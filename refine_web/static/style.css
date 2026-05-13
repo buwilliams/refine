@@ -19,7 +19,7 @@
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; height: 100%; }
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                "Helvetica Neue", Arial, sans-serif;
@@ -27,6 +27,11 @@ body {
   color: var(--fg);
   font-size: 14px;
   line-height: 1.45;
+  /* Full-viewport flex column: topbar + banners + main, where main owns
+     the inner scroll. Pages that don't fill the viewport (Dashboard) can
+     stretch their last section to the bottom via the same flex chain. */
+  display: flex;
+  flex-direction: column;
 }
 code, pre {
   font-family: "SF Mono", Menlo, Consolas, monospace;
@@ -94,13 +99,58 @@ pre {
   cursor: pointer;
 }
 
-main { padding: 20px; max-width: 1100px; margin: 0 auto; }
+main {
+  padding: 20px;
+  max-width: 1100px;
+  margin: 0 auto;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;          /* let main shrink so its children's overflow scrolls inside, not the page */
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
 
 h2 { font-weight: 600; font-size: 18px; margin: 0 0 12px; }
 h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
 
 .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .row > * { min-width: 0; }
+
+/* ---- Dashboard layout: fill the viewport vertically -----------------
+   #dash is the JS-rendered root of the Dashboard view. The bottom row
+   ("Currently running" + "Recent activity") gets the remaining vertical
+   space; its cards scroll internally beyond a sensible minimum. */
+#dash {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+#dash > section.card,
+#dash > section.card-grid {
+  flex: 0 0 auto;   /* fixed-size sections */
+}
+#dash > section.row {
+  flex: 1 1 auto;   /* claims the remaining vertical space */
+  min-height: 280px;
+}
+#dash > section.row > .card {
+  flex: 1 1 0;
+  min-width: 300px;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  min-height: 0;
+}
+
+/* Scrollable content area inside a card. */
+.card-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
 .card {
   background: var(--card);
   border: 1px solid var(--border);

@@ -359,7 +359,7 @@ function drawDashboard(d) {
   const dash = $("#dash");
   dash.innerHTML = `
     ${needsAttention.length ? `
-      <section class="card" style="margin-bottom:18px">
+      <section class="card">
         <h3>Needs attention</h3>
         <div class="actions">
           ${needsAttention.map((x) => `
@@ -377,24 +377,28 @@ function drawDashboard(d) {
         </a>`).join("")}
     </section>
 
-    <section class="row" style="margin-top:18px">
-      <div class="card" style="flex:1;min-width:300px">
+    <section class="row">
+      <div class="card">
         <h3>Currently running</h3>
-        ${(d.running || []).length === 0
-          ? `<p class="muted">No agent subprocesses running.</p>`
-          : `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
-            ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
-              <td><code>${r.gap_id.slice(0,8)}…</code></td>
-              <td>${fmtElapsed(r.elapsed_seconds)}</td>
-              <td>${fmtElapsed(r.idle_seconds)}</td>
-              <td class="muted small">${r.pid}</td>
-            </tr>`).join("")}
-            </tbody></table>`}
+        <div class="card-scroll">
+          ${(d.running || []).length === 0
+            ? `<p class="muted">No agent subprocesses running.</p>`
+            : `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
+              ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
+                <td><code>${r.gap_id.slice(0,8)}…</code></td>
+                <td>${fmtElapsed(r.elapsed_seconds)}</td>
+                <td>${fmtElapsed(r.idle_seconds)}</td>
+                <td class="muted small">${r.pid}</td>
+              </tr>`).join("")}
+              </tbody></table>`}
+        </div>
       </div>
 
-      <div class="card" style="flex:1;min-width:300px">
+      <div class="card">
         <h3>Recent activity</h3>
-        ${renderActivityList(d.activity || [])}
+        <div class="card-scroll">
+          ${renderActivityList(d.activity || [])}
+        </div>
       </div>
     </section>
   `;
