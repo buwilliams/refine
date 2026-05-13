@@ -76,6 +76,10 @@ uv run refine doctor               # config + IPC + claude + git status report
 
 Open <http://localhost:8080>.
 
+UI edits are picked up live — `refine_web/static/` is bind-mounted into
+the container, so changes to `index.html`, `app.js`, or `style.css` are
+visible on the next browser refresh without rebuilding the image.
+
 For a different client, `cd /opt/refine-globex` (or wherever) and run the
 same commands. Each clone tracks its own binding.
 
