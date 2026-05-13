@@ -4,7 +4,7 @@
 
 A web application for managing background Claude Code agents that autonomously modify an existing application.
 
-Deployed per-client by a consulting firm. The client's QA / Product team uses refine to describe Gaps between current and desired behavior; refine drives Claude Code agents to close those Gaps so the consulting firm is not the bottleneck for issues that domain experts can describe and that admit manual verification.
+Deployed per project by a consulting firm — each client codebase gets its own refine instance (a single client may have several). The client's QA / Product team uses refine to describe Gaps between current and desired behavior; refine drives Claude Code agents to close those Gaps so the consulting firm is not the bottleneck for issues that domain experts can describe and that admit manual verification.
 
 Refine is always available: when a Gap enters `todo`, refine launches an agent CLI subprocess for it immediately (subject to a configurable parallel-run cap).
 
@@ -13,7 +13,7 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 - **Runtime split:** Docker hosts only the webapp. Agent CLI subprocesses, git operations, and flat-file I/O run natively on the host, so they inherit the host's Claude Code auth, SSH credentials, git config, and filesystem permissions. See **Runtime topology** below.
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
-- **Storage:** Single SQLite file (index, settings, run state, reporters) plus flat JSON files (one per Gap). All committed to the client application's repository — **including the SQLite file** — so refine's state travels with the codebase.
+- **Storage:** Single SQLite file (`status`, run state, settings, reporters, activity, ID→path index) plus flat JSON files (one per Gap). All committed to the client application's repository — **including the SQLite file** — so refine's state travels with the codebase.
 - **Settings:** All application settings live in SQLite, editable from the UI, scoped per refine instance / client project.
 - **External dependencies:** None at runtime beyond the Claude Code CLI and the local git binary, both installed on the host. Stand-alone — no third-party SaaS.
 - **Auth:** None for refine itself. Refine assumes deployment on a trusted private network.
@@ -25,7 +25,7 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 **In Docker (`refine-web`):**
 
 - Python web server (UI + JSON API + SSE).
-- **Reads** the SQLite database and gap JSON files via a bind mount onto the host filesystem. **Writes** SQLite directly (settings, reporters, ephemeral run state) but does **not** write gap JSON files.
+- **Reads** the SQLite database and gap JSON files via a bind mount onto the host filesystem. **Writes** SQLite directly for settings, reporters, the pause flag, `status` transitions driven by user actions that don't require the runner (e.g. Cancel from non-running states, new-round submissions), and user-action activity-feed entries. Does **not** write gap JSON files — routes those edits through the runner via IPC.
 - Talks to the host runner over a local IPC channel (e.g. Unix domain socket mounted into the container — concrete wire protocol TBD) for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
 
 **On the host (`refine-runner`):**
@@ -37,7 +37,7 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 
 **Shared filesystem state:**
 
-- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The webapp container bind-mounts the volume root; the runner accesses it natively. Both processes read and write the same files.
+- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The webapp container bind-mounts the volume root; the runner accesses it natively. Both processes read these files. **Write ownership differs:** `gap.json` is runner-only (the webapp routes edits through IPC). SQLite is shared — webapp writes settings, reporters, and user-action state changes; runner writes subprocess and git-event state. WAL mode plus per-table ownership keeps the writers from contending.
 
 **Why this split:** Running CLI subprocesses inside the webapp container would mean either baking host credentials into the image or volume-mounting `~/.claude`, SSH keys, and git config in — fragile and surprising. Running them natively on the host means refine reuses whatever auth and tooling the operator already has set up.
 
@@ -52,7 +52,7 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 | `id`       | string   | ULID. Used for hash sharding and as primary key in SQLite.        |
 | `name`     | string   | LLM-generated from the first round and any original import text.  |
 | `status`   | enum     | Happy path: `todo` → `in-progress` → `review` → `done`. Failure: `in-progress` → `failed` → `todo`. Any non-terminal status → `cancelled`. |
-| `rounds`    | array    | Human-authored. Agent executes; agent may append `logs` per round. |
+| `rounds`    | array    | Human-submitted; runner appends `logs[]` entries as the agent runs. |
 | `created`  | datetime | UTC.                                                              |
 | `updated`  | datetime | UTC.                                                              |
 
@@ -97,7 +97,7 @@ Transitions:
 - `todo → in-progress` — automatic when refine launches an agent subprocess for the Gap.
 - `in-progress → review` — automatic on successful agent completion.
 - `in-progress → failed` — automatic on agent error, idle timeout, hard cap, exit-0-with-no-commits, or runner-restart reconciliation.
-- `failed → todo` — explicit user action ("Retry"). The worktree and branch are reused.
+- `failed → todo` — explicit user action ("Retry"). The worktree and branch are reused. **Blocked** if a prior `category: auth` failure remains unresolved — see Failure handling → Retry pre-flight.
 - `review → done` — explicit user action ("Verify"). Refine performs the merge and push as part of the transition.
 - `review → todo` — explicit user action; triggered by appending a new round (human submitting follow-up work). The branch is retained.
 - any non-terminal status → `cancelled` — explicit user action ("Cancel"). For `in-progress`, refine kills the CLI subprocess first. Worktree and branch are cleaned up.
@@ -131,15 +131,16 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 
 ```
 <volume-root>/
-  index.sqlite                 # ID → path, search index, settings, run state, reporters
+  index.sqlite                 # status, run state, settings, reporters, activity, ID→path index
   gaps/
     ab/                        # first 2 chars of Gap ULID
       cdef…/                   # remaining ULID
-        gap.json               # full Gap record (rounds, logs, metadata)
+        gap.json               # id, name, timestamps, rounds (with reporter, actual/target, logs)
 ```
 
 - **One JSON file per Gap.** All round content and logs live in `gap.json`.
-- **SQLite indexes** Gaps for list, filter, and search. It is also the source of truth for ephemeral run state (per-Gap locks, currently-running subprocesses), runtime settings, and the reporters list. `gap.json` is the source of truth for Gap content (rounds, logs, each round's reporter).
+- **`gap.json` holds** identity and content: `id`, `name`, `created`, `updated`, and the `rounds` array (each round with `reporter`, `actual`, `target`, timestamps, and `logs[]`). `status` is **not** in `gap.json` — it lives only in SQLite, so a status transition does not require rewriting the file.
+- **SQLite holds** `status`, ephemeral run state (per-Gap locks, currently-running subprocesses, pause flag), runtime settings, the reporters list, and the activity feed. It also indexes Gaps (by `id`, `name`, `created`, `updated`) for fast list, filter, and search.
 - The volume root lives inside the client repo and is committed there.
 
 ## Agent execution
@@ -147,6 +148,7 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 ### Mechanism
 
 - The **host runner** (see **Runtime topology**) shells out to the **Claude Code CLI** (`claude --print` / headless mode) directly on the host. The webapp requests a launch over IPC; the runner spawns and supervises the subprocess.
+- **Pre-flight check.** At runner startup, and before spawning a subprocess after a prior auth failure, the runner issues a fast `claude --version` (or equivalent no-op) to confirm CLI presence and valid auth. Failure surfaces as the **Claude auth pre-flight failed** banner; humans can re-run it on demand from Settings.
 - **One fresh CLI invocation per unaddressed round.** No session is resumed; the agent has no memory of prior rounds. The latest round's `actual` / `target` becomes the prompt.
 - **Cross-round continuity carries through the Gap's branch**, not through a Claude session. Each round's agent starts with the worktree exactly as the prior round's commits left it.
 - Consequence: round descriptions must be self-contained. A follow-up round cannot say "do what we discussed before" — humans must restate the relevant context in the round body.
@@ -192,10 +194,9 @@ Conflict & failure paths:
 - A failed CLI invocation moves the Gap to `failed` and appends an error entry to the latest round's `logs[]`.
 - The UI surfaces failed Gaps with a **Retry** action, which moves the Gap back to `todo`; refine will spawn a new subprocess as soon as a slot is available. No automatic retry.
 - The worktree and branch persist across retries; the next invocation runs fresh against whatever state the prior run left in the worktree.
-- **Stuck-detection.** Two independent signals can move a running subprocess to `failed`. They are deliberately separate because elapsed time alone is a poor stuck-signal — large Gaps can legitimately run for many hours.
+- **Stuck-detection.** Two independent signals can move a running subprocess to `failed`. They are deliberately separate because elapsed time alone is a poor stuck-signal — large Gaps can legitimately run for many hours. Both signals produce friendly summaries distinct from "agent errored" (see **Feedback & recovery**).
   - **Idle timeout** (primary) — if the CLI subprocess emits no stdout/stderr for the configured idle window (default `15 min`), refine treats it as stuck and kills it. Activity is the real "alive" signal; Claude Code prints continuously when working.
   - **Hard wall-clock cap** (ultimate stop-gap) — if a single invocation has been running longer than the configured cap (default `24 h`), refine kills it. Intended to fire only on pathological runs that produce output but never finish. Can be disabled by setting to `0`.
-  Both produce friendly summaries distinct from "agent errored" (see **Feedback & recovery**).
 - **Retry pre-flight**: when retrying a Gap whose previous failure was `category: auth`, refine re-runs the runner's Claude auth pre-flight first. If it still fails, the Retry is blocked with the auth banner restated — saves burning an agent run on a known-broken environment.
 - **Runner restart**: on startup, the host runner reconciles state — any Gap in `in-progress` without a live subprocess is moved to `failed` with a "runner restarted" log entry. Its worktree and branch are preserved so the human can Retry.
 - **Mid-merge / mid-push crash**: a Gap in `review` whose Verify started but didn't finish (runner crashed mid-merge or mid-push) remains in `review` with a log entry recording how far it got. Clicking Verify again retries the entire fetch → pull → merge → push sequence; refine skips steps already completed locally (a fresh merge against an already-merged branch is a no-op fast-forward), so retries are safe to repeat.
@@ -235,6 +236,8 @@ Both the global activity feed and each round's `logs[]` use the same structured 
 - **Automatic system events** — `refine` for state transitions and auto-recovery; `runner` for subprocess output, git events, and pre-flight checks.
 
 Within a round's `logs[]`, `gap_id` is implicit and may be omitted. `details` and `actions` are optional.
+
+**Where events appear.** Per-round events (agent output, git activity, run failures) appear in **both** the round's `logs[]` (carrying `details`) and the activity feed (summary plus a back-link to the Gap). Cross-Gap or systemic events (banner conditions, settings changes, reporter management) appear only in the activity feed.
 
 ### Friendly summaries (stderr → summary catalog)
 
@@ -321,7 +324,7 @@ Single landing view summarizing:
 
 - View currently running agent subprocesses (which Gap each is on, elapsed time).
 - Configure the parallel-run cap at runtime.
-- Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed.
+- Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. The pause flag is stored in SQLite, so it survives runner restarts.
 - Cancel an in-flight Gap — kills the CLI subprocess, releases the lock, and moves the Gap to `cancelled` (worktree and branch are cleaned up).
 
 ### Chat
@@ -347,7 +350,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 - Static HTML + vanilla JavaScript served by the Python backend.
 - No JS framework, no build step, no transpilation.
-- **Live updates via Server-Sent Events (SSE).** Single EventSource stream per page delivers status changes, round events (new round, run start/finish), and log appends.
+- **Live updates via Server-Sent Events (SSE).** Single EventSource stream per page delivers status changes, round events (new round, run start/finish), round-log appends (entries written into the open round's `logs[]`), and activity-feed entries.
 
 ## Application settings
 
@@ -359,7 +362,7 @@ All application settings live in the SQLite database and are editable from the *
 |-----------------------|--------------------------------------------|-------|
 | Parallel-run cap      | `3`                                        | Max agent subprocesses running concurrently. |
 | Branch name pattern   | `refine/<gap-id>`                          | `<gap-id>` is substituted at branch creation. |
-| Merge target          | client repo's current branch at merge time | |
+| Merge target          | client repo's current branch at merge time | **Fixed policy** — not configurable. Refine always merges into whatever branch is checked out at merge time. |
 | Agent idle timeout    | `15 min`                                   | Kill the subprocess if it produces no output for this long. Primary stuck-detector. Set to `0` to disable. |
 | Agent hard cap        | `24 h`                                     | Maximum wall-clock runtime per agent invocation. Ultimate stop-gap for runaway runs. Set to `0` to disable. |
 
