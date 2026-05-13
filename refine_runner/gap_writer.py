@@ -32,16 +32,43 @@ def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any]) -> dict
         return gap
 
 
-def set_notes(gap_id: str, notes: str) -> dict[str, Any]:
-    """Replace the Gap's freeform notes field in gap.json."""
+def set_notes(gap_id: str, notes: list[dict[str, Any]]) -> dict[str, Any]:
+    """Replace the Gap's notes list in gap.json. Each note must be a dict
+    with at least an `id` and `body`; missing timestamps / author are
+    filled in here so the on-disk format stays consistent.
+    """
+    if not isinstance(notes, list):
+        raise ValueError("notes must be a list")
+    now = now_iso()
+    cleaned: list[dict[str, Any]] = []
+    for n in notes:
+        if not isinstance(n, dict):
+            raise ValueError("each note must be an object")
+        body = (n.get("body") or "").strip()
+        if not body:
+            # Drop empty notes silently — keeps the API forgiving.
+            continue
+        nid = n.get("id") or _new_note_id()
+        cleaned.append({
+            "id": str(nid),
+            "author": str(n.get("author") or "").strip(),
+            "body": body,
+            "created": str(n.get("created") or now),
+            "updated": str(n.get("updated") or now),
+        })
     with _lock_for(gap_id):
         gap = shared_gaps.read_gap_json(gap_id)
         if gap is None:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
-        gap["notes"] = notes
-        gap["updated"] = now_iso()
+        gap["notes"] = cleaned
+        gap["updated"] = now
         shared_gaps.write_gap_json(gap)
         return gap
+
+
+def _new_note_id() -> str:
+    import secrets
+    return "note_" + secrets.token_hex(6)
 
 
 def append_round(gap_id: str, round_obj: dict[str, Any]) -> dict[str, Any]:

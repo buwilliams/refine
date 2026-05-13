@@ -44,6 +44,8 @@ def _h_list_gaps(_h, _m, _b, q):
         status=_get_one(q, "status"),
         q=_get_one(q, "q"),
         limit=int(_get_one(q, "limit", "200")),
+        sort=_get_one(q, "sort"),
+        direction=_get_one(q, "dir"),
     )
 
 

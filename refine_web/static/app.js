@@ -448,12 +448,31 @@ function renderActivityList(entries) {
 
 // ---- Gaps: list -------------------------------------------------------------
 
+const GAPS_DEFAULT_DIR = {
+  name: "asc", status: "asc", priority: "asc",
+  updated: "desc", id: "desc",
+};
+
+function gapsHash(parts) {
+  const next = new URLSearchParams();
+  if (parts.q)      next.set("q", parts.q);
+  if (parts.status) next.set("status", parts.status);
+  if (parts.sort)   next.set("sort", parts.sort);
+  if (parts.dir)    next.set("dir", parts.dir);
+  return "#/gaps" + (next.toString() ? "?" + next : "");
+}
+
 async function renderGapsList() {
   renderBanners([]);
-  const url = new URL(location.href);
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
   const status = hashQs.get("status") || "";
   const q = hashQs.get("q") || "";
+  const sort = (hashQs.get("sort") || "").toLowerCase();
+  const dir = (hashQs.get("dir") || "").toLowerCase();
+  // Effective sort/dir for indicator rendering: fall back to server defaults
+  // when nothing is in the hash.
+  const effectiveSort = sort || "updated";
+  const effectiveDir = dir || (GAPS_DEFAULT_DIR[effectiveSort] || "desc");
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
@@ -471,43 +490,55 @@ async function renderGapsList() {
     <div id="gaps-table"><p class="muted">Loading…</p></div>
   `;
   $("#search").addEventListener("input", debounce((e) => {
-    const q2 = e.target.value;
-    const next = new URLSearchParams();
-    if (q2) next.set("q", q2);
-    if (status) next.set("status", status);
-    location.hash = "#/gaps" + (next.toString() ? "?" + next : "");
+    location.hash = gapsHash({ q: e.target.value, status, sort, dir });
   }, 250));
   $("#filter-status").addEventListener("change", (e) => {
-    const next = new URLSearchParams();
-    if (q) next.set("q", q);
-    if (e.target.value) next.set("status", e.target.value);
-    location.hash = "#/gaps" + (next.toString() ? "?" + next : "");
+    location.hash = gapsHash({ q, status: e.target.value, sort, dir });
   });
   try {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (q) params.set("q", q);
+    if (sort) params.set("sort", sort);
+    if (dir) params.set("dir", dir);
     const data = await api("GET", "/api/gaps?" + params);
     const gaps = data.gaps || [];
     const countEl = $("#gaps-count");
     if (countEl) {
       countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
     }
-    drawGapsTable(gaps);
+    drawGapsTable(gaps, { q, status, sort: effectiveSort, dir: effectiveDir });
   } catch (e) {
     $("#gaps-table").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
-function drawGapsTable(gaps) {
+function drawGapsTable(gaps, state) {
   const root = $("#gaps-table");
   if (!gaps.length) {
-    root.innerHTML = `<p class="muted">No gaps yet. <a href="#/gaps/new">Create one</a>.</p>`;
+    root.innerHTML = `<p class="muted">No gaps match the current filters.</p>`;
     return;
   }
+  const columns = [
+    { key: "name",     label: "Name"     },
+    { key: "status",   label: "Status"   },
+    { key: "priority", label: "Priority" },
+    { key: "updated",  label: "Updated"  },
+    { key: "id",       label: "ID"       },
+  ];
+  const headHtml = columns.map((c) => {
+    const isActive = c.key === state.sort;
+    const arrow = isActive
+      ? (state.dir === "asc" ? "↑" : "↓")
+      : `<span class="sort-arrow-placeholder">↕</span>`;
+    return `<th class="sortable ${isActive ? "active" : ""}"
+                data-sort-key="${c.key}">
+              ${c.label} <span class="sort-arrow">${arrow}</span>
+            </th>`;
+  }).join("");
   root.innerHTML = `
     <table class="table">
-      <thead><tr><th>Name</th><th>Status</th><th>Priority</th><th>Updated</th><th>ID</th></tr></thead>
+      <thead><tr>${headHtml}</tr></thead>
       <tbody>
         ${gaps.map((g) => `
           <tr data-id="${g.id}">
@@ -522,6 +553,22 @@ function drawGapsTable(gaps) {
   `;
   $$(".table tbody tr", root).forEach((row) => {
     row.addEventListener("click", () => location.hash = "#/gaps/" + row.dataset.id);
+  });
+  $$(".table th.sortable", root).forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      let nextDir;
+      if (key === state.sort) {
+        // Same column — flip the direction.
+        nextDir = state.dir === "asc" ? "desc" : "asc";
+      } else {
+        // New column — use its natural default direction.
+        nextDir = GAPS_DEFAULT_DIR[key] || "desc";
+      }
+      location.hash = gapsHash({
+        q: state.q, status: state.status, sort: key, dir: nextDir,
+      });
+    });
   });
 }
 
@@ -617,21 +664,32 @@ function drawGapDetail(gap) {
           <span class="banner-actions">${failureBanner.actionsHtml}</span>
         </div>` : ""}
 
-      <div class="card" style="margin-bottom:14px">
-        <div class="row" style="align-items:center;margin-bottom:6px">
-          <h3 style="margin:0">Notes</h3>
+      <details class="card notes-card" style="margin-bottom:14px">
+        <summary class="notes-card-summary">
+          <span><strong>Notes (${(gap.notes || []).length})</strong></span>
           <span class="muted small">Saved to gap.json and included in attached
-            Chat context. Edit any time.</span>
+            Chat context.</span>
           <span class="spacer"></span>
           <span id="gap-notes-status" class="muted small"></span>
+        </summary>
+        <div style="margin-top:10px">
+          <div id="notes-list">
+            ${(gap.notes || []).length === 0
+              ? `<p class="muted small">No notes yet.</p>`
+              : (gap.notes || []).map(renderNote).join("")}
+          </div>
+          <details class="note-composer" style="margin-top:10px">
+            <summary>+ Add a note</summary>
+            <div class="form-row" style="margin-top:8px">
+              <textarea id="new-note-body" rows="3"
+                        placeholder="Anything Claude or the team should know — links to specs, prior decisions, constraints, related code paths."></textarea>
+            </div>
+            <div class="actions">
+              <button id="btn-add-note">Save note</button>
+            </div>
+          </details>
         </div>
-        <textarea id="gap-notes" rows="5"
-                  placeholder="Anything Claude or the team should know about this Gap — links to specs, prior decisions, constraints, related code paths."
-                  >${htmlEscape(gap.notes || "")}</textarea>
-        <div class="actions" style="margin-top:8px">
-          <button id="btn-save-notes">Save notes</button>
-        </div>
-      </div>
+      </details>
 
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
@@ -692,21 +750,58 @@ function drawGapDetail(gap) {
       await loadGapDetail(gap.id);
     } catch (e) { toast(e.message, "error"); }
   });
-  $("#btn-save-notes")?.addEventListener("click", async () => {
-    const btn = $("#btn-save-notes");
-    const ta = $("#gap-notes");
+  $("#btn-add-note")?.addEventListener("click", async () => {
+    const btn = $("#btn-add-note");
+    const ta = $("#new-note-body");
     if (!ta) return;
-    const notes = ta.value;
+    const body = (ta.value || "").trim();
+    if (!body) return toast("Note can't be empty", "error");
+    const author = state.lastReporter || "";
+    const nextNotes = [...(gap.notes || []), { author, body }];
     await withButtonBusy(btn, "Saving…", async () => {
       try {
-        await api("PATCH", "/api/gaps/" + gap.id, { notes });
-        const statusEl = $("#gap-notes-status");
-        if (statusEl) statusEl.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
-        // Refresh the local gap.notes so a later re-render doesn't show stale.
-        gap.notes = notes;
+        await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
+        toast("Note added", "info");
+        await loadGapDetail(gap.id);
       } catch (e) { toast(e.message, "error"); }
     });
   });
+  $$("[data-note-edit]").forEach((el) => el.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const id = el.dataset.noteEdit;
+    const existing = (gap.notes || []).find((n) => n.id === id);
+    if (!existing) return;
+    const body = await modalPrompt(
+      "Edit note", existing.body,
+      { title: "Edit note", okLabel: "Save" },
+    );
+    if (body === null) return;
+    const trimmed = (body || "").trim();
+    if (!trimmed) return toast("Note can't be empty", "error");
+    const nextNotes = (gap.notes || []).map(
+      (n) => n.id === id ? { ...n, body: trimmed } : n,
+    );
+    try {
+      await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
+      toast("Note updated", "info");
+      await loadGapDetail(gap.id);
+    } catch (err) { toast(err.message, "error"); }
+  }));
+  $$("[data-note-delete]").forEach((el) => el.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const id = el.dataset.noteDelete;
+    const ok = await modalConfirm(
+      "Delete this note?",
+      { title: "Delete note", okLabel: "Delete", danger: true },
+    );
+    if (!ok) return;
+    const nextNotes = (gap.notes || []).filter((n) => n.id !== id);
+    try {
+      await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
+      toast("Note deleted", "info");
+      await loadGapDetail(gap.id);
+    } catch (err) { toast(err.message, "error"); }
+  }));
   $("#gap-priority-select")?.addEventListener("change", async (e) => {
     const next = e.target.value;
     try {
@@ -791,13 +886,33 @@ function renderRound(rnd, idx, isLatest, editable) {
           <dt>target</dt><dd>${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
         </dl>
         ${logs.length ? `
-          <details ${isLatest ? "open" : ""}>
+          <details>
             <summary>Logs (${logs.length})</summary>
             ${logs.map((l) => renderLogEntry(l)).join("")}
           </details>` : `<p class="muted small">No logs.</p>`}
       </div>
     </div>
   `;
+}
+
+function renderNote(n) {
+  const firstLine = (n.body || "").split("\n", 1)[0];
+  const preview = firstLine.length > 80
+    ? firstLine.slice(0, 77) + "…"
+    : firstLine;
+  const meta = [n.author, n.created ? fmtTime(n.created) : ""].filter(Boolean).join(" · ");
+  return `
+    <details class="note">
+      <summary>
+        <span class="note-preview">${htmlEscape(preview || "(empty)")}</span>
+        ${meta ? `<span class="muted small note-meta">${htmlEscape(meta)}</span>` : ""}
+      </summary>
+      <div class="note-body">${htmlEscape(n.body || "").replace(/\n/g, "<br>")}</div>
+      <div class="actions" style="margin-top:6px">
+        <button class="secondary" data-note-edit="${htmlEscape(n.id)}">Edit</button>
+        <button class="danger" data-note-delete="${htmlEscape(n.id)}">Delete</button>
+      </div>
+    </details>`;
 }
 
 function renderLogEntry(l) {

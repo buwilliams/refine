@@ -24,10 +24,12 @@ services:
     working_dir: /refine-data
     volumes:
       - "${REFINE_CLIENT_REFINE_DIR:?Run `refine init <client-repo>` first to bind this clone}:/refine-data"
-      # Bind-mount the UI assets read-only so edits to index.html / app.js /
-      # style.css show up on the next browser refresh — no `docker compose
-      # build` required.
-      - "./refine_web/static:/app/refine_web/static:ro"
+      # Bind-mount the Python source + UI assets read-only so edits to
+      # refine_web/, refine_shared/, or refine_web/static/ show up on next
+      # container restart (Python) or next browser refresh (static) — no
+      # `docker compose build` required for development.
+      - "./refine_web:/app/refine_web:ro"
+      - "./refine_shared:/app/refine_shared:ro"
     ports:
       - "8080:8080"
     restart: unless-stopped

@@ -264,8 +264,8 @@ class Runner:
     def _h_set_notes(self, params: dict) -> dict:
         gap_id = params["gap_id"]
         notes = params.get("notes")
-        if not isinstance(notes, str):
-            raise ValueError("notes must be a string")
+        if not isinstance(notes, list):
+            raise ValueError("notes must be a list of {id, author, body, ...} objects")
         gap = gap_writer.set_notes(gap_id, notes)
         # Mirror the touch onto the index row so listings sort right.
         with db.transaction(self._conn):
@@ -275,7 +275,7 @@ class Runner:
             )
         activity.append(
             self._conn,
-            message=f"Notes updated ({len(notes)} chars)",
+            message=f"Notes updated ({len(gap['notes'])} note{'' if len(gap['notes']) == 1 else 's'})",
             severity="info", category="state",
             gap_id=gap_id, actor="refine",
         )
@@ -392,14 +392,25 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
             msg = entry.get("message", "")
             sev = entry.get("severity", "info")
             parts.append(f"- [{ts}] ({sev}) {msg}")
-    notes = (gap_json.get("notes") or "").strip()
+    notes = gap_json.get("notes") or []
     if notes:
         parts.append("")
         parts.append("## Notes from the user")
         parts.append("These are freeform notes the operator attached to this")
         parts.append("Gap — treat them as authoritative additional context.")
-        parts.append("")
-        parts.append(notes)
+        for n in notes:
+            if not isinstance(n, dict):
+                continue
+            body = (n.get("body") or "").strip()
+            if not body:
+                continue
+            author = (n.get("author") or "").strip()
+            created = (n.get("created") or "").strip()
+            header_bits = [b for b in [author, created] if b]
+            header = f" ({' · '.join(header_bits)})" if header_bits else ""
+            parts.append("")
+            parts.append(f"### Note{header}")
+            parts.append(body)
     parts += [
         "",
         "Don't commit anything to git unless I explicitly ask. Don't repeat",

@@ -245,6 +245,14 @@ select {
 }
 .table th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
 .table tr:hover { background: var(--code-bg); cursor: pointer; }
+.table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+.table th.sortable:hover { color: var(--fg); }
+.table th.sortable.active { color: var(--accent); }
+.table th .sort-arrow { font-size: 11px; margin-left: 4px; }
+.table th .sort-arrow-placeholder { color: var(--border); }
 
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
@@ -341,6 +349,69 @@ select {
 
 .diff-show-details { font-size: 12px; color: var(--muted); cursor: pointer; }
 .collapsed { display: none; }
+
+/* --- Notes ------------------------------------------------------------ */
+.notes-card.card { padding: 0; }
+.notes-card > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius);
+}
+.notes-card > summary::-webkit-details-marker { display: none; }
+.notes-card > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.1s ease-out;
+}
+.notes-card[open] > summary::before { transform: rotate(90deg); }
+.notes-card > summary:hover { background: var(--code-bg); }
+.notes-card > div { padding: 0 16px 14px; }
+
+.note {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.note > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.note > summary::-webkit-details-marker { display: none; }
+.note > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 10px;
+  transition: transform 0.1s ease-out;
+}
+.note[open] > summary::before { transform: rotate(90deg); }
+.note > summary:hover { background: var(--code-bg); }
+.note-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-meta { white-space: nowrap; }
+.note-body {
+  padding: 8px 12px 4px 26px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.note .actions { padding: 0 12px 10px 26px; }
+.note-composer > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent);
+}
 
 /* --- Chat tabs -------------------------------------------------------- */
 .chat-tabs {

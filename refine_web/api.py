@@ -38,9 +38,46 @@ def _conn() -> sqlite3.Connection:
 
 _VALID_PRIORITIES = ("low", "medium", "high")
 
+# Map a public sort key to a SQL expression. Whitelisted to prevent SQL
+# injection from the query string. `id` doubles as a chronological sort
+# because we mint Gap ids as ULIDs.
+_GAPS_SORT_EXPRESSIONS: dict[str, str] = {
+    "name":     "name COLLATE NOCASE",
+    "status":   "status",
+    "priority": "CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END",
+    "updated":  "updated",
+    "created":  "created",
+    "id":       "id",
+}
+# Default direction per column when one isn't supplied.
+_GAPS_DEFAULT_DIR: dict[str, str] = {
+    "name":     "ASC",
+    "status":   "ASC",
+    "priority": "ASC",   # CASE maps high=0, so ASC = high first
+    "updated":  "DESC",
+    "created":  "DESC",
+    "id":       "DESC",
+}
+
+
+def _gaps_order_clause(sort: str | None, direction: str | None) -> str:
+    key = (sort or "updated").lower()
+    if key not in _GAPS_SORT_EXPRESSIONS:
+        key = "updated"
+    expr = _GAPS_SORT_EXPRESSIONS[key]
+    d = (direction or "").upper()
+    if d not in ("ASC", "DESC"):
+        d = _GAPS_DEFAULT_DIR[key]
+    # Tiebreaker by updated so the order is deterministic when the primary
+    # key is equal across rows.
+    tiebreaker = "" if key == "updated" else ", updated DESC"
+    return f"{expr} {d}{tiebreaker}"
+
 
 def list_gaps(*, status: str | None = None, q: str | None = None,
-              limit: int = 200) -> tuple[int, dict]:
+              limit: int = 200,
+              sort: str | None = None,
+              direction: str | None = None) -> tuple[int, dict]:
     sql = ["SELECT id, name, status, priority, created, updated, branch_name FROM gaps_index"]
     args: list[Any] = []
     where: list[str] = []
@@ -53,7 +90,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         args.extend([like, like])
     if where:
         sql.append("WHERE " + " AND ".join(where))
-    sql.append("ORDER BY updated DESC LIMIT ?")
+    sql.append("ORDER BY " + _gaps_order_clause(sort, direction) + " LIMIT ?")
     args.append(limit)
     conn = _conn()
     try:
@@ -203,8 +240,8 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             conn.close()
     if notes_change:
         notes = body.get("notes")
-        if not isinstance(notes, str):
-            return err(400, "notes must be a string")
+        if not isinstance(notes, list):
+            return err(400, "notes must be a list of {id, author, body, ...} objects")
         try:
             get_client().call(M_SET_NOTES, {"gap_id": gap_id, "notes": notes})
         except IpcError as e:

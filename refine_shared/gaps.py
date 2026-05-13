@@ -51,9 +51,32 @@ def empty_gap(gap_id: str, name: str) -> dict[str, Any]:
         "name": name,
         "created": now,
         "updated": now,
-        "notes": "",
+        "notes": [],
         "rounds": [],
     }
+
+
+def normalize_notes(value: Any) -> list[dict[str, Any]]:
+    """Coerce a gap's `notes` field to the list form regardless of what's on
+    disk. Old gap.json files store notes as a single string; we promote that
+    to a single-entry list transparently so callers always see a list.
+    """
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [n for n in value if isinstance(n, dict)]
+    if isinstance(value, str):
+        s = value.strip()
+        if not s:
+            return []
+        return [{
+            "id": "legacy",
+            "author": "",
+            "body": s,
+            "created": "",
+            "updated": "",
+        }]
+    return []
 
 
 def new_round(reporter: str, actual: str, target: str) -> dict[str, Any]:
@@ -73,7 +96,10 @@ def read_gap_json(gap_id: str) -> dict[str, Any] | None:
     if not p.exists():
         return None
     with open(p, "rb") as f:
-        return json.loads(f.read().decode("utf-8"))
+        gap = json.loads(f.read().decode("utf-8"))
+    # Transparent legacy-shape migration: notes used to be a single string.
+    gap["notes"] = normalize_notes(gap.get("notes"))
+    return gap
 
 
 def write_gap_json(gap: dict[str, Any]) -> None:
