@@ -21,64 +21,77 @@ refine/
 ├── refine_shared/        # storage, IPC, friendly summaries, config loader
 ├── refine_runner/        # host-native daemon (subprocess + git + gap.json owner)
 ├── refine_web/           # Dockerized webapp + static HTML/JS
-├── scripts/              # run-runner.sh, refine-runner.service
+├── scripts/              # refine-runner.service (example systemd unit)
 ├── Dockerfile            # builds refine-web
-├── docker-compose.yml    # runs refine-web (relative bind mounts; no env vars)
+├── docker-compose.yml    # runs refine-web (relative bind mounts, no env vars)
+├── pyproject.toml        # makes `refine` a real console script
 └── spec.md               # the design document
 ```
 
 ## Quick start
 
-There are no environment variables. Configuration lives in one file —
-`refine/refine.toml` inside the client repo — created by `refine init`.
+### One-time on the host
 
-### 1. Initialize the client repo
+Install refine once per machine. This puts the `refine` command on the
+operator's PATH; nothing is added to any client repo.
+
+```bash
+git clone https://github.com/buwilliams/refine.git /opt/refine
+pip install /opt/refine
+# or, to keep refine isolated from system Python:
+#   pipx install /opt/refine
+```
+
+You should now be able to run `refine --help`.
+
+### Per client repo
+
+Inside each client's git repo, bootstrap a refine volume root:
 
 ```bash
 cd /srv/clients/acme-app   # the client's git repo
-python -m refine init       # writes refine/refine.toml + refine/run + refine/gaps
+refine init                # creates ./refine/refine.toml + ./refine/run + ./refine/gaps
+git add refine/refine.toml refine/.gitignore
+git commit -m "add refine"
 ```
 
-Commit `refine/refine.toml` and any `refine/gaps/*/gap.json` files to the
-client repo. The auto-generated `refine/.gitignore` excludes the SQLite file
-and the runner socket.
+`refine init` only writes config and creates directories. It does *not* install
+anything. The created `refine/.gitignore` excludes the SQLite file and the
+runner socket; everything else (refine.toml, gap.json files) gets committed
+alongside the client's source so refine state travels with the codebase.
 
-### 2. Start the host runner
-
-Native on the host so it inherits `claude` auth, SSH keys, and git config.
+### Day to day
 
 ```bash
 cd /srv/clients/acme-app
-claude login                # once, as the operator user
-python -m refine runner     # finds refine.toml automatically
-```
 
-For production, install `scripts/refine-runner.service` as a systemd unit
-(edit `WorkingDirectory` and `PYTHONPATH` first).
+# one-time, on this host: log in to Claude as the operator
+claude login
 
-### 3. Start the webapp
+# start the runner (foreground; use systemd for production)
+refine runner &
 
-In a separate terminal, from the same client-repo directory:
-
-```bash
-cd /srv/clients/acme-app
+# start the webapp (bind-mounts ./refine from the cwd)
 docker compose --file /opt/refine/docker-compose.yml up
 ```
 
-(Or symlink `docker-compose.yml` into the client repo so you can just
-`docker compose up`.)
-
 Open <http://localhost:8080>.
 
-### 4. Verify
+### Verify
 
 ```bash
 cd /srv/clients/acme-app
-python -m refine doctor
+refine doctor
 ```
 
-This prints config paths, IPC reachability, claude auth status, and git
+Prints config paths, runner-socket reachability, claude auth status, and git
 state. Use it whenever something doesn't behave as expected.
+
+### Production runner
+
+Install `scripts/refine-runner.service` as a systemd unit (edit `User`,
+`Group`, and `WorkingDirectory` first). The unit invokes `/usr/local/bin/refine
+runner` and reads `refine.toml` from its `WorkingDirectory`. Zero env vars.
 
 ## How it talks to itself
 
@@ -103,10 +116,10 @@ state. Use it whenever something doesn't behave as expected.
 
 ## Configuration
 
-A single TOML file is the only thing to edit:
+A single TOML file is the only thing operators edit:
 
 ```toml
-# refine/refine.toml
+# refine/refine.toml (created by `refine init`)
 client_repo  = ".."                  # relative to this file (= the client repo root)
 runner_socket = "./run/runner.sock"
 [web]
@@ -115,8 +128,8 @@ port = 8080
 ```
 
 Almost everything else — parallel-run cap, idle timeout, hard cap, branch
-naming, reporters — lives in the SQLite settings table, editable from the UI's
-Settings page.
+naming, reporters — lives in the SQLite settings table and is editable from
+the UI's Settings page.
 
 ## Operational assumptions
 
@@ -135,12 +148,12 @@ Settings page.
 
 ## CLI reference
 
-| Command              | What it does                                                       |
-|----------------------|--------------------------------------------------------------------|
-| `refine init`        | Write `refine.toml` + `run/` + `gaps/` in the chosen directory.    |
-| `refine runner`      | Start the host-native runner daemon.                               |
-| `refine web`         | Start the webapp (rarely used directly — Docker wraps it).         |
-| `refine doctor`      | Show config, IPC, claude auth, and git status — your first stop when something breaks. |
+| Command          | What it does                                                       |
+|------------------|--------------------------------------------------------------------|
+| `refine init`    | Write `refine.toml` + `run/` + `gaps/` in the chosen directory.    |
+| `refine runner`  | Start the host-native runner daemon.                               |
+| `refine web`     | Start the webapp (rarely used directly — Docker wraps it).         |
+| `refine doctor`  | Show config, IPC, claude auth, and git status.                     |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.
 

@@ -1,10 +1,13 @@
 # Example systemd unit for refine-runner. Install at:
 #   /etc/systemd/system/refine-runner.service
 #
+# Prereq: refine has been installed on the host (`pip install /path/to/refine`
+# or `pipx install /path/to/refine`). The `refine` command must be on PATH for
+# the configured user.
+#
 # Edit:
 #   - User/Group           — operator account (must have run `claude login`)
 #   - WorkingDirectory     — the client repo root (where ./refine/refine.toml lives)
-#   - ExecStart's PYTHONPATH (or installed location of refine)
 #
 # refine has zero env-var configuration: refine.toml in WorkingDirectory does it.
 
@@ -17,9 +20,7 @@ Type=simple
 User=refine
 Group=refine
 WorkingDirectory=/srv/clients/acme-app
-# Adjust PYTHONPATH to point at where this codebase is installed on the host.
-Environment=PYTHONPATH=/opt/refine
-ExecStart=/usr/bin/python3 -m refine runner
+ExecStart=/usr/local/bin/refine runner
 Restart=on-failure
 RestartSec=2
 

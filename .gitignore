@@ -5,6 +5,10 @@ __pycache__/
 .env
 .DS_Store
 
+# setuptools build artifacts
+build/
+dist/
+
 # Local volume root if anyone tries refine against this repo itself
 /refine-data/
 *.sqlite

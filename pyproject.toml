@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "refine"
+version = "0.1.0"
+description = "Background Claude Code agents that close behavior Gaps in client codebases."
+requires-python = ">=3.10"
+license = "MIT"
+readme = "README.md"
+authors = [{name = "buwilliams"}]
+# Stdlib-only at runtime. No dependencies declared on purpose.
+
+[project.scripts]
+refine = "refine.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["refine*", "refine_shared*", "refine_runner*", "refine_web*"]
+
+[tool.setuptools.package-data]
+refine_web = ["static/*"]

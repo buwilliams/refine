@@ -63,10 +63,10 @@ def cmd_init(args: argparse.Namespace) -> int:
     print()
     print("Next steps:")
     print(f"  1. cd {target.parent}")
-    print(f"  2. {sys.executable} -m refine runner   # in one terminal")
+    print(f"  2. refine runner                       # in one terminal")
     print(f"  3. docker compose up                   # in another terminal")
     print()
-    print("Or use `python -m refine doctor` to verify configuration.")
+    print("Run `refine doctor` to verify the configuration.")
     return 0
 
 
