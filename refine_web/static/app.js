@@ -815,86 +815,57 @@ async function renderAgents() {
     <div id="agents-content"><p class="muted">Loading…</p></div>
   `;
   try {
-    const [dash, settings, diag] = await Promise.all([
+    const [dash, settings] = await Promise.all([
       api("GET", "/api/dashboard"),
       api("GET", "/api/settings"),
-      api("GET", "/api/diagnostics"),
     ]);
-    drawAgents(dash, settings.settings, diag);
+    drawAgents(dash, settings.settings);
   } catch (e) {
     $("#agents-content").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
-function drawAgents(dash, settings, diag) {
+function drawAgents(dash, settings) {
   const paused = settings.paused === "1";
-  const cap = settings.parallel_run_cap;
-  const idle = settings.agent_idle_timeout_seconds;
-  const hard = settings.agent_hard_cap_seconds;
   $("#agents-content").innerHTML = `
     <div class="card">
-      <h3>Concurrency</h3>
-      <div class="actions" style="margin-bottom:8px">
-        <button id="btn-pause" class="${paused ? "" : "secondary"}">${paused ? "Resume" : "Pause"} agent spawning</button>
-        <span class="muted small">${paused ? "Paused — new subprocesses won't launch." : "Active — new subprocesses launch on demand."}</span>
-      </div>
-      <div class="form-row" style="max-width:280px">
-        <label>Parallel-run cap</label>
-        <input type="number" id="cap" value="${cap}" min="1" max="64">
-      </div>
-      <div class="form-row" style="max-width:280px">
-        <label>Idle timeout (seconds, 0 = disable)</label>
-        <input type="number" id="idle" value="${idle}" min="0">
-      </div>
-      <div class="form-row" style="max-width:280px">
-        <label>Hard cap (seconds, 0 = disable)</label>
-        <input type="number" id="hard" value="${hard}" min="0">
-      </div>
+      <h3>Agent spawning</h3>
       <div class="actions">
-        <button id="btn-save-conc">Save</button>
+        <button id="btn-pause" class="${paused ? "" : "secondary"}">
+          ${paused ? "Resume" : "Pause"} agent spawning
+        </button>
+        <span class="muted small">
+          ${paused
+            ? "Paused — new subprocesses won't launch; running ones continue."
+            : "Active — new subprocesses launch on demand."}
+        </span>
       </div>
+      <p class="muted small" style="margin-top:8px">
+        Runtime limits (parallel-run cap, idle timeout, hard cap) and IPC
+        diagnostics live on the <a href="#/settings">Settings</a> page.
+      </p>
     </div>
 
     <div class="card" style="margin-top:16px">
       <h3>Currently running</h3>
       ${(dash.running || []).length === 0
         ? `<p class="muted">Nothing running.</p>`
-        : `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead><tbody>
-          ${dash.running.map((r) => `<tr>
-            <td><a href="#/gaps/${r.gap_id}">${r.gap_id.slice(0,10)}…</a></td>
-            <td>${fmtElapsed(r.elapsed_seconds)}</td>
-            <td>${fmtElapsed(r.idle_seconds)}</td>
-            <td><button class="danger" data-cancel="${r.gap_id}">Cancel</button></td>
-          </tr>`).join("")}
-          </tbody></table>`}
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>IPC diagnostics</h3>
-      <dl class="kv">
-        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.socket_path ? `<dt>Socket</dt><dd><code>${htmlEscape(diag.socket_path)}</code></dd>` : ""}
-        ${diag.last_contact_at ? `<dt>Last contact</dt><dd>${fmtTime(diag.last_contact_at)}</dd>` : ""}
-      </dl>
-      ${diag.recent_errors && diag.recent_errors.length ? `
-        <h4>Recent errors</h4>
-        <pre>${diag.recent_errors.map(htmlEscape).join("\n")}</pre>` : ""}
+        : `<table class="table">
+            <thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead>
+            <tbody>
+              ${dash.running.map((r) => `<tr>
+                <td><a href="#/gaps/${r.gap_id}">${r.gap_id.slice(0,10)}…</a></td>
+                <td>${fmtElapsed(r.elapsed_seconds)}</td>
+                <td>${fmtElapsed(r.idle_seconds)}</td>
+                <td><button class="danger" data-cancel="${r.gap_id}">Cancel</button></td>
+              </tr>`).join("")}
+            </tbody>
+          </table>`}
     </div>
   `;
   $("#btn-pause").addEventListener("click", async () => {
     try {
       await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
-      await renderAgents();
-    } catch (e) { toast(e.message, "error"); }
-  });
-  $("#btn-save-conc").addEventListener("click", async () => {
-    try {
-      await api("PATCH", "/api/settings", {
-        parallel_run_cap: $("#cap").value,
-        agent_idle_timeout_seconds: $("#idle").value,
-        agent_hard_cap_seconds: $("#hard").value,
-      });
-      toast("Saved", "info");
       await renderAgents();
     } catch (e) { toast(e.message, "error"); }
   });
