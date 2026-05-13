@@ -1204,10 +1204,12 @@ function drawChat() {
         <span class="spacer"></span>
         <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
       </div>
-      <pre id="chat-output" style="min-height:240px;background:var(--card);border:1px solid var(--border)">${htmlEscape(active.output || "")}</pre>
-      <div id="chat-pending" class="chat-pending" hidden>
-        <span class="chat-pending-dots"><span></span><span></span><span></span></span>
-        Claude is thinking…
+      <div class="chat-output-box">
+        <pre id="chat-output">${htmlEscape(active.output || "")}</pre>
+        <div id="chat-pending" class="chat-pending" hidden>
+          <span class="chat-pending-dots"><span></span><span></span><span></span></span>
+          Claude is thinking…
+        </div>
       </div>
       <div class="actions" style="margin-top:8px">
         <input type="text" id="chat-input" placeholder="Type and press Enter…"

@@ -380,16 +380,33 @@ select {
   background: var(--success);
 }
 
+/* Bordered container that wraps the chat output and the pending indicator
+   so "Claude is thinking…" sits inside the same box as the transcript. */
+.chat-output-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.chat-output-box pre {
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  min-height: 240px;
+  max-height: none;
+  padding: 10px 12px;
+}
+
 .chat-pending {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 10px;
-  margin-top: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--code-bg);
   font-size: 13px;
   color: var(--muted);
-  background: var(--code-bg);
-  border-radius: var(--radius);
 }
 .chat-pending[hidden] { display: none; }
 .chat-pending-dots {
