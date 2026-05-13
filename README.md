@@ -30,11 +30,6 @@ refine/
 
 ## Quick start
 
-The flow uses [`uv`](https://docs.astral.sh/uv/) so you never have to install
-refine system-wide. Each refine clone is bound to one client repo via
-`refine init`, and all `uv run refine …` commands then "just know" which
-client to target.
-
 ### 1. Clone refine once per client
 
 ```bash
