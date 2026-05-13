@@ -289,8 +289,25 @@ select {
 .search-bar select { width: auto; }
 
 .gap-detail h2 { font-size: 22px; }
-.round { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; background: var(--card); }
-.round-head { padding: 10px 14px; display: flex; gap: 12px; align-items: center; border-bottom: 1px solid var(--border); }
+.round { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; background: var(--card); overflow: hidden; }
+.round > .round-head {
+  padding: 10px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+.round[open] > .round-head { border-bottom: 1px solid var(--border); }
+.round > .round-head::-webkit-details-marker { display: none; }
+.round > .round-head::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.1s ease-out;
+}
+.round[open] > .round-head::before { transform: rotate(90deg); }
+.round > .round-head:hover { background: var(--code-bg); }
 .round-body { padding: 12px 14px; }
 .round-body .pair { display: grid; grid-template-columns: 80px 1fr; gap: 4px 10px; margin-bottom: 8px; }
 .round-body .pair dt { color: var(--muted); font-size: 12px; padding-top: 2px; }

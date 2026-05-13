@@ -873,13 +873,13 @@ function attachActivityToRounds(rounds, activity) {
 function renderRound(rnd, idx, isLatest, editable) {
   const logs = rnd._mergedLogs || rnd.logs || [];
   return `
-    <div class="round">
-      <div class="round-head">
+    <details class="round" ${isLatest ? "open" : ""}>
+      <summary class="round-head">
         <strong>Round ${idx + 1}</strong>
         ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
         <span class="spacer"></span>
         <span class="muted small">${htmlEscape(rnd.reporter || "(no reporter)")} · ${fmtTime(rnd.created)}</span>
-      </div>
+      </summary>
       <div class="round-body">
         <dl class="pair">
           <dt>actual</dt><dd>${htmlEscape(rnd.actual || "").replace(/\n/g, "<br>")}</dd>
@@ -891,7 +891,7 @@ function renderRound(rnd, idx, isLatest, editable) {
             ${logs.map((l) => renderLogEntry(l)).join("")}
           </details>` : `<p class="muted small">No logs.</p>`}
       </div>
-    </div>
+    </details>
   `;
 }
 
