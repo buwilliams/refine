@@ -42,6 +42,90 @@ function toast(message, kind = "info") {
   setTimeout(() => el.remove(), 4000);
 }
 
+// ---- Modals (replace native prompt / confirm) -------------------------------
+//
+// Both return a Promise. modalPrompt resolves to the entered string or null
+// if cancelled. modalConfirm resolves to a boolean.
+//
+// Keyboard: Enter submits, Escape cancels. Clicking the backdrop cancels.
+
+function _openModal(buildBody, onResolveDefault, focusSel) {
+  return new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop";
+    const body = buildBody();
+    root.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${body}</div>`;
+    document.body.appendChild(root);
+
+    let resolved = false;
+    function close(value) {
+      if (resolved) return;
+      resolved = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(onResolveDefault.cancel);
+      } else if (e.key === "Enter") {
+        // Allow Enter inside a textarea to insert newlines (none today, but safe).
+        if (e.target && e.target.tagName === "TEXTAREA") return;
+        e.preventDefault();
+        const okBtn = root.querySelector("[data-ok]");
+        if (okBtn) okBtn.click();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    root.addEventListener("click", (e) => {
+      if (e.target === root) close(onResolveDefault.cancel);
+    });
+
+    root.querySelector("[data-cancel]").addEventListener("click", () =>
+      close(onResolveDefault.cancel));
+    root.querySelector("[data-ok]").addEventListener("click", () => {
+      const input = root.querySelector(".modal-input");
+      close(input ? input.value : onResolveDefault.ok);
+    });
+
+    const focus = root.querySelector(focusSel);
+    if (focus) {
+      focus.focus();
+      if (focus.tagName === "INPUT") focus.select();
+    }
+  });
+}
+
+function modalPrompt(label, defaultValue = "", {
+  title = null, okLabel = "OK", cancelLabel = "Cancel",
+} = {}) {
+  const body = () => `
+    ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
+    <div class="modal-body">
+      <label>${htmlEscape(label)}</label>
+      <input type="text" class="modal-input" value="${htmlEscape(defaultValue)}">
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>${htmlEscape(cancelLabel)}</button>
+      <button data-ok>${htmlEscape(okLabel)}</button>
+    </div>`;
+  return _openModal(body, { cancel: null, ok: "" }, ".modal-input");
+}
+
+function modalConfirm(message, {
+  title = null, okLabel = "OK", cancelLabel = "Cancel", danger = false,
+} = {}) {
+  const body = () => `
+    ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
+    <div class="modal-body">${htmlEscape(message)}</div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>${htmlEscape(cancelLabel)}</button>
+      <button ${danger ? 'class="danger"' : ""} data-ok>${htmlEscape(okLabel)}</button>
+    </div>`;
+  return _openModal(body, { cancel: false, ok: true }, "[data-ok]");
+}
+
 function fmtTime(iso) {
   if (!iso) return "";
   const d = new Date(iso);
@@ -98,8 +182,9 @@ function populateAllReporterDropdowns() {
 }
 
 async function handleReporterAdd(sel) {
-  const name = prompt("New reporter name:");
-  if (!name) {
+  const name = await modalPrompt("Name for the new reporter:",
+                                  "", { title: "Add reporter" });
+  if (!name || !name.trim()) {
     sel.value = state.lastReporter || "";
     return null;
   }
@@ -470,15 +555,20 @@ function drawGapDetail(gap) {
   `;
 
   $("#btn-rename")?.addEventListener("click", async () => {
-    const name = prompt("New name", gap.name);
-    if (!name) return;
+    const name = await modalPrompt("New name", gap.name,
+                                   { title: "Rename Gap" });
+    if (!name || !name.trim()) return;
     try {
-      await api("PATCH", "/api/gaps/" + gap.id, { name });
+      await api("PATCH", "/api/gaps/" + gap.id, { name: name.trim() });
       await loadGapDetail(gap.id);
     } catch (e) { toast(e.message, "error"); }
   });
   $("#btn-delete")?.addEventListener("click", async () => {
-    if (!confirm(`Delete Gap "${gap.name}"? This cannot be undone.`)) return;
+    const ok = await modalConfirm(
+      `Delete Gap "${gap.name}"? This cannot be undone.`,
+      { title: "Delete Gap", okLabel: "Delete", danger: true },
+    );
+    if (!ok) return;
     try {
       await api("DELETE", "/api/gaps/" + gap.id);
       location.hash = "#/gaps";
@@ -627,7 +717,12 @@ function bindFailureBannerActions(gap) {
           if (r.ok) toast("Merged + pushed", "info");
           else toast(r.message || "Verify did not complete", "error");
         } else if (action === "cancel") {
-          if (!confirm("Cancel this Gap? Worktree and branch will be cleaned up.")) return;
+          const ok = await modalConfirm(
+            "Cancel this Gap? Worktree and branch will be cleaned up.",
+            { title: "Cancel Gap", okLabel: "Cancel Gap", danger: true,
+              cancelLabel: "Keep working" },
+          );
+          if (!ok) return;
           await api("POST", `/api/gaps/${gap.id}/cancel`);
           toast("Cancelled", "info");
         } else if (action === "chat") {
@@ -663,7 +758,11 @@ function bindFailureBannerActions(gap) {
     verifyRow.querySelector("[data-chat]").onclick = () =>
       location.hash = "#/chat?gap=" + gap.id;
     verifyRow.querySelector("[data-cancel]").onclick = async () => {
-      if (!confirm("Cancel this Gap?")) return;
+      const ok = await modalConfirm("Cancel this Gap?", {
+        title: "Cancel Gap", okLabel: "Cancel Gap", danger: true,
+        cancelLabel: "Keep working",
+      });
+      if (!ok) return;
       try { await api("POST", `/api/gaps/${gap.id}/cancel`); location.hash = "#/gaps"; }
       catch (e) { toast(e.message, "error"); }
     };
@@ -872,7 +971,12 @@ function drawAgents(dash, settings) {
   $$("[data-cancel]").forEach((b) => {
     b.addEventListener("click", async () => {
       const id = b.dataset.cancel;
-      if (!confirm("Cancel this Gap's running subprocess?")) return;
+      const ok = await modalConfirm(
+        "Cancel this Gap's running subprocess?",
+        { title: "Cancel run", okLabel: "Cancel run", danger: true,
+          cancelLabel: "Keep running" },
+      );
+      if (!ok) return;
       try { await api("POST", `/api/gaps/${id}/cancel`); await renderAgents(); }
       catch (e) { toast(e.message, "error"); }
     });
@@ -1076,20 +1180,26 @@ function drawSettings(s, diag, reps) {
     } catch (e) { toast(e.message, "error"); }
   });
   $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm("Remove this reporter from the dropdown?")) return;
+    const ok = await modalConfirm(
+      "Remove this reporter from the dropdown? Historical rounds keep their original reporter string.",
+      { title: "Remove reporter", okLabel: "Remove", danger: true },
+    );
+    if (!ok) return;
     try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await renderSettings(); }
     catch (e) { toast(e.message, "error"); }
   }));
   $$("[data-rename]").forEach((b) => b.addEventListener("click", async () => {
-    const name = prompt("New name", b.dataset.name);
-    if (!name) return;
-    try { await api("PATCH", "/api/reporters/" + b.dataset.rename, { name }); await renderSettings(); }
+    const name = await modalPrompt("New name", b.dataset.name,
+                                   { title: "Rename reporter" });
+    if (!name || !name.trim()) return;
+    try { await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: name.trim() }); await renderSettings(); }
     catch (e) { toast(e.message, "error"); }
   }));
   $("#r-add").addEventListener("click", async () => {
-    const name = prompt("Reporter name");
-    if (!name) return;
-    try { await api("POST", "/api/reporters", { name }); await refreshReporters(); await renderSettings(); }
+    const name = await modalPrompt("Reporter name", "",
+                                   { title: "Add reporter" });
+    if (!name || !name.trim()) return;
+    try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
     catch (e) { toast(e.message, "error"); }
   });
 }
