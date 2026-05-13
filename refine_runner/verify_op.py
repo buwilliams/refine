@@ -122,7 +122,8 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
         _log(conn, gap_id, "Branch already merged into current — proceeding to push",
              severity="info", category="git", actor=actor)
     else:
-        r = git_ops.merge_branch(branch, message=f"Merge {branch}")
+        merge_message = _build_merge_message(conn, gap_id, branch, current)
+        r = git_ops.merge_branch(branch, message=merge_message)
         if not r.ok:
             stderr = r.stderr + ("\n" + r.stdout if r.stdout else "")
             if "CONFLICT" in stderr or "conflict" in stderr.lower():
@@ -194,3 +195,62 @@ def _log(conn: sqlite3.Connection, gap_id: str, message: str, *,
         conn, message=message, severity=severity, category=category,
         gap_id=gap_id, actor=actor, details=details,
     )
+
+
+def _build_merge_message(conn: sqlite3.Connection, gap_id: str,
+                          branch: str, current: str) -> str:
+    """Build a descriptive merge commit message:
+
+        Merge refine/<gap_id> into <current>: <gap name>
+
+        <latest round target — what we asked the agent to do>
+
+        Commits on this branch:
+        - <commit 1 subject>
+        - <commit 2 subject>
+        ...
+
+        Refine Gap: <gap_id>
+    """
+    from refine_shared.gaps import read_gap_json
+    from . import git_ops
+
+    # Gap name from SQLite.
+    row = conn.execute(
+        "SELECT name FROM gaps_index WHERE id = ?", (gap_id,),
+    ).fetchone()
+    gap_name = (row["name"] if row else "") or gap_id
+
+    # Latest round target (the asked-for behavior).
+    target = ""
+    try:
+        gap_json = read_gap_json(gap_id) or {}
+        rounds = gap_json.get("rounds") or []
+        if rounds:
+            target = (rounds[-1].get("target") or "").strip()
+    except Exception:
+        pass
+
+    # Commit subjects on the branch (relative to its merge-base with current).
+    subjects: list[str] = []
+    base = git_ops._run(["merge-base", current, branch])
+    if base.ok and base.stdout.strip():
+        log = git_ops._run([
+            "log", "--no-merges", "--reverse", "--pretty=%s",
+            f"{base.stdout.strip()}..{branch}",
+        ])
+        if log.ok:
+            subjects = [s for s in log.stdout.splitlines() if s.strip()]
+
+    lines: list[str] = [f"Merge {branch} into {current}: {gap_name}"]
+    if target:
+        truncated = target if len(target) <= 500 else target[:500] + "…"
+        lines += ["", truncated]
+    if subjects:
+        lines += ["", "Commits on this branch:"]
+        for s in subjects[:20]:
+            lines.append(f"- {s}")
+        if len(subjects) > 20:
+            lines.append(f"- … and {len(subjects) - 20} more")
+    lines += ["", f"Refine Gap: {gap_id}"]
+    return "\n".join(lines)
