@@ -1,0 +1,32 @@
+# refine-web — Dockerized webapp.
+#
+# The companion refine-runner is NOT in this compose file by design — it runs
+# natively on the host so it inherits the host's Claude Code auth, SSH keys,
+# and git config. See README → "Running the host runner".
+
+services:
+  refine-web:
+    build:
+      context: .
+      args:
+        # Align the in-container process owner with the host user that owns
+        # the bind-mounted volume root + runner socket.
+        REFINE_UID: ${REFINE_UID:-1000}
+        REFINE_GID: ${REFINE_GID:-1000}
+    user: "${REFINE_UID:-1000}:${REFINE_GID:-1000}"
+    environment:
+      # Path inside the container; the host path is mounted onto it (below).
+      REFINE_VOLUME_ROOT: /refine-data
+      # Unix socket where the host runner is listening (host path mounted in).
+      REFINE_RUNNER_SOCKET: /var/run/refine/runner.sock
+      REFINE_WEB_PORT: 8080
+    volumes:
+      # Volume root: lives inside the client repo on the host. Required.
+      # Set REFINE_HOST_VOLUME_ROOT in your shell or .env file.
+      - "${REFINE_HOST_VOLUME_ROOT:?Set REFINE_HOST_VOLUME_ROOT to the host path of the client repo's volume root}:/refine-data"
+      # Host runner IPC socket directory (single dir mount so the socket file
+      # is visible to both sides).
+      - "${REFINE_HOST_SOCKET_DIR:-/var/run/refine}:/var/run/refine"
+    ports:
+      - "${REFINE_PORT:-8080}:8080"
+    restart: unless-stopped

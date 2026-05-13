@@ -1,0 +1,161 @@
+"""Git operations against the client repo.
+
+Operational assumption (per spec): the host running refine is dedicated to
+refine; no human edits the working copy directly; all local commits on the
+client's current branch come from refine's agent runs.
+"""
+from __future__ import annotations
+
+import os
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+
+def client_repo_path() -> Path:
+    """The bind-mounted client repo lives at <volume-root>/.. (volume root is inside the repo).
+
+    Override via REFINE_CLIENT_REPO env var.
+    """
+    p = os.environ.get("REFINE_CLIENT_REPO")
+    if p:
+        return Path(p)
+    # by default: volume root parent (volume root lives *inside* the client repo)
+    from refine_shared.paths import volume_root
+    return volume_root().resolve().parent
+
+
+def worktrees_dir() -> Path:
+    return client_repo_path() / ".git" / "refine-worktrees"
+
+
+@dataclass
+class GitResult:
+    ok: bool
+    stdout: str
+    stderr: str
+    code: int
+
+
+def _run(args: list[str], *, cwd: Path | None = None, env: dict | None = None,
+         timeout: float | None = 120.0) -> GitResult:
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd) if cwd else None,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    return GitResult(
+        ok=(proc.returncode == 0),
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+        code=proc.returncode,
+    )
+
+
+# ---- pre-checks --------------------------------------------------------------
+
+def current_branch(cwd: Path | None = None) -> str | None:
+    r = _run(["symbolic-ref", "--quiet", "--short", "HEAD"], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return None  # detached HEAD
+    return r.stdout.strip()
+
+
+def upstream_branch(branch: str, cwd: Path | None = None) -> str | None:
+    r = _run(
+        ["rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}"],
+        cwd=cwd or client_repo_path(),
+    )
+    if not r.ok:
+        return None
+    return r.stdout.strip()
+
+
+def working_copy_dirty(cwd: Path | None = None) -> bool:
+    r = _run(["status", "--porcelain"], cwd=cwd or client_repo_path())
+    return bool(r.ok and r.stdout.strip())
+
+
+def fetch(cwd: Path | None = None) -> GitResult:
+    return _run(["fetch", "--prune"], cwd=cwd or client_repo_path(), timeout=300.0)
+
+
+# ---- worktree management -----------------------------------------------------
+
+def gap_worktree_path(gap_id: str) -> Path:
+    return worktrees_dir() / gap_id.upper()
+
+
+def worktree_exists(gap_id: str) -> bool:
+    return gap_worktree_path(gap_id).exists()
+
+
+def create_worktree(gap_id: str, base_ref: str, branch_name: str) -> GitResult:
+    """Create a worktree at .git/refine-worktrees/<GAP_ID> tracking branch_name based on base_ref.
+
+    If the branch already exists, reuse it.
+    """
+    worktrees_dir().mkdir(parents=True, exist_ok=True)
+    wt = gap_worktree_path(gap_id)
+    # is the branch already created?
+    exists = _run(["rev-parse", "--verify", "--quiet", f"refs/heads/{branch_name}"]).ok
+    if exists:
+        return _run(["worktree", "add", str(wt), branch_name])
+    return _run(["worktree", "add", "-b", branch_name, str(wt), base_ref])
+
+
+def remove_worktree(gap_id: str, *, force: bool = True) -> GitResult:
+    wt = gap_worktree_path(gap_id)
+    if not wt.exists():
+        return GitResult(ok=True, stdout="", stderr="(no worktree)", code=0)
+    args = ["worktree", "remove"]
+    if force:
+        args.append("--force")
+    args.append(str(wt))
+    return _run(args)
+
+
+def delete_branch(branch_name: str, *, force: bool = True) -> GitResult:
+    args = ["branch", "-D" if force else "-d", branch_name]
+    return _run(args)
+
+
+def commits_on_branch_since(base_ref: str, cwd: Path) -> int:
+    r = _run(["rev-list", "--count", f"{base_ref}..HEAD"], cwd=cwd)
+    if not r.ok:
+        return 0
+    try:
+        return int(r.stdout.strip())
+    except ValueError:
+        return 0
+
+
+# ---- merge & push (review → done) --------------------------------------------
+
+def pull_ff_only(cwd: Path | None = None) -> GitResult:
+    return _run(["pull", "--ff-only", "--no-rebase"], cwd=cwd or client_repo_path())
+
+
+def merge_branch(branch: str, *, cwd: Path | None = None,
+                 message: str | None = None) -> GitResult:
+    args = ["merge", "--no-edit"]
+    if message:
+        args.extend(["-m", message])
+    args.append(branch)
+    return _run(args, cwd=cwd or client_repo_path())
+
+
+def push_current(cwd: Path | None = None) -> GitResult:
+    return _run(["push"], cwd=cwd or client_repo_path(), timeout=300.0)
+
+
+def is_already_merged(branch: str, cwd: Path | None = None) -> bool:
+    """Check if `branch` is reachable from current HEAD (i.e., already merged)."""
+    r = _run(
+        ["merge-base", "--is-ancestor", branch, "HEAD"],
+        cwd=cwd or client_repo_path(),
+    )
+    return r.ok  # exit 0 = is ancestor, 1 = not

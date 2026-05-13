@@ -1,0 +1,145 @@
+"""review → done transition: fetch, pull --ff-only, merge, push.
+
+If any step fails, the Gap stays in `review` with an explanatory log entry.
+On push failure (after a successful local merge), the Gap remains in `review`
+per spec — push failure is an environment issue, not a Gap-completion event.
+"""
+from __future__ import annotations
+
+import sqlite3
+
+from refine_shared import activity, db
+from refine_shared.gaps import now_iso
+
+from . import gap_writer, git_ops
+
+
+def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
+                   actor: str = "refine") -> dict:
+    """Run the merge+push sequence for a Gap currently in `review`.
+
+    Returns a dict with keys: ok, stage, message, details.
+    """
+    row = conn.execute(
+        "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gap_id,),
+    ).fetchone()
+    if not row:
+        return {"ok": False, "stage": "lookup", "message": "Gap not found"}
+    if row["status"] != "review":
+        return {"ok": False, "stage": "lookup",
+                "message": f"Gap is not in review (status={row['status']})"}
+
+    branch = row["branch_name"]
+    if not branch:
+        return {"ok": False, "stage": "lookup",
+                "message": "Gap has no branch_name recorded"}
+
+    # Pre-check: current branch + upstream + clean working copy
+    current = git_ops.current_branch()
+    if current is None:
+        msg = "Client repo is in detached-HEAD state"
+        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "precheck", "message": msg}
+    if git_ops.upstream_branch(current) is None:
+        msg = f"Branch `{current}` has no upstream"
+        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "precheck", "message": msg}
+    if git_ops.working_copy_dirty():
+        msg = f"Working copy has uncommitted changes on `{current}`"
+        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "precheck", "message": msg}
+
+    # 1. fetch
+    r = git_ops.fetch()
+    if not r.ok:
+        _log(conn, gap_id, "git fetch failed during verify", details=r.stderr,
+             severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "fetch", "message": "git fetch failed",
+                "details": r.stderr}
+
+    # 2. pull --ff-only
+    r = git_ops.pull_ff_only()
+    if not r.ok:
+        _log(conn, gap_id,
+             "Local branch diverged from remote — manual reconciliation needed",
+             details=r.stderr, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "pull",
+                "message": "Local branch diverged from remote", "details": r.stderr}
+
+    # 3. merge (idempotent if already merged)
+    if git_ops.is_already_merged(branch):
+        _log(conn, gap_id, "Branch already merged into current — proceeding to push",
+             severity="info", category="git", actor=actor)
+    else:
+        r = git_ops.merge_branch(branch, message=f"Merge {branch}")
+        if not r.ok:
+            stderr = r.stderr + ("\n" + r.stdout if r.stdout else "")
+            if "CONFLICT" in stderr or "conflict" in stderr.lower():
+                _log(conn, gap_id, "Merge conflict — leave the worktree intact",
+                     details=stderr, severity="error", category="git", actor=actor)
+                return {"ok": False, "stage": "merge",
+                        "message": "Merge conflict", "details": stderr}
+            _log(conn, gap_id, "git merge failed", details=stderr,
+                 severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "merge", "message": "git merge failed",
+                    "details": stderr}
+
+    # 4. push (one retry on non-FF)
+    r = git_ops.push_current()
+    if not r.ok and ("non-fast-forward" in r.stderr or
+                     "fetch first" in r.stderr or
+                     "rejected" in r.stderr):
+        # Retry: re-fetch, re-pull --ff-only, re-merge if needed, re-push.
+        f2 = git_ops.fetch()
+        if f2.ok:
+            p2 = git_ops.pull_ff_only()
+            if p2.ok and not git_ops.is_already_merged(branch):
+                git_ops.merge_branch(branch, message=f"Merge {branch}")
+            r = git_ops.push_current()
+    if not r.ok:
+        _log(conn, gap_id,
+             "Push failed — environment issue; Gap stays in `review`",
+             details=r.stderr, severity="error", category="git", actor=actor)
+        # Per spec: gap STAYS IN REVIEW, does NOT transition to done.
+        return {"ok": False, "stage": "push",
+                "message": "Push failed", "details": r.stderr}
+
+    # All four steps succeeded → done; clean up branch + worktree.
+    with db.transaction(conn):
+        conn.execute(
+            "UPDATE gaps_index SET status = 'done', updated = ? WHERE id = ?",
+            (now_iso(), gap_id),
+        )
+    git_ops.remove_worktree(gap_id)
+    git_ops.delete_branch(branch)
+    activity.append(
+        conn,
+        message="Gap merged + pushed; transitioned to done",
+        severity="info", category="state", gap_id=gap_id, actor=actor,
+    )
+    return {"ok": True, "stage": "done", "message": "Merged and pushed"}
+
+
+def _log(conn: sqlite3.Connection, gap_id: str, message: str, *,
+         severity: str, category: str, actor: str,
+         details: str | None = None) -> None:
+    # Append to latest round's logs[] + activity
+    row = conn.execute(
+        "SELECT json_path FROM gaps_index WHERE id = ?", (gap_id,),
+    ).fetchone()
+    if row:
+        from refine_shared.gaps import read_gap_json
+        gap = read_gap_json(gap_id)
+        if gap and gap.get("rounds"):
+            try:
+                gap_writer.append_round_log(
+                    gap_id=gap_id, round_idx=len(gap["rounds"]) - 1,
+                    severity=severity, category=category,
+                    message=message, details=details, actor=actor,
+                )
+            except Exception:
+                pass
+    activity.append(
+        conn, message=message, severity=severity, category=category,
+        gap_id=gap_id, actor=actor, details=details,
+    )

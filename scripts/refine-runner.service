@@ -1,0 +1,24 @@
+# Example systemd unit for refine-runner. Install at:
+#   /etc/systemd/system/refine-runner.service
+# (Or use --user mode if you prefer running under a user instance.)
+[Unit]
+Description=refine host runner
+After=network.target
+
+[Service]
+Type=simple
+# Adjust to your operator user.
+User=refine
+Group=refine
+# These three paths *must* match the docker-compose mounts.
+Environment=REFINE_VOLUME_ROOT=/srv/clients/acme-app/refine
+Environment=REFINE_CLIENT_REPO=/srv/clients/acme-app
+Environment=REFINE_RUNNER_SOCKET=/var/run/refine/runner.sock
+# Where this repo lives on the host (so `python3 -m refine_runner` can find it).
+WorkingDirectory=/opt/refine
+ExecStart=/usr/bin/python3 -m refine_runner
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

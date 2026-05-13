@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>refine</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">refine</div>
+    <nav class="nav">
+      <a href="#/" data-route="dashboard">Dashboard</a>
+      <a href="#/gaps" data-route="gaps">Gaps</a>
+      <a href="#/agents" data-route="agents">Agents</a>
+      <a href="#/chat" data-route="chat">Chat</a>
+      <a href="#/settings" data-route="settings">Settings</a>
+    </nav>
+    <div class="reporter-corner">
+      <label>Reporter:
+        <select id="global-reporter"></select>
+      </label>
+    </div>
+  </header>
+
+  <div id="banners" class="banners"></div>
+
+  <main id="main"></main>
+
+  <template id="t-banner">
+    <div class="banner">
+      <span class="banner-msg"></span>
+      <span class="banner-actions"></span>
+    </div>
+  </template>
+
+  <script src="/static/app.js" type="module"></script>
+</body>
+</html>

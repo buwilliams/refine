@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+.DS_Store
+
+# Local volume root if anyone tries refine against this repo itself
+/refine-data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Editor state
+.vscode/
+.idea/
+*.swp
