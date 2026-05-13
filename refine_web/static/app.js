@@ -202,10 +202,19 @@ async function handleReporterAdd(sel) {
 }
 
 function setLastReporter(name) {
+  const wasEmpty = !state.lastReporter;
   state.lastReporter = name;
   localStorage.setItem("refine_last_reporter", name);
   const g = $("#global-reporter");
   if (g) g.value = name;
+  // If the user just picked their first reporter, re-render views gated on a
+  // selected reporter so the form replaces the "pick a reporter" notice.
+  if (wasEmpty && name) {
+    const r = state.currentRoute;
+    if (r === "gaps_new" || r === "gaps_import" || r === "gaps_detail") {
+      navigate();
+    }
+  }
 }
 
 // react to "+ Add new reporter" selection on any dropdown
@@ -285,7 +294,10 @@ const routes = {
 function parseHash() {
   const raw = location.hash.slice(1) || "/";
   // "/" → dashboard, "/gaps" → list, "/gaps/<id>" → detail
-  const parts = raw.split("/").filter(Boolean);
+  // Strip the query string (e.g. "?status=review") before path parsing;
+  // views that care about query params read them off location.hash directly.
+  const path = raw.split("?", 1)[0];
+  const parts = path.split("/").filter(Boolean);
   if (parts.length === 0) return { route: "dashboard" };
   if (parts[0] === "gaps") {
     if (parts.length === 1) return { route: "gaps" };
@@ -519,13 +531,19 @@ function drawGapDetail(gap) {
   const failureBanner = computeFailureBanner(gap, latest);
 
   const isLatestEditable = (gap.status === "todo" || gap.status === "failed");
+  const verifyEnabled = gap.status === "review";
+  const cancelEnabled = !["done", "cancelled"].includes(gap.status);
 
   $("#main").innerHTML = `
     <div class="gap-detail">
       <div class="row" style="align-items:center;margin-bottom:8px">
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
         <span class="status-pill ${gap.status}">${gap.status}</span>
-        <span class="spacer"></span>
+      </div>
+      <div class="actions" style="margin-bottom:10px">
+        <button id="btn-verify" ${verifyEnabled ? "" : "disabled"}>Verify</button>
+        <button class="secondary" id="btn-chat">Open Chat</button>
+        <button class="danger" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
         <button class="secondary" id="btn-rename">Rename</button>
         <button class="danger" id="btn-delete">Delete</button>
       </div>
@@ -558,12 +576,38 @@ function drawGapDetail(gap) {
     </div>
   `;
 
+  $("#btn-verify")?.addEventListener("click", async () => {
+    if ($("#btn-verify").disabled) return;
+    try {
+      const r = await api("POST", `/api/gaps/${gap.id}/verify`);
+      if (r.ok) toast("Merged + pushed", "info");
+      else toast(r.message || "Verify did not complete", "error");
+      await loadGapDetail(gap.id);
+    } catch (e) { toast(e.message, "error"); }
+  });
+  $("#btn-chat")?.addEventListener("click", () => {
+    location.hash = "#/chat?gap=" + gap.id;
+  });
   $("#btn-rename")?.addEventListener("click", async () => {
     const name = await modalPrompt("New name", gap.name,
                                    { title: "Rename Gap" });
     if (!name || !name.trim()) return;
     try {
       await api("PATCH", "/api/gaps/" + gap.id, { name: name.trim() });
+      await loadGapDetail(gap.id);
+    } catch (e) { toast(e.message, "error"); }
+  });
+  $("#btn-cancel")?.addEventListener("click", async () => {
+    if ($("#btn-cancel").disabled) return;
+    const ok = await modalConfirm(
+      "Cancel this Gap? Any running subprocess will be stopped and the worktree + branch cleaned up.",
+      { title: "Cancel Gap", okLabel: "Cancel Gap", danger: true,
+        cancelLabel: "Keep working" },
+    );
+    if (!ok) return;
+    try {
+      await api("POST", `/api/gaps/${gap.id}/cancel`);
+      toast("Cancelled", "info");
       await loadGapDetail(gap.id);
     } catch (e) { toast(e.message, "error"); }
   });
@@ -621,14 +665,13 @@ function renderRoundForm(kind, prefill) {
   const actual = prefill?.actual || "";
   const target = prefill?.target || "";
   const reporter = state.lastReporter || "";
+  if (!reporter) return renderPickReporterNotice();
   const submitLabel = kind === "submit" ? "Submit new round" : "Save changes";
   return `
     <form id="round-form" data-kind="${kind}">
-      <div class="form-row">
-        <label>Reporter <span class="muted">(required)</span></label>
-        <select name="reporter" data-reporter-select required>
-          <option value="">— pick reporter —</option>
-        </select>
+      <div class="muted small" style="margin-bottom:8px">
+        Submitting as <strong>${htmlEscape(reporter)}</strong>
+        — change in the top-right reporter selector.
       </div>
       <div class="form-row">
         <label>Actual (current behavior)</label>
@@ -645,23 +688,25 @@ function renderRoundForm(kind, prefill) {
   `;
 }
 
+function renderPickReporterNotice() {
+  return `
+    <p class="muted">
+      Pick a reporter in the top-right selector to enable this form.
+    </p>
+  `;
+}
+
 function bindRoundFormSubmit(gap) {
   const form = $("#round-form");
   if (!form) return;
-  // populate reporter dropdown
-  populateAllReporterDropdowns();
-  const sel = form.querySelector("[data-reporter-select]");
-  if (sel) sel.value = state.lastReporter || "";
-
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const reporter = state.lastReporter || "";
+    if (!reporter) return toast("Pick a reporter in the top-right selector", "error");
     const fd = new FormData(form);
-    const reporter = fd.get("reporter");
     const actual = (fd.get("actual") || "").toString().trim();
     const target = (fd.get("target") || "").toString().trim();
-    if (!reporter) return toast("Pick a reporter", "error");
     if (!actual && !target) return toast("Provide actual or target", "error");
-    setLastReporter(reporter);
     const kind = form.dataset.kind;
     try {
       if (kind === "submit") {
@@ -684,11 +729,7 @@ function computeFailureBanner(gap, latest) {
     return {
       severity: "error",
       message: lastLog?.message || "Agent run failed",
-      actionsHtml: `
-        <button data-action="retry">Retry</button>
-        <button class="secondary" data-action="chat">Open Chat</button>
-        <button class="secondary" data-action="cancel">Cancel Gap</button>
-      `,
+      actionsHtml: `<button data-action="retry">Retry</button>`,
     };
   }
   if (gap.status === "review") {
@@ -698,10 +739,7 @@ function computeFailureBanner(gap, latest) {
       return {
         severity: "error",
         message: errLog.message || "Review needs attention",
-        actionsHtml: `
-          <button data-action="verify">Verify</button>
-          <button class="secondary" data-action="chat">Open Chat</button>
-        `,
+        actionsHtml: "",
       };
     }
   }
@@ -709,84 +747,48 @@ function computeFailureBanner(gap, latest) {
 }
 
 function bindFailureBannerActions(gap) {
+  // Only Retry lives in the banner now — Verify / Open Chat / Cancel / Rename /
+  // Delete are in the unified action menu at the top of the page.
   $$("[data-action]", $(".gap-detail .banner") || document).forEach((btn) => {
     btn.addEventListener("click", async () => {
       const action = btn.dataset.action;
+      if (action !== "retry") return;
       try {
-        if (action === "retry") {
-          await api("POST", `/api/gaps/${gap.id}/retry`);
-          toast("Queued for retry", "info");
-        } else if (action === "verify") {
-          const r = await api("POST", `/api/gaps/${gap.id}/verify`);
-          if (r.ok) toast("Merged + pushed", "info");
-          else toast(r.message || "Verify did not complete", "error");
-        } else if (action === "cancel") {
-          const ok = await modalConfirm(
-            "Cancel this Gap? Worktree and branch will be cleaned up.",
-            { title: "Cancel Gap", okLabel: "Cancel Gap", danger: true,
-              cancelLabel: "Keep working" },
-          );
-          if (!ok) return;
-          await api("POST", `/api/gaps/${gap.id}/cancel`);
-          toast("Cancelled", "info");
-        } else if (action === "chat") {
-          location.hash = "#/chat?gap=" + gap.id;
-          return;
-        }
+        await api("POST", `/api/gaps/${gap.id}/retry`);
+        toast("Queued for retry", "info");
         await loadGapDetail(gap.id);
       } catch (e) {
         toast(e.message, "error");
       }
     });
   });
-  // Also handle verify when status=review and no stuck condition is shown.
-  if (gap.status === "review" && !computeFailureBanner(gap, gap.rounds.slice(-1)[0] || null)) {
-    const verifyRow = document.createElement("div");
-    verifyRow.className = "card";
-    verifyRow.style.marginTop = "14px";
-    verifyRow.innerHTML = `
-      <div class="actions">
-        <button data-verify>Verify (merge + push)</button>
-        <button class="secondary" data-chat>Open Chat</button>
-        <button class="danger" data-cancel>Cancel Gap</button>
-      </div>`;
-    $(".gap-detail").appendChild(verifyRow);
-    verifyRow.querySelector("[data-verify]").onclick = async () => {
-      try {
-        const r = await api("POST", `/api/gaps/${gap.id}/verify`);
-        if (r.ok) toast("Merged + pushed", "info");
-        else toast(r.message || "Verify did not complete", "error");
-        await loadGapDetail(gap.id);
-      } catch (e) { toast(e.message, "error"); }
-    };
-    verifyRow.querySelector("[data-chat]").onclick = () =>
-      location.hash = "#/chat?gap=" + gap.id;
-    verifyRow.querySelector("[data-cancel]").onclick = async () => {
-      const ok = await modalConfirm("Cancel this Gap?", {
-        title: "Cancel Gap", okLabel: "Cancel Gap", danger: true,
-        cancelLabel: "Keep working",
-      });
-      if (!ok) return;
-      try { await api("POST", `/api/gaps/${gap.id}/cancel`); location.hash = "#/gaps"; }
-      catch (e) { toast(e.message, "error"); }
-    };
-  }
 }
 
 // ---- Gaps: new --------------------------------------------------------------
 
 async function renderGapNew() {
   renderBanners([]);
+  const reporter = state.lastReporter || "";
+  if (!reporter) {
+    $("#main").innerHTML = `
+      <h2>New Gap</h2>
+      <div class="card">
+        ${renderPickReporterNotice()}
+        <div class="actions" style="margin-top:8px">
+          <a class="btn secondary" href="#/gaps">Back to gaps</a>
+        </div>
+      </div>
+    `;
+    return;
+  }
   $("#main").innerHTML = `
     <h2>New Gap</h2>
     <div class="card">
+      <div class="muted small" style="margin-bottom:8px">
+        Submitting as <strong>${htmlEscape(reporter)}</strong>
+        — change in the top-right reporter selector.
+      </div>
       <form id="new-gap-form">
-        <div class="form-row">
-          <label>Reporter <span class="muted">(required)</span></label>
-          <select name="reporter" data-reporter-select required>
-            <option value="">— pick reporter —</option>
-          </select>
-        </div>
         <div class="form-row">
           <label>Name <span class="muted">(optional; auto-generated if blank)</span></label>
           <input type="text" name="name" placeholder="e.g. Login button is the wrong color">
@@ -806,22 +808,20 @@ async function renderGapNew() {
       </form>
     </div>
   `;
-  populateAllReporterDropdowns();
   const form = $("#new-gap-form");
-  const sel = form.querySelector("[data-reporter-select]");
-  if (sel) sel.value = state.lastReporter || "";
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
+    const currentReporter = state.lastReporter || "";
+    if (!currentReporter) return toast("Pick a reporter in the top-right selector", "error");
     const fd = new FormData(form);
-    const reporter = fd.get("reporter");
     const actual = (fd.get("actual") || "").toString().trim();
     const target = (fd.get("target") || "").toString().trim();
     const name = (fd.get("name") || "").toString().trim();
-    if (!reporter) return toast("Pick a reporter", "error");
     if (!actual && !target) return toast("Provide actual or target", "error");
-    setLastReporter(reporter);
     try {
-      const r = await api("POST", "/api/gaps", { reporter, actual, target, name });
+      const r = await api("POST", "/api/gaps", {
+        reporter: currentReporter, actual, target, name,
+      });
       toast("Gap created", "info");
       location.hash = "#/gaps/" + r.gap.id;
     } catch (err) {
@@ -834,16 +834,27 @@ async function renderGapNew() {
 
 async function renderGapImport() {
   renderBanners([]);
+  const reporter = state.lastReporter || "";
+  if (!reporter) {
+    $("#main").innerHTML = `
+      <h2>Import gaps</h2>
+      <div class="card">
+        ${renderPickReporterNotice()}
+        <div class="actions" style="margin-top:8px">
+          <a class="btn secondary" href="#/gaps">Back to gaps</a>
+        </div>
+      </div>
+    `;
+    return;
+  }
   $("#main").innerHTML = `
     <h2>Import gaps</h2>
     <p class="muted">Paste free-form text (meeting transcript, bug report, feedback dump).
     refine extracts a draft list — review and edit before saving.</p>
     <div class="card">
-      <div class="form-row">
-        <label>Reporter <span class="muted">(applies to all extracted gaps)</span></label>
-        <select id="import-reporter" data-reporter-select required>
-          <option value="">— pick reporter —</option>
-        </select>
+      <div class="muted small" style="margin-bottom:8px">
+        Submitting as <strong>${htmlEscape(reporter)}</strong>
+        — applies to all extracted gaps. Change in the top-right reporter selector.
       </div>
       <div class="form-row">
         <label>Source text</label>
@@ -856,8 +867,6 @@ async function renderGapImport() {
     </div>
     <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
   `;
-  populateAllReporterDropdowns();
-  $("#import-reporter").value = state.lastReporter || "";
   $("#btn-extract").addEventListener("click", async () => {
     const text = $("#import-text").value.trim();
     if (!text) return toast("Paste some text first", "error");
@@ -893,9 +902,8 @@ function drawDrafts(drafts) {
     </div>
   `;
   $("#btn-persist").addEventListener("click", async () => {
-    const reporter = $("#import-reporter").value;
-    if (!reporter) return toast("Pick a reporter", "error");
-    setLastReporter(reporter);
+    const reporter = state.lastReporter || "";
+    if (!reporter) return toast("Pick a reporter in the top-right selector", "error");
     const payload = $$(".draft", root).map((row) => ({
       name: row.querySelector(".d-name").value.trim(),
       actual: row.querySelector(".d-actual").value.trim(),
@@ -1193,11 +1201,17 @@ function drawSettings(s, diag, reps) {
     catch (e) { toast(e.message, "error"); }
   }));
   $$("[data-rename]").forEach((b) => b.addEventListener("click", async () => {
-    const name = await modalPrompt("New name", b.dataset.name,
+    const oldName = b.dataset.name;
+    const name = await modalPrompt("New name", oldName,
                                    { title: "Rename reporter" });
     if (!name || !name.trim()) return;
-    try { await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: name.trim() }); await renderSettings(); }
-    catch (e) { toast(e.message, "error"); }
+    const newName = name.trim();
+    try {
+      await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: newName });
+      if (state.lastReporter === oldName) setLastReporter(newName);
+      await refreshReporters();
+      await renderSettings();
+    } catch (e) { toast(e.message, "error"); }
   }));
   $("#r-add").addEventListener("click", async () => {
     const name = await modalPrompt("Reporter name", "",

@@ -32,9 +32,14 @@ class GitResult:
 
 def _run(args: list[str], *, cwd: Path | None = None, env: dict | None = None,
          timeout: float | None = 120.0) -> GitResult:
+    # Default to the client repo. Without this, callers that forget to pass
+    # cwd inherit the runner's process cwd — which is usually the refine
+    # source clone (itself a git repo), causing `git worktree add` and friends
+    # to operate on refine instead of the target project.
+    run_cwd = cwd if cwd is not None else client_repo_path()
     proc = subprocess.run(
         ["git", *args],
-        cwd=str(cwd) if cwd else None,
+        cwd=str(run_cwd),
         env=env,
         capture_output=True,
         text=True,
