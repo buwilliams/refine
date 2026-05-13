@@ -25,14 +25,14 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 **In Docker (`refine-web`):**
 
 - Python web server (UI + JSON API + SSE).
-- Reads and writes the SQLite database and gap JSON files via a bind mount onto the host filesystem.
-- Talks to the host runner over a local IPC channel (e.g. Unix domain socket mounted into the container — concrete wire protocol TBD) to launch / cancel agent subprocesses and query their state.
+- **Reads** the SQLite database and gap JSON files via a bind mount onto the host filesystem. **Writes** SQLite directly (settings, reporters, ephemeral run state) but does **not** write gap JSON files.
+- Talks to the host runner over a local IPC channel (e.g. Unix domain socket mounted into the container — concrete wire protocol TBD) for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
 
 **On the host (`refine-runner`):**
 
 - Spawns Claude Code CLI subprocesses (`claude --print ...`) directly on the host — they inherit the host's `~/.claude/` auth, PATH, and shell.
 - Runs every `git` operation against the client repo — fetch, branch, worktree, merge, push — using the host's SSH keys and git config.
-- Writes round `logs[]` entries and updates the gap JSON files as work progresses.
+- **Owns all `gap.json` writes.** Serializes them per-Gap with an atomic temp-file-plus-rename. Applies round submissions, round edits, and log appends sent over IPC by the webapp, plus its own log appends from agent subprocesses and git events.
 - Reports state changes back to the webapp via the IPC channel and by writing to SQLite (which the webapp's SSE stream surfaces).
 
 **Shared filesystem state:**
@@ -66,7 +66,12 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
   "created":  "2026-05-13T00:00:00Z",
   "updated":  "2026-05-13T00:00:00Z",
   "logs": [
-    { "datetime": "2026-05-13T00:00:01Z", "message": "agent started" }
+    {
+      "datetime": "2026-05-13T00:00:01Z",
+      "severity": "info",
+      "category": "cli",
+      "message":  "agent started"
+    }
   ]
 }
 ```
@@ -75,7 +80,7 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 - **`reporter`:** Name of the person submitting this round, chosen at submission time from a dropdown of known reporters (with an inline option to add a new name). Stored as a string on the round; renaming a reporter later does not rewrite historical rounds. See **Reporters**.
 - **Lifecycle:** Each round bundles one human submission with the agent run it triggers. The **first round** *is* the Gap (the original ask). **Subsequent rounds** are follow-ups submitted by the human after reviewing the prior round and deciding more work is needed.
 - **Execution:** Only the **latest** round drives the next agent invocation. **Each round is independent** — the agent runs fresh with no memory of prior rounds. Continuity carries through the **state of the Gap's branch**: each round's agent sees the commits earlier rounds produced. Round descriptions must therefore be self-contained.
-- **`logs[]`:** Append-only entries written by refine during the agent's run for that round. Each entry has shape `{datetime, message}`. Sources include model output, tool-call summaries, git events, and errors.
+- **`logs[]`:** Append-only entries written by refine during the agent's run for that round. Each entry has shape `{datetime, severity, category, message, details?, actions?}` — same structured shape as the global activity feed. See **Feedback & recovery** for the full schema and the catalog of friendly summaries. Sources include model output, tool-call summaries, git events, and errors.
 
 ### Statuses
 
@@ -83,15 +88,15 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 |----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `todo`         | Gap has a latest round that needs an agent run (initial submission, retry after failure, or follow-up after verification). Awaiting an available subprocess slot.        |
 | `in-progress`  | A CLI subprocess is running for the Gap. Its branch + worktree exist.                                                                                                     |
-| `review`       | Agent has finished the latest round. Changes sit on the Gap's branch. Human **manually tests** the change (typically by checking out the Gap's branch locally and exercising the app) and then either Verifies (→ `done`) or submits a new round (→ `todo`).                                                      |
+| `review`       | Agent has finished the latest round. Changes sit on the Gap's branch. Human **manually tests** the change, then either Verifies (→ `done`) or submits a new round (→ `todo`). |
 | `done`         | Human has verified. Refine has merged the Gap's branch into the client repo's current branch and pushed upstream. Terminal.                                              |
-| `failed`       | The agent's CLI invocation errored, or the runner restarted while the Gap was in-progress. Worktree and branch retained for a Retry.                                      |
+| `failed`       | The agent run did not produce a successful result — errored, hit the idle timeout, exceeded the hard cap, exited with no commits, or was reconciled by a runner restart. Worktree and branch retained for a Retry. |
 | `cancelled`    | User cancelled the Gap. Worktree and branch cleaned up. Terminal.                                                                                                         |
 
 Transitions:
 - `todo → in-progress` — automatic when refine launches an agent subprocess for the Gap.
 - `in-progress → review` — automatic on successful agent completion.
-- `in-progress → failed` — automatic on agent error.
+- `in-progress → failed` — automatic on agent error, idle timeout, hard cap, exit-0-with-no-commits, or runner-restart reconciliation.
 - `failed → todo` — explicit user action ("Retry"). The worktree and branch are reused.
 - `review → done` — explicit user action ("Verify"). Refine performs the merge and push as part of the transition.
 - `review → todo` — explicit user action; triggered by appending a new round (human submitting follow-up work). The branch is retained.
@@ -163,6 +168,7 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 
 **On Gap pickup (`todo → in-progress`):**
 
+0. **Pre-check** — the client repo must be on a named branch with an upstream (`git rev-parse --abbrev-ref HEAD@{upstream}` resolves). If not, abort pickup; surface a banner (*"Branch `<n>` has no upstream — run `git push -u origin <n>` on the host"*); leave the Gap in `todo` to be retried when the operator fixes it.
 1. `git fetch` from the remote.
 2. Record the client repo's current branch name.
 3. Create the Gap's worktree and branch off `origin/<current-branch>` so the agent starts from the freshest remote tip (not stale local state).
@@ -186,21 +192,128 @@ Conflict & failure paths:
 - A failed CLI invocation moves the Gap to `failed` and appends an error entry to the latest round's `logs[]`.
 - The UI surfaces failed Gaps with a **Retry** action, which moves the Gap back to `todo`; refine will spawn a new subprocess as soon as a slot is available. No automatic retry.
 - The worktree and branch persist across retries; the next invocation runs fresh against whatever state the prior run left in the worktree.
+- **Stuck-detection.** Two independent signals can move a running subprocess to `failed`. They are deliberately separate because elapsed time alone is a poor stuck-signal — large Gaps can legitimately run for many hours.
+  - **Idle timeout** (primary) — if the CLI subprocess emits no stdout/stderr for the configured idle window (default `15 min`), refine treats it as stuck and kills it. Activity is the real "alive" signal; Claude Code prints continuously when working.
+  - **Hard wall-clock cap** (ultimate stop-gap) — if a single invocation has been running longer than the configured cap (default `24 h`), refine kills it. Intended to fire only on pathological runs that produce output but never finish. Can be disabled by setting to `0`.
+  Both produce friendly summaries distinct from "agent errored" (see **Feedback & recovery**).
+- **Retry pre-flight**: when retrying a Gap whose previous failure was `category: auth`, refine re-runs the runner's Claude auth pre-flight first. If it still fails, the Retry is blocked with the auth banner restated — saves burning an agent run on a known-broken environment.
 - **Runner restart**: on startup, the host runner reconciles state — any Gap in `in-progress` without a live subprocess is moved to `failed` with a "runner restarted" log entry. Its worktree and branch are preserved so the human can Retry.
+- **Mid-merge / mid-push crash**: a Gap in `review` whose Verify started but didn't finish (runner crashed mid-merge or mid-push) remains in `review` with a log entry recording how far it got. Clicking Verify again retries the entire fetch → pull → merge → push sequence; refine skips steps already completed locally (a fresh merge against an already-merged branch is a no-op fast-forward), so retries are safe to repeat.
+
+## Feedback & recovery
+
+Every failure must tell the user what happened in plain language and offer a recovery path. Six principles drive the design:
+
+1. **Status carries the story** — a Gap's status plus its latest log entry should answer "what happened?" without hunting through the activity feed.
+2. **Every error offers at least one action** — never just "Error." Always summary + ≥1 recovery action (Retry, Open Chat, Edit round, View details).
+3. **Two reading levels** — friendly summary on top; **Show details** reveals raw stderr / paths / exit code.
+4. **Self-heal silently** — stale `localStorage` reporters, orphan worktrees, runner-restart fail-marking — fixed without notifying.
+5. **Chat is the universal escape hatch** — for anything refine cannot auto-resolve (merge conflict, dirty working copy, push race, hook failure, auth issue), the recovery affordance is always **Open Chat** attached to the Gap.
+6. **Banners for systemic problems** — auth missing, runner unreachable, disk near full — visible on every page until resolved.
+
+### Activity entry shape
+
+Both the global activity feed and each round's `logs[]` use the same structured entry shape:
+
+```json
+{
+  "datetime": "2026-05-13T00:00:01Z",
+  "severity": "info | warn | error",
+  "category": "auth | git | cli | io | state | user",
+  "gap_id":   "ULID or null",
+  "actor":    "<reporter name> | refine | runner",
+  "message":  "human-readable summary",
+  "details":  "expandable raw stderr / paths / exit code",
+  "actions":  [{ "label": "Retry", "endpoint": "/gaps/<id>/retry" }]
+}
+```
+
+`actor` semantics:
+
+- **Round submission** — the chosen reporter name.
+- **Other user-triggered transitions** (Verify, Retry, Cancel) — `refine`. Unattributed by design; see **Reporters → Scope**.
+- **Automatic system events** — `refine` for state transitions and auto-recovery; `runner` for subprocess output, git events, and pre-flight checks.
+
+Within a round's `logs[]`, `gap_id` is implicit and may be omitted. `details` and `actions` are optional.
+
+### Friendly summaries (stderr → summary catalog)
+
+The runner pattern-matches CLI / git stderr against canonical error classes and prepends a one-line, actionable summary. The user sees the summary; **Show details** reveals raw stderr. The `category` drives which recovery action set the UI shows.
+
+| Pattern matched | Category | Summary message |
+|-----------------|----------|-----------------|
+| Claude auth error | `auth` | `Claude auth issue — run \`claude login\` on the host` |
+| `git push` non-fast-forward | `git` | `Push rejected — another developer pushed first` |
+| `git push` auth failure | `git` | `Push auth failed — check SSH agent / git credentials on the host` |
+| `git pull` non-fast-forward | `git` | `Local branch diverged from remote — manual reconciliation needed` |
+| Pre-commit hook exit ≠ 0 | `git` | `Pre-commit hook \`<name>\` failed` |
+| Pre-push hook exit ≠ 0 | `git` | `Pre-push hook \`<name>\` blocked the push` |
+| No subprocess output for idle window | `cli` | `Agent appears stuck — no output for Xm` |
+| Hard wall-clock cap exceeded | `cli` | `Agent exceeded the X-hour run cap` |
+| Exit 0, no new commits | `cli` | `Agent exited without producing changes — try refining the round` |
+| Anthropic rate-limit response | `cli` | `Claude rate-limited — try again shortly` |
+
+This is the canonical catalog. Adding a new error class is one new pattern entry plus one new row in the recovery table below.
+
+### Failure-state UI contract
+
+When a Gap is in `failed`, or in `review` with a known recovery condition (dirty working copy, push race, hook block), the Gap detail page **must** render:
+
+- **Top banner** with the category-specific summary message.
+- **Latest log entry** inline.
+- **Action row** in priority order. Typical sets:
+  - `failed`: **Retry · Edit latest round · Open Chat · Cancel · Show details**
+  - `review` w/ push race: **Verify · Open Chat · Cancel · Show details**
+  - `review` w/ dirty working copy: **Open Chat · Verify (after fix) · Cancel · Show details**
+  - `review` w/ merge conflict: **Open Chat · Verify (after resolution) · Cancel · Show details**
+  - `review` w/ pull cannot fast-forward: **Open Chat · Verify · Cancel · Show details**
+- **Full logs** expandable below the banner.
+
+No "Error: failed" dead-ends.
+
+### Global banners
+
+Sticky banners visible on every page until the underlying condition clears:
+
+- **Host runner unreachable** — *"Host runner unreachable (`<socket-path>`). Retrying every Xs. Last contact: <timestamp>."*
+- **Claude auth pre-flight failed** — *"Refine cannot reach Claude — run `claude login` on the host."* Action: **Re-check auth**.
+- **Volume root not writable** — *"Volume root not writable as UID N. Fix `user:` in docker-compose."* (Typically surfaces in container logs; webapp may not fully start.)
+- **Disk usage critical** — *"Volume root partition is N% full."* Warn at 85%, error at 95%.
+
+### Per-failure recovery reference
+
+| Failure | Surface | Plain-language message | Recovery actions |
+|---------|---------|------------------------|------------------|
+| Agent idle (no output) | Gap detail (`failed`) | "Agent appears stuck — no output for Xm" | Retry / Edit round / Open Chat |
+| Hard cap exceeded | Gap detail (`failed`) | "Agent exceeded the X-hour run cap" | Retry / Edit round / Open Chat |
+| Exit 0, no commits | Gap detail (`failed`) | "Agent finished without producing changes" | Edit round / Retry / Open Chat |
+| Claude auth missing | Banner | "Refine cannot reach Claude — run `claude login`" | Re-check auth |
+| Pre-commit hook fail | Gap detail (`failed`) | "Pre-commit hook `<n>` failed" | Open Chat / Edit round / Retry |
+| Pre-push hook fail | Gap detail (`review`) | "Pre-push hook `<n>` blocked the push" | Open Chat / Verify after fix |
+| Push race | Gap detail (`review`) | "Another developer pushed; merge needs to be redone" | Verify |
+| Dirty working copy | Inline on Verify | "Working copy has uncommitted changes on `<branch>`" | Open Chat / Verify once clean |
+| No upstream / detached HEAD | Banner + Gap (`todo`) | "Branch `<n>` has no upstream — run `git push -u origin <n>`" | (operator fix; auto-resumes) |
+| Runner down | Banner | "Host runner unreachable" | (operator fix; auto-resumes) |
+| UID mismatch | Container won't start | "Volume root not writable as UID N" | Fix `user:` in docker-compose |
+| Race / stale UI | Inline toast | "This Gap changed since you loaded it — refreshing" | (auto-refresh; user retries) |
+| Import extraction failed | Import dialog | "Could not extract Gaps — review raw output and create manually" | Show raw output / Manual entry |
+| Stale `localStorage` reporter | Reporter dropdown | (silent) | (clear; force fresh pick) |
 
 ## Features
 
 ### Dashboard
 
 Single landing view summarizing:
+- **Needs attention** — aggregates anything requiring human action: systemic banners (auth, runner, disk) and counts of failed Gaps / Gaps stuck in `review` with known recovery conditions. Each count is a clickable filter.
 - Counts per status.
 - Currently running agent subprocesses (which Gap each is on, elapsed time).
-- Recent activity feed (round submissions with reporter, state transitions, completions, failures).
+- Recent activity feed — structured entries (see **Feedback & recovery** for the entry shape). Includes round submissions with reporter, state transitions, completions, and failures.
 
 ### Gap Manager
 
 - **CRUD** — Gaps are fully CRUD. Rounds are **append-only**: only the **latest** round can be edited, and only while it is still unaddressed (Gap status `todo` or `failed`); all prior rounds are sealed, read-only.
-- **Delete by status** — deleting an `in-progress` Gap cancels it first (kills the subprocess, releases the lock) and then removes the record. Deleting from `review` or `failed` cleans up the Gap's worktree and branch. Deleting from `done` removes only the Gap record — the merged commits stay in the client repo.
+- **Cancel** — available on the Gap detail page for any non-terminal status (`todo`, `in-progress`, `review`, `failed`); moves the Gap to `cancelled` and cleans up worktree+branch. Agent Manager's Cancel is a shortcut for the `in-progress` case.
+- **Delete by status** — deleting an `in-progress` Gap cancels it first (kills the subprocess, releases the lock) and then removes the record. Deleting from `review` or `failed` cleans up the Gap's worktree and branch. Deleting from `todo` or `cancelled` removes just the record (no worktree to clean up — `todo` may not have one yet, `cancelled` was already cleaned up). Deleting from `done` removes only the Gap record; the merged commits stay in the client repo.
 - **Search** — over name, round `actual` / `target` / `reporter`, status, dates.
 - **Import** — paste free-form text (meeting transcript, bug report, feedback dump); an LLM call extracts a list of discrete Gaps, each with a seeded initial round. The user picks a reporter (defaulting to the last-used name) to attribute the imported rounds to, then reviews and confirms before persisting.
 
@@ -216,7 +329,7 @@ Single landing view summarizing:
 Two modes, both backed by Claude Code CLI:
 
 1. **Standalone, codebase-scoped.** Ad-hoc chat against the client repo. No Gap context. Useful for exploration or manual fixes outside the Gap workflow.
-2. **Attached to a Gap.** Opens a fresh CLI chat session in the Gap's worktree, so the chat sees that Gap's branch. Useful for exploring on top of the agent's work, running it locally, making manual tweaks, or resolving environment issues like a stuck merge or push. Available when the Gap's worktree exists — typically status `review` or `failed`, or briefly in `todo` between rounds — and no agent subprocess is currently running for the Gap.
+2. **Attached to a Gap.** Opens a fresh CLI chat session in the Gap's worktree, so the chat sees that Gap's branch. Useful for exploring on top of the agent's work, running it locally, making manual tweaks, or resolving environment issues like a stuck merge or push. Available when the Gap's worktree exists — typically status `review` or `failed`, or briefly in `todo` between rounds — and no agent subprocess is currently running for the Gap. An **Open Chat** affordance appears among the recovery actions on every failed Gap and every Gap stuck in `review` with a known recovery condition (see **Feedback & recovery**).
 
 Chat sessions are human-driven, not rounds: they do **not** count toward the parallel-run cap.
 
@@ -226,6 +339,8 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 - **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.
+- **Re-check auth** — on-demand re-run of the host runner's Claude auth pre-flight; clears the auth banner if it now passes.
+- **IPC diagnostics** — runner socket path, last-contact timestamp, recent IPC errors.
 - Changes take effect immediately.
 
 ## UI
@@ -245,6 +360,8 @@ All application settings live in the SQLite database and are editable from the *
 | Parallel-run cap      | `3`                                        | Max agent subprocesses running concurrently. |
 | Branch name pattern   | `refine/<gap-id>`                          | `<gap-id>` is substituted at branch creation. |
 | Merge target          | client repo's current branch at merge time | |
+| Agent idle timeout    | `15 min`                                   | Kill the subprocess if it produces no output for this long. Primary stuck-detector. Set to `0` to disable. |
+| Agent hard cap        | `24 h`                                     | Maximum wall-clock runtime per agent invocation. Ultimate stop-gap for runaway runs. Set to `0` to disable. |
 
 **Reporters list:** the set of known reporter names that backs the round-submission dropdown. Managed from the Settings → Reporters page. See **Reporters** for the full semantics.
 
