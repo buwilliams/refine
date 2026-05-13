@@ -1,15 +1,21 @@
-"""Run the refine-runner daemon on the host."""
+"""Run the refine-runner daemon on the host.
+
+Use `python -m refine runner` (the CLI dispatcher) for normal operation. This
+module's main() is kept for backwards compatibility with `python -m refine_runner`.
+"""
 from __future__ import annotations
 
 import signal
 import sys
 import threading
-import time
+
+from refine_shared import config
 
 from .runner import Runner
 
 
 def main() -> int:
+    config.get()  # ensure refine.toml is found early; surfaces a clean error
     runner = Runner()
     stop_event = threading.Event()
 

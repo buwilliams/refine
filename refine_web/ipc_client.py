@@ -2,13 +2,12 @@
 from __future__ import annotations
 
 import json
-import os
 import socket
 import threading
 import uuid
 from typing import Any
 
-from refine_shared.ipc_protocol import DEFAULT_SOCKET_PATH
+from refine_shared.ipc_protocol import default_socket_path
 
 _lock = threading.Lock()
 
@@ -23,9 +22,7 @@ class IpcError(Exception):
 
 class RunnerClient:
     def __init__(self, socket_path: str | None = None) -> None:
-        self.socket_path = socket_path or os.environ.get(
-            "REFINE_RUNNER_SOCKET", DEFAULT_SOCKET_PATH
-        )
+        self.socket_path = socket_path or default_socket_path()
 
     def call(self, method: str, params: dict | None = None,
              *, timeout: float = 30.0) -> dict:

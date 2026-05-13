@@ -1,0 +1,245 @@
+"""argparse-based CLI for refine.
+
+Subcommands:
+- init    — write refine.toml + run/ + gaps/ in a chosen volume root
+- runner  — start the host-native runner daemon
+- web     — start the webapp (rarely invoked directly; Docker wraps it)
+- doctor  — diagnostic snapshot (config, IPC, claude, git)
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import socket
+import subprocess
+import sys
+from pathlib import Path
+
+from refine_shared import config
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="refine", description="Manage refine.")
+    parser.add_argument(
+        "--config", "-c",
+        help="Path to refine.toml (defaults to walking up from cwd).",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p_init = sub.add_parser("init", help="Initialize a new refine instance.")
+    p_init.add_argument(
+        "--dir", "-d", default="refine",
+        help='Volume root directory to create (default: "./refine").',
+    )
+    p_init.add_argument("--force", action="store_true",
+                        help="Overwrite an existing refine.toml.")
+    p_init.set_defaults(fn=cmd_init)
+
+    p_runner = sub.add_parser("runner", help="Start the host runner daemon.")
+    p_runner.set_defaults(fn=cmd_runner)
+
+    p_web = sub.add_parser("web", help="Start the webapp.")
+    p_web.set_defaults(fn=cmd_web)
+
+    p_doctor = sub.add_parser("doctor", help="Print a diagnostic snapshot.")
+    p_doctor.set_defaults(fn=cmd_doctor)
+
+    args = parser.parse_args(argv)
+    return args.fn(args)
+
+
+# ----- init -------------------------------------------------------------------
+
+def cmd_init(args: argparse.Namespace) -> int:
+    target = Path(args.dir).resolve()
+    try:
+        cfg_path = config.write_defaults(target, force=args.force)
+    except config.ConfigError as e:
+        print(f"refine init: {e}", file=sys.stderr)
+        return 1
+    print(f"Wrote {cfg_path}")
+    print(f"Created directories: {target}/run, {target}/gaps")
+    print()
+    print("Next steps:")
+    print(f"  1. cd {target.parent}")
+    print(f"  2. {sys.executable} -m refine runner   # in one terminal")
+    print(f"  3. docker compose up                   # in another terminal")
+    print()
+    print("Or use `python -m refine doctor` to verify configuration.")
+    return 0
+
+
+# ----- runner -----------------------------------------------------------------
+
+def cmd_runner(args: argparse.Namespace) -> int:
+    _load_config_or_exit(args)
+    from refine_runner.__main__ import main as runner_main
+    return runner_main()
+
+
+# ----- web --------------------------------------------------------------------
+
+def cmd_web(args: argparse.Namespace) -> int:
+    _load_config_or_exit(args)
+    from refine_web.__main__ import main as web_main
+    return web_main()
+
+
+# ----- doctor -----------------------------------------------------------------
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    cfg_path = args.config
+    try:
+        cfg = config.get(path=cfg_path) if cfg_path else config.get()
+    except config.ConfigError as e:
+        print(_red("No refine configuration found."))
+        print(f"  {e}")
+        print()
+        print("Run `refine init` in the client repo to create one.")
+        return 1
+
+    print(_section("Configuration"))
+    _kv("config file",   cfg.config_path)
+    _kv("volume root",   cfg.volume_root)
+    _kv("client repo",   cfg.client_repo)
+    _kv("runner socket", cfg.runner_socket)
+    _kv("web host:port", f"{cfg.web_host}:{cfg.web_port}")
+
+    print(_section("Volume root"))
+    sqlite_present = cfg.sqlite_path.is_file()
+    _kv("index.sqlite",  f"{cfg.sqlite_path} ({'present' if sqlite_present else 'missing'})")
+    gap_count = _count_gap_files(cfg.gaps_dir)
+    _kv("gaps/ files",   f"{gap_count} gap.json file(s)")
+    _kv("runner socket dir", cfg.runner_socket.parent)
+
+    print(_section("Host runner"))
+    reachable, ping_msg = _ipc_ping(cfg.runner_socket)
+    _kv("socket reachable", _bool(reachable))
+    if not reachable:
+        _kv("error", ping_msg or "")
+    else:
+        _kv("ping ok", "pong")
+
+    print(_section("Claude CLI"))
+    claude_path = shutil.which("claude") or "(not on PATH)"
+    _kv("claude path", claude_path)
+    ok, msg = _claude_version(claude_path)
+    _kv("claude --version", _bool(ok))
+    if not ok:
+        _kv("error", msg or "")
+
+    print(_section("Client repo / git"))
+    repo = cfg.client_repo
+    if not (repo / ".git").exists():
+        _kv("git", _red("not a git repository"))
+    else:
+        branch = _git(repo, "symbolic-ref", "--quiet", "--short", "HEAD")
+        upstream = _git(repo, "rev-parse", "--abbrev-ref", f"{branch.strip()}@{{upstream}}") if branch.strip() else None
+        dirty = _git(repo, "status", "--porcelain")
+        _kv("branch", branch.strip() or _red("detached HEAD"))
+        _kv("upstream", (upstream or "").strip() or _red("no upstream"))
+        _kv("clean", _bool(not (dirty or "").strip()))
+
+    print()
+    ok_all = reachable and ok and (repo / ".git").exists()
+    print(_green("doctor: ok") if ok_all else _red("doctor: issues to address (see above)"))
+    return 0 if ok_all else 1
+
+
+# ----- helpers ----------------------------------------------------------------
+
+def _load_config_or_exit(args: argparse.Namespace) -> None:
+    try:
+        if args.config:
+            config.get(path=args.config)
+        else:
+            config.get()
+    except config.ConfigError as e:
+        print(f"refine: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _ipc_ping(socket_path: Path) -> tuple[bool, str | None]:
+    if not socket_path.exists():
+        return False, f"socket file not found: {socket_path}"
+    try:
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+            s.settimeout(3.0)
+            s.connect(str(socket_path))
+            envelope = {"id": "doctor", "method": "ping", "params": {}}
+            s.sendall((json.dumps(envelope) + "\n").encode("utf-8"))
+            buf = b""
+            while b"\n" not in buf:
+                chunk = s.recv(65536)
+                if not chunk:
+                    break
+                buf += chunk
+        line, _, _ = buf.partition(b"\n")
+        resp = json.loads(line.decode("utf-8"))
+        if resp.get("ok") and resp.get("result", {}).get("pong"):
+            return True, None
+        return False, f"unexpected response: {resp}"
+    except (ConnectionRefusedError, PermissionError, FileNotFoundError) as e:
+        return False, repr(e)
+    except Exception as e:
+        return False, repr(e)
+
+
+def _claude_version(claude_path: str) -> tuple[bool, str | None]:
+    try:
+        out = subprocess.run(
+            [claude_path, "--version"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if out.returncode == 0:
+            return True, out.stdout.strip()
+        return False, (out.stderr.strip() or out.stdout.strip()
+                       or f"exit code {out.returncode}")
+    except FileNotFoundError as e:
+        return False, repr(e)
+    except subprocess.TimeoutExpired:
+        return False, "claude --version timed out (10s)"
+    except Exception as e:
+        return False, repr(e)
+
+
+def _git(cwd: Path, *args: str) -> str:
+    try:
+        out = subprocess.run(
+            ["git", *args], cwd=str(cwd),
+            capture_output=True, text=True, timeout=10,
+        )
+        return out.stdout
+    except Exception:
+        return ""
+
+
+def _count_gap_files(gaps_dir: Path) -> int:
+    if not gaps_dir.is_dir():
+        return 0
+    return sum(1 for _ in gaps_dir.rglob("gap.json"))
+
+
+def _section(title: str) -> str:
+    return f"\n{_bold(title)}\n" + "-" * len(title)
+
+
+def _kv(label: str, value) -> None:  # noqa: ANN001
+    print(f"  {label:<22} {value}")
+
+
+def _bool(b: bool) -> str:
+    return _green("yes") if b else _red("no")
+
+
+def _bold(s: str) -> str:
+    return f"\033[1m{s}\033[0m" if sys.stdout.isatty() else s
+
+
+def _red(s: str) -> str:
+    return f"\033[31m{s}\033[0m" if sys.stdout.isatty() else s
+
+
+def _green(s: str) -> str:
+    return f"\033[32m{s}\033[0m" if sys.stdout.isatty() else s

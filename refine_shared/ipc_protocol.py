@@ -11,12 +11,11 @@ A blank line is ignored. Connection is one-shot for now (simple).
 """
 from __future__ import annotations
 
-import os
-from typing import Final
 
-DEFAULT_SOCKET_PATH: Final = os.environ.get(
-    "REFINE_RUNNER_SOCKET", "/var/run/refine/runner.sock"
-)
+def default_socket_path() -> str:
+    """Return the configured runner socket path. Reads refine.toml on first call."""
+    from . import config
+    return str(config.get().runner_socket)
 
 # Method names
 M_PING = "ping"

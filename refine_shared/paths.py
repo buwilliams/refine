@@ -1,36 +1,37 @@
-"""Filesystem layout for the volume root.
+"""Filesystem layout helpers.
 
-Spec: <volume-root>/
-        index.sqlite
-        gaps/<first 2 chars of ULID>/<remaining ULID>/gap.json
+Resolves paths inside the volume root (the directory containing refine.toml).
+Spec:
+    <volume-root>/
+      refine.toml
+      index.sqlite
+      run/runner.sock
+      gaps/<first 2 chars>/<remaining ULID>/gap.json
 """
 from __future__ import annotations
 
-import os
 from pathlib import Path
+
+from . import config
 
 
 def volume_root() -> Path:
-    """Read REFINE_VOLUME_ROOT env var (set in docker-compose / runner start)."""
-    p = os.environ.get("REFINE_VOLUME_ROOT")
-    if not p:
-        raise RuntimeError("REFINE_VOLUME_ROOT not set")
-    return Path(p)
+    return config.get().volume_root
 
 
-def sqlite_path(root: Path | None = None) -> Path:
-    return (root or volume_root()) / "index.sqlite"
+def sqlite_path() -> Path:
+    return config.get().sqlite_path
 
 
-def gap_dir(gap_id: str, root: Path | None = None) -> Path:
+def gap_dir(gap_id: str) -> Path:
     gid = gap_id.upper()
     if len(gid) < 3:
         raise ValueError(f"gap_id too short: {gap_id!r}")
-    return (root or volume_root()) / "gaps" / gid[:2] / gid[2:]
+    return volume_root() / "gaps" / gid[:2] / gid[2:]
 
 
-def gap_json_path(gap_id: str, root: Path | None = None) -> Path:
-    return gap_dir(gap_id, root) / "gap.json"
+def gap_json_path(gap_id: str) -> Path:
+    return gap_dir(gap_id) / "gap.json"
 
 
 def relative_gap_path(gap_id: str) -> str:

@@ -13,10 +13,10 @@ from typing import Any
 from refine_shared import activity, db, gaps as shared_gaps, reporters
 from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
-    DEFAULT_SOCKET_PATH, M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ,
-    M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS,
-    M_EDIT_ROUND, M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING,
-    M_VERIFY,
+    M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
+    M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
+    M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING, M_VERIFY,
+    default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
@@ -43,7 +43,7 @@ class Runner:
         self.dispatcher = _dispatcher.Dispatcher(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
         )
-        self.ipc = IpcServer(DEFAULT_SOCKET_PATH, self._dispatch_method)
+        self.ipc = IpcServer(default_socket_path(), self._dispatch_method)
         self.chat = ChatManager()
 
     def _get_conn(self) -> sqlite3.Connection:

@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-from .paths import sqlite_path, volume_root
+from .paths import sqlite_path
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS gaps_index (

@@ -13,16 +13,9 @@ from pathlib import Path
 
 
 def client_repo_path() -> Path:
-    """The bind-mounted client repo lives at <volume-root>/.. (volume root is inside the repo).
-
-    Override via REFINE_CLIENT_REPO env var.
-    """
-    p = os.environ.get("REFINE_CLIENT_REPO")
-    if p:
-        return Path(p)
-    # by default: volume root parent (volume root lives *inside* the client repo)
-    from refine_shared.paths import volume_root
-    return volume_root().resolve().parent
+    """The client repo, as configured in refine.toml."""
+    from refine_shared import config
+    return config.get().client_repo
 
 
 def worktrees_dir() -> Path:

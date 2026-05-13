@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -26,19 +27,24 @@ def main() -> int:
     subprocess.run(["git", "init", "-q"], cwd=client, check=True)
     subprocess.run(["git", "-c", "user.email=t@x", "-c", "user.name=t",
                     "commit", "--allow-empty", "-m", "init"], cwd=client, check=True)
-    vroot = client / "refine"
-    vroot.mkdir()
+    os.chdir(client)
 
-    socket_path = str(tmp / "runner.sock")
-    os.environ["REFINE_VOLUME_ROOT"] = str(vroot)
-    os.environ["REFINE_CLIENT_REPO"] = str(client)
-    os.environ["REFINE_RUNNER_SOCKET"] = socket_path
-    os.environ["REFINE_WEB_PORT"] = "18099"
-
-    # Force re-import in this env.
+    # Clear any cached refine modules from prior test runs.
     for mod in list(sys.modules):
-        if mod.startswith("refine_"):
+        if mod.startswith("refine"):
             del sys.modules[mod]
+
+    from refine_shared import config
+
+    # Write the config (equivalent to `refine init`). Override the web port
+    # so we don't collide with any local 8080.
+    cfg_path = config.write_defaults(client / "refine")
+    cfg_path.write_text(
+        cfg_path.read_text().replace("port = 8080", "port = 18099")
+        .replace("0.0.0.0", "127.0.0.1"),
+        encoding="utf-8",
+    )
+    cfg = config.get(reload=True)
 
     from refine_runner.runner import Runner
     from refine_web.ipc_client import RunnerClient
@@ -49,26 +55,23 @@ def main() -> int:
     runner.start()
     print("[ok] runner started")
     try:
-        # IPC ping
-        client_ipc = RunnerClient(socket_path)
+        client_ipc = RunnerClient()
         resp = client_ipc.ping()
         assert resp.get("pong") is True
         print("[ok] IPC ping → pong")
 
-        # Start the webapp in a background thread
         poller = SqlitePoller(interval=0.5)
         poller.start()
         web_thread = threading.Thread(
-            target=lambda: web_server.run(host="127.0.0.1", port=18099),
+            target=lambda: web_server.run(host=cfg.web_host, port=cfg.web_port),
             daemon=True,
         )
         web_thread.start()
-        # wait briefly for server to bind
-        time.sleep(0.6)
+        time.sleep(0.6)  # give server time to bind
 
         def get_json(path: str) -> tuple[int, dict]:
             req = urllib.request.Request(
-                f"http://127.0.0.1:18099{path}",
+                f"http://{cfg.web_host}:{cfg.web_port}{path}",
                 headers={"Accept": "application/json"},
             )
             try:
@@ -80,9 +83,8 @@ def main() -> int:
         def post_json(path: str, body: dict) -> tuple[int, dict]:
             data = json.dumps(body).encode("utf-8")
             req = urllib.request.Request(
-                f"http://127.0.0.1:18099{path}",
-                data=data,
-                method="POST",
+                f"http://{cfg.web_host}:{cfg.web_port}{path}",
+                data=data, method="POST",
                 headers={"Content-Type": "application/json"},
             )
             try:
@@ -96,12 +98,10 @@ def main() -> int:
         assert dash["runner_reachable"] is True
         print("[ok] /api/dashboard → 200, runner reachable")
 
-        # Create a reporter
         status, rep = post_json("/api/reporters", {"name": "Jane Doe"})
         assert status == 201
         print(f"[ok] reporter created: {rep['reporter']['name']}")
 
-        # Create a Gap
         status, created = post_json("/api/gaps", {
             "reporter": "Jane Doe",
             "actual": "Login button is red.",
@@ -112,7 +112,6 @@ def main() -> int:
         gap_id = created["gap"]["id"]
         print(f"[ok] gap created: {gap_id}")
 
-        # Fetch it back
         status, fetched = get_json(f"/api/gaps/{gap_id}")
         assert status == 200
         assert fetched["gap"]["name"] == "Recolor login button"
@@ -120,33 +119,28 @@ def main() -> int:
         assert fetched["gap"]["rounds"][0]["reporter"] == "Jane Doe"
         print("[ok] gap fetched + status=todo + reporter on round")
 
-        # Add a round (must NOT work on a todo Gap — it's editing the latest)
+        # Appending to a `todo` gap should be rejected per spec.
         status, append_result = post_json(f"/api/gaps/{gap_id}/rounds", {
             "reporter": "Jane Doe", "actual": "still red", "target": "blue",
         })
-        # Conflict expected for status=todo (which is right)
         assert status == 409, append_result
         print("[ok] appending to a `todo` gap is correctly rejected (409)")
 
-        # Edit the latest round (allowed on todo)
-        status, _ = post_json(f"/api/gaps/{gap_id}/cancel", {})  # use cancel as a sentinel
-        # cancel from todo should move to cancelled
-        assert status in (200, 409), _
-        print("[ok] cancel from todo: status=", status)
+        # Cancel from todo → cancelled.
+        status, _ = post_json(f"/api/gaps/{gap_id}/cancel", {})
+        assert status == 200, _
+        print("[ok] cancel from todo → 200")
 
-        # Activity feed should have entries
         status, act = get_json("/api/activity?limit=20")
         assert status == 200
         assert isinstance(act["activity"], list) and len(act["activity"]) >= 1
         print(f"[ok] activity feed: {len(act['activity'])} entries")
 
-        # Settings endpoint
         status, s = get_json("/api/settings")
         assert status == 200
         assert "parallel_run_cap" in s["settings"]
         print("[ok] /api/settings")
 
-        # IPC diagnostics
         status, d = get_json("/api/diagnostics")
         assert status == 200
         assert d.get("reachable") is True
@@ -154,8 +148,8 @@ def main() -> int:
 
     finally:
         runner.shutdown()
-        # the webapp's thread is daemon; let the test exit terminate it
         time.sleep(0.2)
+        os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)
 
     print("\nALL OK")

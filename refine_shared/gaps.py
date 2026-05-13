@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .paths import gap_dir, gap_json_path
+from .paths import gap_dir, gap_json_path  # both consult the loaded Config
 
 
 def now_iso() -> str:
@@ -67,23 +67,23 @@ def new_round(reporter: str, actual: str, target: str) -> dict[str, Any]:
     }
 
 
-def read_gap_json(gap_id: str, root: Path | None = None) -> dict[str, Any] | None:
-    p = gap_json_path(gap_id, root)
+def read_gap_json(gap_id: str) -> dict[str, Any] | None:
+    p = gap_json_path(gap_id)
     if not p.exists():
         return None
     with open(p, "rb") as f:
         return json.loads(f.read().decode("utf-8"))
 
 
-def write_gap_json(gap: dict[str, Any], root: Path | None = None) -> None:
+def write_gap_json(gap: dict[str, Any]) -> None:
     """Atomic write: temp file in same directory + rename + fsync directory.
 
     RUNNER ONLY. The webapp must route writes through IPC.
     """
     gid = gap["id"]
-    d = gap_dir(gid, root)
+    d = gap_dir(gid)
     d.mkdir(parents=True, exist_ok=True)
-    p = gap_json_path(gid, root)
+    p = gap_json_path(gid)
     data = json.dumps(gap, ensure_ascii=False, indent=2).encode("utf-8")
     fd, tmp = tempfile.mkstemp(prefix=".gap.", suffix=".tmp", dir=str(d))
     try:

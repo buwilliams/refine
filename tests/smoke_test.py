@@ -1,6 +1,7 @@
 """End-to-end smoke test (no real Claude CLI / git remote required).
 
 Validates:
+- `refine init`-equivalent config bootstrap
 - DB init + schema is creatable
 - ULID generation
 - Reporter add/list
@@ -8,8 +9,7 @@ Validates:
 - Round append + log append
 - Friendly classification of various outcomes
 - Activity feed read/write
-- Verify-precheck failure paths (without a real git repo, the precheck fails
-  cleanly — we just check the error code paths return)
+- Runner instantiation against the configured paths
 """
 from __future__ import annotations
 
@@ -24,24 +24,29 @@ from pathlib import Path
 def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="refine-smoke-"))
     print(f"using tmp dir: {tmp}")
-    # Make a fake "client repo" with a `refine/` subdir as the volume root.
+    # Make a fake "client repo" and `refine init` a volume root inside it.
     client = tmp / "client"
     client.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=client, check=True)
     subprocess.run(["git", "-c", "user.email=t@x", "-c", "user.name=t",
                     "commit", "--allow-empty", "-m", "init"], cwd=client, check=True)
-    vroot = client / "refine"
-    vroot.mkdir()
 
-    os.environ["REFINE_VOLUME_ROOT"] = str(vroot)
-    os.environ["REFINE_CLIENT_REPO"] = str(client)
-    os.environ["REFINE_RUNNER_SOCKET"] = str(tmp / "runner.sock")
+    # Drop into the client repo so config discovery works.
+    os.chdir(client)
 
-    # Re-import in this configured environment.
-    import importlib
+    # Re-import in this clean environment.
     for mod in list(sys.modules):
-        if mod.startswith("refine_"):
+        if mod.startswith("refine"):
             del sys.modules[mod]
+
+    from refine_shared import config
+
+    # Equivalent of `refine init`
+    cfg_path = config.write_defaults(client / "refine")
+    print(f"wrote config: {cfg_path}")
+    cfg = config.get()
+    print(f"volume root:  {cfg.volume_root}")
+    print(f"client repo:  {cfg.client_repo}")
 
     from refine_shared import db, reporters, activity, gaps as shared_gaps
     from refine_shared.ulid import new_ulid, is_ulid
@@ -80,7 +85,6 @@ def main() -> int:
     assert len(gap["rounds"]) == 1
     assert gap["rounds"][0]["reporter"] == "Jane Doe"
 
-    # mirror SQLite index row (this is what runner does inside _h_create_gap)
     from refine_shared.paths import relative_gap_path
     with db.transaction(conn):
         conn.execute(
@@ -90,7 +94,6 @@ def main() -> int:
              relative_gap_path(uid)),
         )
 
-    # Read it back via the public read path
     g2 = shared_gaps.read_gap_json(uid)
     assert g2 is not None and g2["name"] == "Recolor button"
     print("[ok] gap created + persisted")
@@ -142,13 +145,12 @@ def main() -> int:
     assert classify_outcome(exit_code=2, killed_reason=None, no_new_commits=False).kind == "failure"
     print("[ok] subprocess outcome classification")
 
-    # --- Pre-flight (no Claude installed in CI is the expected path) --------
+    # --- Pre-flight ---------------------------------------------------------
     from refine_runner import preflight
     ok, msg = preflight.check(conn)
     print(f"[ok] preflight ran (ok={ok}, msg={'set' if msg else 'none'})")
 
-    # --- Runner instantiation (no socket bind) ------------------------------
-    # Don't actually start the runner here; just check the class wires up.
+    # --- Runner instantiation -----------------------------------------------
     from refine_runner.runner import Runner
     r = Runner()
     assert r.sub_mgr is not None
@@ -157,6 +159,7 @@ def main() -> int:
 
     # cleanup
     conn.close()
+    os.chdir(tempfile.gettempdir())  # release the cwd before rmtree
     shutil.rmtree(tmp, ignore_errors=True)
     print("\nALL OK")
     return 0
