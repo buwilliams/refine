@@ -1,7 +1,6 @@
 """Run the refine-runner daemon on the host.
 
-Use `python -m refine runner` (the CLI dispatcher) for normal operation. This
-module's main() is kept for backwards compatibility with `python -m refine_runner`.
+Invoked as `uv run refine runner` (the CLI dispatcher).
 """
 from __future__ import annotations
 

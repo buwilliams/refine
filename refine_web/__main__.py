@@ -1,9 +1,7 @@
 """Webapp entry point.
 
 Loads refine.toml, initializes SQLite, starts the SSE poller, and serves HTTP.
-
-Use `python -m refine web` (the CLI dispatcher) for normal operation. This
-module's main() is kept for backwards compatibility with `python -m refine_web`.
+Invoked as `uv run refine web` (the CLI dispatcher).
 """
 from __future__ import annotations
 

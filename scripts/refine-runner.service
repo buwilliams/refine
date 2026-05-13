@@ -1,19 +1,14 @@
 # Example systemd unit for refine-runner. Install at:
 #   /etc/systemd/system/refine-runner.service
 #
-# Two viable styles depending on how refine is invoked:
+# Adjust:
+#   - User/Group         — operator account (the one that ran `claude login`
+#                          and has rights to the bound client repo)
+#   - WorkingDirectory   — the refine source clone (the dir containing
+#                          .refine-binding produced by `refine init`)
 #
-# A) Bound-clone style (matches `uv run refine init <client>` flow):
-#    - WorkingDirectory is the refine source clone
-#    - The .refine-binding inside it points at the client repo
-#    - ExecStart uses `uv run refine runner` (uv must be available to User)
-#
-# B) Installed-CLI style (matches `pip install /opt/refine` flow):
-#    - WorkingDirectory is the client repo (where refine.toml lives)
-#    - ExecStart uses `/usr/local/bin/refine runner`
-#
-# Pick one and delete the other. Adjust User/Group to the operator account
-# (the one that has run `claude login`).
+# refine has zero env-var configuration: the binding inside WorkingDirectory
+# resolves which client to operate on.
 
 [Unit]
 Description=refine host runner
@@ -23,15 +18,8 @@ After=network.target
 Type=simple
 User=refine
 Group=refine
-
-# --- Style A: bound clone with uv ---
-# WorkingDirectory=/opt/refine-acme
-# ExecStart=/usr/local/bin/uv run refine runner
-
-# --- Style B: globally installed refine ---
-WorkingDirectory=/srv/clients/acme-app
-ExecStart=/usr/local/bin/refine runner
-
+WorkingDirectory=/opt/refine-acme
+ExecStart=/usr/local/bin/uv run refine runner
 Restart=on-failure
 RestartSec=2
 

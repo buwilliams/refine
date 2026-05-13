@@ -90,18 +90,11 @@ uv run refine init /srv/clients/other-client --force
 
 `--force` is required because a binding already exists.
 
-### No `uv`? Two alternatives
-
-- `cd /opt/refine && PYTHONPATH=. python3 -m refine init <path>` — stdlib-only.
-- `pip install /opt/refine` (or `pipx install`) → use `refine` as a global
-  command, then `cd <client repo> && refine init`. No binding file needed in
-  that flow because `refine.toml` is discovered by walking up from cwd.
-
 ### Production runner
 
 Install `scripts/refine-runner.service` as a systemd unit (edit `User`,
-`Group`, and `WorkingDirectory` first). The unit runs `refine runner` from
-your refine clone via `uv run` (or installed binary). Zero env vars.
+`Group`, and `WorkingDirectory` first). The unit runs `uv run refine runner`
+from your refine clone. Zero env vars.
 
 ## How it talks to itself
 
@@ -158,20 +151,20 @@ the UI's Settings page.
 
 ## CLI reference
 
-| Command          | What it does                                                       |
-|------------------|--------------------------------------------------------------------|
-| `refine init`    | Write `refine.toml` + `run/` + `gaps/` in the chosen directory.    |
-| `refine runner`  | Start the host-native runner daemon.                               |
-| `refine web`     | Start the webapp (rarely used directly — Docker wraps it).         |
-| `refine doctor`  | Show config, IPC, claude auth, and git status.                     |
+| Command                       | What it does                                                       |
+|-------------------------------|--------------------------------------------------------------------|
+| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/` in `<path>`; bind this clone. |
+| `uv run refine runner`        | Start the host-native runner daemon.                               |
+| `uv run refine web`           | Start the webapp (rarely used directly — Docker wraps it).         |
+| `uv run refine doctor`        | Show config, IPC, claude auth, and git status.                     |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.
 
 ## Running the tests
 
 ```bash
-PYTHONPATH=. python3 tests/smoke_test.py        # data-layer + storage
-PYTHONPATH=. python3 tests/integration_test.py   # runner + webapp end-to-end
+uv run python tests/smoke_test.py        # data-layer + storage
+uv run python tests/integration_test.py   # runner + webapp end-to-end
 ```
 
 The integration test boots a real runner and webapp on a temp directory and

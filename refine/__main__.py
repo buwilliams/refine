@@ -1,4 +1,4 @@
-"""`python -m refine <subcommand>` entry."""
+"""`uv run refine <subcommand>` entry."""
 from .cli import main
 
 raise SystemExit(main())
