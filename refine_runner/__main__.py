@@ -1,6 +1,6 @@
 """Run the refine-runner daemon on the host.
 
-Invoked as `uv run refine runner` (the CLI dispatcher).
+Invoked as `uv run refine start` (the CLI dispatcher).
 """
 from __future__ import annotations
 

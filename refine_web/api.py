@@ -14,7 +14,7 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RUNNING, M_VERIFY,
+    M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RUNNING, M_SET_NOTES, M_VERIFY,
 )
 from refine_shared.ulid import new_ulid
 
@@ -169,41 +169,54 @@ def _autoname(actual: str, target: str) -> str:
 
 
 def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
-    """PATCH handler: accepts `name` and/or `priority`. Both are SQLite-only
-    fields (status / priority are not in gap.json), so we write the index
-    row directly and nudge gap.json to keep its mtime fresh.
+    """PATCH handler: accepts `name`, `priority`, and/or `notes`.
+
+    Name and priority are SQLite-only fields — we write the index row
+    directly and nudge gap.json so its mtime matches. Notes live in
+    gap.json (gap-level metadata that should travel with the file), so
+    we route those writes through the runner via M_SET_NOTES.
     """
-    fields: dict[str, str] = {}
+    sql_fields: dict[str, str] = {}
     if "name" in body:
         new_name = (body.get("name") or "").strip()
         if not new_name:
             return err(400, "name is required")
-        fields["name"] = new_name
+        sql_fields["name"] = new_name
     if "priority" in body:
         p = (body.get("priority") or "").strip().lower()
         if p not in _VALID_PRIORITIES:
             return err(400, "priority must be one of low/medium/high")
-        fields["priority"] = p
-    if not fields:
-        return err(400, "expected `name` and/or `priority`")
-    set_clause = ", ".join(f"{k} = ?" for k in fields) + ", updated = ?"
-    args = list(fields.values()) + [now_iso(), gap_id]
-    conn = _conn()
-    try:
-        with db.transaction(conn):
-            conn.execute(
-                f"UPDATE gaps_index SET {set_clause} WHERE id = ?", args,
-            )
-    finally:
-        conn.close()
-    # gap.json carries `updated` too — nudge it through the runner so the
-    # file's mtime matches the index change.
-    try:
-        get_client().call(M_EDIT_ROUND, {
-            "gap_id": gap_id, "actual": None, "target": None, "reporter": None,
-        })
-    except IpcError:
-        pass
+        sql_fields["priority"] = p
+    notes_change = "notes" in body
+    if not sql_fields and not notes_change:
+        return err(400, "expected `name`, `priority`, and/or `notes`")
+    if sql_fields:
+        set_clause = ", ".join(f"{k} = ?" for k in sql_fields) + ", updated = ?"
+        args = list(sql_fields.values()) + [now_iso(), gap_id]
+        conn = _conn()
+        try:
+            with db.transaction(conn):
+                conn.execute(
+                    f"UPDATE gaps_index SET {set_clause} WHERE id = ?", args,
+                )
+        finally:
+            conn.close()
+    if notes_change:
+        notes = body.get("notes")
+        if not isinstance(notes, str):
+            return err(400, "notes must be a string")
+        try:
+            get_client().call(M_SET_NOTES, {"gap_id": gap_id, "notes": notes})
+        except IpcError as e:
+            return _ipc_err(e)
+    elif sql_fields:
+        # nudge gap.json's mtime to match the index update.
+        try:
+            get_client().call(M_EDIT_ROUND, {
+                "gap_id": gap_id, "actual": None, "target": None, "reporter": None,
+            })
+        except IpcError:
+            pass
     return 200, {"ok": True}
 
 

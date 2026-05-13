@@ -51,6 +51,7 @@ def empty_gap(gap_id: str, name: str) -> dict[str, Any]:
         "name": name,
         "created": now,
         "updated": now,
+        "notes": "",
         "rounds": [],
     }
 

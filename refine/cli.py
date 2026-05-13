@@ -2,7 +2,8 @@
 
 Subcommands:
 - init    — write refine.toml + run/ + gaps/ in a chosen volume root
-- runner  — start the host-native runner daemon
+- start   — start the host-native runner daemon (alias: `runner`, deprecated)
+- stop    — stop the running runner daemon
 - web     — start the webapp (rarely invoked directly; Docker wraps it)
 - doctor  — diagnostic snapshot (config, IPC, claude, git)
 """
@@ -46,7 +47,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="Overwrite an existing refine.toml / .refine-binding.")
     p_init.set_defaults(fn=cmd_init)
 
-    p_runner = sub.add_parser("runner", help="Start the host runner daemon.")
+    # `runner` kept as a hidden alias for the old name so existing systemd
+    # units / scripts keep working.
+    p_runner = sub.add_parser(
+        "start", aliases=["runner"],
+        help="Start the host runner daemon.",
+    )
     p_runner.add_argument(
         "--foreground", "-f", action="store_true",
         help="Stay attached to the terminal instead of detaching. Useful for "
@@ -137,14 +143,16 @@ def cmd_init(args: argparse.Namespace) -> int:
     print()
     print("Next steps:")
     if binding_written:
-        print(f"  1. uv run refine runner          # in one terminal (from {cwd})")
+        print(f"  1. uv run refine start            # in one terminal (from {cwd})")
         print(f"  2. docker compose up              # in another (from {cwd})")
         print(f"  3. uv run refine doctor           # whenever something looks off")
+        print(f"     (uv run refine stop            # to stop the runner)")
     else:
         print(f"  1. cd {client_repo}")
-        print(f"  2. refine runner                  # in one terminal")
+        print(f"  2. refine start                   # in one terminal")
         print(f"  3. docker compose up              # in another")
         print(f"  4. refine doctor                  # whenever something looks off")
+        print(f"     (refine stop                   # to stop the runner)")
     return 0
 
 
@@ -169,10 +177,10 @@ def cmd_runner(args: argparse.Namespace) -> int:
     existing_pid = _read_pid(pid_path)
     if existing_pid is not None and _pid_alive(existing_pid):
         print(
-            f"refine runner: already running (pid {existing_pid}).\n"
+            f"refine start: already running (pid {existing_pid}).\n"
             f"  socket: {cfg.runner_socket}\n"
             f"  logs:   {log_path}\n"
-            f"  stop:   kill {existing_pid}",
+            f"  stop:   uv run refine stop",
             file=sys.stderr,
         )
         return 1
@@ -194,7 +202,7 @@ def cmd_runner(args: argparse.Namespace) -> int:
         while time.time() < deadline:
             if not _pid_alive(pid):
                 print(
-                    f"refine runner: child {pid} exited before binding the socket. "
+                    f"refine start: child {pid} exited before binding the socket. "
                     f"See {log_path}.",
                     file=sys.stderr,
                 )
@@ -205,7 +213,7 @@ def cmd_runner(args: argparse.Namespace) -> int:
             time.sleep(0.1)
         if not bound:
             print(
-                f"refine runner: child {pid} alive but socket did not appear within 5s. "
+                f"refine start: child {pid} alive but socket did not appear within 5s. "
                 f"See {log_path}.",
                 file=sys.stderr,
             )
@@ -213,7 +221,7 @@ def cmd_runner(args: argparse.Namespace) -> int:
         print(f"refine runner started (pid {pid})")
         print(f"  socket: {cfg.runner_socket}")
         print(f"  logs:   {log_path}")
-        print(f"  stop:   kill {pid}")
+        print(f"  stop:   uv run refine stop")
         return 0
 
     # --- Child: detach from controlling terminal, redirect I/O, run the daemon.

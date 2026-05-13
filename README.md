@@ -80,9 +80,10 @@ git commit -m "add refine"
 cd /opt/refine-acme
 
 claude login                       # one-time, as the operator user
-uv run refine runner               # daemonizes; prints pid, socket, log path
+uv run refine start                # daemonizes; prints pid, socket, log path
 docker compose up                  # webapp, reads the .env
 uv run refine doctor               # config + IPC + claude + git status report
+uv run refine stop                 # stop the runner when you're done
 ```
 
 Open <http://localhost:8080>.
@@ -108,8 +109,8 @@ uv run refine init /srv/clients/other-client --force
 ### Production runner
 
 Install `scripts/refine-runner.service` as a systemd unit (edit `User`,
-`Group`, and `WorkingDirectory` first). The unit runs `uv run refine runner`
-from your refine clone. Zero env vars.
+`Group`, and `WorkingDirectory` first). The unit runs `uv run refine start
+--foreground` from your refine clone. Zero env vars.
 
 ## How it talks to itself
 
@@ -169,7 +170,7 @@ the UI's Settings page.
 | Command                       | What it does                                                       |
 |-------------------------------|--------------------------------------------------------------------|
 | `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/` in `<path>`; bind this clone. |
-| `uv run refine runner`        | Start the host-native runner daemon.                               |
+| `uv run refine start`         | Start the host-native runner daemon (alias: `runner`).            |
 | `uv run refine stop`          | Stop the running runner (SIGTERM, escalates to SIGKILL on timeout). |
 | `uv run refine web`           | Start the webapp (rarely used directly — Docker wraps it).         |
 | `uv run refine doctor`        | Show config, IPC, claude auth, and git status.                     |

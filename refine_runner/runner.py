@@ -15,8 +15,8 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING, M_VERIFY,
-    default_socket_path,
+    M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING, M_SET_NOTES,
+    M_VERIFY, default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
@@ -95,6 +95,7 @@ class Runner:
             M_EDIT_ROUND: self._h_edit_round,
             M_LOG_APPEND: self._h_log_append,
             M_DELETE_GAP: self._h_delete_gap,
+            M_SET_NOTES: self._h_set_notes,
             M_CHAT_START: self._h_chat_start,
             M_CHAT_INPUT: self._h_chat_input,
             M_CHAT_READ: self._h_chat_read,
@@ -260,6 +261,26 @@ class Runner:
         )
         return {"deleted": True}
 
+    def _h_set_notes(self, params: dict) -> dict:
+        gap_id = params["gap_id"]
+        notes = params.get("notes")
+        if not isinstance(notes, str):
+            raise ValueError("notes must be a string")
+        gap = gap_writer.set_notes(gap_id, notes)
+        # Mirror the touch onto the index row so listings sort right.
+        with db.transaction(self._conn):
+            self._conn.execute(
+                "UPDATE gaps_index SET updated = ? WHERE id = ?",
+                (gap["updated"], gap_id),
+            )
+        activity.append(
+            self._conn,
+            message=f"Notes updated ({len(notes)} chars)",
+            severity="info", category="state",
+            gap_id=gap_id, actor="refine",
+        )
+        return {"gap": gap}
+
     # ---- chat ----------------------------------------------------------------
 
     def _h_chat_start(self, params: dict) -> dict:
@@ -371,6 +392,14 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
             msg = entry.get("message", "")
             sev = entry.get("severity", "info")
             parts.append(f"- [{ts}] ({sev}) {msg}")
+    notes = (gap_json.get("notes") or "").strip()
+    if notes:
+        parts.append("")
+        parts.append("## Notes from the user")
+        parts.append("These are freeform notes the operator attached to this")
+        parts.append("Gap — treat them as authoritative additional context.")
+        parts.append("")
+        parts.append(notes)
     parts += [
         "",
         "Don't commit anything to git unless I explicitly ask. Don't repeat",

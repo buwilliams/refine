@@ -617,6 +617,22 @@ function drawGapDetail(gap) {
           <span class="banner-actions">${failureBanner.actionsHtml}</span>
         </div>` : ""}
 
+      <div class="card" style="margin-bottom:14px">
+        <div class="row" style="align-items:center;margin-bottom:6px">
+          <h3 style="margin:0">Notes</h3>
+          <span class="muted small">Saved to gap.json and included in attached
+            Chat context. Edit any time.</span>
+          <span class="spacer"></span>
+          <span id="gap-notes-status" class="muted small"></span>
+        </div>
+        <textarea id="gap-notes" rows="5"
+                  placeholder="Anything Claude or the team should know about this Gap — links to specs, prior decisions, constraints, related code paths."
+                  >${htmlEscape(gap.notes || "")}</textarea>
+        <div class="actions" style="margin-top:8px">
+          <button id="btn-save-notes">Save notes</button>
+        </div>
+      </div>
+
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
         rounds.map((rnd, idx) => renderRound(rnd, idx, idx === rounds.length - 1, isLatestEditable && idx === rounds.length - 1)).join("")}
@@ -675,6 +691,21 @@ function drawGapDetail(gap) {
       await api("PATCH", "/api/gaps/" + gap.id, { name: name.trim() });
       await loadGapDetail(gap.id);
     } catch (e) { toast(e.message, "error"); }
+  });
+  $("#btn-save-notes")?.addEventListener("click", async () => {
+    const btn = $("#btn-save-notes");
+    const ta = $("#gap-notes");
+    if (!ta) return;
+    const notes = ta.value;
+    await withButtonBusy(btn, "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/gaps/" + gap.id, { notes });
+        const statusEl = $("#gap-notes-status");
+        if (statusEl) statusEl.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
+        // Refresh the local gap.notes so a later re-render doesn't show stale.
+        gap.notes = notes;
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $("#gap-priority-select")?.addEventListener("change", async (e) => {
     const next = e.target.value;

@@ -28,6 +28,7 @@ M_APPEND_ROUND = "append_round"           # human submitted a new round → gap.
 M_EDIT_ROUND = "edit_round"               # webapp asks runner to edit the latest round
 M_LOG_APPEND = "log_append"               # append a {datetime, severity, category, message} entry
 M_DELETE_GAP = "delete_gap"               # remove gap.json + worktree as appropriate
+M_SET_NOTES = "set_notes"                  # save freeform Gap-level notes
 M_CHAT_START = "chat_start"               # spawn an interactive `claude` subprocess in a worktree
 M_CHAT_INPUT = "chat_input"               # feed input line to running chat
 M_CHAT_READ = "chat_read"                 # drain queued output lines + liveness

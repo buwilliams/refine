@@ -32,6 +32,18 @@ def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any]) -> dict
         return gap
 
 
+def set_notes(gap_id: str, notes: str) -> dict[str, Any]:
+    """Replace the Gap's freeform notes field in gap.json."""
+    with _lock_for(gap_id):
+        gap = shared_gaps.read_gap_json(gap_id)
+        if gap is None:
+            raise FileNotFoundError(f"gap.json missing for {gap_id}")
+        gap["notes"] = notes
+        gap["updated"] = now_iso()
+        shared_gaps.write_gap_json(gap)
+        return gap
+
+
 def append_round(gap_id: str, round_obj: dict[str, Any]) -> dict[str, Any]:
     with _lock_for(gap_id):
         gap = shared_gaps.read_gap_json(gap_id)
