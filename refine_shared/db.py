@@ -26,9 +26,10 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     branch_name TEXT,
     json_path   TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_gaps_status   ON gaps_index(status);
-CREATE INDEX IF NOT EXISTS idx_gaps_updated  ON gaps_index(updated);
-CREATE INDEX IF NOT EXISTS idx_gaps_priority ON gaps_index(priority);
+CREATE INDEX IF NOT EXISTS idx_gaps_status  ON gaps_index(status);
+CREATE INDEX IF NOT EXISTS idx_gaps_updated ON gaps_index(updated);
+-- idx_gaps_priority is created in _migrate() after the ALTER TABLE step,
+-- so it works on databases that predate the priority column.
 
 CREATE TABLE IF NOT EXISTS runs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -120,9 +121,12 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE gaps_index ADD COLUMN priority TEXT NOT NULL DEFAULT 'low'"
         )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_gaps_priority ON gaps_index(priority)"
-        )
+    # Always (re-)assert the index. CREATE INDEX IF NOT EXISTS is a no-op on
+    # fresh databases (just after the executescript built the table) and on
+    # already-migrated ones — so this is safe to run unconditionally.
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gaps_priority ON gaps_index(priority)"
+    )
 
 
 @contextmanager
