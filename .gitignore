@@ -9,6 +9,10 @@ __pycache__/
 build/
 dist/
 
+# Per-clone refine binding (links this refine source dir to a client repo).
+# Created by `refine init`; host-specific; do not commit.
+.refine-binding
+
 # Local volume root if anyone tries refine against this repo itself
 /refine-data/
 *.sqlite

@@ -1,27 +1,28 @@
 # refine-web — Dockerized webapp.
 #
-# Run from inside the client repo (the directory that contains `refine/`):
+# Run from the refine source directory, after `refine init <client-repo>`
+# has bound this clone to a client (which writes the .env file this compose
+# file reads):
 #
-#   cd /srv/clients/acme-app
-#   docker compose --file <path-to-refine>/docker-compose.yml up
+#   cd /opt/refine
+#   uv run refine init /srv/clients/acme-app
+#   docker compose up
 #
-# Or symlink this file into the client repo. The bind mounts below are
-# relative to docker compose's own working directory.
+# REFINE_CLIENT_REFINE_DIR is set by `refine init` in the .env file alongside
+# this compose file. Inside the container, /refine-data is the volume root;
+# refine.toml is discovered automatically because working_dir is /refine-data.
 #
-# The companion refine-runner is NOT in this compose file by design — it runs
-# natively on the host so it inherits the host's Claude Code auth, SSH keys,
-# and git config. See README → "Running the host runner".
+# The companion refine-runner runs natively on the host (so it inherits the
+# host's Claude Code auth, SSH keys, and git config); it's not in this compose
+# file by design. See README.
 
 services:
   refine-web:
     build:
       context: .
-    # Inside the container, /refine-data is the volume root; refine.toml is
-    # discovered automatically because /refine-data is the working dir.
     working_dir: /refine-data
     volumes:
-      # The client repo's `refine/` directory becomes the volume root.
-      - ./refine:/refine-data
+      - "${REFINE_CLIENT_REFINE_DIR:?Run `refine init <client-repo>` first to bind this clone}:/refine-data"
     ports:
       - "8080:8080"
     restart: unless-stopped

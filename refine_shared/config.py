@@ -30,6 +30,7 @@ except ModuleNotFoundError:
 
 
 CONFIG_FILENAME = "refine.toml"
+BINDING_FILENAME = ".refine-binding"
 
 
 class ConfigError(Exception):
@@ -93,13 +94,31 @@ def _resolve(base: Path, p: str) -> Path:
 
 
 def find_config(start: Path | None = None) -> Path | None:
-    """Walk up from `start` (cwd) looking for refine.toml or refine/refine.toml.
+    """Discover refine.toml. Tries, in order:
 
-    Also checks fixed fallback locations used by the Docker container.
+    1. A `.refine-binding` file in cwd or any ancestor — its target client
+       repo's `refine/refine.toml`. This is the "run from /opt/refine
+       targeting /srv/clients/<x>" workflow.
+    2. Walking up from cwd looking for `refine.toml` or `refine/refine.toml`.
+       This is the "run from inside the client repo" workflow.
+    3. The Docker-conventional `/refine-data/refine.toml`.
     """
     start = (start or Path.cwd()).resolve()
-    candidates = []
-    seen = set()
+
+    # 1. Binding file
+    binding = find_binding(start)
+    if binding is not None:
+        try:
+            client_repo = read_binding(binding)
+            cfg = client_repo / "refine" / CONFIG_FILENAME
+            if cfg.is_file():
+                return cfg
+        except (ConfigError, OSError):
+            pass
+
+    # 2. Walk up
+    candidates: list[Path] = []
+    seen: set[Path] = set()
     for d in [start, *start.parents]:
         for c in (d / CONFIG_FILENAME, d / "refine" / CONFIG_FILENAME):
             key = c.resolve(strict=False)
@@ -107,14 +126,62 @@ def find_config(start: Path | None = None) -> Path | None:
                 continue
             seen.add(key)
             candidates.append(c)
-    # Docker-conventional locations (kept stable across versions; not user-facing).
-    for fixed in (Path("/refine-data") / CONFIG_FILENAME,):
-        if fixed not in seen:
-            candidates.append(fixed)
+
+    # 3. Docker-conventional fallback
+    fixed = Path("/refine-data") / CONFIG_FILENAME
+    if fixed.resolve(strict=False) not in seen:
+        candidates.append(fixed)
+
     for c in candidates:
         if c.is_file():
             return c
     return None
+
+
+# ---- Binding ----------------------------------------------------------------
+
+def find_binding(start: Path | None = None) -> Path | None:
+    """Look for `.refine-binding` in cwd (or `start`) and its ancestors."""
+    start = (start or Path.cwd()).resolve()
+    for d in [start, *start.parents]:
+        b = d / BINDING_FILENAME
+        if b.is_file():
+            return b
+    return None
+
+
+def read_binding(binding_path: Path) -> Path:
+    """Read `.refine-binding` and return the bound client repo path.
+
+    File format: first non-empty, non-comment line is the path (absolute or
+    relative to the binding file's directory).
+    """
+    text = binding_path.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        p = Path(s).expanduser()
+        if not p.is_absolute():
+            p = (binding_path.parent / p).resolve()
+        return p
+    raise ConfigError(f"{binding_path} contains no client-repo path")
+
+
+def write_binding(refine_source_dir: Path, client_repo: Path) -> Path:
+    """Write `.refine-binding` in the refine source dir pointing at a client.
+
+    Returns the absolute path to the written binding file.
+    """
+    refine_source_dir = refine_source_dir.resolve()
+    binding = refine_source_dir / BINDING_FILENAME
+    binding.write_text(
+        f"# refine binding — this refine clone targets the client repo below.\n"
+        f"# Created by `refine init`. Re-run `refine init <other_path>` to rebind.\n"
+        f"{client_repo.resolve()}\n",
+        encoding="utf-8",
+    )
+    return binding
 
 
 DEFAULT_TOML = """# refine — per-project configuration. Commit this file alongside the

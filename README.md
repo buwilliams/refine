@@ -30,68 +30,82 @@ refine/
 
 ## Quick start
 
-### One-time on the host
+The flow uses [`uv`](https://docs.astral.sh/uv/) so you never have to install
+refine system-wide. Each refine clone is bound to one client repo via
+`refine init`, and all `uv run refine …` commands then "just know" which
+client to target.
 
-Install refine once per machine. This puts the `refine` command on the
-operator's PATH; nothing is added to any client repo.
+### 1. Clone refine once per client
 
 ```bash
-git clone https://github.com/buwilliams/refine.git /opt/refine
-pip install /opt/refine
-# or, to keep refine isolated from system Python:
-#   pipx install /opt/refine
+git clone https://github.com/buwilliams/refine.git /opt/refine-acme
 ```
 
-You should now be able to run `refine --help`.
+(You can have multiple clones if you're working across clients —
+`/opt/refine-acme`, `/opt/refine-globex`, etc. Each is paired with one
+client.)
 
-### Per client repo
-
-Inside each client's git repo, bootstrap a refine volume root:
+### 2. Bind the clone to the client repo
 
 ```bash
-cd /srv/clients/acme-app   # the client's git repo
-refine init                # creates ./refine/refine.toml + ./refine/run + ./refine/gaps
+cd /opt/refine-acme
+uv run refine init /srv/clients/acme-app
+```
+
+This:
+- Creates `/srv/clients/acme-app/refine/refine.toml` + `run/` + `gaps/` +
+  `.gitignore` (the client's volume root).
+- Writes `/opt/refine-acme/.refine-binding` so future commands from
+  `/opt/refine-acme` target this client.
+- Writes `/opt/refine-acme/.env` so `docker compose` reads the bind-mount path.
+
+Commit the new files in the client repo when you're ready:
+
+```bash
+cd /srv/clients/acme-app
 git add refine/refine.toml refine/.gitignore
 git commit -m "add refine"
 ```
 
-`refine init` only writes config and creates directories. It does *not* install
-anything. The created `refine/.gitignore` excludes the SQLite file and the
-runner socket; everything else (refine.toml, gap.json files) gets committed
-alongside the client's source so refine state travels with the codebase.
-
-### Day to day
+### 3. Run from the refine source dir
 
 ```bash
-cd /srv/clients/acme-app
+cd /opt/refine-acme
 
-# one-time, on this host: log in to Claude as the operator
-claude login
-
-# start the runner (foreground; use systemd for production)
-refine runner &
-
-# start the webapp (bind-mounts ./refine from the cwd)
-docker compose --file /opt/refine/docker-compose.yml up
+claude login                       # one-time, as the operator user
+uv run refine runner &             # host-native daemon, reads the binding
+docker compose up                  # webapp, reads the .env
+uv run refine doctor               # config + IPC + claude + git status report
 ```
 
 Open <http://localhost:8080>.
 
-### Verify
+For a different client, `cd /opt/refine-globex` (or wherever) and run the
+same commands. Each clone tracks its own binding.
+
+### Re-binding
+
+To point an existing refine clone at a different client:
 
 ```bash
-cd /srv/clients/acme-app
-refine doctor
+cd /opt/refine-acme
+uv run refine init /srv/clients/other-client --force
 ```
 
-Prints config paths, runner-socket reachability, claude auth status, and git
-state. Use it whenever something doesn't behave as expected.
+`--force` is required because a binding already exists.
+
+### No `uv`? Two alternatives
+
+- `cd /opt/refine && PYTHONPATH=. python3 -m refine init <path>` — stdlib-only.
+- `pip install /opt/refine` (or `pipx install`) → use `refine` as a global
+  command, then `cd <client repo> && refine init`. No binding file needed in
+  that flow because `refine.toml` is discovered by walking up from cwd.
 
 ### Production runner
 
 Install `scripts/refine-runner.service` as a systemd unit (edit `User`,
-`Group`, and `WorkingDirectory` first). The unit invokes `/usr/local/bin/refine
-runner` and reads `refine.toml` from its `WorkingDirectory`. Zero env vars.
+`Group`, and `WorkingDirectory` first). The unit runs `refine runner` from
+your refine clone via `uv run` (or installed binary). Zero env vars.
 
 ## How it talks to itself
 
