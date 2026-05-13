@@ -66,11 +66,8 @@ pre {
 .nav a.active { background: var(--accent-bg); color: var(--accent); font-weight: 500; }
 .nav a:hover { background: var(--code-bg); }
 .reporter-corner select {
-  margin-left: 6px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: white;
+  width: auto;
+  min-width: 180px;
 }
 
 .banners { padding: 0 20px; }
