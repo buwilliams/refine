@@ -69,7 +69,7 @@ git commit -m "add refine"
 cd /opt/refine-acme
 
 claude login                       # one-time, as the operator user
-uv run refine runner &             # host-native daemon, reads the binding
+uv run refine runner               # daemonizes; prints pid, socket, log path
 docker compose up                  # webapp, reads the .env
 uv run refine doctor               # config + IPC + claude + git status report
 ```

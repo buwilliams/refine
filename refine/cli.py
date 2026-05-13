@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -46,6 +47,11 @@ def main(argv: list[str] | None = None) -> int:
     p_init.set_defaults(fn=cmd_init)
 
     p_runner = sub.add_parser("runner", help="Start the host runner daemon.")
+    p_runner.add_argument(
+        "--foreground", "-f", action="store_true",
+        help="Stay attached to the terminal instead of detaching. Useful for "
+             "debugging and required for systemd Type=simple units.",
+    )
     p_runner.set_defaults(fn=cmd_runner)
 
     p_web = sub.add_parser("web", help="Start the webapp.")
@@ -133,8 +139,107 @@ def _is_refine_source_dir(p: Path) -> bool:
 
 def cmd_runner(args: argparse.Namespace) -> int:
     _load_config_or_exit(args)
+    cfg = config.get()
+
+    if args.foreground:
+        from refine_runner.__main__ import main as runner_main
+        return runner_main()
+
+    pid_path = cfg.volume_root / "run" / "runner.pid"
+    log_path = cfg.volume_root / "run" / "runner.log"
+
+    existing_pid = _read_pid(pid_path)
+    if existing_pid is not None and _pid_alive(existing_pid):
+        print(
+            f"refine runner: already running (pid {existing_pid}).\n"
+            f"  socket: {cfg.runner_socket}\n"
+            f"  logs:   {log_path}\n"
+            f"  stop:   kill {existing_pid}",
+            file=sys.stderr,
+        )
+        return 1
+    if existing_pid is not None and not _pid_alive(existing_pid):
+        try:
+            pid_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    pid = os.fork()
+    if pid > 0:
+        # Parent: poll briefly for the socket file (= daemon is listening).
+        # Surface a crash if the child dies before binding.
+        import time
+        deadline = time.time() + 5.0
+        bound = False
+        while time.time() < deadline:
+            if not _pid_alive(pid):
+                print(
+                    f"refine runner: child {pid} exited before binding the socket. "
+                    f"See {log_path}.",
+                    file=sys.stderr,
+                )
+                return 1
+            if cfg.runner_socket.exists():
+                bound = True
+                break
+            time.sleep(0.1)
+        if not bound:
+            print(
+                f"refine runner: child {pid} alive but socket did not appear within 5s. "
+                f"See {log_path}.",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"refine runner started (pid {pid})")
+        print(f"  socket: {cfg.runner_socket}")
+        print(f"  logs:   {log_path}")
+        print(f"  stop:   kill {pid}")
+        return 0
+
+    # --- Child: detach from controlling terminal, redirect I/O, run the daemon.
+    import signal
+    os.setsid()
+    log_fd = os.open(str(log_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+    devnull_fd = os.open(os.devnull, os.O_RDONLY)
+    os.dup2(log_fd, 1)        # stdout → log file
+    os.dup2(log_fd, 2)        # stderr → log file
+    os.dup2(devnull_fd, 0)    # stdin  → /dev/null
+    os.close(log_fd)
+    os.close(devnull_fd)
+
+    pid_path.write_text(f"{os.getpid()}\n")
+
+    def _cleanup_pid_file(*_a):
+        try:
+            pid_path.unlink()
+        except FileNotFoundError:
+            pass
+
+    import atexit
+    atexit.register(_cleanup_pid_file)
+
     from refine_runner.__main__ import main as runner_main
-    return runner_main()
+    sys.exit(runner_main())
+
+
+def _read_pid(p: Path) -> int | None:
+    try:
+        return int(p.read_text().strip())
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        # Process exists; we just don't own it.
+        return True
 
 
 # ----- web --------------------------------------------------------------------

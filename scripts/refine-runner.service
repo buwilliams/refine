@@ -19,7 +19,7 @@ Type=simple
 User=refine
 Group=refine
 WorkingDirectory=/opt/refine-acme
-ExecStart=/usr/local/bin/uv run refine runner
+ExecStart=/usr/local/bin/uv run refine runner --foreground
 Restart=on-failure
 RestartSec=2
 
