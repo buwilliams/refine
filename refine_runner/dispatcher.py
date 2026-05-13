@@ -64,10 +64,17 @@ class Dispatcher:
         running = len(self.sub_mgr.running_snapshot())
         if running >= cap:
             return
+        # High → Medium → Low, then oldest-updated first within a tier.
+        # SQLite sorts text alphabetically, which would put high < low < medium —
+        # wrong order — so we explicitly map priority to an integer rank.
         rows = conn.execute(
             "SELECT id, name, branch_name FROM gaps_index "
             "WHERE status = 'todo' "
-            "ORDER BY updated ASC LIMIT ?",
+            "ORDER BY CASE priority "
+            "  WHEN 'high'   THEN 0 "
+            "  WHEN 'medium' THEN 1 "
+            "  ELSE 2 "
+            "END, updated ASC LIMIT ?",
             (cap - running,),
         ).fetchall()
         for row in rows:

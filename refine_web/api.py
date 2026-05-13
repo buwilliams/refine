@@ -36,9 +36,12 @@ def _conn() -> sqlite3.Connection:
 
 # --- Gap endpoints ------------------------------------------------------------
 
+_VALID_PRIORITIES = ("low", "medium", "high")
+
+
 def list_gaps(*, status: str | None = None, q: str | None = None,
               limit: int = 200) -> tuple[int, dict]:
-    sql = ["SELECT id, name, status, created, updated, branch_name FROM gaps_index"]
+    sql = ["SELECT id, name, status, priority, created, updated, branch_name FROM gaps_index"]
     args: list[Any] = []
     where: list[str] = []
     if status:
@@ -70,7 +73,7 @@ def _augment_with_round_search(initial: list[dict], q: str,
     conn = _conn()
     try:
         rows = conn.execute(
-            "SELECT id, name, status, created, updated, branch_name "
+            "SELECT id, name, status, priority, created, updated, branch_name "
             "FROM gaps_index ORDER BY updated DESC LIMIT 1000"
         ).fetchall()
     finally:
@@ -100,7 +103,7 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
         row = conn.execute(
-            "SELECT id, name, status, created, updated, branch_name "
+            "SELECT id, name, status, priority, created, updated, branch_name "
             "FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
         if not row:
@@ -115,9 +118,11 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
         "id": gap_id, "name": row["name"], "rounds": [],
         "created": row["created"], "updated": row["updated"],
     }
-    # SQLite is the source of truth for `status` — overlay it onto the response.
+    # SQLite is the source of truth for `status` and `priority` — overlay
+    # them onto the response.
     gap = dict(gap)
     gap["status"] = row["status"]
+    gap["priority"] = row["priority"] or "low"
     gap["branch_name"] = row["branch_name"]
     gap["activity"] = gap_activity
     return 200, {"gap": gap}
@@ -131,6 +136,9 @@ def create_gap(body: dict) -> tuple[int, dict]:
     actual = (body.get("actual") or "").strip()
     target = (body.get("target") or "").strip()
     name = (body.get("name") or "").strip() or _autoname(actual, target)
+    priority = (body.get("priority") or "low").strip().lower()
+    if priority not in _VALID_PRIORITIES:
+        return err(400, "priority must be one of low/medium/high")
     if not reporter:
         return err(400, "reporter is required")
     if not actual and not target:
@@ -140,7 +148,7 @@ def create_gap(body: dict) -> tuple[int, dict]:
     gap_id = new_ulid()
     try:
         result = get_client().call(M_CREATE_GAP, {
-            "gap_id": gap_id, "name": name,
+            "gap_id": gap_id, "name": name, "priority": priority,
             "reporter": reporter, "actual": actual, "target": target,
         })
     except IpcError as e:
@@ -161,23 +169,39 @@ def _autoname(actual: str, target: str) -> str:
 
 
 def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
-    new_name = (body.get("name") or "").strip()
-    if not new_name:
-        return err(400, "name is required")
+    """PATCH handler: accepts `name` and/or `priority`. Both are SQLite-only
+    fields (status / priority are not in gap.json), so we write the index
+    row directly and nudge gap.json to keep its mtime fresh.
+    """
+    fields: dict[str, str] = {}
+    if "name" in body:
+        new_name = (body.get("name") or "").strip()
+        if not new_name:
+            return err(400, "name is required")
+        fields["name"] = new_name
+    if "priority" in body:
+        p = (body.get("priority") or "").strip().lower()
+        if p not in _VALID_PRIORITIES:
+            return err(400, "priority must be one of low/medium/high")
+        fields["priority"] = p
+    if not fields:
+        return err(400, "expected `name` and/or `priority`")
+    set_clause = ", ".join(f"{k} = ?" for k in fields) + ", updated = ?"
+    args = list(fields.values()) + [now_iso(), gap_id]
     conn = _conn()
     try:
         with db.transaction(conn):
             conn.execute(
-                "UPDATE gaps_index SET name = ?, updated = ? WHERE id = ?",
-                (new_name, now_iso(), gap_id),
+                f"UPDATE gaps_index SET {set_clause} WHERE id = ?", args,
             )
     finally:
         conn.close()
-    # gap.json carries name too — route the write through the runner.
+    # gap.json carries `updated` too — nudge it through the runner so the
+    # file's mtime matches the index change.
     try:
         get_client().call(M_EDIT_ROUND, {
             "gap_id": gap_id, "actual": None, "target": None, "reporter": None,
-        })  # no-op edit just to keep gap.json fresh; OK to be a tiny lie if reporter null
+        })
     except IpcError:
         pass
     return 200, {"ok": True}

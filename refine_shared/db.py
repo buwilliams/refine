@@ -20,13 +20,15 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     id          TEXT PRIMARY KEY,
     name        TEXT NOT NULL,
     status      TEXT NOT NULL,
+    priority    TEXT NOT NULL DEFAULT 'low',
     created     TEXT NOT NULL,
     updated     TEXT NOT NULL,
     branch_name TEXT,
     json_path   TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_gaps_status  ON gaps_index(status);
-CREATE INDEX IF NOT EXISTS idx_gaps_updated ON gaps_index(updated);
+CREATE INDEX IF NOT EXISTS idx_gaps_status   ON gaps_index(status);
+CREATE INDEX IF NOT EXISTS idx_gaps_updated  ON gaps_index(updated);
+CREATE INDEX IF NOT EXISTS idx_gaps_priority ON gaps_index(priority);
 
 CREATE TABLE IF NOT EXISTS runs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -101,12 +103,26 @@ def init_db(path: Path | None = None) -> None:
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
+        _migrate(conn)
         for k, v in DEFAULT_SETTINGS.items():
             conn.execute(
                 "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v)
             )
     finally:
         conn.close()
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Bring existing databases up to current schema. Idempotent — checks
+    `PRAGMA table_info` before adding columns."""
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(gaps_index)")}
+    if "priority" not in cols:
+        conn.execute(
+            "ALTER TABLE gaps_index ADD COLUMN priority TEXT NOT NULL DEFAULT 'low'"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_gaps_priority ON gaps_index(priority)"
+        )
 
 
 @contextmanager

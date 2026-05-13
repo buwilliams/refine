@@ -156,6 +156,7 @@ class Runner:
     def _h_create_gap(self, params: dict) -> dict:
         gap_id = params["gap_id"]
         name = params.get("name", "Untitled Gap")
+        priority = _normalize_priority(params.get("priority"))
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -166,9 +167,9 @@ class Runner:
         from refine_shared.paths import relative_gap_path
         with db.transaction(self._conn):
             self._conn.execute(
-                "INSERT INTO gaps_index (id, name, status, created, updated, json_path) "
-                "VALUES (?, ?, 'todo', ?, ?, ?)",
-                (gap_id, name, gap["created"], gap["updated"],
+                "INSERT INTO gaps_index (id, name, status, priority, created, updated, json_path) "
+                "VALUES (?, ?, 'todo', ?, ?, ?, ?)",
+                (gap_id, name, priority, gap["created"], gap["updated"],
                  relative_gap_path(gap_id)),
             )
         # ensure reporter exists in dropdown list
@@ -294,6 +295,17 @@ class Runner:
     def _h_chat_stop(self, params: dict) -> dict:
         ok = self.chat.stop(params["session_id"])
         return {"stopped": ok}
+
+
+_VALID_PRIORITIES = ("low", "medium", "high")
+
+
+def _normalize_priority(value: Any) -> str:
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in _VALID_PRIORITIES:
+            return v
+    return "low"
 
 
 # ---- chat priming -----------------------------------------------------------

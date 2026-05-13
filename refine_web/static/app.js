@@ -507,12 +507,13 @@ function drawGapsTable(gaps) {
   }
   root.innerHTML = `
     <table class="table">
-      <thead><tr><th>Name</th><th>Status</th><th>Updated</th><th>ID</th></tr></thead>
+      <thead><tr><th>Name</th><th>Status</th><th>Priority</th><th>Updated</th><th>ID</th></tr></thead>
       <tbody>
         ${gaps.map((g) => `
           <tr data-id="${g.id}">
             <td>${htmlEscape(g.name)}</td>
             <td><span class="status-pill ${g.status}">${g.status}</span></td>
+            <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small">${fmtTime(g.updated)}</td>
             <td class="muted small"><code>${g.id.slice(0,10)}…</code></td>
           </tr>`).join("")}
@@ -590,6 +591,12 @@ function drawGapDetail(gap) {
       <div class="row" style="align-items:center;margin-bottom:8px">
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
         <span class="status-pill ${gap.status}">${gap.status}</span>
+        <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
+        <label class="muted small" for="gap-priority-select">change:</label>
+        <select id="gap-priority-select" style="width:auto">
+          ${["low", "medium", "high"].map((p) => `
+            <option value="${p}" ${p === (gap.priority || "low") ? "selected" : ""}>${p}</option>`).join("")}
+        </select>
       </div>
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-verify" ${verifyEnabled ? "" : "disabled"}>Verify</button>
@@ -668,6 +675,17 @@ function drawGapDetail(gap) {
       await api("PATCH", "/api/gaps/" + gap.id, { name: name.trim() });
       await loadGapDetail(gap.id);
     } catch (e) { toast(e.message, "error"); }
+  });
+  $("#gap-priority-select")?.addEventListener("change", async (e) => {
+    const next = e.target.value;
+    try {
+      await api("PATCH", "/api/gaps/" + gap.id, { priority: next });
+      toast(`Priority set to ${next}`, "info");
+      await loadGapDetail(gap.id);
+    } catch (err) {
+      toast(err.message, "error");
+      e.target.value = gap.priority || "low";   // revert on failure
+    }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {
     const btn = $("#btn-cancel");
@@ -883,9 +901,18 @@ async function renderGapNew() {
           <label>Target (desired behavior)</label>
           <textarea name="target" placeholder="What should be happening?"></textarea>
         </div>
+        <div class="form-row">
+          <label>Priority</label>
+          <select name="priority">
+            <option value="low" selected>Low (default)</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+          </select>
+        </div>
         <p class="muted small">
           A name will be auto-generated from the text above — you can rename
-          the Gap on its detail page afterwards.
+          the Gap on its detail page afterwards. High-priority Gaps run before
+          medium, and medium before low.
         </p>
         <div class="actions">
           <button type="submit">Create Gap</button>
@@ -902,10 +929,11 @@ async function renderGapNew() {
     const fd = new FormData(form);
     const actual = (fd.get("actual") || "").toString().trim();
     const target = (fd.get("target") || "").toString().trim();
+    const priority = (fd.get("priority") || "low").toString();
     if (!actual && !target) return toast("Provide actual or target", "error");
     try {
       const r = await api("POST", "/api/gaps", {
-        reporter: currentReporter, actual, target,
+        reporter: currentReporter, actual, target, priority,
       });
       toast("Gap created", "info");
       location.hash = "#/gaps/" + r.gap.id;

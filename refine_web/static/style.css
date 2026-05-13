@@ -178,6 +178,18 @@ h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
 .status-pill.failed      { background: #fdecea; color: #b3261e; }
 .status-pill.cancelled   { background: #eef0f4; color: #6a7280; }
 
+.priority-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: lowercase;
+}
+.priority-pill.priority-low    { background: #eef0f4; color: #4a5060; }
+.priority-pill.priority-medium { background: var(--warn-bg); color: var(--warn); }
+.priority-pill.priority-high   { background: var(--error-bg); color: var(--error); }
+
 button, .btn {
   font: inherit;
   line-height: 1.3;
