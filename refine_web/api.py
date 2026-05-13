@@ -255,7 +255,11 @@ def verify(gap_id: str) -> tuple[int, dict]:
 
 
 def retry(gap_id: str) -> tuple[int, dict]:
-    # Webapp writes status=todo directly (per write-ownership split).
+    """Reopen a terminal Gap by transitioning it back to `todo` so the
+    dispatcher picks it up again. Allowed from `failed`, `done`, or
+    `cancelled`. (Webapp writes `status=todo` directly per the write-
+    ownership split.)
+    """
     conn = _conn()
     try:
         row = conn.execute(
@@ -263,9 +267,14 @@ def retry(gap_id: str) -> tuple[int, dict]:
         ).fetchone()
         if not row:
             return err(404, "Gap not found")
-        if row["status"] != "failed":
-            return err(409, f"Retry only valid from failed (status={row['status']})")
-        # Retry pre-flight: if last failure was auth, re-run pre-flight.
+        prev_status = row["status"]
+        if prev_status not in ("failed", "done", "cancelled"):
+            return err(
+                409,
+                f"Reopen only valid from failed/done/cancelled (status={prev_status})",
+            )
+        # If the most recent failure was an auth issue, re-run pre-flight
+        # before reopening so we don't immediately fail again.
         last = conn.execute(
             "SELECT failure_category FROM runs WHERE gap_id = ? "
             "ORDER BY id DESC LIMIT 1", (gap_id,),
@@ -274,7 +283,7 @@ def retry(gap_id: str) -> tuple[int, dict]:
             try:
                 pf = get_client().call(M_PREFLIGHT, {})
                 if not pf.get("ok"):
-                    return err(409, "Auth pre-flight still failing — Retry blocked",
+                    return err(409, "Auth pre-flight still failing — Reopen blocked",
                                pf.get("message"))
             except IpcError as e:
                 return _ipc_err(e)
@@ -284,7 +293,7 @@ def retry(gap_id: str) -> tuple[int, dict]:
                 (now_iso(), gap_id),
             )
         activity.append(
-            conn, message="Retry requested",
+            conn, message=f"Reopened from {prev_status} → todo",
             severity="info", category="state",
             gap_id=gap_id, actor="refine",
         )
@@ -371,6 +380,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
     allowed = {
         "parallel_run_cap", "branch_name_pattern",
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
+        "chat_idle_timeout_seconds",
         "paused",
     }
     conn = _conn()

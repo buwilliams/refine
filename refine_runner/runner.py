@@ -44,7 +44,11 @@ class Runner:
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
         )
         self.ipc = IpcServer(default_socket_path(), self._dispatch_method)
-        self.chat = ChatManager()
+        self.chat = ChatManager(
+            get_standalone_idle_timeout=lambda: db.get_setting_int(
+                self._conn, "chat_idle_timeout_seconds", 300,
+            ),
+        )
 
     def _get_conn(self) -> sqlite3.Connection:
         return self._conn
@@ -258,9 +262,11 @@ class Runner:
             cwd = git_ops.gap_worktree_path(gap_id)
             if not cwd.exists():
                 raise ValueError(f"Gap {gap_id} has no worktree")
+            is_standalone = False
         else:
             cwd = git_ops.client_repo_path()
-        sid = self.chat.start(cwd)
+            is_standalone = True
+        sid = self.chat.start(cwd, is_standalone=is_standalone)
         return {"session_id": sid}
 
     def _h_chat_input(self, params: dict) -> dict:

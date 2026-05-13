@@ -194,6 +194,7 @@ button, .btn {
   text-decoration: none;  /* anchors with .btn */
 }
 button.secondary, .btn.secondary { background: white; color: var(--fg); border-color: var(--border); }
+button.warn, .btn.warn           { background: var(--warn); color: white; }
 button.danger, .btn.danger       { background: var(--error); color: white; }
 button.subtle, .btn.subtle       { background: transparent; color: var(--muted); border-color: transparent; }
 button:disabled, .btn:disabled   { opacity: 0.5; cursor: not-allowed; }

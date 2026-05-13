@@ -207,6 +207,9 @@ function setLastReporter(name) {
   localStorage.setItem("refine_last_reporter", name);
   const g = $("#global-reporter");
   if (g) g.value = name;
+  // Keep any in-page "Submitting as X" indicator in sync without re-rendering
+  // the form (which would lose the user's typed-but-unsubmitted text).
+  for (const el of $$(".js-reporter-name")) el.textContent = name;
   // If the user just picked their first reporter, re-render views gated on a
   // selected reporter so the form replaces the "pick a reporter" notice.
   if (wasEmpty && name) {
@@ -447,6 +450,7 @@ async function renderGapsList() {
         ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
           .map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
       </select>
+      <span id="gaps-count" class="muted small"></span>
       <span class="spacer"></span>
       <a class="btn" href="#/gaps/new">+ New Gap</a>
       <a class="btn secondary" href="#/gaps/import">Import…</a>
@@ -471,7 +475,12 @@ async function renderGapsList() {
     if (status) params.set("status", status);
     if (q) params.set("q", q);
     const data = await api("GET", "/api/gaps?" + params);
-    drawGapsTable(data.gaps || []);
+    const gaps = data.gaps || [];
+    const countEl = $("#gaps-count");
+    if (countEl) {
+      countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
+    }
+    drawGapsTable(gaps);
   } catch (e) {
     $("#gaps-table").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
@@ -533,6 +542,10 @@ function drawGapDetail(gap) {
   const isLatestEditable = (gap.status === "todo" || gap.status === "failed");
   const verifyEnabled = gap.status === "review";
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
+  // Chat is "attach to the running agent" — only meaningful while in-progress.
+  const chatEnabled = gap.status === "in-progress";
+  // Reopen pulls a terminal Gap back to todo so the dispatcher picks it up.
+  const reopenEnabled = ["failed", "done", "cancelled"].includes(gap.status);
 
   $("#main").innerHTML = `
     <div class="gap-detail">
@@ -542,9 +555,10 @@ function drawGapDetail(gap) {
       </div>
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-verify" ${verifyEnabled ? "" : "disabled"}>Verify</button>
-        <button class="secondary" id="btn-chat">Open Chat</button>
-        <button class="danger" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
-        <button class="secondary" id="btn-rename">Rename</button>
+        <button id="btn-chat" ${chatEnabled ? "" : "disabled"}>Open Chat</button>
+        <button id="btn-reopen" ${reopenEnabled ? "" : "disabled"}>Reopen</button>
+        <button class="warn" id="btn-rename">Rename</button>
+        <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
         <button class="danger" id="btn-delete">Delete</button>
       </div>
       <div class="muted small" style="margin-bottom:14px">
@@ -586,7 +600,21 @@ function drawGapDetail(gap) {
     } catch (e) { toast(e.message, "error"); }
   });
   $("#btn-chat")?.addEventListener("click", () => {
+    if ($("#btn-chat").disabled) return;
     location.hash = "#/chat?gap=" + gap.id;
+  });
+  $("#btn-reopen")?.addEventListener("click", async () => {
+    if ($("#btn-reopen").disabled) return;
+    const ok = await modalConfirm(
+      `Reopen this Gap? It will move from ${gap.status} back to todo and the dispatcher will pick it up again.`,
+      { title: "Reopen Gap", okLabel: "Reopen", cancelLabel: "Keep as-is" },
+    );
+    if (!ok) return;
+    try {
+      await api("POST", `/api/gaps/${gap.id}/retry`);
+      toast("Reopened", "info");
+      await loadGapDetail(gap.id);
+    } catch (e) { toast(e.message, "error"); }
   });
   $("#btn-rename")?.addEventListener("click", async () => {
     const name = await modalPrompt("New name", gap.name,
@@ -670,7 +698,7 @@ function renderRoundForm(kind, prefill) {
   return `
     <form id="round-form" data-kind="${kind}">
       <div class="muted small" style="margin-bottom:8px">
-        Submitting as <strong>${htmlEscape(reporter)}</strong>
+        Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
         — change in the top-right reporter selector.
       </div>
       <div class="form-row">
@@ -729,7 +757,7 @@ function computeFailureBanner(gap, latest) {
     return {
       severity: "error",
       message: lastLog?.message || "Agent run failed",
-      actionsHtml: `<button data-action="retry">Retry</button>`,
+      actionsHtml: "",
     };
   }
   if (gap.status === "review") {
@@ -746,22 +774,9 @@ function computeFailureBanner(gap, latest) {
   return null;
 }
 
-function bindFailureBannerActions(gap) {
-  // Only Retry lives in the banner now — Verify / Open Chat / Cancel / Rename /
-  // Delete are in the unified action menu at the top of the page.
-  $$("[data-action]", $(".gap-detail .banner") || document).forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const action = btn.dataset.action;
-      if (action !== "retry") return;
-      try {
-        await api("POST", `/api/gaps/${gap.id}/retry`);
-        toast("Queued for retry", "info");
-        await loadGapDetail(gap.id);
-      } catch (e) {
-        toast(e.message, "error");
-      }
-    });
-  });
+function bindFailureBannerActions(_gap) {
+  // No banner-level actions: Verify / Open Chat / Reopen / Rename / Cancel /
+  // Delete all live in the unified action menu at the top of the page.
 }
 
 // ---- Gaps: new --------------------------------------------------------------
@@ -785,7 +800,7 @@ async function renderGapNew() {
     <h2>New Gap</h2>
     <div class="card">
       <div class="muted small" style="margin-bottom:8px">
-        Submitting as <strong>${htmlEscape(reporter)}</strong>
+        Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
         — change in the top-right reporter selector.
       </div>
       <form id="new-gap-form">
@@ -853,7 +868,7 @@ async function renderGapImport() {
     refine extracts a draft list — review and edit before saving.</p>
     <div class="card">
       <div class="muted small" style="margin-bottom:8px">
-        Submitting as <strong>${htmlEscape(reporter)}</strong>
+        Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
         — applies to all extracted gaps. Change in the top-right reporter selector.
       </div>
       <div class="form-row">
@@ -1063,7 +1078,9 @@ async function pollChat() {
       if (atBottom) pre.scrollTop = pre.scrollHeight;
     }
     if (r.alive === false) {
-      $("#chat-status").textContent = `Session ${chatState.sessionId} ended.`;
+      $("#chat-status").textContent = r.closed_reason
+        ? `Session ${chatState.sessionId} ended — ${r.closed_reason}.`
+        : `Session ${chatState.sessionId} ended.`;
       $("#chat-input").disabled = true;
       $("#btn-stop").disabled = true;
       clearInterval(chatState.pollTimer);
@@ -1134,6 +1151,9 @@ function drawSettings(s, diag, reps) {
         <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
       <div class="form-row"><label>Agent hard cap (seconds)</label>
         <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
+      <div class="form-row"><label>Standalone chat idle timeout (seconds)
+        <span class="muted small">— set to 0 to disable auto-close</span></label>
+        <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
       <div class="actions"><button id="s-save">Save</button></div>
     </div>
 
@@ -1181,6 +1201,7 @@ function drawSettings(s, diag, reps) {
         branch_name_pattern: $("#s-pattern").value,
         agent_idle_timeout_seconds: $("#s-idle").value,
         agent_hard_cap_seconds: $("#s-hard").value,
+        chat_idle_timeout_seconds: $("#s-chat-idle").value,
       });
       toast("Saved", "info");
     } catch (e) { toast(e.message, "error"); }

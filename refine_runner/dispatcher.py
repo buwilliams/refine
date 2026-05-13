@@ -79,7 +79,9 @@ class Dispatcher:
 
     def _launch_one(self, conn: sqlite3.Connection, gap_id: str,
                     existing_branch: str | None) -> None:
-        # Retry pre-flight: if last failure was auth, re-check first.
+        # Retry pre-flight: if last failure was auth, re-check first. This is
+        # a "soft" abort — leave the Gap in todo so a successful re-check
+        # picks it up automatically.
         last = conn.execute(
             "SELECT failure_category FROM runs WHERE gap_id = ? "
             "ORDER BY id DESC LIMIT 1",
@@ -99,31 +101,27 @@ class Dispatcher:
         # Pre-checks: branch + upstream
         current = git_ops.current_branch()
         if current is None:
-            activity.append(
-                conn,
-                message="Client repo is in detached-HEAD state — pickup aborted",
-                severity="error", category="git",
-                gap_id=gap_id, actor="runner",
+            self._abort_to_failed(
+                conn, gap_id,
+                "Client repo is in detached-HEAD state — pickup aborted",
+                category="git",
             )
             return
         upstream = git_ops.upstream_branch(current)
         if upstream is None:
-            activity.append(
-                conn,
-                message=f"Branch `{current}` has no upstream — run `git push -u origin {current}` on the host",
-                severity="error", category="git",
-                gap_id=gap_id, actor="runner",
+            self._abort_to_failed(
+                conn, gap_id,
+                f"Branch `{current}` has no upstream — run `git push -u origin {current}` on the host",
+                category="git",
             )
             return
 
         # Fetch fresh.
         r = git_ops.fetch()
         if not r.ok:
-            activity.append(
-                conn,
-                message="git fetch failed",
-                severity="error", category="git",
-                gap_id=gap_id, actor="runner", details=r.stderr[:2000],
+            self._abort_to_failed(
+                conn, gap_id, "git fetch failed",
+                category="git", details=r.stderr[:2000],
             )
             return
 
@@ -134,22 +132,18 @@ class Dispatcher:
 
         wt = git_ops.create_worktree(gap_id, base_ref, branch_name)
         if not wt.ok:
-            activity.append(
-                conn,
-                message="git worktree create failed",
-                severity="error", category="git",
-                gap_id=gap_id, actor="runner", details=wt.stderr[:2000],
+            self._abort_to_failed(
+                conn, gap_id, "git worktree create failed",
+                category="git", details=wt.stderr[:2000],
             )
             return
 
         # Read the Gap and compute the prompt from the latest round.
         gap = read_gap_json(gap_id)
         if not gap or not gap.get("rounds"):
-            activity.append(
-                conn,
-                message="Gap has no rounds — cannot launch",
-                severity="error", category="state",
-                gap_id=gap_id, actor="runner",
+            self._abort_to_failed(
+                conn, gap_id, "Gap has no rounds — cannot launch",
+                category="state",
             )
             return
         round_idx = len(gap["rounds"]) - 1
@@ -191,6 +185,24 @@ class Dispatcher:
                 gid, round_idx, code, reason, base_commit,
             ),
         )
+
+    def _abort_to_failed(self, conn: sqlite3.Connection, gap_id: str,
+                         message: str, *, category: str,
+                         details: str | None = None) -> None:
+        """Log a pre-launch failure and move the Gap to `failed` so the
+        dispatcher stops re-attempting it every tick. The user can Reopen the
+        Gap once the underlying environment issue is resolved."""
+        activity.append(
+            conn, message=message,
+            severity="error", category=category,
+            gap_id=gap_id, actor="runner", details=details or "",
+        )
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'failed', updated = ? "
+                "WHERE id = ? AND status = 'todo'",
+                (now_iso(), gap_id),
+            )
 
     def _on_finished(self, gap_id: str, round_idx: int, exit_code: int,
                      killed_reason: str | None, base_commit: str) -> None:

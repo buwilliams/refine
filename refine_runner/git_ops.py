@@ -7,6 +7,7 @@ client's current branch come from refine's agent runs.
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -94,15 +95,53 @@ def worktree_exists(gap_id: str) -> bool:
 def create_worktree(gap_id: str, base_ref: str, branch_name: str) -> GitResult:
     """Create a worktree at .git/refine-worktrees/<GAP_ID> tracking branch_name based on base_ref.
 
-    If the branch already exists, reuse it.
+    If the branch already exists, reuse it. If the target path already exists,
+    either reuse it (when git already knows it as a worktree) or remove the
+    orphan directory and create fresh — typical after a runner crash, or as
+    leftover from the pre-fix cwd bug that registered worktrees against the
+    refine source clone instead of the client repo.
     """
     worktrees_dir().mkdir(parents=True, exist_ok=True)
     wt = gap_worktree_path(gap_id)
+    if wt.exists():
+        if _is_registered_worktree(wt):
+            return GitResult(
+                ok=True, stdout="", stderr="(reused existing worktree)", code=0,
+            )
+        try:
+            shutil.rmtree(wt)
+        except OSError as e:
+            return GitResult(
+                ok=False, stdout="",
+                stderr=f"orphan worktree at {wt} could not be removed: {e}",
+                code=1,
+            )
     # is the branch already created?
     exists = _run(["rev-parse", "--verify", "--quiet", f"refs/heads/{branch_name}"]).ok
     if exists:
         return _run(["worktree", "add", str(wt), branch_name])
     return _run(["worktree", "add", "-b", branch_name, str(wt), base_ref])
+
+
+def _is_registered_worktree(path: Path) -> bool:
+    """Is `path` listed by `git worktree list` in the client repo?"""
+    r = _run(["worktree", "list", "--porcelain"])
+    if not r.ok:
+        return False
+    try:
+        target = str(path.resolve())
+    except OSError:
+        return False
+    for line in r.stdout.splitlines():
+        if not line.startswith("worktree "):
+            continue
+        wt_path = line[len("worktree "):].strip()
+        try:
+            if str(Path(wt_path).resolve()) == target:
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def remove_worktree(gap_id: str, *, force: bool = True) -> GitResult:

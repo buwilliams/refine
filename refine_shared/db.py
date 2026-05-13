@@ -80,6 +80,7 @@ DEFAULT_SETTINGS = {
     "branch_name_pattern": "refine/{gap_id}",
     "agent_idle_timeout_seconds": "900",   # 15 min
     "agent_hard_cap_seconds": "86400",     # 24 h
+    "chat_idle_timeout_seconds": "300",    # 5 min — auto-close idle chats
     "paused": "0",
 }
 
