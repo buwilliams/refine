@@ -210,17 +210,20 @@ class SubprocessManager:
     def _drain_stdout(self, h: RunHandle) -> None:
         assert h.proc.stdout is not None
         buf: list[str] = []
+        last_flush = time.monotonic()
         try:
             for line in h.proc.stdout:
                 h.last_output = time.monotonic()
                 line = line.rstrip("\n")
                 if not line:
                     continue
-                # Update the run row's last_output_at periodically (not every line).
                 buf.append(line)
-                if len(buf) >= 20:
+                # Flush often so users see streaming output. Flush per line for
+                # small bursts, or whenever 1s elapses with buffered content.
+                if len(buf) >= 5 or (h.last_output - last_flush) >= 1.0:
                     self._flush_lines(h, buf)
                     buf = []
+                    last_flush = h.last_output
         finally:
             if buf:
                 self._flush_lines(h, buf)

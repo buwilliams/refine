@@ -20,7 +20,7 @@ from refine_shared.ipc_protocol import (
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, preflight, recovery, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, preflight, recovery, state_committer, subprocess_mgr, verify_op
 from .chat_mgr import ChatManager
 from .ipc_server import IpcServer
 
@@ -49,6 +49,9 @@ class Runner:
                 self._conn, "chat_idle_timeout_seconds", 300,
             ),
         )
+        self.state_committer = state_committer.StateCommitter(
+            get_conn=self._get_conn,
+        )
 
     def _get_conn(self) -> sqlite3.Connection:
         return self._conn
@@ -60,6 +63,7 @@ class Runner:
         recovery.reconcile_on_start(self._conn)
         preflight.check(self._conn)
         self.dispatcher.start()
+        self.state_committer.start()
         self.ipc.start()
         activity.append(
             self._conn, message="refine-runner started",
@@ -68,6 +72,7 @@ class Runner:
 
     def shutdown(self) -> None:
         self.ipc.stop()
+        self.state_committer.stop()
         self.dispatcher.stop()
         activity.append(
             self._conn, message="refine-runner stopping",
@@ -258,15 +263,24 @@ class Runner:
 
     def _h_chat_start(self, params: dict) -> dict:
         gap_id = params.get("gap_id")
+        priming_prompt: str | None = None
+        priming_intro: str | None = None
         if gap_id:
             cwd = git_ops.gap_worktree_path(gap_id)
             if not cwd.exists():
                 raise ValueError(f"Gap {gap_id} has no worktree")
             is_standalone = False
+            priming_prompt, priming_intro = _build_gap_chat_preamble(
+                self._conn, gap_id,
+            )
         else:
             cwd = git_ops.client_repo_path()
             is_standalone = True
-        sid = self.chat.start(cwd, is_standalone=is_standalone)
+        sid = self.chat.start(
+            cwd, is_standalone=is_standalone,
+            priming_prompt=priming_prompt,
+            priming_intro=priming_intro,
+        )
         return {"session_id": sid}
 
     def _h_chat_input(self, params: dict) -> dict:
@@ -280,3 +294,69 @@ class Runner:
     def _h_chat_stop(self, params: dict) -> dict:
         ok = self.chat.stop(params["session_id"])
         return {"stopped": ok}
+
+
+# ---- chat priming -----------------------------------------------------------
+
+def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
+                              ) -> tuple[str | None, str | None]:
+    """Build a context preamble for an attached-chat session.
+
+    Returns (priming_prompt, user_intro_line). The priming prompt is sent to
+    claude with output discarded so it lives in claude's session memory
+    silently; the intro line is appended to the user-visible chat buffer so
+    the user knows context was loaded.
+    """
+    row = conn.execute(
+        "SELECT name, status, branch_name FROM gaps_index WHERE id = ?",
+        (gap_id,),
+    ).fetchone()
+    if not row:
+        return None, None
+    gap_json = shared_gaps.read_gap_json(gap_id) or {}
+    rounds = gap_json.get("rounds") or []
+    latest = rounds[-1] if rounds else {}
+    recent_activity = activity.recent(conn, limit=10, gap_id=gap_id)
+    # Activity rows from `recent` are ordered DESC; flip for chronological.
+    recent_activity = list(reversed(recent_activity))
+
+    parts: list[str] = [
+        "You're in a refine chat session attached to a Gap (a behavior",
+        "change the team is tracking). You're running inside that Gap's git",
+        "worktree (your cwd) so you can read code and run tools.",
+        "",
+        f"Gap: {row['name']}",
+        f"ID: {gap_id}",
+        f"Status: {row['status']}",
+    ]
+    if row["branch_name"]:
+        parts.append(f"Branch: {row['branch_name']}")
+    if latest:
+        parts.append("")
+        parts.append(f"Latest round ({len(rounds)} of {len(rounds)}):")
+        if latest.get("reporter"):
+            parts.append(f"- Reporter: {latest['reporter']}")
+        if latest.get("actual"):
+            parts.append(f"- Actual (current behavior): {latest['actual']}")
+        if latest.get("target"):
+            parts.append(f"- Target (desired behavior): {latest['target']}")
+    if recent_activity:
+        parts.append("")
+        parts.append("Recent activity:")
+        for entry in recent_activity:
+            ts = entry.get("datetime", "")
+            msg = entry.get("message", "")
+            parts.append(f"- [{ts}] {msg}")
+    parts += [
+        "",
+        "Don't restate this context back to me. Briefly acknowledge that",
+        "you've read it (one short sentence) and wait for my first question.",
+        "Don't commit anything unless I ask.",
+    ]
+    priming_prompt = "\n".join(parts)
+    intro = (
+        f"[refine] Loaded Gap context for {row['name']} "
+        f"({gap_id[:10]}…, status={row['status']}). You can start chatting "
+        f"as soon as the indicator clears."
+    )
+    return priming_prompt, intro

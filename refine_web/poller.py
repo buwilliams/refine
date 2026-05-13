@@ -22,6 +22,8 @@ class SqlitePoller:
         self._last_activity_id: int = 0
         # last-seen status by gap id; detect transitions
         self._last_status: dict[str, tuple[str, str]] = {}  # gap_id -> (status, updated)
+        # last-seen runs.last_output_at by gap id; detect streaming subprocess output
+        self._last_run_output: dict[str, str] = {}
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._loop, name="refine-poller",
@@ -80,5 +82,21 @@ class SqlitePoller:
                             "to": pair[0],
                             "updated": pair[1],
                         })
+
+            # Active-run streaming output: when a runner flushes lines to a
+            # round's logs[], it bumps runs.last_output_at. We can't watch the
+            # gap.json file from here, but this column lets us nudge clients
+            # to refresh the round view.
+            for r in conn.execute(
+                "SELECT gap_id, last_output_at FROM runs "
+                "WHERE finished_at IS NULL"
+            ):
+                gid = r["gap_id"]
+                ts = r["last_output_at"]
+                prev = self._last_run_output.get(gid)
+                if ts and ts != prev:
+                    self._last_run_output[gid] = ts
+                    if prev is not None:  # skip first-seen so we don't replay
+                        sse.publish("round_log_added", {"gap_id": gid})
         finally:
             conn.close()

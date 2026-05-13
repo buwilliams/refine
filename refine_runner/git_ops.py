@@ -82,6 +82,55 @@ def fetch(cwd: Path | None = None) -> GitResult:
     return _run(["fetch", "--prune"], cwd=cwd or client_repo_path(), timeout=300.0)
 
 
+def stash_push(message: str, *, cwd: Path | None = None) -> GitResult:
+    """Stash all uncommitted changes (incl. untracked) so we can run a clean
+    git operation. Returns a result whose stdout we don't really care about;
+    callers should test `ok` and pair with `stash_pop`.
+    """
+    return _run(
+        ["stash", "push", "--include-untracked", "-m", message],
+        cwd=cwd or client_repo_path(),
+    )
+
+
+def stash_pop(cwd: Path | None = None) -> GitResult:
+    return _run(["stash", "pop"], cwd=cwd or client_repo_path())
+
+
+def dirty_paths_under(prefix: str) -> list[str]:
+    """Return repo-relative paths reported by `git status --porcelain` that
+    sit under `prefix`. `prefix` is matched as a path segment.
+    """
+    r = _run(["status", "--porcelain", "--", prefix])
+    if not r.ok:
+        return []
+    paths: list[str] = []
+    for line in r.stdout.splitlines():
+        # Porcelain format: "XY <path>" (or "XY <path> -> <newpath>" for renames)
+        if len(line) < 3:
+            continue
+        path_part = line[3:]
+        if " -> " in path_part:
+            path_part = path_part.split(" -> ", 1)[1]
+        paths.append(path_part)
+    return paths
+
+
+def add_and_commit(paths: list[str], message: str,
+                   *, cwd: Path | None = None) -> GitResult:
+    """Stage the given paths and commit them. No-op if nothing to commit
+    (we don't try `commit --allow-empty`)."""
+    if not paths:
+        return GitResult(ok=True, stdout="", stderr="(nothing to commit)", code=0)
+    add = _run(["add", "--", *paths], cwd=cwd or client_repo_path())
+    if not add.ok:
+        return add
+    return _run(
+        ["commit", "-m", message, "--", *paths],
+        cwd=cwd or client_repo_path(),
+    )
+
+
 # ---- worktree management -----------------------------------------------------
 
 def gap_worktree_path(gap_id: str) -> Path:

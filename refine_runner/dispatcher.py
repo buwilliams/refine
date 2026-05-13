@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from refine_shared import activity, db
 from refine_shared.gaps import now_iso, read_gap_json
 
-from . import gap_writer, git_ops, preflight, subprocess_mgr
+from . import gap_writer, git_ops, preflight, subprocess_mgr, verify_op
 from .friendly_outcome import classify_outcome
 
 
@@ -247,6 +247,22 @@ class Dispatcher:
             gap_id=gap_id, actor="runner",
             details=outcome.details,
         )
+
+        # Auto-verify: as soon as a round succeeds, merge the gap's branch
+        # into the currently checked-out branch (and push). If any verify
+        # step fails (e.g., dirty working copy, push rejected, merge
+        # conflict), the Gap stays in `review` with the failure logged and
+        # the user can resolve and click Verify manually.
+        if success:
+            try:
+                verify_op.perform_verify(conn, gap_id, actor="runner")
+            except Exception as e:
+                activity.append(
+                    conn,
+                    message=f"Auto-verify raised: {e!r}",
+                    severity="error", category="git",
+                    gap_id=gap_id, actor="runner",
+                )
 
 
 def _format_prompt(round_obj: dict) -> str:

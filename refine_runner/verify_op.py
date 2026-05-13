@@ -34,7 +34,7 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
         return {"ok": False, "stage": "lookup",
                 "message": "Gap has no branch_name recorded"}
 
-    # Pre-check: current branch + upstream + clean working copy
+    # Pre-check: current branch + upstream
     current = git_ops.current_branch()
     if current is None:
         msg = "Client repo is in detached-HEAD state"
@@ -44,11 +44,62 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
         msg = f"Branch `{current}` has no upstream"
         _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
         return {"ok": False, "stage": "precheck", "message": msg}
-    if git_ops.working_copy_dirty():
-        msg = f"Working copy has uncommitted changes on `{current}`"
-        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
-        return {"ok": False, "stage": "precheck", "message": msg}
 
+    # Auto-commit refine's own state (`.refine/`) — gap.json and friends
+    # are tracked content per the spec, and the runner writes them as it
+    # goes, so they show up as dirty between rounds. Commit them on the
+    # current branch with a clear marker so the merge sees a clean tree.
+    refine_dirty = git_ops.dirty_paths_under(".refine")
+    if refine_dirty:
+        cr = git_ops.add_and_commit(
+            refine_dirty,
+            f"refine: persist gap state ({gap_id})",
+        )
+        if not cr.ok:
+            msg = "Could not commit refine state before merge"
+            _log(conn, gap_id, msg, details=cr.stderr,
+                 severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "precheck",
+                    "message": msg, "details": cr.stderr}
+        _log(
+            conn, gap_id,
+            f"Auto-committed refine state ({len(refine_dirty)} path"
+            f"{'' if len(refine_dirty) == 1 else 's'}) before merge",
+            severity="info", category="git", actor=actor,
+        )
+
+    # Any remaining dirty content is foreign to refine — stash it around the
+    # merge and pop afterwards so the user's WIP survives the operation.
+    stashed = False
+    if git_ops.working_copy_dirty():
+        sr = git_ops.stash_push(f"refine auto-stash for {gap_id}")
+        if not sr.ok:
+            msg = "Could not stash uncommitted changes before merge"
+            _log(conn, gap_id, msg, details=sr.stderr,
+                 severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "precheck",
+                    "message": msg, "details": sr.stderr}
+        stashed = True
+        _log(conn, gap_id, "Auto-stashed remaining uncommitted changes before merge",
+             severity="info", category="git", actor=actor)
+
+    try:
+        return _verify_body(conn, gap_id, current, branch, actor=actor)
+    finally:
+        if stashed:
+            pop = git_ops.stash_pop()
+            if not pop.ok:
+                _log(
+                    conn, gap_id,
+                    "Auto-stash pop failed — your uncommitted changes remain "
+                    "in `git stash`; resolve manually with `git stash list`",
+                    details=pop.stderr,
+                    severity="warn", category="git", actor=actor,
+                )
+
+
+def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
+                 branch: str, *, actor: str) -> dict:
     # 1. fetch
     r = git_ops.fetch()
     if not r.ok:

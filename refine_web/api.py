@@ -103,10 +103,14 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
             "SELECT id, name, status, created, updated, branch_name "
             "FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
+        if not row:
+            return err(404, "Gap not found")
+        # Gap-scoped activity entries (lifecycle events, dispatcher errors,
+        # subprocess flush nudges). These are merged into the round view so
+        # users see real progress even when the round's logs[] is empty.
+        gap_activity = activity.recent(conn, limit=500, gap_id=gap_id)
     finally:
         conn.close()
-    if not row:
-        return err(404, "Gap not found")
     gap = shared_gaps.read_gap_json(gap_id) or {
         "id": gap_id, "name": row["name"], "rounds": [],
         "created": row["created"], "updated": row["updated"],
@@ -115,6 +119,7 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     gap = dict(gap)
     gap["status"] = row["status"]
     gap["branch_name"] = row["branch_name"]
+    gap["activity"] = gap_activity
     return 200, {"gap": gap}
 
 
@@ -419,13 +424,28 @@ def ipc_diagnostics() -> tuple[int, dict]:
 # --- Activity / Dashboard -----------------------------------------------------
 
 def list_activity(*, limit: int = 100, gap_id: str | None = None,
-                  since_id: int | None = None) -> tuple[int, dict]:
+                  since_id: int | None = None,
+                  severity: str | None = None,
+                  category: str | None = None,
+                  actor: str | None = None,
+                  q: str | None = None,
+                  include_facets: bool = False) -> tuple[int, dict]:
     conn = _conn()
     try:
-        entries = activity.recent(conn, limit=limit, gap_id=gap_id, since_id=since_id)
+        entries = activity.recent(
+            conn, limit=limit, gap_id=gap_id, since_id=since_id,
+            severity=severity, category=category, actor=actor, q=q,
+        )
+        body: dict = {"activity": entries}
+        if include_facets:
+            body["facets"] = {
+                "categories": activity.distinct_categories(conn),
+                "actors": activity.distinct_actors(conn),
+                "severities": ["info", "warn", "error"],
+            }
     finally:
         conn.close()
-    return 200, {"activity": entries}
+    return 200, body
 
 
 def dashboard_summary() -> tuple[int, dict]:

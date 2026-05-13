@@ -48,6 +48,10 @@ def recent(
     limit: int = 100,
     gap_id: str | None = None,
     since_id: int | None = None,
+    severity: str | None = None,
+    category: str | None = None,
+    actor: str | None = None,
+    q: str | None = None,
 ) -> list[dict[str, Any]]:
     sql = [
         "SELECT id, datetime, severity, category, gap_id, actor, message, "
@@ -61,6 +65,19 @@ def recent(
     if since_id is not None:
         where.append("id > ?")
         args.append(since_id)
+    if severity:
+        where.append("severity = ?")
+        args.append(severity)
+    if category:
+        where.append("category = ?")
+        args.append(category)
+    if actor:
+        where.append("actor = ?")
+        args.append(actor)
+    if q:
+        where.append("(message LIKE ? OR details LIKE ?)")
+        like = f"%{q}%"
+        args.extend([like, like])
     if where:
         sql.append("WHERE " + " AND ".join(where))
     sql.append("ORDER BY id DESC LIMIT ?")
@@ -69,6 +86,22 @@ def recent(
     for r in conn.execute(" ".join(sql), args):
         out.append(_row_to_entry(r))
     return out
+
+
+def distinct_categories(conn: sqlite3.Connection) -> list[str]:
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT category FROM activity "
+        "WHERE category IS NOT NULL AND category != '' "
+        "ORDER BY category"
+    )]
+
+
+def distinct_actors(conn: sqlite3.Connection) -> list[str]:
+    return [r[0] for r in conn.execute(
+        "SELECT DISTINCT actor FROM activity "
+        "WHERE actor IS NOT NULL AND actor != '' "
+        "ORDER BY actor"
+    )]
 
 
 def _row_to_entry(r: sqlite3.Row) -> dict[str, Any]:

@@ -262,6 +262,7 @@ function initSSE() {
   sseSource.addEventListener("activity_added", (e) => {
     // Refresh dashboard activity if visible; refresh current gap if relevant
     if (state.currentRoute === "dashboard") renderDashboard();
+    if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       try {
         const data = JSON.parse(e.data);
@@ -272,9 +273,19 @@ function initSSE() {
   sseSource.addEventListener("status_change", () => {
     if (state.currentRoute === "dashboard") renderDashboard();
     if (state.currentRoute === "gaps_list") renderGapsList();
+    if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);
     }
+  });
+  sseSource.addEventListener("round_log_added", (e) => {
+    // Subprocess flushed new stdout to the active round's logs[]. If the user
+    // is viewing that gap's detail, refresh so the new lines appear live.
+    if (state.currentRoute !== "gaps_detail" || !state.currentGap) return;
+    try {
+      const data = JSON.parse(e.data);
+      if (data.gap_id === state.currentGap) loadGapDetail(state.currentGap);
+    } catch {}
   });
   sseSource.onerror = () => {
     // Browser will auto-reconnect.
@@ -291,6 +302,7 @@ const routes = {
   gaps_import: renderGapImport,
   agents: renderAgents,
   chat: renderChat,
+  logs: renderLogs,
   settings: renderSettings,
 };
 
@@ -310,6 +322,7 @@ function parseHash() {
   }
   if (parts[0] === "agents") return { route: "agents" };
   if (parts[0] === "chat") return { route: "chat" };
+  if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "settings") return { route: "settings" };
   return { route: "dashboard" };
 }
@@ -516,6 +529,26 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
+// Run `fn` while the button shows a busy label and is disabled. Used for
+// operations that may take noticeable time (verify, fetch+merge+push, auth
+// recheck, etc.) so the user sees that something is happening and can't
+// accidentally double-fire the request.
+async function withButtonBusy(btn, busyLabel, fn) {
+  if (!btn) return await fn();
+  const wasDisabled = btn.disabled;
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    return await fn();
+  } finally {
+    // The button may have been re-rendered by the awaited work (e.g., a
+    // reload of the view); setting properties on a detached node is a no-op.
+    btn.disabled = wasDisabled;
+    btn.textContent = orig;
+  }
+}
+
 // ---- Gaps: detail -----------------------------------------------------------
 
 async function renderGapDetail(r) {
@@ -536,6 +569,11 @@ async function loadGapDetail(gapId) {
 function drawGapDetail(gap) {
   renderBanners([]);
   const rounds = gap.rounds || [];
+  // Merge gap-scoped activity into each round so users see lifecycle events
+  // and runner errors alongside the round's own logs[]. Each activity entry
+  // goes into the latest round whose `created` is at or before the entry's
+  // datetime.
+  attachActivityToRounds(rounds, gap.activity || []);
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
 
@@ -591,30 +629,36 @@ function drawGapDetail(gap) {
   `;
 
   $("#btn-verify")?.addEventListener("click", async () => {
-    if ($("#btn-verify").disabled) return;
-    try {
-      const r = await api("POST", `/api/gaps/${gap.id}/verify`);
-      if (r.ok) toast("Merged + pushed", "info");
-      else toast(r.message || "Verify did not complete", "error");
-      await loadGapDetail(gap.id);
-    } catch (e) { toast(e.message, "error"); }
+    const btn = $("#btn-verify");
+    if (btn.disabled) return;
+    await withButtonBusy(btn, "Verifying…", async () => {
+      try {
+        const r = await api("POST", `/api/gaps/${gap.id}/verify`);
+        if (r.ok) toast("Merged + pushed", "info");
+        else toast(r.message || "Verify did not complete", "error");
+        await loadGapDetail(gap.id);
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $("#btn-chat")?.addEventListener("click", () => {
     if ($("#btn-chat").disabled) return;
     location.hash = "#/chat?gap=" + gap.id;
   });
   $("#btn-reopen")?.addEventListener("click", async () => {
-    if ($("#btn-reopen").disabled) return;
+    const btn = $("#btn-reopen");
+    if (btn.disabled) return;
     const ok = await modalConfirm(
       `Reopen this Gap? It will move from ${gap.status} back to todo and the dispatcher will pick it up again.`,
       { title: "Reopen Gap", okLabel: "Reopen", cancelLabel: "Keep as-is" },
     );
     if (!ok) return;
-    try {
-      await api("POST", `/api/gaps/${gap.id}/retry`);
-      toast("Reopened", "info");
-      await loadGapDetail(gap.id);
-    } catch (e) { toast(e.message, "error"); }
+    await withButtonBusy(btn, "Reopening…", async () => {
+      try {
+        await api("POST", `/api/gaps/${gap.id}/retry`);
+        toast("Reopened", "info");
+        await loadGapDetail(gap.id);
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $("#btn-rename")?.addEventListener("click", async () => {
     const name = await modalPrompt("New name", gap.name,
@@ -626,18 +670,21 @@ function drawGapDetail(gap) {
     } catch (e) { toast(e.message, "error"); }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {
-    if ($("#btn-cancel").disabled) return;
+    const btn = $("#btn-cancel");
+    if (btn.disabled) return;
     const ok = await modalConfirm(
       "Cancel this Gap? Any running subprocess will be stopped and the worktree + branch cleaned up.",
       { title: "Cancel Gap", okLabel: "Cancel Gap", danger: true,
         cancelLabel: "Keep working" },
     );
     if (!ok) return;
-    try {
-      await api("POST", `/api/gaps/${gap.id}/cancel`);
-      toast("Cancelled", "info");
-      await loadGapDetail(gap.id);
-    } catch (e) { toast(e.message, "error"); }
+    await withButtonBusy(btn, "Cancelling…", async () => {
+      try {
+        await api("POST", `/api/gaps/${gap.id}/cancel`);
+        toast("Cancelled", "info");
+        await loadGapDetail(gap.id);
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $("#btn-delete")?.addEventListener("click", async () => {
     const ok = await modalConfirm(
@@ -655,8 +702,32 @@ function drawGapDetail(gap) {
   bindRoundFormSubmit(gap);
 }
 
+function attachActivityToRounds(rounds, activity) {
+  // Reset any prior merge — we always recompute from gap.activity + rnd.logs.
+  for (const r of rounds) r._mergedLogs = (r.logs || []).slice();
+  if (!rounds.length) return;
+  // Sort rounds ascending by `created`; bucket each activity entry into the
+  // last round whose `created` ≤ entry.datetime.
+  const bucket = (ts) => {
+    let idx = 0;
+    for (let i = 0; i < rounds.length; i++) {
+      if ((rounds[i].created || "") <= ts) idx = i;
+      else break;
+    }
+    return idx;
+  };
+  for (const a of activity) {
+    const idx = bucket(a.datetime || "");
+    rounds[idx]._mergedLogs.push(a);
+  }
+  // Sort each round's merged logs by datetime ascending.
+  for (const r of rounds) {
+    r._mergedLogs.sort((x, y) => (x.datetime || "").localeCompare(y.datetime || ""));
+  }
+}
+
 function renderRound(rnd, idx, isLatest, editable) {
-  const logs = rnd.logs || [];
+  const logs = rnd._mergedLogs || rnd.logs || [];
   return `
     <div class="round">
       <div class="round-head">
@@ -805,10 +876,6 @@ async function renderGapNew() {
       </div>
       <form id="new-gap-form">
         <div class="form-row">
-          <label>Name <span class="muted">(optional; auto-generated if blank)</span></label>
-          <input type="text" name="name" placeholder="e.g. Login button is the wrong color">
-        </div>
-        <div class="form-row">
           <label>Actual (current behavior)</label>
           <textarea name="actual" placeholder="What's happening today?"></textarea>
         </div>
@@ -816,6 +883,10 @@ async function renderGapNew() {
           <label>Target (desired behavior)</label>
           <textarea name="target" placeholder="What should be happening?"></textarea>
         </div>
+        <p class="muted small">
+          A name will be auto-generated from the text above — you can rename
+          the Gap on its detail page afterwards.
+        </p>
         <div class="actions">
           <button type="submit">Create Gap</button>
           <a class="btn secondary" href="#/gaps">Cancel</a>
@@ -831,11 +902,10 @@ async function renderGapNew() {
     const fd = new FormData(form);
     const actual = (fd.get("actual") || "").toString().trim();
     const target = (fd.get("target") || "").toString().trim();
-    const name = (fd.get("name") || "").toString().trim();
     if (!actual && !target) return toast("Provide actual or target", "error");
     try {
       const r = await api("POST", "/api/gaps", {
-        reporter: currentReporter, actual, target, name,
+        reporter: currentReporter, actual, target,
       });
       toast("Gap created", "info");
       location.hash = "#/gaps/" + r.gap.id;
@@ -883,12 +953,16 @@ async function renderGapImport() {
     <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
   `;
   $("#btn-extract").addEventListener("click", async () => {
+    const btn = $("#btn-extract");
+    if (btn.disabled) return;
     const text = $("#import-text").value.trim();
     if (!text) return toast("Paste some text first", "error");
-    try {
-      const r = await api("POST", "/api/import/extract", { text });
-      drawDrafts(r.drafts || []);
-    } catch (e) { toast(e.message, "error"); }
+    await withButtonBusy(btn, "Extracting…", async () => {
+      try {
+        const r = await api("POST", "/api/import/extract", { text });
+        drawDrafts(r.drafts || []);
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
 }
 
@@ -1012,114 +1086,423 @@ function drawAgents(dash, settings) {
 
 // ---- Chat -------------------------------------------------------------------
 
-// Chat state, persisted per-session inside the page.
-const chatState = { sessionId: null, gapId: null, pollTimer: null };
+// chatState holds one tab per chat: the permanent "standalone" tab plus one
+// per Gap that the user opened via Open Chat. Each tab carries its own
+// session id, accumulated output, and closed-reason. Only the active tab is
+// polled; output for other tabs accumulates server-side in the runner's
+// per-session deque until the user switches to that tab.
+const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
+const chatState = {
+  tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
+  activeTabId: "standalone",
+  pollTimer: null,
+};
+
+function ensureStandaloneTab() {
+  if (!chatState.tabs.standalone) {
+    chatState.tabs.standalone = {
+      gapId: null, label: "Standalone",
+      sessionId: null, output: "", closedReason: null,
+    };
+  }
+}
+
+function loadChatStateFromStorage() {
+  try {
+    const raw = localStorage.getItem(CHAT_TABS_STORAGE_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object" && parsed.tabs) {
+      chatState.tabs = parsed.tabs;
+      if (parsed.activeTabId && chatState.tabs[parsed.activeTabId]) {
+        chatState.activeTabId = parsed.activeTabId;
+      }
+    }
+  } catch {}
+  ensureStandaloneTab();
+}
+
+function saveChatStateToStorage() {
+  // We persist sessionIds too: the runner can keep them alive across page
+  // navigations. On a stale id the next read returns alive=false and we
+  // clear it.
+  const tabs = {};
+  for (const [id, t] of Object.entries(chatState.tabs)) {
+    tabs[id] = {
+      gapId: t.gapId, label: t.label,
+      sessionId: t.sessionId,
+      output: (t.output || "").slice(-50_000),
+      closedReason: t.closedReason,
+    };
+  }
+  try {
+    localStorage.setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
+      tabs, activeTabId: chatState.activeTabId,
+    }));
+  } catch {}
+}
 
 async function renderChat() {
   renderBanners([]);
-  // ?gap=<id> from the URL hash for attached mode
+  loadChatStateFromStorage();
+  ensureStandaloneTab();
+
+  // If we arrived via "Open Chat" on a Gap, ensure that tab exists and is active.
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
   const gapId = hashQs.get("gap") || null;
-  chatState.gapId = gapId;
+  if (gapId) {
+    if (!chatState.tabs[gapId]) {
+      chatState.tabs[gapId] = {
+        gapId,
+        label: `Gap ${gapId.slice(0, 8)}…`,
+        sessionId: null, output: "", closedReason: null,
+      };
+    }
+    chatState.activeTabId = gapId;
+    saveChatStateToStorage();
+  }
+
+  drawChat();
+}
+
+function drawChat() {
+  const tabs = chatState.tabs;
+  const activeId = chatState.activeTabId;
+  const active = tabs[activeId] || tabs.standalone;
+  const hasSession = !!active.sessionId;
+
+  const startLabel = active.gapId
+    ? `Start attached to Gap ${active.gapId.slice(0, 10)}…`
+    : "Start standalone";
+  const toggleLabel = hasSession
+    ? (active.gapId ? "Stop session" : "Stop standalone")
+    : startLabel;
+  const toggleClass = hasSession ? "danger" : "";
+
+  const statusLine = !active.sessionId
+    ? "No active session."
+    : (active.closedReason
+        ? `Session ${active.sessionId} ended — ${active.closedReason}.`
+        : `Session ${active.sessionId} active.`);
 
   $("#main").innerHTML = `
     <h2>Chat</h2>
     <p class="muted">Interactive Claude Code chat. Doesn't count toward the parallel-run cap.
     Standalone runs against the client repo; attached runs in a Gap's worktree.</p>
+    <div class="chat-tabs">
+      ${Object.entries(tabs).map(([id, t]) => `
+        <button class="chat-tab ${id === activeId ? "active" : ""}"
+                data-tab-id="${htmlEscape(id)}"
+                title="${htmlEscape(t.gapId || "Standalone chat")}">
+          ${htmlEscape(t.label)}${t.sessionId ? ` <span class="chat-tab-dot" title="active session"></span>` : ""}
+          ${id === "standalone" ? "" : `<span class="chat-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
+        </button>`).join("")}
+    </div>
     <div class="card">
       <div class="actions" style="margin-bottom:10px">
-        <button id="btn-start-standalone" class="${gapId ? "secondary" : ""}">Start standalone</button>
-        ${gapId ? `<button id="btn-start-attached">Start attached to Gap <code>${gapId.slice(0,10)}…</code></button>` : ""}
+        <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
         <span class="spacer"></span>
-        <button id="btn-stop" class="danger" disabled>Stop session</button>
+        <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
       </div>
-      <div id="chat-status" class="muted small">No active session.</div>
-      <pre id="chat-output" style="min-height:240px;background:var(--card);border:1px solid var(--border)"></pre>
+      <pre id="chat-output" style="min-height:240px;background:var(--card);border:1px solid var(--border)">${htmlEscape(active.output || "")}</pre>
+      <div id="chat-pending" class="chat-pending" hidden>
+        <span class="chat-pending-dots"><span></span><span></span><span></span></span>
+        Claude is thinking…
+      </div>
       <div class="actions" style="margin-top:8px">
-        <input type="text" id="chat-input" placeholder="Type and press Enter…" disabled>
+        <input type="text" id="chat-input" placeholder="Type and press Enter…"
+               ${hasSession && !active.pending ? "" : "disabled"}>
       </div>
     </div>
   `;
-  $("#btn-start-standalone").addEventListener("click", () => startChat(null));
-  $("#btn-start-attached")?.addEventListener("click", () => startChat(gapId));
-  $("#btn-stop").addEventListener("click", stopChat);
+  applyPendingIndicator(active);
+
+  // Scroll the output to the bottom on initial render.
+  const pre = $("#chat-output");
+  if (pre) pre.scrollTop = pre.scrollHeight;
+
+  $$(".chat-tab").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      // Don't switch when the user clicked the × close.
+      if (e.target.matches("[data-close-tab]")) return;
+      const id = el.dataset.tabId;
+      if (id && id !== chatState.activeTabId) switchChatTab(id);
+    });
+  });
+  $$("[data-close-tab]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeChatTab(el.dataset.closeTab);
+    });
+  });
+  $("#btn-chat-toggle").addEventListener("click", toggleActiveChat);
   $("#chat-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendChatLine();
     }
   });
+
+  // Begin polling if the active tab has a session.
+  restartPollForActiveTab();
 }
 
-async function startChat(gapId) {
-  try {
-    if (chatState.pollTimer) clearInterval(chatState.pollTimer);
-    const r = await api("POST", "/api/chat/start", gapId ? { gap_id: gapId } : {});
-    chatState.sessionId = r.session_id;
-    $("#chat-status").textContent = `Session ${r.session_id} active${gapId ? " (attached to " + gapId.slice(0,10) + "…)" : " (standalone)"}`;
-    $("#chat-input").disabled = false;
-    $("#btn-stop").disabled = false;
-    $("#chat-input").focus();
-    $("#chat-output").textContent = "";
-    chatState.pollTimer = setInterval(pollChat, 800);
-  } catch (e) {
-    toast("Could not start chat: " + e.message, "error");
+function applyPendingIndicator(tab) {
+  const ind = $("#chat-pending");
+  const input = $("#chat-input");
+  if (ind) ind.hidden = !tab || !tab.pending;
+  if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
+}
+
+function restartPollForActiveTab() {
+  if (chatState.pollTimer) {
+    clearInterval(chatState.pollTimer);
+    chatState.pollTimer = null;
   }
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t || !t.sessionId) return;
+  chatState.pollTimer = setInterval(pollChat, 800);
+  // Fire an immediate poll so the user doesn't wait 800ms for the first read.
+  pollChat();
+}
+
+function switchChatTab(tabId) {
+  if (!chatState.tabs[tabId]) return;
+  chatState.activeTabId = tabId;
+  saveChatStateToStorage();
+  drawChat();
+}
+
+async function closeChatTab(tabId) {
+  if (tabId === "standalone") return;            // never closeable
+  const t = chatState.tabs[tabId];
+  if (!t) return;
+  if (t.sessionId) {
+    try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
+  }
+  delete chatState.tabs[tabId];
+  if (chatState.activeTabId === tabId) chatState.activeTabId = "standalone";
+  saveChatStateToStorage();
+  drawChat();
+}
+
+async function toggleActiveChat() {
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t) return;
+  const btn = $("#btn-chat-toggle");
+  if (t.sessionId) {
+    await withButtonBusy(btn, "Stopping…", async () => {
+      try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
+      t.sessionId = null;
+      t.closedReason = "stopped by user";
+      saveChatStateToStorage();
+      drawChat();
+    });
+    return;
+  }
+  await withButtonBusy(btn, "Starting…", async () => {
+    try {
+      const r = await api("POST", "/api/chat/start",
+                          t.gapId ? { gap_id: t.gapId } : {});
+      t.sessionId = r.session_id;
+      t.closedReason = null;
+      t.output = "";
+      saveChatStateToStorage();
+      drawChat();
+      $("#chat-input")?.focus();
+    } catch (e) {
+      toast("Could not start chat: " + e.message, "error");
+    }
+  });
 }
 
 async function pollChat() {
-  if (!chatState.sessionId) return;
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t || !t.sessionId) return;
+  const sid = t.sessionId;
   try {
-    const r = await api("GET", `/api/chat/${chatState.sessionId}/read`);
+    const r = await api("GET", `/api/chat/${sid}/read`);
     if (r.lines && r.lines.length) {
-      const pre = $("#chat-output");
-      const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 50;
-      pre.textContent += r.lines.join("\n") + "\n";
-      if (atBottom) pre.scrollTop = pre.scrollHeight;
+      t.output = (t.output || "") + r.lines.join("\n") + "\n";
+      // Only update the DOM if this tab is still active.
+      if (chatState.activeTabId in chatState.tabs &&
+          chatState.tabs[chatState.activeTabId].sessionId === sid) {
+        const pre = $("#chat-output");
+        if (pre) {
+          const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 50;
+          pre.textContent += r.lines.join("\n") + "\n";
+          if (atBottom) pre.scrollTop = pre.scrollHeight;
+        }
+      }
+      saveChatStateToStorage();
     }
+    // Pending state is authoritative from the runner: `in_flight` is true
+    // while a `claude --print` subprocess is running for this session.
+    const wasPending = !!t.pending;
+    t.pending = !!r.in_flight;
+    if (wasPending !== t.pending) applyPendingIndicator(t);
     if (r.alive === false) {
-      $("#chat-status").textContent = r.closed_reason
-        ? `Session ${chatState.sessionId} ended — ${r.closed_reason}.`
-        : `Session ${chatState.sessionId} ended.`;
-      $("#chat-input").disabled = true;
-      $("#btn-stop").disabled = true;
-      clearInterval(chatState.pollTimer);
-      chatState.pollTimer = null;
-      chatState.sessionId = null;
+      t.closedReason = r.closed_reason || "session ended";
+      t.sessionId = null;
+      t.pending = false;
+      saveChatStateToStorage();
+      drawChat();
     }
-  } catch (e) {
-    // tolerate transient errors; the SSE/poller will reconnect on its own
+  } catch {
+    // Tolerate transient errors; SSE/poller reconnects on its own.
   }
 }
 
 async function sendChatLine() {
-  if (!chatState.sessionId) return;
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t || !t.sessionId || t.pending) return;
   const input = $("#chat-input");
   const text = input.value;
   if (!text.trim()) return;
   input.value = "";
-  // echo locally so the user sees their input
+  const echo = `\n> ${text}\n`;
+  t.output = (t.output || "") + echo;
   const pre = $("#chat-output");
-  pre.textContent += `\n> ${text}\n`;
-  pre.scrollTop = pre.scrollHeight;
+  if (pre) {
+    pre.textContent += echo;
+    pre.scrollTop = pre.scrollHeight;
+  }
+  // Optimistically flip into pending so the indicator appears immediately
+  // (the next poll will confirm via `in_flight`).
+  t.pending = true;
+  applyPendingIndicator(t);
+  saveChatStateToStorage();
   try {
-    await api("POST", `/api/chat/${chatState.sessionId}/input`, { text });
+    await api("POST", `/api/chat/${t.sessionId}/input`, { text });
+    // Trigger a poll right away so we pick up `in_flight` and (likely soon)
+    // the response without waiting the full 800ms tick.
+    pollChat();
   } catch (e) {
+    t.pending = false;
+    applyPendingIndicator(t);
     toast("Could not send: " + e.message, "error");
   }
 }
 
-async function stopChat() {
-  if (!chatState.sessionId) return;
+// ---- Logs -------------------------------------------------------------------
+
+const LOGS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+
+function logsFiltersFromHash() {
+  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  return {
+    severity: hashQs.get("severity") || "",
+    category: hashQs.get("category") || "",
+    actor: hashQs.get("actor") || "",
+    gap_id: hashQs.get("gap_id") || "",
+    q: hashQs.get("q") || "",
+    limit: parseInt(hashQs.get("limit") || "100", 10) || 100,
+  };
+}
+
+function logsHashFromFilters(f) {
+  const next = new URLSearchParams();
+  for (const [k, v] of Object.entries(f)) {
+    if (v && !(k === "limit" && v === 100)) next.set(k, String(v));
+  }
+  return "#/logs" + (next.toString() ? "?" + next : "");
+}
+
+async function renderLogs() {
+  renderBanners([]);
+  const f = logsFiltersFromHash();
+  $("#main").innerHTML = `
+    <h2>Logs</h2>
+    <div class="search-bar">
+      <input type="text" id="logs-q" placeholder="Search message or details…" value="${htmlEscape(f.q)}">
+      <select id="logs-severity">
+        <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
+        <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
+        <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
+        <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
+      </select>
+      <select id="logs-category"><option value="">all categories</option></select>
+      <select id="logs-actor"><option value="">all actors</option></select>
+      <input type="text" id="logs-gap-id" placeholder="Gap ID" value="${htmlEscape(f.gap_id)}" style="width:180px">
+      <select id="logs-limit">
+        ${LOGS_LIMIT_OPTIONS.map((n) =>
+          `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
+      </select>
+      <span class="spacer"></span>
+      <span id="logs-count" class="muted small"></span>
+      <button class="secondary" id="logs-clear">Clear filters</button>
+    </div>
+    <div id="logs-list"><p class="muted">Loading…</p></div>
+  `;
+
+  $("#logs-q").addEventListener("input", debounce(() => navigateLogs(), 300));
+  $("#logs-severity").addEventListener("change", () => navigateLogs());
+  $("#logs-category").addEventListener("change", () => navigateLogs());
+  $("#logs-actor").addEventListener("change", () => navigateLogs());
+  $("#logs-gap-id").addEventListener("input", debounce(() => navigateLogs(), 300));
+  $("#logs-limit").addEventListener("change", () => navigateLogs());
+  $("#logs-clear").addEventListener("click", () => { location.hash = "#/logs"; });
+
+  await loadLogs();
+}
+
+function navigateLogs() {
+  const next = {
+    severity: $("#logs-severity").value,
+    category: $("#logs-category").value,
+    actor: $("#logs-actor").value,
+    gap_id: $("#logs-gap-id").value.trim(),
+    q: $("#logs-q").value,
+    limit: parseInt($("#logs-limit").value, 10) || 100,
+  };
+  location.hash = logsHashFromFilters(next);
+}
+
+async function loadLogs() {
+  if (state.currentRoute !== "logs") return;
+  const f = logsFiltersFromHash();
+  const params = new URLSearchParams();
+  if (f.severity) params.set("severity", f.severity);
+  if (f.category) params.set("category", f.category);
+  if (f.actor) params.set("actor", f.actor);
+  if (f.gap_id) params.set("gap_id", f.gap_id);
+  if (f.q) params.set("q", f.q);
+  params.set("limit", String(f.limit));
+  params.set("facets", "1");
   try {
-    await api("POST", `/api/chat/${chatState.sessionId}/stop`);
-  } catch (e) {}
-  if (chatState.pollTimer) clearInterval(chatState.pollTimer);
-  chatState.pollTimer = null;
-  chatState.sessionId = null;
-  $("#chat-status").textContent = "Session ended.";
-  $("#chat-input").disabled = true;
-  $("#btn-stop").disabled = true;
+    const data = await api("GET", "/api/activity?" + params);
+    drawLogsList(data, f);
+  } catch (e) {
+    $("#logs-list").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+  }
+}
+
+function drawLogsList(data, f) {
+  const entries = data.activity || [];
+  const facets = data.facets || {};
+  // Re-populate facet dropdowns from server-side distinct values.
+  const catSel = $("#logs-category");
+  if (catSel) {
+    const existing = facets.categories || [];
+    catSel.innerHTML = `<option value="">all categories</option>` +
+      existing.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join("");
+  }
+  const actSel = $("#logs-actor");
+  if (actSel) {
+    const existing = facets.actors || [];
+    actSel.innerHTML = `<option value="">all actors</option>` +
+      existing.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join("");
+  }
+  const countEl = $("#logs-count");
+  if (countEl) {
+    countEl.textContent = `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`;
+  }
+  const root = $("#logs-list");
+  if (!entries.length) {
+    root.innerHTML = `<p class="muted">No log entries match the current filters.</p>`;
+    return;
+  }
+  root.innerHTML = renderActivityList(entries);
 }
 
 // ---- Settings ---------------------------------------------------------------
@@ -1195,22 +1578,26 @@ function drawSettings(s, diag, reps) {
     </div>
   `;
   $("#s-save").addEventListener("click", async () => {
-    try {
-      await api("PATCH", "/api/settings", {
-        parallel_run_cap: $("#s-cap").value,
-        branch_name_pattern: $("#s-pattern").value,
-        agent_idle_timeout_seconds: $("#s-idle").value,
-        agent_hard_cap_seconds: $("#s-hard").value,
-        chat_idle_timeout_seconds: $("#s-chat-idle").value,
-      });
-      toast("Saved", "info");
-    } catch (e) { toast(e.message, "error"); }
+    await withButtonBusy($("#s-save"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
+          parallel_run_cap: $("#s-cap").value,
+          branch_name_pattern: $("#s-pattern").value,
+          agent_idle_timeout_seconds: $("#s-idle").value,
+          agent_hard_cap_seconds: $("#s-hard").value,
+          chat_idle_timeout_seconds: $("#s-chat-idle").value,
+        });
+        toast("Saved", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $("#s-recheck").addEventListener("click", async () => {
-    try {
-      const r = await api("POST", "/api/settings/recheck-auth");
-      toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
-    } catch (e) { toast(e.message, "error"); }
+    await withButtonBusy($("#s-recheck"), "Re-checking…", async () => {
+      try {
+        const r = await api("POST", "/api/settings/recheck-auth");
+        toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(

@@ -329,3 +329,83 @@ select {
 
 .diff-show-details { font-size: 12px; color: var(--muted); cursor: pointer; }
 .collapsed { display: none; }
+
+/* --- Chat tabs -------------------------------------------------------- */
+.chat-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: -1px;     /* overlap the card border below */
+  flex-wrap: wrap;
+}
+.chat-tab {
+  height: auto;
+  padding: 6px 12px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.chat-tab:hover { background: var(--code-bg); }
+.chat-tab.active {
+  background: var(--card);
+  color: var(--fg);
+  border-bottom-color: var(--card);  /* "merges" with the card top */
+  font-weight: 600;
+}
+.chat-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  border-radius: 50%;
+}
+.chat-tab-close:hover { background: var(--border); color: var(--fg); }
+.chat-tab-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.chat-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--code-bg);
+  border-radius: var(--radius);
+}
+.chat-pending[hidden] { display: none; }
+.chat-pending-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.chat-pending-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  animation: chat-dot-bounce 1.2s infinite ease-in-out both;
+}
+.chat-pending-dots span:nth-child(1) { animation-delay: -0.32s; }
+.chat-pending-dots span:nth-child(2) { animation-delay: -0.16s; }
+@keyframes chat-dot-bounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+  40%           { transform: scale(1);   opacity: 1; }
+}

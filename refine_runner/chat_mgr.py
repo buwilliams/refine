@@ -65,7 +65,9 @@ class ChatManager:
     def shutdown(self) -> None:
         self._supervisor_stop.set()
 
-    def start(self, cwd: Path, *, is_standalone: bool = True) -> str:
+    def start(self, cwd: Path, *, is_standalone: bool = True,
+              priming_prompt: str | None = None,
+              priming_intro: str | None = None) -> str:
         sid = uuid.uuid4().hex[:12]
         session = ChatSession(
             session_id=sid,
@@ -76,7 +78,43 @@ class ChatManager:
         )
         with self._lock:
             self._sessions[sid] = session
+        if priming_prompt:
+            # A short user-facing line so they know context was loaded; the
+            # priming Q+A itself is discarded (DEVNULL stdout) so the chat
+            # transcript starts at the user's first real message.
+            if priming_intro:
+                with session.out_lock:
+                    session.out_lines.append(priming_intro)
+            self._spawn_priming(session, priming_prompt)
         return sid
+
+    def _spawn_priming(self, s: ChatSession, prompt: str) -> None:
+        """Seed the claude session with a context preamble. The output is
+        discarded — the model retains the priming exchange in its session
+        history, so subsequent `--resume` calls have full context, but the
+        user sees a clean transcript from their first message onward.
+        """
+        claude = shutil.which("claude") or "claude"
+        args = [claude, "--print", "--session-id", s.claude_uuid, prompt]
+        with s.proc_lock:
+            try:
+                s.proc = subprocess.Popen(
+                    args,
+                    cwd=str(s.cwd),
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                    start_new_session=True,
+                )
+            except (OSError, FileNotFoundError) as e:
+                with s.out_lock:
+                    s.out_lines.append(
+                        f"[refine] failed to load gap context: {e}",
+                    )
+                return
+            s.has_sent_first = True
+            s.last_activity_ts = time.monotonic()
 
     def send(self, session_id: str, text: str) -> bool:
         with self._lock:
@@ -127,11 +165,14 @@ class ChatManager:
         with s.out_lock:
             lines = list(s.out_lines)
             s.out_lines.clear()
+        with s.proc_lock:
+            in_flight = s.proc is not None and s.proc.poll() is None
         return {
             "alive": s.alive,
             "session_id": session_id,
             "lines": lines[-max_lines:],
             "closed_reason": s.closed_reason,
+            "in_flight": in_flight,
         }
 
     def stop(self, session_id: str, *, reason: str | None = None) -> bool:

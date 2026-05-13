@@ -136,10 +136,16 @@ def _h_diag(_h, _m, _b, _q):
 def _h_activity(_h, _m, _b, q):
     sid = _get_one(q, "since_id")
     since = int(sid) if sid else None
+    facets = _get_one(q, "facets")
     return api.list_activity(
         limit=int(_get_one(q, "limit", "100")),
         gap_id=_get_one(q, "gap_id"),
         since_id=since,
+        severity=_get_one(q, "severity"),
+        category=_get_one(q, "category"),
+        actor=_get_one(q, "actor"),
+        q=_get_one(q, "q"),
+        include_facets=bool(facets and facets != "0"),
     )
 
 
