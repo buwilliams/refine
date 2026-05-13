@@ -54,6 +54,24 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_runner.set_defaults(fn=cmd_runner)
 
+    p_stop = sub.add_parser(
+        "stop",
+        help="Stop the host runner daemon if one is running.",
+        description=(
+            "Reads run/runner.pid from the bound client's .refine/ directory "
+            "and sends SIGTERM; falls back to SIGKILL after a timeout."
+        ),
+    )
+    p_stop.add_argument(
+        "--timeout", "-t", type=float, default=10.0,
+        help="Seconds to wait for graceful exit before SIGKILL (default 10).",
+    )
+    p_stop.add_argument(
+        "--force", action="store_true",
+        help="Skip SIGTERM and go straight to SIGKILL.",
+    )
+    p_stop.set_defaults(fn=cmd_stop)
+
     p_web = sub.add_parser("web", help="Start the webapp.")
     p_web.set_defaults(fn=cmd_web)
 
@@ -145,8 +163,8 @@ def cmd_runner(args: argparse.Namespace) -> int:
         from refine_runner.__main__ import main as runner_main
         return runner_main()
 
-    pid_path = cfg.volume_root / "run" / "runner.pid"
-    log_path = cfg.volume_root / "run" / "runner.log"
+    pid_path = _runner_pid_path(cfg)
+    log_path = _runner_log_path(cfg)
 
     existing_pid = _read_pid(pid_path)
     if existing_pid is not None and _pid_alive(existing_pid):
@@ -222,6 +240,119 @@ def cmd_runner(args: argparse.Namespace) -> int:
 
     from refine_runner.__main__ import main as runner_main
     sys.exit(runner_main())
+
+
+def cmd_stop(args: argparse.Namespace) -> int:
+    import signal
+    import time
+
+    _load_config_or_exit(args)
+    cfg = config.get()
+    pid_path = _runner_pid_path(cfg)
+
+    pid = _read_pid(pid_path)
+    if pid is None:
+        # No pidfile — but the socket might be live from an older process
+        # that didn't write one. Tell the user what we see.
+        if cfg.runner_socket.exists():
+            print(
+                f"refine stop: no {pid_path} but socket {cfg.runner_socket} "
+                f"exists. The runner was probably started another way; stop "
+                f"it manually.",
+                file=sys.stderr,
+            )
+            return 1
+        print("refine stop: no runner is running (no pidfile, no socket).")
+        return 0
+    if not _pid_alive(pid):
+        print(f"refine stop: stale pidfile (pid {pid} is not running); removing.")
+        try:
+            pid_path.unlink()
+        except FileNotFoundError:
+            pass
+        return 0
+
+    sig = signal.SIGKILL if args.force else signal.SIGTERM
+    sig_name = "SIGKILL" if args.force else "SIGTERM"
+    try:
+        os.kill(pid, sig)
+    except PermissionError:
+        print(
+            f"refine stop: pid {pid} is not owned by this user. "
+            f"Try sudo or run as the user that started the runner.",
+            file=sys.stderr,
+        )
+        return 1
+    except ProcessLookupError:
+        print(f"refine stop: pid {pid} disappeared before signal landed.")
+        try:
+            pid_path.unlink()
+        except FileNotFoundError:
+            pass
+        return 0
+    print(f"refine stop: sent {sig_name} to pid {pid}; waiting up to {args.timeout:.0f}s…")
+
+    deadline = time.time() + args.timeout
+    while time.time() < deadline:
+        if not _pid_alive(pid):
+            print(f"refine stop: pid {pid} exited cleanly.")
+            try:
+                pid_path.unlink()
+            except FileNotFoundError:
+                pass
+            return 0
+        time.sleep(0.1)
+
+    if args.force:
+        # Already sent SIGKILL; nothing else to escalate to.
+        print(f"refine stop: pid {pid} still alive after SIGKILL — giving up.",
+              file=sys.stderr)
+        return 1
+
+    print(f"refine stop: pid {pid} did not exit after SIGTERM; escalating to SIGKILL.")
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    # Short wait after SIGKILL to confirm.
+    deadline = time.time() + 3.0
+    while time.time() < deadline:
+        if not _pid_alive(pid):
+            try:
+                pid_path.unlink()
+            except FileNotFoundError:
+                pass
+            print(f"refine stop: pid {pid} killed.")
+            return 0
+        time.sleep(0.1)
+    print(f"refine stop: pid {pid} still alive after SIGKILL.", file=sys.stderr)
+    return 1
+
+
+def _runner_state_dir(cfg: "config.Config") -> Path:
+    """Where to keep the runner pidfile and log file.
+
+    Prefer the refine source dir (the directory containing `.refine-binding`,
+    typically the user's refine clone). The bound client's `.refine/` lives
+    inside a bind-mounted volume that's exposed to the webapp container — and
+    daemon state shouldn't leak in there. Fall back to the volume root when
+    no binding is in scope (the inside-client-repo workflow).
+    """
+    binding = config.find_binding()
+    if binding is not None:
+        d = binding.parent / "run"
+    else:
+        d = cfg.volume_root / "run"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _runner_pid_path(cfg: "config.Config") -> Path:
+    return _runner_state_dir(cfg) / "runner.pid"
+
+
+def _runner_log_path(cfg: "config.Config") -> Path:
+    return _runner_state_dir(cfg) / "runner.log"
 
 
 def _read_pid(p: Path) -> int | None:

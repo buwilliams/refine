@@ -13,6 +13,9 @@ dist/
 # Created by `refine init`; host-specific; do not commit.
 .refine-binding
 
+# Host runner state (pidfile + log) for this clone. Host-specific; do not commit.
+/run/
+
 # Local volume root if anyone tries refine against this repo itself
 /refine-data/
 *.sqlite

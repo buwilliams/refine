@@ -1,8 +1,19 @@
 # refine
 
-Background Claude Code agents that close behavior **Gaps** in client codebases,
-driven by QA/Product. See [`spec.md`](spec.md) for the design — the rest of
-this README is just how to run it.
+refine turns behavior bug reports into merged commits. QA, Product, and
+support describe a **Gap** — what the app does today versus what it should
+do instead — and refine launches a Claude Code agent in a git worktree
+against the codebase. The agent makes the change, commits, and refine
+merges the work back to the branch you have checked out. Gaps move
+`todo → in-progress → review → done`, with `failed` and `cancelled` for the
+unhappy paths; multiple Gaps run in parallel up to a configurable cap.
+
+You drive everything from a web UI: a status dashboard, per-Gap activity
+feeds, a filterable Logs view, and an interactive Chat that can be
+standalone or attached to a Gap's worktree with that Gap's context
+pre-loaded. Refine handles the git plumbing — worktrees, fetch, merge,
+push, auto-committing its own state — and inherits Claude Code auth from
+the host, so operators rarely need to think about either.
 
 ## Components
 
@@ -159,6 +170,7 @@ the UI's Settings page.
 |-------------------------------|--------------------------------------------------------------------|
 | `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/` in `<path>`; bind this clone. |
 | `uv run refine runner`        | Start the host-native runner daemon.                               |
+| `uv run refine stop`          | Stop the running runner (SIGTERM, escalates to SIGKILL on timeout). |
 | `uv run refine web`           | Start the webapp (rarely used directly — Docker wraps it).         |
 | `uv run refine doctor`        | Show config, IPC, claude auth, and git status.                     |
 

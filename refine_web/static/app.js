@@ -1201,6 +1201,10 @@ function drawChat() {
     <div class="card">
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
+        <button id="btn-chat-clear" class="secondary"
+                ${(active.output || active.sessionId) ? "" : "disabled"}>
+          Clear history
+        </button>
         <span class="spacer"></span>
         <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
       </div>
@@ -1238,6 +1242,7 @@ function drawChat() {
     });
   });
   $("#btn-chat-toggle").addEventListener("click", toggleActiveChat);
+  $("#btn-chat-clear").addEventListener("click", clearActiveChat);
   $("#chat-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1286,6 +1291,31 @@ async function closeChatTab(tabId) {
   if (chatState.activeTabId === tabId) chatState.activeTabId = "standalone";
   saveChatStateToStorage();
   drawChat();
+}
+
+async function clearActiveChat() {
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t) return;
+  if (!t.output && !t.sessionId) return;     // nothing to clear
+  const btn = $("#btn-chat-clear");
+  const ok = await modalConfirm(
+    "Clear this chat's history? Any active session will be stopped and " +
+    "the transcript wiped. Starting again gives Claude a fresh conversation.",
+    { title: "Clear chat history", okLabel: "Clear", danger: true,
+      cancelLabel: "Keep history" },
+  );
+  if (!ok) return;
+  await withButtonBusy(btn, "Clearing…", async () => {
+    if (t.sessionId) {
+      try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
+    }
+    t.sessionId = null;
+    t.output = "";
+    t.closedReason = null;
+    t.pending = false;
+    saveChatStateToStorage();
+    drawChat();
+  });
 }
 
 async function toggleActiveChat() {
