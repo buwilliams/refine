@@ -9,8 +9,9 @@
 #   docker compose up
 #
 # REFINE_CLIENT_REFINE_DIR is set by `refine init` in the .env file alongside
-# this compose file. Inside the container, /refine-data is the volume root;
-# refine.toml is discovered automatically because working_dir is /refine-data.
+# this compose file. It points at the client repo's `.refine/` directory.
+# Inside the container, /refine-data is the volume root; refine.toml is
+# discovered automatically because working_dir is /refine-data.
 #
 # The companion refine-runner runs natively on the host (so it inherits the
 # host's Claude Code auth, SSH keys, and git config); it's not in this compose

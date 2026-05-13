@@ -31,7 +31,7 @@ def main(argv: list[str] | None = None) -> int:
         "init",
         help="Initialize refine for a client repo and bind this refine clone to it.",
         description=(
-            "Bootstraps a client repo: creates <client>/refine/refine.toml + "
+            "Bootstraps a client repo: creates <client>/.refine/refine.toml + "
             "run/ + gaps/, and (when run from a refine source dir) writes a "
             ".refine-binding + .env so subsequent commands target the same "
             "client without arguments."
@@ -75,7 +75,7 @@ def cmd_init(args: argparse.Namespace) -> int:
         )
         return 1
 
-    target = client_repo / "refine"
+    target = client_repo / ".refine"
     try:
         cfg_path = config.write_defaults(target, force=args.force)
     except config.ConfigError as e:

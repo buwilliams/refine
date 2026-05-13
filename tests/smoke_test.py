@@ -42,7 +42,7 @@ def main() -> int:
     from refine_shared import config
 
     # Equivalent of `refine init`
-    cfg_path = config.write_defaults(client / "refine")
+    cfg_path = config.write_defaults(client / ".refine")
     print(f"wrote config: {cfg_path}")
     cfg = config.get()
     print(f"volume root:  {cfg.volume_root}")

@@ -97,9 +97,9 @@ def find_config(start: Path | None = None) -> Path | None:
     """Discover refine.toml. Tries, in order:
 
     1. A `.refine-binding` file in cwd or any ancestor — its target client
-       repo's `refine/refine.toml`. This is the "run from /opt/refine
+       repo's `.refine/refine.toml`. This is the "run from /opt/refine
        targeting /srv/clients/<x>" workflow.
-    2. Walking up from cwd looking for `refine.toml` or `refine/refine.toml`.
+    2. Walking up from cwd looking for `refine.toml` or `.refine/refine.toml`.
        This is the "run from inside the client repo" workflow.
     3. The Docker-conventional `/refine-data/refine.toml`.
     """
@@ -110,7 +110,7 @@ def find_config(start: Path | None = None) -> Path | None:
     if binding is not None:
         try:
             client_repo = read_binding(binding)
-            cfg = client_repo / "refine" / CONFIG_FILENAME
+            cfg = client_repo / ".refine" / CONFIG_FILENAME
             if cfg.is_file():
                 return cfg
         except (ConfigError, OSError):
@@ -120,7 +120,7 @@ def find_config(start: Path | None = None) -> Path | None:
     candidates: list[Path] = []
     seen: set[Path] = set()
     for d in [start, *start.parents]:
-        for c in (d / CONFIG_FILENAME, d / "refine" / CONFIG_FILENAME):
+        for c in (d / CONFIG_FILENAME, d / ".refine" / CONFIG_FILENAME):
             key = c.resolve(strict=False)
             if key in seen:
                 continue

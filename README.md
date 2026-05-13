@@ -48,8 +48,9 @@ uv run refine init /srv/clients/acme-app
 ```
 
 This:
-- Creates `/srv/clients/acme-app/refine/refine.toml` + `run/` + `gaps/` +
-  `.gitignore` (the client's volume root).
+- Creates `/srv/clients/acme-app/.refine/refine.toml` + `run/` + `gaps/` +
+  `.gitignore` (the client's volume root — hidden by convention, since it's
+  system-utility state, not project source).
 - Writes `/opt/refine-acme/.refine-binding` so future commands from
   `/opt/refine-acme` target this client.
 - Writes `/opt/refine-acme/.env` so `docker compose` reads the bind-mount path.
@@ -58,7 +59,7 @@ Commit the new files in the client repo when you're ready:
 
 ```bash
 cd /srv/clients/acme-app
-git add refine/refine.toml refine/.gitignore
+git add .refine/refine.toml .refine/.gitignore
 git commit -m "add refine"
 ```
 
@@ -128,7 +129,7 @@ your refine clone via `uv run` (or installed binary). Zero env vars.
 A single TOML file is the only thing operators edit:
 
 ```toml
-# refine/refine.toml (created by `refine init`)
+# .refine/refine.toml (created by `refine init`)
 client_repo  = ".."                  # relative to this file (= the client repo root)
 runner_socket = "./run/runner.sock"
 [web]

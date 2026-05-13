@@ -38,7 +38,7 @@ def main() -> int:
 
     # Write the config (equivalent to `refine init`). Override the web port
     # so we don't collide with any local 8080.
-    cfg_path = config.write_defaults(client / "refine")
+    cfg_path = config.write_defaults(client / ".refine")
     cfg_path.write_text(
         cfg_path.read_text().replace("port = 8080", "port = 18099")
         .replace("0.0.0.0", "127.0.0.1"),
