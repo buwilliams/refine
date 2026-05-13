@@ -321,19 +321,30 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     recent_activity = list(reversed(recent_activity))
 
     parts: list[str] = [
-        "You're in a refine chat session attached to a Gap (a behavior",
-        "change the team is tracking). You're running inside that Gap's git",
-        "worktree (your cwd) so you can read code and run tools.",
+        "You're in a refine chat session attached to an in-progress Gap (a",
+        "behavior change the team is tracking). You're running inside the",
+        "Gap's git worktree (your cwd), so you can read code, run `git log`,",
+        "`git status`, `git diff`, and other tools to investigate the agent's",
+        "progress.",
         "",
-        f"Gap: {row['name']}",
-        f"ID: {gap_id}",
-        f"Status: {row['status']}",
+        "Below is the context the user has on their end. When they ask about",
+        "the Gap's progress, status, or what's happening, treat their question",
+        "as being about THIS GAP — not as small talk. Use the context and the",
+        "live worktree state to give a specific, grounded answer. If they ask",
+        "an open-ended question (e.g. \"how is it going?\"), summarize the",
+        "current state: status, what the latest round asks for, what commits",
+        "the agent has made on this branch, and any recent errors.",
+        "",
+        "## Gap context",
+        f"- Name: {row['name']}",
+        f"- ID: {gap_id}",
+        f"- Status: {row['status']}",
     ]
     if row["branch_name"]:
-        parts.append(f"Branch: {row['branch_name']}")
+        parts.append(f"- Branch: {row['branch_name']}")
     if latest:
         parts.append("")
-        parts.append(f"Latest round ({len(rounds)} of {len(rounds)}):")
+        parts.append(f"## Latest round ({len(rounds)} of {len(rounds)})")
         if latest.get("reporter"):
             parts.append(f"- Reporter: {latest['reporter']}")
         if latest.get("actual"):
@@ -342,16 +353,17 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
             parts.append(f"- Target (desired behavior): {latest['target']}")
     if recent_activity:
         parts.append("")
-        parts.append("Recent activity:")
+        parts.append("## Recent activity (oldest first)")
         for entry in recent_activity:
             ts = entry.get("datetime", "")
             msg = entry.get("message", "")
-            parts.append(f"- [{ts}] {msg}")
+            sev = entry.get("severity", "info")
+            parts.append(f"- [{ts}] ({sev}) {msg}")
     parts += [
         "",
-        "Don't restate this context back to me. Briefly acknowledge that",
-        "you've read it (one short sentence) and wait for my first question.",
-        "Don't commit anything unless I ask.",
+        "Don't commit anything to git unless I explicitly ask. Don't repeat",
+        "this context block back to me verbatim — synthesize it in your",
+        "answer. The user's first message follows.",
     ]
     priming_prompt = "\n".join(parts)
     intro = (

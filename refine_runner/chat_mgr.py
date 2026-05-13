@@ -43,6 +43,10 @@ class ChatSession:
     has_sent_first: bool = False
     alive: bool = True             # cleared by stop() / supervisor
     closed_reason: str | None = None
+    # Context text to prepend to the user's first message (used by attached
+    # chats to seed the conversation with the Gap's context). Cleared after
+    # the first send.
+    pending_priming_text: str | None = None
 
 
 class ChatManager:
@@ -75,46 +79,16 @@ class ChatManager:
             cwd=cwd,
             is_standalone=is_standalone,
             last_activity_ts=time.monotonic(),
+            pending_priming_text=priming_prompt or None,
         )
+        # Show the intro line as a user-visible note so they know context will
+        # be loaded with their first message.
+        if priming_intro:
+            with session.out_lock:
+                session.out_lines.append(priming_intro)
         with self._lock:
             self._sessions[sid] = session
-        if priming_prompt:
-            # A short user-facing line so they know context was loaded; the
-            # priming Q+A itself is discarded (DEVNULL stdout) so the chat
-            # transcript starts at the user's first real message.
-            if priming_intro:
-                with session.out_lock:
-                    session.out_lines.append(priming_intro)
-            self._spawn_priming(session, priming_prompt)
         return sid
-
-    def _spawn_priming(self, s: ChatSession, prompt: str) -> None:
-        """Seed the claude session with a context preamble. The output is
-        discarded — the model retains the priming exchange in its session
-        history, so subsequent `--resume` calls have full context, but the
-        user sees a clean transcript from their first message onward.
-        """
-        claude = shutil.which("claude") or "claude"
-        args = [claude, "--print", "--session-id", s.claude_uuid, prompt]
-        with s.proc_lock:
-            try:
-                s.proc = subprocess.Popen(
-                    args,
-                    cwd=str(s.cwd),
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    text=True,
-                    start_new_session=True,
-                )
-            except (OSError, FileNotFoundError) as e:
-                with s.out_lock:
-                    s.out_lines.append(
-                        f"[refine] failed to load gap context: {e}",
-                    )
-                return
-            s.has_sent_first = True
-            s.last_activity_ts = time.monotonic()
 
     def send(self, session_id: str, text: str) -> bool:
         with self._lock:
@@ -127,11 +101,21 @@ class ChatManager:
                 return False
             claude = shutil.which("claude") or "claude"
             args = [claude, "--print"]
+            # On the first send of an attached chat, prepend the Gap context
+            # so claude has the full picture in one shot. The user only sees
+            # their own text echoed back in the UI.
+            effective_prompt = text
+            if s.pending_priming_text and not s.has_sent_first:
+                effective_prompt = (
+                    f"{s.pending_priming_text}\n\n---\n\n"
+                    f"Now, my first question:\n{text}"
+                )
+                s.pending_priming_text = None
             if s.has_sent_first:
                 args.extend(["--resume", s.claude_uuid])
             else:
                 args.extend(["--session-id", s.claude_uuid])
-            args.append(text)
+            args.append(effective_prompt)
             try:
                 s.proc = subprocess.Popen(
                     args,
