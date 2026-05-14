@@ -222,6 +222,34 @@ def _h_chat_stop(_h, m, _b, _q):
     return api.chat_stop(m.group(1))
 
 
+# ---- Target application ------------------------------------------------------
+
+
+@route("GET", r"/api/target-app/status")
+def _h_target_app_status(_h, _m, _b, _q):
+    return api.target_app_status()
+
+
+@route("POST", r"/api/target-app/start")
+def _h_target_app_start(_h, _m, body, _q):
+    return api.target_app_start(body or {})
+
+
+@route("POST", r"/api/target-app/stop")
+def _h_target_app_stop(_h, _m, body, _q):
+    return api.target_app_stop(body or {})
+
+
+@route("POST", r"/api/target-app/health")
+def _h_target_app_health(_h, _m, body, _q):
+    return api.target_app_health(body or {})
+
+
+@route("POST", r"/api/target-app/generate-instructions")
+def _h_target_app_generate(_h, _m, body, _q):
+    return api.target_app_generate(body or {})
+
+
 # ---- helpers -----------------------------------------------------------------
 
 def _get_one(q: dict, key: str, default: str | None = None) -> str | None:

@@ -10,6 +10,11 @@ const state = {
   needsAttentionBanners: [],
   currentRoute: null,
   currentGap: null,
+  // The hash that's "underneath" the Gap detail modal. Updated whenever
+  // navigate() runs for a route other than gaps_detail. Used to restore
+  // the URL when the modal is dismissed so the page the user came from
+  // is what they land back on.
+  underlayHash: "#/",
   // Provider-scoped feature flag matrix from `/api/features`. Refreshed
   // on app start and after any Settings save. UI helpers below read
   // `state.features` to gate Chat / Import affordances.
@@ -490,6 +495,12 @@ function initSSE() {
       loadGapDetail(state.currentGap);
     }
   });
+  sseSource.addEventListener("target_app_state", () => {
+    refreshTargetAppToggle();
+  });
+  sseSource.addEventListener("target_app_health", () => {
+    refreshTargetAppToggle();
+  });
   sseSource.addEventListener("round_log_added", (e) => {
     // Subprocess flushed new stdout to the active round's logs[]. If the user
     // is viewing that gap's detail, refresh so the new lines appear live.
@@ -506,10 +517,11 @@ function initSSE() {
 
 // ---- Router -----------------------------------------------------------------
 
+// `gaps_detail` is handled directly in `navigate()` because it opens a
+// modal on top of the current screen rather than replacing `#main`.
 const routes = {
   dashboard: renderDashboard,
   gaps: renderGapsList,
-  gaps_detail: renderGapDetail,
   gaps_new: renderGapNew,
   gaps_import: renderGapImport,
   agents: renderAgents,
@@ -562,8 +574,37 @@ function navigate() {
   if (prevRoute === "tutorial" && r.route !== "tutorial") {
     closeTutorialModal();
   }
+
+  if (r.route === "gaps_detail") {
+    // Gap detail is now a modal layered on top of the current screen, so
+    // the user keeps their underlying context (Dashboard, Gaps list, etc.)
+    // and dismissing returns them to where they were. We don't touch
+    // `#main` — whatever's there stays. If `#main` is empty (cold-load
+    // deep link), open the dashboard underneath as the natural landing.
+    //
+    // Refresh the underlay hash from the URL we navigated AWAY from on
+    // this hashchange — but only if it wasn't another gap-detail URL
+    // (modal-to-modal swaps shouldn't clobber the true underlay).
+    try {
+      const prevHash = new URL(_prevHashURL).hash || "#/";
+      if (!/^#\/gaps\/[^/]+/.test(prevHash) || /^#\/gaps\/(new|import)/.test(prevHash)) {
+        state.underlayHash = prevHash;
+      }
+    } catch { /* keep prior state.underlayHash */ }
+    state.currentRoute = "gaps_detail";
+    state.currentGap = r.id;
+    highlightNav("gaps");
+    openGapDetailModal(r.id);
+    return;
+  }
+
+  // Leaving a Gap detail modal — close it (without rewriting the hash,
+  // since we're already moving to a different one).
+  if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
+
   state.currentRoute = r.route;
   state.currentGap = r.id || null;
+  state.underlayHash = location.hash || "#/";
   highlightNav(r.route);
   const fn = routes[r.route];
   if (fn) fn(r);
@@ -578,7 +619,17 @@ function highlightNav(route) {
   }
 }
 
-window.addEventListener("hashchange", navigate);
+// Capture the URL we navigated FROM so the gap-detail modal can return
+// the user to their actual prior view — including any filter params the
+// Gaps list applied via `history.replaceState` (which doesn't fire
+// `hashchange`). `navigate()` reads this only when transitioning into
+// the `gaps_detail` route.
+let _prevHashURL = location.href;
+window.addEventListener("hashchange", (e) => {
+  try { _prevHashURL = e.oldURL || location.href; }
+  catch { _prevHashURL = location.href; }
+  navigate();
+});
 
 // ---- Dashboard --------------------------------------------------------------
 
@@ -696,22 +747,22 @@ function drawDashboard(d, opts = {}) {
 
     ${reviewReporter ? `
     <section class="card" id="reviews-for-reporter-card">
-      <h3>
-        Awaiting your review
-        <span class="muted small">— ${htmlEscape(reviewReporter)}</span>
-      </h3>
+      <div class="card-head-row">
+        <h3>
+          Awaiting your review
+          <span class="muted small">— ${htmlEscape(reviewReporter)}</span>
+        </h3>
+        ${reviewsForReporter.length === 0 ? "" : `
+          <button id="rev-bulk-verify" disabled>Verify selected</button>`}
+      </div>
       ${reviewsForReporter.length === 0
         ? `<p class="muted">Nothing in <code>review</code> assigned to you right now.</p>`
-        : `<div class="actions" style="margin-bottom:8px">
-            <label class="muted small">
-              <input type="checkbox" id="rev-select-all"> Select all
-            </label>
-            <span class="spacer"></span>
-            <button id="rev-bulk-verify" disabled>Verify selected</button>
-          </div>
-          <table class="table">
+        : `<table class="table">
             <thead><tr>
-              <th style="width:24px"></th>
+              <th class="gap-select-col">
+                <input type="checkbox" id="rev-select-all"
+                       aria-label="Select all reviews">
+              </th>
               <th>Gap</th>
               <th>Updated</th>
               <th class="actions-col" style="white-space:nowrap"></th>
@@ -719,7 +770,7 @@ function drawDashboard(d, opts = {}) {
             <tbody>
               ${reviewsForReporter.map((g) => `
                 <tr data-rev-row="${g.id}">
-                  <td><input type="checkbox" class="rev-row-check" data-rev-id="${g.id}"></td>
+                  <td class="gap-select-col"><input type="checkbox" class="rev-row-check" data-rev-id="${g.id}"></td>
                   <td>
                     <a href="#/gaps/${g.id}" title="${htmlEscape(g.id)}">
                       ${htmlEscape(g.name)}
@@ -1517,10 +1568,88 @@ async function withButtonBusy(btn, busyLabel, fn) {
 
 // ---- Gaps: detail -----------------------------------------------------------
 
+// Gap detail is rendered as a modal layered over whatever screen the user
+// was on (Dashboard, Gaps list, etc.) so that opening a Gap doesn't blow
+// away context. `navigate()` handles the `#/gaps/<id>` route by calling
+// `openGapDetailModal` directly — so `renderGapDetail` is no longer wired
+// into the routes table. Kept as a thin wrapper in case any callers find
+// it useful later.
 async function renderGapDetail(r) {
-  state.currentGap = r.id;
-  $("#main").innerHTML = `<p class="muted">Loading…</p>`;
-  await loadGapDetail(r.id);
+  openGapDetailModal(r.id);
+}
+
+let _gapModalRoot = null;
+
+function gapDetailContainer() {
+  return _gapModalRoot?.querySelector(".gap-detail-modal-body") || null;
+}
+
+function openGapDetailModal(gapId) {
+  // Make sure something is underneath. On a cold-load deep link (e.g. user
+  // pastes `#/gaps/abc123` into a new tab), `#main` is empty — paint the
+  // dashboard underneath so dismissing the modal leaves the user on a
+  // sensible page.
+  ensureGapModalUnderlay();
+
+  if (_gapModalRoot) {
+    // Modal is already open — swap the body to the new gap.
+    const body = _gapModalRoot.querySelector(".gap-detail-modal-body");
+    if (body) body.innerHTML = `<p class="muted">Loading…</p>`;
+    loadGapDetail(gapId);
+    return;
+  }
+
+  const root = document.createElement("div");
+  root.className = "modal-backdrop gap-detail-backdrop";
+  root.innerHTML = `
+    <div class="modal gap-detail-modal" role="dialog" aria-modal="true"
+         aria-label="Gap detail">
+      <button class="modal-close" type="button" aria-label="Close">×</button>
+      <div class="gap-detail-modal-body"><p class="muted">Loading…</p></div>
+    </div>
+  `;
+  document.body.appendChild(root);
+  _gapModalRoot = root;
+
+  function onKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); dismiss(); }
+  }
+  function dismiss() {
+    closeGapDetailModal({ navigateAway: true });
+  }
+  document.addEventListener("keydown", onKey, true);
+  root._cleanup = () => document.removeEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) dismiss();
+  });
+  root.querySelector(".modal-close").addEventListener("click", dismiss);
+
+  loadGapDetail(gapId);
+}
+
+function closeGapDetailModal({ navigateAway = false } = {}) {
+  if (!_gapModalRoot) return;
+  _gapModalRoot._cleanup?.();
+  _gapModalRoot.remove();
+  _gapModalRoot = null;
+  state.currentGap = null;
+  if (navigateAway) {
+    // Restore the URL to whatever was underneath. If we're already there
+    // somehow (shouldn't happen), no-op so we don't trigger a redundant
+    // re-render.
+    const target = state.underlayHash || "#/";
+    if (location.hash !== target) location.hash = target;
+    else state.currentRoute = parseHash().route;
+  }
+}
+
+function ensureGapModalUnderlay() {
+  const main = $("#main");
+  if (main && main.innerHTML.trim()) return;
+  // Paint the dashboard underneath. We don't change `state.currentRoute`
+  // here — the caller will set it to "gaps_detail" — but the dashboard's
+  // render is keyed off DOM state, not route, so this works.
+  renderDashboard();
 }
 
 async function loadGapDetail(gapId) {
@@ -1528,7 +1657,10 @@ async function loadGapDetail(gapId) {
     const { gap } = await api("GET", "/api/gaps/" + gapId);
     drawGapDetail(gap);
   } catch (e) {
-    $("#main").innerHTML = `<p class="muted">Could not load gap: ${htmlEscape(e.message)}</p>`;
+    const container = gapDetailContainer();
+    if (container) {
+      container.innerHTML = `<p class="muted">Could not load gap: ${htmlEscape(e.message)}</p>`;
+    }
   }
 }
 
@@ -1607,7 +1739,9 @@ function drawGapDetail(gap) {
     <button id="btn-state-forward">${htmlEscape(workflow.forward.label)}</button>
   ` : "";
 
-  $("#main").innerHTML = `
+  const container = gapDetailContainer();
+  if (!container) return;
+  container.innerHTML = `
     <div class="gap-detail">
       <div class="row" style="align-items:center;margin-bottom:8px">
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
@@ -3378,6 +3512,7 @@ function drawSettings(s, diag, reps, feats) {
     { slug: "reporters",    label: "Reporters" },
     { slug: "runtime",      label: "Runtime" },
     { slug: "cli",          label: "AI Provider" },
+    { slug: "target-app",   label: "Target App" },
     { slug: "diagnostics",  label: "Diagnostics" },
   ];
   const activeSlug = readSettingsTab(tabs);
@@ -3494,6 +3629,49 @@ function drawSettings(s, diag, reps, feats) {
         historical rounds keep their original reporter string so audit
         history is preserved.
       </p>
+    </div>`)}
+
+    ${pane("target-app", `
+    <div class="card">
+      <h3>Target application</h3>
+      <p class="muted small" style="margin-top:0">
+        Plain-language prompts sent to a Standalone agent in the client
+        repo to bring the application up or take it down. Refine doesn't
+        own the running process — the prompt does (background it with
+        <code>nohup … &amp;</code> or hand off to a process manager so it
+        survives the agent's exit). Refine tracks whether the app is
+        alive by polling the health URL below.
+      </p>
+      <div class="form-row"><label>Health check URL
+        <span class="muted small">— refine GETs this every ${"~15s"}. 2xx = healthy. Leave blank to skip health checks.</span></label>
+        <input type="text" id="s-target-health-url"
+               placeholder="http://localhost:3000/health"
+               value="${htmlEscape(s.target_app_health_url || "")}"></div>
+      <div class="form-row"><label>Start instructions
+        <span class="muted small">— what the agent should do to bring the app up (install / build / launch). Click <strong>Generate</strong> to have the agent draft this by analysing the repo.</span></label>
+        <textarea id="s-target-start" rows="6"
+                  placeholder="e.g. Run \`npm install\` if node_modules is missing, then \`nohup npm run dev > /tmp/app.log 2>&1 &\`. Wait 5s and confirm http://localhost:3000/health returns 200.">${htmlEscape(s.target_app_start_instructions || "")}</textarea>
+        <div class="actions" style="margin-top:6px">
+          <button class="secondary" id="s-target-gen-start">Generate from codebase</button>
+        </div>
+      </div>
+      <div class="form-row"><label>Stop instructions
+        <span class="muted small">— what the agent should do to shut the app down.</span></label>
+        <textarea id="s-target-stop" rows="6"
+                  placeholder="e.g. Find the process listening on port 3000 (\`lsof -ti:3000\`), send SIGTERM, wait 3s, SIGKILL if still alive.">${htmlEscape(s.target_app_stop_instructions || "")}</textarea>
+        <div class="actions" style="margin-top:6px">
+          <button class="secondary" id="s-target-gen-stop">Generate from codebase</button>
+        </div>
+      </div>
+      <div class="actions"><button id="s-save-target">Save</button></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Current status</h3>
+      <div id="target-app-status-block" class="muted">Loading…</div>
+      <div class="actions" style="margin-top:8px">
+        <button class="secondary" id="s-target-health-now">Run health check now</button>
+      </div>
     </div>`)}
 
     ${pane("diagnostics", `
@@ -3659,6 +3837,107 @@ function drawSettings(s, diag, reps, feats) {
     try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
     catch (e) { toast(e.message, "error"); }
   });
+
+  // --- Target application tab ----------------------------------------------
+  $("#s-save-target")?.addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-target"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
+          target_app_health_url: $("#s-target-health-url").value,
+          target_app_start_instructions: $("#s-target-start").value,
+          target_app_stop_instructions: $("#s-target-stop").value,
+        });
+        toast("Saved", "info");
+        refreshTargetAppStatus();
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  const wireGenerate = (btnId, kind, textareaId) => {
+    $(btnId)?.addEventListener("click", async () => {
+      const btn = $(btnId);
+      const ok = await modalConfirm(
+        `Ask the agent to analyse the codebase and draft ${kind} instructions? `
+        + `This can take a minute or two, and overwrites the text in the box.`,
+        { title: `Generate ${kind} instructions`, okLabel: "Generate" },
+      );
+      if (!ok) return;
+      await withButtonBusy(btn, "Generating…", async () => {
+        try {
+          const r = await api("POST", "/api/target-app/generate-instructions",
+                              { kind });
+          if (r.ok && r.text) {
+            $(textareaId).value = r.text;
+            toast(`Generated — review and click Save to persist`, "info");
+          } else {
+            toast("Generation produced no text", "error");
+          }
+        } catch (e) { toast(e.message, "error"); }
+      });
+    });
+  };
+  wireGenerate("#s-target-gen-start", "start", "#s-target-start");
+  wireGenerate("#s-target-gen-stop",  "stop",  "#s-target-stop");
+  $("#s-target-health-now")?.addEventListener("click", async () => {
+    const btn = $("#s-target-health-now");
+    await withButtonBusy(btn, "Probing…", async () => {
+      try {
+        const r = await api("POST", "/api/target-app/health");
+        toast(r.last_health_ok ? "Health check OK" : (r.probe_message || "Unhealthy"),
+              r.last_health_ok ? "info" : "error");
+        drawTargetAppStatusBlock(r);
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  // Kick off the initial status load (and let SSE refresh later).
+  refreshTargetAppStatus();
+}
+
+// Re-fetch + repaint the target-app status block inside the Settings panel.
+// Cheap to call from anywhere — silently no-ops if Settings isn't rendered.
+async function refreshTargetAppStatus() {
+  const block = document.getElementById("target-app-status-block");
+  if (!block) return;
+  try {
+    const r = await api("GET", "/api/target-app/status");
+    drawTargetAppStatusBlock(r);
+  } catch (e) {
+    block.innerHTML = `<span class="muted">Status unavailable: ${htmlEscape(e.message)}</span>`;
+  }
+}
+
+function drawTargetAppStatusBlock(snap) {
+  const block = document.getElementById("target-app-status-block");
+  if (!block) return;
+  const stateLabel = {
+    running:  "Running",
+    starting: "Starting…",
+    stopping: "Stopping…",
+    stopped:  "Stopped",
+    unknown:  "Unknown",
+  }[snap.state] || snap.state || "Unknown";
+  const healthBits = snap.last_health_at
+    ? `Last health check: ${snap.last_health_ok ? "OK" : "FAIL"} · ${fmtTime(snap.last_health_at)}`
+    : "No health checks yet.";
+  block.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="target-app-dot" data-status-dot></span>
+      <strong>${htmlEscape(stateLabel)}</strong>
+      ${snap.health_url ? `<span class="muted small">${htmlEscape(snap.health_url)}</span>` : `<span class="muted small">No health URL configured</span>`}
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
+    ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
+  `;
+  // Apply dot colour from the parent state via a CSS hook — the .target-app-dot
+  // colour rules key off `data-state` on an ancestor, so set it here too.
+  const dot = block.querySelector("[data-status-dot]");
+  if (dot) {
+    dot.style.background = ({
+      running:  "#1f9d4d",
+      stopped:  "#c63838",
+      starting: "#d4a106",
+      stopping: "#d4a106",
+    }[snap.state]) || "#b8bcc6";
+  }
 }
 
 // ---- Tutorial ---------------------------------------------------------------
@@ -3847,9 +4126,112 @@ async function init() {
   }
   initChatDock();
   initSSE();
+  initTargetAppToggle();
   refreshFeatures();
   setInterval(tickRunningCells, 1000);
   navigate();
+}
+
+// ---- Target application toggle (topbar) -------------------------------------
+//
+// Single button sitting next to the reporter dropdown. The dot is the
+// status (green=running, red=stopped, amber=in-flight, grey=unknown).
+// Click flips between start and stop based on current state. The status
+// surface is refreshed via SSE (target_app_state, target_app_health) and
+// on a 30s safety poll in case SSE is wedged.
+
+let _targetAppSnapshot = null;
+
+function initTargetAppToggle() {
+  const btn = document.getElementById("target-app-toggle");
+  if (!btn) return;
+  btn.addEventListener("click", onTargetAppToggleClick);
+  refreshTargetAppToggle();
+  // Backup poll so the dot isn't stale if SSE drops.
+  setInterval(refreshTargetAppToggle, 30000);
+}
+
+async function refreshTargetAppToggle() {
+  const btn = document.getElementById("target-app-toggle");
+  if (!btn) return;
+  try {
+    const snap = await api("GET", "/api/target-app/status");
+    applyTargetAppSnapshot(snap);
+  } catch {
+    // Leave whatever state the dot was showing; we'll retry on the next tick.
+  }
+}
+
+function applyTargetAppSnapshot(snap) {
+  _targetAppSnapshot = snap;
+  const btn = document.getElementById("target-app-toggle");
+  if (!btn) return;
+  const appState = snap.state || "unknown";
+  btn.dataset.state = appState;
+  const label = {
+    running:  "App: running",
+    stopped:  "App: stopped",
+    starting: "App: starting…",
+    stopping: "App: stopping…",
+    unknown:  "App: unknown",
+  }[appState] || "App";
+  btn.title = label
+    + (snap.last_health_at
+        ? ` · last check ${snap.last_health_ok ? "OK" : "FAIL"} at ${fmtTime(snap.last_health_at)}`
+        : "")
+    + (snap.last_error ? ` · ${snap.last_error}` : "");
+  const lbl = btn.querySelector(".target-app-label");
+  if (lbl) lbl.textContent = label.replace(/^App: /, "");
+  btn.disabled = appState === "starting" || appState === "stopping";
+  // Repaint the Settings status block when it's visible.
+  if (state.currentRoute === "settings") {
+    drawTargetAppStatusBlock(snap);
+  }
+}
+
+async function onTargetAppToggleClick() {
+  const btn = document.getElementById("target-app-toggle");
+  if (!btn || btn.disabled) return;
+  const snap = _targetAppSnapshot || {};
+  const isRunning = snap.state === "running";
+  const action = isRunning ? "stop" : "start";
+  const hasPrompt = isRunning
+    ? snap.has_stop_instructions
+    : snap.has_start_instructions;
+  if (!hasPrompt) {
+    toast(
+      `No ${action} instructions configured. Set them on Settings → Target App.`,
+      "error",
+    );
+    return;
+  }
+  const ok = await modalConfirm(
+    isRunning
+      ? "Stop the target application now?"
+      : "Start the target application now? This may take a minute or two while the agent installs / builds.",
+    { title: isRunning ? "Stop application" : "Start application",
+      okLabel: isRunning ? "Stop" : "Start",
+      danger: isRunning },
+  );
+  if (!ok) return;
+  // Optimistic UI flip: in-flight state shows the amber pulsing dot.
+  btn.dataset.state = isRunning ? "stopping" : "starting";
+  btn.disabled = true;
+  try {
+    const r = await api("POST", `/api/target-app/${action}`);
+    toast(r.message || `${action} completed`, r.ok ? "info" : "error");
+    applyTargetAppSnapshot({
+      ..._targetAppSnapshot,
+      state: r.state || (isRunning ? "stopped" : "running"),
+      last_error: r.ok ? "" : (r.message || ""),
+    });
+  } catch (e) {
+    toast(e.message, "error");
+    // Reset to whatever the server thinks.
+    refreshTargetAppToggle();
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 init();

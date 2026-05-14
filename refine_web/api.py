@@ -16,7 +16,8 @@ from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
-    M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_UNDO_GAP, M_VERIFY,
+    M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
+    M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_shared.ulid import new_ulid
 
@@ -752,6 +753,12 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "agent_subpath", "merge_target_branch",
         "agent_cli",
         "paused",
+        # Target-app prompts + health URL. The state fields
+        # (target_app_state etc.) are owned by the system and are
+        # mutated via the /api/target-app/* endpoints, not Settings.
+        "target_app_start_instructions",
+        "target_app_stop_instructions",
+        "target_app_health_url",
     }
     valid_agent_clis = ("claude", "codex", "gemini")
     normalized: dict[str, str] = {}
@@ -1089,6 +1096,207 @@ def chat_stop(sid: str) -> tuple[int, dict]:
     except IpcError as e:
         return _ipc_err(e)
     return 200, result
+
+
+# --- Target application -------------------------------------------------------
+#
+# The operator writes plain-language start/stop prompts in Settings (or
+# generates them via /api/target-app/generate-instructions). Clicking the
+# nav toggle hits /start or /stop, which routes through the runner to a
+# Standalone agent. State transitions are recorded in SQLite settings so
+# every browser tab sees the same status.
+
+_TARGET_APP_STATES = ("stopped", "starting", "running", "stopping", "unknown")
+
+
+def target_app_status() -> tuple[int, dict]:
+    """Return the current target-app state + last health-check snapshot."""
+    conn = _conn()
+    try:
+        snap = _target_app_snapshot(conn)
+    finally:
+        conn.close()
+    return 200, snap
+
+
+def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
+    state = db.get_setting(conn, "target_app_state") or "unknown"
+    return {
+        "state": state if state in _TARGET_APP_STATES else "unknown",
+        "health_url": db.get_setting(conn, "target_app_health_url") or "",
+        "has_start_instructions": bool(
+            (db.get_setting(conn, "target_app_start_instructions") or "").strip()
+        ),
+        "has_stop_instructions": bool(
+            (db.get_setting(conn, "target_app_stop_instructions") or "").strip()
+        ),
+        "last_health_at": db.get_setting(conn, "target_app_last_health_at") or "",
+        "last_health_ok": (db.get_setting(conn, "target_app_last_health_ok") or "0") == "1",
+        "last_error": db.get_setting(conn, "target_app_last_error") or "",
+    }
+
+
+def target_app_start(_body: dict | None = None) -> tuple[int, dict]:
+    """Run the configured start instructions via the host runner.
+
+    Transitions state stopped/unknown → starting, fires the agent, then
+    transitions to running on success (or back to stopped on failure).
+    Long-running because the agent typically takes a minute or two.
+    """
+    return _target_app_run("start")
+
+
+def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
+    """Run the configured stop instructions via the host runner."""
+    return _target_app_run("stop")
+
+
+def _target_app_run(kind: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        key = f"target_app_{kind}_instructions"
+        prompt = (db.get_setting(conn, key) or "").strip()
+        if not prompt:
+            return err(400,
+                f"No {kind} instructions configured. "
+                f"Add them on Settings → Target Application, or use "
+                f"the Generate button to draft them.")
+        # Optimistic transition. The agent run is synchronous but long;
+        # SSE listeners see the in-flight state via /api/target-app/status.
+        next_pending = "starting" if kind == "start" else "stopping"
+        db.set_setting(conn, "target_app_state", next_pending)
+        db.set_setting(conn, "target_app_last_error", "")
+        activity.append(
+            conn,
+            message=f"target-app: {kind} requested via UI",
+            severity="info", category="target_app", actor="refine",
+        )
+    finally:
+        conn.close()
+
+    try:
+        result = get_client().call(
+            M_TARGET_APP_RUN,
+            {"kind": kind, "prompt": prompt},
+            timeout=900.0,
+        )
+    except IpcError as e:
+        _target_app_record_failure(kind, e.message)
+        return _ipc_err(e)
+
+    ok = bool(result.get("ok"))
+    final_state = ("running" if ok else "stopped") if kind == "start" \
+                  else ("stopped" if ok else "running")
+    err_msg = "" if ok else (result.get("message") or "agent run failed")
+    conn = _conn()
+    try:
+        db.set_setting(conn, "target_app_state", final_state)
+        db.set_setting(conn, "target_app_last_error", err_msg)
+    finally:
+        conn.close()
+    # Trigger an immediate health check so the UI doesn't sit at the
+    # optimistic state until the next poll. Only meaningful when start
+    # succeeded; for stop, the health check is expected to fail.
+    if ok and kind == "start":
+        _target_app_run_health_check()
+
+    status = 200 if ok else 502
+    return status, {
+        "ok": ok,
+        "state": final_state,
+        "message": result.get("message") or "",
+        "details": (result.get("stderr") or result.get("stdout") or "")[:8000],
+    }
+
+
+def _target_app_record_failure(kind: str, message: str) -> None:
+    conn = _conn()
+    try:
+        # Roll the optimistic transition back to the opposite terminal so
+        # the UI doesn't show a stuck "starting" forever.
+        rollback = "stopped" if kind == "start" else "running"
+        db.set_setting(conn, "target_app_state", rollback)
+        db.set_setting(conn, "target_app_last_error", message)
+        activity.append(
+            conn,
+            message=f"target-app: {kind} failed — {message}",
+            severity="error", category="target_app", actor="refine",
+        )
+    finally:
+        conn.close()
+
+
+def target_app_generate(body: dict) -> tuple[int, dict]:
+    """Use the agent to draft start or stop instructions for this codebase.
+
+    Body: `{kind: "start" | "stop"}`. Returns the generated text without
+    persisting — the operator reviews it in the UI and saves via the
+    regular settings PATCH if happy.
+    """
+    kind = (body.get("kind") or "").strip().lower()
+    if kind not in ("start", "stop"):
+        return err(400, "kind must be 'start' or 'stop'")
+    try:
+        result = get_client().call(
+            M_TARGET_APP_GENERATE, {"kind": kind}, timeout=600.0,
+        )
+    except IpcError as e:
+        return _ipc_err(e)
+    if not result.get("ok"):
+        return 502, {"error": {"message": result.get("message") or "generation failed"}}
+    return 200, {"ok": True, "text": result.get("text") or ""}
+
+
+def target_app_health(_body: dict | None = None) -> tuple[int, dict]:
+    """Force an immediate health check and return the result."""
+    snap = _target_app_run_health_check()
+    return 200, snap
+
+
+def _target_app_run_health_check() -> dict:
+    """Issue one health probe and update the snapshot in SQLite.
+
+    Probing logic lives in the runner module to share code paths with
+    other target-app helpers; we call it directly from the webapp here
+    because health checks are pure stdlib HTTP and don't need the host
+    runner's auth context.
+    """
+    # Importing here avoids loading runner-only modules at webapp import
+    # time (they're available because runner + webapp ship in the same
+    # repo, but keeping the import local makes the dependency explicit).
+    from refine_runner import target_app as _target_app
+    conn = _conn()
+    try:
+        url = (db.get_setting(conn, "target_app_health_url") or "").strip()
+    finally:
+        conn.close()
+    if not url:
+        return _persist_health_result(False, "no health URL configured", probed=False)
+    res = _target_app.http_health(url)
+    return _persist_health_result(bool(res.get("ok")), res.get("message") or "")
+
+
+def _persist_health_result(ok: bool, message: str, *, probed: bool = True) -> dict:
+    """Update the singleton health row + transition state when appropriate."""
+    conn = _conn()
+    try:
+        if probed:
+            db.set_setting(conn, "target_app_last_health_at", now_iso())
+            db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0")
+        cur_state = db.get_setting(conn, "target_app_state") or "unknown"
+        # Auto-transition based on health-check outcome — but don't
+        # clobber explicit user transitions in flight (starting/stopping
+        # stay until the agent finishes). The webapp moves out of those
+        # states from `_target_app_run` once the agent returns.
+        if probed and cur_state not in ("starting", "stopping"):
+            new_state = "running" if ok else "stopped"
+            if new_state != cur_state:
+                db.set_setting(conn, "target_app_state", new_state)
+        snap = _target_app_snapshot(conn)
+    finally:
+        conn.close()
+    snap["probe_message"] = message
+    return snap
 
 
 # --- helpers ------------------------------------------------------------------

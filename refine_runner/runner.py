@@ -17,11 +17,12 @@ from refine_shared.ipc_protocol import (
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
-    M_SET_NOTES, M_UNDO_GAP, M_VERIFY, default_socket_path,
+    M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_RUN, M_UNDO_GAP,
+    M_VERIFY, default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, merger as _merger, preflight, recovery, state_committer, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, preflight, recovery, state_committer, subprocess_mgr, target_app, verify_op
 from .chat_mgr import ChatManager
 from .ipc_server import IpcServer
 
@@ -115,6 +116,8 @@ class Runner:
             M_RENAME_REPORTER_STRINGS: self._h_rename_reporter_strings,
             M_LIST_CHANGES: self._h_list_changes,
             M_UNDO_GAP: self._h_undo_gap,
+            M_TARGET_APP_RUN: self._h_target_app_run,
+            M_TARGET_APP_GENERATE: self._h_target_app_generate,
         }
         h = handlers.get(method)
         if h is None:
@@ -659,6 +662,70 @@ class Runner:
     def _h_chat_stop(self, params: dict) -> dict:
         ok = self.chat.stop(params["session_id"])
         return {"stopped": ok}
+
+    # ---- target-app ----------------------------------------------------------
+
+    def _h_target_app_run(self, params: dict) -> dict:
+        """Run a target-app start/stop prompt as a Standalone agent.
+
+        Params: `{kind: "start"|"stop", prompt: str}` — the caller
+        sends the actual prompt text so the runner doesn't need to
+        re-read SQLite (settings live in the same DB but rounds via
+        the webapp keep that round-trip in one place).
+
+        Logs lifecycle to the activity feed and returns the agent's
+        captured stdout/stderr so the webapp can surface details.
+        """
+        kind = (params.get("kind") or "").strip().lower()
+        if kind not in ("start", "stop"):
+            raise ValueError("kind must be 'start' or 'stop'")
+        prompt = params.get("prompt") or ""
+        activity.append(
+            self._conn,
+            message=f"target-app: {kind} requested",
+            severity="info", category="target_app", actor="refine",
+        )
+        result = target_app.run_instructions(prompt)
+        sev = "info" if result["ok"] else "error"
+        msg = (
+            f"target-app: {kind} {'completed' if result['ok'] else 'failed'} — {result['message']}"
+        )
+        details_parts = []
+        if result.get("stdout"):
+            details_parts.append("stdout:\n" + result["stdout"])
+        if result.get("stderr"):
+            details_parts.append("stderr:\n" + result["stderr"])
+        details = "\n\n".join(details_parts) if details_parts else None
+        activity.append(
+            self._conn, message=msg, severity=sev,
+            category="target_app", actor="refine",
+            details=details,
+        )
+        return result
+
+    def _h_target_app_generate(self, params: dict) -> dict:
+        """Generate start or stop instructions via an agent analysis pass.
+
+        Returns `{ok, text, message}`. The webapp stores `text` as the
+        new instructions if `ok` is True.
+        """
+        kind = (params.get("kind") or "").strip().lower()
+        if kind not in ("start", "stop"):
+            raise ValueError("kind must be 'start' or 'stop'")
+        activity.append(
+            self._conn,
+            message=f"target-app: generating {kind} instructions",
+            severity="info", category="target_app", actor="refine",
+        )
+        result = target_app.generate_instructions(kind)
+        sev = "info" if result["ok"] else "warn"
+        activity.append(
+            self._conn,
+            message=(f"target-app: {kind} instructions "
+                     f"{'generated' if result['ok'] else 'generation failed'} — {result['message']}"),
+            severity=sev, category="target_app", actor="refine",
+        )
+        return result
 
 
 _VALID_PRIORITIES = ("low", "medium", "high")

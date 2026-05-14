@@ -84,6 +84,45 @@ pre {
   min-width: 180px;
 }
 
+/* Target-app status toggle in the topbar. The dot's colour is the
+   status (green=running, red=stopped, amber=in-flight, grey=unknown),
+   the label is constant so the button keeps its width as state
+   changes. Click toggles between start/stop based on current state. */
+.target-app-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+}
+.target-app-toggle:hover { background: var(--code-bg); }
+.target-app-toggle[disabled] { opacity: 0.6; cursor: progress; }
+.target-app-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #b8bcc6;
+  box-shadow: 0 0 0 2px rgba(0,0,0,0.04);
+  flex: 0 0 auto;
+}
+.target-app-toggle[data-state="running"] .target-app-dot { background: #1f9d4d; }
+.target-app-toggle[data-state="stopped"] .target-app-dot { background: #c63838; }
+.target-app-toggle[data-state="starting"] .target-app-dot,
+.target-app-toggle[data-state="stopping"] .target-app-dot {
+  background: #d4a106;
+  animation: target-app-pulse 1.1s ease-in-out infinite;
+}
+@keyframes target-app-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
 .banners { padding: 0 20px; }
 .banner {
   margin: 12px 0;
@@ -122,6 +161,17 @@ main {
 
 h2 { font-weight: 600; font-size: 18px; margin: 0 0 12px; }
 h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
+
+/* Inline a primary action on the same line as a card heading.
+   The h3 keeps its own margins; the row aligns to its baseline so
+   the button sits flush with the heading text. */
+.card-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.card-head-row > h3 { margin: 14px 0 6px; }
 
 .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .row > * { min-width: 0; }
@@ -568,8 +618,50 @@ select {
   to   { opacity: 1; }
 }
 
+/* Close affordance shared by Tutorial + Gap detail modals. */
+.modal-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius);
+  z-index: 1;
+}
+.modal-close:hover { background: var(--code-bg); color: var(--fg); }
+
 .diff-show-details { font-size: 12px; color: var(--muted); cursor: pointer; }
 .collapsed { display: none; }
+
+/* --- Gap detail modal -------------------------------------------------- */
+/* Leave the chat dock peeking out at the bottom — the dock publishes its
+   height via `--chat-dock-height`, so the modal's backdrop stops above it
+   instead of covering it. The user can keep chatting while the modal sits
+   on top of the underlying screen. */
+.gap-detail-backdrop {
+  bottom: var(--chat-dock-height, 0);
+}
+.gap-detail-modal {
+  position: relative;
+  max-width: 960px;
+  width: calc(100% - 40px);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - var(--chat-dock-height, 0px) - 60px);
+  overflow: hidden;
+}
+.gap-detail-modal-body {
+  overflow: auto;
+  padding: 22px 24px 24px;
+}
+.gap-detail-modal-body .gap-detail h2 { margin-top: 0; }
 
 /* --- Tutorial modal ---------------------------------------------------- */
 .tutorial-modal {

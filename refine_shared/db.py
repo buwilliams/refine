@@ -106,6 +106,23 @@ DEFAULT_SETTINGS = {
     # to this branch (auto-stashing any WIP) and restore the host's
     # original branch afterward.
     "merge_target_branch": "",
+    # Target-application management. Plain-language prompts the operator
+    # writes (or generates via the agent) that get sent to a Standalone
+    # agent subprocess to bring the client's application up or take it
+    # down. Refine doesn't own the process — the prompt does (e.g.
+    # `nohup npm run dev &` so it survives the agent's exit). Refine
+    # learns whether the app is alive by polling `target_app_health_url`.
+    "target_app_start_instructions": "",
+    "target_app_stop_instructions": "",
+    "target_app_health_url": "",
+    # Latest known status. "stopped" | "starting" | "running" |
+    # "stopping" | "unknown". The webapp transitions through these
+    # based on user actions + health-check outcomes.
+    "target_app_state": "unknown",
+    "target_app_last_health_at": "",     # ISO timestamp
+    "target_app_last_health_ok": "0",    # "1" / "0"
+    # Last-operation log: error message if start/stop failed, else "".
+    "target_app_last_error": "",
 }
 
 

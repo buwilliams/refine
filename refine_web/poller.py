@@ -15,8 +15,13 @@ from . import sse
 
 
 class SqlitePoller:
-    def __init__(self, interval: float = 1.0) -> None:
+    def __init__(self, interval: float = 1.0,
+                 target_app_health_interval: float = 15.0) -> None:
         self.interval = interval
+        # How often to probe the configured target-app health URL. Polled
+        # less aggressively than the per-second SQLite scan since the
+        # check is a real HTTP roundtrip.
+        self.target_app_health_interval = target_app_health_interval
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._last_activity_id: int = 0
@@ -24,6 +29,12 @@ class SqlitePoller:
         self._last_status: dict[str, tuple[str, str]] = {}  # gap_id -> (status, updated)
         # last-seen runs.last_output_at by gap id; detect streaming subprocess output
         self._last_run_output: dict[str, str] = {}
+        # When the last target-app health check ran (monotonic seconds);
+        # the actual outcome is persisted in SQLite via the api helper.
+        self._last_target_app_health_at: float = 0.0
+        # Previously-observed target-app state — emit an SSE event when
+        # it transitions so the nav button updates without a poll.
+        self._last_target_app_state: str | None = None
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._loop, name="refine-poller",
@@ -98,5 +109,49 @@ class SqlitePoller:
                     self._last_run_output[gid] = ts
                     if prev is not None:  # skip first-seen so we don't replay
                         sse.publish("round_log_added", {"gap_id": gid})
+
+            # Detect target-app state transitions (start/stop commands flip
+            # the setting from another request handler; we re-broadcast so
+            # other browser tabs update without polling).
+            cur_state = db.get_setting(conn, "target_app_state") or "unknown"
+            if self._last_target_app_state is None:
+                self._last_target_app_state = cur_state
+            elif cur_state != self._last_target_app_state:
+                self._last_target_app_state = cur_state
+                sse.publish("target_app_state", {"state": cur_state})
         finally:
             conn.close()
+
+        # Periodic health probe — separate cadence from the SQLite tick so
+        # we don't hammer the target-app's `/health` every second.
+        now = time.monotonic()
+        if (self.target_app_health_interval > 0
+                and now - self._last_target_app_health_at
+                >= self.target_app_health_interval):
+            self._last_target_app_health_at = now
+            try:
+                self._run_target_app_health_check()
+            except Exception:
+                pass
+
+    def _run_target_app_health_check(self) -> None:
+        """Probe the configured health URL and persist the result.
+
+        Imports locally so an unconfigured webapp doesn't pull in the
+        runner module on every tick. The api helper handles the
+        no-URL-configured case as a no-op probe.
+        """
+        from . import api as web_api
+        conn = self._conn()
+        try:
+            url = (db.get_setting(conn, "target_app_health_url") or "").strip()
+        finally:
+            conn.close()
+        if not url:
+            return
+        snap = web_api._target_app_run_health_check()  # noqa: SLF001
+        sse.publish("target_app_health", {
+            "ok": snap.get("last_health_ok"),
+            "at": snap.get("last_health_at"),
+            "state": snap.get("state"),
+        })
