@@ -254,3 +254,9 @@ and git remotes, both of which need a configured host).
 This is a v1 implementation tracking [`spec.md`](spec.md). Several
 **out-of-scope** items from the spec remain out of scope: authentication,
 external-tracker integrations, cross-instance sync, automatic retries.
+
+## License
+
+[MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No
+warranty, no support obligations on my end. If you build something useful
+on top, a heads-up is appreciated but not required.
