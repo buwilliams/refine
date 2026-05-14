@@ -3,6 +3,9 @@
 Subcommands:
 - init    — write refine.toml + run/ + gaps/ in a chosen volume root,
             then write + enable a systemd --user unit for the runner.
+- reset   — undo `init` in this clone (stop services, disable unit,
+            remove binding); optional --purge also deletes the client's
+            .refine/ data so you can re-`init` against a different repo.
 - start   — bring up runner (systemd) + webapp (docker compose).
 - stop    — stop runner + webapp.
 - status  — show what's running (read-only).
@@ -54,6 +57,27 @@ def main(argv: list[str] | None = None) -> int:
     p_init.add_argument("--force", action="store_true",
                         help="Overwrite an existing refine.toml / .refine-binding / unit file.")
     p_init.set_defaults(fn=cmd_init)
+
+    p_reset = sub.add_parser(
+        "reset",
+        help="Undo `refine init` in this clone so it can be pointed at a different repo.",
+        description=(
+            "Stops the runner + webapp, removes the .refine-binding and .env "
+            "files from this clone, disables + removes the systemd --user "
+            "unit, and (with --purge) wipes the bound client repo's .refine/ "
+            "directory. The client repo itself is never touched."
+        ),
+    )
+    p_reset.add_argument(
+        "--purge", action="store_true",
+        help="Also delete the bound client repo's .refine/ directory "
+             "(gap.json files, sqlite index, run/, .gitignore). DATA LOSS.",
+    )
+    p_reset.add_argument(
+        "-y", "--yes", action="store_true",
+        help="Skip the confirmation prompt for --purge.",
+    )
+    p_reset.set_defaults(fn=cmd_reset)
 
     p_start = sub.add_parser(
         "start",
@@ -319,6 +343,93 @@ def cmd_stop(args: argparse.Namespace) -> int:
         return rc
 
     print("Stopped.")
+    return 0
+
+
+def cmd_reset(args: argparse.Namespace) -> int:
+    """Undo `refine init` in this clone.
+
+    The reverse of init: stop services, disable + remove the systemd unit,
+    delete `.refine-binding` and `.env` from the clone dir, and optionally
+    purge the client's `.refine/` directory. Leaves the client repo's
+    source tree untouched.
+
+    After this, the clone is fresh and can be re-`init`'d against any
+    other client repo.
+    """
+    cwd = Path.cwd().resolve()
+    binding_path = cwd / config.BINDING_FILENAME
+    if not binding_path.exists():
+        print(
+            f"refine reset: no {config.BINDING_FILENAME} in {cwd} — nothing to reset.\n"
+            f"  (run this from a refine source dir that was previously init'd)",
+            file=sys.stderr,
+        )
+        return 1
+
+    unit = config.read_binding_unit(binding_path) or config.unit_name_for(cwd)
+    try:
+        client_repo = config.read_binding(binding_path)
+    except config.ConfigError:
+        client_repo = None
+    client_refine_dir = (client_repo / ".refine") if client_repo else None
+
+    # Purge confirmation up front (refuse to silently delete data).
+    if args.purge:
+        if not client_refine_dir or not client_refine_dir.is_dir():
+            print("refine reset: --purge: no client .refine/ directory to delete.")
+        elif not args.yes:
+            print(f"--purge will DELETE {client_refine_dir}")
+            print("This removes ALL gap data, the sqlite index, and the runner socket.")
+            try:
+                answer = input("Type 'yes' to confirm: ").strip().lower()
+            except EOFError:
+                answer = ""
+            if answer != "yes":
+                print("Aborted.")
+                return 1
+
+    # 1. Stop services (best-effort — keep going if they were already down).
+    print(f"Stopping runner (systemctl --user stop {unit})…")
+    rc, out = _systemctl("stop", unit)
+    if rc != 0:
+        print(f"  (systemctl: {out.strip()})", file=sys.stderr)
+    print("Stopping webapp (docker compose down)…")
+    _docker_compose(cwd, "down")
+
+    # 2. Disable + remove the systemd unit.
+    rc, out = _systemctl("disable", unit)
+    if rc != 0:
+        # If it wasn't enabled or doesn't exist, that's fine.
+        print(f"  (systemctl disable: {out.strip()})", file=sys.stderr)
+    unit_path = SYSTEMD_USER_DIR / f"{unit}.service"
+    if unit_path.exists():
+        unit_path.unlink()
+        print(f"Removed {unit_path}")
+        _systemctl("daemon-reload")
+
+    # 3. Remove binding + .env from the clone.
+    binding_path.unlink()
+    print(f"Removed {binding_path}")
+    env_path = cwd / ".env"
+    if env_path.exists():
+        env_path.unlink()
+        print(f"Removed {env_path}")
+
+    # 4. Optional: purge the client repo's .refine/ directory.
+    if args.purge and client_refine_dir and client_refine_dir.is_dir():
+        shutil.rmtree(client_refine_dir)
+        print(f"Removed {client_refine_dir}")
+
+    print()
+    print("Reset complete. To bind this clone to a different repo:")
+    print(f"  cd {cwd}")
+    print(f"  uv run refine init <path/to/new-client-repo>")
+    if client_refine_dir and client_refine_dir.is_dir() and not args.purge:
+        print()
+        print(f"The previous client's data is preserved at:")
+        print(f"  {client_refine_dir}")
+        print("Re-running `refine init` against that path will pick it up again.")
     return 0
 
 

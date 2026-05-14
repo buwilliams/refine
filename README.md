@@ -133,7 +133,8 @@ same commands. Each clone tracks its own binding and its own systemd unit
 
 ### Re-binding
 
-To point an existing refine clone at a different client:
+To point an existing refine clone at a different client, either overwrite the
+binding in place:
 
 ```bash
 cd /opt/refine-acme
@@ -143,6 +144,21 @@ uv run refine init /srv/clients/other-client --force
 `--force` is required because a binding already exists. The unit file is
 rewritten in place; the clone's directory name — and thus its unit name —
 does not change.
+
+Or wipe the clone's binding first and `init` fresh:
+
+```bash
+cd /opt/refine-acme
+uv run refine reset                                # stop services, disable unit, remove binding + .env
+uv run refine init /srv/clients/other-client       # bind to the new client
+
+# To also delete the old client's .refine/ data (gap.json files, sqlite index):
+uv run refine reset --purge -y
+```
+
+`reset` never touches the client repo's source tree, and without `--purge`
+the previous client's `.refine/` directory stays intact — so you can rebind
+to that path later and pick up where you left off.
 
 ## How it talks to itself
 
@@ -208,6 +224,7 @@ the UI's Settings page.
 | Command                       | What it does                                                                                                |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------|
 | `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, bind this clone, install + enable a systemd --user unit.    |
+| `uv run refine reset`         | Undo `init` in this clone: stop services, disable + remove the systemd unit, delete `.refine-binding` + `.env`. Add `--purge` (+ `-y` to skip prompt) to also delete the bound client's `.refine/` data. |
 | `uv run refine start`         | Rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy.  |
 | `uv run refine stop`          | `systemctl --user stop <unit>` + `docker compose down`.                                                     |
 | `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |
