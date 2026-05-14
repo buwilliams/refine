@@ -616,6 +616,11 @@ async function loadGapDetail(gapId) {
 
 function drawGapDetail(gap) {
   renderBanners([]);
+  // Preserve the notes-card open state across re-renders of the same gap so
+  // saving a note (or an SSE-driven refresh) doesn't snap it shut.
+  const notesOpen = document.querySelector(
+    `.notes-card[data-gap-id="${gap.id}"]`,
+  )?.open ?? false;
   const rounds = gap.rounds || [];
   // Merge gap-scoped activity into each round so users see lifecycle events
   // and runner errors alongside the round's own logs[]. Each activity entry
@@ -639,17 +644,13 @@ function drawGapDetail(gap) {
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
         <span class="status-pill ${gap.status}">${gap.status}</span>
         <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
-        <label class="muted small" for="gap-priority-select">change:</label>
-        <select id="gap-priority-select" style="width:auto">
-          ${["low", "medium", "high"].map((p) => `
-            <option value="${p}" ${p === (gap.priority || "low") ? "selected" : ""}>${p}</option>`).join("")}
-        </select>
       </div>
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-verify" ${verifyEnabled ? "" : "disabled"}>Verify</button>
         <button id="btn-chat" ${chatEnabled ? "" : "disabled"}>Open Chat</button>
         <button id="btn-reopen" ${reopenEnabled ? "" : "disabled"}>Reopen</button>
         <button class="warn" id="btn-rename">Rename</button>
+        <button class="warn" id="btn-priority">Change Priority</button>
         <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
         <button class="danger" id="btn-delete">Delete</button>
       </div>
@@ -664,7 +665,7 @@ function drawGapDetail(gap) {
           <span class="banner-actions">${failureBanner.actionsHtml}</span>
         </div>` : ""}
 
-      <details class="card notes-card" style="margin-bottom:14px">
+      <details class="card notes-card" data-gap-id="${gap.id}" style="margin-bottom:14px" ${notesOpen ? "open" : ""}>
         <summary class="notes-card-summary">
           <span><strong>Notes (${(gap.notes || []).length})</strong></span>
           <span class="muted small">Saved to gap.json and included in attached
@@ -750,6 +751,9 @@ function drawGapDetail(gap) {
       await loadGapDetail(gap.id);
     } catch (e) { toast(e.message, "error"); }
   });
+  $(".note-composer")?.addEventListener("toggle", (e) => {
+    if (e.target.open) $("#new-note-body")?.focus();
+  });
   $("#btn-add-note")?.addEventListener("click", async () => {
     const btn = $("#btn-add-note");
     const ta = $("#new-note-body");
@@ -802,15 +806,32 @@ function drawGapDetail(gap) {
       await loadGapDetail(gap.id);
     } catch (err) { toast(err.message, "error"); }
   }));
-  $("#gap-priority-select")?.addEventListener("change", async (e) => {
-    const next = e.target.value;
+  $("#btn-priority")?.addEventListener("click", async () => {
+    const current = gap.priority || "low";
+    const body = () => `
+      <div class="modal-title">Change priority</div>
+      <div class="modal-body">
+        <label for="modal-priority-select">Priority</label>
+        <select class="modal-input" id="modal-priority-select" style="width:100%">
+          ${["low", "medium", "high"].map((p) =>
+            `<option value="${p}" ${p === current ? "selected" : ""}>${p}</option>`,
+          ).join("")}
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+        <button data-ok>Save</button>
+      </div>`;
+    const next = await _openModal(
+      body, { cancel: null, ok: current }, ".modal-input",
+    );
+    if (next === null || next === current) return;
     try {
       await api("PATCH", "/api/gaps/" + gap.id, { priority: next });
       toast(`Priority set to ${next}`, "info");
       await loadGapDetail(gap.id);
     } catch (err) {
       toast(err.message, "error");
-      e.target.value = gap.priority || "low";   // revert on failure
     }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {
