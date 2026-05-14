@@ -109,6 +109,54 @@ def stash_pop(cwd: Path | None = None) -> GitResult:
     return _run(["stash", "pop"], cwd=cwd or client_repo_path())
 
 
+def in_progress_op(cwd: Path | None = None) -> tuple[str, str] | None:
+    """Detect a half-finished git operation in the client repo.
+
+    Returns `(op_name, recovery_hint)` when one of merge / rebase /
+    cherry-pick / revert / am / bisect has left state behind in `.git/`,
+    or `None` when the repo is in a clean operational state. We look
+    only for sentinel files — fast and works without invoking git.
+
+    Catches the common refine failure mode where an earlier verify
+    merged a Gap's branch into the target, hit code-level conflicts,
+    and the conflicts were never resolved — every subsequent verify
+    then trips on `git commit` (MERGE_HEAD blocks non-merge commits).
+    """
+    root = cwd or client_repo_path()
+    # Locate the actual `.git` dir; in a worktree `.git` is a file
+    # pointing at the real gitdir. Use `rev-parse --git-dir` to resolve.
+    r = _run(["rev-parse", "--git-dir"], cwd=root)
+    if not r.ok:
+        return None
+    git_dir = (root / r.stdout.strip()).resolve()
+    checks = (
+        ("MERGE_HEAD",            "merge",
+         "Run `git merge --abort` to discard, or resolve conflicts and "
+         "`git commit` to finish."),
+        ("REBASE_HEAD",           "rebase",
+         "Run `git rebase --abort` to discard, or resolve and "
+         "`git rebase --continue`."),
+        ("rebase-merge",          "rebase",
+         "Run `git rebase --abort` to discard, or resolve and "
+         "`git rebase --continue`."),
+        ("rebase-apply",          "rebase",
+         "Run `git rebase --abort` to discard, or resolve and "
+         "`git rebase --continue`."),
+        ("CHERRY_PICK_HEAD",      "cherry-pick",
+         "Run `git cherry-pick --abort` to discard, or resolve and "
+         "`git cherry-pick --continue`."),
+        ("REVERT_HEAD",           "revert",
+         "Run `git revert --abort` to discard, or resolve and "
+         "`git revert --continue`."),
+        ("BISECT_LOG",            "bisect",
+         "Run `git bisect reset` when finished."),
+    )
+    for name, op, hint in checks:
+        if (git_dir / name).exists():
+            return (op, hint)
+    return None
+
+
 def dirty_paths_under(prefix: str) -> list[str]:
     """Return repo-relative paths reported by `git status --porcelain` that
     sit under `prefix`. `prefix` is matched as a path segment.

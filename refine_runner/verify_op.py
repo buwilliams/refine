@@ -62,6 +62,22 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
              f"locally and skip the push.",
              severity="info", category="git", actor=actor)
 
+    # If the host's working tree is in an unfinished git operation —
+    # typically a prior merge that hit code-level conflicts and was
+    # never resolved — every later verify silently trips on the
+    # subsequent `git commit` (you can't make a non-merge commit while
+    # MERGE_HEAD exists) and surfaces as the misleading "Could not
+    # commit refine state before merge" error. Detect it up front and
+    # tell the operator what to actually fix.
+    stuck = git_ops.in_progress_op()
+    if stuck:
+        op_name, hint = stuck
+        msg = (f"Client repo has an unfinished `{op_name}` in progress on "
+               f"`{host_branch or '?'}` — verify cannot proceed until it's "
+               f"resolved. {hint}")
+        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "precheck", "message": msg}
+
     # If the host's HEAD isn't on the target branch yet, switch to it so
     # the merge lands where the operator configured. Stash any WIP first
     # so the checkout doesn't fail. We restore the host's original branch
