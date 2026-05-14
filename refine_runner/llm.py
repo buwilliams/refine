@@ -20,15 +20,26 @@ from .chat_mgr import _chat_env, _resolve_claude
 _EXTRACT_PROMPT_TEMPLATE = """\
 You are extracting distinct software-change requests ("Gaps") from a
 free-form text dump (meeting transcript, bug report, customer feedback,
-etc.). Each Gap describes ONE behavior the team wants to change.
+feature request, etc.). Each Gap describes ONE thing the team wants
+to change about the software — either a BUG (current behavior is
+wrong) or a FEATURE (something that doesn't exist yet but should).
 
 For each Gap, produce a JSON object with exactly three string keys:
-  - "name":   a short title (max 80 characters)
-  - "actual": the current behavior — what is happening today (1-3 sentences)
-  - "target": the desired behavior — what should happen instead (1-3 sentences)
+  - "name":   a short title (max 80 characters).
+  - "actual": what is happening — or NOT happening — today (1-3 sentences).
+              For a bug, describe the broken current behavior.
+              For a feature request, the current behavior is the *absence*
+              of the feature. Say so explicitly, e.g. "There is no Tetris
+              app in the project today." or "The dashboard has no export
+              button." NEVER skip a Gap just because the source text
+              doesn't describe a current behavior — for feature requests,
+              the absence IS the current behavior.
+  - "target": what should happen instead (1-3 sentences).
 
-Return a JSON array of those objects. If the text does not describe any
-concrete behavior changes, return [].
+Return a JSON array of those objects. Return [] only when the text
+contains no actionable software change — pure social talk, weather
+small-talk, "thanks for the demo", etc. A request to build something
+new IS an actionable software change.
 
 IMPORTANT: Output ONLY the JSON array — no prose, no markdown code
 fences, no commentary. Your entire response must parse as JSON.
