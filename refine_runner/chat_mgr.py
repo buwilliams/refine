@@ -36,6 +36,16 @@ from typing import Callable, Deque
 # diverge from the host CLI's OAuth login. Strip all of them before spawn so
 # chat behaves exactly like the user's interactive `claude` in a clean
 # terminal — which uses the credentials persisted by `claude login`.
+# How long to wait for `claude` to actually exit after it emits its
+# terminal `result` event. Past this point, something is almost
+# certainly holding the stdio pipes open — typically a backgrounded
+# bash subprocess the agent spawned ("python -m http.server &"). We
+# SIGTERM the whole process group so the chat can accept the next
+# message instead of hanging in-flight forever. Mirrors the agent
+# runner's _RESULT_EXIT_GRACE_SECONDS in subprocess_mgr.py.
+_RESULT_EXIT_GRACE_SECONDS = 10.0
+
+
 _AUTH_OVERRIDE_VARS = (
     # API-key family
     "ANTHROPIC_API_KEY",
@@ -142,6 +152,10 @@ class ChatSession:
     proc_lock: threading.Lock = field(default_factory=threading.Lock)
     proc: subprocess.Popen | None = None   # in-flight request, if any
     pump: threading.Thread | None = None
+    # PIDs of in-flight procs we've already armed a result-watchdog for.
+    # Stored as ints (not the Popen) so the dataclass stays hashable-free
+    # and we don't pin procs after they exit.
+    watchdog_armed_pids: set[int] = field(default_factory=set)
     alive: bool = True             # cleared by stop() / supervisor
     closed_reason: str | None = None
     # Context text to prepend to the user's first message (used by attached
@@ -481,6 +495,11 @@ class ChatManager:
                        or "Claude returned an error.")
                 with s.out_lock:
                     s.out_lines.append(f"[refine] {err}")
+            # Once the agent has logically finished, give claude a short
+            # grace to exit; if a backgrounded subprocess (HTTP server,
+            # file watcher, …) is keeping the stdio pipes open, kill
+            # the process group so the chat doesn't hang in-flight.
+            self._arm_result_watchdog(s)
             return
 
         # ---- older bare shape: top-level assistant message --------------
@@ -519,6 +538,52 @@ class ChatManager:
             for chunk in chunks:
                 for ln in chunk.split("\n"):
                     s.out_lines.append(ln)
+
+    def _arm_result_watchdog(self, s: ChatSession) -> None:
+        """Schedule a one-shot watchdog for the currently in-flight chat
+        proc: wait the grace period, then SIGTERM the process group if
+        claude hasn't exited on its own. Idempotent per-proc — repeated
+        result events (shouldn't happen, but defensive) don't double-arm."""
+        with s.proc_lock:
+            proc = s.proc
+            if proc is None or proc.poll() is not None:
+                return
+            pid = proc.pid
+            if pid in s.watchdog_armed_pids:
+                return
+            s.watchdog_armed_pids.add(pid)
+        threading.Thread(
+            target=self._result_watchdog,
+            args=(s, proc),
+            name=f"refine-chat-result-{s.session_id}",
+            daemon=True,
+        ).start()
+
+    def _result_watchdog(self, s: ChatSession,
+                          proc: subprocess.Popen) -> None:
+        # Brief grace for claude to exit on its own.
+        try:
+            proc.wait(timeout=_RESULT_EXIT_GRACE_SECONDS)
+            return  # clean exit
+        except subprocess.TimeoutExpired:
+            pass
+        # Still alive after grace — SIGTERM the whole process group so
+        # backgrounded children (http.server, watchers, …) come down too.
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        except (ProcessLookupError, PermissionError):
+            return
+        try:
+            proc.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+        with s.out_lock:
+            s.out_lines.append(
+                "[refine] Backgrounded subprocess terminated to free the chat.",
+            )
 
     def _supervise(self) -> None:
         # Poll every 15s. Granularity beyond that is fine; users won't notice
