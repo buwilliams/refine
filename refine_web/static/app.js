@@ -1839,12 +1839,15 @@ function openNewGapModal() {
     const priority = (fd.get("priority") || "low").toString();
     if (!actual && !target) return toast("Provide actual or target", "error");
     try {
-      const r = await api("POST", "/api/gaps", {
+      await api("POST", "/api/gaps", {
         reporter: currentReporter, actual, target, priority,
       });
       toast("Gap created", "info");
-      close(false);
-      location.hash = "#/gaps/" + r.gap.id;
+      // Stay on whatever screen the modal was layered over — Dashboard,
+      // Gaps list, etc. `close(true)` only re-routes if we came in via
+      // the `#/gaps/new` deep link; otherwise the underlying hash is
+      // preserved so the user doesn't lose their place.
+      close(true);
     } catch (err) {
       toast(err.message, "error");
     }
@@ -1994,8 +1997,10 @@ function drawImportDrafts(root, drafts, close) {
     try {
       const r = await api("POST", "/api/import/persist", { reporter, drafts: payload });
       toast(`Created ${r.count} gap(s)`, "info");
-      close(false);
-      location.hash = "#/gaps";
+      // Stay on the underlying screen — same behavior as the New Gap
+      // modal. `close(true)` only redirects when the user came in via
+      // the `#/gaps/import` deep link.
+      close(true);
     } catch (e) { toast(e.message, "error"); }
   });
 }
