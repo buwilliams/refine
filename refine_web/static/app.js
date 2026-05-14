@@ -232,6 +232,20 @@ document.addEventListener("change", async (e) => {
   }
 });
 
+// "+ New Gap" and "Import…" in the topbar open modals in place rather than
+// navigating to dedicated screens. The hrefs are kept for deep-linking /
+// accessibility; click handlers intercept so the user's current view stays
+// underneath.
+document.addEventListener("click", (e) => {
+  if (e.target.closest("#btn-new-gap")) {
+    e.preventDefault();
+    openNewGapModal();
+  } else if (e.target.closest("#btn-import")) {
+    e.preventDefault();
+    openImportModal();
+  }
+});
+
 // ---- Banners ----------------------------------------------------------------
 
 function renderBanners(items) {
@@ -301,7 +315,6 @@ const routes = {
   gaps_new: renderGapNew,
   gaps_import: renderGapImport,
   agents: renderAgents,
-  chat: renderChat,
   logs: renderLogs,
   settings: renderSettings,
 };
@@ -321,7 +334,7 @@ function parseHash() {
     return { route: "gaps_detail", id: parts[1] };
   }
   if (parts[0] === "agents") return { route: "agents" };
-  if (parts[0] === "chat") return { route: "chat" };
+  if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "settings") return { route: "settings" };
   return { route: "dashboard" };
@@ -329,6 +342,15 @@ function parseHash() {
 
 function navigate() {
   const r = parseHash();
+  if (r.route === "chat_redirect") {
+    // Legacy `#/chat[?gap=...]` deep links now open the dock and bounce to
+    // the dashboard so the URL no longer points at a removed screen.
+    const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+    const gapId = hashQs.get("gap") || null;
+    openChatDock(gapId ? { gapId } : {});
+    location.hash = "#/";
+    return;
+  }
   state.currentRoute = r.route;
   state.currentGap = r.id || null;
   highlightNav(r.route);
@@ -745,7 +767,7 @@ function drawGapDetail(gap) {
   });
   $("#btn-chat")?.addEventListener("click", () => {
     if ($("#btn-chat").disabled) return;
-    location.hash = "#/chat?gap=" + gap.id;
+    openChatDock({ gapId: gap.id });
   });
   $("#btn-reopen")?.addEventListener("click", async () => {
     const btn = $("#btn-reopen");
@@ -1059,59 +1081,102 @@ function bindFailureBannerActions(_gap) {
 // ---- Gaps: new --------------------------------------------------------------
 
 async function renderGapNew() {
-  renderBanners([]);
+  // The "New Gap" screen is a modal layered over the gaps list — render the
+  // list underneath so the URL #/gaps/new still has meaningful context, then
+  // open the modal on top.
+  await renderGapsList();
+  openNewGapModal();
+}
+
+let _newGapModalOpen = false;
+
+function openNewGapModal() {
+  if (_newGapModalOpen) return;
   const reporter = state.lastReporter || "";
   if (!reporter) {
-    $("#main").innerHTML = `
-      <h2>New Gap</h2>
-      <div class="card">
-        ${renderPickReporterNotice()}
-        <div class="actions" style="margin-top:8px">
-          <a class="btn secondary" href="#/gaps">Back to gaps</a>
-        </div>
-      </div>
-    `;
+    toast("Pick a reporter in the top-right selector first", "error");
     return;
   }
-  $("#main").innerHTML = `
-    <h2>New Gap</h2>
-    <div class="card">
-      <div class="muted small" style="margin-bottom:8px">
-        Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
-        — change in the top-right reporter selector.
+  _newGapModalOpen = true;
+
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-gap-title" style="max-width:560px">
+      <div class="modal-title" id="new-gap-title">New Gap</div>
+      <div class="modal-body">
+        <div class="muted small" style="margin-bottom:8px">
+          Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
+          — change in the top-right reporter selector.
+        </div>
+        <form id="new-gap-form">
+          <div class="form-row">
+            <label>Actual (current behavior)</label>
+            <textarea name="actual" placeholder="What's happening today?"></textarea>
+          </div>
+          <div class="form-row">
+            <label>Target (desired behavior)</label>
+            <textarea name="target" placeholder="What should be happening?"></textarea>
+          </div>
+          <div class="form-row">
+            <label>Priority</label>
+            <select name="priority">
+              <option value="low" selected>Low (default)</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <p class="muted small">
+            A name will be auto-generated from the text above — you can rename
+            the Gap on its detail page afterwards. High-priority Gaps run before
+            medium, and medium before low.
+          </p>
+        </form>
       </div>
-      <form id="new-gap-form">
-        <div class="form-row">
-          <label>Actual (current behavior)</label>
-          <textarea name="actual" placeholder="What's happening today?"></textarea>
-        </div>
-        <div class="form-row">
-          <label>Target (desired behavior)</label>
-          <textarea name="target" placeholder="What should be happening?"></textarea>
-        </div>
-        <div class="form-row">
-          <label>Priority</label>
-          <select name="priority">
-            <option value="low" selected>Low (default)</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-        <p class="muted small">
-          A name will be auto-generated from the text above — you can rename
-          the Gap on its detail page afterwards. High-priority Gaps run before
-          medium, and medium before low.
-        </p>
-        <div class="actions">
-          <button type="submit">Create Gap</button>
-          <a class="btn secondary" href="#/gaps">Cancel</a>
-        </div>
-      </form>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+        <button data-ok>Create Gap</button>
+      </div>
     </div>
   `;
-  const form = $("#new-gap-form");
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
+  document.body.appendChild(root);
+
+  let closed = false;
+  function close(navigateAway) {
+    if (closed) return;
+    closed = true;
+    _newGapModalOpen = false;
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+    // If the modal was opened via the #/gaps/new route, send the user back
+    // to the gaps list when they dismiss it (so the URL no longer points at
+    // a "screen" that no longer exists).
+    if (navigateAway && location.hash.startsWith("#/gaps/new")) {
+      location.hash = "#/gaps";
+    }
+  }
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close(true);
+    } else if (e.key === "Enter") {
+      // Allow Enter inside textareas to insert newlines.
+      if (e.target && e.target.tagName === "TEXTAREA") return;
+      e.preventDefault();
+      submit();
+    }
+  }
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close(true);
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+  root.querySelector("[data-ok]").addEventListener("click", submit);
+
+  const form = root.querySelector("#new-gap-form");
+  form.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+
+  async function submit() {
     const currentReporter = state.lastReporter || "";
     if (!currentReporter) return toast("Pick a reporter in the top-right selector", "error");
     const fd = new FormData(form);
@@ -1124,72 +1189,112 @@ async function renderGapNew() {
         reporter: currentReporter, actual, target, priority,
       });
       toast("Gap created", "info");
+      close(false);
       location.hash = "#/gaps/" + r.gap.id;
     } catch (err) {
       toast(err.message, "error");
     }
-  });
+  }
+
+  const firstField = root.querySelector("textarea[name='actual']");
+  if (firstField) firstField.focus();
 }
 
 // ---- Gaps: import -----------------------------------------------------------
 
 async function renderGapImport() {
-  renderBanners([]);
+  // Import is a modal layered over the gaps list, mirroring New Gap.
+  await renderGapsList();
+  openImportModal();
+}
+
+let _importModalOpen = false;
+
+function openImportModal() {
+  if (_importModalOpen) return;
   const reporter = state.lastReporter || "";
   if (!reporter) {
-    $("#main").innerHTML = `
-      <h2>Import gaps</h2>
-      <div class="card">
-        ${renderPickReporterNotice()}
-        <div class="actions" style="margin-top:8px">
-          <a class="btn secondary" href="#/gaps">Back to gaps</a>
-        </div>
-      </div>
-    `;
+    toast("Pick a reporter in the top-right selector first", "error");
     return;
   }
-  $("#main").innerHTML = `
-    <h2>Import gaps</h2>
-    <p class="muted">Paste free-form text (meeting transcript, bug report, feedback dump).
-    refine extracts a draft list — review and edit before saving.</p>
-    <div class="card">
-      <div class="muted small" style="margin-bottom:8px">
-        Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
-        — applies to all extracted gaps. Change in the top-right reporter selector.
+  _importModalOpen = true;
+
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true"
+         aria-labelledby="import-title" style="max-width:680px">
+      <div class="modal-title" id="import-title">Import gaps</div>
+      <div class="modal-body" style="max-height:70vh;overflow:auto">
+        <p class="muted small">Paste free-form text (meeting transcript, bug report,
+        feedback dump). refine extracts a draft list — review and edit before saving.</p>
+        <div class="muted small" style="margin-bottom:8px">
+          Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
+          — applies to all extracted gaps. Change in the top-right reporter selector.
+        </div>
+        <div class="form-row">
+          <label>Source text</label>
+          <textarea id="import-text" rows="8" placeholder="Paste here…"></textarea>
+        </div>
+        <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
       </div>
-      <div class="form-row">
-        <label>Source text</label>
-        <textarea id="import-text" rows="10" placeholder="Paste here…"></textarea>
-      </div>
-      <div class="actions">
-        <button id="btn-extract">Extract drafts</button>
-        <a class="btn secondary" href="#/gaps">Cancel</a>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+        <button id="btn-extract" data-ok>Extract drafts</button>
       </div>
     </div>
-    <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
   `;
-  $("#btn-extract").addEventListener("click", async () => {
-    const btn = $("#btn-extract");
+  document.body.appendChild(root);
+
+  let closed = false;
+  function close(navigateAway) {
+    if (closed) return;
+    closed = true;
+    _importModalOpen = false;
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+    if (navigateAway && location.hash.startsWith("#/gaps/import")) {
+      location.hash = "#/gaps";
+    }
+  }
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close(true);
+    }
+    // Enter inside textareas always inserts a newline; no global Enter
+    // submit, since this modal has two distinct submit steps.
+  }
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close(true);
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+
+  root.querySelector("#btn-extract").addEventListener("click", async () => {
+    const btn = root.querySelector("#btn-extract");
     if (btn.disabled) return;
-    const text = $("#import-text").value.trim();
+    const text = root.querySelector("#import-text").value.trim();
     if (!text) return toast("Paste some text first", "error");
     await withButtonBusy(btn, "Extracting…", async () => {
       try {
         const r = await api("POST", "/api/import/extract", { text });
-        drawDrafts(r.drafts || []);
+        drawImportDrafts(root, r.drafts || [], close);
       } catch (e) { toast(e.message, "error"); }
     });
   });
+
+  root.querySelector("#import-text").focus();
 }
 
-function drawDrafts(drafts) {
-  const root = $("#import-drafts");
+function drawImportDrafts(root, drafts, close) {
+  const drafts_root = root.querySelector("#import-drafts");
   if (!drafts.length) {
-    root.innerHTML = `<p class="muted">No drafts extracted.</p>`;
+    drafts_root.innerHTML = `<p class="muted">No drafts extracted.</p>`;
     return;
   }
-  root.innerHTML = `
-    <h3>Extracted drafts (${drafts.length}) — review &amp; confirm</h3>
+  drafts_root.innerHTML = `
+    <h3 style="margin-top:0">Extracted drafts (${drafts.length}) — review &amp; confirm</h3>
     ${drafts.map((d, i) => `
       <div class="draft" data-idx="${i}">
         <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
@@ -1202,14 +1307,18 @@ function drawDrafts(drafts) {
           <textarea class="d-target" rows="3">${htmlEscape(d.target)}</textarea>
         </div>
       </div>`).join("")}
-    <div class="actions" style="margin-top:8px">
-      <button id="btn-persist">Save ${drafts.length} gap${drafts.length === 1 ? "" : "s"}</button>
-    </div>
   `;
-  $("#btn-persist").addEventListener("click", async () => {
+  // Swap the primary action from "Extract drafts" to "Save N gap(s)".
+  const actions = root.querySelector(".modal-actions");
+  actions.innerHTML = `
+    <button class="secondary" data-cancel>Cancel</button>
+    <button id="btn-persist">Save ${drafts.length} gap${drafts.length === 1 ? "" : "s"}</button>
+  `;
+  actions.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+  actions.querySelector("#btn-persist").addEventListener("click", async () => {
     const reporter = state.lastReporter || "";
     if (!reporter) return toast("Pick a reporter in the top-right selector", "error");
-    const payload = $$(".draft", root).map((row) => ({
+    const payload = $$(".draft", drafts_root).map((row) => ({
       name: row.querySelector(".d-name").value.trim(),
       actual: row.querySelector(".d-actual").value.trim(),
       target: row.querySelector(".d-target").value.trim(),
@@ -1217,6 +1326,7 @@ function drawDrafts(drafts) {
     try {
       const r = await api("POST", "/api/import/persist", { reporter, drafts: payload });
       toast(`Created ${r.count} gap(s)`, "info");
+      close(false);
       location.hash = "#/gaps";
     } catch (e) { toast(e.message, "error"); }
   });
@@ -1312,6 +1422,8 @@ const chatState = {
   tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
   pollTimer: null,
+  open: false,             // dock expanded?
+  bodyHeight: null,        // user-resized body height in px; null → 20vh default
 };
 
 function ensureStandaloneTab() {
@@ -1332,6 +1444,10 @@ function loadChatStateFromStorage() {
       chatState.tabs = parsed.tabs;
       if (parsed.activeTabId && chatState.tabs[parsed.activeTabId]) {
         chatState.activeTabId = parsed.activeTabId;
+      }
+      if (typeof parsed.open === "boolean") chatState.open = parsed.open;
+      if (typeof parsed.bodyHeight === "number" && parsed.bodyHeight > 0) {
+        chatState.bodyHeight = parsed.bodyHeight;
       }
     }
   } catch {}
@@ -1354,18 +1470,55 @@ function saveChatStateToStorage() {
   try {
     localStorage.setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
       tabs, activeTabId: chatState.activeTabId,
+      open: chatState.open, bodyHeight: chatState.bodyHeight,
     }));
   } catch {}
 }
 
-async function renderChat() {
-  renderBanners([]);
+function defaultChatBodyHeight() {
+  return Math.max(120, Math.round(window.innerHeight * 0.20));
+}
+
+function clampChatBodyHeight(px) {
+  const min = 120;
+  const max = Math.max(min, Math.round(window.innerHeight * 0.85));
+  return Math.max(min, Math.min(max, Math.round(px)));
+}
+
+function initChatDock() {
   loadChatStateFromStorage();
   ensureStandaloneTab();
+  drawChatDock();
+  observeChatDockSize();
+}
 
-  // If we arrived via "Open Chat" on a Gap, ensure that tab exists and is active.
-  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
-  const gapId = hashQs.get("gap") || null;
+// Keep --chat-dock-height in sync with whatever vertical space the dock
+// actually occupies (collapsed bar, expanded panel, or mid-drag). `body`
+// reads this variable as its bottom padding so page content never slides
+// underneath the dock.
+function observeChatDockSize() {
+  const root = $("#chat-dock");
+  if (!root) return;
+  const apply = () => {
+    document.documentElement.style.setProperty(
+      "--chat-dock-height", `${root.offsetHeight}px`,
+    );
+  };
+  apply();
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(apply).observe(root);
+  } else {
+    window.addEventListener("resize", apply);
+  }
+}
+
+// Opens the dock and (optionally) ensures a tab for a specific gap is active.
+// Wired up by the "Open Chat" button on the gap detail page and by any
+// surviving `#/chat?gap=...` deep links. For gap tabs with no live session,
+// kicks off a chat session immediately so the runner can inject the Gap
+// context into claude's session memory before the user types.
+function openChatDock({ gapId = null } = {}) {
+  ensureStandaloneTab();
   if (gapId) {
     if (!chatState.tabs[gapId]) {
       chatState.tabs[gapId] = {
@@ -1375,13 +1528,38 @@ async function renderChat() {
       };
     }
     chatState.activeTabId = gapId;
-    saveChatStateToStorage();
   }
-
-  drawChat();
+  chatState.open = true;
+  saveChatStateToStorage();
+  drawChatDock();
+  if (gapId) {
+    const t = chatState.tabs[gapId];
+    if (t && !t.sessionId) startGapChatSession(t);
+  }
 }
 
-function drawChat() {
+async function startGapChatSession(tab) {
+  try {
+    const r = await api("POST", "/api/chat/start", { gap_id: tab.gapId });
+    tab.sessionId = r.session_id;
+    tab.closedReason = null;
+    saveChatStateToStorage();
+    drawChatDock();
+    $("#chat-input")?.focus();
+  } catch (e) {
+    toast("Could not start chat: " + e.message, "error");
+  }
+}
+
+function toggleChatDock() {
+  chatState.open = !chatState.open;
+  saveChatStateToStorage();
+  drawChatDock();
+}
+
+function drawChatDock() {
+  const root = $("#chat-dock");
+  if (!root) return;
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
   const active = tabs[activeId] || tabs.standalone;
@@ -1401,20 +1579,33 @@ function drawChat() {
         ? `Session ${active.sessionId} ended — ${active.closedReason}.`
         : `Session ${active.sessionId} active.`);
 
-  $("#main").innerHTML = `
-    <h2>Chat</h2>
-    <p class="muted">Interactive Claude Code chat. Doesn't count toward the parallel-run cap.
-    Standalone runs against the client repo; attached runs in a Gap's worktree.</p>
-    <div class="chat-tabs">
-      ${Object.entries(tabs).map(([id, t]) => `
-        <button class="chat-tab ${id === activeId ? "active" : ""}"
-                data-tab-id="${htmlEscape(id)}"
-                title="${htmlEscape(t.gapId || "Standalone chat")}">
-          ${htmlEscape(t.label)}${t.sessionId ? ` <span class="chat-tab-dot" title="active session"></span>` : ""}
-          ${id === "standalone" ? "" : `<span class="chat-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
-        </button>`).join("")}
+  root.classList.toggle("open", !!chatState.open);
+  if (chatState.open && !chatState.bodyHeight) {
+    chatState.bodyHeight = defaultChatBodyHeight();
+  }
+  root.innerHTML = `
+    <div class="chat-dock-resize" id="chat-dock-resize"
+         role="separator" aria-orientation="horizontal"
+         aria-label="Resize chat panel"
+         title="Drag to resize"></div>
+    <div class="chat-dock-bar" id="chat-dock-bar"
+         title="${chatState.open ? "Click to collapse" : "Click a tab to expand chat"}">
+      <span class="chat-dock-label">Chat</span>
+      <div class="chat-tabs">
+        ${Object.entries(tabs).map(([id, t]) => `
+          <button class="chat-tab ${id === activeId ? "active" : ""}"
+                  data-tab-id="${htmlEscape(id)}"
+                  title="${htmlEscape(t.gapId || "Standalone chat")}">
+            ${htmlEscape(t.label)}${t.sessionId ? ` <span class="chat-tab-dot" title="active session"></span>` : ""}
+            ${id === "standalone" ? "" : `<span class="chat-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
+          </button>`).join("")}
+      </div>
+      <button class="chat-dock-toggle" id="btn-dock-toggle"
+              aria-label="${chatState.open ? "Collapse chat" : "Expand chat"}"
+              title="${chatState.open ? "Collapse chat" : "Expand chat"}">▾</button>
     </div>
-    <div class="card">
+    <div class="chat-dock-body"
+         style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
         <button id="btn-chat-clear" class="secondary"
@@ -1432,43 +1623,92 @@ function drawChat() {
         </div>
       </div>
       <div class="actions" style="margin-top:8px">
-        <input type="text" id="chat-input" placeholder="Type and press Enter…"
+        <input type="text" id="chat-input"
+               placeholder="${hasSession
+                 ? "Type and press Enter…"
+                 : "Click Start to begin session before sending messages is enabled."}"
                ${hasSession && !active.pending ? "" : "disabled"}>
       </div>
     </div>
   `;
   applyPendingIndicator(active);
 
-  // Scroll the output to the bottom on initial render.
-  const pre = $("#chat-output");
-  if (pre) pre.scrollTop = pre.scrollHeight;
+  if (chatState.open) {
+    const pre = $("#chat-output");
+    if (pre) pre.scrollTop = pre.scrollHeight;
+  }
 
-  $$(".chat-tab").forEach((el) => {
+  $$(".chat-tab", root).forEach((el) => {
     el.addEventListener("click", (e) => {
-      // Don't switch when the user clicked the × close.
       if (e.target.matches("[data-close-tab]")) return;
       const id = el.dataset.tabId;
-      if (id && id !== chatState.activeTabId) switchChatTab(id);
+      if (!id) return;
+      if (id === chatState.activeTabId) {
+        // Clicking the active tab toggles the dock open/closed.
+        toggleChatDock();
+      } else {
+        switchChatTab(id);
+        if (!chatState.open) {
+          chatState.open = true;
+          saveChatStateToStorage();
+          drawChatDock();
+        }
+      }
     });
   });
-  $$("[data-close-tab]").forEach((el) => {
+  $$("[data-close-tab]", root).forEach((el) => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
       closeChatTab(el.dataset.closeTab);
     });
   });
-  $("#btn-chat-toggle").addEventListener("click", toggleActiveChat);
-  $("#btn-chat-clear").addEventListener("click", clearActiveChat);
-  $("#chat-input").addEventListener("keydown", (e) => {
+  $("#btn-dock-toggle")?.addEventListener("click", toggleChatDock);
+  $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
+  $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
+  $("#chat-input")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendChatLine();
     }
   });
 
-  // Begin polling if the active tab has a session.
+  wireChatDockResize(root);
   restartPollForActiveTab();
 }
+
+function wireChatDockResize(root) {
+  const handle = root.querySelector("#chat-dock-resize");
+  const body = root.querySelector(".chat-dock-body");
+  if (!handle || !body) return;
+  handle.addEventListener("pointerdown", (e) => {
+    if (!chatState.open) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    const startH = body.getBoundingClientRect().height;
+    handle.setPointerCapture(e.pointerId);
+    root.classList.add("resizing");
+    function onMove(ev) {
+      // Drag up grows the panel; drag down shrinks it.
+      const next = clampChatBodyHeight(startH + (startY - ev.clientY));
+      body.style.height = next + "px";
+      chatState.bodyHeight = next;
+    }
+    function onUp(ev) {
+      handle.removeEventListener("pointermove", onMove);
+      handle.removeEventListener("pointerup", onUp);
+      handle.removeEventListener("pointercancel", onUp);
+      try { handle.releasePointerCapture(ev.pointerId); } catch {}
+      root.classList.remove("resizing");
+      saveChatStateToStorage();
+    }
+    handle.addEventListener("pointermove", onMove);
+    handle.addEventListener("pointerup", onUp);
+    handle.addEventListener("pointercancel", onUp);
+  });
+}
+
+// Back-compat alias used by helpers below; thin wrapper.
+function drawChat() { drawChatDock(); }
 
 function applyPendingIndicator(tab) {
   const ind = $("#chat-pending");
@@ -1886,6 +2126,7 @@ async function init() {
   } catch (e) {
     // not fatal — likely fresh install with no reporters yet
   }
+  initChatDock();
   initSSE();
   navigate();
 }

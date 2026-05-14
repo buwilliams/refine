@@ -12,14 +12,13 @@
     <nav class="nav">
       <a href="#/" data-route="dashboard">Dashboard</a>
       <a href="#/gaps" data-route="gaps">Gaps</a>
-      <a href="#/chat" data-route="chat">Chat</a>
       <a href="#/logs" data-route="logs">Logs</a>
       <a href="#/agents" data-route="agents">Agents</a>
       <a href="#/settings" data-route="settings">Settings</a>
-      <a class="btn nav-action" href="#/gaps/new">+ New Gap</a>
-      <a class="btn secondary nav-action" href="#/gaps/import">Import…</a>
     </nav>
-    <div class="reporter-corner">
+    <div class="topbar-actions">
+      <a class="btn nav-action" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
+      <a class="btn secondary nav-action" href="#/gaps/import" id="btn-import">Import…</a>
       <select id="global-reporter" aria-label="Reporter"></select>
     </div>
   </header>
@@ -27,6 +26,8 @@
   <div id="banners" class="banners"></div>
 
   <main id="main"></main>
+
+  <aside id="chat-dock" class="chat-dock" aria-label="Chat dock"></aside>
 
   <template id="t-banner">
     <div class="banner">

@@ -548,9 +548,10 @@ def dashboard_summary() -> tuple[int, dict]:
         index_rows = conn.execute(
             "SELECT id, status FROM gaps_index"
         ).fetchall()
+        known_reporters = [r["name"] for r in reporters.list_all(conn)]
     finally:
         conn.close()
-    reporter_stats = _compute_reporter_stats(index_rows)
+    reporter_stats = _compute_reporter_stats(index_rows, known_reporters)
     runner_reachable = get_client().is_reachable()
     return 200, {
         "counts": counts,
@@ -567,8 +568,12 @@ def dashboard_summary() -> tuple[int, dict]:
 _ACTIVE_STATUSES = ("todo", "in-progress", "review")
 
 
-def _compute_reporter_stats(index_rows) -> list[dict]:
-    by_reporter: dict[str, dict] = {}
+def _compute_reporter_stats(index_rows, known_reporters: list[str]) -> list[dict]:
+    def _empty(name: str) -> dict:
+        return {"reporter": name, "active": 0, "done": 0,
+                "reported": 0, "completion_rate": 0.0}
+
+    by_reporter: dict[str, dict] = {n: _empty(n) for n in known_reporters}
     for row in index_rows:
         gap = shared_gaps.read_gap_json(row["id"])
         if not gap:
@@ -579,10 +584,7 @@ def _compute_reporter_stats(index_rows) -> list[dict]:
         reporter = (rounds[-1].get("reporter") or "").strip()
         if not reporter:
             continue
-        bucket = by_reporter.setdefault(
-            reporter, {"reporter": reporter, "active": 0, "done": 0,
-                      "reported": 0, "completion_rate": 0.0},
-        )
+        bucket = by_reporter.setdefault(reporter, _empty(reporter))
         bucket["reported"] += 1
         status = row["status"]
         if status in _ACTIVE_STATUSES:
@@ -594,7 +596,7 @@ def _compute_reporter_stats(index_rows) -> list[dict]:
         b["completion_rate"] = (
             round(100.0 * b["done"] / b["reported"], 1) if b["reported"] else 0.0
         )
-    out.sort(key=lambda b: (-b["reported"], b["reporter"].lower()))
+    out.sort(key=lambda b: (-b["done"], b["reporter"].lower()))
     return out
 
 
