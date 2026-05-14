@@ -161,6 +161,15 @@ class Dispatcher:
             )
             base_ref = target
 
+        # Pre-launch validation: has this round's work already been
+        # merged into target? One `Refine Gap: <gap_id>` trailered
+        # merge commit lands on target per completed round, so the
+        # count divides cleanly per round. If existing merges already
+        # cover the latest round, skip the agent run — the work is
+        # done, just queue the Gap for human approval.
+        if self._maybe_skip_already_implemented(conn, gap_id, target):
+            return
+
         # Compute the branch name + worktree.
         pattern = db.get_setting(conn, "branch_name_pattern", "refine/{gap_id}") or "refine/{gap_id}"
         branch_name = existing_branch or pattern.format(gap_id=gap_id)
@@ -235,6 +244,67 @@ class Dispatcher:
                 agent_reported_success=agent_ok,
             ),
         )
+
+    def _maybe_skip_already_implemented(self, conn: sqlite3.Connection,
+                                          gap_id: str, target: str) -> bool:
+        """Pre-launch idempotency guard. Returns True if we skipped
+        the launch because the latest round's work is already on the
+        target branch.
+
+        The signal: count merge commits on `target` whose body carries
+        `Refine Gap: <gap_id>`. Each completed round produces exactly
+        one such commit, so:
+
+            n_merges >= n_rounds  ⇒  the latest round is already done
+
+        Round 1 with no prior merges: 0 merges, 1 round → 0 < 1 → run.
+        Round 2 after round 1 merged: 1 merge, 2 rounds → 1 < 2 → run.
+        Round 1 with a leftover merge (e.g., runner crashed after
+        verify): 1 merge, 1 round → 1 >= 1 → skip.
+
+        On skip we send the Gap to `review` directly (todo → review,
+        skipping in-progress) since the work is already on target and
+        the human just needs to approve it. No worktree created, no
+        agent spawned.
+        """
+        gap = read_gap_json(gap_id)
+        if not gap:
+            return False
+        rounds = gap.get("rounds") or []
+        n_rounds = len(rounds)
+        if n_rounds == 0:
+            return False
+        n_merges = git_ops.count_refine_merges_for_gap(gap_id, target)
+        if n_merges < n_rounds:
+            return False
+
+        round_idx = n_rounds - 1
+        msg = (f"Skipped agent run — this round's work is already on "
+               f"`{target}` ({n_merges} merge commit"
+               f"{'' if n_merges == 1 else 's'} for this Gap). "
+               f"Moved straight to review for human approval.")
+        # Log to the latest round's logs[] so the audit trail shows
+        # why we bypassed the agent for this specific round.
+        try:
+            gap_writer.append_round_log(
+                gap_id=gap_id, round_idx=round_idx,
+                severity="info", category="state", actor="runner",
+                message=msg,
+            )
+        except Exception:
+            pass
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'review', updated = ? "
+                "WHERE id = ? AND status = 'todo'",
+                (now_iso(), gap_id),
+            )
+        activity.append(
+            conn, message=msg,
+            severity="info", category="state",
+            gap_id=gap_id, actor="runner",
+        )
+        return True
 
     def _abort_to_failed(self, conn: sqlite3.Connection, gap_id: str,
                          message: str, *, category: str,

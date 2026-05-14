@@ -399,6 +399,28 @@ def list_refine_merges(branch: str, limit: int = 50,
     return out
 
 
+def count_refine_merges_for_gap(gap_id: str, branch: str, *,
+                                  cwd: Path | None = None) -> int:
+    """Count merge commits on `branch` whose body carries
+    `Refine Gap: <gap_id>`. One merge commit per completed round, so
+    the dispatcher uses `count >= len(rounds)` as the "this round's
+    work is already merged" signal."""
+    gap_id_upper = gap_id.strip().upper()
+    if not gap_id_upper:
+        return 0
+    # Walk first-parent merges; match the trailer in the body. Cheaper
+    # than parsing every commit — git filters server-side.
+    r = _run([
+        "log", "--first-parent", "--merges",
+        f"--grep=^Refine Gap: {gap_id_upper}$",
+        "--extended-regexp", "--pretty=format:%H",
+        branch,
+    ], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return 0
+    return sum(1 for ln in r.stdout.splitlines() if ln.strip())
+
+
 def gap_id_from_commit(commit_sha: str, *,
                        cwd: Path | None = None) -> str | None:
     """Read the body of `commit_sha` and pull out its `Refine Gap:` trailer."""
