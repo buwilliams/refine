@@ -628,13 +628,23 @@ async function renderGapsList() {
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
-    <div class="search-bar">
-      <input type="text" id="search" placeholder="Search gaps…" value="${htmlEscape(q)}">
-      <select id="filter-status">
-        ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
-          .map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
-      </select>
-      <span id="gaps-count" class="muted small"></span>
+    <div class="filter-bar">
+      <div class="filter-row filter-row-primary">
+        <input type="text" id="search" class="filter-grow"
+               placeholder="Search gaps…" value="${htmlEscape(q)}">
+        <select id="filter-status">
+          ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
+            .map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
+        </select>
+      </div>
+      <div class="filter-row filter-row-bulk">
+        <span id="gaps-count" class="muted small"></span>
+        <span class="spacer"></span>
+        <span class="muted small">Bulk update matching:</span>
+        <button class="secondary small" id="bulk-set-priority">Priority…</button>
+        <button class="secondary small" id="bulk-set-status">Status…</button>
+        <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
+      </div>
     </div>
     <div id="gaps-table"><p class="muted">Loading…</p></div>
   `;
@@ -644,6 +654,11 @@ async function renderGapsList() {
   $("#filter-status").addEventListener("change", (e) => {
     location.hash = gapsHash({ q, status: e.target.value, sort, dir });
   });
+  // The bulk-action buttons read the current filter from the hash at click
+  // time, so they always reflect what the user can see.
+  $("#bulk-set-priority").addEventListener("click", () => openBulkModal("priority"));
+  $("#bulk-set-status").addEventListener("click", () => openBulkModal("status"));
+  $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
   try {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
@@ -719,6 +734,97 @@ function drawGapsTable(gaps, state) {
       });
     });
   });
+}
+
+// ---- Gaps: bulk-update modal ------------------------------------------------
+//
+// Each bulk action prompts for a new value and confirms the change against
+// the *current* filter (read from the URL hash at click time). The server
+// re-runs the filter query, so what the user sees in the table is what gets
+// updated — no client-side ID list to drift out of sync. Exactly one field
+// is changed per call so the confirmation reads cleanly.
+
+const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
+const BULK_STATUS_OPTIONS = [
+  "todo", "in-progress", "review", "done", "failed", "cancelled",
+];
+
+async function openBulkModal(field) {
+  // Snapshot the current filter the same way renderGapsList parses it.
+  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  const filter = {
+    status: hashQs.get("status") || "",
+    q: hashQs.get("q") || "",
+  };
+  const filterDesc = describeGapsFilter(filter);
+  const countText = ($("#gaps-count")?.textContent || "").trim();
+  const label = { priority: "Priority", status: "Status", reporter: "Reporter" }[field];
+
+  let valueControlHtml = "";
+  if (field === "priority") {
+    valueControlHtml = `
+      <select class="modal-input" id="bulk-value-priority" style="width:100%">
+        ${BULK_PRIORITY_OPTIONS.map((p) => `<option value="${p}">${p}</option>`).join("")}
+      </select>`;
+  } else if (field === "status") {
+    valueControlHtml = `
+      <select class="modal-input" id="bulk-value-status" style="width:100%">
+        ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s}">${s}</option>`).join("")}
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        Bookkeeping-only — won't kill a running subprocess or clean up a
+        worktree. Use the per-Gap actions for full state transitions.
+      </p>`;
+  } else if (field === "reporter") {
+    const opts = (state.reporters || [])
+      .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
+      .join("");
+    valueControlHtml = `
+      <select class="modal-input" id="bulk-value-reporter" style="width:100%">
+        <option value="">— pick reporter —</option>
+        ${opts}
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        Rewrites the latest round's <strong>reporter</strong> on each Gap.
+        Earlier rounds keep their original reporter.
+      </p>`;
+  }
+
+  const body = () => `
+    <div class="modal-title">Bulk set ${htmlEscape(label.toLowerCase())}</div>
+    <div class="modal-body">
+      <div class="muted small" style="margin-bottom:8px">
+        Applies to ${htmlEscape(countText || "all matching")} —
+        ${htmlEscape(filterDesc)}.
+      </div>
+      <label for="bulk-value-${field}">New ${htmlEscape(label.toLowerCase())}</label>
+      ${valueControlHtml}
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>Cancel</button>
+      <button data-ok>Apply</button>
+    </div>`;
+  const next = await _openModal(
+    body, { cancel: null, ok: "" }, ".modal-input",
+  );
+  if (next === null) return;
+  if (!next) return;          // user opened the picker but didn't choose
+  try {
+    const r = await api("POST", "/api/gaps/bulk", {
+      filter, update: { [field]: next },
+    });
+    toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
+    await renderGapsList();
+  } catch (e) {
+    toast(`Bulk update failed: ${e.message}`, "error");
+  }
+}
+
+function describeGapsFilter(filter) {
+  const parts = [];
+  if (filter.status) parts.push(`status=${filter.status}`);
+  if (filter.q) parts.push(`q="${filter.q}"`);
+  return parts.length ? parts.join(", ") : "all gaps";
 }
 
 function debounce(fn, ms) {

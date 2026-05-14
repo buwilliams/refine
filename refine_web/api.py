@@ -37,6 +37,9 @@ def _conn() -> sqlite3.Connection:
 # --- Gap endpoints ------------------------------------------------------------
 
 _VALID_PRIORITIES = ("low", "medium", "high")
+_VALID_STATUSES = (
+    "todo", "in-progress", "review", "done", "failed", "cancelled",
+)
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
 # injection from the query string. `id` doubles as a chronological sort
@@ -263,6 +266,98 @@ def delete_gap(gap_id: str) -> tuple[int, dict]:
     except IpcError as e:
         return _ipc_err(e)
     return 200, result
+
+
+def bulk_update_gaps(body: dict) -> tuple[int, dict]:
+    """Apply a single field update to every Gap matching the supplied filter.
+
+    Body shape:
+
+        {"filter": {"status": "...", "q": "..."},
+         "update": {"priority": "high"} | {"status": "cancelled"} | {"reporter": "alice"}}
+
+    Exactly one update key is honored per call so the action is unambiguous
+    to confirm in the UI. `priority` and `status` are SQL-index fields and
+    are updated in a single transaction; `reporter` rewrites each Gap's
+    latest round via the runner-owned `M_EDIT_ROUND` path, one Gap at a
+    time. Status changes here are bookkeeping-only — they don't trigger
+    workflow side effects like killing a running subprocess or cleaning
+    up a worktree; for those, use the per-Gap action on the detail page.
+    """
+    update = body.get("update") or {}
+    update = {k: v for k, v in update.items()
+              if k in ("priority", "status", "reporter")}
+    if len(update) != 1:
+        return err(400,
+                   "update must contain exactly one of "
+                   "`priority`, `status`, or `reporter`")
+    field, raw = next(iter(update.items()))
+    value = (raw or "").strip()
+    if field == "priority":
+        value = value.lower()
+        if value not in _VALID_PRIORITIES:
+            return err(400, "priority must be one of low/medium/high")
+    elif field == "status":
+        value = value.lower()
+        if value not in _VALID_STATUSES:
+            return err(400, "invalid status")
+    else:  # reporter
+        if not value or not _VALID_REPORTER.match(value):
+            return err(400, "invalid reporter name")
+
+    filt = body.get("filter") or {}
+    code, listing = list_gaps(
+        status=filt.get("status") or None,
+        q=filt.get("q") or None,
+        limit=10_000,
+    )
+    if code != 200:
+        return code, listing
+    gap_ids = [g["id"] for g in listing.get("gaps") or []]
+    if not gap_ids:
+        return 200, {"updated": 0, "ids": []}
+
+    updated_ids: list[str] = []
+
+    if field in ("priority", "status"):
+        conn = _conn()
+        try:
+            with db.transaction(conn):
+                placeholders = ",".join("?" * len(gap_ids))
+                conn.execute(
+                    f"UPDATE gaps_index SET {field} = ?, updated = ? "
+                    f"WHERE id IN ({placeholders})",
+                    [value, now_iso(), *gap_ids],
+                )
+        finally:
+            conn.close()
+        # Nudge each gap.json's mtime via the runner so listings sort
+        # consistently and any file-watchers see the touch.
+        for gid in gap_ids:
+            try:
+                get_client().call(M_EDIT_ROUND, {
+                    "gap_id": gid,
+                    "actual": None, "target": None, "reporter": None,
+                })
+                updated_ids.append(gid)
+            except IpcError:
+                updated_ids.append(gid)
+    else:  # reporter — rewrite the latest round's reporter on each gap
+        for gid in gap_ids:
+            try:
+                get_client().call(M_EDIT_ROUND, {
+                    "gap_id": gid,
+                    "actual": None, "target": None,
+                    "reporter": value,
+                })
+                updated_ids.append(gid)
+            except IpcError:
+                # Skip gaps the runner refused (no rounds yet, etc.) and
+                # keep going. The response count reflects what stuck.
+                continue
+
+    return 200, {"updated": len(updated_ids), "ids": updated_ids,
+                 "field": field, "value": value}
 
 
 def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
