@@ -27,11 +27,15 @@ from . import git_ops
 from .chat_mgr import _chat_env, _resolve_claude
 
 
-# Tighter than the agent runner's per-round caps — conflict resolution
-# is a focused task on a small file set, not an open-ended Gap. If the
-# agent can't finish in this window it's stuck.
-_IDLE_SECONDS = 120.0
-_HARD_CAP_SECONDS = 600.0
+# Caps for the resolver subprocess. Wider than the original 120s/600s:
+# real conflicts (e.g. a multi-hunk merge on a single file) routinely
+# burn >2 min of thinking time between the initial Read and the first
+# Edit, with no stdout events to keep `last_chunk_at` warm. Killing on
+# idle there means the resolver never actually edits anything. We
+# default to 10 min idle / 30 min hard which is generous for focused
+# resolution but still catches a true runaway.
+_IDLE_SECONDS = 600.0
+_HARD_CAP_SECONDS = 1800.0
 
 
 def attempt_auto_resolve(

@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from refine_shared import activity, db
 from refine_shared.gaps import now_iso, read_gap_json
 
-from . import gap_writer, git_ops, preflight, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, preflight, subprocess_mgr
 from .friendly_outcome import classify_outcome
 
 
@@ -26,6 +26,11 @@ class Dispatcher:
 
     get_conn: callable  # type: ignore[type-arg]
     sub_mgr: subprocess_mgr.SubprocessManager
+    # Called when an agent run finishes successfully — the merger
+    # uses this signal to scan promptly for the new "awaiting merge"
+    # Gap rather than waiting on its 10s poll. Optional so tests can
+    # instantiate a Dispatcher without one.
+    on_run_finished: callable | None = None  # type: ignore[type-arg]
     poll_interval: float = 2.0
 
     _stop: threading.Event = None  # type: ignore[assignment]
@@ -306,34 +311,17 @@ class Dispatcher:
             details=outcome.details,
         )
 
-        # Auto-verify: as soon as a round succeeds, merge the gap's branch
-        # into the currently checked-out branch (and push). The Gap is
-        # still `in-progress` at this point — verify will land it in
-        # `done` on success. After verify returns, any Gap still in
-        # `in-progress` means verify failed somewhere recoverable
-        # (dirty working copy, push rejected, unresolvable merge
-        # conflict) — transition to `review` so the user can resolve
-        # and click Verify manually.
-        if success:
+        # Auto-verify is owned by the Merger now — a single-threaded
+        # worker that serializes every operation on the host worktree.
+        # We just signal "a Gap is ready to merge" so the merger scans
+        # promptly instead of waiting on its periodic tick. The Gap
+        # stays in `in-progress` until the merger lands it in `done`
+        # or punts it to `review`.
+        if success and self.on_run_finished is not None:
             try:
-                verify_op.perform_verify(conn, gap_id, actor="runner")
-            except Exception as e:
-                activity.append(
-                    conn,
-                    message=f"Auto-verify raised: {e!r}",
-                    severity="error", category="git",
-                    gap_id=gap_id, actor="runner",
-                )
-            row = conn.execute(
-                "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
-            ).fetchone()
-            if row and row["status"] == "in-progress":
-                with db.transaction(conn):
-                    conn.execute(
-                        "UPDATE gaps_index SET status = 'review', "
-                        "updated = ? WHERE id = ?",
-                        (now_iso(), gap_id),
-                    )
+                self.on_run_finished(gap_id)
+            except Exception:
+                pass
 
 
 def _format_prompt(round_obj: dict) -> str:

@@ -21,7 +21,7 @@ from refine_shared.ipc_protocol import (
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, preflight, recovery, state_committer, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, preflight, recovery, state_committer, subprocess_mgr, verify_op
 from .chat_mgr import ChatManager
 from .ipc_server import IpcServer
 
@@ -41,8 +41,15 @@ class Runner:
         self._conn.execute("PRAGMA foreign_keys = ON")
 
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
+        # The merger owns the host worktree — everything that merges,
+        # auto-resolves conflicts, or cleans stale git op state goes
+        # through it. See refine_runner/merger.py for the rationale.
+        self.merger = _merger.Merger(
+            get_conn=self._get_conn, sub_mgr=self.sub_mgr,
+        )
         self.dispatcher = _dispatcher.Dispatcher(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
+            on_run_finished=lambda _gid: self.merger.wake(),
         )
         self.ipc = IpcServer(default_socket_path(), self._dispatch_method)
         self.chat = ChatManager(
@@ -64,6 +71,7 @@ class Runner:
         recovery.reconcile_on_start(self._conn)
         preflight.check(self._conn)
         self.dispatcher.start()
+        self.merger.start()
         self.state_committer.start()
         self.ipc.start()
         activity.append(
@@ -74,6 +82,7 @@ class Runner:
     def shutdown(self) -> None:
         self.ipc.stop()
         self.state_committer.stop()
+        self.merger.stop()
         self.dispatcher.stop()
         activity.append(
             self._conn, message="refine-runner stopping",
@@ -158,7 +167,11 @@ class Runner:
         return {"killed_subprocess": killed}
 
     def _h_verify(self, params: dict) -> dict:
-        return verify_op.perform_verify(self._conn, params["gap_id"])
+        # Route through the merger so a user-triggered Verify can't race
+        # with an in-flight auto-verify of another Gap. The merger's
+        # single lock serializes everything that touches the host
+        # worktree.
+        return self.merger.verify_now(params["gap_id"])
 
     def _h_create_gap(self, params: dict) -> dict:
         gap_id = params["gap_id"]
