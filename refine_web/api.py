@@ -79,9 +79,17 @@ def _gaps_order_clause(sort: str | None, direction: str | None) -> str:
 
 
 def list_gaps(*, status: str | None = None, q: str | None = None,
+              severity: str | None = None,
+              category: str | None = None,
+              actor: str | None = None,
               limit: int = 200,
               sort: str | None = None,
-              direction: str | None = None) -> tuple[int, dict]:
+              direction: str | None = None,
+              include_facets: bool = False) -> tuple[int, dict]:
+    """List Gaps. `severity` / `category` / `actor` filter to Gaps that
+    have at least one activity entry matching — so the user can find,
+    e.g., "Gaps that hit a `git` error", "Gaps the agent touched", etc.
+    """
     sql = ["SELECT id, name, status, priority, created, updated, branch_name FROM gaps_index"]
     args: list[Any] = []
     where: list[str] = []
@@ -92,6 +100,24 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         where.append("(name LIKE ? OR id LIKE ?)")
         like = f"%{q}%"
         args.extend([like, like])
+    # Activity-derived filters: gap must have at least one matching entry.
+    if severity or category or actor:
+        sub_where = ["gap_id IS NOT NULL"]
+        sub_args: list[Any] = []
+        if severity:
+            sub_where.append("severity = ?")
+            sub_args.append(severity)
+        if category:
+            sub_where.append("category = ?")
+            sub_args.append(category)
+        if actor:
+            sub_where.append("actor = ?")
+            sub_args.append(actor)
+        where.append(
+            "id IN (SELECT DISTINCT gap_id FROM activity WHERE "
+            + " AND ".join(sub_where) + ")"
+        )
+        args.extend(sub_args)
     if where:
         sql.append("WHERE " + " AND ".join(where))
     sql.append("ORDER BY " + _gaps_order_clause(sort, direction) + " LIMIT ?")
@@ -99,12 +125,23 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     conn = _conn()
     try:
         rows = [dict(r) for r in conn.execute(" ".join(sql), args)]
+        facets: dict | None = None
+        if include_facets:
+            facets = {
+                "categories": activity.distinct_categories(conn),
+                "actors": activity.distinct_actors(conn),
+            }
     finally:
         conn.close()
-    # If q is given, also search the gap.json round content for a match.
-    if q and len(rows) < limit:
+    # Round-content search only kicks in when the only non-q filters are
+    # the existing ones — the activity-side subquery already constrains
+    # the candidate id set.
+    if q and len(rows) < limit and not (severity or category or actor):
         rows = _augment_with_round_search(rows, q, limit)
-    return 200, {"gaps": rows}
+    body: dict = {"gaps": rows}
+    if facets is not None:
+        body["facets"] = facets
+    return 200, body
 
 
 def _augment_with_round_search(initial: list[dict], q: str,
@@ -310,6 +347,9 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     code, listing = list_gaps(
         status=filt.get("status") or None,
         q=filt.get("q") or None,
+        severity=filt.get("severity") or None,
+        category=filt.get("category") or None,
+        actor=filt.get("actor") or None,
         limit=10_000,
     )
     if code != 200:

@@ -607,42 +607,57 @@ const GAPS_DEFAULT_DIR = {
   updated: "desc", id: "desc",
 };
 
+// Mirror Logs' entries-limit dropdown so the two screens feel consistent.
+const GAPS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+const GAPS_DEFAULT_LIMIT = 100;
+
 function gapsHash(parts) {
   const next = new URLSearchParams();
-  if (parts.q)      next.set("q", parts.q);
-  if (parts.status) next.set("status", parts.status);
-  if (parts.sort)   next.set("sort", parts.sort);
-  if (parts.dir)    next.set("dir", parts.dir);
+  if (parts.q)        next.set("q", parts.q);
+  if (parts.status)   next.set("status", parts.status);
+  if (parts.severity) next.set("severity", parts.severity);
+  if (parts.category) next.set("category", parts.category);
+  if (parts.actor)    next.set("actor", parts.actor);
+  if (parts.limit && parts.limit !== GAPS_DEFAULT_LIMIT) next.set("limit", String(parts.limit));
+  if (parts.sort)     next.set("sort", parts.sort);
+  if (parts.dir)      next.set("dir", parts.dir);
   return "#/gaps" + (next.toString() ? "?" + next : "");
 }
 
 async function renderGapsList() {
   renderBanners([]);
-  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
-  const status = hashQs.get("status") || "";
-  const q = hashQs.get("q") || "";
-  const sort = (hashQs.get("sort") || "").toLowerCase();
-  const dir = (hashQs.get("dir") || "").toLowerCase();
-  // Effective sort/dir for indicator rendering: fall back to server defaults
-  // when nothing is in the hash.
-  const effectiveSort = sort || "updated";
-  const effectiveDir = dir || (GAPS_DEFAULT_DIR[effectiveSort] || "desc");
+  const f = gapsFilterFromHash();
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
     <div class="filter-bar">
       <div class="filter-row filter-row-primary">
         <input type="text" id="search" class="filter-grow"
-               placeholder="Search gaps…" value="${htmlEscape(q)}">
+               placeholder="Search gaps…" value="${htmlEscape(f.q)}">
         <select id="filter-status">
           ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
-            .map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
+            .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
         </select>
       </div>
+      <div class="filter-row filter-row-activity">
+        <select id="gaps-severity">
+          <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
+          <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
+          <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
+          <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
+        </select>
+        <select id="gaps-category"><option value="">all categories</option></select>
+        <select id="gaps-actor"><option value="">all actors</option></select>
+        <select id="gaps-limit">
+          ${GAPS_LIMIT_OPTIONS.map((n) =>
+            `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
+        </select>
+        <span class="spacer"></span>
+        <span id="gaps-count" class="muted small"></span>
+        <button class="secondary" id="gaps-clear">Clear filters</button>
+      </div>
       <div class="filter-row filter-row-bulk">
-        <span class="muted small">
-          <span id="gaps-count"></span>, bulk update matching:
-        </span>
+        <span class="muted small">Bulk update matching:</span>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
@@ -659,8 +674,19 @@ async function renderGapsList() {
   $("#search").addEventListener("input", debounce(() => {
     updateGapsFilter({ q: $("#search").value });
   }, 250));
-  $("#filter-status").addEventListener("change", (e) => {
-    updateGapsFilter({ status: e.target.value });
+  $("#filter-status").addEventListener("change", (e) =>
+    updateGapsFilter({ status: e.target.value }));
+  $("#gaps-severity").addEventListener("change", (e) =>
+    updateGapsFilter({ severity: e.target.value }));
+  $("#gaps-category").addEventListener("change", (e) =>
+    updateGapsFilter({ category: e.target.value }));
+  $("#gaps-actor").addEventListener("change", (e) =>
+    updateGapsFilter({ actor: e.target.value }));
+  $("#gaps-limit").addEventListener("change", (e) =>
+    updateGapsFilter({ limit: parseInt(e.target.value, 10) || GAPS_DEFAULT_LIMIT }));
+  $("#gaps-clear").addEventListener("click", () => {
+    history.replaceState(null, "", "#/gaps");
+    renderGapsList();
   });
   // The bulk-action buttons read the current filter from the hash at click
   // time, so they always reflect what the user can see.
@@ -681,6 +707,11 @@ function gapsFilterFromHash() {
   return {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
+    severity: hashQs.get("severity") || "",
+    category: hashQs.get("category") || "",
+    actor: hashQs.get("actor") || "",
+    limit: parseInt(hashQs.get("limit") || String(GAPS_DEFAULT_LIMIT), 10)
+           || GAPS_DEFAULT_LIMIT,
     sort, dir,
     effectiveSort, effectiveDir,
   };
@@ -694,6 +725,10 @@ function updateGapsFilter(patch) {
   const next = {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
+    severity: "severity" in patch ? patch.severity : current.severity,
+    category: "category" in patch ? patch.category : current.category,
+    actor: "actor" in patch ? patch.actor : current.actor,
+    limit: "limit" in patch ? patch.limit : current.limit,
     sort: "sort" in patch ? patch.sort : current.sort,
     dir: "dir" in patch ? patch.dir : current.dir,
   };
@@ -707,11 +742,31 @@ async function refreshGapsTable() {
   const params = new URLSearchParams();
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
+  if (f.severity) params.set("severity", f.severity);
+  if (f.category) params.set("category", f.category);
+  if (f.actor) params.set("actor", f.actor);
+  if (f.limit) params.set("limit", String(f.limit));
   if (f.sort) params.set("sort", f.sort);
   if (f.dir) params.set("dir", f.dir);
+  params.set("facets", "1");
   try {
     const data = await api("GET", "/api/gaps?" + params);
     const gaps = data.gaps || [];
+    const facets = data.facets || {};
+    // Refresh the category / actor dropdowns from the server-side
+    // distinct values — same pattern as the Logs screen.
+    const catSel = $("#gaps-category");
+    if (catSel) {
+      const cats = facets.categories || [];
+      catSel.innerHTML = `<option value="">all categories</option>` +
+        cats.map((c) => `<option value="${htmlEscape(c)}" ${c === f.category ? "selected" : ""}>${htmlEscape(c)}</option>`).join("");
+    }
+    const actSel = $("#gaps-actor");
+    if (actSel) {
+      const acts = facets.actors || [];
+      actSel.innerHTML = `<option value="">all actors</option>` +
+        acts.map((a) => `<option value="${htmlEscape(a)}" ${a === f.actor ? "selected" : ""}>${htmlEscape(a)}</option>`).join("");
+    }
     const countEl = $("#gaps-count");
     if (countEl) {
       countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
@@ -797,11 +852,12 @@ const BULK_STATUS_OPTIONS = [
 ];
 
 async function openBulkModal(field) {
-  // Snapshot the current filter the same way renderGapsList parses it.
-  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  // Snapshot the current filter so the modal + the server-side bulk
+  // operation see exactly what the user sees in the table.
+  const f = gapsFilterFromHash();
   const filter = {
-    status: hashQs.get("status") || "",
-    q: hashQs.get("q") || "",
+    status: f.status, q: f.q,
+    severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
   const countText = ($("#gaps-count")?.textContent || "").trim();
@@ -869,8 +925,11 @@ async function openBulkModal(field) {
 
 function describeGapsFilter(filter) {
   const parts = [];
-  if (filter.status) parts.push(`status=${filter.status}`);
-  if (filter.q) parts.push(`q="${filter.q}"`);
+  if (filter.status)   parts.push(`status=${filter.status}`);
+  if (filter.q)        parts.push(`q="${filter.q}"`);
+  if (filter.severity) parts.push(`severity=${filter.severity}`);
+  if (filter.category) parts.push(`category=${filter.category}`);
+  if (filter.actor)    parts.push(`actor=${filter.actor}`);
   return parts.length ? parts.join(", ") : "all gaps";
 }
 

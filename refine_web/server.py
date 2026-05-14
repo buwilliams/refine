@@ -40,12 +40,17 @@ def _h_dashboard(_h, _m, _b, _q):
 
 @route("GET", r"/api/gaps")
 def _h_list_gaps(_h, _m, _b, q):
+    facets = _get_one(q, "facets")
     return api.list_gaps(
         status=_get_one(q, "status"),
         q=_get_one(q, "q"),
+        severity=_get_one(q, "severity"),
+        category=_get_one(q, "category"),
+        actor=_get_one(q, "actor"),
         limit=int(_get_one(q, "limit", "200")),
         sort=_get_one(q, "sort"),
         direction=_get_one(q, "dir"),
+        include_facets=bool(facets and facets != "0"),
     )
 
 
