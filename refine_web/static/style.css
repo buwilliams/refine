@@ -210,6 +210,24 @@ h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
 .settings-pane { display: none; }
 .settings-pane.active { display: block; }
 
+/* Worker role pill — Agents screen's "Currently running" table now
+   shows both kinds of workers (agent subprocess + merger). The pill
+   sits in front of the Gap link so users can tell at a glance which
+   worker is acting on each row. */
+.role-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  margin-right: 8px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+.role-pill.agent  { background: #fff4d0; color: #875e00; }
+.role-pill.merger { background: #ffeac2; color: #7a4500; }
+.merger-row td:last-child { color: var(--muted); }
+
 /* Feature-flag matrix on Settings. Inline toggle + override badge,
    rendered inside table cells; .feature-current-col highlights the
    active provider's column so the operator can spot at a glance
