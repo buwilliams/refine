@@ -673,6 +673,7 @@ async function renderGapsList() {
         </select>
         <span class="spacer"></span>
         <span id="gaps-count" class="muted small"></span>
+        <span id="gaps-filtered" class="filter-pill" hidden>Filtered</span>
         <button class="secondary" id="gaps-clear">Clear filters</button>
       </div>
       <div class="filter-row filter-row-bulk">
@@ -795,6 +796,7 @@ async function refreshGapsTable() {
     if (countEl) {
       countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
     }
+    applyGapsFilterIndicator(f);
     drawGapsTable(gaps, {
       q: f.q, status: f.status,
       sort: f.effectiveSort, dir: f.effectiveDir,
@@ -945,6 +947,32 @@ async function openBulkModal(field) {
   } catch (e) {
     toast(`Bulk update failed: ${e.message}`, "error");
   }
+}
+
+// Highlight each non-default Gaps filter control with the accent
+// border + show the "Filtered" pill next to the count when any filter
+// is active. Called after every table refresh.
+function applyGapsFilterIndicator(f) {
+  const active = {
+    "search": !!f.q,
+    "filter-status": !!f.status,
+    "filter-reporter": !!f.reporter,
+    "gaps-severity": !!f.severity,
+    "gaps-category": !!f.category,
+    "gaps-actor": !!f.actor,
+    "gaps-limit": f.limit !== GAPS_DEFAULT_LIMIT,
+  };
+  let anyActive = false;
+  for (const [id, on] of Object.entries(active)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.classList.toggle("filter-active", on);
+    if (on) anyActive = true;
+  }
+  const pill = $("#gaps-filtered");
+  if (pill) pill.hidden = !anyActive;
+  const tbl = $("#gaps-table");
+  if (tbl) tbl.classList.toggle("results-filtered", anyActive);
 }
 
 function describeGapsFilter(filter) {
@@ -2328,6 +2356,7 @@ async function renderLogs() {
         </select>
         <span class="spacer"></span>
         <span id="logs-count" class="muted small"></span>
+        <span id="logs-filtered" class="filter-pill" hidden>Filtered</span>
         <button class="secondary" id="logs-clear">Clear filters</button>
       </div>
     </div>
@@ -2396,12 +2425,36 @@ function drawLogsList(data, f) {
   if (countEl) {
     countEl.textContent = `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`;
   }
+  applyLogsFilterIndicator(f);
   const root = $("#logs-list");
   if (!entries.length) {
     root.innerHTML = `<p class="muted">No log entries match the current filters.</p>`;
     return;
   }
   root.innerHTML = renderActivityList(entries);
+}
+
+// Mirror of applyGapsFilterIndicator for the Logs screen.
+function applyLogsFilterIndicator(f) {
+  const active = {
+    "logs-q": !!f.q,
+    "logs-gap-id": !!f.gap_id,
+    "logs-severity": !!f.severity,
+    "logs-category": !!f.category,
+    "logs-actor": !!f.actor,
+    "logs-limit": f.limit !== 100,
+  };
+  let anyActive = false;
+  for (const [id, on] of Object.entries(active)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.classList.toggle("filter-active", on);
+    if (on) anyActive = true;
+  }
+  const pill = $("#logs-filtered");
+  if (pill) pill.hidden = !anyActive;
+  const list = $("#logs-list");
+  if (list) list.classList.toggle("results-filtered", anyActive);
 }
 
 // ---- Settings ---------------------------------------------------------------

@@ -307,6 +307,49 @@ select {
   gap: 8px;
   margin-bottom: 14px;
 }
+/* When a filter control has a non-default value, give it an accent
+   border + subtle background so the user can tell at a glance which
+   filters are active. Applied by JS after each refresh. */
+.filter-bar input.filter-active,
+.filter-bar select.filter-active {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: 0 0 0 1px var(--accent-bg);
+}
+/* "Filtered" pill that appears next to the entry count when any
+   filter is non-default. */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border-radius: 999px;
+  margin-left: 6px;
+}
+.filter-pill[hidden] { display: none; }
+
+/* Accent the results container itself when filters are active, so the
+   "you're looking at a filtered subset" cue isn't only in the filter
+   bar — it travels with the data. Left-edge accent stripe + a faint
+   accent tint on the table header. */
+.results-filtered {
+  position: relative;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--accent-bg), transparent 60px);
+}
+.results-filtered .table thead tr {
+  background: var(--accent-bg);
+}
+.results-filtered .table thead th {
+  color: var(--accent);
+}
 .filter-row {
   display: flex;
   gap: 8px;
