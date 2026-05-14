@@ -272,22 +272,18 @@ class Dispatcher:
         success = outcome.kind == "success"
 
         # Failure path: move straight to `failed` and we're done.
-        # Success path: keep the Gap in `in-progress` so the UI shows
-        # a single uninterrupted "still working" state through auto-
-        # verify (fetch + merge + push, including any auto-resolve of
-        # merge conflicts that might run for minutes). The Gap only
-        # leaves `in-progress` when verify either lands it in `done`
-        # (clean merge committed and pushed) or kicks it back to
-        # `review` for human resolution. Without this, the Gap would
-        # briefly flash `review` while a long-running conflict
-        # resolver was actively still working on it.
-        if not success:
-            with db.transaction(conn):
-                conn.execute(
-                    "UPDATE gaps_index SET status = 'failed', updated = ? "
-                    "WHERE id = ?",
-                    (now_iso(), gap_id),
-                )
+        # Success path: transition to `ready-merge`. That's the
+        # system-owned status — picked up by the Merger, never set or
+        # cleared by the user. The dispatcher owns the
+        # `in-progress -> ready-merge` flip; the merger owns
+        # `ready-merge -> done` (clean verify) and
+        # `ready-merge -> review` (verify needed human attention).
+        next_status = "ready-merge" if success else "failed"
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
+                (next_status, now_iso(), gap_id),
+            )
 
         try:
             gap_writer.append_round_log(
@@ -313,10 +309,11 @@ class Dispatcher:
 
         # Auto-verify is owned by the Merger now — a single-threaded
         # worker that serializes every operation on the host worktree.
-        # We just signal "a Gap is ready to merge" so the merger scans
-        # promptly instead of waiting on its periodic tick. The Gap
-        # stays in `in-progress` until the merger lands it in `done`
-        # or punts it to `review`.
+        # The dispatcher just flipped the Gap to `ready-merge`; tell
+        # the merger to scan promptly instead of waiting on its
+        # periodic tick. The Gap stays in `ready-merge` until the
+        # merger lands it in `done` (clean verify) or punts it to
+        # `review` (verify needed human attention).
         if success and self.on_run_finished is not None:
             try:
                 self.on_run_finished(gap_id)

@@ -553,7 +553,7 @@ function drawDashboard(d) {
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
-  const orderedStatuses = ["backlog", "todo", "in-progress", "review", "done", "failed", "cancelled"];
+  const orderedStatuses = ["backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled"];
   const dash = $("#dash");
   dash.innerHTML = `
     ${needsAttention.length ? `
@@ -703,7 +703,7 @@ async function renderGapsList() {
       </div>
       <div class="filter-row filter-row-activity">
         <select id="filter-status">
-          ${["", "backlog", "todo", "in-progress", "review", "done", "failed", "cancelled"]
+          ${["", "backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled"]
             .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
         </select>
         <select id="filter-reporter">
@@ -1028,7 +1028,7 @@ function _updateSelectAllState(gaps) {
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
 const BULK_STATUS_OPTIONS = [
-  "backlog", "todo", "in-progress", "review", "done", "failed", "cancelled",
+  "backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled",
 ];
 
 async function openBulkModal(field) {
@@ -1251,25 +1251,28 @@ async function loadGapDetail(gapId) {
 }
 
 // User-driven workflow transitions for a Gap. Each state declares its
-// `back` and `forward` neighbors; `in-progress` has neither because the
-// dispatcher owns that state (agent picks up todo → in-progress → review
-// automatically). Forward from `review` goes through the dedicated
-// /verify endpoint (real git merge + push); every other transition is a
-// status PATCH with no workflow side effects.
+// `back` and `forward` neighbors. Two states have no user buttons —
+// `in-progress` (dispatcher owns) and `ready-merge` (merger owns) —
+// because they're system-driven phases the agent passes through
+// automatically (todo → in-progress → ready-merge → done | review).
+// Forward from `review` goes through the dedicated /verify endpoint
+// (real git merge + push); every other transition is a status PATCH
+// with no workflow side effects.
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
 // from done). Use back to send the Gap back to todo and rerun.
 const GAP_WORKFLOW = {
-  backlog:   { forward: { label: "Todo →",     next: "todo"   } },
-  todo:      { back:    { label: "← Backlog",  next: "backlog" },
-               forward: { label: "Review →",   next: "review" } },
-  // in-progress: no user buttons — dispatcher transitions in and out.
-  review:    { back:    { label: "← Todo",     next: "todo"   },
-               forward: { label: "Verify →",   next: "done", verify: true } },
-  done:      { back:    { label: "← Review",   next: "review" } },
-  failed:    { back:    { label: "← Todo",     next: "todo"   } },
-  cancelled: { back:    { label: "← Todo",     next: "todo"   } },
+  backlog:      { forward: { label: "Todo →",     next: "todo"   } },
+  todo:         { back:    { label: "← Backlog",  next: "backlog" },
+                  forward: { label: "Review →",   next: "review" } },
+  // in-progress: no user buttons — dispatcher owns.
+  // ready-merge: no user buttons — merger owns.
+  review:       { back:    { label: "← Todo",     next: "todo"   },
+                  forward: { label: "Verify →",   next: "done", verify: true } },
+  done:         { back:    { label: "← Review",   next: "review" } },
+  failed:       { back:    { label: "← Todo",     next: "todo"   } },
+  cancelled:    { back:    { label: "← Todo",     next: "todo"   } },
 };
 
 function drawGapDetail(gap) {
@@ -2229,7 +2232,7 @@ function renderMergerCard(m, paused) {
             <td class="js-elapsed-tick"
                 data-base="${m.elapsed_seconds || 0}"
                 data-anchor-ms="${anchorMs}">${fmtElapsed(m.elapsed_seconds || 0)}</td>
-            <td><span class="status-pill in-progress">merging</span></td>
+            <td><span class="status-pill ready-merge">merging</span></td>
           </tr>
         </tbody>
       </table>

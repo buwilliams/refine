@@ -40,7 +40,8 @@ def _conn() -> sqlite3.Connection:
 
 _VALID_PRIORITIES = ("low", "medium", "high")
 _VALID_STATUSES = (
-    "backlog", "todo", "in-progress", "review", "done", "failed", "cancelled",
+    "backlog", "todo", "in-progress", "ready-merge",
+    "review", "done", "failed", "cancelled",
 )
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
@@ -883,7 +884,7 @@ def dashboard_summary() -> tuple[int, dict]:
     }
 
 
-_ACTIVE_STATUSES = ("todo", "in-progress", "review")
+_ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "review")
 
 
 def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]:

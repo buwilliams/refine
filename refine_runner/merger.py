@@ -22,10 +22,10 @@ problems it solves:
 
 Status semantics:
 
-- A Gap whose agent succeeded stays in `in-progress` (dispatcher
-  doesn't transition it). The merger's `_find_one_ready()` query
-  picks up any `in-progress` Gap that isn't actively running a
-  subprocess — that's the "agent done, awaiting merge" set.
+- A Gap whose agent succeeded transitions to `ready-merge` (the
+  dispatcher owns that flip). `ready-merge` is system-owned: the
+  user never sets or clears it. The merger's `_find_one_ready()`
+  query picks up any `ready-merge` Gap, oldest-finished first.
 - The merger calls `verify_op.perform_verify`. On success, verify
   transitions the Gap to `done`. On failure, the merger transitions
   the Gap to `review` so the operator has a recovery path, and
@@ -33,8 +33,9 @@ Status semantics:
 
 On runner restart, `recovery.reconcile_on_start` distinguishes "agent
 crashed mid-run" (orphan → `failed`) from "agent finished, awaiting
-merge" (leave in-progress; merger picks up). The merger's first tick
-after start drains anything that piled up.
+merge" (was already `ready-merge`, or now bumped to it from
+`in-progress` if the dispatcher crashed mid-flip). The merger's
+first tick after start drains anything that piled up.
 """
 from __future__ import annotations
 
@@ -108,15 +109,15 @@ class Merger:
             last = self._last_outcome
         elapsed = (int(time.monotonic() - started)
                    if started is not None else 0)
-        # Queue depth: in-progress Gaps with no live subprocess, minus
-        # the one currently merging (if any).
+        # Queue depth: `ready-merge` Gaps waiting on the merger, minus
+        # the one currently merging (if any). `ready-merge` is
+        # system-owned and only ever set by the dispatcher after a
+        # successful agent run, so the count is the merge backlog.
         queued = 0
         for row in self._get_conn().execute(
-            "SELECT id FROM gaps_index WHERE status = 'in-progress'"
+            "SELECT id FROM gaps_index WHERE status = 'ready-merge'"
         ):
             gid = row["id"]
-            if self._sub_mgr.is_running(gid):
-                continue
             if gid == gap_id:
                 continue
             queued += 1
@@ -198,19 +199,13 @@ class Merger:
             self._wake.set()
 
     def _find_one_ready(self) -> str | None:
-        """An `in-progress` Gap with no live subprocess is one whose
-        agent has finished and is awaiting merge. Process oldest-
-        finished first (FIFO) so Gaps don't starve."""
-        rows = self._get_conn().execute(
-            "SELECT id FROM gaps_index WHERE status = 'in-progress' "
-            "ORDER BY updated ASC"
-        ).fetchall()
-        for row in rows:
-            gid = row["id"]
-            if self._sub_mgr.is_running(gid):
-                continue
-            return gid
-        return None
+        """`ready-merge` Gaps are waiting on the merger. Process
+        oldest-flipped first (FIFO) so Gaps don't starve."""
+        row = self._get_conn().execute(
+            "SELECT id FROM gaps_index WHERE status = 'ready-merge' "
+            "ORDER BY updated ASC LIMIT 1"
+        ).fetchone()
+        return row["id"] if row else None
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()
@@ -250,7 +245,7 @@ class Merger:
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
-        if row and row["status"] == "in-progress":
+        if row and row["status"] == "ready-merge":
             with db.transaction(conn):
                 conn.execute(
                     "UPDATE gaps_index SET status = 'review', updated = ? "

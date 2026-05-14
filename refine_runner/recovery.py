@@ -22,17 +22,20 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
 
     Two possibilities for a Gap left in `in-progress` across a restart:
 
-    - The agent finished successfully and the Gap was queued for the
-      merger (which then crashed/restarted). Its latest run has
+    - The agent finished successfully but the dispatcher crashed
+      before flipping to `ready-merge`. Its latest run has
       `finished_at` set, `status='finished'`, no `failure_category`.
-      Leave the Gap in-progress; the merger picks it up on its first
-      tick after startup.
+      Promote the Gap to `ready-merge` so the merger picks it up on
+      its first tick after startup.
 
     - The agent was actively running and got killed by the restart
       (or it never even finished spawning). The latest run is either
       missing, still has `finished_at IS NULL`, or has a failure
       category. Mark the Gap `failed` per spec — the operator can
       Retry once the underlying issue is resolved.
+
+    `ready-merge` Gaps that survived the restart are already in the
+    correct state — leave them; the merger picks them up.
 
     Returns count moved to `failed`.
     """
@@ -49,14 +52,21 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
         ).fetchone()
         round_idx = rrow["round_idx"] if rrow else 0
 
-        # Awaiting-merge case — leave the Gap; the merger will resume.
+        # Awaiting-merge case — bump to `ready-merge` so the merger
+        # picks the Gap up on its first tick after startup.
         if (rrow and rrow["finished_at"]
                 and rrow["status"] == "finished"
                 and not rrow["failure_category"]):
+            with db.transaction(conn):
+                conn.execute(
+                    "UPDATE gaps_index SET status = 'ready-merge', "
+                    "updated = ? WHERE id = ?",
+                    (now_iso(), gid),
+                )
             activity.append(
                 conn,
                 message="Runner restarted while Gap was awaiting merge — "
-                        "resuming via merger",
+                        "promoted to ready-merge for the merger",
                 severity="info", category="state",
                 gap_id=gid, actor="runner",
             )

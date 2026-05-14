@@ -183,6 +183,7 @@ h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
 .status-pill.backlog     { background: #f4eef8; color: #6e478a; }
 .status-pill.todo        { background: #eef0f4; color: #4a5060; }
 .status-pill.in-progress { background: #fff4d0; color: #875e00; }
+.status-pill.ready-merge { background: #ffeac2; color: #7a4500; }
 .status-pill.review      { background: #e8f1ff; color: #0050a0; }
 .status-pill.done        { background: #e7f5ec; color: #1f6b3a; }
 .status-pill.failed      { background: #fdecea; color: #b3261e; }

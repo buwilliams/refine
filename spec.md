@@ -51,7 +51,7 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 |------------|----------|------------------------------------------------------------------|
 | `id`       | string   | ULID. Used for hash sharding and as primary key in SQLite.        |
 | `name`     | string   | LLM-generated from the first round and any original import text.  |
-| `status`   | enum     | Happy path: `todo` → `in-progress` → `review` → `done`. Failure: `in-progress` → `failed` → `todo`. Any non-terminal status → `cancelled`. |
+| `status`   | enum     | Happy path: `todo` → `in-progress` → `ready-merge` → `done`. Auto-merge needs human attention: `ready-merge` → `review` → `done`. Failure: `in-progress` → `failed` → `todo`. Any non-terminal status → `cancelled`. |
 | `rounds`    | array    | Human-submitted; runner appends `logs[]` entries as the agent runs. |
 | `created`  | datetime | UTC.                                                              |
 | `updated`  | datetime | UTC.                                                              |
@@ -88,21 +88,24 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 |----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `todo`         | Gap has a latest round that needs an agent run (initial submission, retry after failure, or follow-up after verification). Awaiting an available subprocess slot.        |
 | `in-progress`  | A CLI subprocess is running for the Gap. Its branch + worktree exist.                                                                                                     |
-| `review`       | Agent has finished the latest round. Changes sit on the Gap's branch. Human **manually tests** the change, then either Verifies (→ `done`) or submits a new round (→ `todo`). |
-| `done`         | Human has verified. Refine has merged the Gap's branch into the client repo's current branch and pushed upstream. Terminal.                                              |
+| `ready-merge`  | Agent run finished successfully. Gap is queued for the Merger — a single-threaded worker that owns the host worktree and processes merges one at a time. System-owned: the user never sets or clears this status. |
+| `review`       | Auto-merge couldn't complete (real conflict, push race, dirty working copy). Human **manually tests** the change, then either Verifies (→ `done`) or submits a new round (→ `todo`). |
+| `done`         | Refine has merged the Gap's branch into the client repo's current branch and pushed upstream. Terminal.                                                                                                          |
 | `failed`       | The agent run did not produce a successful result — errored, hit the idle timeout, exceeded the hard cap, exited with no commits, or was reconciled by a runner restart. Worktree and branch retained for a Retry. |
 | `cancelled`    | User cancelled the Gap. Worktree and branch cleaned up. Terminal.                                                                                                         |
 
 Transitions:
 - `todo → in-progress` — automatic when refine launches an agent subprocess for the Gap.
-- `in-progress → review` — automatic on successful agent completion.
+- `in-progress → ready-merge` — automatic on successful agent completion. The Gap joins the merger's queue.
 - `in-progress → failed` — automatic on agent error, idle timeout, hard cap, exit-0-with-no-commits, or runner-restart reconciliation.
+- `ready-merge → done` — automatic when the Merger successfully completes verify (fetch → pull → merge → push, including any auto-resolve of merge conflicts).
+- `ready-merge → review` — automatic when verify can't complete cleanly (real conflict the auto-resolver couldn't fix, push race, dirty working copy). Surfaces for human attention.
 - `failed → todo` — explicit user action ("Retry"). The worktree and branch are reused. **Blocked** if a prior `category: auth` failure remains unresolved — see Failure handling → Retry pre-flight.
-- `review → done` — explicit user action ("Verify"). Refine performs the merge and push as part of the transition.
+- `review → done` — explicit user action ("Verify"). Routes through the Merger so it can't race with an auto-merge.
 - `review → todo` — explicit user action; triggered by appending a new round (human submitting follow-up work). The branch is retained.
 - any non-terminal status → `cancelled` — explicit user action ("Cancel"). For `in-progress`, refine kills the CLI subprocess first. Worktree and branch are cleaned up.
 
-Back-and-forth between human and agent loops through `review → todo → in-progress → review` until the human verifies.
+Back-and-forth between human and agent loops through `review → todo → in-progress → ready-merge → review` (or `done`) until the merge completes cleanly.
 
 ## Reporters
 
