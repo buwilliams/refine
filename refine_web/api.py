@@ -50,6 +50,7 @@ _GAPS_SORT_EXPRESSIONS: dict[str, str] = {
     "name":     "name COLLATE NOCASE",
     "status":   "status",
     "priority": "CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END",
+    "reporter": "reporter COLLATE NOCASE",
     "updated":  "updated",
     "created":  "created",
     "id":       "id",
@@ -59,6 +60,7 @@ _GAPS_DEFAULT_DIR: dict[str, str] = {
     "name":     "ASC",
     "status":   "ASC",
     "priority": "ASC",   # CASE maps high=0, so ASC = high first
+    "reporter": "ASC",
     "updated":  "DESC",
     "created":  "DESC",
     "id":       "DESC",
@@ -89,11 +91,15 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
               direction: str | None = None,
               include_facets: bool = False) -> tuple[int, dict]:
     """List Gaps. `severity` / `category` / `actor` filter to Gaps that
-    have at least one activity entry matching. `reporter` filters to
-    Gaps whose *latest round's* reporter is X — same attribution rule
-    the dashboard's Reporter stats uses.
+    have at least one activity entry matching. `reporter` filters by
+    the indexed `gaps_index.reporter` column, which the runner keeps in
+    sync with the latest round's reporter on every write.
     """
-    sql = ["SELECT id, name, status, priority, created, updated, branch_name FROM gaps_index"]
+    sql = [
+        "SELECT id, name, status, priority, reporter, "
+        "created, updated, branch_name "
+        "FROM gaps_index"
+    ]
     args: list[Any] = []
     where: list[str] = []
     if status:
@@ -103,6 +109,9 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         where.append("(name LIKE ? OR id LIKE ?)")
         like = f"%{q}%"
         args.extend([like, like])
+    if reporter:
+        where.append("reporter = ?")
+        args.append(reporter)
     # Activity-derived filters: gap must have at least one matching entry.
     if severity or category or actor:
         sub_where = ["gap_id IS NOT NULL"]
@@ -124,11 +133,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     if where:
         sql.append("WHERE " + " AND ".join(where))
     sql.append("ORDER BY " + _gaps_order_clause(sort, direction) + " LIMIT ?")
-    # Reporter is a JSON-side filter (lives on the latest round), so we
-    # over-fetch and post-filter in Python below. Cap the over-fetch so
-    # a rare reporter on a large index doesn't fall through completely.
-    sql_limit = max(limit * 10, 2000) if reporter else limit
-    args.append(sql_limit)
+    args.append(limit)
     conn = _conn()
     try:
         rows = [dict(r) for r in conn.execute(" ".join(sql), args)]
@@ -145,31 +150,10 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     # the candidate id set.
     if q and len(rows) < limit and not (severity or category or actor or reporter):
         rows = _augment_with_round_search(rows, q, limit)
-    if reporter:
-        rows = _filter_by_reporter(rows, reporter, limit)
     body: dict = {"gaps": rows}
     if facets is not None:
         body["facets"] = facets
     return 200, body
-
-
-def _filter_by_reporter(rows: list[dict], reporter: str,
-                         limit: int) -> list[dict]:
-    """Keep only Gaps whose latest round was filed by `reporter`. Uses
-    the same attribution rule as `_compute_reporter_stats`."""
-    keep: list[dict] = []
-    for row in rows:
-        gap = shared_gaps.read_gap_json(row["id"])
-        if not gap:
-            continue
-        rounds = gap.get("rounds") or []
-        if not rounds:
-            continue
-        if (rounds[-1].get("reporter") or "").strip() == reporter:
-            keep.append(row)
-            if len(keep) >= limit:
-                break
-    return keep
 
 
 def _augment_with_round_search(initial: list[dict], q: str,
@@ -828,15 +812,19 @@ def dashboard_summary() -> tuple[int, dict]:
         } if pf else None)
         # latest activity (top of feed)
         feed = activity.recent(conn, limit=50)
-        # Per-reporter stats: attribute each gap to the reporter of its
-        # most recent round, then bucket by gap status.
-        index_rows = conn.execute(
-            "SELECT id, status FROM gaps_index"
+        # Per-reporter stats: the runner mirrors the latest round's
+        # reporter onto `gaps_index.reporter`, so the SQL aggregation
+        # gives us exact counts without reading every gap.json.
+        stat_rows = conn.execute(
+            "SELECT reporter, status, COUNT(*) AS n "
+            "FROM gaps_index "
+            "WHERE reporter != '' "
+            "GROUP BY reporter, status"
         ).fetchall()
         known_reporters = [r["name"] for r in reporters.list_all(conn)]
     finally:
         conn.close()
-    reporter_stats = _compute_reporter_stats(index_rows, known_reporters)
+    reporter_stats = _compute_reporter_stats(stat_rows, known_reporters)
     runner_reachable = get_client().is_reachable()
     return 200, {
         "counts": counts,
@@ -853,29 +841,26 @@ def dashboard_summary() -> tuple[int, dict]:
 _ACTIVE_STATUSES = ("todo", "in-progress", "review")
 
 
-def _compute_reporter_stats(index_rows, known_reporters: list[str]) -> list[dict]:
+def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]:
+    """Build `reporter_stats` from the pre-aggregated (reporter, status,
+    count) rows produced by the dashboard query. Seeds every known
+    reporter (so inactive ones show as zeroes), then folds in any
+    historical reporters that appear on Gaps but aren't in the table."""
     def _empty(name: str) -> dict:
         return {"reporter": name, "active": 0, "done": 0,
                 "reported": 0, "completion_rate": 0.0}
 
     by_reporter: dict[str, dict] = {n: _empty(n) for n in known_reporters}
-    for row in index_rows:
-        gap = shared_gaps.read_gap_json(row["id"])
-        if not gap:
-            continue
-        rounds = gap.get("rounds") or []
-        if not rounds:
-            continue
-        reporter = (rounds[-1].get("reporter") or "").strip()
-        if not reporter:
-            continue
+    for row in stat_rows:
+        reporter = row["reporter"]
         bucket = by_reporter.setdefault(reporter, _empty(reporter))
-        bucket["reported"] += 1
+        n = row["n"]
+        bucket["reported"] += n
         status = row["status"]
         if status in _ACTIVE_STATUSES:
-            bucket["active"] += 1
+            bucket["active"] += n
         elif status == "done":
-            bucket["done"] += 1
+            bucket["done"] += n
     out = list(by_reporter.values())
     for b in out:
         b["completion_rate"] = (

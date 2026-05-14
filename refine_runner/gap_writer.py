@@ -128,16 +128,29 @@ def rename_reporter_in_rounds(conn, old_name: str, new_name: str) -> int:
             if gap is None:
                 continue
             changed = False
+            latest_changed = False
             now = now_iso()
-            for r in gap.get("rounds") or []:
+            rounds = gap.get("rounds") or []
+            for idx, r in enumerate(rounds):
                 if r.get("reporter") == old_name:
                     r["reporter"] = new_name
                     r["updated"] = now
                     changed = True
+                    if idx == len(rounds) - 1:
+                        latest_changed = True
             if changed:
                 gap["updated"] = now
                 shared_gaps.write_gap_json(gap)
                 touched += 1
+                # Mirror the rename onto the index `reporter` column when
+                # it's the latest round that changed — the column tracks
+                # the latest-round attribution. Older-round renames don't
+                # affect the current attribution.
+                if latest_changed:
+                    conn.execute(
+                        "UPDATE gaps_index SET reporter = ? WHERE id = ?",
+                        (new_name, gap_id),
+                    )
     return touched
 
 

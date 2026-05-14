@@ -459,6 +459,12 @@ function navigate() {
     location.hash = "#/";
     return;
   }
+  // Leaving the Gaps list forgets per-row bulk deselections on purpose —
+  // a fresh visit starts with everything selected again.
+  const prevRoute = state.currentRoute;
+  if (prevRoute === "gaps" && r.route !== "gaps") {
+    gapsExcludedIds.clear();
+  }
   state.currentRoute = r.route;
   state.currentGap = r.id || null;
   highlightNav(r.route);
@@ -615,7 +621,7 @@ function renderActivityList(entries) {
 
 const GAPS_DEFAULT_DIR = {
   name: "asc", status: "asc", priority: "asc",
-  updated: "desc", id: "desc",
+  reporter: "asc", updated: "desc", id: "desc",
 };
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
@@ -688,8 +694,8 @@ async function renderGapsList() {
       </div>
       <div class="filter-row filter-row-bulk">
         <span class="muted small">Bulk update matching:</span>
-        <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-status">Status…</button>
+        <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
         <button class="secondary small" id="bulk-delete">Delete…</button>
       </div>
@@ -855,13 +861,16 @@ function drawGapsTable(gaps, state) {
     return;
   }
   const columns = [
-    { key: "name",     label: "Name"     },
-    { key: "status",   label: "Status"   },
-    { key: "priority", label: "Priority" },
-    { key: "updated",  label: "Updated"  },
-    { key: "id",       label: "ID"       },
+    { key: "name",     label: "Name",     sortable: true },
+    { key: "status",   label: "Status",   sortable: true },
+    { key: "priority", label: "Priority", sortable: true },
+    { key: "reporter", label: "Reporter", sortable: true },
+    { key: "updated",  label: "Updated",  sortable: true },
   ];
   const sortHeads = columns.map((c) => {
+    if (!c.sortable) {
+      return `<th>${c.label}</th>`;
+    }
     const isActive = c.key === state.sort;
     const arrow = isActive
       ? (state.dir === "asc" ? "↑" : "↓")
@@ -896,8 +905,8 @@ function drawGapsTable(gaps, state) {
             <td>${htmlEscape(g.name)}</td>
             <td><span class="status-pill ${g.status}">${g.status}</span></td>
             <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
+            <td class="muted small">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
             <td class="muted small">${fmtTime(g.updated)}</td>
-            <td class="muted small"><code>${g.id.slice(0,10)}…</code></td>
           </tr>`;
         }).join("")}
       </tbody>

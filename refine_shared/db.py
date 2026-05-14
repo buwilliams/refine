@@ -21,15 +21,16 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     name        TEXT NOT NULL,
     status      TEXT NOT NULL,
     priority    TEXT NOT NULL DEFAULT 'low',
+    reporter    TEXT NOT NULL DEFAULT '',
     created     TEXT NOT NULL,
     updated     TEXT NOT NULL,
     branch_name TEXT,
     json_path   TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_gaps_status  ON gaps_index(status);
-CREATE INDEX IF NOT EXISTS idx_gaps_updated ON gaps_index(updated);
--- idx_gaps_priority is created in _migrate() after the ALTER TABLE step,
--- so it works on databases that predate the priority column.
+CREATE INDEX IF NOT EXISTS idx_gaps_status   ON gaps_index(status);
+CREATE INDEX IF NOT EXISTS idx_gaps_updated  ON gaps_index(updated);
+-- idx_gaps_priority + idx_gaps_reporter are created in _migrate() after
+-- their respective ALTER TABLE steps so older databases pick them up.
 
 CREATE TABLE IF NOT EXISTS runs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -133,12 +134,44 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE gaps_index ADD COLUMN priority TEXT NOT NULL DEFAULT 'low'"
         )
-    # Always (re-)assert the index. CREATE INDEX IF NOT EXISTS is a no-op on
+    if "reporter" not in cols:
+        conn.execute(
+            "ALTER TABLE gaps_index ADD COLUMN reporter TEXT NOT NULL DEFAULT ''"
+        )
+        _backfill_reporter(conn)
+    # Always (re-)assert indexes. CREATE INDEX IF NOT EXISTS is a no-op on
     # fresh databases (just after the executescript built the table) and on
     # already-migrated ones — so this is safe to run unconditionally.
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_priority ON gaps_index(priority)"
     )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gaps_reporter ON gaps_index(reporter)"
+    )
+
+
+def _backfill_reporter(conn: sqlite3.Connection) -> None:
+    """One-time backfill: read each Gap's gap.json and copy the latest
+    round's reporter into the new index column. Runs inside `_migrate`
+    immediately after the column is added, so the column is empty on
+    every existing row at the time of call."""
+    # Import lazily to avoid a circular import: gaps -> db (paths/sqlite_path).
+    from . import gaps as shared_gaps
+    rows = conn.execute("SELECT id FROM gaps_index").fetchall()
+    for row in rows:
+        gap_id = row["id"]
+        gap = shared_gaps.read_gap_json(gap_id)
+        if not gap:
+            continue
+        rounds = gap.get("rounds") or []
+        if not rounds:
+            continue
+        rep = (rounds[-1].get("reporter") or "").strip()
+        if rep:
+            conn.execute(
+                "UPDATE gaps_index SET reporter = ? WHERE id = ?",
+                (rep, gap_id),
+            )
 
 
 @contextmanager

@@ -172,10 +172,11 @@ class Runner:
         from refine_shared.paths import relative_gap_path
         with db.transaction(self._conn):
             self._conn.execute(
-                "INSERT INTO gaps_index (id, name, status, priority, created, updated, json_path) "
-                "VALUES (?, ?, 'todo', ?, ?, ?, ?)",
-                (gap_id, name, priority, gap["created"], gap["updated"],
-                 relative_gap_path(gap_id)),
+                "INSERT INTO gaps_index "
+                "(id, name, status, priority, reporter, created, updated, json_path) "
+                "VALUES (?, ?, 'todo', ?, ?, ?, ?, ?)",
+                (gap_id, name, priority, params["reporter"],
+                 gap["created"], gap["updated"], relative_gap_path(gap_id)),
             )
         # ensure reporter exists in dropdown list
         try:
@@ -197,11 +198,14 @@ class Runner:
             target=params.get("target", ""),
         )
         gap = gap_writer.append_round(gap_id, round_obj)
-        # review → todo (or todo if currently failed/review/done; webapp guards this)
+        # review → todo (or todo if currently failed/review/done; webapp guards this).
+        # The new round's reporter is now the latest, so mirror that onto
+        # the index column.
         with db.transaction(self._conn):
             self._conn.execute(
-                "UPDATE gaps_index SET status = 'todo', updated = ? WHERE id = ?",
-                (now_iso(), gap_id),
+                "UPDATE gaps_index SET status = 'todo', reporter = ?, updated = ? "
+                "WHERE id = ?",
+                (params["reporter"], now_iso(), gap_id),
             )
         try:
             reporters.add(self._conn, params["reporter"])
@@ -221,6 +225,15 @@ class Runner:
             target=params.get("target"),
             reporter=params.get("reporter"),
         )
+        # Keep the index reporter in sync with the latest round when the
+        # reporter was actually changed by this edit. (None means "leave
+        # it alone" in `edit_latest_round`.)
+        if params.get("reporter") is not None:
+            with db.transaction(self._conn):
+                self._conn.execute(
+                    "UPDATE gaps_index SET reporter = ? WHERE id = ?",
+                    (params["reporter"], params["gap_id"]),
+                )
         return {"gap": gap}
 
     def _h_log_append(self, params: dict) -> dict:
