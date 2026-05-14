@@ -32,21 +32,100 @@ from pathlib import Path
 from typing import Callable, Deque
 
 
+# Env vars that, if set, would make `claude` use API-key auth or otherwise
+# diverge from the host CLI's OAuth login. Strip all of them before spawn so
+# chat behaves exactly like the user's interactive `claude` in a clean
+# terminal — which uses the credentials persisted by `claude login`.
+_AUTH_OVERRIDE_VARS = (
+    # API-key family
+    "ANTHROPIC_API_KEY",
+    "CLAUDE_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    # Endpoint redirects that would aim a valid key at the wrong service
+    "ANTHROPIC_BASE_URL",
+    "ANTHROPIC_VERSION",
+    # Alternate cloud providers — force the user's Anthropic OAuth login
+    "CLAUDE_CODE_USE_BEDROCK",
+    "CLAUDE_CODE_USE_VERTEX",
+    # Inherited Claude-Code-agent context that would make claude treat the
+    # subprocess as part of *another* session's auth context
+    "CLAUDECODE",
+    "CLAUDE_CODE_ENTRYPOINT",
+    "CLAUDE_CODE_SESSION_ID",
+    "CLAUDE_CODE_EXECPATH",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS",
+    "AI_AGENT",
+    "CLAUDE_EFFORT",
+)
+
+
+_login_path_cache: str | None = None
+_login_path_resolved = False
+
+
+def _user_login_path() -> str | None:
+    """Capture the PATH the user's interactive login shell sees.
+
+    The systemd --user manager runs the runner with a minimal PATH that
+    typically lacks `~/.local/bin`, `~/.npm-global/bin`, `/opt/homebrew/bin`,
+    and other host-specific bin dirs the user has set up — so
+    `shutil.which("claude")` lands on a stale system-wide binary (or
+    nothing) instead of the Claude Code CLI the user actually logged into.
+
+    Rather than hardcode any particular install location (which would
+    break on macOS, NixOS, asdf/mise setups, etc.), we ask the user's
+    login shell exactly once for its PATH. Whatever that shell prints is
+    what `claude` resolves against in interactive use — matching it makes
+    chat behave like the user's terminal.
+    """
+    global _login_path_cache, _login_path_resolved
+    if _login_path_resolved:
+        return _login_path_cache
+    _login_path_resolved = True
+    shell = os.environ.get("SHELL") or "/bin/bash"
+    try:
+        out = subprocess.run(
+            [shell, "-lc", "printf %s \"$PATH\""],
+            capture_output=True, text=True, timeout=5,
+        )
+    except Exception:
+        return None
+    path = (out.stdout or "").strip()
+    if out.returncode == 0 and path:
+        _login_path_cache = path
+    return _login_path_cache
+
+
 def _chat_env() -> dict[str, str]:
     """Build the environment chat subprocesses run with.
 
     Chat is supposed to behave like the host CLI `claude` the user runs in
-    a terminal — which means OAuth via `~/.claude/`, not an API key. If a
-    stale or invalid `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` leaks in from
-    the runner's process env, claude prefers that key and produces
-    "Invalid API key · Please run /login" instead of using the login the
-    user already has. Strip those vars so we always fall back to the
-    host's logged-in auth.
+    a clean terminal — which uses the OAuth login stored under
+    `~/.claude/`, not an API key. Any of `_AUTH_OVERRIDE_VARS` that leak in
+    from the runner's process env would derail that: a stale API key
+    yields "Invalid API key · Please run /login", a base-URL override
+    points the key at the wrong service, and the Claude-Code-agent
+    inheritance bits make claude believe it's running inside another
+    session. Strip all of them so we always fall through to the user's
+    logged-in auth.
+
+    We also override PATH with the user's interactive-login-shell PATH
+    (cached after the first call) so `shutil.which("claude")` resolves
+    to whatever binary the user's terminal would resolve — wherever they
+    happen to have it installed, on any OS.
     """
     env = os.environ.copy()
-    for key in ("ANTHROPIC_API_KEY", "CLAUDE_API_KEY"):
+    for key in _AUTH_OVERRIDE_VARS:
         env.pop(key, None)
+    login_path = _user_login_path()
+    if login_path:
+        env["PATH"] = login_path
     return env
+
+
+def _resolve_claude(env: dict[str, str]) -> str:
+    """Find the `claude` binary on the chat env's PATH, not the runner's."""
+    return shutil.which("claude", path=env.get("PATH")) or "claude"
 
 
 @dataclass
@@ -121,7 +200,8 @@ class ChatManager:
         the rest of the output (the user shouldn't see claude's reply to
         the priming itself)."""
         def runner() -> None:
-            claude = shutil.which("claude") or "claude"
+            env = _chat_env()
+            claude = _resolve_claude(env)
             args = [claude, "--print",
                     "--output-format=stream-json", "--verbose",
                     priming_text]
@@ -129,7 +209,7 @@ class ChatManager:
                 proc = subprocess.Popen(
                     args,
                     cwd=str(s.cwd),
-                    env=_chat_env(),
+                    env=env,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -192,7 +272,8 @@ class ChatManager:
             # Reject a second message while the previous one is still running.
             if s.proc is not None and s.proc.poll() is None:
                 return False
-            claude = shutil.which("claude") or "claude"
+            env = _chat_env()
+            claude = _resolve_claude(env)
             # `--output-format=stream-json` (with required `--verbose`) emits
             # structured events we parse in `_pump_output`, including the
             # `system init` event that carries claude's session id.
@@ -215,7 +296,7 @@ class ChatManager:
                 s.proc = subprocess.Popen(
                     args,
                     cwd=str(s.cwd),
-                    env=_chat_env(),
+                    env=env,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
