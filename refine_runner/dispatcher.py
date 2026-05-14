@@ -225,8 +225,9 @@ class Dispatcher:
             base_ref=base_commit,
             idle_window=idle,
             hard_cap=cap,
-            on_finished=lambda gid, code, reason: self._on_finished(
+            on_finished=lambda gid, code, reason, agent_ok: self._on_finished(
                 gid, round_idx, code, reason, base_commit,
+                agent_reported_success=agent_ok,
             ),
         )
 
@@ -249,7 +250,8 @@ class Dispatcher:
             )
 
     def _on_finished(self, gap_id: str, round_idx: int, exit_code: int,
-                     killed_reason: str | None, base_commit: str) -> None:
+                     killed_reason: str | None, base_commit: str,
+                     *, agent_reported_success: bool | None = None) -> None:
         conn = self.get_conn()
         cwd = git_ops.gap_worktree_path(gap_id)
         new_commits = git_ops.commits_on_branch_since(base_commit, cwd)
@@ -259,6 +261,7 @@ class Dispatcher:
             exit_code=exit_code,
             killed_reason=killed_reason,
             no_new_commits=no_new_commits,
+            agent_reported_success=agent_reported_success,
         )
 
         success = outcome.kind == "success"

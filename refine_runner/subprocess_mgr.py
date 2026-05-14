@@ -157,6 +157,15 @@ class RunHandle:
     # short grace period later (because a backgrounded subprocess is
     # holding its stdio pipes open), we SIGTERM the process group.
     result_seen_at: float | None = None
+    # Mirrors `result.is_error` from the stream-json terminal event:
+    # True  → agent reported success (regardless of whether it produced
+    #         commits — e.g., when actual already matched target),
+    # False → agent reported failure,
+    # None  → no `result` event observed (e.g., subprocess crashed).
+    # Plumbed into the outcome classifier so a clean exit with the
+    # agent's own success signal doesn't get demoted to `failed`
+    # solely because nothing changed in the worktree.
+    agent_reported_success: bool | None = None
 
     def __post_init__(self) -> None:
         if self.finished is None:
@@ -183,7 +192,7 @@ class SubprocessManager:
         base_ref: str,
         idle_window: int,
         hard_cap: int,
-        on_finished: Callable[[str, int, str | None], None] | None = None,
+        on_finished: Callable[..., None] | None = None,
     ) -> int:
         """Spawn a `claude --print` subprocess in the Gap's worktree.
 
@@ -289,7 +298,7 @@ class SubprocessManager:
     def _supervise(
         self,
         h: RunHandle,
-        on_finished: Callable[[str, int, str | None], None] | None,
+        on_finished: Callable[..., None] | None,
     ) -> None:
         # Reader thread for stdout (stderr is merged in)
         reader = threading.Thread(
@@ -348,7 +357,8 @@ class SubprocessManager:
         h.finished.set()
         if on_finished is not None:
             try:
-                on_finished(h.gap_id, exit_code, h.killed_reason)
+                on_finished(h.gap_id, exit_code, h.killed_reason,
+                            h.agent_reported_success)
             except Exception as e:  # pragma: no cover — defensive
                 activity.append(
                     self._get_conn(),
@@ -391,6 +401,7 @@ class SubprocessManager:
                         self._write_log_entry(h, s)
                 if isinstance(evt, dict) and evt.get("type") == "result":
                     h.result_seen_at = time.monotonic()
+                    h.agent_reported_success = not bool(evt.get("is_error"))
         finally:
             # final last_output_at touch
             try:

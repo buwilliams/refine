@@ -143,6 +143,22 @@ def main() -> int:
     assert classify_outcome(exit_code=0, killed_reason="idle", no_new_commits=False).kind == "failure"
     assert classify_outcome(exit_code=0, killed_reason="hard_cap", no_new_commits=False).kind == "failure"
     assert classify_outcome(exit_code=2, killed_reason=None, no_new_commits=False).kind == "failure"
+    # No commits but the agent's `result` event reported success
+    # ("target already met") — trust the agent over the no-commits heuristic.
+    target_met = classify_outcome(exit_code=0, killed_reason=None,
+                                   no_new_commits=True,
+                                   agent_reported_success=True)
+    assert target_met.kind == "success", target_met
+    assert "target was already met" in target_met.message, target_met
+    # Same applies on the `result_grace` exit path.
+    assert classify_outcome(exit_code=0, killed_reason="result_grace",
+                            no_new_commits=True,
+                            agent_reported_success=True).kind == "success"
+    # Without an explicit success signal, the no-commits heuristic still
+    # demotes to `failed` (preserves prior behavior).
+    assert classify_outcome(exit_code=0, killed_reason=None,
+                            no_new_commits=True,
+                            agent_reported_success=None).kind == "failure"
     print("[ok] subprocess outcome classification")
 
     # --- Pre-flight ---------------------------------------------------------

@@ -14,7 +14,8 @@ class Outcome:
 
 
 def classify_outcome(*, exit_code: int, killed_reason: str | None,
-                     no_new_commits: bool) -> Outcome:
+                     no_new_commits: bool,
+                     agent_reported_success: bool | None = None) -> Outcome:
     if killed_reason == "idle":
         return Outcome("failure", "cli", "error", "Agent appears stuck — no output during the idle window")
     if killed_reason == "hard_cap":
@@ -26,11 +27,18 @@ def classify_outcome(*, exit_code: int, killed_reason: str | None,
         # exit (almost always: it kicked off a backgrounded subprocess
         # that kept the stdio pipes open). We SIGTERMed the process
         # group; the agent's commits are still in the worktree, so this
-        # is a clean wrap-up modulo the "did anything change?" check.
-        if no_new_commits:
+        # is a clean wrap-up. If the agent reported success in its
+        # `result` event we trust that — even with no new commits, the
+        # target may already be met.
+        if no_new_commits and not agent_reported_success:
             return Outcome(
                 "failure", "cli", "warn",
                 "Agent exited without producing changes — try refining the round",
+            )
+        if no_new_commits:
+            return Outcome(
+                "success", "cli", "info",
+                "Agent reported the target was already met — no changes were needed",
             )
         return Outcome(
             "success", "cli", "info",
@@ -39,6 +47,15 @@ def classify_outcome(*, exit_code: int, killed_reason: str | None,
     if exit_code != 0:
         return Outcome("failure", "cli", "error", f"Agent errored (exit {exit_code})")
     if no_new_commits:
+        # Trust the agent's own success signal over the "no commits"
+        # heuristic. Gap "stop the X application" when X is already
+        # stopped is a legitimate no-op success — the agent investigated,
+        # confirmed actual already matches target, and exited cleanly.
+        if agent_reported_success:
+            return Outcome(
+                "success", "cli", "info",
+                "Agent reported the target was already met — no changes were needed",
+            )
         return Outcome(
             "failure", "cli", "warn",
             "Agent exited without producing changes — try refining the round",
