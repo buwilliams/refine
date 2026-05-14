@@ -145,6 +145,112 @@ function htmlEscape(s) {
   }[c]));
 }
 
+// ---- Minimal Markdown → HTML ------------------------------------------------
+//
+// Used to render chat transcripts. Inputs come from the Claude CLI's
+// stream-json `assistant.content[].text` blocks (text only — never raw HTML),
+// plus the user-echoed `> message` lines we synthesize locally. We html-escape
+// every text fragment before substitution and only emit a small whitelist of
+// inline tags, so even if claude's text contained literal HTML we'd render it
+// as literal text.
+//
+// Block-level: code fences (```), headings (#…######), unordered (- / *) and
+// ordered (1.) lists, blockquotes (>), paragraphs separated by blank lines.
+// Inline: **bold**, *italic*, `code`, [text](http(s)://...).
+function mdToHtml(text) {
+  if (!text) return "";
+  const lines = String(text).replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const fence = line.match(/^```\s*([^\s`]*)\s*$/);
+    if (fence) {
+      const lang = fence[1] || "";
+      const code = [];
+      i++;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+        code.push(lines[i]);
+        i++;
+      }
+      if (i < lines.length) i++;
+      const cls = lang ? ` class="lang-${htmlEscape(lang)}"` : "";
+      out.push(`<pre><code${cls}>${htmlEscape(code.join("\n"))}</code></pre>`);
+      continue;
+    }
+    if (!line.trim()) { i++; continue; }
+    const heading = line.match(/^(#{1,6})\s+(.+)$/);
+    if (heading) {
+      const lvl = heading[1].length;
+      out.push(`<h${lvl}>${mdInline(heading[2])}</h${lvl}>`);
+      i++;
+      continue;
+    }
+    if (/^\s*>\s?/.test(line)) {
+      const quoted = [];
+      while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+        quoted.push(lines[i].replace(/^\s*>\s?/, ""));
+        i++;
+      }
+      // Recurse so nested formatting inside the quote works.
+      out.push(`<blockquote>${mdToHtml(quoted.join("\n"))}</blockquote>`);
+      continue;
+    }
+    if (/^\s*[-*]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+        i++;
+      }
+      out.push(`<ul>${items.map(it => `<li>${mdInline(it)}</li>`).join("")}</ul>`);
+      continue;
+    }
+    if (/^\s*\d+\.\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*\d+\.\s+/, ""));
+        i++;
+      }
+      out.push(`<ol>${items.map(it => `<li>${mdInline(it)}</li>`).join("")}</ol>`);
+      continue;
+    }
+    // Paragraph: gather until a blank line or a recognized block opener.
+    const para = [];
+    while (i < lines.length) {
+      const ln = lines[i];
+      if (!ln.trim()) break;
+      if (/^```/.test(ln) || /^(#{1,6})\s+/.test(ln) ||
+          /^\s*[-*]\s+/.test(ln) || /^\s*\d+\.\s+/.test(ln) ||
+          /^\s*>\s?/.test(ln)) break;
+      para.push(ln);
+      i++;
+    }
+    if (para.length) {
+      out.push(`<p>${mdInline(para.join("\n"))}</p>`);
+    }
+  }
+  return out.join("\n");
+}
+
+function mdInline(text) {
+  let s = htmlEscape(text);
+  // Inline code first so its contents aren't mangled by later passes.
+  s = s.replace(/`([^`\n]+)`/g, (_, c) => `<code>${c}</code>`);
+  // Bold before italic so ** isn't greedily matched as italic.
+  s = s.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/__([^_\n]+)__/g, "<strong>$1</strong>");
+  s = s.replace(/\*([^*\n]+)\*/g, "<em>$1</em>");
+  s = s.replace(/(^|[^\w])_([^_\n]+)_(?![\w])/g, "$1<em>$2</em>");
+  // Links: only http(s)/mailto pass through; anything else stays literal.
+  s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, txt, url) => {
+    if (!/^(https?:|mailto:)/i.test(url)) return m;
+    return `<a href="${url}" target="_blank" rel="noopener noreferrer">${txt}</a>`;
+  });
+  // Convert remaining hard newlines inside a paragraph to <br>.
+  s = s.replace(/\n/g, "<br>");
+  return s;
+}
+
 // ---- reporter dropdown ------------------------------------------------------
 
 async function refreshReporters() {
@@ -1424,6 +1530,7 @@ const chatState = {
   pollTimer: null,
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
+  fullscreen: false,       // when true, panel fills viewport below the topbar
 };
 
 function ensureStandaloneTab() {
@@ -1449,6 +1556,9 @@ function loadChatStateFromStorage() {
       if (typeof parsed.bodyHeight === "number" && parsed.bodyHeight > 0) {
         chatState.bodyHeight = parsed.bodyHeight;
       }
+      if (typeof parsed.fullscreen === "boolean") {
+        chatState.fullscreen = parsed.fullscreen;
+      }
     }
   } catch {}
   ensureStandaloneTab();
@@ -1471,6 +1581,7 @@ function saveChatStateToStorage() {
     localStorage.setItem(CHAT_TABS_STORAGE_KEY, JSON.stringify({
       tabs, activeTabId: chatState.activeTabId,
       open: chatState.open, bodyHeight: chatState.bodyHeight,
+      fullscreen: chatState.fullscreen,
     }));
   } catch {}
 }
@@ -1490,6 +1601,25 @@ function initChatDock() {
   ensureStandaloneTab();
   drawChatDock();
   observeChatDockSize();
+  observeTopbarHeight();
+}
+
+// Publish the topbar's actual height as --topbar-height on <html> so the
+// fullscreen chat dock can anchor its top edge just below the main nav.
+function observeTopbarHeight() {
+  const topbar = document.querySelector(".topbar");
+  if (!topbar) return;
+  const apply = () => {
+    document.documentElement.style.setProperty(
+      "--topbar-height", `${topbar.offsetHeight}px`,
+    );
+  };
+  apply();
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(apply).observe(topbar);
+  } else {
+    window.addEventListener("resize", apply);
+  }
 }
 
 // Keep --chat-dock-height in sync with whatever vertical space the dock
@@ -1553,6 +1683,16 @@ async function startGapChatSession(tab) {
 
 function toggleChatDock() {
   chatState.open = !chatState.open;
+  // Collapsing the dock also exits fullscreen — leaving fullscreen on
+  // while the body is hidden would orphan the topbar offset.
+  if (!chatState.open) chatState.fullscreen = false;
+  saveChatStateToStorage();
+  drawChatDock();
+}
+
+function toggleChatFullscreen() {
+  chatState.fullscreen = !chatState.fullscreen;
+  if (chatState.fullscreen) chatState.open = true;  // fullscreen implies open
   saveChatStateToStorage();
   drawChatDock();
 }
@@ -1580,6 +1720,7 @@ function drawChatDock() {
         : `Session ${active.sessionId} active.`);
 
   root.classList.toggle("open", !!chatState.open);
+  root.classList.toggle("fullscreen", !!chatState.fullscreen);
   if (chatState.open && !chatState.bodyHeight) {
     chatState.bodyHeight = defaultChatBodyHeight();
   }
@@ -1600,7 +1741,12 @@ function drawChatDock() {
             ${id === "standalone" ? "" : `<span class="chat-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
           </button>`).join("")}
       </div>
-      <button class="chat-dock-toggle" id="btn-dock-toggle"
+      <button class="chat-dock-toggle chat-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
+              id="btn-dock-fullscreen"
+              aria-label="${chatState.fullscreen ? "Exit fullscreen chat" : "Fullscreen chat"}"
+              aria-pressed="${chatState.fullscreen ? "true" : "false"}"
+              title="${chatState.fullscreen ? "Exit fullscreen" : "Fullscreen"}">⛶</button>
+      <button class="chat-dock-toggle chat-dock-collapse" id="btn-dock-toggle"
               aria-label="${chatState.open ? "Collapse chat" : "Expand chat"}"
               title="${chatState.open ? "Collapse chat" : "Expand chat"}">▾</button>
     </div>
@@ -1616,7 +1762,7 @@ function drawChatDock() {
         <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
       </div>
       <div class="chat-output-box">
-        <pre id="chat-output">${htmlEscape(active.output || "")}</pre>
+        <div id="chat-output" class="chat-output">${mdToHtml(active.output || "")}</div>
         <div id="chat-pending" class="chat-pending" hidden>
           <span class="chat-pending-dots"><span></span><span></span><span></span></span>
           Claude is thinking…
@@ -1634,8 +1780,8 @@ function drawChatDock() {
   applyPendingIndicator(active);
 
   if (chatState.open) {
-    const pre = $("#chat-output");
-    if (pre) pre.scrollTop = pre.scrollHeight;
+    const out = $("#chat-output");
+    if (out) out.scrollTop = out.scrollHeight;
   }
 
   $$(".chat-tab", root).forEach((el) => {
@@ -1663,6 +1809,7 @@ function drawChatDock() {
     });
   });
   $("#btn-dock-toggle")?.addEventListener("click", toggleChatDock);
+  $("#btn-dock-fullscreen")?.addEventListener("click", toggleChatFullscreen);
   $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
   $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
   $("#chat-input")?.addEventListener("keydown", (e) => {
@@ -1815,11 +1962,14 @@ async function pollChat() {
       // Only update the DOM if this tab is still active.
       if (chatState.activeTabId in chatState.tabs &&
           chatState.tabs[chatState.activeTabId].sessionId === sid) {
-        const pre = $("#chat-output");
-        if (pre) {
-          const atBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 50;
-          pre.textContent += r.lines.join("\n") + "\n";
-          if (atBottom) pre.scrollTop = pre.scrollHeight;
+        const out = $("#chat-output");
+        if (out) {
+          const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 50;
+          // Re-render the full transcript as markdown — incremental
+          // append won't work since block elements (code fences, lists)
+          // can span multiple chunks.
+          out.innerHTML = mdToHtml(t.output || "");
+          if (atBottom) out.scrollTop = out.scrollHeight;
         }
       }
       saveChatStateToStorage();
@@ -1850,10 +2000,10 @@ async function sendChatLine() {
   input.value = "";
   const echo = `\n> ${text}\n`;
   t.output = (t.output || "") + echo;
-  const pre = $("#chat-output");
-  if (pre) {
-    pre.textContent += echo;
-    pre.scrollTop = pre.scrollHeight;
+  const out = $("#chat-output");
+  if (out) {
+    out.innerHTML = mdToHtml(t.output || "");
+    out.scrollTop = out.scrollHeight;
   }
   // Optimistically flip into pending so the indicator appears immediately
   // (the next poll will confirm via `in_flight`).
@@ -1901,24 +2051,34 @@ async function renderLogs() {
   const f = logsFiltersFromHash();
   $("#main").innerHTML = `
     <h2>Logs</h2>
-    <div class="search-bar">
-      <input type="text" id="logs-q" placeholder="Search message or details…" value="${htmlEscape(f.q)}">
-      <select id="logs-severity">
-        <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
-        <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
-        <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
-        <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
-      </select>
-      <select id="logs-category"><option value="">all categories</option></select>
-      <select id="logs-actor"><option value="">all actors</option></select>
-      <input type="text" id="logs-gap-id" placeholder="Gap ID" value="${htmlEscape(f.gap_id)}" style="width:180px">
-      <select id="logs-limit">
-        ${LOGS_LIMIT_OPTIONS.map((n) =>
-          `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
-      </select>
-      <span class="spacer"></span>
-      <span id="logs-count" class="muted small"></span>
-      <button class="secondary" id="logs-clear">Clear filters</button>
+    <div class="filter-bar">
+      <div class="filter-row filter-row-primary">
+        <input type="text" id="logs-q"
+               class="filter-grow"
+               placeholder="Search message or details…"
+               value="${htmlEscape(f.q)}">
+        <input type="text" id="logs-gap-id"
+               class="filter-gap-id"
+               placeholder="Gap ID"
+               value="${htmlEscape(f.gap_id)}">
+      </div>
+      <div class="filter-row filter-row-filters">
+        <select id="logs-severity">
+          <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
+          <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
+          <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
+          <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
+        </select>
+        <select id="logs-category"><option value="">all categories</option></select>
+        <select id="logs-actor"><option value="">all actors</option></select>
+        <select id="logs-limit">
+          ${LOGS_LIMIT_OPTIONS.map((n) =>
+            `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
+        </select>
+        <span class="spacer"></span>
+        <span id="logs-count" class="muted small"></span>
+        <button class="secondary" id="logs-clear">Clear filters</button>
+      </div>
     </div>
     <div id="logs-list"><p class="muted">Loading…</p></div>
   `;
