@@ -3186,9 +3186,9 @@ function drawSettings(s, diag, reps, feats) {
   // localStorage key and DOM hook. Same order as the linear stack was
   // before this refactor.
   const tabs = [
+    { slug: "reporters",    label: "Reporters" },
     { slug: "runtime",      label: "Runtime" },
     { slug: "cli",          label: "AI Provider" },
-    { slug: "reporters",    label: "Reporters" },
     { slug: "diagnostics",  label: "Diagnostics" },
   ];
   const activeSlug = readSettingsTab(tabs);
