@@ -168,7 +168,7 @@ h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
   box-shadow: var(--shadow);
 }
 
-.card-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+.card-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
 
 .status-pill {
   display: inline-block;
