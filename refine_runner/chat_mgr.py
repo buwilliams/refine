@@ -45,6 +45,16 @@ from typing import Callable, Deque
 # runner's _RESULT_EXIT_GRACE_SECONDS in subprocess_mgr.py.
 _RESULT_EXIT_GRACE_SECONDS = 10.0
 
+# Per-turn stdout-idle watchdog. If `claude --print` produces no output
+# for this long while it's still running, we treat the turn as wedged
+# and SIGTERM the process group. Catches the case where the agent
+# kicked off a backgrounded bash and then never emitted a `result`
+# event — the result-grace watchdog above can't fire because no
+# result ever arrives. 60s is generous enough for legitimate thinking
+# (claude streams events as it works, including tool_use / tool_result
+# pairs) but tight enough that the chat self-heals quickly.
+_TURN_STDOUT_IDLE_SECONDS = 60.0
+
 
 _AUTH_OVERRIDE_VARS = (
     # API-key family
@@ -156,6 +166,10 @@ class ChatSession:
     # Stored as ints (not the Popen) so the dataclass stays hashable-free
     # and we don't pin procs after they exit.
     watchdog_armed_pids: set[int] = field(default_factory=set)
+    # Monotonic timestamp of the last stdout chunk from the current
+    # in-flight proc; updated in `_consume_chat_output` per read. The
+    # idle-watchdog reads this to decide when to SIGTERM a wedged turn.
+    last_chunk_at: float = 0.0
     alive: bool = True             # cleared by stop() / supervisor
     closed_reason: str | None = None
     # Context text to prepend to the user's first message (used by attached
@@ -324,11 +338,21 @@ class ChatManager:
                 return False
             s.last_activity_ts = time.monotonic()
             proc = s.proc
+            s.last_chunk_at = time.monotonic()
         s.pump = threading.Thread(
             target=self._pump_output, args=(s, proc),
             name=f"refine-chat-{session_id}", daemon=True,
         )
         s.pump.start()
+        # Per-turn idle watchdog: catches the case where claude streams
+        # an assistant message, kicks off a backgrounded subprocess,
+        # and never emits a `result` event — the result-grace watchdog
+        # only arms on a real `result`, so without this fallback the
+        # chat hangs in-flight forever.
+        threading.Thread(
+            target=self._idle_watchdog, args=(s, proc),
+            name=f"refine-chat-idle-{session_id}", daemon=True,
+        ).start()
         return True
 
     def read(self, session_id: str, *, max_lines: int = 200) -> dict:
@@ -411,6 +435,9 @@ class ChatManager:
                 chunk = stream.read(4096)
                 if not chunk:
                     break
+                # Liveness signal for the idle-watchdog: any byte from
+                # claude resets the wedged-turn countdown.
+                s.last_chunk_at = time.monotonic()
                 buf += chunk
                 buf = self._drain_json_objects(
                     s, decoder, buf, suppress_assistant=suppress_assistant,
@@ -558,6 +585,38 @@ class ChatManager:
             name=f"refine-chat-result-{s.session_id}",
             daemon=True,
         ).start()
+
+    def _idle_watchdog(self, s: ChatSession,
+                         proc: subprocess.Popen) -> None:
+        """Per-turn fallback for when no `result` event ever arrives.
+
+        Polls every 5s. If the proc is still alive and we've gone
+        `_TURN_STDOUT_IDLE_SECONDS` without a stdout chunk, SIGTERM
+        the process group so the chat can recover. Exits as soon as
+        the proc itself exits — no work to do.
+        """
+        while proc.poll() is None:
+            if (time.monotonic() - s.last_chunk_at
+                    > _TURN_STDOUT_IDLE_SECONDS):
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                except (ProcessLookupError, PermissionError):
+                    return
+                try:
+                    proc.wait(timeout=5.0)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    except (ProcessLookupError, PermissionError):
+                        pass
+                with s.out_lock:
+                    s.out_lines.append(
+                        "[refine] Turn went idle on stdout — terminated to "
+                        "free the chat (likely a backgrounded subprocess "
+                        "that didn't detach).",
+                    )
+                return
+            time.sleep(5.0)
 
     def _result_watchdog(self, s: ChatSession,
                           proc: subprocess.Popen) -> None:
