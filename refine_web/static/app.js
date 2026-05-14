@@ -603,38 +603,29 @@ function drawDashboard(d) {
           </table>`}
     </section>
 
-    <section class="row">
-      <div class="card">
-        <h3>Currently running</h3>
-        <div class="card-scroll">
-          ${(d.running || []).length === 0
-            ? `<p class="muted">No agent subprocesses running.</p>`
-            : (() => {
-                // Anchor seconds-at-fetch + a single `data-anchor-ms`
-                // timestamp so the tick can compute a live value
-                // without re-fetching: shown = base + (now - anchor) / 1000.
-                const anchorMs = Date.now();
-                return `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
-                  ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
-                    <td><code>${r.gap_id.slice(0,8)}…</code></td>
-                    <td class="js-elapsed-tick"
-                        data-base="${r.elapsed_seconds}"
-                        data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
-                    <td class="js-idle-tick"
-                        data-base="${r.idle_seconds}"
-                        data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
-                    <td class="muted small">${r.pid}</td>
-                  </tr>`).join("")}
-                  </tbody></table>`;
-              })()}
-        </div>
-      </div>
-
-      <div class="card">
-        <h3>Recent activity</h3>
-        <div class="card-scroll">
-          ${renderActivityList(d.activity || [])}
-        </div>
+    <section class="card">
+      <h3>Currently running</h3>
+      <div class="card-scroll">
+        ${(d.running || []).length === 0
+          ? `<p class="muted">No agent subprocesses running.</p>`
+          : (() => {
+              // Anchor seconds-at-fetch + a single `data-anchor-ms`
+              // timestamp so the tick can compute a live value
+              // without re-fetching: shown = base + (now - anchor) / 1000.
+              const anchorMs = Date.now();
+              return `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
+                ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
+                  <td><code>${r.gap_id.slice(0,8)}…</code></td>
+                  <td class="js-elapsed-tick"
+                      data-base="${r.elapsed_seconds}"
+                      data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
+                  <td class="js-idle-tick"
+                      data-base="${r.idle_seconds}"
+                      data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
+                  <td class="muted small">${r.pid}</td>
+                </tr>`).join("")}
+                </tbody></table>`;
+            })()}
       </div>
     </section>
   `;
@@ -2177,6 +2168,13 @@ function drawAgents(dash, settings) {
               </tbody>
             </table>`;
           })()}
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Recent activity</h3>
+      <div class="card-scroll">
+        ${renderActivityList(dash.activity || [])}
+      </div>
     </div>
   `;
   $("#btn-pause").addEventListener("click", async () => {
