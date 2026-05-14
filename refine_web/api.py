@@ -543,8 +543,14 @@ def dashboard_summary() -> tuple[int, dict]:
         } if pf else None)
         # latest activity (top of feed)
         feed = activity.recent(conn, limit=50)
+        # Per-reporter stats: attribute each gap to the reporter of its
+        # most recent round, then bucket by gap status.
+        index_rows = conn.execute(
+            "SELECT id, status FROM gaps_index"
+        ).fetchall()
     finally:
         conn.close()
+    reporter_stats = _compute_reporter_stats(index_rows)
     runner_reachable = get_client().is_reachable()
     return 200, {
         "counts": counts,
@@ -552,9 +558,44 @@ def dashboard_summary() -> tuple[int, dict]:
         "preflight": preflight,
         "activity": feed,
         "runner_reachable": runner_reachable,
+        "reporter_stats": reporter_stats,
         "needs_attention": _compute_needs_attention(counts, preflight,
                                                     runner_reachable),
     }
+
+
+_ACTIVE_STATUSES = ("todo", "in-progress", "review")
+
+
+def _compute_reporter_stats(index_rows) -> list[dict]:
+    by_reporter: dict[str, dict] = {}
+    for row in index_rows:
+        gap = shared_gaps.read_gap_json(row["id"])
+        if not gap:
+            continue
+        rounds = gap.get("rounds") or []
+        if not rounds:
+            continue
+        reporter = (rounds[-1].get("reporter") or "").strip()
+        if not reporter:
+            continue
+        bucket = by_reporter.setdefault(
+            reporter, {"reporter": reporter, "active": 0, "done": 0,
+                      "reported": 0, "completion_rate": 0.0},
+        )
+        bucket["reported"] += 1
+        status = row["status"]
+        if status in _ACTIVE_STATUSES:
+            bucket["active"] += 1
+        elif status == "done":
+            bucket["done"] += 1
+    out = list(by_reporter.values())
+    for b in out:
+        b["completion_rate"] = (
+            round(100.0 * b["done"] / b["reported"], 1) if b["reported"] else 0.0
+        )
+    out.sort(key=lambda b: (-b["reported"], b["reporter"].lower()))
+    return out
 
 
 def _compute_needs_attention(counts: dict, preflight: dict | None,

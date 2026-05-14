@@ -405,6 +405,30 @@ function drawDashboard(d) {
         </a>`).join("")}
     </section>
 
+    <section class="card">
+      <h3>Reporter stats</h3>
+      ${(d.reporter_stats || []).length === 0
+        ? `<p class="muted">No reporter activity yet.</p>`
+        : `<table class="table">
+            <thead><tr>
+              <th>Reporter</th>
+              <th>Active</th>
+              <th>Done</th>
+              <th>Reported</th>
+              <th>Done / Reported</th>
+            </tr></thead>
+            <tbody>
+              ${d.reporter_stats.map((s) => `<tr>
+                <td>${htmlEscape(s.reporter)}</td>
+                <td>${s.active}</td>
+                <td>${s.done}</td>
+                <td>${s.reported}</td>
+                <td>${s.completion_rate.toFixed(1)}%</td>
+              </tr>`).join("")}
+            </tbody>
+          </table>`}
+    </section>
+
     <section class="row">
       <div class="card">
         <h3>Currently running</h3>
@@ -662,7 +686,23 @@ function drawGapDetail(gap) {
           <span class="banner-actions">${failureBanner.actionsHtml}</span>
         </div>` : ""}
 
-      <details class="card notes-card" data-gap-id="${gap.id}" style="margin-bottom:14px" ${notesOpen ? "open" : ""}>
+      <h3>Rounds (${rounds.length})</h3>
+      ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
+        rounds.map((rnd, idx) => renderRound(rnd, idx, idx === rounds.length - 1, isLatestEditable && idx === rounds.length - 1)).join("")}
+
+      ${(gap.status === "todo" || gap.status === "failed") ? `
+        <div class="card" style="margin-top:14px">
+          <h3>Edit latest round</h3>
+          ${renderRoundForm("edit", latest)}
+        </div>` : ""}
+
+      ${gap.status === "review" ? `
+        <div class="card" style="margin-top:14px">
+          <h3>Submit follow-up round</h3>
+          ${renderRoundForm("submit", null)}
+        </div>` : ""}
+
+      <details class="card notes-card" data-gap-id="${gap.id}" style="margin-top:14px" ${notesOpen ? "open" : ""}>
         <summary class="notes-card-summary">
           <span><strong>Notes (${(gap.notes || []).length})</strong></span>
           <span class="muted small">Saved to gap.json and included in attached
@@ -688,22 +728,6 @@ function drawGapDetail(gap) {
           </details>
         </div>
       </details>
-
-      <h3>Rounds (${rounds.length})</h3>
-      ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
-        rounds.map((rnd, idx) => renderRound(rnd, idx, idx === rounds.length - 1, isLatestEditable && idx === rounds.length - 1)).join("")}
-
-      ${(gap.status === "todo" || gap.status === "failed") ? `
-        <div class="card" style="margin-top:14px">
-          <h3>Edit latest round</h3>
-          ${renderRoundForm("edit", latest)}
-        </div>` : ""}
-
-      ${gap.status === "review" ? `
-        <div class="card" style="margin-top:14px">
-          <h3>Submit follow-up round</h3>
-          ${renderRoundForm("submit", null)}
-        </div>` : ""}
     </div>
   `;
 
