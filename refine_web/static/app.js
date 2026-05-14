@@ -3669,9 +3669,17 @@ function drawSettings(s, diag, reps, feats) {
     <div class="card" style="margin-top:16px">
       <h3>Current status</h3>
       <div id="target-app-status-block" class="muted">Loading…</div>
-      <div class="actions" style="margin-top:8px">
+      <div class="actions" style="margin-top:10px">
+        <button id="s-target-start">Start application</button>
+        <button class="danger" id="s-target-stop">Stop application</button>
+        <span class="spacer"></span>
         <button class="secondary" id="s-target-health-now">Run health check now</button>
       </div>
+      <p class="muted small" style="margin-top:6px">
+        Start / Stop live here on purpose — the indicator next to the
+        reporter dropdown is read-only so typical users can't take the
+        application down by accident.
+      </p>
     </div>`)}
 
     ${pane("diagnostics", `
@@ -3877,6 +3885,18 @@ function drawSettings(s, diag, reps, feats) {
   };
   wireGenerate("#s-target-gen-start", "start", "#s-target-start");
   wireGenerate("#s-target-gen-stop",  "stop",  "#s-target-stop");
+  $("#s-target-start")?.addEventListener("click", async () => {
+    const btn = $("#s-target-start");
+    await withButtonBusy(btn, "Starting…", async () => {
+      await runTargetAppAction("start");
+    });
+  });
+  $("#s-target-stop")?.addEventListener("click", async () => {
+    const btn = $("#s-target-stop");
+    await withButtonBusy(btn, "Stopping…", async () => {
+      await runTargetAppAction("stop");
+    });
+  });
   $("#s-target-health-now")?.addEventListener("click", async () => {
     const btn = $("#s-target-health-now");
     await withButtonBusy(btn, "Probing…", async () => {
@@ -3941,6 +3961,30 @@ function drawTargetAppStatusBlock(snap) {
       starting: "#d4a106",
       stopping: "#d4a106",
     }[snap.state]) || "#b8bcc6";
+  }
+  // Reflect state on the Start / Stop buttons: only one applies at a
+  // time. Both are disabled while a transition is in flight so the
+  // user can't fire a second action mid-agent-run.
+  const startBtn = document.getElementById("s-target-start");
+  const stopBtn  = document.getElementById("s-target-stop");
+  if (startBtn && stopBtn) {
+    const isRunning  = snap.state === "running";
+    const isStopped  = snap.state === "stopped" || snap.state === "unknown";
+    const inFlight   = snap.state === "starting" || snap.state === "stopping";
+    startBtn.style.display = (isStopped || inFlight) ? "" : "none";
+    stopBtn.style.display  = (isRunning || inFlight) ? "" : "none";
+    startBtn.disabled = inFlight || !snap.has_start_instructions;
+    stopBtn.disabled  = inFlight || !snap.has_stop_instructions;
+    if (!snap.has_start_instructions) {
+      startBtn.title = "Configure start instructions above first.";
+    } else {
+      startBtn.title = "";
+    }
+    if (!snap.has_stop_instructions) {
+      stopBtn.title = "Configure stop instructions above first.";
+    } else {
+      stopBtn.title = "";
+    }
   }
 }
 
@@ -4136,28 +4180,28 @@ async function init() {
   navigate();
 }
 
-// ---- Target application toggle (topbar) -------------------------------------
+// ---- Target application status (topbar indicator + Settings controls) ------
 //
-// Single button sitting next to the reporter dropdown. The dot is the
-// status (green=running, red=stopped, amber=in-flight, grey=unknown).
-// Click flips between start and stop based on current state. The status
-// surface is refreshed via SSE (target_app_state, target_app_health) and
-// on a 30s safety poll in case SSE is wedged.
+// The topbar dot is a *read-only* status indicator (deliberately not a
+// one-click toggle, so typical users can't take the app down by
+// accident). It links to Settings, where the actual Start / Stop
+// button lives. The dot's colour reflects the current state
+// (green=running, red=stopped, amber=in-flight, grey=unknown) and is
+// refreshed via SSE plus a 30s safety poll in case SSE is wedged.
 
 let _targetAppSnapshot = null;
 
 function initTargetAppToggle() {
-  const btn = document.getElementById("target-app-toggle");
-  if (!btn) return;
-  btn.addEventListener("click", onTargetAppToggleClick);
+  const indicator = document.getElementById("target-app-indicator");
+  if (!indicator) return;
   refreshTargetAppToggle();
   // Backup poll so the dot isn't stale if SSE drops.
   setInterval(refreshTargetAppToggle, 30000);
 }
 
 async function refreshTargetAppToggle() {
-  const btn = document.getElementById("target-app-toggle");
-  if (!btn) return;
+  const indicator = document.getElementById("target-app-indicator");
+  if (!indicator) return;
   try {
     const snap = await api("GET", "/api/target-app/status");
     applyTargetAppSnapshot(snap);
@@ -4168,10 +4212,10 @@ async function refreshTargetAppToggle() {
 
 function applyTargetAppSnapshot(snap) {
   _targetAppSnapshot = snap;
-  const btn = document.getElementById("target-app-toggle");
-  if (!btn) return;
+  const indicator = document.getElementById("target-app-indicator");
+  if (!indicator) return;
   const appState = snap.state || "unknown";
-  btn.dataset.state = appState;
+  indicator.dataset.state = appState;
   const label = {
     running:  "App: running",
     stopped:  "App: stopped",
@@ -4179,62 +4223,61 @@ function applyTargetAppSnapshot(snap) {
     stopping: "App: stopping…",
     unknown:  "App: unknown",
   }[appState] || "App";
-  btn.title = label
+  indicator.title = label
     + (snap.last_health_at
         ? ` · last check ${snap.last_health_ok ? "OK" : "FAIL"} at ${fmtTime(snap.last_health_at)}`
         : "")
-    + (snap.last_error ? ` · ${snap.last_error}` : "");
-  const lbl = btn.querySelector(".target-app-label");
+    + (snap.last_error ? ` · ${snap.last_error}` : "")
+    + " — click to manage in Settings";
+  const lbl = indicator.querySelector(".target-app-label");
   if (lbl) lbl.textContent = label.replace(/^App: /, "");
-  btn.disabled = appState === "starting" || appState === "stopping";
-  // Repaint the Settings status block when it's visible.
+  // Repaint the Settings status block (and the start/stop button)
+  // whenever the Settings screen is visible.
   if (state.currentRoute === "settings") {
     drawTargetAppStatusBlock(snap);
   }
 }
 
-async function onTargetAppToggleClick() {
-  const btn = document.getElementById("target-app-toggle");
-  if (!btn || btn.disabled) return;
+async function runTargetAppAction(action) {
+  // action is "start" or "stop". Called from the buttons on Settings.
   const snap = _targetAppSnapshot || {};
-  const isRunning = snap.state === "running";
-  const action = isRunning ? "stop" : "start";
-  const hasPrompt = isRunning
-    ? snap.has_stop_instructions
-    : snap.has_start_instructions;
+  const hasPrompt = action === "start"
+    ? snap.has_start_instructions
+    : snap.has_stop_instructions;
   if (!hasPrompt) {
     toast(
-      `No ${action} instructions configured. Set them on Settings → Target App.`,
+      `No ${action} instructions configured. Set them above, then click Save.`,
       "error",
     );
     return;
   }
+  const isStop = action === "stop";
   const ok = await modalConfirm(
-    isRunning
+    isStop
       ? "Stop the target application now?"
       : "Start the target application now? This may take a minute or two while the agent installs / builds.",
-    { title: isRunning ? "Stop application" : "Start application",
-      okLabel: isRunning ? "Stop" : "Start",
-      danger: isRunning },
+    { title: isStop ? "Stop application" : "Start application",
+      okLabel: isStop ? "Stop" : "Start",
+      danger: isStop },
   );
   if (!ok) return;
-  // Optimistic UI flip: in-flight state shows the amber pulsing dot.
-  btn.dataset.state = isRunning ? "stopping" : "starting";
-  btn.disabled = true;
+  // Optimistic UI flip so the dot transitions immediately.
+  applyTargetAppSnapshot({
+    ..._targetAppSnapshot,
+    state: isStop ? "stopping" : "starting",
+  });
   try {
     const r = await api("POST", `/api/target-app/${action}`);
     toast(r.message || `${action} completed`, r.ok ? "info" : "error");
     applyTargetAppSnapshot({
       ..._targetAppSnapshot,
-      state: r.state || (isRunning ? "stopped" : "running"),
+      state: r.state || (isStop ? "stopped" : "running"),
       last_error: r.ok ? "" : (r.message || ""),
     });
   } catch (e) {
     toast(e.message, "error");
     // Reset to whatever the server thinks.
     refreshTargetAppToggle();
-  } finally {
-    btn.disabled = false;
   }
 }
 
