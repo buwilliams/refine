@@ -109,6 +109,38 @@ def stash_pop(cwd: Path | None = None) -> GitResult:
     return _run(["stash", "pop"], cwd=cwd or client_repo_path())
 
 
+def unmerged_paths(cwd: Path | None = None) -> list[str]:
+    """Files left in conflict state by a half-finished merge.
+
+    Returns repo-relative paths that `git diff --name-only --diff-filter=U`
+    reports — i.e., entries that still have <<<<<<< markers and aren't
+    staged as resolved.
+    """
+    r = _run(["diff", "--name-only", "--diff-filter=U"],
+             cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
+    return [ln.strip() for ln in r.stdout.splitlines() if ln.strip()]
+
+
+def commit_pending_merge(message: str, *,
+                          cwd: Path | None = None) -> GitResult:
+    """Commit the in-progress merge — assumes `MERGE_HEAD` is set and
+    all conflicting files have already been staged. Produces a proper
+    two-parent merge commit so the `Refine Gap:` trailer in `message`
+    lands on a commit the Changes screen can list."""
+    return _run(["commit", "--no-edit", "-m", message],
+                 cwd=cwd or client_repo_path())
+
+
+def head_parents(cwd: Path | None = None) -> list[str]:
+    """SHA list of HEAD's parents. Empty if HEAD doesn't resolve."""
+    r = _run(["log", "-1", "--format=%P"], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
+    return [p for p in r.stdout.strip().split() if p]
+
+
 def in_progress_op(cwd: Path | None = None) -> tuple[str, str] | None:
     """Detect a half-finished git operation in the client repo.
 

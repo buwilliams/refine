@@ -11,7 +11,7 @@ import sqlite3
 from refine_shared import activity, db
 from refine_shared.gaps import now_iso
 
-from . import gap_writer, git_ops
+from . import conflict_resolver, gap_writer, git_ops
 
 
 def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
@@ -248,14 +248,44 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
         if not r.ok:
             stderr = r.stderr + ("\n" + r.stdout if r.stdout else "")
             if "CONFLICT" in stderr or "conflict" in stderr.lower():
-                _log(conn, gap_id, "Merge conflict — leave the worktree intact",
-                     details=stderr, severity="error", category="git", actor=actor)
+                _log(conn, gap_id,
+                     "Merge conflict — attempting auto-resolve via Claude",
+                     details=stderr, severity="warn", category="git",
+                     actor=actor)
+                resolve = conflict_resolver.attempt_auto_resolve(
+                    conn, gap_id,
+                    branch=branch, target=current,
+                    merge_message=merge_message, actor=actor,
+                    log=lambda message, *, severity, category,
+                                details=None: _log(
+                        conn, gap_id, message,
+                        severity=severity, category=category, actor=actor,
+                        details=details,
+                    ),
+                )
+                if not resolve.get("ok"):
+                    # Per spec: leave the worktree intact for human
+                    # resolution. The merge is still in flight on the
+                    # host's working tree; Verify won't try again until
+                    # the operator either resolves manually or aborts.
+                    _log(conn, gap_id,
+                         "Merge conflict — leave the worktree intact for "
+                         "human resolution",
+                         details=resolve.get("details") or stderr,
+                         severity="error", category="git", actor=actor)
+                    return {"ok": False, "stage": "merge",
+                            "message": resolve.get("message")
+                                       or "Merge conflict",
+                            "details": resolve.get("details") or stderr}
+                # Auto-resolve succeeded — the merge is committed. Drop
+                # into the push/cleanup flow as if the merge had been
+                # clean from the start.
+            else:
+                _log(conn, gap_id, "git merge failed", details=stderr,
+                     severity="error", category="git", actor=actor)
                 return {"ok": False, "stage": "merge",
-                        "message": "Merge conflict", "details": stderr}
-            _log(conn, gap_id, "git merge failed", details=stderr,
-                 severity="error", category="git", actor=actor)
-            return {"ok": False, "stage": "merge", "message": "git merge failed",
-                    "details": stderr}
+                        "message": "git merge failed",
+                        "details": stderr}
 
     # 4. push — only when an upstream exists. Without one, the local
     # merge IS the ship.
