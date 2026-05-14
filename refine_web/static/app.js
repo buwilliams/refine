@@ -1062,9 +1062,11 @@ async function openBulkModal(field) {
       filter, exclude_ids: excludeIds, update: { [field]: next },
     });
     toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
-    // Successful bulk op may have changed the result set or facets;
-    // clear stale exclusions and re-render top-to-bottom.
-    gapsExcludedIds.clear();
+    // Preserve the user's unchecked rows across the refresh — they
+    // explicitly opted those out of the operation that just ran and
+    // will likely want them excluded from follow-up actions too.
+    // Stale IDs (rows that no longer match the filter) are harmless;
+    // they're just ignored at the next selection-state pass.
     await renderGapsList();
   } catch (e) {
     toast(`Bulk update failed: ${e.message}`, "error");
@@ -1141,9 +1143,9 @@ async function confirmBulkDelete() {
     } else {
       toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}.`, "info");
     }
-    // Clear stale exclusions and re-render top-to-bottom — the filtered
-    // view may now be empty and facets may have changed.
-    gapsExcludedIds.clear();
+    // Preserve the user's unchecked rows so follow-up bulk actions
+    // continue to skip them. IDs of deleted gaps drop out of the next
+    // fetch naturally — they remain in the set but are inert.
     await renderGapsList();
   } catch (e) {
     toast(`Bulk delete failed: ${e.message}`, "error");
