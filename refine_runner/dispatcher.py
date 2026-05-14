@@ -12,6 +12,7 @@ import sqlite3
 import threading
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
 from refine_shared import activity, db
 from refine_shared.gaps import now_iso, read_gap_json
@@ -65,6 +66,7 @@ class Dispatcher:
         paused = db.get_setting_int(conn, "paused", 0)
         if paused:
             return
+        self._promote_backlog(conn)
         cap = db.get_setting_int(conn, "parallel_run_cap", 3)
         running = len(self.sub_mgr.running_snapshot())
         if running >= cap:
@@ -88,6 +90,45 @@ class Dispatcher:
             if self.sub_mgr.is_running(gid):
                 continue
             self._launch_one(conn, gid, row["branch_name"])
+
+    def _promote_backlog(self, conn: sqlite3.Connection) -> None:
+        """Auto-promote `backlog` Gaps to `todo` once they've sat idle for
+        the configured interval. -1 = never (disabled), 0 = instant,
+        otherwise seconds since the row's `updated` timestamp."""
+        n = db.get_setting_int(conn, "backlog_promote_after_seconds", 3600)
+        if n < 0:
+            return
+        if n == 0:
+            rows = conn.execute(
+                "SELECT id FROM gaps_index WHERE status = 'backlog'"
+            ).fetchall()
+        else:
+            cutoff = (datetime.now(timezone.utc) - timedelta(seconds=n)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+            rows = conn.execute(
+                "SELECT id FROM gaps_index "
+                "WHERE status = 'backlog' AND updated <= ?",
+                (cutoff,),
+            ).fetchall()
+        if not rows:
+            return
+        ts = now_iso()
+        for row in rows:
+            gid = row["id"]
+            with db.transaction(conn):
+                cur = conn.execute(
+                    "UPDATE gaps_index SET status = 'todo', updated = ? "
+                    "WHERE id = ? AND status = 'backlog'",
+                    (ts, gid),
+                )
+            if cur.rowcount:
+                activity.append(
+                    conn,
+                    message="Auto-promoted from backlog to todo",
+                    severity="info", category="state",
+                    gap_id=gid, actor="runner",
+                )
 
     def _launch_one(self, conn: sqlite3.Connection, gap_id: str,
                     existing_branch: str | None) -> None:

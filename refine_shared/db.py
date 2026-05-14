@@ -85,6 +85,10 @@ DEFAULT_SETTINGS = {
     "agent_idle_timeout_seconds": "900",   # 15 min
     "agent_hard_cap_seconds": "86400",     # 24 h
     "chat_idle_timeout_seconds": "300",    # 5 min — auto-close idle chats
+    # How long a Gap can sit in 'backlog' before the dispatcher auto-promotes
+    # it to 'todo'. 3600 = 1 h default. Sentinel -1 = never (disabled).
+    # 0 = instant (promote on next tick).
+    "backlog_promote_after_seconds": "3600",
     "paused": "0",
     # Which agent CLI refine drives for Gap runs, conflict
     # resolution, and pre-flight. One of: claude | codex | gemini.

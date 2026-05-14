@@ -400,6 +400,9 @@ function setLastReporter(name) {
       navigate();
     }
   }
+  // Dashboard's "Awaiting your review" section is reporter-scoped — refresh
+  // it whenever the selection changes so the list re-targets immediately.
+  if (state.currentRoute === "dashboard") refreshDashboard();
 }
 
 // react to "+ Add new reporter" selection on any dropdown
@@ -598,16 +601,24 @@ async function refreshDashboard() {
   // every SSE handler that wants the dashboard to track live state.
   if (state.currentRoute !== "dashboard") return;
   try {
-    const d = await api("GET", "/api/dashboard");
+    const reporter = state.lastReporter || "";
+    const [d, reviews] = await Promise.all([
+      api("GET", "/api/dashboard"),
+      reporter
+        ? api("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + "&limit=200")
+        : Promise.resolve({ gaps: [] }),
+    ]);
     state.dashboard = d;
-    drawDashboard(d);
+    drawDashboard(d, { reviewsForReporter: reviews.gaps || [], reporter });
   } catch (e) {
     const dash = document.getElementById("dash");
     if (dash) dash.innerHTML = `<p class="muted">Failed to load: ${htmlEscape(e.message)}</p>`;
   }
 }
 
-function drawDashboard(d) {
+function drawDashboard(d, opts = {}) {
+  const reviewsForReporter = opts.reviewsForReporter || [];
+  const reviewReporter = opts.reporter || "";
   // Global banners
   const banners = (d.needs_attention || []).filter((x) => x.kind === "banner")
     .map((x) => ({
@@ -683,6 +694,48 @@ function drawDashboard(d) {
           </table>`}
     </section>
 
+    ${reviewReporter ? `
+    <section class="card" id="reviews-for-reporter-card">
+      <h3>
+        Awaiting your review
+        <span class="muted small">— ${htmlEscape(reviewReporter)}</span>
+      </h3>
+      ${reviewsForReporter.length === 0
+        ? `<p class="muted">Nothing in <code>review</code> assigned to you right now.</p>`
+        : `<div class="actions" style="margin-bottom:8px">
+            <label class="muted small">
+              <input type="checkbox" id="rev-select-all"> Select all
+            </label>
+            <span class="spacer"></span>
+            <button id="rev-bulk-verify" disabled>Verify selected</button>
+          </div>
+          <table class="table">
+            <thead><tr>
+              <th style="width:24px"></th>
+              <th>Gap</th>
+              <th>Updated</th>
+              <th class="actions-col" style="white-space:nowrap"></th>
+            </tr></thead>
+            <tbody>
+              ${reviewsForReporter.map((g) => `
+                <tr data-rev-row="${g.id}">
+                  <td><input type="checkbox" class="rev-row-check" data-rev-id="${g.id}"></td>
+                  <td>
+                    <a href="#/gaps/${g.id}" title="${htmlEscape(g.id)}">
+                      ${htmlEscape(g.name)}
+                    </a>
+                  </td>
+                  <td class="muted small">${fmtTime(g.updated)}</td>
+                  <td class="actions" style="white-space:nowrap">
+                    <button data-rev-verify="${g.id}">Verify →</button>
+                    <button class="secondary" data-rev-add-round="${g.id}"
+                            data-rev-name="${htmlEscape(g.name)}">Add round</button>
+                  </td>
+                </tr>`).join("")}
+            </tbody>
+          </table>`}
+    </section>` : ""}
+
     <section class="card">
       <h3>Currently running</h3>
       <div class="card-scroll">
@@ -717,6 +770,155 @@ function drawDashboard(d) {
       location.hash = gapsHash({ reporter: row.dataset.reporter });
     });
   });
+
+  wireReviewsForReporter(reviewsForReporter);
+}
+
+function wireReviewsForReporter(reviews) {
+  if (!reviews || !reviews.length) return;
+  const card = document.getElementById("reviews-for-reporter-card");
+  if (!card) return;
+  const checks = () => $$(".rev-row-check", card);
+  const selected = () => checks().filter((c) => c.checked).map((c) => c.dataset.revId);
+  const syncBulkButton = () => {
+    const btn = $("#rev-bulk-verify", card);
+    if (!btn) return;
+    const n = selected().length;
+    btn.disabled = n === 0;
+    btn.textContent = n === 0 ? "Verify selected" : `Verify selected (${n})`;
+  };
+  const selectAll = $("#rev-select-all", card);
+  selectAll?.addEventListener("change", () => {
+    checks().forEach((c) => { c.checked = selectAll.checked; });
+    syncBulkButton();
+  });
+  checks().forEach((c) => c.addEventListener("change", () => {
+    if (!c.checked && selectAll) selectAll.checked = false;
+    syncBulkButton();
+  }));
+
+  $$("[data-rev-verify]", card).forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.revVerify;
+      await withButtonBusy(btn, "Verifying…", async () => {
+        try {
+          const r = await api("POST", `/api/gaps/${id}/verify`);
+          if (r.ok) toast(r.message || "Verified", "info");
+          else toast(r.message || "Verify did not complete", "error");
+        } catch (e) { toast(e.message, "error"); }
+        await refreshDashboard();
+      });
+    });
+  });
+
+  $$("[data-rev-add-round]", card).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openAddRoundModal({
+        gapId: btn.dataset.revAddRound,
+        gapName: btn.dataset.revName || "",
+      });
+    });
+  });
+
+  $("#rev-bulk-verify", card)?.addEventListener("click", async () => {
+    const ids = selected();
+    if (!ids.length) return;
+    const ok = await modalConfirm(
+      `Verify ${ids.length} gap${ids.length === 1 ? "" : "s"}?`,
+      { title: "Bulk verify", okLabel: "Verify all" },
+    );
+    if (!ok) return;
+    const btn = $("#rev-bulk-verify", card);
+    await withButtonBusy(btn, `Verifying 0/${ids.length}…`, async () => {
+      let done = 0, failed = 0;
+      for (const id of ids) {
+        btn.textContent = `Verifying ${done + 1}/${ids.length}…`;
+        try {
+          const r = await api("POST", `/api/gaps/${id}/verify`);
+          if (!r.ok) failed++;
+        } catch (_e) { failed++; }
+        done++;
+      }
+      const msg = failed
+        ? `Verified ${done - failed} of ${ids.length} — ${failed} did not complete`
+        : `Verified ${done} gap${done === 1 ? "" : "s"}`;
+      toast(msg, failed ? "error" : "info");
+      await refreshDashboard();
+    });
+  });
+
+  syncBulkButton();
+}
+
+function openAddRoundModal({ gapId, gapName }) {
+  const reporter = state.lastReporter || "";
+  if (!reporter) {
+    toast("Pick a reporter in the top-right selector first", "error");
+    return;
+  }
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true"
+         aria-labelledby="add-round-title" style="max-width:560px">
+      <div class="modal-title" id="add-round-title">
+        Add round — ${htmlEscape(gapName || gapId)}
+      </div>
+      <div class="modal-body">
+        <div class="muted small" style="margin-bottom:8px">
+          Submitting as <strong>${htmlEscape(reporter)}</strong>
+          — change in the top-right reporter selector.
+        </div>
+        <form id="add-round-form">
+          <div class="form-row">
+            <label>Actual (current behavior)</label>
+            <textarea name="actual" placeholder="What's still happening?"></textarea>
+          </div>
+          <div class="form-row">
+            <label>Target (desired behavior)</label>
+            <textarea name="target" placeholder="What should be happening?"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+        <button data-ok>Submit new round</button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+  };
+  const onKey = (e) => { if (e.key === "Escape") close(); };
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => { if (e.target === root) close(); });
+  root.querySelector("[data-cancel]").addEventListener("click", close);
+  const submit = async () => {
+    const form = root.querySelector("#add-round-form");
+    const fd = new FormData(form);
+    const actual = (fd.get("actual") || "").toString().trim();
+    const target = (fd.get("target") || "").toString().trim();
+    if (!actual && !target) return toast("Provide actual or target", "error");
+    const okBtn = root.querySelector("[data-ok]");
+    await withButtonBusy(okBtn, "Submitting…", async () => {
+      try {
+        await api("POST", `/api/gaps/${gapId}/rounds`,
+                  { reporter, actual, target });
+        toast("New round submitted", "info");
+        close();
+        await refreshDashboard();
+      } catch (err) { toast(err.message, "error"); }
+    });
+  };
+  root.querySelector("[data-ok]").addEventListener("click", submit);
+  root.querySelector("#add-round-form").addEventListener("submit", (e) => {
+    e.preventDefault(); submit();
+  });
+  root.querySelector("textarea[name='actual']")?.focus();
 }
 
 function renderActivityList(entries) {
@@ -3204,6 +3406,20 @@ function drawSettings(s, diag, reps, feats) {
       <div class="form-row"><label>Standalone chat idle timeout (seconds)
         <span class="muted small">— set to 0 to disable auto-close</span></label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
+      <div class="form-row"><label>Auto-promote backlog → todo
+        <span class="muted small">— how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.</span></label>
+        <select id="s-backlog-promote">
+          ${[
+            ["-1",    "Never"],
+            ["0",     "Instant"],
+            ["300",   "5 minutes"],
+            ["1800",  "30 minutes"],
+            ["3600",  "1 hour"],
+            ["10800", "3 hours"],
+            ["21600", "6 hours"],
+            ["86400", "24 hours"],
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
       <div class="actions"><button id="s-save">Save</button></div>
     </div>
 
@@ -3319,6 +3535,7 @@ function drawSettings(s, diag, reps, feats) {
           agent_idle_timeout_seconds: $("#s-idle").value,
           agent_hard_cap_seconds: $("#s-hard").value,
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
+          backlog_promote_after_seconds: $("#s-backlog-promote").value,
         });
         toast("Saved", "info");
       } catch (e) { toast(e.message, "error"); }

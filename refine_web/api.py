@@ -748,6 +748,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "parallel_run_cap", "branch_name_pattern",
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
         "chat_idle_timeout_seconds",
+        "backlog_promote_after_seconds",
         "agent_subpath", "merge_target_branch",
         "agent_cli",
         "paused",
@@ -787,6 +788,20 @@ def update_settings(body: dict) -> tuple[int, dict]:
                 return err(400,
                     f"agent_cli must be one of {', '.join(valid_agent_clis)}")
             normalized[k] = choice
+        elif k == "backlog_promote_after_seconds":
+            # -1 = never, 0 = instant, otherwise seconds. Restrict to the
+            # canonical set shown in the UI so a stale client can't smuggle
+            # in something weird.
+            try:
+                n = int(v)
+            except (TypeError, ValueError):
+                return err(400, "backlog_promote_after_seconds must be an integer")
+            allowed_intervals = {-1, 0, 300, 1800, 3600, 10800, 21600, 86400}
+            if n not in allowed_intervals:
+                return err(400,
+                    "backlog_promote_after_seconds must be one of "
+                    "-1 (never), 0 (instant), 300, 1800, 3600, 10800, 21600, 86400")
+            normalized[k] = str(n)
         else:
             normalized[k] = str(v)
     conn = _conn()
