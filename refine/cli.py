@@ -8,6 +8,7 @@ Subcommands:
             .refine/ data so you can re-`init` against a different repo.
 - start   — bring up runner (systemd) + webapp (docker compose).
 - stop    — stop runner + webapp.
+- restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
 - runner  — start the runner daemon in-process (used by the systemd unit
             and for interactive debugging; not the daily verb).
@@ -97,6 +98,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Skip the rebuild staleness check entirely.",
     )
     p_start.set_defaults(fn=cmd_start)
+
+    p_restart = sub.add_parser(
+        "restart",
+        help="Stop runner + webapp, then start them again.",
+        description=(
+            "Equivalent to `refine stop && refine start`. Accepts the same "
+            "rebuild flags as `start` for the post-stop bring-up."
+        ),
+    )
+    p_restart.add_argument(
+        "--rebuild", action="store_true",
+        help="Force a `docker compose build` between stop and start.",
+    )
+    p_restart.add_argument(
+        "--no-rebuild", action="store_true",
+        help="Skip the rebuild staleness check on the post-stop start.",
+    )
+    p_restart.set_defaults(fn=cmd_restart)
 
     p_stop = sub.add_parser(
         "stop",
@@ -344,6 +363,17 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
     print("Stopped.")
     return 0
+
+
+def cmd_restart(args: argparse.Namespace) -> int:
+    """`refine stop && refine start` — picks up source changes the
+    running processes haven't loaded yet (runner Python code, webapp
+    image rebuilds) without forcing the operator to run two commands."""
+    rc = cmd_stop(args)
+    if rc != 0:
+        return rc
+    print()
+    return cmd_start(args)
 
 
 def cmd_reset(args: argparse.Namespace) -> int:

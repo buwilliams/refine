@@ -115,11 +115,13 @@ def main() -> int:
         status, fetched = get_json(f"/api/gaps/{gap_id}")
         assert status == 200
         assert fetched["gap"]["name"] == "Recolor login button"
-        assert fetched["gap"]["status"] == "todo"
+        assert fetched["gap"]["status"] == "backlog"
         assert fetched["gap"]["rounds"][0]["reporter"] == "Jane Doe"
-        print("[ok] gap fetched + status=todo + reporter on round")
+        print("[ok] gap fetched + status=backlog + reporter on round")
 
-        # Appending to a `todo` gap should be rejected per spec.
+        # Appending to a `backlog` gap should be rejected per spec — only
+        # `review` (a previously-worked Gap with the user adding a follow-up
+        # round) accepts new rounds via this endpoint.
         status, append_result = post_json(f"/api/gaps/{gap_id}/rounds", {
             "reporter": "Jane Doe", "actual": "still red", "target": "blue",
         })

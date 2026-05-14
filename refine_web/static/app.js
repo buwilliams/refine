@@ -519,7 +519,7 @@ function drawDashboard(d) {
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
-  const orderedStatuses = ["todo", "in-progress", "review", "done", "failed", "cancelled"];
+  const orderedStatuses = ["backlog", "todo", "in-progress", "review", "done", "failed", "cancelled"];
   const dash = $("#dash");
   dash.innerHTML = `
     ${needsAttention.length ? `
@@ -667,7 +667,7 @@ async function renderGapsList() {
       </div>
       <div class="filter-row filter-row-activity">
         <select id="filter-status">
-          ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
+          ${["", "backlog", "todo", "in-progress", "review", "done", "failed", "cancelled"]
             .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
         </select>
         <select id="filter-reporter">
@@ -992,7 +992,7 @@ function _updateSelectAllState(gaps) {
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
 const BULK_STATUS_OPTIONS = [
-  "todo", "in-progress", "review", "done", "failed", "cancelled",
+  "backlog", "todo", "in-progress", "review", "done", "failed", "cancelled",
 ];
 
 async function openBulkModal(field) {
@@ -1230,11 +1230,15 @@ function drawGapDetail(gap) {
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
 
-  const isLatestEditable = (gap.status === "todo" || gap.status === "failed");
+  const isLatestEditable = (gap.status === "backlog" ||
+                            gap.status === "todo" ||
+                            gap.status === "failed");
   const verifyEnabled = gap.status === "review";
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
-  // Chat is "attach to the running agent" — only meaningful while in-progress.
-  const chatEnabled = gap.status === "in-progress";
+  // Chat is always available — the value is the Gap context the runner
+  // primes into claude's session. The chat runs in the Gap's worktree
+  // when one exists (in-progress / todo with a registered worktree) and
+  // falls back to the client repo when it doesn't (done / cancelled).
   // Reopen pulls a terminal Gap back to todo so the dispatcher picks it up.
   const reopenEnabled = ["failed", "done", "cancelled"].includes(gap.status);
 
@@ -1247,7 +1251,7 @@ function drawGapDetail(gap) {
       </div>
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-verify" ${verifyEnabled ? "" : "disabled"}>Verify</button>
-        <button id="btn-chat" ${chatEnabled ? "" : "disabled"}>Open Chat</button>
+        <button id="btn-chat">Open Chat</button>
         <button id="btn-reopen" ${reopenEnabled ? "" : "disabled"}>Reopen</button>
         <button class="warn" id="btn-rename">Rename</button>
         <button class="warn" id="btn-priority">Change Priority</button>
@@ -1269,7 +1273,7 @@ function drawGapDetail(gap) {
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
         rounds.map((rnd, idx) => renderRound(rnd, idx, idx === rounds.length - 1, isLatestEditable && idx === rounds.length - 1)).join("")}
 
-      ${(gap.status === "todo" || gap.status === "failed") ? `
+      ${(gap.status === "backlog" || gap.status === "todo" || gap.status === "failed") ? `
         <div class="card" style="margin-top:14px">
           <h3>Edit latest round</h3>
           ${renderRoundForm("edit", latest)}
@@ -1323,7 +1327,6 @@ function drawGapDetail(gap) {
     });
   });
   $("#btn-chat")?.addEventListener("click", () => {
-    if ($("#btn-chat").disabled) return;
     openChatDock({ gapId: gap.id });
   });
   $("#btn-reopen")?.addEventListener("click", async () => {

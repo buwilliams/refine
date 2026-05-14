@@ -71,8 +71,19 @@ class SubprocessManager:
         Returns the PID. on_finished(gap_id, exit_code, killed_reason) is invoked
         from the supervisor thread when the subprocess exits.
         """
-        claude_path = shutil.which("claude") or "claude"
-        env = os.environ.copy()
+        # Reuse the same env + PATH plumbing the chat subprocess uses
+        # (chat_mgr._chat_env / _resolve_claude): strip API-key vars so
+        # OAuth from `~/.claude/` wins, and resolve `claude` via the
+        # user's interactive login-shell PATH so we hit the
+        # `~/.local/bin/claude` they've actually logged into — not
+        # whatever stale `claude` happens to be on systemd-user's
+        # stripped PATH. Without this, `~/.claude/settings.json`
+        # (and its `skipDangerousModePermissionPrompt`) is invisible
+        # to the agent and `--dangerously-skip-permissions` hits its
+        # "must be accepted in an interactive session first" gate.
+        from .chat_mgr import _chat_env, _resolve_claude
+        env = _chat_env()
+        claude_path = _resolve_claude(env)
         # The agent inherits ~/.claude auth on the host. PATH and HOME come along.
         proc = subprocess.Popen(
             [claude_path, "--print", "--dangerously-skip-permissions", prompt],

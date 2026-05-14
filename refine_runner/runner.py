@@ -174,7 +174,7 @@ class Runner:
             self._conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, json_path) "
-                "VALUES (?, ?, 'todo', ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?)",
                 (gap_id, name, priority, params["reporter"],
                  gap["created"], gap["updated"], relative_gap_path(gap_id)),
             )
@@ -357,12 +357,17 @@ class Runner:
         priming_prompt: str | None = None
         priming_intro: str | None = None
         if gap_id:
-            root = git_ops.gap_worktree_path(gap_id)
-            if not root.exists():
-                raise ValueError(f"Gap {gap_id} has no worktree")
+            # Prefer the Gap's worktree when it exists (in-progress / todo
+            # / review / failed Gaps with a registered worktree). For
+            # done/cancelled Gaps the worktree is gone — fall back to the
+            # client repo so chat still works for retrospectives. The
+            # priming preamble will know which cwd it has.
+            worktree = git_ops.gap_worktree_path(gap_id)
+            worktree_present = worktree.exists()
+            root = worktree if worktree_present else git_ops.client_repo_path()
             is_standalone = False
             priming_prompt, priming_intro = _build_gap_chat_preamble(
-                self._conn, gap_id,
+                self._conn, gap_id, worktree_present=worktree_present,
             )
         else:
             root = git_ops.client_repo_path()
@@ -414,6 +419,7 @@ def _normalize_priority(value: Any) -> str:
 # ---- chat priming -----------------------------------------------------------
 
 def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
+                              *, worktree_present: bool = True,
                               ) -> tuple[str | None, str | None]:
     """Build a context preamble for an attached-chat session.
 
@@ -421,6 +427,12 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     claude with output discarded so it lives in claude's session memory
     silently; the intro line is appended to the user-visible chat buffer so
     the user knows context was loaded.
+
+    `worktree_present` controls how we describe the cwd: True when the
+    Gap's git worktree still exists (in-progress / todo / review / failed
+    Gaps), False when it's already been cleaned up (done / cancelled).
+    In the latter case the chat runs in the client repo for retrospective
+    Q&A — and the preamble tells claude that explicitly.
     """
     row = conn.execute(
         "SELECT name, status, branch_name FROM gaps_index WHERE id = ?",
@@ -436,17 +448,29 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     recent_activity = list(reversed(recent_activity))
 
     subpath = (db.get_setting(conn, "agent_subpath") or "").strip()
-    cwd_note = (
-        f"Your cwd is `{subpath}/` inside the Gap's git worktree — a sub-"
-        f"project the operator configured. The rest of the worktree (and "
-        f"all git history) lives one level up; `cd ..` or absolute paths "
-        f"reach it."
-        if subpath else
-        "You're running inside the Gap's git worktree (your cwd)."
-    )
+    if worktree_present:
+        cwd_note = (
+            f"Your cwd is `{subpath}/` inside the Gap's git worktree — a sub-"
+            f"project the operator configured. The rest of the worktree (and "
+            f"all git history) lives one level up; `cd ..` or absolute paths "
+            f"reach it."
+            if subpath else
+            "You're running inside the Gap's git worktree (your cwd)."
+        )
+    else:
+        # The Gap's worktree has been cleaned up (done / cancelled) so
+        # we're in the client repo instead. Set expectations: any code
+        # state you see is the current main-line, not the in-progress
+        # Gap branch.
+        cwd_note = (
+            "This Gap's git worktree has already been cleaned up (the Gap is "
+            "in a terminal state), so your cwd is the client repo itself. "
+            "The Gap's commits, if merged, are on the main-line history; the "
+            "branch may or may not still exist."
+        )
     parts: list[str] = [
-        "You're in a refine chat session attached to an in-progress Gap (a",
-        "behavior change the team is tracking). " + cwd_note + " You can",
+        "You're in a refine chat session about a Gap (a behavior change",
+        "the team is tracking). " + cwd_note + " You can",
         "read code, run `git log`,",
         "`git status`, `git diff`, and other tools to investigate the agent's",
         "progress.",

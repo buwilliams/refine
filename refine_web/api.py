@@ -40,7 +40,7 @@ def _conn() -> sqlite3.Connection:
 
 _VALID_PRIORITIES = ("low", "medium", "high")
 _VALID_STATUSES = (
-    "todo", "in-progress", "review", "done", "failed", "cancelled",
+    "backlog", "todo", "in-progress", "review", "done", "failed", "cancelled",
 )
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
@@ -506,7 +506,7 @@ def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
         conn.close()
     if not row:
         return err(404, "Gap not found")
-    if row["status"] not in ("todo", "failed"):
+    if row["status"] not in ("backlog", "todo", "failed"):
         return err(409, "Only the latest unaddressed round can be edited "
                         f"(status={row['status']})")
     try:

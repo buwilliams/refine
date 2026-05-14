@@ -3,13 +3,15 @@
 Refine turns software gaps (features and bugs) into verified software
 through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
-*what it should do instead* — submits a Gap. Refine launches a Claude
-Code agent in a git worktree to close it; a human reviews the diff
-and the live behavior; only after that review does **verify** merge
-the work to the configured target branch and push. Gaps move
-`todo → in-progress → review → done`, with `failed` and `cancelled`
-for the unhappy paths; multiple Gaps run in parallel up to a
-configurable cap.
+*what it should do instead* — submits a Gap. New Gaps land in
+**backlog**, where they sit idle until someone promotes them to
+**todo**. From there refine launches a Claude Code agent in a git
+worktree to close it; a human reviews the diff and the live behavior;
+only after that review does **verify** merge the work to the
+configured target branch and push. Gaps move
+`backlog → todo → in-progress → review → done`, with `failed` and
+`cancelled` for the unhappy paths; multiple Gaps run in parallel up
+to a configurable cap.
 
 You drive everything from a web UI:
 
@@ -234,6 +236,7 @@ the UI's Settings page.
 | `uv run refine reset`         | Undo `init` in this clone: stop services, disable + remove the systemd unit, delete `.refine-binding` + `.env`. Add `--purge` (+ `-y` to skip prompt) to also delete the bound client's `.refine/` data. |
 | `uv run refine start`         | Rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy.  |
 | `uv run refine stop`          | `systemctl --user stop <unit>` + `docker compose down`.                                                     |
+| `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands. Same `--rebuild` / `--no-rebuild` flags as `start`. |
 | `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |
 | `uv run refine runner`        | Run the runner in the foreground (what the systemd unit invokes).                                           |
 | `uv run refine web`           | Start the webapp in-process (rarely used directly — Docker wraps it).                                       |
