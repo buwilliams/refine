@@ -372,6 +372,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
             return err(400, "invalid reporter name")
 
     filt = body.get("filter") or {}
+    excluded = set(body.get("exclude_ids") or [])
     code, listing = list_gaps(
         status=filt.get("status") or None,
         q=filt.get("q") or None,
@@ -383,7 +384,8 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     )
     if code != 200:
         return code, listing
-    gap_ids = [g["id"] for g in listing.get("gaps") or []]
+    gap_ids = [g["id"] for g in (listing.get("gaps") or [])
+               if g["id"] not in excluded]
     if not gap_ids:
         return 200, {"updated": 0, "ids": []}
 
@@ -440,6 +442,7 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     abort the run — we collect them in the response.
     """
     filt = body.get("filter") or {}
+    excluded = set(body.get("exclude_ids") or [])
     code, listing = list_gaps(
         status=filt.get("status") or None,
         q=filt.get("q") or None,
@@ -451,7 +454,8 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     )
     if code != 200:
         return code, listing
-    gap_ids = [g["id"] for g in listing.get("gaps") or []]
+    gap_ids = [g["id"] for g in (listing.get("gaps") or [])
+               if g["id"] not in excluded]
     if not gap_ids:
         return 200, {"deleted": 0, "ids": [], "failures": []}
 

@@ -393,6 +393,19 @@ select {
 .results-filtered .table thead th {
   color: var(--accent);
 }
+
+/* Bulk-action selection column on the Gaps list. Narrow + centered;
+   only rendered when the filter shell is expanded. */
+.table th.gap-select-col,
+.table td.gap-select-col {
+  width: 32px;
+  padding-left: 12px;
+  padding-right: 4px;
+  text-align: center;
+}
+.table td.gap-select-col input[type="checkbox"] {
+  cursor: pointer;
+}
 .filter-row {
   display: flex;
   gap: 8px;

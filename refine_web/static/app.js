@@ -730,6 +730,14 @@ async function renderGapsList() {
   $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
   $("#bulk-delete").addEventListener("click", () => confirmBulkDelete());
 
+  // Expanding / collapsing the filter shell shows / hides the per-row
+  // checkbox column. Redraw from the cached results so we don't re-fetch.
+  $("#gaps-filter-shell").addEventListener("toggle", () => {
+    if (_lastGapsRender) {
+      drawGapsTable(_lastGapsRender.gaps, _lastGapsRender.state);
+    }
+  });
+
   await refreshGapsTable();
 }
 
@@ -811,18 +819,37 @@ async function refreshGapsTable() {
       countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
     }
     applyGapsFilterIndicator(f);
-    drawGapsTable(gaps, {
+    const renderState = {
       q: f.q, status: f.status,
       sort: f.effectiveSort, dir: f.effectiveDir,
-    });
+    };
+    _lastGapsRender = { gaps, state: renderState };
+    drawGapsTable(gaps, renderState);
   } catch (e) {
     const tbl = $("#gaps-table");
     if (tbl) tbl.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
+// IDs the user has explicitly DESELECTED from bulk operations. Every Gap
+// starts selected by default — the bulk endpoints apply to "every Gap
+// matching the filter, minus this set". Persisted only in-memory; the
+// excluded set survives filter tweaks and re-expanding the filter shell
+// but resets on a hard navigation away from the Gaps screen.
+const gapsExcludedIds = new Set();
+
+// Cached snapshot of the last refresh, so toggling the filter shell open
+// or closed can redraw the table without re-fetching.
+let _lastGapsRender = null;
+
 function drawGapsTable(gaps, state) {
   const root = $("#gaps-table");
+  // Selection UI follows the filter shell — only show checkboxes when the
+  // shell is expanded (i.e. the user has indicated they want to interact
+  // with bulk actions). Collapsed = focus on results.
+  const shell = document.getElementById("gaps-filter-shell");
+  const showSelection = !!(shell && shell.open);
+
   if (!gaps.length) {
     root.innerHTML = `<p class="muted">No gaps match the current filters.</p>`;
     return;
@@ -834,7 +861,7 @@ function drawGapsTable(gaps, state) {
     { key: "updated",  label: "Updated"  },
     { key: "id",       label: "ID"       },
   ];
-  const headHtml = columns.map((c) => {
+  const sortHeads = columns.map((c) => {
     const isActive = c.key === state.sort;
     const arrow = isActive
       ? (state.dir === "asc" ? "↑" : "↓")
@@ -844,24 +871,72 @@ function drawGapsTable(gaps, state) {
               ${c.label} <span class="sort-arrow">${arrow}</span>
             </th>`;
   }).join("");
+  const selectionHead = showSelection
+    ? `<th class="gap-select-col">
+         <input type="checkbox" id="gap-select-all"
+                aria-label="Select all on this page">
+       </th>`
+    : "";
   root.innerHTML = `
     <table class="table">
-      <thead><tr>${headHtml}</tr></thead>
+      <thead><tr>${selectionHead}${sortHeads}</tr></thead>
       <tbody>
-        ${gaps.map((g) => `
-          <tr data-id="${g.id}">
+        ${gaps.map((g) => {
+          const selected = !gapsExcludedIds.has(g.id);
+          const cell = showSelection
+            ? `<td class="gap-select-col">
+                 <input type="checkbox" class="gap-select"
+                        data-id="${g.id}"
+                        ${selected ? "checked" : ""}
+                        aria-label="Select gap ${htmlEscape(g.name)}">
+               </td>`
+            : "";
+          return `<tr data-id="${g.id}">
+            ${cell}
             <td>${htmlEscape(g.name)}</td>
             <td><span class="status-pill ${g.status}">${g.status}</span></td>
             <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small">${fmtTime(g.updated)}</td>
             <td class="muted small"><code>${g.id.slice(0,10)}…</code></td>
-          </tr>`).join("")}
+          </tr>`;
+        }).join("")}
       </tbody>
     </table>
   `;
+  // Row click navigates to gap detail — but a click on the checkbox (or
+  // its surrounding td) should toggle selection, not navigate.
   $$(".table tbody tr", root).forEach((row) => {
-    row.addEventListener("click", () => location.hash = "#/gaps/" + row.dataset.id);
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".gap-select-col")) return;
+      location.hash = "#/gaps/" + row.dataset.id;
+    });
   });
+  $$(".gap-select", root).forEach((cb) => {
+    cb.addEventListener("click", (e) => e.stopPropagation());
+    cb.addEventListener("change", (e) => {
+      const id = e.target.dataset.id;
+      if (e.target.checked) gapsExcludedIds.delete(id);
+      else gapsExcludedIds.add(id);
+      _updateSelectAllState(gaps);
+    });
+  });
+  const selectAll = root.querySelector("#gap-select-all");
+  if (selectAll) {
+    _updateSelectAllState(gaps);
+    selectAll.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const shouldCheck = selectAll.checked;
+      for (const g of gaps) {
+        if (shouldCheck) gapsExcludedIds.delete(g.id);
+        else gapsExcludedIds.add(g.id);
+      }
+      // Re-sync the row checkboxes without a full redraw.
+      $$(".gap-select", root).forEach((cb) => {
+        cb.checked = !gapsExcludedIds.has(cb.dataset.id);
+      });
+      selectAll.indeterminate = false;
+    });
+  }
   $$(".table th.sortable", root).forEach((th) => {
     th.addEventListener("click", () => {
       const key = th.dataset.sortKey;
@@ -876,6 +951,26 @@ function drawGapsTable(gaps, state) {
       updateGapsFilter({ sort: key, dir: nextDir });
     });
   });
+}
+
+// Sync the header checkbox's checked / indeterminate state to the page
+// selection: all checked → checked, none checked → unchecked, mix →
+// indeterminate. Called after every selection change.
+function _updateSelectAllState(gaps) {
+  const master = document.getElementById("gap-select-all");
+  if (!master) return;
+  let selected = 0;
+  for (const g of gaps) if (!gapsExcludedIds.has(g.id)) selected++;
+  if (selected === 0) {
+    master.checked = false;
+    master.indeterminate = false;
+  } else if (selected === gaps.length) {
+    master.checked = true;
+    master.indeterminate = false;
+  } else {
+    master.checked = false;
+    master.indeterminate = true;
+  }
 }
 
 // ---- Gaps: bulk-update modal ------------------------------------------------
@@ -900,7 +995,17 @@ async function openBulkModal(field) {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const countText = ($("#gaps-count")?.textContent || "").trim();
+  // When the filter shell is open, the user may have unchecked some of
+  // the rows. Translate that into an explicit exclude list and a
+  // selected-count for the modal text.
+  const excludeIds = _selectionSnapshot();
+  const matchingCount = _lastGapsRender?.gaps?.length || 0;
+  const selectedCount = matchingCount - excludeIds.filter(
+    (id) => (_lastGapsRender?.gaps || []).some((g) => g.id === id),
+  ).length;
+  const countText = excludeIds.length && _lastGapsRender
+    ? `${selectedCount} of ${matchingCount} selected`
+    : ($("#gaps-count")?.textContent || "").trim();
   const label = { priority: "Priority", status: "Status", reporter: "Reporter" }[field];
 
   let valueControlHtml = "";
@@ -954,13 +1059,22 @@ async function openBulkModal(field) {
   if (!next) return;          // user opened the picker but didn't choose
   try {
     const r = await api("POST", "/api/gaps/bulk", {
-      filter, update: { [field]: next },
+      filter, exclude_ids: excludeIds, update: { [field]: next },
     });
     toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
+    // Successful bulk op may have changed the result set or facets;
+    // clear stale exclusions and re-render top-to-bottom.
+    gapsExcludedIds.clear();
     await renderGapsList();
   } catch (e) {
     toast(`Bulk update failed: ${e.message}`, "error");
   }
+}
+
+// Frozen-at-call-time copy of the user's deselected IDs (so a slow
+// network request doesn't see live edits).
+function _selectionSnapshot() {
+  return Array.from(gapsExcludedIds);
 }
 
 // Highlight each non-default Gaps filter control with the accent
@@ -996,7 +1110,14 @@ async function confirmBulkDelete() {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const countText = ($("#gaps-count")?.textContent || "matching gaps").trim();
+  const excludeIds = _selectionSnapshot();
+  const matchingCount = _lastGapsRender?.gaps?.length || 0;
+  const selectedCount = matchingCount - excludeIds.filter(
+    (id) => (_lastGapsRender?.gaps || []).some((g) => g.id === id),
+  ).length;
+  const countText = excludeIds.length && _lastGapsRender
+    ? `${selectedCount} of ${matchingCount} selected gaps`
+    : (($("#gaps-count")?.textContent || "matching gaps").trim());
   const ok = await modalConfirm(
     `Permanently delete ${countText} (${filterDesc})? This cancels any ` +
     "running subprocesses, removes worktrees and branches for non-done " +
@@ -1010,7 +1131,9 @@ async function confirmBulkDelete() {
   );
   if (!ok) return;
   try {
-    const r = await api("POST", "/api/gaps/bulk/delete", { filter });
+    const r = await api("POST", "/api/gaps/bulk/delete", {
+      filter, exclude_ids: excludeIds,
+    });
     const failedN = (r.failures || []).length;
     if (failedN) {
       toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}, ` +
@@ -1018,8 +1141,9 @@ async function confirmBulkDelete() {
     } else {
       toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}.`, "info");
     }
-    // The filtered view may now be empty / wrong — re-render top-to-bottom
-    // so the reporter and other dropdowns get fresh facet values.
+    // Clear stale exclusions and re-render top-to-bottom — the filtered
+    // view may now be empty and facets may have changed.
+    gapsExcludedIds.clear();
     await renderGapsList();
   } catch (e) {
     toast(`Bulk delete failed: ${e.message}`, "error");
