@@ -15,9 +15,9 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT,
-    M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING, M_SET_NOTES,
-    M_VERIFY, default_socket_path,
+    M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
+    M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
+    M_SET_NOTES, M_UNDO_GAP, M_VERIFY, default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
@@ -104,6 +104,8 @@ class Runner:
             M_EXTRACT_GAPS: self._h_extract_gaps,
             M_RENAME_REPORTER: self._h_rename_reporter,
             M_RENAME_REPORTER_STRINGS: self._h_rename_reporter_strings,
+            M_LIST_CHANGES: self._h_list_changes,
+            M_UNDO_GAP: self._h_undo_gap,
         }
         h = handlers.get(method)
         if h is None:
@@ -351,6 +353,153 @@ class Runner:
             severity="info", category="state", actor="refine",
         )
         return {"touched": touched}
+
+    def _effective_target_branch(self) -> str | None:
+        """The configured merge target branch, or the host's current
+        branch when nothing's set. None if neither resolves (e.g. host
+        is in detached-HEAD state with no setting)."""
+        configured = (db.get_setting(self._conn, "merge_target_branch")
+                      or "").strip()
+        if configured:
+            return configured
+        return git_ops.current_branch()
+
+    def _h_list_changes(self, params: dict) -> dict:
+        """List refine merge commits on the target branch.
+
+        Returns each commit plus the Gap metadata refine knows about
+        (name + current status). Powers the Changes screen.
+        """
+        target = self._effective_target_branch()
+        if not target:
+            return {"branch": None, "changes": []}
+        limit = int(params.get("limit") or 50)
+        merges = git_ops.list_refine_merges(target, limit=limit)
+        if not merges:
+            return {"branch": target, "changes": []}
+        ids = [m["gap_id"] for m in merges]
+        placeholders = ",".join("?" * len(ids))
+        rows = self._conn.execute(
+            f"SELECT id, name, status, priority "
+            f"FROM gaps_index WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        by_id = {r["id"]: r for r in rows}
+        for m in merges:
+            row = by_id.get(m["gap_id"])
+            m["name"] = row["name"] if row else None
+            m["status"] = row["status"] if row else None
+            m["priority"] = row["priority"] if row else None
+        return {"branch": target, "changes": merges}
+
+    def _h_undo_gap(self, params: dict) -> dict:
+        """Revert a refine merge commit and transition the Gap to
+        `cancelled` with a log entry. The Gap's branch was already
+        deleted by verify, so we only need to touch the target branch.
+
+        Mirrors verify_op's branch-switching dance — if the host's HEAD
+        isn't on the target branch, stash WIP and switch before the
+        revert, restore on exit.
+        """
+        commit_sha = (params.get("commit") or "").strip()
+        if not commit_sha:
+            raise ValueError("commit is required")
+        gap_id = git_ops.gap_id_from_commit(commit_sha)
+        if not gap_id:
+            return {"ok": False, "stage": "lookup",
+                    "message": f"commit {commit_sha[:10]}… isn't a refine merge"}
+        target = self._effective_target_branch()
+        if not target:
+            return {"ok": False, "stage": "precheck",
+                    "message": ("could not resolve target branch — host is in "
+                                "detached HEAD and no merge_target_branch is "
+                                "configured")}
+        if not git_ops.local_branch_exists(target):
+            return {"ok": False, "stage": "precheck",
+                    "message": f"target branch `{target}` doesn't exist locally"}
+
+        host_branch = git_ops.current_branch()
+        switched_from: str | None = None
+        pre_switch_stash = False
+        if host_branch != target:
+            if git_ops.working_copy_dirty():
+                sr = git_ops.stash_push(
+                    f"refine auto-stash before undo of {commit_sha[:10]}",
+                )
+                if not sr.ok:
+                    return {"ok": False, "stage": "precheck",
+                            "message": "could not stash WIP before checkout",
+                            "details": sr.stderr}
+                pre_switch_stash = True
+            ck = git_ops.checkout_branch(target)
+            if not ck.ok:
+                if pre_switch_stash:
+                    git_ops.stash_pop()
+                return {"ok": False, "stage": "precheck",
+                        "message": f"could not check out target `{target}`",
+                        "details": ck.stderr}
+            switched_from = host_branch
+
+        pushed = False
+        try:
+            # `git revert -m 1 <merge> --no-edit`
+            r = git_ops.revert_merge_commit(commit_sha)
+            if not r.ok:
+                blob = (r.stdout or "") + "\n" + (r.stderr or "")
+                # Abort the partial revert so the worktree is clean again.
+                git_ops.revert_abort()
+                return {"ok": False, "stage": "revert",
+                        "message": ("revert conflicted — undo aborted; "
+                                    "resolve manually if needed"),
+                        "details": blob[:2000]}
+            # Push if there's an upstream; local-only repos still get the
+            # revert in their working state.
+            if git_ops.upstream_branch(target) is not None:
+                p = git_ops.push_current()
+                if p.ok:
+                    pushed = True
+                else:
+                    activity.append(
+                        self._conn,
+                        message=("Undo revert committed but push failed — "
+                                 "Gap still cancelled locally"),
+                        severity="warn", category="git",
+                        gap_id=gap_id, actor="refine",
+                        details=p.stderr[:2000],
+                    )
+        finally:
+            if switched_from:
+                back = git_ops.checkout_branch(switched_from)
+                if back.ok and pre_switch_stash:
+                    git_ops.stash_pop()
+
+        # Move the Gap to cancelled + log the undo on the latest round.
+        with db.transaction(self._conn):
+            self._conn.execute(
+                "UPDATE gaps_index SET status = 'cancelled', updated = ? WHERE id = ?",
+                (now_iso(), gap_id),
+            )
+        msg = (f"Gap undone — reverted merge `{commit_sha[:10]}…` on "
+               f"`{target}`" + (" and pushed" if pushed else " (push skipped)"))
+        try:
+            gap = shared_gaps.read_gap_json(gap_id) or {}
+            rounds = gap.get("rounds") or []
+            if rounds:
+                gap_writer.append_round_log(
+                    gap_id=gap_id, round_idx=len(rounds) - 1,
+                    severity="warn", category="git", actor="refine",
+                    message=msg,
+                )
+        except Exception:
+            pass
+        activity.append(
+            self._conn,
+            message=msg,
+            severity="warn", category="git",
+            gap_id=gap_id, actor="refine",
+        )
+        return {"ok": True, "gap_id": gap_id,
+                "commit": commit_sha, "pushed": pushed, "target": target}
 
     def _h_chat_start(self, params: dict) -> dict:
         gap_id = params.get("gap_id")

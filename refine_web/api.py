@@ -15,8 +15,8 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RENAME_REPORTER,
-    M_RUNNING, M_SET_NOTES, M_VERIFY,
+    M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
+    M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_UNDO_GAP, M_VERIFY,
 )
 from refine_shared.ulid import new_ulid
 
@@ -538,6 +538,36 @@ def verify(gap_id: str) -> tuple[int, dict]:
     except IpcError as e:
         return _ipc_err(e)
     return 200, result
+
+
+def list_changes(*, limit: int = 50) -> tuple[int, dict]:
+    """List refine merge commits on the target branch (plus the Gap
+    metadata for each). Used by the Changes screen."""
+    try:
+        result = get_client().call(
+            M_LIST_CHANGES, {"limit": int(limit)}, timeout=15.0,
+        )
+    except IpcError as e:
+        return _ipc_err(e)
+    return 200, result
+
+
+def undo_change(body: dict) -> tuple[int, dict]:
+    """Revert a refine merge commit. The runner derives the Gap id from
+    the commit's `Refine Gap:` trailer, switches branches if needed,
+    runs `git revert -m 1`, pushes when an upstream exists, and moves
+    the Gap to `cancelled` with a log entry."""
+    commit = (body.get("commit") or "").strip()
+    if not commit:
+        return err(400, "commit is required")
+    try:
+        result = get_client().call(
+            M_UNDO_GAP, {"commit": commit}, timeout=120.0,
+        )
+    except IpcError as e:
+        return _ipc_err(e)
+    code = 200 if result.get("ok") else 409
+    return code, result
 
 
 def retry(gap_id: str) -> tuple[int, dict]:

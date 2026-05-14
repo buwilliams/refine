@@ -110,6 +110,16 @@ def _h_cancel(_h, m, _b, _q):
     return api.cancel(m.group(1).upper())
 
 
+@route("GET", r"/api/changes")
+def _h_list_changes(_h, _m, _b, q):
+    return api.list_changes(limit=int(_get_one(q, "limit", "50")))
+
+
+@route("POST", r"/api/changes/undo")
+def _h_undo_change(_h, _m, body, _q):
+    return api.undo_change(body or {})
+
+
 @route("GET", r"/api/reporters")
 def _h_list_reporters(_h, _m, _b, _q):
     return api.list_reporters()

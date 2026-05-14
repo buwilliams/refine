@@ -7,11 +7,22 @@ client's current branch come from refine's agent runs.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
+
+
+# Merge commits made by refine's verify path end with a `Refine Gap: <id>`
+# trailer (see refine_runner.verify_op._build_merge_message). We use the
+# trailer to recover gap_id from a merge commit on the target branch.
+_REFINE_GAP_FOOTER = re.compile(
+    r"^\s*Refine Gap:\s*([0-9A-Za-z]{26})\s*$", re.MULTILINE,
+)
+_LOG_RECORD_SEP = "\x1e"
+_LOG_FIELD_SEP = "\x1f"
 
 
 def client_repo_path() -> Path:
@@ -254,8 +265,11 @@ def pull_ff_only(cwd: Path | None = None) -> GitResult:
 
 
 def merge_branch(branch: str, *, cwd: Path | None = None,
-                 message: str | None = None) -> GitResult:
+                 message: str | None = None,
+                 no_ff: bool = False) -> GitResult:
     args = ["merge", "--no-edit"]
+    if no_ff:
+        args.append("--no-ff")
     if message:
         args.extend(["-m", message])
     args.append(branch)
@@ -264,6 +278,71 @@ def merge_branch(branch: str, *, cwd: Path | None = None,
 
 def push_current(cwd: Path | None = None) -> GitResult:
     return _run(["push"], cwd=cwd or client_repo_path(), timeout=300.0)
+
+
+def list_refine_merges(branch: str, limit: int = 50,
+                        *, cwd: Path | None = None) -> list[dict]:
+    """Walk `branch` for merge commits refine produced.
+
+    A refine merge has the trailer `Refine Gap: <gap_id>` in its body
+    (verify_op._build_merge_message). Returns the matching commits as
+    `[{commit, committed, subject, gap_id, branch}]`, newest first.
+    """
+    fmt = _LOG_FIELD_SEP.join(["%H", "%cI", "%s", "%B"]) + _LOG_RECORD_SEP
+    r = _run([
+        "log", "--first-parent", "--merges",
+        f"--max-count={int(limit)}",
+        f"--pretty=format:{fmt}",
+        branch,
+    ], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
+    out: list[dict] = []
+    for chunk in r.stdout.split(_LOG_RECORD_SEP):
+        chunk = chunk.strip("\x00\n ")
+        if not chunk:
+            continue
+        parts = chunk.split(_LOG_FIELD_SEP, 3)
+        if len(parts) != 4:
+            continue
+        sha, committed, subject, body = parts
+        m = _REFINE_GAP_FOOTER.search(body)
+        if not m:
+            continue
+        out.append({
+            "commit": sha,
+            "committed": committed,
+            "subject": subject,
+            "gap_id": m.group(1),
+            "branch": branch,
+        })
+    return out
+
+
+def gap_id_from_commit(commit_sha: str, *,
+                       cwd: Path | None = None) -> str | None:
+    """Read the body of `commit_sha` and pull out its `Refine Gap:` trailer."""
+    r = _run(["show", "-s", "--pretty=%B", commit_sha],
+             cwd=cwd or client_repo_path())
+    if not r.ok:
+        return None
+    m = _REFINE_GAP_FOOTER.search(r.stdout)
+    return m.group(1) if m else None
+
+
+def revert_merge_commit(commit_sha: str, *,
+                         cwd: Path | None = None) -> GitResult:
+    """`git revert -m 1 --no-edit <merge>` on the current branch. The
+    caller is responsible for being on the right branch and for handling
+    conflicts (look at `stderr` / `stdout` for "CONFLICT")."""
+    return _run(
+        ["revert", "-m", "1", "--no-edit", commit_sha],
+        cwd=cwd or client_repo_path(),
+    )
+
+
+def revert_abort(cwd: Path | None = None) -> GitResult:
+    return _run(["revert", "--abort"], cwd=cwd or client_repo_path())
 
 
 def local_branch_exists(branch: str, cwd: Path | None = None) -> bool:

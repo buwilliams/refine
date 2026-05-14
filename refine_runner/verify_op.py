@@ -225,7 +225,10 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
              severity="info", category="git", actor=actor)
     else:
         merge_message = _build_merge_message(conn, gap_id, branch, current)
-        r = git_ops.merge_branch(branch, message=merge_message)
+        # `--no-ff` so every Gap completion produces a merge commit
+        # carrying the `Refine Gap:` trailer — that's what the Changes
+        # screen pivots on for Undo.
+        r = git_ops.merge_branch(branch, message=merge_message, no_ff=True)
         if not r.ok:
             stderr = r.stderr + ("\n" + r.stdout if r.stdout else "")
             if "CONFLICT" in stderr or "conflict" in stderr.lower():

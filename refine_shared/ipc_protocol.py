@@ -38,6 +38,8 @@ M_DIAGNOSTICS = "diagnostics"             # last-contact, recent IPC errors
 M_EXTRACT_GAPS = "extract_gaps"           # one-shot LLM extraction of Gap drafts from free-form text
 M_RENAME_REPORTER = "rename_reporter"     # rename in reporters table + cascade through gap.json rounds
 M_RENAME_REPORTER_STRINGS = "rename_reporter_strings"  # cascade through gap.json only (maintenance)
+M_LIST_CHANGES = "list_changes"           # list refine merge commits on the target branch
+M_UNDO_GAP = "undo_gap"                   # revert a refine merge commit + transition the Gap to cancelled
 
 
 def envelope_ok(req_id: str, result: dict | None = None) -> dict:
