@@ -3643,7 +3643,7 @@ function drawSettings(s, diag, reps, feats) {
         alive by polling the health URL below.
       </p>
       <div class="form-row"><label>Health check URL
-        <span class="muted small">— refine GETs this every ${"~15s"}. 2xx = healthy. Leave blank to skip health checks.</span></label>
+        <span class="muted small">— refine GETs this every ${"~15s"}. 2xx = healthy. The probe runs on the <strong>host</strong> (via the runner), so <code>localhost</code> resolves to the host the target app is bound on — not the webapp container. Leave blank to skip health checks.</span></label>
         <input type="text" id="s-target-health-url"
                placeholder="http://localhost:3000/health"
                value="${htmlEscape(s.target_app_health_url || "")}"></div>
@@ -3918,6 +3918,9 @@ function drawTargetAppStatusBlock(snap) {
   const healthBits = snap.last_health_at
     ? `Last health check: ${snap.last_health_ok ? "OK" : "FAIL"} · ${fmtTime(snap.last_health_at)}`
     : "No health checks yet.";
+  const healthDetail = snap.last_health_message && !snap.last_health_ok
+    ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Probe: ${htmlEscape(snap.last_health_message)}</p>`
+    : "";
   block.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px">
       <span class="target-app-dot" data-status-dot></span>
@@ -3925,6 +3928,7 @@ function drawTargetAppStatusBlock(snap) {
       ${snap.health_url ? `<span class="muted small">${htmlEscape(snap.health_url)}</span>` : `<span class="muted small">No health URL configured</span>`}
     </div>
     <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
+    ${healthDetail}
     ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
   `;
   // Apply dot colour from the parent state via a CSS hook — the .target-app-dot

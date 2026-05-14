@@ -121,6 +121,10 @@ DEFAULT_SETTINGS = {
     "target_app_state": "unknown",
     "target_app_last_health_at": "",     # ISO timestamp
     "target_app_last_health_ok": "0",    # "1" / "0"
+    # Last health-probe message (e.g. "HTTP 200", "unreachable: …",
+    # "runner unreachable: …"). Surfaced in Settings so the operator
+    # can see WHY a probe is failing without scanning the activity feed.
+    "target_app_last_health_message": "",
     # Last-operation log: error message if start/stop failed, else "".
     "target_app_last_error": "",
 }

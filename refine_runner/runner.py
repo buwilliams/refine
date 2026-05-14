@@ -17,8 +17,8 @@ from refine_shared.ipc_protocol import (
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
-    M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_RUN, M_UNDO_GAP,
-    M_VERIFY, default_socket_path,
+    M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
+    M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY, default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
@@ -118,6 +118,7 @@ class Runner:
             M_UNDO_GAP: self._h_undo_gap,
             M_TARGET_APP_RUN: self._h_target_app_run,
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
+            M_TARGET_APP_HEALTH: self._h_target_app_health,
         }
         h = handlers.get(method)
         if h is None:
@@ -702,6 +703,19 @@ class Runner:
             details=details,
         )
         return result
+
+    def _h_target_app_health(self, params: dict) -> dict:
+        """Probe the configured health URL from the host.
+
+        Runs in the runner process so `localhost` and 127.0.0.1 in the
+        URL resolve to the host the target app is bound on, not the
+        webapp's Docker container. The caller supplies the URL (the
+        webapp reads it from the same SQLite settings table either
+        way; passing it in keeps the handler stateless).
+        """
+        url = (params.get("url") or "").strip()
+        timeout = float(params.get("timeout") or 5.0)
+        return target_app.http_health(url, timeout=timeout)
 
     def _h_target_app_generate(self, params: dict) -> dict:
         """Generate start or stop instructions via an agent analysis pass.

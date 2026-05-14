@@ -17,7 +17,7 @@ from refine_shared.ipc_protocol import (
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
-    M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
+    M_TARGET_APP_HEALTH, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_shared.ulid import new_ulid
 
@@ -1132,6 +1132,7 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
         ),
         "last_health_at": db.get_setting(conn, "target_app_last_health_at") or "",
         "last_health_ok": (db.get_setting(conn, "target_app_last_health_ok") or "0") == "1",
+        "last_health_message": db.get_setting(conn, "target_app_last_health_message") or "",
         "last_error": db.get_setting(conn, "target_app_last_error") or "",
     }
 
@@ -1256,15 +1257,12 @@ def target_app_health(_body: dict | None = None) -> tuple[int, dict]:
 def _target_app_run_health_check() -> dict:
     """Issue one health probe and update the snapshot in SQLite.
 
-    Probing logic lives in the runner module to share code paths with
-    other target-app helpers; we call it directly from the webapp here
-    because health checks are pure stdlib HTTP and don't need the host
-    runner's auth context.
+    The probe runs on the **host** via the runner (IPC) rather than
+    inside the webapp container, so URLs that reference `localhost`
+    or `127.0.0.1` resolve to the host the target application is
+    actually listening on (not the webapp container, where nothing
+    of the operator's app is running).
     """
-    # Importing here avoids loading runner-only modules at webapp import
-    # time (they're available because runner + webapp ship in the same
-    # repo, but keeping the import local makes the dependency explicit).
-    from refine_runner import target_app as _target_app
     conn = _conn()
     try:
         url = (db.get_setting(conn, "target_app_health_url") or "").strip()
@@ -1272,7 +1270,15 @@ def _target_app_run_health_check() -> dict:
         conn.close()
     if not url:
         return _persist_health_result(False, "no health URL configured", probed=False)
-    res = _target_app.http_health(url)
+    try:
+        res = get_client().call(
+            M_TARGET_APP_HEALTH, {"url": url}, timeout=10.0,
+        )
+    except IpcError as e:
+        # If the runner is unreachable, the runner-unreachable banner
+        # already surfaces that fact globally — don't double-report
+        # via the target-app block, just record the failure.
+        return _persist_health_result(False, f"runner unreachable: {e.message}")
     return _persist_health_result(bool(res.get("ok")), res.get("message") or "")
 
 
@@ -1283,6 +1289,7 @@ def _persist_health_result(ok: bool, message: str, *, probed: bool = True) -> di
         if probed:
             db.set_setting(conn, "target_app_last_health_at", now_iso())
             db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0")
+            db.set_setting(conn, "target_app_last_health_message", message or "")
         cur_state = db.get_setting(conn, "target_app_state") or "unknown"
         # Auto-transition based on health-check outcome — but don't
         # clobber explicit user transitions in flight (starting/stopping

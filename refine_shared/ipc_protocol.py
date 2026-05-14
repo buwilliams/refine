@@ -42,6 +42,7 @@ M_LIST_CHANGES = "list_changes"           # list refine merge commits on the tar
 M_UNDO_GAP = "undo_gap"                   # revert a refine merge commit + transition the Gap to cancelled
 M_TARGET_APP_RUN = "target_app_run"       # run target-app start/stop instructions via Standalone agent
 M_TARGET_APP_GENERATE = "target_app_generate"  # ask the agent to analyze the codebase and write start/stop instructions
+M_TARGET_APP_HEALTH = "target_app_health"  # probe the configured health URL FROM THE HOST (not the webapp container)
 
 
 def envelope_ok(req_id: str, result: dict | None = None) -> dict:
