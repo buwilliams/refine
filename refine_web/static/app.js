@@ -1214,6 +1214,28 @@ async function loadGapDetail(gapId) {
   }
 }
 
+// User-driven workflow transitions for a Gap. Each state declares its
+// `back` and `forward` neighbors; `in-progress` has neither because the
+// dispatcher owns that state (agent picks up todo → in-progress → review
+// automatically). Forward from `review` goes through the dedicated
+// /verify endpoint (real git merge + push); every other transition is a
+// status PATCH with no workflow side effects.
+//
+// failed / cancelled only expose a back arrow — there's no obvious
+// forward target for them (they're terminal-ish in opposite directions
+// from done). Use back to send the Gap back to todo and rerun.
+const GAP_WORKFLOW = {
+  backlog:   { forward: { label: "Todo →",     next: "todo"   } },
+  todo:      { back:    { label: "← Backlog",  next: "backlog" },
+               forward: { label: "Review →",   next: "review" } },
+  // in-progress: no user buttons — dispatcher transitions in and out.
+  review:    { back:    { label: "← Todo",     next: "todo"   },
+               forward: { label: "Verify →",   next: "done", verify: true } },
+  done:      { back:    { label: "← Review",   next: "review" } },
+  failed:    { back:    { label: "← Todo",     next: "todo"   } },
+  cancelled: { back:    { label: "← Todo",     next: "todo"   } },
+};
+
 function drawGapDetail(gap) {
   renderBanners([]);
   // Preserve the notes-card open state across re-renders of the same gap so
@@ -1233,14 +1255,24 @@ function drawGapDetail(gap) {
   const isLatestEditable = (gap.status === "backlog" ||
                             gap.status === "todo" ||
                             gap.status === "failed");
-  const verifyEnabled = gap.status === "review";
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
   // Chat is always available — the value is the Gap context the runner
   // primes into claude's session. The chat runs in the Gap's worktree
-  // when one exists (in-progress / todo with a registered worktree) and
-  // falls back to the client repo when it doesn't (done / cancelled).
-  // Reopen pulls a terminal Gap back to todo so the dispatcher picks it up.
-  const reopenEnabled = ["failed", "done", "cancelled"].includes(gap.status);
+  // when one exists and falls back to the client repo when it doesn't.
+
+  // Dynamic workflow buttons: each state shows the previous/next state
+  // it can move to as back / forward buttons. The user-driven workflow
+  // skips `in-progress` (the dispatcher owns that). Forward from review
+  // goes through the existing `verify` endpoint (the only transition
+  // with real git side effects); everything else is a bookkeeping
+  // status update via PATCH /api/gaps/<id>.
+  const workflow = GAP_WORKFLOW[gap.status] || {};
+  const backBtn = workflow.back ? `
+    <button id="btn-state-back">${htmlEscape(workflow.back.label)}</button>
+  ` : "";
+  const forwardBtn = workflow.forward ? `
+    <button id="btn-state-forward">${htmlEscape(workflow.forward.label)}</button>
+  ` : "";
 
   $("#main").innerHTML = `
     <div class="gap-detail">
@@ -1250,9 +1282,9 @@ function drawGapDetail(gap) {
         <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
       </div>
       <div class="actions" style="margin-bottom:10px">
-        <button id="btn-verify" ${verifyEnabled ? "" : "disabled"}>Verify</button>
+        ${backBtn}
+        ${forwardBtn}
         <button id="btn-chat">Open Chat</button>
-        <button id="btn-reopen" ${reopenEnabled ? "" : "disabled"}>Reopen</button>
         <button class="warn" id="btn-rename">Rename</button>
         <button class="warn" id="btn-priority">Change Priority</button>
         <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
@@ -1314,37 +1346,35 @@ function drawGapDetail(gap) {
     </div>
   `;
 
-  $("#btn-verify")?.addEventListener("click", async () => {
-    const btn = $("#btn-verify");
-    if (btn.disabled) return;
-    await withButtonBusy(btn, "Verifying…", async () => {
-      try {
-        const r = await api("POST", `/api/gaps/${gap.id}/verify`);
-        if (r.ok) toast("Merged + pushed", "info");
-        else toast(r.message || "Verify did not complete", "error");
-        await loadGapDetail(gap.id);
-      } catch (e) { toast(e.message, "error"); }
-    });
-  });
   $("#btn-chat")?.addEventListener("click", () => {
     openChatDock({ gapId: gap.id });
   });
-  $("#btn-reopen")?.addEventListener("click", async () => {
-    const btn = $("#btn-reopen");
-    if (btn.disabled) return;
-    const ok = await modalConfirm(
-      `Reopen this Gap? It will move from ${gap.status} back to todo and the dispatcher will pick it up again.`,
-      { title: "Reopen Gap", okLabel: "Reopen", cancelLabel: "Keep as-is" },
-    );
-    if (!ok) return;
-    await withButtonBusy(btn, "Reopening…", async () => {
-      try {
-        await api("POST", `/api/gaps/${gap.id}/retry`);
-        toast("Reopened", "info");
-        await loadGapDetail(gap.id);
-      } catch (e) { toast(e.message, "error"); }
+
+  // Workflow back / forward buttons. Forward from `review` calls the
+  // existing /verify endpoint (the only transition with real git side
+  // effects); every other arrow is a plain status PATCH.
+  const wireWorkflow = (btnId, target) => {
+    if (!target) return;
+    $(btnId)?.addEventListener("click", async () => {
+      const btn = $(btnId);
+      const busyLabel = target.verify ? "Verifying…" : `Moving to ${target.next}…`;
+      await withButtonBusy(btn, busyLabel, async () => {
+        try {
+          if (target.verify) {
+            const r = await api("POST", `/api/gaps/${gap.id}/verify`);
+            if (r.ok) toast(r.message || "Verified", "info");
+            else toast(r.message || "Verify did not complete", "error");
+          } else {
+            await api("PATCH", `/api/gaps/${gap.id}`, { status: target.next });
+            toast(`Moved to ${target.next}`, "info");
+          }
+          await loadGapDetail(gap.id);
+        } catch (e) { toast(e.message, "error"); }
+      });
     });
-  });
+  };
+  wireWorkflow("#btn-state-back", workflow.back);
+  wireWorkflow("#btn-state-forward", workflow.forward);
   $("#btn-rename")?.addEventListener("click", async () => {
     const name = await modalPrompt("New name", gap.name,
                                    { title: "Rename Gap" });

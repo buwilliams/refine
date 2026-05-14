@@ -277,9 +277,20 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
         if p not in _VALID_PRIORITIES:
             return err(400, "priority must be one of low/medium/high")
         sql_fields["priority"] = p
+    if "status" in body:
+        # Per-Gap status updates power the workflow back/forward buttons
+        # on the detail page. The transitions are bookkeeping-only — they
+        # don't kick off agent runs, cancel running subprocesses, or
+        # touch the worktree. (The agent picks up Gaps in `todo`; the
+        # `verify` endpoint still owns the merge+push that lands a Gap
+        # in `done`.)
+        s = (body.get("status") or "").strip().lower()
+        if s not in _VALID_STATUSES:
+            return err(400, "invalid status")
+        sql_fields["status"] = s
     notes_change = "notes" in body
     if not sql_fields and not notes_change:
-        return err(400, "expected `name`, `priority`, and/or `notes`")
+        return err(400, "expected `name`, `priority`, `status`, and/or `notes`")
     if sql_fields:
         set_clause = ", ".join(f"{k} = ?" for k in sql_fields) + ", updated = ?"
         args = list(sql_fields.values()) + [now_iso(), gap_id]
