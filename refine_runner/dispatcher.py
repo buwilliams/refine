@@ -265,13 +265,24 @@ class Dispatcher:
         )
 
         success = outcome.kind == "success"
-        next_status = "review" if success else "failed"
 
-        with db.transaction(conn):
-            conn.execute(
-                "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
-                (next_status, now_iso(), gap_id),
-            )
+        # Failure path: move straight to `failed` and we're done.
+        # Success path: keep the Gap in `in-progress` so the UI shows
+        # a single uninterrupted "still working" state through auto-
+        # verify (fetch + merge + push, including any auto-resolve of
+        # merge conflicts that might run for minutes). The Gap only
+        # leaves `in-progress` when verify either lands it in `done`
+        # (clean merge committed and pushed) or kicks it back to
+        # `review` for human resolution. Without this, the Gap would
+        # briefly flash `review` while a long-running conflict
+        # resolver was actively still working on it.
+        if not success:
+            with db.transaction(conn):
+                conn.execute(
+                    "UPDATE gaps_index SET status = 'failed', updated = ? "
+                    "WHERE id = ?",
+                    (now_iso(), gap_id),
+                )
 
         try:
             gap_writer.append_round_log(
@@ -296,10 +307,13 @@ class Dispatcher:
         )
 
         # Auto-verify: as soon as a round succeeds, merge the gap's branch
-        # into the currently checked-out branch (and push). If any verify
-        # step fails (e.g., dirty working copy, push rejected, merge
-        # conflict), the Gap stays in `review` with the failure logged and
-        # the user can resolve and click Verify manually.
+        # into the currently checked-out branch (and push). The Gap is
+        # still `in-progress` at this point — verify will land it in
+        # `done` on success. After verify returns, any Gap still in
+        # `in-progress` means verify failed somewhere recoverable
+        # (dirty working copy, push rejected, unresolvable merge
+        # conflict) — transition to `review` so the user can resolve
+        # and click Verify manually.
         if success:
             try:
                 verify_op.perform_verify(conn, gap_id, actor="runner")
@@ -310,6 +324,16 @@ class Dispatcher:
                     severity="error", category="git",
                     gap_id=gap_id, actor="runner",
                 )
+            row = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
+            ).fetchone()
+            if row and row["status"] == "in-progress":
+                with db.transaction(conn):
+                    conn.execute(
+                        "UPDATE gaps_index SET status = 'review', "
+                        "updated = ? WHERE id = ?",
+                        (now_iso(), gap_id),
+                    )
 
 
 def _format_prompt(round_obj: dict) -> str:

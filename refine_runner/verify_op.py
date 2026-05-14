@@ -25,9 +25,13 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
     ).fetchone()
     if not row:
         return {"ok": False, "stage": "lookup", "message": "Gap not found"}
-    if row["status"] != "review":
+    # `review` is the typical entry status (user-triggered Verify). The
+    # dispatcher also calls perform_verify directly after a successful
+    # round while the Gap is still `in-progress` — see the comment in
+    # `_on_finished`. Both are valid; any other status is a mis-call.
+    if row["status"] not in ("review", "in-progress"):
         return {"ok": False, "stage": "lookup",
-                "message": f"Gap is not in review (status={row['status']})"}
+                "message": f"Gap is not verifiable (status={row['status']})"}
 
     branch = row["branch_name"]
     if not branch:
