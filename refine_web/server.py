@@ -65,6 +65,11 @@ def _h_bulk_update_gaps(_h, _m, body, _q):
     return api.bulk_update_gaps(body or {})
 
 
+@route("POST", r"/api/gaps/bulk/delete")
+def _h_bulk_delete_gaps(_h, _m, body, _q):
+    return api.bulk_delete_gaps(body or {})
+
+
 @route("GET", r"/api/gaps/([0-9A-Za-z]{26})")
 def _h_get_gap(_h, m, _b, _q):
     return api.get_gap(m.group(1).upper())

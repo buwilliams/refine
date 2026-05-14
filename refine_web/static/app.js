@@ -681,6 +681,8 @@ async function renderGapsList() {
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
+        <span class="spacer"></span>
+        <button class="danger small" id="bulk-delete">Delete…</button>
       </div>
     </div>
     <div id="gaps-table"><p class="muted">Loading…</p></div>
@@ -715,6 +717,7 @@ async function renderGapsList() {
   $("#bulk-set-priority").addEventListener("click", () => openBulkModal("priority"));
   $("#bulk-set-status").addEventListener("click", () => openBulkModal("status"));
   $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
+  $("#bulk-delete").addEventListener("click", () => confirmBulkDelete());
 
   await refreshGapsTable();
 }
@@ -973,6 +976,43 @@ function applyGapsFilterIndicator(f) {
   if (pill) pill.hidden = !anyActive;
   const tbl = $("#gaps-table");
   if (tbl) tbl.classList.toggle("results-filtered", anyActive);
+}
+
+async function confirmBulkDelete() {
+  const f = gapsFilterFromHash();
+  const filter = {
+    status: f.status, q: f.q, reporter: f.reporter,
+    severity: f.severity, category: f.category, actor: f.actor,
+  };
+  const filterDesc = describeGapsFilter(filter);
+  const countText = ($("#gaps-count")?.textContent || "matching gaps").trim();
+  const ok = await modalConfirm(
+    `Permanently delete ${countText} (${filterDesc})? This cancels any ` +
+    "running subprocesses, removes worktrees and branches for non-done " +
+    "Gaps, and erases their gap.json files. This cannot be undone.",
+    {
+      title: "Delete Gaps",
+      okLabel: `Delete ${countText}`,
+      cancelLabel: "Keep them",
+      danger: true,
+    },
+  );
+  if (!ok) return;
+  try {
+    const r = await api("POST", "/api/gaps/bulk/delete", { filter });
+    const failedN = (r.failures || []).length;
+    if (failedN) {
+      toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}, ` +
+            `${failedN} failed.`, "warn");
+    } else {
+      toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}.`, "info");
+    }
+    // The filtered view may now be empty / wrong — re-render top-to-bottom
+    // so the reporter and other dropdowns get fresh facet values.
+    await renderGapsList();
+  } catch (e) {
+    toast(`Bulk delete failed: ${e.message}`, "error");
+  }
 }
 
 function describeGapsFilter(filter) {

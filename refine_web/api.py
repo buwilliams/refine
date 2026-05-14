@@ -430,6 +430,49 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                  "field": field, "value": value}
 
 
+def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
+    """Delete every Gap matching the supplied filter.
+
+    Each Gap is dispatched through the same `M_DELETE_GAP` path a
+    single-Gap delete uses, so the runner cancels any running
+    subprocess, tears down the worktree + branch for non-done gaps,
+    erases gap.json, and cleans the index. Per-Gap failures don't
+    abort the run — we collect them in the response.
+    """
+    filt = body.get("filter") or {}
+    code, listing = list_gaps(
+        status=filt.get("status") or None,
+        q=filt.get("q") or None,
+        severity=filt.get("severity") or None,
+        category=filt.get("category") or None,
+        actor=filt.get("actor") or None,
+        reporter=filt.get("reporter") or None,
+        limit=10_000,
+    )
+    if code != 200:
+        return code, listing
+    gap_ids = [g["id"] for g in listing.get("gaps") or []]
+    if not gap_ids:
+        return 200, {"deleted": 0, "ids": [], "failures": []}
+
+    deleted_ids: list[str] = []
+    failures: list[dict] = []
+    for gid in gap_ids:
+        try:
+            res = get_client().call(
+                M_DELETE_GAP, {"gap_id": gid}, timeout=60.0,
+            )
+            if res.get("deleted"):
+                deleted_ids.append(gid)
+        except IpcError as e:
+            failures.append({"id": gid, "error": str(e)})
+    return 200, {
+        "deleted": len(deleted_ids),
+        "ids": deleted_ids,
+        "failures": failures,
+    }
+
+
 def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     reporter = (body.get("reporter") or "").strip()
     actual = (body.get("actual") or "").strip()
