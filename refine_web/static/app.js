@@ -483,9 +483,6 @@ async function renderGapsList() {
           .map((s) => `<option value="${s}" ${s === status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
       </select>
       <span id="gaps-count" class="muted small"></span>
-      <span class="spacer"></span>
-      <a class="btn" href="#/gaps/new">+ New Gap</a>
-      <a class="btn secondary" href="#/gaps/import">Import…</a>
     </div>
     <div id="gaps-table"><p class="muted">Loading…</p></div>
   `;
