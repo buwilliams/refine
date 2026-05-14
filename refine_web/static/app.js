@@ -413,6 +413,7 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "agents") refreshAgents();
+    if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       try {
         const data = JSON.parse(e.data);
@@ -430,6 +431,9 @@ function initSSE() {
     // table on the Agents screen — refresh when one fires so the row
     // appears or disappears without a manual reload.
     if (state.currentRoute === "agents") refreshAgents();
+    // Changes screen: a Gap moving to `done` lands a new merge commit
+    // here; a cancellation flips an existing row's Undo button state.
+    if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);
     }
@@ -2035,22 +2039,30 @@ function drawImportDrafts(root, drafts, close) {
 // `cancelled` with a log entry.
 
 async function renderChanges() {
+  // First-paint scaffold only; SSE handlers call `loadChanges` directly
+  // so the table redraws in place without a `Loading…` flash.
   renderBanners([]);
-  $("#main").innerHTML = `<h2>Changes</h2><div id="changes-body"><p class="muted">Loading…</p></div>`;
+  if (!document.getElementById("changes-body")) {
+    $("#main").innerHTML = `<h2>Changes</h2><div id="changes-body"><p class="muted">Loading…</p></div>`;
+  }
   await loadChanges();
 }
 
 async function loadChanges() {
+  if (state.currentRoute !== "changes") return;
   try {
     const data = await api("GET", "/api/changes");
     drawChanges(data);
   } catch (e) {
-    $("#changes-body").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+    const root = document.getElementById("changes-body");
+    if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
 function drawChanges(data) {
-  const root = $("#changes-body");
+  const root = document.getElementById("changes-body");
+  // Guard against a late SSE refresh after the user navigated away.
+  if (!root) return;
   const branch = data.branch || "(unknown)";
   const changes = data.changes || [];
   if (!branch || branch === "(unknown)") {
@@ -2120,7 +2132,14 @@ function drawChanges(data) {
         try {
           const r = await api("POST", "/api/changes/undo", { commit });
           if (r.ok) {
-            toast(`Undone${r.pushed ? " and pushed" : ""}`, "info");
+            // Surface the push-failed-but-revert-succeeded case
+            // prominently — the local state is ahead of remote and
+            // the user needs to push manually.
+            if (r.push_warning) {
+              toast(r.push_warning, "error");
+            } else {
+              toast(`Undone${r.pushed ? " and pushed" : ""}`, "info");
+            }
             await loadChanges();
           } else {
             toast(r.message || "Undo failed", "error");

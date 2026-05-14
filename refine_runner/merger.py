@@ -138,6 +138,29 @@ class Merger:
 
     # ---- synchronous entry point ---------------------------------------------
 
+    def run_under_host_lock(self, thunk, *, label: str) -> dict:
+        """Serialize an arbitrary host-worktree operation through the
+        same lock the merger holds during auto-verify. Before invoking
+        `thunk`, abort any leftover half-finished `merge`/`rebase`/etc.
+        After a failed thunk, run cleanup again so the next op starts
+        clean. Used by Undo (Changes screen) and could be used by any
+        future feature that mutates `HEAD` on the host."""
+        with self._host_lock:
+            self._cleanup_worktree(reason=f"pre-{label} cleanup")
+            try:
+                result = thunk()
+            except Exception as e:
+                activity.append(
+                    self._get_conn(),
+                    message=f"{label} raised: {e!r}",
+                    severity="error", category="git", actor="runner",
+                )
+                result = {"ok": False, "stage": "internal",
+                          "message": f"{label} raised: {e!r}"}
+            if not result.get("ok"):
+                self._cleanup_worktree(reason=f"post-{label} failure cleanup")
+            return result
+
     def verify_now(self, gap_id: str, *, actor: str = "refine") -> dict:
         """Synchronously run verify for a Gap. Serializes with the
         background tick so a user-triggered Verify can't race with

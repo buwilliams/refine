@@ -410,20 +410,38 @@ class Runner:
 
     def _h_undo_gap(self, params: dict) -> dict:
         """Revert a refine merge commit and transition the Gap to
-        `cancelled` with a log entry. The Gap's branch was already
-        deleted by verify, so we only need to touch the target branch.
+        `cancelled` with a log entry.
 
-        Mirrors verify_op's branch-switching dance — if the host's HEAD
-        isn't on the target branch, stash WIP and switch before the
-        revert, restore on exit.
+        Routes through the merger's host lock so a concurrent auto-
+        merge or user Verify can't race with us on the shared host
+        worktree. The merger also runs its cleanup-worktree pass
+        before AND after — aborting any leftover stuck
+        `merge`/`rebase` from a prior failure so the revert doesn't
+        trip on stale state, and tearing down any partial revert if
+        our own attempt fails.
         """
         commit_sha = (params.get("commit") or "").strip()
         if not commit_sha:
             raise ValueError("commit is required")
+        return self.merger.run_under_host_lock(
+            lambda: self._do_undo_gap(commit_sha),
+            label="undo",
+        )
+
+    def _do_undo_gap(self, commit_sha: str) -> dict:
         gap_id = git_ops.gap_id_from_commit(commit_sha)
         if not gap_id:
             return {"ok": False, "stage": "lookup",
                     "message": f"commit {commit_sha[:10]}… isn't a refine merge"}
+        # Reject undo on a Gap that's already cancelled — defends
+        # against a stale UI where the button was visible/clickable
+        # after a concurrent undo from another tab.
+        row = self._conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
+        ).fetchone()
+        if row and row["status"] == "cancelled":
+            return {"ok": False, "stage": "state",
+                    "message": "Gap is already cancelled — nothing to undo"}
         target = self._effective_target_branch()
         if not target:
             return {"ok": False, "stage": "precheck",
@@ -436,20 +454,25 @@ class Runner:
 
         host_branch = git_ops.current_branch()
         switched_from: str | None = None
-        pre_switch_stash = False
+        # Always stash WIP — even when we're already on the target
+        # branch. `git revert` refuses to run with a dirty working
+        # tree, so the prior "only stash if switching" rule left a
+        # dead-end failure path on a fresh checkout that happened
+        # to have local edits.
+        stashed = False
+        if git_ops.working_copy_dirty():
+            sr = git_ops.stash_push(
+                f"refine auto-stash before undo of {commit_sha[:10]}",
+            )
+            if not sr.ok:
+                return {"ok": False, "stage": "precheck",
+                        "message": "could not stash WIP before undo",
+                        "details": sr.stderr}
+            stashed = True
         if host_branch != target:
-            if git_ops.working_copy_dirty():
-                sr = git_ops.stash_push(
-                    f"refine auto-stash before undo of {commit_sha[:10]}",
-                )
-                if not sr.ok:
-                    return {"ok": False, "stage": "precheck",
-                            "message": "could not stash WIP before checkout",
-                            "details": sr.stderr}
-                pre_switch_stash = True
             ck = git_ops.checkout_branch(target)
             if not ck.ok:
-                if pre_switch_stash:
+                if stashed:
                     git_ops.stash_pop()
                 return {"ok": False, "stage": "precheck",
                         "message": f"could not check out target `{target}`",
@@ -457,6 +480,8 @@ class Runner:
             switched_from = host_branch
 
         pushed = False
+        push_warning: str | None = None
+        revert_message: str | None = None
         try:
             # `git revert -m 1 <merge> --no-edit`
             r = git_ops.revert_merge_commit(commit_sha)
@@ -465,20 +490,25 @@ class Runner:
                 # Abort the partial revert so the worktree is clean again.
                 git_ops.revert_abort()
                 return {"ok": False, "stage": "revert",
-                        "message": ("revert conflicted — undo aborted; "
-                                    "resolve manually if needed"),
+                        "message": ("revert conflicted — undo aborted; the "
+                                    "merge commit touches paths that have "
+                                    "since changed. Resolve manually with "
+                                    "`git revert -m 1 <sha>` on the host."),
                         "details": blob[:2000]}
-            # Push if there's an upstream; local-only repos still get the
-            # revert in their working state.
+            # Push if there's an upstream; local-only repos still get
+            # the revert in their working state.
             if git_ops.upstream_branch(target) is not None:
                 p = git_ops.push_current()
                 if p.ok:
                     pushed = True
                 else:
+                    push_warning = (
+                        f"Revert committed locally on `{target}` but push "
+                        f"failed — your remote still has the merge. Push "
+                        f"manually once the underlying issue is resolved."
+                    )
                     activity.append(
-                        self._conn,
-                        message=("Undo revert committed but push failed — "
-                                 "Gap still cancelled locally"),
+                        self._conn, message=push_warning,
                         severity="warn", category="git",
                         gap_id=gap_id, actor="refine",
                         details=p.stderr[:2000],
@@ -486,8 +516,28 @@ class Runner:
         finally:
             if switched_from:
                 back = git_ops.checkout_branch(switched_from)
-                if back.ok and pre_switch_stash:
-                    git_ops.stash_pop()
+                if not back.ok:
+                    activity.append(
+                        self._conn,
+                        message=(f"Could not restore host HEAD to "
+                                 f"`{switched_from}` after undo — host is "
+                                 f"still on `{target}`"),
+                        severity="warn", category="git",
+                        gap_id=gap_id, actor="refine",
+                        details=back.stderr[:2000],
+                    )
+            if stashed:
+                pop = git_ops.stash_pop()
+                if not pop.ok:
+                    activity.append(
+                        self._conn,
+                        message=("Auto-stash pop after undo failed — your "
+                                 "WIP remains in `git stash`. Recover with "
+                                 "`git stash list` + `git stash pop`."),
+                        severity="warn", category="git",
+                        gap_id=gap_id, actor="refine",
+                        details=pop.stderr[:2000],
+                    )
 
         # Move the Gap to cancelled + log the undo on the latest round.
         with db.transaction(self._conn):
@@ -495,8 +545,18 @@ class Runner:
                 "UPDATE gaps_index SET status = 'cancelled', updated = ? WHERE id = ?",
                 (now_iso(), gap_id),
             )
-        msg = (f"Gap undone — reverted merge `{commit_sha[:10]}…` on "
-               f"`{target}`" + (" and pushed" if pushed else " (push skipped)"))
+        if pushed:
+            revert_message = (
+                f"Gap undone — reverted merge `{commit_sha[:10]}…` on "
+                f"`{target}` and pushed"
+            )
+        elif push_warning:
+            revert_message = push_warning
+        else:
+            revert_message = (
+                f"Gap undone — reverted merge `{commit_sha[:10]}…` on "
+                f"`{target}` (no upstream — push skipped)"
+            )
         try:
             gap = shared_gaps.read_gap_json(gap_id) or {}
             rounds = gap.get("rounds") or []
@@ -504,18 +564,20 @@ class Runner:
                 gap_writer.append_round_log(
                     gap_id=gap_id, round_idx=len(rounds) - 1,
                     severity="warn", category="git", actor="refine",
-                    message=msg,
+                    message=revert_message,
                 )
         except Exception:
             pass
         activity.append(
             self._conn,
-            message=msg,
+            message=revert_message,
             severity="warn", category="git",
             gap_id=gap_id, actor="refine",
         )
         return {"ok": True, "gap_id": gap_id,
-                "commit": commit_sha, "pushed": pushed, "target": target}
+                "commit": commit_sha, "pushed": pushed, "target": target,
+                "push_warning": push_warning,
+                "message": revert_message}
 
     def _h_chat_start(self, params: dict) -> dict:
         gap_id = params.get("gap_id")
