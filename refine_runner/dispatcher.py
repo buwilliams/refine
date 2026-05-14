@@ -179,12 +179,26 @@ class Dispatcher:
 
         idle = db.get_setting_int(conn, "agent_idle_timeout_seconds", 900)
         cap = db.get_setting_int(conn, "agent_hard_cap_seconds", 86400)
+        # The agent runs inside the operator-configured sub-project when set
+        # (e.g. a monorepo's `apps/web`). Worktree creation + base_ref + on-
+        # finished git plumbing all stay at the worktree root above; only
+        # the Claude subprocess cwd changes.
+        worktree_root = git_ops.gap_worktree_path(gap_id)
+        agent_subpath = db.get_setting(conn, "agent_subpath") or ""
+        agent_cwd = git_ops.apply_agent_subpath(
+            worktree_root, agent_subpath,
+            log=lambda msg: activity.append(
+                conn, message=f"agent_subpath: {msg}",
+                severity="warn", category="state",
+                gap_id=gap_id, actor="runner",
+            ),
+        )
 
         self.sub_mgr.launch(
             gap_id=gap_id,
             round_idx=round_idx,
             prompt=prompt,
-            cwd=git_ops.gap_worktree_path(gap_id),
+            cwd=agent_cwd,
             base_ref=base_commit,
             idle_window=idle,
             hard_cap=cap,

@@ -674,16 +674,34 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "parallel_run_cap", "branch_name_pattern",
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
         "chat_idle_timeout_seconds",
+        "agent_subpath",
         "paused",
     }
+    normalized: dict[str, str] = {}
+    for k, v in body.items():
+        if k not in allowed:
+            return err(400, f"unknown setting: {k}")
+        if k == "agent_subpath":
+            sub = str(v or "").strip()
+            # Reject absolute paths, `..` traversal, and any embedded NUL.
+            if sub:
+                if sub.startswith("/") or sub.startswith("~"):
+                    return err(400, "agent_subpath must be relative to the repo root")
+                if "\0" in sub:
+                    return err(400, "agent_subpath contains an invalid character")
+                parts = [p for p in sub.replace("\\", "/").split("/") if p]
+                if any(p == ".." for p in parts):
+                    return err(400, "agent_subpath must not contain `..` components")
+                sub = "/".join(parts)
+            normalized[k] = sub
+        else:
+            normalized[k] = str(v)
     conn = _conn()
     try:
-        for k, v in body.items():
-            if k not in allowed:
-                return err(400, f"unknown setting: {k}")
-            db.set_setting(conn, k, str(v))
+        for k, v in normalized.items():
+            db.set_setting(conn, k, v)
         activity.append(
-            conn, message=f"Settings updated: {', '.join(body.keys())}",
+            conn, message=f"Settings updated: {', '.join(normalized.keys())}",
             severity="info", category="user", actor="refine",
         )
     finally:

@@ -2550,6 +2550,11 @@ function drawSettings(s, diag, reps) {
       <div class="form-row"><label>Standalone chat idle timeout (seconds)
         <span class="muted small">— set to 0 to disable auto-close</span></label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
+      <div class="form-row"><label>Agent subpath
+        <span class="muted small">— optional sub-project (relative to the repo root) used as the Claude subprocess cwd. Leave blank to use the repo root. Git operations always run at the repo root.</span></label>
+        <input type="text" id="s-subpath"
+               placeholder="e.g. apps/web"
+               value="${htmlEscape(s.agent_subpath || "")}"></div>
       <div class="actions"><button id="s-save">Save</button></div>
     </div>
 
@@ -2618,6 +2623,7 @@ function drawSettings(s, diag, reps) {
           agent_idle_timeout_seconds: $("#s-idle").value,
           agent_hard_cap_seconds: $("#s-hard").value,
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
+          agent_subpath: $("#s-subpath").value,
         });
         toast("Saved", "info");
       } catch (e) { toast(e.message, "error"); }

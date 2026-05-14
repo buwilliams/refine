@@ -11,6 +11,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 
 def client_repo_path() -> Path:
@@ -135,6 +136,33 @@ def add_and_commit(paths: list[str], message: str,
 
 def gap_worktree_path(gap_id: str) -> Path:
     return worktrees_dir() / gap_id.upper()
+
+
+def apply_agent_subpath(root: Path, subpath: str | None,
+                         *, log: Callable[[str], None] | None = None) -> Path:
+    """Resolve the agent/chat working directory for a given base `root`.
+
+    `subpath` is the operator-configured `agent_subpath` setting (a
+    repo-relative path). When non-empty and the resolved subdir exists
+    under `root`, return that joined path; otherwise return `root` and
+    optionally log a warning. Git plumbing always stays at `root` —
+    only the Claude subprocess `cwd` changes.
+    """
+    if not subpath:
+        return root
+    candidate = (root / subpath).resolve()
+    # Confine to `root` — don't follow a symlink or `..` outside the worktree.
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError:
+        if log:
+            log(f"agent_subpath {subpath!r} resolves outside {root}; using root")
+        return root
+    if not candidate.is_dir():
+        if log:
+            log(f"agent_subpath {subpath!r} does not exist under {root}; using root")
+        return root
+    return candidate
 
 
 def worktree_exists(gap_id: str) -> bool:

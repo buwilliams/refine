@@ -344,16 +344,29 @@ class Runner:
         priming_prompt: str | None = None
         priming_intro: str | None = None
         if gap_id:
-            cwd = git_ops.gap_worktree_path(gap_id)
-            if not cwd.exists():
+            root = git_ops.gap_worktree_path(gap_id)
+            if not root.exists():
                 raise ValueError(f"Gap {gap_id} has no worktree")
             is_standalone = False
             priming_prompt, priming_intro = _build_gap_chat_preamble(
                 self._conn, gap_id,
             )
         else:
-            cwd = git_ops.client_repo_path()
+            root = git_ops.client_repo_path()
             is_standalone = True
+        # Run chat inside the configured sub-project when one is set; fall
+        # back to the worktree / client repo root if the subpath is empty
+        # or missing.
+        agent_subpath = db.get_setting(self._conn, "agent_subpath") or ""
+        cwd = git_ops.apply_agent_subpath(
+            root, agent_subpath,
+            log=lambda msg: activity.append(
+                self._conn,
+                message=f"agent_subpath: {msg}",
+                severity="warn", category="state",
+                gap_id=gap_id, actor="runner",
+            ),
+        )
         sid = self.chat.start(
             cwd, is_standalone=is_standalone,
             priming_prompt=priming_prompt,
@@ -409,10 +422,19 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     # Activity rows from `recent` are ordered DESC; flip for chronological.
     recent_activity = list(reversed(recent_activity))
 
+    subpath = (db.get_setting(conn, "agent_subpath") or "").strip()
+    cwd_note = (
+        f"Your cwd is `{subpath}/` inside the Gap's git worktree — a sub-"
+        f"project the operator configured. The rest of the worktree (and "
+        f"all git history) lives one level up; `cd ..` or absolute paths "
+        f"reach it."
+        if subpath else
+        "You're running inside the Gap's git worktree (your cwd)."
+    )
     parts: list[str] = [
         "You're in a refine chat session attached to an in-progress Gap (a",
-        "behavior change the team is tracking). You're running inside the",
-        "Gap's git worktree (your cwd), so you can read code, run `git log`,",
+        "behavior change the team is tracking). " + cwd_note + " You can",
+        "read code, run `git log`,",
         "`git status`, `git diff`, and other tools to investigate the agent's",
         "progress.",
         "",

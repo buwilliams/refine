@@ -195,7 +195,10 @@ port = 8080
 ```
 
 Almost everything else — parallel-run cap, idle timeout, hard cap, branch
-naming, reporters — lives in the SQLite settings table and is editable from
+naming, **agent subpath** (an optional sub-project the Claude subprocesses
+`cd` into while git plumbing stays at the repo root — useful for monorepos
+hosting multiple sub-projects), reporters — lives in the SQLite settings
+table and is editable from
 the UI's Settings page.
 
 ## Operational assumptions
