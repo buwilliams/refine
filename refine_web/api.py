@@ -14,7 +14,8 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RUNNING, M_SET_NOTES, M_VERIFY,
+    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RUNNING,
+    M_SET_NOTES, M_VERIFY,
 )
 from refine_shared.ulid import new_ulid
 
@@ -720,27 +721,21 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
 # --- Import (LLM extraction) --------------------------------------------------
 
 def import_extract(body: dict) -> tuple[int, dict]:
-    """Naive paragraph-based extraction.
-
-    The spec mentions an LLM call for richer extraction. Until we wire up an
-    `extract_gaps` IPC method that runs the Claude CLI with a structured prompt,
-    we offer trivial paragraph-based splitting so the workflow is functional.
-    The user reviews + edits before persisting.
+    """LLM-driven extraction: hand the raw text to the host claude CLI
+    via the runner and return the parsed `{name, actual, target}` drafts
+    for the user to review before persisting. Times out generously since
+    the model call can take 30–90s for longer pastes.
     """
     raw = (body.get("text") or "").strip()
     if not raw:
         return err(400, "text is required")
-    paragraphs = [p.strip() for p in re.split(r"\n\s*\n+", raw) if p.strip()]
-    drafts = []
-    for p in paragraphs:
-        first_line = p.split("\n", 1)[0]
-        drafts.append({
-            "name": _autoname(p, ""),
-            "actual": "Inferred from import — please refine.",
-            "target": p,
-            "preview": first_line,
-        })
-    return 200, {"drafts": drafts}
+    try:
+        result = get_client().call(
+            M_EXTRACT_GAPS, {"text": raw}, timeout=200.0,
+        )
+    except IpcError as e:
+        return _ipc_err(e)
+    return 200, {"drafts": result.get("drafts") or []}
 
 
 def import_persist(body: dict) -> tuple[int, dict]:

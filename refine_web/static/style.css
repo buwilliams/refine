@@ -460,6 +460,29 @@ select {
   color: var(--accent);
 }
 
+/* Loading row: spinner + "Loading…" message, used during LLM calls. */
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 /* --- Chat dock -------------------------------------------------------- */
 .chat-dock {
   position: fixed;

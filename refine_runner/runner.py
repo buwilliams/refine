@@ -15,12 +15,12 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING, M_SET_NOTES,
-    M_VERIFY, default_socket_path,
+    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING,
+    M_SET_NOTES, M_VERIFY, default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, preflight, recovery, state_committer, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, llm, preflight, recovery, state_committer, subprocess_mgr, verify_op
 from .chat_mgr import ChatManager
 from .ipc_server import IpcServer
 
@@ -100,6 +100,7 @@ class Runner:
             M_CHAT_INPUT: self._h_chat_input,
             M_CHAT_READ: self._h_chat_read,
             M_CHAT_STOP: self._h_chat_stop,
+            M_EXTRACT_GAPS: self._h_extract_gaps,
         }
         h = handlers.get(method)
         if h is None:
@@ -282,6 +283,11 @@ class Runner:
         return {"gap": gap}
 
     # ---- chat ----------------------------------------------------------------
+
+    def _h_extract_gaps(self, params: dict) -> dict:
+        text = params.get("text") or ""
+        drafts = llm.extract_gaps(text)
+        return {"drafts": drafts}
 
     def _h_chat_start(self, params: dict) -> dict:
         gap_id = params.get("gap_id")

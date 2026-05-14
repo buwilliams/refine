@@ -1488,11 +1488,25 @@ function openImportModal() {
     if (btn.disabled) return;
     const text = root.querySelector("#import-text").value.trim();
     if (!text) return toast("Paste some text first", "error");
+    // Show an explicit loading indicator in the drafts area — the LLM
+    // call typically takes 20-90s and the busy button alone isn't enough
+    // signal that something's happening.
+    const draftsRoot = root.querySelector("#import-drafts");
+    if (draftsRoot) {
+      draftsRoot.innerHTML = `
+        <div class="loading-row">
+          <span class="loading-spinner"></span>
+          <span>Loading… asking Claude to extract Gaps from your text. This may take up to a minute.</span>
+        </div>`;
+    }
     await withButtonBusy(btn, "Extracting…", async () => {
       try {
         const r = await api("POST", "/api/import/extract", { text });
         drawImportDrafts(root, r.drafts || [], close);
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) {
+        if (draftsRoot) draftsRoot.innerHTML = "";
+        toast(e.message, "error");
+      }
     });
   });
 

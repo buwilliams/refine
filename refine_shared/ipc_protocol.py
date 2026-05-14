@@ -35,6 +35,7 @@ M_CHAT_READ = "chat_read"                 # drain queued output lines + liveness
 M_CHAT_STOP = "chat_stop"                 # end a chat session
 M_RUNNING = "running"                     # query: which subprocesses are running
 M_DIAGNOSTICS = "diagnostics"             # last-contact, recent IPC errors
+M_EXTRACT_GAPS = "extract_gaps"           # one-shot LLM extraction of Gap drafts from free-form text
 
 
 def envelope_ok(req_id: str, result: dict | None = None) -> dict:
