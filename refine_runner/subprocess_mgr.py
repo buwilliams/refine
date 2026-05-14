@@ -8,6 +8,7 @@ Per spec:
 """
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import signal
@@ -23,6 +24,120 @@ from refine_shared import activity, db
 from refine_shared.gaps import now_iso
 
 from . import gap_writer  # local module; sole owner of gap.json writes
+
+
+def _format_agent_event(line: str) -> list[str] | None:
+    """Translate one `--output-format=stream-json` event into a list of
+    round-log entries (one per logical thing the event represents).
+
+    Returns:
+      - list of strings: each becomes its own log entry.
+      - None: the line wasn't JSON; caller should fall back to raw
+        passthrough (covers `claude` CLI errors that fire before /
+        after the stream-json envelope opens).
+    """
+    try:
+        evt = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(evt, dict):
+        return None
+
+    t = evt.get("type")
+
+    if t == "system":
+        sub = evt.get("subtype")
+        if sub == "init":
+            sid = (evt.get("session_id") or "")[:8]
+            model = evt.get("model") or "?"
+            return [f"[session] init — model={model} session={sid}"]
+        # status / requesting / etc. are too granular for the round log.
+        return []
+
+    if t == "assistant":
+        msg = evt.get("message") or {}
+        out: list[str] = []
+        for block in msg.get("content") or []:
+            bt = block.get("type")
+            if bt == "text":
+                text = (block.get("text") or "").strip()
+                if text:
+                    out.append(text)
+            elif bt == "tool_use":
+                name = block.get("name") or "tool"
+                inp = block.get("input") or {}
+                out.append(f"[{name}] {_summarize_tool_input(name, inp)}")
+        return out
+
+    if t == "user":
+        msg = evt.get("message") or {}
+        out = []
+        for block in msg.get("content") or []:
+            if block.get("type") != "tool_result":
+                continue
+            err = bool(block.get("is_error"))
+            content = block.get("content")
+            summary = _summarize_tool_result(content)
+            if not summary:
+                continue
+            prefix = "[tool err]" if err else "[tool result]"
+            out.append(f"{prefix} {summary[:160]}")
+        return out
+
+    if t == "result":
+        if evt.get("is_error"):
+            err = evt.get("error") or evt.get("result") or "error"
+            return [f"[result error] {err}"]
+        # successful result text is already in the last `assistant` event
+        return []
+
+    # `stream_event` (deltas, message_start/stop, etc.) are too granular —
+    # silently drop. `last_output` still ticks per line so idle stays live.
+    return []
+
+
+def _summarize_tool_input(name: str, inp: dict) -> str:
+    """Short, human-readable description of a tool_use input block."""
+    if not isinstance(inp, dict):
+        return ""
+    if name == "Bash":
+        cmd = (inp.get("command") or "").splitlines()
+        return cmd[0][:160] if cmd else "(empty)"
+    if name in ("Read", "Edit", "Write", "NotebookEdit"):
+        return inp.get("file_path") or "(?)"
+    if name in ("Glob", "Grep"):
+        return inp.get("pattern") or "(?)"
+    if name == "TodoWrite":
+        todos = inp.get("todos") or []
+        return f"{len(todos)} todo{'' if len(todos) == 1 else 's'}"
+    if name == "Task":
+        return (inp.get("description")
+                or inp.get("prompt", "")[:80]
+                or "(task)")
+    try:
+        return json.dumps(inp, ensure_ascii=False)[:120]
+    except Exception:
+        return "?"
+
+
+def _summarize_tool_result(content) -> str:
+    """First useful line of a tool_result block — content is either a
+    string or a list of {type:text, text:…} blocks."""
+    if isinstance(content, str):
+        for ln in content.splitlines():
+            ln = ln.strip()
+            if ln:
+                return ln
+        return ""
+    if isinstance(content, list):
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                text = (block.get("text") or "").strip()
+                if text:
+                    return text.splitlines()[0]
+    return ""
 
 
 @dataclass
@@ -84,9 +199,18 @@ class SubprocessManager:
         from .chat_mgr import _chat_env, _resolve_claude
         env = _chat_env()
         claude_path = _resolve_claude(env)
-        # The agent inherits ~/.claude auth on the host. PATH and HOME come along.
+        # `--output-format=stream-json --verbose` makes claude emit one
+        # JSON event per line while it works (system init, assistant
+        # turn, tool_use, tool_result, result). We translate each event
+        # into a friendly round-log entry in `_drain_stdout` — and
+        # because every event lands as a stdout line, the existing
+        # `h.last_output = monotonic()` per-line update gives a real
+        # "Idle" reading (previously stayed at 0 because plain --print
+        # was silent until the final response flush).
         proc = subprocess.Popen(
-            [claude_path, "--print", "--dangerously-skip-permissions", prompt],
+            [claude_path, "--print",
+             "--output-format=stream-json", "--verbose",
+             "--dangerously-skip-permissions", prompt],
             cwd=str(cwd),
             env=env,
             stdin=subprocess.DEVNULL,
@@ -219,25 +343,31 @@ class SubprocessManager:
                 )
 
     def _drain_stdout(self, h: RunHandle) -> None:
+        """Translate stream-json events from claude into round-log lines.
+
+        With `--output-format=stream-json --verbose`, each stdout line is
+        a JSON event: `system/init`, `assistant` (with text + tool_use
+        blocks), `user` (with tool_result blocks), `result`, plus noisy
+        `stream_event` deltas. We pick the meaningful ones and emit one
+        round-log entry per. Non-JSON lines (CLI errors before/after
+        stream-json) pass through verbatim.
+        """
         assert h.proc.stdout is not None
-        buf: list[str] = []
-        last_flush = time.monotonic()
         try:
-            for line in h.proc.stdout:
+            for raw in h.proc.stdout:
                 h.last_output = time.monotonic()
-                line = line.rstrip("\n")
+                line = raw.rstrip("\n")
                 if not line:
                     continue
-                buf.append(line)
-                # Flush often so users see streaming output. Flush per line for
-                # small bursts, or whenever 1s elapses with buffered content.
-                if len(buf) >= 5 or (h.last_output - last_flush) >= 1.0:
-                    self._flush_lines(h, buf)
-                    buf = []
-                    last_flush = h.last_output
+                summaries = _format_agent_event(line)
+                if summaries is None:
+                    # Wasn't JSON — could be a `claude` CLI error or
+                    # plain stderr message merged in via stderr=STDOUT.
+                    summaries = [line]
+                for s in summaries:
+                    if s:
+                        self._write_log_entry(h, s)
         finally:
-            if buf:
-                self._flush_lines(h, buf)
             # final last_output_at touch
             try:
                 conn = self._get_conn()
@@ -249,21 +379,19 @@ class SubprocessManager:
             except Exception:
                 pass
 
-    def _flush_lines(self, h: RunHandle, lines: list[str]) -> None:
-        message = "\n".join(lines)
-        # Append as one log entry to the round's logs[]
+    def _write_log_entry(self, h: RunHandle, message: str) -> None:
+        """One round-log entry per call + a `last_output_at` bump."""
         try:
             gap_writer.append_round_log(
                 gap_id=h.gap_id,
                 round_idx=h.round_idx,
                 severity="info",
                 category="cli",
-                message=message[:200],  # keep summary short
+                message=message[:200],
                 details=message if len(message) > 200 else None,
             )
         except Exception:
             pass
-        # touch last_output_at
         try:
             conn = self._get_conn()
             with db.transaction(conn):
