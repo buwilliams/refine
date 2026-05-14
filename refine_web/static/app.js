@@ -548,13 +548,16 @@ function drawDashboard(d) {
               <th>Done / Reported</th>
             </tr></thead>
             <tbody>
-              ${d.reporter_stats.map((s) => `<tr>
-                <td>${htmlEscape(s.reporter)}</td>
-                <td>${s.active}</td>
-                <td>${s.done}</td>
-                <td>${s.reported}</td>
-                <td>${s.completion_rate.toFixed(1)}%</td>
-              </tr>`).join("")}
+              ${d.reporter_stats.map((s) => `
+                <tr class="reporter-stats-row"
+                    data-reporter="${htmlEscape(s.reporter)}"
+                    title="See Gaps reported by ${htmlEscape(s.reporter)}">
+                  <td>${htmlEscape(s.reporter)}</td>
+                  <td>${s.active}</td>
+                  <td>${s.done}</td>
+                  <td>${s.reported}</td>
+                  <td>${s.completion_rate.toFixed(1)}%</td>
+                </tr>`).join("")}
             </tbody>
           </table>`}
     </section>
@@ -584,6 +587,14 @@ function drawDashboard(d) {
       </div>
     </section>
   `;
+  // Click any reporter row → deep-link into the Gaps list filtered by
+  // that reporter. We use data-reporter + a delegated listener so the
+  // name can contain spaces/quotes without HTML-escaping hazards.
+  $$(".reporter-stats-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      location.hash = gapsHash({ reporter: row.dataset.reporter });
+    });
+  });
 }
 
 function renderActivityList(entries) {
@@ -615,6 +626,7 @@ function gapsHash(parts) {
   const next = new URLSearchParams();
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
+  if (parts.reporter) next.set("reporter", parts.reporter);
   if (parts.severity) next.set("severity", parts.severity);
   if (parts.category) next.set("category", parts.category);
   if (parts.actor)    next.set("actor", parts.actor);
@@ -637,6 +649,13 @@ async function renderGapsList() {
         <select id="filter-status">
           ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
             .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
+        </select>
+        <select id="filter-reporter">
+          <option value="" ${f.reporter === "" ? "selected" : ""}>all reporters</option>
+          ${(state.reporters || []).map((r) =>
+            `<option value="${htmlEscape(r.name)}" ${r.name === f.reporter ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
+          ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
+            ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
       </div>
       <div class="filter-row filter-row-activity">
@@ -676,6 +695,8 @@ async function renderGapsList() {
   }, 250));
   $("#filter-status").addEventListener("change", (e) =>
     updateGapsFilter({ status: e.target.value }));
+  $("#filter-reporter").addEventListener("change", (e) =>
+    updateGapsFilter({ reporter: e.target.value }));
   $("#gaps-severity").addEventListener("change", (e) =>
     updateGapsFilter({ severity: e.target.value }));
   $("#gaps-category").addEventListener("change", (e) =>
@@ -707,6 +728,7 @@ function gapsFilterFromHash() {
   return {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
+    reporter: hashQs.get("reporter") || "",
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
     actor: hashQs.get("actor") || "",
@@ -725,6 +747,7 @@ function updateGapsFilter(patch) {
   const next = {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
+    reporter: "reporter" in patch ? patch.reporter : current.reporter,
     severity: "severity" in patch ? patch.severity : current.severity,
     category: "category" in patch ? patch.category : current.category,
     actor: "actor" in patch ? patch.actor : current.actor,
@@ -742,6 +765,7 @@ async function refreshGapsTable() {
   const params = new URLSearchParams();
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
+  if (f.reporter) params.set("reporter", f.reporter);
   if (f.severity) params.set("severity", f.severity);
   if (f.category) params.set("category", f.category);
   if (f.actor) params.set("actor", f.actor);
@@ -856,7 +880,7 @@ async function openBulkModal(field) {
   // operation see exactly what the user sees in the table.
   const f = gapsFilterFromHash();
   const filter = {
-    status: f.status, q: f.q,
+    status: f.status, q: f.q, reporter: f.reporter,
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
@@ -926,6 +950,7 @@ async function openBulkModal(field) {
 function describeGapsFilter(filter) {
   const parts = [];
   if (filter.status)   parts.push(`status=${filter.status}`);
+  if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
   if (filter.q)        parts.push(`q="${filter.q}"`);
   if (filter.severity) parts.push(`severity=${filter.severity}`);
   if (filter.category) parts.push(`category=${filter.category}`);

@@ -82,13 +82,15 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
               severity: str | None = None,
               category: str | None = None,
               actor: str | None = None,
+              reporter: str | None = None,
               limit: int = 200,
               sort: str | None = None,
               direction: str | None = None,
               include_facets: bool = False) -> tuple[int, dict]:
     """List Gaps. `severity` / `category` / `actor` filter to Gaps that
-    have at least one activity entry matching — so the user can find,
-    e.g., "Gaps that hit a `git` error", "Gaps the agent touched", etc.
+    have at least one activity entry matching. `reporter` filters to
+    Gaps whose *latest round's* reporter is X — same attribution rule
+    the dashboard's Reporter stats uses.
     """
     sql = ["SELECT id, name, status, priority, created, updated, branch_name FROM gaps_index"]
     args: list[Any] = []
@@ -121,7 +123,11 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     if where:
         sql.append("WHERE " + " AND ".join(where))
     sql.append("ORDER BY " + _gaps_order_clause(sort, direction) + " LIMIT ?")
-    args.append(limit)
+    # Reporter is a JSON-side filter (lives on the latest round), so we
+    # over-fetch and post-filter in Python below. Cap the over-fetch so
+    # a rare reporter on a large index doesn't fall through completely.
+    sql_limit = max(limit * 10, 2000) if reporter else limit
+    args.append(sql_limit)
     conn = _conn()
     try:
         rows = [dict(r) for r in conn.execute(" ".join(sql), args)]
@@ -136,12 +142,33 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     # Round-content search only kicks in when the only non-q filters are
     # the existing ones — the activity-side subquery already constrains
     # the candidate id set.
-    if q and len(rows) < limit and not (severity or category or actor):
+    if q and len(rows) < limit and not (severity or category or actor or reporter):
         rows = _augment_with_round_search(rows, q, limit)
+    if reporter:
+        rows = _filter_by_reporter(rows, reporter, limit)
     body: dict = {"gaps": rows}
     if facets is not None:
         body["facets"] = facets
     return 200, body
+
+
+def _filter_by_reporter(rows: list[dict], reporter: str,
+                         limit: int) -> list[dict]:
+    """Keep only Gaps whose latest round was filed by `reporter`. Uses
+    the same attribution rule as `_compute_reporter_stats`."""
+    keep: list[dict] = []
+    for row in rows:
+        gap = shared_gaps.read_gap_json(row["id"])
+        if not gap:
+            continue
+        rounds = gap.get("rounds") or []
+        if not rounds:
+            continue
+        if (rounds[-1].get("reporter") or "").strip() == reporter:
+            keep.append(row)
+            if len(keep) >= limit:
+                break
+    return keep
 
 
 def _augment_with_round_search(initial: list[dict], q: str,
@@ -350,6 +377,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
         severity=filt.get("severity") or None,
         category=filt.get("category") or None,
         actor=filt.get("actor") or None,
+        reporter=filt.get("reporter") or None,
         limit=10_000,
     )
     if code != 200:

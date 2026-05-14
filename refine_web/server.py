@@ -47,6 +47,7 @@ def _h_list_gaps(_h, _m, _b, q):
         severity=_get_one(q, "severity"),
         category=_get_one(q, "category"),
         actor=_get_one(q, "actor"),
+        reporter=_get_one(q, "reporter"),
         limit=int(_get_one(q, "limit", "200")),
         sort=_get_one(q, "sort"),
         direction=_get_one(q, "dir"),
