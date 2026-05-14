@@ -105,20 +105,38 @@ class Dispatcher:
                 )
                 return
 
-        # Pre-checks: branch + upstream
-        current = git_ops.current_branch()
-        if current is None:
-            self._abort_to_failed(
-                conn, gap_id,
-                "Client repo is in detached-HEAD state — pickup aborted",
-                category="git",
-            )
-            return
-        upstream = git_ops.upstream_branch(current)
+        # Pre-checks: target branch + upstream. The agent's worktree is
+        # based off the same branch `verify` will merge back into — by
+        # default that's the host's checked-out branch, but the operator
+        # can pin it via the `merge_target_branch` setting (e.g. on a
+        # monorepo where you want all Gaps to merge to `main` regardless
+        # of what the host happens to be on).
+        target = (db.get_setting(conn, "merge_target_branch") or "").strip()
+        if target:
+            if not git_ops.local_branch_exists(target):
+                self._abort_to_failed(
+                    conn, gap_id,
+                    f"Configured merge_target_branch `{target}` does not "
+                    f"exist locally — create/track it first or clear the setting",
+                    category="git",
+                )
+                return
+        else:
+            host_branch = git_ops.current_branch()
+            if host_branch is None:
+                self._abort_to_failed(
+                    conn, gap_id,
+                    "Client repo is in detached-HEAD state and no "
+                    "merge_target_branch is configured — pickup aborted",
+                    category="git",
+                )
+                return
+            target = host_branch
+        upstream = git_ops.upstream_branch(target)
         if upstream is None:
             self._abort_to_failed(
                 conn, gap_id,
-                f"Branch `{current}` has no upstream — run `git push -u origin {current}` on the host",
+                f"Branch `{target}` has no upstream — run `git push -u origin {target}` on the host",
                 category="git",
             )
             return
@@ -135,7 +153,7 @@ class Dispatcher:
         # Compute the branch name + worktree.
         pattern = db.get_setting(conn, "branch_name_pattern", "refine/{gap_id}") or "refine/{gap_id}"
         branch_name = existing_branch or pattern.format(gap_id=gap_id)
-        base_ref = f"origin/{current}"
+        base_ref = f"origin/{target}"
 
         wt = git_ops.create_worktree(gap_id, base_ref, branch_name)
         if not wt.ok:

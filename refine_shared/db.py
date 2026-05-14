@@ -91,6 +91,12 @@ DEFAULT_SETTINGS = {
     # create, fetch, merge, push — still happens at the base repo root.
     # Empty = use the worktree / client repo root (default).
     "agent_subpath": "",
+    # The branch all Gap worktrees are based on and all `verify` merges
+    # land on. Empty = follow the host's currently-checked-out branch
+    # (legacy behavior). When set, `verify` will switch the host's HEAD
+    # to this branch (auto-stashing any WIP) and restore the host's
+    # original branch afterward.
+    "merge_target_branch": "",
 }
 
 

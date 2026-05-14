@@ -195,10 +195,11 @@ port = 8080
 ```
 
 Almost everything else — parallel-run cap, idle timeout, hard cap, branch
-naming, **agent subpath** (an optional sub-project the Claude subprocesses
-`cd` into while git plumbing stays at the repo root — useful for monorepos
-hosting multiple sub-projects), reporters — lives in the SQLite settings
-table and is editable from
+naming, **scope** (an optional `agent_subpath` the Claude subprocesses
+`cd` into, and an optional `merge_target_branch` that all Gap worktrees are
+based on and all `verify` merges land on — useful for monorepos hosting
+multiple sub-projects), reporters — lives in the SQLite settings table and
+is editable from
 the UI's Settings page.
 
 ## Operational assumptions

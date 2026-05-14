@@ -266,6 +266,21 @@ def push_current(cwd: Path | None = None) -> GitResult:
     return _run(["push"], cwd=cwd or client_repo_path(), timeout=300.0)
 
 
+def local_branch_exists(branch: str, cwd: Path | None = None) -> bool:
+    """True if `branch` exists as a local ref in the client repo."""
+    r = _run(
+        ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
+        cwd=cwd or client_repo_path(),
+    )
+    return r.ok
+
+
+def checkout_branch(branch: str, cwd: Path | None = None) -> GitResult:
+    """`git checkout <branch>` in the client repo. Fails if the working
+    copy is dirty in ways that conflict — callers should stash first."""
+    return _run(["checkout", branch], cwd=cwd or client_repo_path())
+
+
 def is_already_merged(branch: str, cwd: Path | None = None) -> bool:
     """Check if `branch` is reachable from current HEAD (i.e., already merged)."""
     r = _run(

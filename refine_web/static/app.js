@@ -2550,12 +2550,27 @@ function drawSettings(s, diag, reps) {
       <div class="form-row"><label>Standalone chat idle timeout (seconds)
         <span class="muted small">— set to 0 to disable auto-close</span></label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
+      <div class="actions"><button id="s-save">Save</button></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Scope</h3>
+      <p class="muted small">
+        Where refine's Claude work lands inside the client repo. The base
+        repo location still owns all git plumbing — worktree create, fetch,
+        merge, push.
+      </p>
       <div class="form-row"><label>Agent subpath
-        <span class="muted small">— optional sub-project (relative to the repo root) used as the Claude subprocess cwd. Leave blank to use the repo root. Git operations always run at the repo root.</span></label>
+        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat Claude subprocesses. Leave blank to use the repo root.</span></label>
         <input type="text" id="s-subpath"
                placeholder="e.g. apps/web"
                value="${htmlEscape(s.agent_subpath || "")}"></div>
-      <div class="actions"><button id="s-save">Save</button></div>
+      <div class="form-row"><label>Merge target branch
+        <span class="muted small">— branch all Gap worktrees are based on and all <code>verify</code> merges land on. Leave blank to follow the host's currently-checked-out branch. When set, <code>verify</code> auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
+        <input type="text" id="s-merge-target"
+               placeholder="e.g. main"
+               value="${htmlEscape(s.merge_target_branch || "")}"></div>
+      <div class="actions"><button id="s-save-scope">Save</button></div>
     </div>
 
     <div class="card" style="margin-top:16px">
@@ -2623,7 +2638,17 @@ function drawSettings(s, diag, reps) {
           agent_idle_timeout_seconds: $("#s-idle").value,
           agent_hard_cap_seconds: $("#s-hard").value,
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
+        });
+        toast("Saved", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-save-scope").addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-scope"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
           agent_subpath: $("#s-subpath").value,
+          merge_target_branch: $("#s-merge-target").value,
         });
         toast("Saved", "info");
       } catch (e) { toast(e.message, "error"); }

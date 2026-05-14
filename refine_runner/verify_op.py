@@ -34,21 +34,67 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
         return {"ok": False, "stage": "lookup",
                 "message": "Gap has no branch_name recorded"}
 
-    # Pre-check: current branch + upstream
-    current = git_ops.current_branch()
-    if current is None:
-        msg = "Client repo is in detached-HEAD state"
+    # Pre-check: resolve the merge target.
+    host_branch = git_ops.current_branch()
+    configured = (db.get_setting(conn, "merge_target_branch") or "").strip()
+    if configured:
+        target = configured
+        if not git_ops.local_branch_exists(target):
+            msg = (f"Configured merge_target_branch `{target}` does not "
+                   f"exist locally — create/track it first or clear the setting")
+            _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "precheck", "message": msg}
+    else:
+        if host_branch is None:
+            msg = ("Client repo is in detached-HEAD state and no "
+                   "merge_target_branch is configured")
+            _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "precheck", "message": msg}
+        target = host_branch
+    if git_ops.upstream_branch(target) is None:
+        msg = f"Branch `{target}` has no upstream"
         _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
         return {"ok": False, "stage": "precheck", "message": msg}
-    if git_ops.upstream_branch(current) is None:
-        msg = f"Branch `{current}` has no upstream"
-        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
-        return {"ok": False, "stage": "precheck", "message": msg}
+
+    # If the host's HEAD isn't on the target branch yet, switch to it so
+    # the merge lands where the operator configured. Stash any WIP first
+    # so the checkout doesn't fail. We restore the host's original branch
+    # in `finally` below.
+    switched_from: str | None = None
+    pre_switch_stash = False
+    if host_branch != target:
+        if git_ops.working_copy_dirty():
+            sr = git_ops.stash_push(f"refine auto-stash before switching to {target}")
+            if not sr.ok:
+                msg = (f"Could not stash uncommitted changes before "
+                       f"switching to {target} for merge")
+                _log(conn, gap_id, msg, details=sr.stderr,
+                     severity="error", category="git", actor=actor)
+                return {"ok": False, "stage": "precheck",
+                        "message": msg, "details": sr.stderr}
+            pre_switch_stash = True
+            _log(conn, gap_id,
+                 f"Auto-stashed WIP on `{host_branch}` before switching to `{target}`",
+                 severity="info", category="git", actor=actor)
+        ck = git_ops.checkout_branch(target)
+        if not ck.ok:
+            # Best-effort restore of the pre-switch stash before bailing.
+            if pre_switch_stash:
+                git_ops.stash_pop()
+            msg = f"Could not check out merge target `{target}`"
+            _log(conn, gap_id, msg, details=ck.stderr,
+                 severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "precheck",
+                    "message": msg, "details": ck.stderr}
+        switched_from = host_branch
+        _log(conn, gap_id,
+             f"Switched host HEAD: `{host_branch}` → `{target}` for merge",
+             severity="info", category="git", actor=actor)
 
     # Auto-commit refine's own state (`.refine/`) — gap.json and friends
     # are tracked content per the spec, and the runner writes them as it
     # goes, so they show up as dirty between rounds. Commit them on the
-    # current branch with a clear marker so the merge sees a clean tree.
+    # target branch with a clear marker so the merge sees a clean tree.
     refine_dirty = git_ops.dirty_paths_under(".refine")
     if refine_dirty:
         cr = git_ops.add_and_commit(
@@ -59,8 +105,11 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
             msg = "Could not commit refine state before merge"
             _log(conn, gap_id, msg, details=cr.stderr,
                  severity="error", category="git", actor=actor)
-            return {"ok": False, "stage": "precheck",
-                    "message": msg, "details": cr.stderr}
+            return _restore_host_branch_and_return(
+                conn, gap_id, switched_from, pre_switch_stash, actor,
+                {"ok": False, "stage": "precheck",
+                 "message": msg, "details": cr.stderr},
+            )
         _log(
             conn, gap_id,
             f"Auto-committed refine state ({len(refine_dirty)} path"
@@ -77,14 +126,17 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
             msg = "Could not stash uncommitted changes before merge"
             _log(conn, gap_id, msg, details=sr.stderr,
                  severity="error", category="git", actor=actor)
-            return {"ok": False, "stage": "precheck",
-                    "message": msg, "details": sr.stderr}
+            return _restore_host_branch_and_return(
+                conn, gap_id, switched_from, pre_switch_stash, actor,
+                {"ok": False, "stage": "precheck",
+                 "message": msg, "details": sr.stderr},
+            )
         stashed = True
         _log(conn, gap_id, "Auto-stashed remaining uncommitted changes before merge",
              severity="info", category="git", actor=actor)
 
     try:
-        return _verify_body(conn, gap_id, current, branch, actor=actor)
+        return _verify_body(conn, gap_id, target, branch, actor=actor)
     finally:
         if stashed:
             pop = git_ops.stash_pop()
@@ -96,6 +148,48 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
                     details=pop.stderr,
                     severity="warn", category="git", actor=actor,
                 )
+        if switched_from:
+            back = git_ops.checkout_branch(switched_from)
+            if not back.ok:
+                _log(
+                    conn, gap_id,
+                    f"Could not restore host HEAD to `{switched_from}` after "
+                    f"verify — host is still on `{target}`",
+                    details=back.stderr,
+                    severity="warn", category="git", actor=actor,
+                )
+            elif pre_switch_stash:
+                pop2 = git_ops.stash_pop()
+                if not pop2.ok:
+                    _log(
+                        conn, gap_id,
+                        f"Auto-stash pop on `{switched_from}` failed — "
+                        f"your WIP remains in `git stash`",
+                        details=pop2.stderr,
+                        severity="warn", category="git", actor=actor,
+                    )
+
+
+def _restore_host_branch_and_return(conn, gap_id, switched_from,
+                                     pre_switch_stash, actor, ret):
+    """Pre-merge failure escape hatch: get the host's HEAD back to where
+    it was before we touched it, then return the supplied error dict."""
+    if switched_from:
+        back = git_ops.checkout_branch(switched_from)
+        if not back.ok:
+            _log(conn, gap_id,
+                 f"Could not restore host HEAD to `{switched_from}` after "
+                 f"precheck failure",
+                 details=back.stderr,
+                 severity="warn", category="git", actor=actor)
+        elif pre_switch_stash:
+            pop = git_ops.stash_pop()
+            if not pop.ok:
+                _log(conn, gap_id,
+                     f"Auto-stash pop on `{switched_from}` failed",
+                     details=pop.stderr,
+                     severity="warn", category="git", actor=actor)
+    return ret
 
 
 def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,

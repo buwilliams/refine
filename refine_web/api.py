@@ -674,14 +674,25 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "parallel_run_cap", "branch_name_pattern",
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
         "chat_idle_timeout_seconds",
-        "agent_subpath",
+        "agent_subpath", "merge_target_branch",
         "paused",
     }
     normalized: dict[str, str] = {}
     for k, v in body.items():
         if k not in allowed:
             return err(400, f"unknown setting: {k}")
-        if k == "agent_subpath":
+        if k == "merge_target_branch":
+            br = str(v or "").strip()
+            # Empty means "follow host's current branch". Validate format
+            # only — existence is checked at the time it's used so the
+            # operator can pre-configure before the branch exists.
+            if br:
+                if any(c.isspace() for c in br):
+                    return err(400, "merge_target_branch may not contain whitespace")
+                if br.startswith("-") or "\0" in br:
+                    return err(400, "merge_target_branch contains an invalid character")
+            normalized[k] = br
+        elif k == "agent_subpath":
             sub = str(v or "").strip()
             # Reject absolute paths, `..` traversal, and any embedded NUL.
             if sub:
