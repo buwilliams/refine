@@ -185,6 +185,31 @@ h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
 .status-pill.in-progress { background: #fff4d0; color: #875e00; }
 .status-pill.ready-merge { background: #ffeac2; color: #7a4500; }
 
+/* Settings screen tab strip. Horizontal scroll on narrow viewports
+   so a long set of tabs degrades gracefully without wrapping into
+   two rows. The active tab gets a thicker underline so the
+   currently-selected section is obvious at a glance. */
+.settings-tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+  overflow-x: auto;
+}
+.settings-tab {
+  background: transparent; border: 0; padding: 8px 14px;
+  font: inherit; color: var(--muted);
+  border-bottom: 2px solid transparent;
+  cursor: pointer; white-space: nowrap;
+}
+.settings-tab:hover { color: inherit; }
+.settings-tab.active {
+  color: inherit;
+  border-bottom-color: var(--accent, #2563eb);
+  font-weight: 600;
+}
+.settings-pane { display: none; }
+.settings-pane.active { display: block; }
+
 /* Feature-flag matrix on Settings. Inline toggle + override badge,
    rendered inside table cells; .feature-current-col highlights the
    active provider's column so the operator can spot at a glance

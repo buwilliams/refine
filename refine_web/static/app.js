@@ -3095,6 +3095,26 @@ async function refreshSettings() {
   }
 }
 
+const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
+
+function readSettingsTab(tabs) {
+  const stored = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
+  if (stored && tabs.some((t) => t.slug === stored)) return stored;
+  return tabs[0]?.slug;
+}
+
+function setSettingsTab(slug) {
+  localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, slug);
+  // Toggle classes in place — no re-render so input focus / scroll
+  // position survive when the user clicks between tabs.
+  $$("[data-tab-pane]").forEach((pane) => {
+    pane.classList.toggle("active", pane.dataset.tabPane === slug);
+  });
+  $$(".settings-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tabTarget === slug);
+  });
+}
+
 function renderFeatureFlagsCard(feats) {
   if (!feats || !feats.features?.length) return "";
   const providers = feats.providers || [];
@@ -3161,7 +3181,32 @@ function drawSettings(s, diag, reps, feats) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
+  // Tab definitions. Order here drives the tab strip; `slug` is the
+  // localStorage key and DOM hook. Same order as the linear stack was
+  // before this refactor.
+  const tabs = [
+    { slug: "runtime",      label: "Runtime" },
+    { slug: "scope",        label: "Scope" },
+    { slug: "cli",          label: "Agent CLI" },
+    { slug: "features",     label: "Feature flags" },
+    { slug: "auth",         label: "Auth" },
+    { slug: "reporters",    label: "Reporters" },
+    { slug: "logs",         label: "Logs retention" },
+    { slug: "diagnostics",  label: "Diagnostics" },
+  ];
+  const activeSlug = readSettingsTab(tabs);
+  const tabStrip = `
+    <nav class="settings-tabs" id="settings-tabs">
+      ${tabs.map((t) => `
+        <button class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
+                data-tab-target="${t.slug}">${htmlEscape(t.label)}</button>`).join("")}
+    </nav>`;
+  const pane = (slug, body) => `
+    <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
+             data-tab-pane="${slug}">${body}</section>`;
   $("#settings-content").innerHTML = `
+    ${tabStrip}
+    ${pane("runtime", `
     <div class="card">
       <h3>Runtime configuration</h3>
       <div class="form-row"><label>Parallel-run cap</label>
@@ -3176,9 +3221,10 @@ function drawSettings(s, diag, reps, feats) {
         <span class="muted small">— set to 0 to disable auto-close</span></label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
       <div class="actions"><button id="s-save">Save</button></div>
-    </div>
+    </div>`)}
 
-    <div class="card" style="margin-top:16px">
+    ${pane("scope", `
+    <div class="card">
       <h3>Scope</h3>
       <p class="muted small">
         Where refine's Claude work lands inside the client repo. The base
@@ -3196,9 +3242,10 @@ function drawSettings(s, diag, reps, feats) {
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
       <div class="actions"><button id="s-save-scope">Save</button></div>
-    </div>
+    </div>`)}
 
-    <div class="card" style="margin-top:16px">
+    ${pane("cli", `
+    <div class="card">
       <h3>Agent CLI</h3>
       <div class="form-row"><label>Which CLI refine drives
         <span class="muted small">— used for Gap agent runs, conflict resolution, and pre-flight. <strong>Chat always uses Claude</strong> because of its session-resume support; Codex / Gemini don't have an equivalent.</span></label>
@@ -3214,17 +3261,20 @@ function drawSettings(s, diag, reps, feats) {
         back to plain stdout passthrough.
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
-    </div>
+    </div>`)}
 
-    ${renderFeatureFlagsCard(feats)}
+    ${pane("features", renderFeatureFlagsCard(feats)
+      || `<div class="card"><p class="muted">Feature flag matrix unavailable — runner unreachable.</p></div>`)}
 
-    <div class="card" style="margin-top:16px">
+    ${pane("auth", `
+    <div class="card">
       <h3>Auth</h3>
       <p class="muted">The selected CLI's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>) — or check that the matching <code>API_KEY</code> env var is exported.</p>
       <button id="s-recheck">Re-check auth</button>
-    </div>
+    </div>`)}
 
-    <div class="card" style="margin-top:16px">
+    ${pane("reporters", `
+    <div class="card">
       <h3>Reporters</h3>
       <table class="table">
         <thead><tr><th>Name</th><th></th></tr></thead>
@@ -3247,9 +3297,10 @@ function drawSettings(s, diag, reps, feats) {
         historical rounds keep their original reporter string so audit
         history is preserved.
       </p>
-    </div>
+    </div>`)}
 
-    <div class="card" style="margin-top:16px">
+    ${pane("logs", `
+    <div class="card">
       <h3>Logs retention</h3>
       <p class="muted small">
         Delete activity entries older than the chosen window. Newer entries
@@ -3263,17 +3314,22 @@ function drawSettings(s, diag, reps, feats) {
         </select>
         <button class="danger" id="logs-cleanup">Clean up old logs</button>
       </div>
-    </div>
+    </div>`)}
 
-    <div class="card" style="margin-top:16px">
+    ${pane("diagnostics", `
+    <div class="card">
       <h3>IPC diagnostics</h3>
       <dl class="kv">
         <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
         ${diag.socket_path ? `<dt>Socket</dt><dd><code>${htmlEscape(diag.socket_path)}</code></dd>` : ""}
         ${diag.last_contact_at ? `<dt>Last contact</dt><dd>${fmtTime(diag.last_contact_at)}</dd>` : ""}
       </dl>
-    </div>
+    </div>`)}
   `;
+  // Tab click handlers — purely DOM-local, no re-fetch.
+  $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
+    btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
+  });
   $("#s-save").addEventListener("click", async () => {
     await withButtonBusy($("#s-save"), "Saving…", async () => {
       try {
