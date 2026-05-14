@@ -134,9 +134,36 @@ function fmtTime(iso) {
 }
 
 function fmtElapsed(seconds) {
+  seconds = Math.max(0, Math.floor(seconds));
   if (seconds < 60) return `${seconds}s`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
   return `${(seconds / 3600).toFixed(1)}h`;
+}
+
+// Abbreviate counter values so dashboard cards stay legible at scale:
+// 999 → "999", 1300 → "1.3K", 1_300_000 → "1.3M", 1_300_000_000 → "1.3B".
+// Drops a trailing ".0" (so 1000 reads as "1K", not "1.0K"). Promotes
+// to the next tier when 1-decimal rounding would push the value over
+// 999 at the current tier (e.g. 999_999 reads as "1M", not "1000K").
+function fmtCount(n) {
+  n = Number(n) || 0;
+  if (n < 1000) return String(n);
+  const tiers = [
+    { div: 1_000_000_000, suffix: "B" },
+    { div: 1_000_000,     suffix: "M" },
+    { div: 1_000,         suffix: "K" },
+  ];
+  for (let i = 0; i < tiers.length; i++) {
+    const t = tiers[i];
+    if (n < t.div) continue;
+    const rounded = Math.round((n / t.div) * 10) / 10;
+    if (rounded >= 1000 && i > 0) {
+      const up = tiers[i - 1];
+      return (n / up.div).toFixed(1).replace(/\.0$/, "") + up.suffix;
+    }
+    return rounded.toFixed(1).replace(/\.0$/, "") + t.suffix;
+  }
+  return String(n);
 }
 
 function htmlEscape(s) {
@@ -535,9 +562,10 @@ function drawDashboard(d) {
 
     <section class="card-grid">
       ${orderedStatuses.map((s) => `
-        <a class="card" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit">
+        <a class="card" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit"
+           title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}">
           <div class="muted small">${s}</div>
-          <div style="font-size:28px;font-weight:600;margin-top:4px">${counts[s] || 0}</div>
+          <div style="font-size:28px;font-weight:600;margin-top:4px">${fmtCount(counts[s] || 0)}</div>
         </a>`).join("")}
     </section>
 
@@ -559,9 +587,9 @@ function drawDashboard(d) {
                     data-reporter="${htmlEscape(s.reporter)}"
                     title="See Gaps reported by ${htmlEscape(s.reporter)}">
                   <td>${htmlEscape(s.reporter)}</td>
-                  <td>${s.active}</td>
-                  <td>${s.done}</td>
-                  <td>${s.reported}</td>
+                  <td>${fmtCount(s.active)}</td>
+                  <td>${fmtCount(s.done)}</td>
+                  <td>${fmtCount(s.reported)}</td>
                   <td>${s.completion_rate.toFixed(1)}%</td>
                 </tr>`).join("")}
             </tbody>
@@ -574,14 +602,24 @@ function drawDashboard(d) {
         <div class="card-scroll">
           ${(d.running || []).length === 0
             ? `<p class="muted">No agent subprocesses running.</p>`
-            : `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
-              ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
-                <td><code>${r.gap_id.slice(0,8)}…</code></td>
-                <td>${fmtElapsed(r.elapsed_seconds)}</td>
-                <td>${fmtElapsed(r.idle_seconds)}</td>
-                <td class="muted small">${r.pid}</td>
-              </tr>`).join("")}
-              </tbody></table>`}
+            : (() => {
+                // Anchor seconds-at-fetch + a single `data-anchor-ms`
+                // timestamp so the tick can compute a live value
+                // without re-fetching: shown = base + (now - anchor) / 1000.
+                const anchorMs = Date.now();
+                return `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
+                  ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
+                    <td><code>${r.gap_id.slice(0,8)}…</code></td>
+                    <td class="js-elapsed-tick"
+                        data-base="${r.elapsed_seconds}"
+                        data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
+                    <td class="js-idle-tick"
+                        data-base="${r.idle_seconds}"
+                        data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
+                    <td class="muted small">${r.pid}</td>
+                  </tr>`).join("")}
+                  </tbody></table>`;
+              })()}
         </div>
       </div>
 
@@ -1980,17 +2018,24 @@ function drawAgents(dash, settings) {
       <h3>Currently running</h3>
       ${(dash.running || []).length === 0
         ? `<p class="muted">Nothing running.</p>`
-        : `<table class="table">
-            <thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead>
-            <tbody>
-              ${dash.running.map((r) => `<tr>
-                <td><a href="#/gaps/${r.gap_id}">${r.gap_id.slice(0,10)}…</a></td>
-                <td>${fmtElapsed(r.elapsed_seconds)}</td>
-                <td>${fmtElapsed(r.idle_seconds)}</td>
-                <td><button class="danger" data-cancel="${r.gap_id}">Cancel</button></td>
-              </tr>`).join("")}
-            </tbody>
-          </table>`}
+        : (() => {
+            const anchorMs = Date.now();
+            return `<table class="table">
+              <thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead>
+              <tbody>
+                ${dash.running.map((r) => `<tr>
+                  <td><a href="#/gaps/${r.gap_id}">${r.gap_id.slice(0,10)}…</a></td>
+                  <td class="js-elapsed-tick"
+                      data-base="${r.elapsed_seconds}"
+                      data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
+                  <td class="js-idle-tick"
+                      data-base="${r.idle_seconds}"
+                      data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
+                  <td><button class="danger" data-cancel="${r.gap_id}">Cancel</button></td>
+                </tr>`).join("")}
+              </tbody>
+            </table>`;
+          })()}
     </div>
   `;
   $("#btn-pause").addEventListener("click", async () => {
@@ -2881,6 +2926,21 @@ function drawSettings(s, diag, reps) {
 
 // ---- Init -------------------------------------------------------------------
 
+// Increment the live "Elapsed" / "Idle" cells once per second so the
+// dashboard and Agents page feel responsive even between SSE refreshes.
+// Cells without `.js-elapsed-tick` / `.js-idle-tick` no-op cheaply.
+function tickRunningCells() {
+  const now = Date.now();
+  document.querySelectorAll(".js-elapsed-tick, .js-idle-tick").forEach((el) => {
+    const base = parseInt(el.dataset.base, 10);
+    const anchor = parseInt(el.dataset.anchorMs, 10);
+    if (Number.isNaN(base) || Number.isNaN(anchor)) return;
+    const seconds = base + Math.floor((now - anchor) / 1000);
+    const next = fmtElapsed(seconds);
+    if (el.textContent !== next) el.textContent = next;
+  });
+}
+
 async function init() {
   try {
     await refreshReporters();
@@ -2889,6 +2949,7 @@ async function init() {
   }
   initChatDock();
   initSSE();
+  setInterval(tickRunningCells, 1000);
   navigate();
 }
 
