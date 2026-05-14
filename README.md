@@ -8,19 +8,41 @@ merges the work back to the branch you have checked out. Gaps move
 `todo → in-progress → review → done`, with `failed` and `cancelled` for the
 unhappy paths; multiple Gaps run in parallel up to a configurable cap.
 
-You drive everything from a web UI: a status dashboard, per-Gap activity
-feeds, a filterable Logs view, and an interactive Chat that can be
-standalone or attached to a Gap's worktree with that Gap's context
-pre-loaded. Refine handles the git plumbing — worktrees, fetch, merge,
-push, auto-committing its own state — and inherits Claude Code auth from
-the host, so operators rarely need to think about either.
+You drive everything from a web UI:
+
+- A **status dashboard** with a Reporter stats card — click a row to deep-link
+  into the Gaps list filtered by that reporter.
+- A **Gaps list** with search + status + reporter + severity / category / actor
+  / entries-limit filters, sortable columns, and bulk-update actions for
+  priority, status, and reporter that respect whatever filter is active.
+- A **filterable Logs view** with the same Logs-style filter set.
+- A **persistent Chat dock** at the bottom of every page — collapsible,
+  vertically resizable, with a fullscreen toggle. Tabs for a standalone chat
+  and one per Gap; opening Chat against an in-progress Gap eagerly primes the
+  claude session with the Gap's context so the user's first message gets a
+  context-aware answer. Transcripts render markdown.
+- Import-from-text uses an **LLM call** (via the host `claude` CLI) to extract
+  `{name, actual, target}` drafts from free-form paste-dumps; a loading
+  indicator shows while the model runs.
+
+Active filters are surfaced visually: matching dropdowns/inputs pick up an
+accent border, a "FILTERED" pill appears next to the count, and the results
+table grows an accent stripe + tinted header.
+
+Refine handles the git plumbing — worktrees, fetch, merge, push,
+auto-committing its own state — and inherits Claude Code auth from the host,
+so operators rarely need to think about either.
 
 ## Components
 
 - **`refine-web`** — Python webapp in Docker (UI + JSON API + SSE).
 - **`refine-runner`** — host-native daemon that owns CLI subprocesses, git
   operations, and `gap.json` writes. Runs natively so it inherits the host's
-  `~/.claude/` auth, SSH keys, and git config.
+  `~/.claude/` auth, SSH keys, and git config. Chat and Import subprocesses
+  additionally strip `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` (+ a few related
+  vars) and resolve `claude` via the user's interactive login-shell `PATH`,
+  so they behave like the user's terminal `claude` regardless of the
+  systemd-user manager's stripped env.
 - They communicate over a Unix-domain socket inside the volume root, which is
   bind-mounted into the webapp container.
 
@@ -173,7 +195,13 @@ the UI's Settings page.
   network.
 - **Reporters** provide unverified identification: each round records who
   submitted it via a free-form name selected from a dropdown. Anyone can pick
-  anyone — by design (see `spec.md → Reporters`).
+  anyone — by design (see `spec.md → Reporters`). Renaming a reporter in
+  Settings cascades through every Gap's `rounds[].reporter` strings so the
+  dropdown and historical data stay in sync; removing a reporter deliberately
+  does *not* cascade, so audit history of who submitted what is preserved.
+- **Claude auth** uses the OAuth login persisted under `~/.claude/` by
+  `claude login` on the host. Chat and Import explicitly strip API-key env
+  vars so a stale `ANTHROPIC_API_KEY` can't override the OAuth session.
 
 ## CLI reference
 
@@ -202,12 +230,6 @@ and git remotes, both of which need a configured host).
 
 ## Caveats / known scope
 
-This is a v1 implementation tracking [`spec.md`](spec.md). Notable simplifications:
-
-- **Import** uses paragraph-based extraction rather than an LLM call. The
-  user reviews and edits each extracted draft before persisting; the structure
-  (a runner IPC method for "extract") is in place to upgrade to LLM-driven
-  extraction without touching the webapp.
-- Several **out-of-scope** items from the spec remain out of scope:
-  authentication, external-tracker integrations, cross-instance sync,
-  automatic retries.
+This is a v1 implementation tracking [`spec.md`](spec.md). Several
+**out-of-scope** items from the spec remain out of scope: authentication,
+external-tracker integrations, cross-instance sync, automatic retries.
