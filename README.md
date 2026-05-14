@@ -1,14 +1,15 @@
 # refine
 
-refine turns Gaps — features or bugs, framed as *what the app does today*
-vs. *what it should do instead* — into verified software. QA, Product,
-support, and engineering all describe Gaps the same way, and refine launches
-a Claude Code agent in a git worktree to close each one. The agent makes the
-change and commits; a human reviews the diff and the live behavior; only
-after that review does **verify** merge the work to the configured target
-branch and push. Gaps move `todo → in-progress → review → done`, with
-`failed` and `cancelled` for the unhappy paths; multiple Gaps run in
-parallel up to a configurable cap.
+Refine turns software gaps (features and bugs) into verified software
+through ordinary people enhanced by agents. QA, Product, support,
+customers — anyone who can articulate *what the app does today* vs
+*what it should do instead* — submits a Gap. Refine launches a Claude
+Code agent in a git worktree to close it; a human reviews the diff
+and the live behavior; only after that review does **verify** merge
+the work to the configured target branch and push. Gaps move
+`todo → in-progress → review → done`, with `failed` and `cancelled`
+for the unhappy paths; multiple Gaps run in parallel up to a
+configurable cap.
 
 You drive everything from a web UI:
 
