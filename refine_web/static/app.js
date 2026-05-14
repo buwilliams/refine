@@ -392,7 +392,9 @@ function initSSE() {
   });
   sseSource.addEventListener("status_change", () => {
     if (state.currentRoute === "dashboard") renderDashboard();
-    if (state.currentRoute === "gaps_list") renderGapsList();
+    // Refresh only the table on background updates so an in-progress
+    // keystroke in the search box isn't interrupted by a full re-render.
+    if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);
@@ -638,9 +640,9 @@ async function renderGapsList() {
         </select>
       </div>
       <div class="filter-row filter-row-bulk">
-        <span id="gaps-count" class="muted small"></span>
-        <span class="spacer"></span>
-        <span class="muted small">Bulk update matching:</span>
+        <span class="muted small">
+          <span id="gaps-count"></span>, bulk update matching:
+        </span>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
@@ -648,32 +650,79 @@ async function renderGapsList() {
     </div>
     <div id="gaps-table"><p class="muted">Loading…</p></div>
   `;
-  $("#search").addEventListener("input", debounce((e) => {
-    location.hash = gapsHash({ q: e.target.value, status, sort, dir });
+  // In-view filter changes update the URL via replaceState (which does NOT
+  // fire `hashchange`) and refresh only the table. Going through
+  // `location.hash =` would trigger renderGapsList again, which rebuilds
+  // `#main` from scratch — that destroys the focused search input mid-
+  // keystroke. Sort-header clicks go through the same path
+  // (`refreshGapsTable`); see drawGapsTable.
+  $("#search").addEventListener("input", debounce(() => {
+    updateGapsFilter({ q: $("#search").value });
   }, 250));
   $("#filter-status").addEventListener("change", (e) => {
-    location.hash = gapsHash({ q, status: e.target.value, sort, dir });
+    updateGapsFilter({ status: e.target.value });
   });
   // The bulk-action buttons read the current filter from the hash at click
   // time, so they always reflect what the user can see.
   $("#bulk-set-priority").addEventListener("click", () => openBulkModal("priority"));
   $("#bulk-set-status").addEventListener("click", () => openBulkModal("status"));
   $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
+
+  await refreshGapsTable();
+}
+
+// Snapshot the current Gaps filter from the URL hash.
+function gapsFilterFromHash() {
+  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  const sort = (hashQs.get("sort") || "").toLowerCase();
+  const dir = (hashQs.get("dir") || "").toLowerCase();
+  const effectiveSort = sort || "updated";
+  const effectiveDir = dir || (GAPS_DEFAULT_DIR[effectiveSort] || "desc");
+  return {
+    q: hashQs.get("q") || "",
+    status: hashQs.get("status") || "",
+    sort, dir,
+    effectiveSort, effectiveDir,
+  };
+}
+
+// Patch one or more filter fields and refresh the table without
+// triggering a full view re-render. The URL stays in sync via
+// `history.replaceState` so reload / share / back behave correctly.
+function updateGapsFilter(patch) {
+  const current = gapsFilterFromHash();
+  const next = {
+    q: "q" in patch ? patch.q : current.q,
+    status: "status" in patch ? patch.status : current.status,
+    sort: "sort" in patch ? patch.sort : current.sort,
+    dir: "dir" in patch ? patch.dir : current.dir,
+  };
+  history.replaceState(null, "", gapsHash(next));
+  refreshGapsTable();
+}
+
+async function refreshGapsTable() {
+  if (state.currentRoute !== "gaps") return;
+  const f = gapsFilterFromHash();
+  const params = new URLSearchParams();
+  if (f.status) params.set("status", f.status);
+  if (f.q) params.set("q", f.q);
+  if (f.sort) params.set("sort", f.sort);
+  if (f.dir) params.set("dir", f.dir);
   try {
-    const params = new URLSearchParams();
-    if (status) params.set("status", status);
-    if (q) params.set("q", q);
-    if (sort) params.set("sort", sort);
-    if (dir) params.set("dir", dir);
     const data = await api("GET", "/api/gaps?" + params);
     const gaps = data.gaps || [];
     const countEl = $("#gaps-count");
     if (countEl) {
       countEl.textContent = `${gaps.length} gap${gaps.length === 1 ? "" : "s"}`;
     }
-    drawGapsTable(gaps, { q, status, sort: effectiveSort, dir: effectiveDir });
+    drawGapsTable(gaps, {
+      q: f.q, status: f.status,
+      sort: f.effectiveSort, dir: f.effectiveDir,
+    });
   } catch (e) {
-    $("#gaps-table").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+    const tbl = $("#gaps-table");
+    if (tbl) tbl.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
@@ -729,9 +778,7 @@ function drawGapsTable(gaps, state) {
         // New column — use its natural default direction.
         nextDir = GAPS_DEFAULT_DIR[key] || "desc";
       }
-      location.hash = gapsHash({
-        q: state.q, status: state.status, sort: key, dir: nextDir,
-      });
+      updateGapsFilter({ sort: key, dir: nextDir });
     });
   });
 }
@@ -2332,7 +2379,10 @@ function drawSettings(s, diag, reps) {
         <button id="r-add">+ Add reporter</button>
       </div>
       <p class="muted small" style="margin-top:6px">
-        Historical rounds retain their original reporter string; renames/removals only affect the dropdown.
+        Renaming a reporter cascades through every Gap's rounds so historical
+        data stays in sync. Removing a reporter only affects the dropdown —
+        historical rounds keep their original reporter string so audit
+        history is preserved.
       </p>
     </div>
 

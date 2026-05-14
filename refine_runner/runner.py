@@ -15,8 +15,9 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT, M_RUNNING,
-    M_SET_NOTES, M_VERIFY, default_socket_path,
+    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PING, M_PREFLIGHT,
+    M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING, M_SET_NOTES,
+    M_VERIFY, default_socket_path,
 )
 
 from . import dispatcher as _dispatcher
@@ -101,6 +102,8 @@ class Runner:
             M_CHAT_READ: self._h_chat_read,
             M_CHAT_STOP: self._h_chat_stop,
             M_EXTRACT_GAPS: self._h_extract_gaps,
+            M_RENAME_REPORTER: self._h_rename_reporter,
+            M_RENAME_REPORTER_STRINGS: self._h_rename_reporter_strings,
         }
         h = handlers.get(method)
         if h is None:
@@ -288,6 +291,53 @@ class Runner:
         text = params.get("text") or ""
         drafts = llm.extract_gaps(text)
         return {"drafts": drafts}
+
+    def _h_rename_reporter(self, params: dict) -> dict:
+        """Rename a reporter in the table AND cascade the new name through
+        every Gap's rounds so the dropdown and historical data stay in
+        sync. Returns the old name plus how many Gaps were touched."""
+        try:
+            rid = int(params.get("rid"))
+        except (TypeError, ValueError):
+            raise ValueError("rid is required and must be an integer")
+        new_name = (params.get("new_name") or "").strip()
+        if not new_name:
+            raise ValueError("new_name is required")
+        row = self._conn.execute(
+            "SELECT name FROM reporters WHERE id = ?", (rid,),
+        ).fetchone()
+        if not row:
+            raise ValueError(f"reporter {rid} not found")
+        old_name = row["name"]
+        if old_name != new_name:
+            reporters.rename(self._conn, rid, new_name)
+        touched = gap_writer.rename_reporter_in_rounds(
+            self._conn, old_name, new_name,
+        )
+        activity.append(
+            self._conn,
+            message=(f"Reporter renamed: {old_name!r} → {new_name!r} "
+                     f"({touched} gap{'' if touched == 1 else 's'} updated)"),
+            severity="info", category="state", actor="refine",
+        )
+        return {"old": old_name, "new": new_name, "touched": touched}
+
+    def _h_rename_reporter_strings(self, params: dict) -> dict:
+        """Cascade-only: rewrite round.reporter == old to new across all
+        Gaps without touching the reporters table. Used for one-off data
+        migrations (e.g. an orphan string that's not in the table)."""
+        old = (params.get("old") or "").strip()
+        new = (params.get("new") or "").strip()
+        if not old or not new:
+            raise ValueError("both `old` and `new` are required")
+        touched = gap_writer.rename_reporter_in_rounds(self._conn, old, new)
+        activity.append(
+            self._conn,
+            message=(f"Reporter strings rewritten: {old!r} → {new!r} "
+                     f"({touched} gap{'' if touched == 1 else 's'} updated)"),
+            severity="info", category="state", actor="refine",
+        )
+        return {"touched": touched}
 
     def _h_chat_start(self, params: dict) -> dict:
         gap_id = params.get("gap_id")

@@ -103,6 +103,44 @@ def edit_latest_round(gap_id: str, *, actual: str | None = None,
         return gap
 
 
+def rename_reporter_in_rounds(conn, old_name: str, new_name: str) -> int:
+    """Rewrite every round whose `reporter == old_name` to `new_name`.
+
+    Walks all Gaps in `gaps_index`, takes the same per-Gap write lock the
+    other writers use, and updates each gap.json atomically. Returns the
+    number of Gaps actually touched (not the number of rounds). No-op if
+    the names match or either side is empty.
+
+    This is the data-side cascade used by the runner's rename-reporter
+    handler so historical rounds line up with the renamed dropdown entry.
+    Deletes do *not* call this — by design, removing a reporter from the
+    table preserves the original reporter string on historical rounds so
+    audit history stays intact.
+    """
+    if not old_name or not new_name or old_name == new_name:
+        return 0
+    rows = conn.execute("SELECT id FROM gaps_index").fetchall()
+    touched = 0
+    for row in rows:
+        gap_id = row["id"]
+        with _lock_for(gap_id):
+            gap = shared_gaps.read_gap_json(gap_id)
+            if gap is None:
+                continue
+            changed = False
+            now = now_iso()
+            for r in gap.get("rounds") or []:
+                if r.get("reporter") == old_name:
+                    r["reporter"] = new_name
+                    r["updated"] = now
+                    changed = True
+            if changed:
+                gap["updated"] = now
+                shared_gaps.write_gap_json(gap)
+                touched += 1
+    return touched
+
+
 def append_round_log(*, gap_id: str, round_idx: int, message: str,
                      severity: str = "info", category: str = "cli",
                      details: str | None = None,

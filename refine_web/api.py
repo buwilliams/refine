@@ -14,8 +14,8 @@ from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RUNNING,
-    M_SET_NOTES, M_VERIFY,
+    M_EXTRACT_GAPS, M_LAUNCH, M_LOG_APPEND, M_PREFLIGHT, M_RENAME_REPORTER,
+    M_RUNNING, M_SET_NOTES, M_VERIFY,
 )
 from refine_shared.ulid import new_ulid
 
@@ -522,12 +522,18 @@ def rename_reporter(rid: int, body: dict) -> tuple[int, dict]:
     name = (body.get("name") or "").strip()
     if not name:
         return err(400, "name is required")
-    conn = _conn()
+    if not _VALID_REPORTER.match(name):
+        return err(400, "invalid reporter name")
+    # Route through the runner so the rename cascades through every Gap's
+    # `rounds[].reporter` strings — keeping the dropdown and historical
+    # data in sync. (Deletes deliberately don't cascade; see delete_reporter.)
     try:
-        reporters.rename(conn, rid, name)
-    finally:
-        conn.close()
-    return 200, {"ok": True}
+        result = get_client().call(
+            M_RENAME_REPORTER, {"rid": rid, "new_name": name}, timeout=60.0,
+        )
+    except IpcError as e:
+        return _ipc_err(e)
+    return 200, {"ok": True, **result}
 
 
 def delete_reporter(rid: int) -> tuple[int, dict]:
