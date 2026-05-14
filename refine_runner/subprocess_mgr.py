@@ -149,6 +149,11 @@ class RunHandle:
     last_output: float
     cwd: Path              # worktree path
     base_ref: str          # commit before the run, for "no commits produced" detection
+    # Whether the CLI emits parseable stream-json events refine can
+    # translate into rich round-log entries (with tool summaries and
+    # a terminal `result` event). True for Claude only today; non-
+    # structured CLIs fall through to line-by-line passthrough.
+    structured_output: bool = True
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
     # Set to time.monotonic() when stream-json emits a `result` event.
@@ -209,21 +214,21 @@ class SubprocessManager:
         # (and its `skipDangerousModePermissionPrompt`) is invisible
         # to the agent and `--dangerously-skip-permissions` hits its
         # "must be accepted in an interactive session first" gate.
-        from .chat_mgr import _chat_env, _resolve_claude
+        from .chat_mgr import _chat_env
+        from . import agent_cli
         env = _chat_env()
-        claude_path = _resolve_claude(env)
-        # `--output-format=stream-json --verbose` makes claude emit one
-        # JSON event per line while it works (system init, assistant
-        # turn, tool_use, tool_result, result). We translate each event
-        # into a friendly round-log entry in `_drain_stdout` — and
-        # because every event lands as a stdout line, the existing
-        # `h.last_output = monotonic()` per-line update gives a real
-        # "Idle" reading (previously stayed at 0 because plain --print
-        # was silent until the final response flush).
+        # The CLI to drive is operator-configurable (claude / codex /
+        # gemini); we look up the binary on the user's interactive-
+        # login PATH that `_chat_env` already provides. Stream-json
+        # parsing in `_drain_stdout` is gated on `spec.structured_output`
+        # so non-Claude CLIs fall back to plain line-by-line logging.
+        spec = agent_cli.get_spec(
+            db.get_setting(self._get_conn(), "agent_cli")
+        )
+        bin_path = agent_cli.resolve_binary(spec, env)
+        args = spec.agent_args(bin_path, prompt)
         proc = subprocess.Popen(
-            [claude_path, "--print",
-             "--output-format=stream-json", "--verbose",
-             "--dangerously-skip-permissions", prompt],
+            args,
             cwd=str(cwd),
             env=env,
             stdin=subprocess.DEVNULL,
@@ -244,6 +249,7 @@ class SubprocessManager:
             last_output=now,
             cwd=cwd,
             base_ref=base_ref,
+            structured_output=spec.structured_output,
         )
         with self._lock:
             self._runs[gap_id] = handle
@@ -388,6 +394,15 @@ class SubprocessManager:
                 h.last_output = time.monotonic()
                 line = raw.rstrip("\n")
                 if not line:
+                    continue
+                if not h.structured_output:
+                    # Codex / Gemini / any non-Claude CLI: plain
+                    # passthrough. The line goes verbatim into the
+                    # round log; idle / hard-cap still work via the
+                    # `last_output` tick above. No `result` event, so
+                    # `agent_reported_success` stays None — outcome
+                    # classification falls back to exit-code-only.
+                    self._write_log_entry(h, line)
                     continue
                 try:
                     evt = json.loads(line)

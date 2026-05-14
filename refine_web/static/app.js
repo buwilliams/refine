@@ -2996,8 +2996,29 @@ async function renderSettings() {
 }
 
 function drawSettings(s, diag, reps) {
+  const cli = (s.agent_cli || "claude").toLowerCase();
+  const cliOption = (value, label) =>
+    `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   $("#settings-content").innerHTML = `
     <div class="card">
+      <h3>Agent CLI</h3>
+      <div class="form-row"><label>Which CLI refine drives
+        <span class="muted small">— used for Gap agent runs, conflict resolution, and pre-flight. <strong>Chat always uses Claude</strong> because of its session-resume support; Codex / Gemini don't have an equivalent.</span></label>
+        <select id="s-cli">
+          ${cliOption("claude", "Claude Code (default)")}
+          ${cliOption("codex", "OpenAI Codex")}
+          ${cliOption("gemini", "Gemini")}
+        </select></div>
+      <p class="muted small" style="margin-top:6px">
+        After switching: re-check auth below to confirm the chosen CLI
+        is installed and authed on the host. Round logs are rich for
+        Claude (tool summaries, live Idle counter); Codex / Gemini fall
+        back to plain stdout passthrough.
+      </p>
+      <div class="actions"><button id="s-save-cli">Save</button></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
       <h3>Runtime configuration</h3>
       <div class="form-row"><label>Parallel-run cap</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
@@ -3035,7 +3056,7 @@ function drawSettings(s, diag, reps) {
 
     <div class="card" style="margin-top:16px">
       <h3>Auth</h3>
-      <p class="muted">Claude Code auth lives on the host. Use Re-check to re-run the pre-flight after running <code>claude login</code>.</p>
+      <p class="muted">The selected CLI's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>) — or check that the matching <code>API_KEY</code> env var is exported.</p>
       <button id="s-recheck">Re-check auth</button>
     </div>
 
@@ -3100,6 +3121,16 @@ function drawSettings(s, diag, reps) {
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
         });
         toast("Saved", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-save-cli").addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-cli"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
+          agent_cli: $("#s-cli").value,
+        });
+        toast("Saved — re-check auth to confirm the new CLI is reachable", "info");
       } catch (e) { toast(e.message, "error"); }
     });
   });

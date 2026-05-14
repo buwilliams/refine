@@ -23,8 +23,10 @@ import threading
 import time
 from pathlib import Path
 
-from . import git_ops
-from .chat_mgr import _chat_env, _resolve_claude
+from refine_shared import db
+
+from . import agent_cli, git_ops
+from .chat_mgr import _chat_env
 
 
 # Caps for the resolver subprocess. Wider than the original 120s/600s:
@@ -71,12 +73,11 @@ def attempt_auto_resolve(
     prompt = _build_prompt(branch=branch, target=target, files=files)
 
     env = _chat_env()
-    claude = _resolve_claude(env)
+    spec = agent_cli.get_spec(db.get_setting(conn, "agent_cli"))
+    bin_path = agent_cli.resolve_binary(spec, env)
     try:
         proc = subprocess.Popen(
-            [claude, "--print",
-             "--output-format=stream-json", "--verbose",
-             "--dangerously-skip-permissions", prompt],
+            spec.agent_args(bin_path, prompt),
             cwd=str(repo),
             env=env,
             stdin=subprocess.DEVNULL,
@@ -88,7 +89,7 @@ def attempt_auto_resolve(
         )
     except (OSError, FileNotFoundError) as e:
         return {"ok": False,
-                "message": f"could not launch claude for auto-resolve: {e}"}
+                "message": f"could not launch {spec.binary} for auto-resolve: {e}"}
 
     _stream_and_supervise(proc, log)
 

@@ -86,6 +86,10 @@ DEFAULT_SETTINGS = {
     "agent_hard_cap_seconds": "86400",     # 24 h
     "chat_idle_timeout_seconds": "300",    # 5 min — auto-close idle chats
     "paused": "0",
+    # Which agent CLI refine drives for Gap runs, conflict
+    # resolution, and pre-flight. One of: claude | codex | gemini.
+    # Chat still uses claude regardless (relies on `--resume`).
+    "agent_cli": "claude",
     # Subdirectory of the client repo (and per-Gap worktree) used as the cwd
     # for *agent* + *chat* Claude subprocesses. Lets a monorepo host claude
     # operations focused on one sub-project while git plumbing — worktree

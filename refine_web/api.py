@@ -705,8 +705,10 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
         "chat_idle_timeout_seconds",
         "agent_subpath", "merge_target_branch",
+        "agent_cli",
         "paused",
     }
+    valid_agent_clis = ("claude", "codex", "gemini")
     normalized: dict[str, str] = {}
     for k, v in body.items():
         if k not in allowed:
@@ -735,6 +737,12 @@ def update_settings(body: dict) -> tuple[int, dict]:
                     return err(400, "agent_subpath must not contain `..` components")
                 sub = "/".join(parts)
             normalized[k] = sub
+        elif k == "agent_cli":
+            choice = str(v or "").strip().lower()
+            if choice not in valid_agent_clis:
+                return err(400,
+                    f"agent_cli must be one of {', '.join(valid_agent_clis)}")
+            normalized[k] = choice
         else:
             normalized[k] = str(v)
     conn = _conn()
