@@ -275,6 +275,17 @@ def _write_and_enable_unit(clone_dir: Path, client_repo: Path, *, force: bool) -
         f"ExecStart={uv} run refine runner\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
+        # KillMode=process so the runner's child processes — most
+        # importantly, any nohup'd target application the agent
+        # backgrounded — survive `systemctl stop` instead of getting
+        # SIGTERM'd as cgroup members. The runner only signals its
+        # own pid; child processes are deliberately orphaned.
+        "KillMode=process\n"
+        # Cap systemd's own stop window so it doesn't sit there for the
+        # default 90s if the runner hangs. The runner's shutdown path
+        # is non-blocking by design (all worker threads are daemons),
+        # so anything past a few seconds is a real bug worth surfacing.
+        "TimeoutStopSec=30s\n"
         "\n"
         "[Install]\n"
         "WantedBy=default.target\n"
@@ -355,6 +366,20 @@ def cmd_stop(args: argparse.Namespace) -> int:
     if rc != 0:
         # Non-fatal: maybe it wasn't running. Continue to compose down.
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
+        if rc == 124:
+            # The wrapper's own timeout fired. Most common cause: the
+            # installed unit predates `KillMode=process`, so systemd is
+            # waiting for child processes (the target-app agent's
+            # nohup'd subprocess, for example) before it considers the
+            # unit stopped. Point the operator at the fix.
+            print(
+                "  Hint: the unit may be waiting for nohup'd child processes "
+                "to exit. Re-run `refine init --force` to regenerate the "
+                "systemd unit with KillMode=process, then try stopping "
+                "again. If the runner is wedged in the meantime, force-kill "
+                f"it with `systemctl --user kill -s SIGKILL {unit}`.",
+                file=sys.stderr,
+            )
 
     print("Stopping webapp (docker compose down)…")
     rc = _docker_compose(clone, "down")
@@ -691,10 +716,17 @@ def _newest_mtime(p: Path) -> float:
 
 
 def _systemctl(*args: str) -> tuple[int, str]:
+    # systemd's TimeoutStopSec defaults to 90s and our unit template caps
+    # it to 30s. The wrapper has to give systemd at least its full stop
+    # window or else we report a false-positive "timed out" — which is
+    # what `refine stop` used to do on units the agent had spawned child
+    # processes for.
+    cmd = args[0] if args else ""
+    timeout = 60 if cmd in ("stop", "start", "restart") else 15
     try:
         out = subprocess.run(
             ["systemctl", "--user", *args],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=timeout,
         )
     except FileNotFoundError:
         return 127, "systemctl not found (systemd --user required)"
