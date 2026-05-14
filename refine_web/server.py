@@ -155,6 +155,16 @@ def _h_recheck(_h, _m, _b, _q):
     return api.recheck_auth()
 
 
+@route("GET", r"/api/features")
+def _h_get_features(_h, _m, _b, _q):
+    return api.list_features()
+
+
+@route("POST", r"/api/features/override")
+def _h_set_feature_override(_h, _m, body, _q):
+    return api.set_feature_override(body or {})
+
+
 @route("GET", r"/api/diagnostics")
 def _h_diag(_h, _m, _b, _q):
     return api.ipc_diagnostics()

@@ -697,6 +697,50 @@ def list_settings() -> tuple[int, dict]:
         conn.close()
 
 
+def list_features() -> tuple[int, dict]:
+    """Provider-scoped feature flag matrix. Used by the Settings UI
+    to render the Feature flags card and by client-side gating of
+    Chat / Import affordances."""
+    from refine_shared import features
+    conn = _conn()
+    try:
+        return 200, features.get_matrix(conn)
+    finally:
+        conn.close()
+
+
+def set_feature_override(body: dict) -> tuple[int, dict]:
+    """Operator override for a (provider, feature) cell. Body:
+        {"provider": "codex", "feature": "chat", "enabled": true|false|null}
+    `enabled=null` clears the override so the code-defined default
+    re-applies."""
+    from refine_shared import features
+    if not isinstance(body, dict):
+        return err(400, "expected an object")
+    provider = (body.get("provider") or "").strip().lower()
+    feature = (body.get("feature") or "").strip()
+    if provider not in features.PROVIDERS:
+        return err(400, f"unknown provider: {provider}")
+    if feature not in features.FEATURES:
+        return err(400, f"unknown feature: {feature}")
+    enabled = body.get("enabled")
+    if enabled is not None and not isinstance(enabled, bool):
+        return err(400, "enabled must be true, false, or null")
+    conn = _conn()
+    try:
+        features.set_override(conn, provider, feature, enabled)
+        activity.append(
+            conn,
+            message=(f"Feature flag `{provider}.{feature}` "
+                     + (f"overridden to {enabled}"
+                        if enabled is not None else "override cleared")),
+            severity="info", category="user", actor="refine",
+        )
+    finally:
+        conn.close()
+    return 200, {"ok": True}
+
+
 def update_settings(body: dict) -> tuple[int, dict]:
     if not isinstance(body, dict) or not body:
         return err(400, "expected an object of {key: value}")
@@ -963,6 +1007,8 @@ def import_extract(body: dict) -> tuple[int, dict]:
         )
     except IpcError as e:
         return _ipc_err(e)
+    if result.get("ok") is False and result.get("code") == "feature_disabled":
+        return 409, result
     return 200, {"drafts": result.get("drafts") or []}
 
 
@@ -1000,6 +1046,8 @@ def chat_start(body: dict) -> tuple[int, dict]:
         result = get_client().call(M_CHAT_START, {"gap_id": body.get("gap_id")})
     except IpcError as e:
         return _ipc_err(e)
+    if result.get("ok") is False and result.get("code") == "feature_disabled":
+        return 409, result
     return 201, result
 
 

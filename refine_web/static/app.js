@@ -10,7 +10,56 @@ const state = {
   needsAttentionBanners: [],
   currentRoute: null,
   currentGap: null,
+  // Provider-scoped feature flag matrix from `/api/features`. Refreshed
+  // on app start and after any Settings save. UI helpers below read
+  // `state.features` to gate Chat / Import affordances.
+  features: null,
 };
+
+async function refreshFeatures() {
+  try {
+    state.features = await api("GET", "/api/features");
+  } catch { /* keep prior value; gates default to permissive */ }
+  // Re-render whatever surfaces depend on the matrix.
+  applyFeatureGates();
+  // Chat dock is always in the DOM — its body content branches on
+  // featureEnabled("chat"), so a redraw is needed when the matrix
+  // (or the active provider) changes.
+  if (typeof drawChatDock === "function") drawChatDock();
+  if (state.currentRoute === "settings") refreshSettings();
+  if (state.currentRoute === "gaps_detail" && state.currentGap) {
+    loadGapDetail(state.currentGap);
+  }
+}
+
+function featureEnabled(featureKey) {
+  // Default-permissive: if we haven't loaded the matrix yet (first
+  // paint racing against /api/features), don't block UI interactions
+  // — the server is still the source of truth and will reject any
+  // gated action with a clear error.
+  const f = state.features;
+  if (!f) return true;
+  const cell = f.matrix?.[`${f.current_provider}.${featureKey}`];
+  return cell ? !!cell.enabled : true;
+}
+
+function applyFeatureGates() {
+  // Top-bar Import button: hide entirely when LLM extraction isn't
+  // supported for this provider. Hiding vs. graying-out is
+  // intentional — the action has no fallback, so the affordance
+  // shouldn't tease the user.
+  const importBtn = document.getElementById("btn-import");
+  if (importBtn) {
+    importBtn.style.display = featureEnabled("import_gaps") ? "" : "none";
+  }
+  // Chat dock toggle: keep visible (the dock is part of the layout)
+  // but mark disabled when chat isn't supported. The dock itself
+  // shows an inline "disabled" notice when expanded.
+  const chatDock = document.getElementById("chat-dock");
+  if (chatDock) {
+    chatDock.dataset.disabled = featureEnabled("chat") ? "0" : "1";
+  }
+}
 
 // ---- API helpers ------------------------------------------------------------
 
@@ -1361,7 +1410,7 @@ function drawGapDetail(gap) {
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}
         ${forwardBtn}
-        <button id="btn-chat">Open Chat</button>
+        <button id="btn-chat" ${featureEnabled("chat") ? "" : "disabled title=\"Chat is disabled for the current agent CLI — see Settings → Feature flags\""}>Open Chat</button>
         <button class="warn" id="btn-rename">Rename</button>
         <button class="warn" id="btn-priority">Change Priority</button>
         <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
@@ -2490,6 +2539,44 @@ function toggleChatFullscreen() {
 function drawChatDock() {
   const root = $("#chat-dock");
   if (!root) return;
+  // Provider-scoped feature gate. When chat is disabled for the
+  // current CLI we still keep the dock visible (it's part of the
+  // layout) and the tab strip clickable, but the body shows a
+  // single explanatory notice instead of the session UI so users
+  // can't try to start a chat that the server will reject.
+  if (!featureEnabled("chat")) {
+    root.classList.toggle("open", !!chatState.open);
+    const providerName = state.features?.current_provider || "the current provider";
+    root.innerHTML = `
+      <div class="chat-dock-bar" id="chat-dock-bar"
+           title="Chat is disabled for this provider">
+        <span class="chat-dock-label">Chat</span>
+        <span class="muted small" style="margin-left:8px">disabled</span>
+        <span class="spacer" style="flex:1"></span>
+        <button class="chat-dock-toggle chat-dock-collapse" id="btn-dock-toggle"
+                aria-label="${chatState.open ? "Collapse chat" : "Expand chat"}"
+                title="${chatState.open ? "Collapse" : "Expand"}">▾</button>
+      </div>
+      <div class="chat-dock-body" style="padding:14px">
+        <p class="muted">
+          Chat is disabled for the <code>${htmlEscape(providerName)}</code>
+          agent CLI. It depends on session-resume features only Claude Code
+          currently provides. Switch the CLI on
+          <a href="#/settings">Settings → Agent CLI</a>, or enable the
+          override on <strong>Feature flags</strong> (experimental).
+        </p>
+      </div>
+    `;
+    $("#chat-dock-bar")?.addEventListener("click", (e) => {
+      if (!e.target.closest("#btn-dock-toggle") && !e.target.closest(".chat-tab")) return;
+      toggleChatDock();
+    });
+    $("#btn-dock-toggle")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleChatDock();
+    });
+    return;
+  }
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
   const active = tabs[activeId] || tabs.standalone;
@@ -2982,20 +3069,95 @@ function applyLogsFilterIndicator(f) {
 
 async function renderSettings() {
   renderBanners([]);
-  $("#main").innerHTML = `<h2>Settings</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
+  // First-paint scaffold only; subsequent refreshes route through
+  // `refreshSettings` so SSE / post-save reloads don't flash `Loading…`.
+  if (!document.getElementById("settings-content")) {
+    $("#main").innerHTML = `<h2>Settings</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
+  }
+  await refreshSettings();
+}
+
+async function refreshSettings() {
+  if (state.currentRoute !== "settings") return;
   try {
-    const [s, diag, reps] = await Promise.all([
+    const [s, diag, reps, feats] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
+      api("GET", "/api/features"),
     ]);
-    drawSettings(s.settings || {}, diag, reps.reporters || []);
+    // Keep the cached matrix fresh so gates elsewhere react too.
+    state.features = feats;
+    drawSettings(s.settings || {}, diag, reps.reporters || [], feats);
   } catch (e) {
-    $("#settings-content").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+    const root = document.getElementById("settings-content");
+    if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
-function drawSettings(s, diag, reps) {
+function renderFeatureFlagsCard(feats) {
+  if (!feats || !feats.features?.length) return "";
+  const providers = feats.providers || [];
+  const current = feats.current_provider;
+  const cell = (provider, featureKey) => {
+    const slot = feats.matrix?.[`${provider}.${featureKey}`] || {};
+    const enabled = !!slot.enabled;
+    const overridden = !!slot.override;
+    const isCurrent = provider === current;
+    return `
+      <td class="${isCurrent ? "feature-current-col" : ""}">
+        <label class="feature-toggle ${enabled ? "on" : "off"}"
+               title="${overridden ? "Operator override" : "Default"}">
+          <input type="checkbox"
+                 data-feature-cell="${provider}.${featureKey}"
+                 data-provider="${htmlEscape(provider)}"
+                 data-feature="${htmlEscape(featureKey)}"
+                 ${enabled ? "checked" : ""}>
+          <span class="feature-toggle-state">${enabled ? "on" : "off"}</span>
+        </label>
+        ${overridden
+          ? `<button class="link-button"
+                     data-feature-clear="${provider}.${featureKey}"
+                     data-provider="${htmlEscape(provider)}"
+                     data-feature="${htmlEscape(featureKey)}"
+                     title="Clear override and use the code-defined default">
+              clear override
+            </button>`
+          : ""}
+      </td>`;
+  };
+  return `
+    <div class="card" style="margin-top:16px">
+      <h3>Feature flags</h3>
+      <p class="muted small" style="margin-top:0">
+        Provider-scoped capability matrix. The current provider is
+        <strong>${htmlEscape(current)}</strong>. Defaults are the
+        code-defined set of features known to work; overriding a cell
+        is experimental and may produce errors at runtime.
+      </p>
+      <table class="table">
+        <thead><tr>
+          <th>Feature</th>
+          ${providers.map((p) => `
+            <th class="${p === current ? "feature-current-col" : ""}">
+              ${htmlEscape(p)}${p === current ? " (current)" : ""}
+            </th>`).join("")}
+        </tr></thead>
+        <tbody>
+          ${feats.features.map((f) => `
+            <tr>
+              <td>
+                <div><strong>${htmlEscape(f.label)}</strong></div>
+                <div class="muted small">${htmlEscape(f.description)}</div>
+              </td>
+              ${providers.map((p) => cell(p, f.key)).join("")}
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function drawSettings(s, diag, reps, feats) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
@@ -3017,6 +3179,8 @@ function drawSettings(s, diag, reps) {
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
     </div>
+
+    ${renderFeatureFlagsCard(feats)}
 
     <div class="card" style="margin-top:16px">
       <h3>Runtime configuration</h3>
@@ -3127,11 +3291,53 @@ function drawSettings(s, diag, reps) {
   $("#s-save-cli").addEventListener("click", async () => {
     await withButtonBusy($("#s-save-cli"), "Saving…", async () => {
       try {
-        await api("PATCH", "/api/settings", {
-          agent_cli: $("#s-cli").value,
-        });
-        toast("Saved — re-check auth to confirm the new CLI is reachable", "info");
+        const chosen = $("#s-cli").value;
+        await api("PATCH", "/api/settings", { agent_cli: chosen });
+        // Pull the matrix for the new provider and surface what
+        // changed. Chat / Import will be hidden or labeled disabled
+        // immediately by the gates.
+        await refreshFeatures();
+        const matrix = state.features?.matrix || {};
+        const disabled = (state.features?.features || [])
+          .filter((f) => !(matrix[`${chosen}.${f.key}`] || {}).enabled)
+          .map((f) => f.label);
+        if (disabled.length) {
+          toast(
+            `Saved. Disabled for ${chosen}: ${disabled.join(", ")}. ` +
+            "See Settings → Feature flags.",
+            "info",
+          );
+        } else {
+          toast("Saved — re-check auth to confirm the new CLI is reachable", "info");
+        }
       } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  // Feature flag toggles.
+  $$("[data-feature-cell]").forEach((box) => {
+    box.addEventListener("change", async (e) => {
+      const { provider, feature } = box.dataset;
+      const enabled = box.checked;
+      try {
+        await api("POST", "/api/features/override", {
+          provider, feature, enabled,
+        });
+        await refreshFeatures();
+      } catch (err) {
+        toast(err.message, "error");
+        box.checked = !enabled; // revert UI on failure
+      }
+    });
+  });
+  $$("[data-feature-clear]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const { provider, feature } = btn.dataset;
+      try {
+        await api("POST", "/api/features/override", {
+          provider, feature, enabled: null,
+        });
+        await refreshFeatures();
+      } catch (err) { toast(err.message, "error"); }
     });
   });
   $("#s-save-scope").addEventListener("click", async () => {
@@ -3227,6 +3433,7 @@ async function init() {
   }
   initChatDock();
   initSSE();
+  refreshFeatures();
   setInterval(tickRunningCells, 1000);
   navigate();
 }

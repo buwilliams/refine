@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_shared import activity, db, gaps as shared_gaps, reporters
+from refine_shared import activity, db, features, gaps as shared_gaps, reporters
 from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
@@ -319,6 +319,21 @@ class Runner:
     # ---- chat ----------------------------------------------------------------
 
     def _h_extract_gaps(self, params: dict) -> dict:
+        if not features.is_enabled(self._conn, "import_gaps"):
+            provider = features.current_provider(self._conn)
+            return {
+                "ok": False,
+                "code": "feature_disabled",
+                "feature": "import_gaps",
+                "provider": provider,
+                "message": (
+                    f"Import (LLM extraction) is disabled for the "
+                    f"`{provider}` provider. Switch to Claude Code on "
+                    f"Settings → Agent CLI, or enable the override on "
+                    f"Settings → Feature flags (experimental)."
+                ),
+                "drafts": [],
+            }
         text = params.get("text") or ""
         drafts = llm.extract_gaps(text)
         return {"drafts": drafts}
@@ -580,6 +595,20 @@ class Runner:
                 "message": revert_message}
 
     def _h_chat_start(self, params: dict) -> dict:
+        if not features.is_enabled(self._conn, "chat"):
+            provider = features.current_provider(self._conn)
+            return {
+                "ok": False,
+                "code": "feature_disabled",
+                "feature": "chat",
+                "provider": provider,
+                "message": (
+                    f"Chat is disabled for the `{provider}` provider. "
+                    f"Switch to Claude Code on Settings → Agent CLI, or "
+                    f"enable the override on Settings → Feature flags "
+                    f"(experimental)."
+                ),
+            }
         gap_id = params.get("gap_id")
         priming_prompt: str | None = None
         priming_intro: str | None = None

@@ -184,6 +184,27 @@ h3 { font-weight: 600; font-size: 15px; margin: 14px 0 6px; }
 .status-pill.todo        { background: #eef0f4; color: #4a5060; }
 .status-pill.in-progress { background: #fff4d0; color: #875e00; }
 .status-pill.ready-merge { background: #ffeac2; color: #7a4500; }
+
+/* Feature-flag matrix on Settings. Inline toggle + override badge,
+   rendered inside table cells; .feature-current-col highlights the
+   active provider's column so the operator can spot at a glance
+   what's on/off for their setup. */
+.feature-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; cursor: pointer;
+}
+.feature-toggle.on { background: #e7f5ec; color: #1f6b3a; }
+.feature-toggle.off { background: #eef0f4; color: #6a7280; }
+.feature-toggle input { margin: 0; }
+.feature-toggle-state { user-select: none; }
+.feature-current-col { background: #f7f9ff; }
+.link-button {
+  background: none; border: 0; padding: 0; margin-left: 8px;
+  color: var(--muted); font-size: 11px; text-decoration: underline;
+  cursor: pointer;
+}
+.link-button:hover { color: inherit; }
 .status-pill.review      { background: #e8f1ff; color: #0050a0; }
 .status-pill.done        { background: #e7f5ec; color: #1f6b3a; }
 .status-pill.failed      { background: #fdecea; color: #b3261e; }
