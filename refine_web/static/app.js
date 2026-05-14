@@ -407,10 +407,12 @@ function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
   sseSource.addEventListener("activity_added", (e) => {
-    // Refresh dashboard activity if visible; refresh current gap if relevant
-    if (state.currentRoute === "dashboard") renderDashboard();
+    // Refresh dashboard activity if visible; refresh current gap if relevant.
+    // Route through the silent `refresh*` paths — not `render*` — so the
+    // screen doesn't blink back to `Loading…` on every event.
+    if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "logs") loadLogs();
-    if (state.currentRoute === "agents") renderAgents();
+    if (state.currentRoute === "agents") refreshAgents();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       try {
         const data = JSON.parse(e.data);
@@ -419,7 +421,7 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("status_change", () => {
-    if (state.currentRoute === "dashboard") renderDashboard();
+    if (state.currentRoute === "dashboard") refreshDashboard();
     // Refresh only the table on background updates so an in-progress
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "gaps") refreshGapsTable();
@@ -427,7 +429,7 @@ function initSSE() {
     // Spawn/finish transitions are what populate the "Currently running"
     // table on the Agents screen — refresh when one fires so the row
     // appears or disappears without a manual reload.
-    if (state.currentRoute === "agents") renderAgents();
+    if (state.currentRoute === "agents") refreshAgents();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);
     }
@@ -520,13 +522,30 @@ window.addEventListener("hashchange", navigate);
 // ---- Dashboard --------------------------------------------------------------
 
 async function renderDashboard() {
-  $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"><p class="muted">Loading…</p></div>`;
+  // First paint only: lay out the outer chrome and a `Loading…`
+  // placeholder. SSE-triggered refreshes route through `refreshDashboard`
+  // below so the screen doesn't flicker back to `Loading…` between
+  // events. If `#dash` is already in the DOM (e.g. the route handler
+  // was re-invoked by hashchange while the screen is already up), skip
+  // the wipe — drawing the new data over the old DOM is silent.
+  if (!document.getElementById("dash")) {
+    $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"><p class="muted">Loading…</p></div>`;
+  }
+  await refreshDashboard();
+}
+
+async function refreshDashboard() {
+  // Silent refresh — fetch + redraw in place, no `Loading…` flash. Used
+  // by both the route handler (after the first-paint scaffold above) and
+  // every SSE handler that wants the dashboard to track live state.
+  if (state.currentRoute !== "dashboard") return;
   try {
     const d = await api("GET", "/api/dashboard");
     state.dashboard = d;
     drawDashboard(d);
   } catch (e) {
-    $("#dash").innerHTML = `<p class="muted">Failed to load: ${htmlEscape(e.message)}</p>`;
+    const dash = document.getElementById("dash");
+    if (dash) dash.innerHTML = `<p class="muted">Failed to load: ${htmlEscape(e.message)}</p>`;
   }
 }
 
@@ -542,7 +561,7 @@ function drawDashboard(d) {
           try {
             await api("POST", "/api/settings/recheck-auth");
             toast("Pre-flight re-run requested", "info");
-            await renderDashboard();
+            await refreshDashboard();
           } catch (e) {
             toast(e.message, "error");
           }
@@ -555,6 +574,9 @@ function drawDashboard(d) {
   const counts = d.counts || {};
   const orderedStatuses = ["backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled"];
   const dash = $("#dash");
+  // Guard against late-arriving SSE refreshes after the user navigated
+  // away — the container is gone, so just bail silently.
+  if (!dash) return;
   dash.innerHTML = `
     ${needsAttention.length ? `
       <section class="card">
@@ -2112,11 +2134,21 @@ function drawChanges(data) {
 // ---- Agents -----------------------------------------------------------------
 
 async function renderAgents() {
+  // First paint only — same flicker-avoidance pattern as renderDashboard.
+  // SSE handlers route through `refreshAgents` instead so live updates
+  // don't reset the screen to `Loading…`.
   renderBanners([]);
-  $("#main").innerHTML = `
-    <h2>Agents</h2>
-    <div id="agents-content"><p class="muted">Loading…</p></div>
-  `;
+  if (!document.getElementById("agents-content")) {
+    $("#main").innerHTML = `
+      <h2>Agents</h2>
+      <div id="agents-content"><p class="muted">Loading…</p></div>
+    `;
+  }
+  await refreshAgents();
+}
+
+async function refreshAgents() {
+  if (state.currentRoute !== "agents") return;
   try {
     const [dash, settings] = await Promise.all([
       api("GET", "/api/dashboard"),
@@ -2124,13 +2156,16 @@ async function renderAgents() {
     ]);
     drawAgents(dash, settings.settings);
   } catch (e) {
-    $("#agents-content").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+    const c = document.getElementById("agents-content");
+    if (c) c.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }
 
 function drawAgents(dash, settings) {
   const paused = settings.paused === "1";
-  $("#agents-content").innerHTML = `
+  const root = document.getElementById("agents-content");
+  if (!root) return;  // late SSE refresh after navigation away
+  root.innerHTML = `
     <div class="card">
       <h3>Agent spawning &amp; merger</h3>
       <div class="actions">
@@ -2194,7 +2229,7 @@ function drawAgents(dash, settings) {
   $("#btn-pause").addEventListener("click", async () => {
     try {
       await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
-      await renderAgents();
+      await refreshAgents();
     } catch (e) { toast(e.message, "error"); }
   });
   $$("[data-cancel]").forEach((b) => {
@@ -2206,7 +2241,7 @@ function drawAgents(dash, settings) {
           cancelLabel: "Keep running" },
       );
       if (!ok) return;
-      try { await api("POST", `/api/gaps/${id}/cancel`); await renderAgents(); }
+      try { await api("POST", `/api/gaps/${id}/cancel`); await refreshAgents(); }
       catch (e) { toast(e.message, "error"); }
     });
   });
