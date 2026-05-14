@@ -1410,7 +1410,7 @@ function drawGapDetail(gap) {
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}
         ${forwardBtn}
-        <button id="btn-chat" ${featureEnabled("chat") ? "" : "disabled title=\"Chat is disabled for the current agent CLI — see Settings → Feature flags\""}>Open Chat</button>
+        <button id="btn-chat" ${featureEnabled("chat") ? "" : "disabled title=\"Chat is disabled for the current agent CLI — see Settings → Agent CLI\""}>Open Chat</button>
         <button class="warn" id="btn-rename">Rename</button>
         <button class="warn" id="btn-priority">Change Priority</button>
         <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
@@ -2563,7 +2563,8 @@ function drawChatDock() {
           agent CLI. It depends on session-resume features only Claude Code
           currently provides. Switch the CLI on
           <a href="#/settings">Settings → Agent CLI</a>, or enable the
-          override on <strong>Feature flags</strong> (experimental).
+          override on the same tab's <strong>Feature flags</strong> section
+          (experimental).
         </p>
       </div>
     `;
@@ -3188,7 +3189,6 @@ function drawSettings(s, diag, reps, feats) {
     { slug: "runtime",      label: "Runtime" },
     { slug: "scope",        label: "Scope" },
     { slug: "cli",          label: "Agent CLI" },
-    { slug: "features",     label: "Feature flags" },
     { slug: "auth",         label: "Auth" },
     { slug: "reporters",    label: "Reporters" },
     { slug: "logs",         label: "Logs retention" },
@@ -3261,10 +3261,9 @@ function drawSettings(s, diag, reps, feats) {
         back to plain stdout passthrough.
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
-    </div>`)}
-
-    ${pane("features", renderFeatureFlagsCard(feats)
-      || `<div class="card"><p class="muted">Feature flag matrix unavailable — runner unreachable.</p></div>`)}
+    </div>
+    ${renderFeatureFlagsCard(feats)
+      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — runner unreachable.</p></div>`}`)}
 
     ${pane("auth", `
     <div class="card">
@@ -3360,7 +3359,7 @@ function drawSettings(s, diag, reps, feats) {
         if (disabled.length) {
           toast(
             `Saved. Disabled for ${chosen}: ${disabled.join(", ")}. ` +
-            "See Settings → Feature flags.",
+            "See Feature flags on this tab.",
             "info",
           );
         } else {

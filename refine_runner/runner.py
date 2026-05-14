@@ -330,7 +330,7 @@ class Runner:
                     f"Import (LLM extraction) is disabled for the "
                     f"`{provider}` provider. Switch to Claude Code on "
                     f"Settings → Agent CLI, or enable the override on "
-                    f"Settings → Feature flags (experimental)."
+                    f"the same tab's Feature flags section (experimental)."
                 ),
                 "drafts": [],
             }
@@ -605,8 +605,8 @@ class Runner:
                 "message": (
                     f"Chat is disabled for the `{provider}` provider. "
                     f"Switch to Claude Code on Settings → Agent CLI, or "
-                    f"enable the override on Settings → Feature flags "
-                    f"(experimental)."
+                    f"enable the override on the same tab's Feature "
+                    f"flags section (experimental)."
                 ),
             }
         gap_id = params.get("gap_id")
