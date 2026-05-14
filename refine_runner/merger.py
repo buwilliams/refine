@@ -69,6 +69,13 @@ class Merger:
         # both the background tick and any synchronous `verify_now`
         # call from the IPC thread (user Verify click).
         self._host_lock = threading.Lock()
+        # Snapshot state for the Agents screen. Updated as the merger
+        # picks up / releases each Gap so the UI can render the
+        # current activity without polling git.
+        self._snap_lock = threading.Lock()
+        self._current_gap_id: str | None = None
+        self._current_started: float | None = None  # monotonic
+        self._last_outcome: str | None = None
 
     # ---- lifecycle -----------------------------------------------------------
 
@@ -87,6 +94,46 @@ class Merger:
         IPC handlers call it after edits that might unblock a Gap (Retry,
         new round). Just sets the event — the loop scans the next tick."""
         self._wake.set()
+
+    def snapshot(self) -> dict:
+        """One-shot status view for the Agents screen. Returns the
+        Gap currently being merged (if any), how long the merger has
+        been working on it, the count of Gaps queued behind it, and
+        whether the global `paused` toggle is in effect — the merger
+        respects the same pause flag as the dispatcher."""
+        paused = bool(db.get_setting_int(self._get_conn(), "paused", 0))
+        with self._snap_lock:
+            gap_id = self._current_gap_id
+            started = self._current_started
+            last = self._last_outcome
+        elapsed = (int(time.monotonic() - started)
+                   if started is not None else 0)
+        # Queue depth: in-progress Gaps with no live subprocess, minus
+        # the one currently merging (if any).
+        queued = 0
+        for row in self._get_conn().execute(
+            "SELECT id FROM gaps_index WHERE status = 'in-progress'"
+        ):
+            gid = row["id"]
+            if self._sub_mgr.is_running(gid):
+                continue
+            if gid == gap_id:
+                continue
+            queued += 1
+        if paused and gap_id is None:
+            state = "paused"
+        elif gap_id is not None:
+            state = "merging"
+        else:
+            state = "idle"
+        return {
+            "state": state,
+            "paused": paused,
+            "gap_id": gap_id,
+            "elapsed_seconds": elapsed,
+            "queued": queued,
+            "last_outcome": last,
+        }
 
     # ---- synchronous entry point ---------------------------------------------
 
@@ -135,6 +182,12 @@ class Merger:
             self._wake.wait(timeout=_POLL_INTERVAL_SECONDS)
 
     def _tick(self) -> None:
+        # Honor the same `paused` toggle as the dispatcher: when paused,
+        # don't pick up new merges (or auto-cleanup). User-triggered
+        # Verify clicks still go through `verify_now`, which doesn't
+        # consult this flag — the user is explicitly asking for work.
+        if db.get_setting_int(self._get_conn(), "paused", 0):
+            return
         with self._host_lock:
             self._cleanup_worktree(reason="pre-tick cleanup")
             gap_id = self._find_one_ready()
@@ -161,17 +214,28 @@ class Merger:
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()
+        # Mark this Gap as the one we're working on so the snapshot
+        # surfaces it on the Agents screen with a live elapsed timer.
+        with self._snap_lock:
+            self._current_gap_id = gap_id
+            self._current_started = time.monotonic()
         try:
-            result = verify_op.perform_verify(conn, gap_id, actor="runner")
-        except Exception as e:
-            activity.append(
-                conn,
-                message=f"Auto-verify raised: {e!r}",
-                severity="error", category="git",
-                gap_id=gap_id, actor="runner",
-            )
-            result = {"ok": False, "stage": "internal",
-                      "message": f"verify raised: {e!r}"}
+            try:
+                result = verify_op.perform_verify(conn, gap_id, actor="runner")
+            except Exception as e:
+                activity.append(
+                    conn,
+                    message=f"Auto-verify raised: {e!r}",
+                    severity="error", category="git",
+                    gap_id=gap_id, actor="runner",
+                )
+                result = {"ok": False, "stage": "internal",
+                          "message": f"verify raised: {e!r}"}
+        finally:
+            with self._snap_lock:
+                self._current_gap_id = None
+                self._current_started = None
+                self._last_outcome = "done" if result.get("ok") else "review"
 
         if result.get("ok"):
             # verify_op already moved the Gap to `done`. Nothing else

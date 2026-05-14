@@ -840,8 +840,11 @@ def dashboard_summary() -> tuple[int, dict]:
             "SELECT status, COUNT(*) AS n FROM gaps_index GROUP BY status"
         ):
             counts[row["status"]] = row["n"]
+        merger_snap: dict | None = None
         try:
-            running = get_client().call(M_RUNNING, {}, timeout=5.0).get("running", [])
+            r = get_client().call(M_RUNNING, {}, timeout=5.0)
+            running = r.get("running", [])
+            merger_snap = r.get("merger")
         except IpcError:
             running = []
         pf = conn.execute(
@@ -870,6 +873,7 @@ def dashboard_summary() -> tuple[int, dict]:
     return 200, {
         "counts": counts,
         "running": running,
+        "merger": merger_snap,
         "preflight": preflight,
         "activity": feed,
         "runner_reachable": runner_reachable,

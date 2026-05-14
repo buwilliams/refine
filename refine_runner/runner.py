@@ -131,7 +131,10 @@ class Runner:
         return {"ok": ok, "message": msg}
 
     def _h_running(self, _: dict) -> dict:
-        return {"running": self.sub_mgr.running_snapshot()}
+        return {
+            "running": self.sub_mgr.running_snapshot(),
+            "merger": self.merger.snapshot(),
+        }
 
     def _h_diagnostics(self, _: dict) -> dict:
         return self.ipc.diagnostics()

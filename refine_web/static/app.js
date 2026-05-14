@@ -2129,15 +2129,15 @@ function drawAgents(dash, settings) {
   const paused = settings.paused === "1";
   $("#agents-content").innerHTML = `
     <div class="card">
-      <h3>Agent spawning</h3>
+      <h3>Agent spawning &amp; merger</h3>
       <div class="actions">
         <button id="btn-pause" class="${paused ? "" : "secondary"}">
-          ${paused ? "Resume" : "Pause"} agent spawning
+          ${paused ? "Resume" : "Pause"} agents
         </button>
         <span class="muted small">
           ${paused
-            ? "Paused — new subprocesses won't launch; running ones continue."
-            : "Active — new subprocesses launch on demand."}
+            ? "Paused — new subprocesses won't launch and the merger won't pick up new merges. In-flight work continues."
+            : "Active — new subprocesses launch on demand and the merger processes Gaps as they finish."}
         </span>
       </div>
       <p class="muted small" style="margin-top:8px">
@@ -2171,6 +2171,17 @@ function drawAgents(dash, settings) {
     </div>
 
     <div class="card" style="margin-top:16px">
+      <h3>Merger</h3>
+      ${renderMergerCard(dash.merger, paused)}
+      <p class="muted small" style="margin-top:8px">
+        The merger is a single-threaded worker that owns the host
+        worktree. It cleans up any half-finished git operation, then
+        merges <code>in-progress</code> Gaps one at a time so concurrent
+        agent runs can't race on <code>git merge</code>.
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:16px">
       <h3>Recent activity</h3>
       <div class="card-scroll">
         ${renderActivityList(dash.activity || [])}
@@ -2196,6 +2207,46 @@ function drawAgents(dash, settings) {
       catch (e) { toast(e.message, "error"); }
     });
   });
+}
+
+function renderMergerCard(m, paused) {
+  // No snapshot from the runner (IPC down) — surface that as muted.
+  if (!m) {
+    return `<p class="muted">Merger state unavailable — runner unreachable.</p>`;
+  }
+  const queued = m.queued || 0;
+  const queuedLine = queued > 0
+    ? `<div class="muted small">${queued} Gap${queued === 1 ? "" : "s"} queued for merge</div>`
+    : `<div class="muted small">No Gaps queued.</div>`;
+  if (m.state === "merging" && m.gap_id) {
+    const anchorMs = Date.now();
+    return `
+      <table class="table">
+        <thead><tr><th>Gap</th><th>Elapsed</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><a href="#/gaps/${htmlEscape(m.gap_id)}">${htmlEscape(m.gap_id.slice(0, 10))}…</a></td>
+            <td class="js-elapsed-tick"
+                data-base="${m.elapsed_seconds || 0}"
+                data-anchor-ms="${anchorMs}">${fmtElapsed(m.elapsed_seconds || 0)}</td>
+            <td><span class="status-pill in-progress">merging</span></td>
+          </tr>
+        </tbody>
+      </table>
+      ${queuedLine}`;
+  }
+  if (m.state === "paused" || (paused && !m.gap_id)) {
+    return `
+      <p><span class="status-pill cancelled">paused</span>
+         Merger is paused along with agent spawning.</p>
+      ${queuedLine}`;
+  }
+  return `
+    <p><span class="status-pill done">idle</span>
+       Nothing to merge.${m.last_outcome
+         ? ` Last merge ended in <code>${htmlEscape(m.last_outcome)}</code>.`
+         : ""}</p>
+    ${queuedLine}`;
 }
 
 // ---- Chat -------------------------------------------------------------------
