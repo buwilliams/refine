@@ -51,10 +51,16 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
             _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
             return {"ok": False, "stage": "precheck", "message": msg}
         target = host_branch
-    if git_ops.upstream_branch(target) is None:
-        msg = f"Branch `{target}` has no upstream"
-        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
-        return {"ok": False, "stage": "precheck", "message": msg}
+    # An upstream is nice-to-have, not required. With one, verify runs
+    # the full fetch → pull → merge → push pipeline. Without one, it
+    # falls back to a local-only merge (no fetch, no pull, no push) so
+    # repos that don't have a remote yet still work end-to-end.
+    has_upstream = git_ops.upstream_branch(target) is not None
+    if not has_upstream:
+        _log(conn, gap_id,
+             f"Branch `{target}` has no upstream — verify will merge "
+             f"locally and skip the push.",
+             severity="info", category="git", actor=actor)
 
     # If the host's HEAD isn't on the target branch yet, switch to it so
     # the merge lands where the operator configured. Stash any WIP first
@@ -136,7 +142,8 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
              severity="info", category="git", actor=actor)
 
     try:
-        return _verify_body(conn, gap_id, target, branch, actor=actor)
+        return _verify_body(conn, gap_id, target, branch,
+                              has_upstream=has_upstream, actor=actor)
     finally:
         if stashed:
             pop = git_ops.stash_pop()
@@ -193,27 +200,28 @@ def _restore_host_branch_and_return(conn, gap_id, switched_from,
 
 
 def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
-                 branch: str, *, actor: str) -> dict:
-    # 1. fetch
-    r = git_ops.fetch()
-    if not r.ok:
-        _log(conn, gap_id, "git fetch failed during verify", details=r.stderr,
-             severity="error", category="git", actor=actor)
-        return {"ok": False, "stage": "fetch", "message": "git fetch failed",
-                "details": r.stderr}
+                 branch: str, *, has_upstream: bool, actor: str) -> dict:
+    # 1. fetch (only if there's a remote-tracking upstream).
+    if has_upstream:
+        r = git_ops.fetch()
+        if not r.ok:
+            _log(conn, gap_id, "git fetch failed during verify", details=r.stderr,
+                 severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "fetch", "message": "git fetch failed",
+                    "details": r.stderr}
 
-    # 2. pull --ff-only
-    r = git_ops.pull_ff_only()
-    if not r.ok:
-        _log(conn, gap_id,
-             "Local branch diverged from remote — manual reconciliation needed",
-             details=r.stderr, severity="error", category="git", actor=actor)
-        return {"ok": False, "stage": "pull",
-                "message": "Local branch diverged from remote", "details": r.stderr}
+        # 2. pull --ff-only
+        r = git_ops.pull_ff_only()
+        if not r.ok:
+            _log(conn, gap_id,
+                 "Local branch diverged from remote — manual reconciliation needed",
+                 details=r.stderr, severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "pull",
+                    "message": "Local branch diverged from remote", "details": r.stderr}
 
-    # 3. merge (idempotent if already merged)
+    # 3. merge (idempotent if already merged) — always runs.
     if git_ops.is_already_merged(branch):
-        _log(conn, gap_id, "Branch already merged into current — proceeding to push",
+        _log(conn, gap_id, "Branch already merged into current — proceeding",
              severity="info", category="git", actor=actor)
     else:
         merge_message = _build_merge_message(conn, gap_id, branch, current)
@@ -230,27 +238,31 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
             return {"ok": False, "stage": "merge", "message": "git merge failed",
                     "details": stderr}
 
-    # 4. push (one retry on non-FF)
-    r = git_ops.push_current()
-    if not r.ok and ("non-fast-forward" in r.stderr or
-                     "fetch first" in r.stderr or
-                     "rejected" in r.stderr):
-        # Retry: re-fetch, re-pull --ff-only, re-merge if needed, re-push.
-        f2 = git_ops.fetch()
-        if f2.ok:
-            p2 = git_ops.pull_ff_only()
-            if p2.ok and not git_ops.is_already_merged(branch):
-                git_ops.merge_branch(branch, message=f"Merge {branch}")
-            r = git_ops.push_current()
-    if not r.ok:
-        _log(conn, gap_id,
-             "Push failed — environment issue; Gap stays in `review`",
-             details=r.stderr, severity="error", category="git", actor=actor)
-        # Per spec: gap STAYS IN REVIEW, does NOT transition to done.
-        return {"ok": False, "stage": "push",
-                "message": "Push failed", "details": r.stderr}
+    # 4. push — only when an upstream exists. Without one, the local
+    # merge IS the ship.
+    pushed = False
+    if has_upstream:
+        r = git_ops.push_current()
+        if not r.ok and ("non-fast-forward" in r.stderr or
+                         "fetch first" in r.stderr or
+                         "rejected" in r.stderr):
+            # Retry: re-fetch, re-pull --ff-only, re-merge if needed, re-push.
+            f2 = git_ops.fetch()
+            if f2.ok:
+                p2 = git_ops.pull_ff_only()
+                if p2.ok and not git_ops.is_already_merged(branch):
+                    git_ops.merge_branch(branch, message=f"Merge {branch}")
+                r = git_ops.push_current()
+        if not r.ok:
+            _log(conn, gap_id,
+                 "Push failed — environment issue; Gap stays in `review`",
+                 details=r.stderr, severity="error", category="git", actor=actor)
+            # Per spec: gap STAYS IN REVIEW, does NOT transition to done.
+            return {"ok": False, "stage": "push",
+                    "message": "Push failed", "details": r.stderr}
+        pushed = True
 
-    # All four steps succeeded → done; clean up branch + worktree.
+    # Done; clean up branch + worktree.
     with db.transaction(conn):
         conn.execute(
             "UPDATE gaps_index SET status = 'done', updated = ? WHERE id = ?",
@@ -258,12 +270,18 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
         )
     git_ops.remove_worktree(gap_id)
     git_ops.delete_branch(branch)
+    done_msg = ("Gap merged + pushed; transitioned to done" if pushed
+                else "Gap merged locally (no upstream — push skipped); "
+                     "transitioned to done")
     activity.append(
         conn,
-        message="Gap merged + pushed; transitioned to done",
+        message=done_msg,
         severity="info", category="state", gap_id=gap_id, actor=actor,
     )
-    return {"ok": True, "stage": "done", "message": "Merged and pushed"}
+    return {"ok": True, "stage": "done",
+            "message": "Merged and pushed" if pushed
+                       else "Merged locally (no upstream — push skipped)",
+            "pushed": pushed}
 
 
 def _log(conn: sqlite3.Connection, gap_id: str, message: str, *,

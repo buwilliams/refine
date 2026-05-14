@@ -132,28 +132,33 @@ class Dispatcher:
                 )
                 return
             target = host_branch
-        upstream = git_ops.upstream_branch(target)
-        if upstream is None:
-            self._abort_to_failed(
-                conn, gap_id,
-                f"Branch `{target}` has no upstream — run `git push -u origin {target}` on the host",
-                category="git",
+        # An upstream is nice-to-have, not required. Without one we
+        # operate in local-only mode: skip the fetch, base the worktree
+        # off the local branch's HEAD, and (later) skip the push at
+        # verify time. The Gap still ships locally.
+        has_upstream = git_ops.upstream_branch(target) is not None
+        if has_upstream:
+            r = git_ops.fetch()
+            if not r.ok:
+                self._abort_to_failed(
+                    conn, gap_id, "git fetch failed",
+                    category="git", details=r.stderr[:2000],
+                )
+                return
+            base_ref = f"origin/{target}"
+        else:
+            activity.append(
+                conn,
+                message=(f"Branch `{target}` has no upstream — running "
+                         f"in local-only mode (skipping fetch / push)."),
+                severity="info", category="git",
+                gap_id=gap_id, actor="runner",
             )
-            return
-
-        # Fetch fresh.
-        r = git_ops.fetch()
-        if not r.ok:
-            self._abort_to_failed(
-                conn, gap_id, "git fetch failed",
-                category="git", details=r.stderr[:2000],
-            )
-            return
+            base_ref = target
 
         # Compute the branch name + worktree.
         pattern = db.get_setting(conn, "branch_name_pattern", "refine/{gap_id}") or "refine/{gap_id}"
         branch_name = existing_branch or pattern.format(gap_id=gap_id)
-        base_ref = f"origin/{target}"
 
         wt = git_ops.create_worktree(gap_id, base_ref, branch_name)
         if not wt.ok:
