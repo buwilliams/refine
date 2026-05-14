@@ -410,6 +410,7 @@ function initSSE() {
     // Refresh dashboard activity if visible; refresh current gap if relevant
     if (state.currentRoute === "dashboard") renderDashboard();
     if (state.currentRoute === "logs") loadLogs();
+    if (state.currentRoute === "agents") renderAgents();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       try {
         const data = JSON.parse(e.data);
@@ -423,6 +424,10 @@ function initSSE() {
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
+    // Spawn/finish transitions are what populate the "Currently running"
+    // table on the Agents screen — refresh when one fires so the row
+    // appears or disappears without a manual reload.
+    if (state.currentRoute === "agents") renderAgents();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);
     }
