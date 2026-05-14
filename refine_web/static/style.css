@@ -297,6 +297,49 @@ select {
 .search-bar input { width: 320px; }
 .search-bar select { width: auto; }
 
+/* Collapsible shell for the filter/bulk-action block on Gaps + Logs.
+   Defaults closed (no `open` attr in HTML) so the screen reads as a
+   results list with a single header strip; users expand to filter or
+   run bulk operations. */
+.filter-shell {
+  margin-bottom: 14px;
+}
+.filter-shell > summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  font-size: 13px;
+}
+.filter-shell > summary::-webkit-details-marker { display: none; }
+.filter-shell > summary::before {
+  content: "▸";
+  color: var(--muted);
+  transition: transform 0.12s ease;
+  display: inline-block;
+}
+.filter-shell[open] > summary::before { transform: rotate(90deg); }
+.filter-shell[open] > summary {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+}
+.filter-shell-title { font-weight: 600; }
+.filter-shell-body {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-top: 0;
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--bg);
+}
+.filter-shell-body .filter-bar { margin-bottom: 0; }
+
 /* Two-row variant for views (e.g. Logs) where filters won't fit on a
    single line: primary inputs on top, dropdown filters + count + clear
    below. Inherits the same field styling as `.search-bar` — only the

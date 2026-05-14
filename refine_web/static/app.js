@@ -639,13 +639,27 @@ function gapsHash(parts) {
 async function renderGapsList() {
   renderBanners([]);
   const f = gapsFilterFromHash();
+  // Preserve the filter shell's open/closed state across full re-renders
+  // (Clear filters, bulk-op completion, etc.). First-ever render has no
+  // prior element, so it falls through to the default (closed).
+  const filterShellOpen = !!document.getElementById("gaps-filter-shell")?.open;
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
+    <details class="filter-shell" id="gaps-filter-shell"${filterShellOpen ? " open" : ""}>
+      <summary>
+        <span class="filter-shell-title">Filters &amp; bulk actions</span>
+        <span class="spacer"></span>
+        <span class="muted small"><span id="gaps-count"></span></span>
+        <span id="gaps-filtered" class="filter-pill" hidden>Filtered</span>
+      </summary>
+      <div class="filter-shell-body">
     <div class="filter-bar">
       <div class="filter-row filter-row-primary">
         <input type="text" id="search" class="filter-grow"
                placeholder="Search gaps…" value="${htmlEscape(f.q)}">
+      </div>
+      <div class="filter-row filter-row-activity">
         <select id="filter-status">
           ${["", "todo", "in-progress", "review", "done", "failed", "cancelled"]
             .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
@@ -657,8 +671,6 @@ async function renderGapsList() {
           ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
-      </div>
-      <div class="filter-row filter-row-activity">
         <select id="gaps-severity">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
           <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
@@ -672,8 +684,6 @@ async function renderGapsList() {
             `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
         </select>
         <span class="spacer"></span>
-        <span id="gaps-count" class="muted small"></span>
-        <span id="gaps-filtered" class="filter-pill" hidden>Filtered</span>
         <button class="secondary" id="gaps-clear">Clear filters</button>
       </div>
       <div class="filter-row filter-row-bulk">
@@ -681,10 +691,11 @@ async function renderGapsList() {
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
-        <span class="spacer"></span>
-        <button class="danger small" id="bulk-delete">Delete…</button>
+        <button class="secondary small" id="bulk-delete">Delete…</button>
       </div>
     </div>
+      </div>
+    </details>
     <div id="gaps-table"><p class="muted">Loading…</p></div>
   `;
   // In-view filter changes update the URL via replaceState (which does NOT
@@ -2368,8 +2379,18 @@ function logsHashFromFilters(f) {
 async function renderLogs() {
   renderBanners([]);
   const f = logsFiltersFromHash();
+  // Preserve the filter shell's open/closed state across full re-renders.
+  const logsFilterShellOpen = !!document.getElementById("logs-filter-shell")?.open;
   $("#main").innerHTML = `
     <h2>Logs</h2>
+    <details class="filter-shell" id="logs-filter-shell"${logsFilterShellOpen ? " open" : ""}>
+      <summary>
+        <span class="filter-shell-title">Filters</span>
+        <span class="spacer"></span>
+        <span class="muted small"><span id="logs-count"></span></span>
+        <span id="logs-filtered" class="filter-pill" hidden>Filtered</span>
+      </summary>
+      <div class="filter-shell-body">
     <div class="filter-bar">
       <div class="filter-row filter-row-primary">
         <input type="text" id="logs-q"
@@ -2395,11 +2416,11 @@ async function renderLogs() {
             `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
         </select>
         <span class="spacer"></span>
-        <span id="logs-count" class="muted small"></span>
-        <span id="logs-filtered" class="filter-pill" hidden>Filtered</span>
         <button class="secondary" id="logs-clear">Clear filters</button>
       </div>
     </div>
+      </div>
+    </details>
     <div id="logs-list"><p class="muted">Loading…</p></div>
   `;
 
