@@ -329,7 +329,7 @@ class Runner:
                 "message": (
                     f"Import (LLM extraction) is disabled for the "
                     f"`{provider}` provider. Switch to Claude Code on "
-                    f"Settings → Agent CLI, or enable the override on "
+                    f"Settings → AI Provider, or enable the override on "
                     f"the same tab's Feature flags section (experimental)."
                 ),
                 "drafts": [],
@@ -604,7 +604,7 @@ class Runner:
                 "provider": provider,
                 "message": (
                     f"Chat is disabled for the `{provider}` provider. "
-                    f"Switch to Claude Code on Settings → Agent CLI, or "
+                    f"Switch to Claude Code on Settings → AI Provider, or "
                     f"enable the override on the same tab's Feature "
                     f"flags section (experimental)."
                 ),

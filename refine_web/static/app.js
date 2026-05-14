@@ -1410,7 +1410,7 @@ function drawGapDetail(gap) {
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}
         ${forwardBtn}
-        <button id="btn-chat" ${featureEnabled("chat") ? "" : "disabled title=\"Chat is disabled for the current agent CLI — see Settings → Agent CLI\""}>Open Chat</button>
+        <button id="btn-chat" ${featureEnabled("chat") ? "" : "disabled title=\"Chat is disabled for the current AI provider — see Settings → AI Provider\""}>Open Chat</button>
         <button class="warn" id="btn-rename">Rename</button>
         <button class="warn" id="btn-priority">Change Priority</button>
         <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
@@ -2560,9 +2560,9 @@ function drawChatDock() {
       <div class="chat-dock-body" style="padding:14px">
         <p class="muted">
           Chat is disabled for the <code>${htmlEscape(providerName)}</code>
-          agent CLI. It depends on session-resume features only Claude Code
-          currently provides. Switch the CLI on
-          <a href="#/settings">Settings → Agent CLI</a>, or enable the
+          AI provider. It depends on session-resume features only Claude
+          Code currently provides. Switch the provider on
+          <a href="#/settings">Settings → AI Provider</a>, or enable the
           override on the same tab's <strong>Feature flags</strong> section
           (experimental).
         </p>
@@ -3187,11 +3187,8 @@ function drawSettings(s, diag, reps, feats) {
   // before this refactor.
   const tabs = [
     { slug: "runtime",      label: "Runtime" },
-    { slug: "scope",        label: "Scope" },
-    { slug: "cli",          label: "Agent CLI" },
-    { slug: "auth",         label: "Auth" },
+    { slug: "cli",          label: "AI Provider" },
     { slug: "reporters",    label: "Reporters" },
-    { slug: "logs",         label: "Logs retention" },
     { slug: "diagnostics",  label: "Diagnostics" },
   ];
   const activeSlug = readSettingsTab(tabs);
@@ -3221,18 +3218,17 @@ function drawSettings(s, diag, reps, feats) {
         <span class="muted small">— set to 0 to disable auto-close</span></label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
       <div class="actions"><button id="s-save">Save</button></div>
-    </div>`)}
+    </div>
 
-    ${pane("scope", `
-    <div class="card">
+    <div class="card" style="margin-top:16px">
       <h3>Scope</h3>
       <p class="muted small">
-        Where refine's Claude work lands inside the client repo. The base
+        Where refine's agent work lands inside the client repo. The base
         repo location still owns all git plumbing — worktree create, fetch,
         merge, push.
       </p>
       <div class="form-row"><label>Agent subpath
-        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat Claude subprocesses. Leave blank to use the repo root.</span></label>
+        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.</span></label>
         <input type="text" id="s-subpath"
                placeholder="e.g. apps/web"
                value="${htmlEscape(s.agent_subpath || "")}"></div>
@@ -3242,12 +3238,18 @@ function drawSettings(s, diag, reps, feats) {
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
       <div class="actions"><button id="s-save-scope">Save</button></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Auth</h3>
+      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>) — or check that the matching <code>API_KEY</code> env var is exported.</p>
+      <button id="s-recheck">Re-check auth</button>
     </div>`)}
 
     ${pane("cli", `
     <div class="card">
-      <h3>Agent CLI</h3>
-      <div class="form-row"><label>Which CLI refine drives
+      <h3>AI Provider</h3>
+      <div class="form-row"><label>Which AI provider refine drives
         <span class="muted small">— used for Gap agent runs, conflict resolution, and pre-flight. <strong>Chat always uses Claude</strong> because of its session-resume support; Codex / Gemini don't have an equivalent.</span></label>
         <select id="s-cli">
           ${cliOption("claude", "Claude Code (default)")}
@@ -3255,22 +3257,15 @@ function drawSettings(s, diag, reps, feats) {
           ${cliOption("gemini", "Gemini")}
         </select></div>
       <p class="muted small" style="margin-top:6px">
-        After switching: re-check auth below to confirm the chosen CLI
-        is installed and authed on the host. Round logs are rich for
-        Claude (tool summaries, live Idle counter); Codex / Gemini fall
-        back to plain stdout passthrough.
+        After switching: re-check auth on the Runtime tab to confirm the
+        chosen provider is installed and authed on the host. Round logs
+        are rich for Claude (tool summaries, live Idle counter); Codex /
+        Gemini fall back to plain stdout passthrough.
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
     </div>
     ${renderFeatureFlagsCard(feats)
       || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — runner unreachable.</p></div>`}`)}
-
-    ${pane("auth", `
-    <div class="card">
-      <h3>Auth</h3>
-      <p class="muted">The selected CLI's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>) — or check that the matching <code>API_KEY</code> env var is exported.</p>
-      <button id="s-recheck">Re-check auth</button>
-    </div>`)}
 
     ${pane("reporters", `
     <div class="card">
@@ -3298,8 +3293,17 @@ function drawSettings(s, diag, reps, feats) {
       </p>
     </div>`)}
 
-    ${pane("logs", `
+    ${pane("diagnostics", `
     <div class="card">
+      <h3>IPC diagnostics</h3>
+      <dl class="kv">
+        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
+        ${diag.socket_path ? `<dt>Socket</dt><dd><code>${htmlEscape(diag.socket_path)}</code></dd>` : ""}
+        ${diag.last_contact_at ? `<dt>Last contact</dt><dd>${fmtTime(diag.last_contact_at)}</dd>` : ""}
+      </dl>
+    </div>
+
+    <div class="card" style="margin-top:16px">
       <h3>Logs retention</h3>
       <p class="muted small">
         Delete activity entries older than the chosen window. Newer entries
@@ -3313,16 +3317,6 @@ function drawSettings(s, diag, reps, feats) {
         </select>
         <button class="danger" id="logs-cleanup">Clean up old logs</button>
       </div>
-    </div>`)}
-
-    ${pane("diagnostics", `
-    <div class="card">
-      <h3>IPC diagnostics</h3>
-      <dl class="kv">
-        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.socket_path ? `<dt>Socket</dt><dd><code>${htmlEscape(diag.socket_path)}</code></dd>` : ""}
-        ${diag.last_contact_at ? `<dt>Last contact</dt><dd>${fmtTime(diag.last_contact_at)}</dd>` : ""}
-      </dl>
     </div>`)}
   `;
   // Tab click handlers — purely DOM-local, no re-fetch.
