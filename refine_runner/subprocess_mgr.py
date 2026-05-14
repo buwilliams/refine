@@ -26,23 +26,21 @@ from refine_shared.gaps import now_iso
 from . import gap_writer  # local module; sole owner of gap.json writes
 
 
-def _format_agent_event(line: str) -> list[str] | None:
-    """Translate one `--output-format=stream-json` event into a list of
-    round-log entries (one per logical thing the event represents).
+# How long to wait for claude to exit after it emits its `result` event
+# before SIGTERMing the process group. Long enough for normal cleanup,
+# short enough that the user doesn't watch the dashboard stall when the
+# agent kicked off a backgrounded HTTP server (or similar) that's now
+# keeping its stdio pipes open indefinitely.
+_RESULT_EXIT_GRACE_SECONDS = 10.0
 
-    Returns:
-      - list of strings: each becomes its own log entry.
-      - None: the line wasn't JSON; caller should fall back to raw
-        passthrough (covers `claude` CLI errors that fire before /
-        after the stream-json envelope opens).
-    """
-    try:
-        evt = json.loads(line)
-    except json.JSONDecodeError:
-        return None
+
+def _summarize_agent_event(evt: dict) -> list[str]:
+    """Translate one parsed `--output-format=stream-json` event into a
+    list of round-log entries (one per logical thing the event
+    represents). Returns an empty list for events we deliberately drop
+    (granular `stream_event` deltas, successful `result`, etc.)."""
     if not isinstance(evt, dict):
-        return None
-
+        return []
     t = evt.get("type")
 
     if t == "system":
@@ -153,6 +151,12 @@ class RunHandle:
     base_ref: str          # commit before the run, for "no commits produced" detection
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
+    # Set to time.monotonic() when stream-json emits a `result` event.
+    # The supervisor uses this to bound how long we wait for claude to
+    # actually exit after it's logically done — if it's still alive a
+    # short grace period later (because a backgrounded subprocess is
+    # holding its stdio pipes open), we SIGTERM the process group.
+    result_seen_at: float | None = None
 
     def __post_init__(self) -> None:
         if self.finished is None:
@@ -305,6 +309,17 @@ class SubprocessManager:
                 if h.idle_window and (now - h.last_output) > h.idle_window:
                     self._kill(h, "idle")
                     break
+                # Bound the post-result wait. Once the agent has emitted
+                # its terminal `result` event, give claude a short grace
+                # period to exit cleanly; if it doesn't, a backgrounded
+                # subprocess (HTTP server, watcher, etc.) is almost
+                # certainly holding the stdio pipes open. SIGTERM the
+                # whole process group so the run wraps up and the Gap
+                # can move on to `review`.
+                if (h.result_seen_at is not None
+                        and (now - h.result_seen_at) > _RESULT_EXIT_GRACE_SECONDS):
+                    self._kill(h, "result_grace")
+                    break
                 # Sleep briefly; check again.
                 if h.finished.wait(timeout=2.0):
                     break  # already finished
@@ -351,6 +366,11 @@ class SubprocessManager:
         `stream_event` deltas. We pick the meaningful ones and emit one
         round-log entry per. Non-JSON lines (CLI errors before/after
         stream-json) pass through verbatim.
+
+        When a `result` event arrives, stamp `h.result_seen_at` so the
+        supervisor can SIGTERM the process group if claude doesn't
+        actually exit shortly after — happens when the agent kicked off
+        a backgrounded subprocess that's holding the stdio pipes open.
         """
         assert h.proc.stdout is not None
         try:
@@ -359,14 +379,18 @@ class SubprocessManager:
                 line = raw.rstrip("\n")
                 if not line:
                     continue
-                summaries = _format_agent_event(line)
-                if summaries is None:
+                try:
+                    evt = json.loads(line)
+                except json.JSONDecodeError:
                     # Wasn't JSON — could be a `claude` CLI error or
                     # plain stderr message merged in via stderr=STDOUT.
-                    summaries = [line]
-                for s in summaries:
+                    self._write_log_entry(h, line)
+                    continue
+                for s in _summarize_agent_event(evt):
                     if s:
                         self._write_log_entry(h, s)
+                if isinstance(evt, dict) and evt.get("type") == "result":
+                    h.result_seen_at = time.monotonic()
         finally:
             # final last_output_at touch
             try:
