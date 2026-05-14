@@ -1281,6 +1281,18 @@ function drawGapDetail(gap) {
   const notesOpen = document.querySelector(
     `.notes-card[data-gap-id="${gap.id}"]`,
   )?.open ?? false;
+  // Same idea for the per-round wrapper and its inner Logs disclosure.
+  // SSE round_log_added events trigger a full drawGapDetail re-render
+  // every time the agent emits a new event; without this, an expanded
+  // round or expanded Logs collapses each time a new log arrives.
+  const prevRoundOpen = {};
+  const prevLogsOpen = {};
+  document.querySelectorAll("details.round[data-round-idx]").forEach((el) => {
+    prevRoundOpen[el.dataset.roundIdx] = el.open;
+  });
+  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
+    prevLogsOpen[el.dataset.roundIdx] = el.open;
+  });
   const rounds = gap.rounds || [];
   // Merge gap-scoped activity into each round so users see lifecycle events
   // and runner errors alongside the round's own logs[]. Each activity entry
@@ -1341,7 +1353,12 @@ function drawGapDetail(gap) {
 
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
-        rounds.map((rnd, idx) => renderRound(rnd, idx, idx === rounds.length - 1, isLatestEditable && idx === rounds.length - 1)).join("")}
+        rounds.map((rnd, idx) => renderRound(
+          rnd, idx,
+          idx === rounds.length - 1,
+          isLatestEditable && idx === rounds.length - 1,
+          prevRoundOpen, prevLogsOpen,
+        )).join("")}
 
       ${(gap.status === "backlog" || gap.status === "todo" || gap.status === "failed") ? `
         <div class="card" style="margin-top:14px">
@@ -1562,10 +1579,17 @@ function attachActivityToRounds(rounds, activity) {
   }
 }
 
-function renderRound(rnd, idx, isLatest, editable) {
+function renderRound(rnd, idx, isLatest, editable,
+                     prevRoundOpen = {}, prevLogsOpen = {}) {
   const logs = rnd._mergedLogs || rnd.logs || [];
+  // Preserve the user's open/closed choice across re-renders. New rounds
+  // (no prior entry in the snapshot) default to "open on latest" — the
+  // historical behavior — and Logs default closed.
+  const key = String(idx);
+  const roundOpen = key in prevRoundOpen ? prevRoundOpen[key] : isLatest;
+  const logsOpen = key in prevLogsOpen ? prevLogsOpen[key] : false;
   return `
-    <details class="round" ${isLatest ? "open" : ""}>
+    <details class="round" data-round-idx="${idx}" ${roundOpen ? "open" : ""}>
       <summary class="round-head">
         <strong>Round ${idx + 1}</strong>
         ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
@@ -1578,7 +1602,7 @@ function renderRound(rnd, idx, isLatest, editable) {
           <dt>target</dt><dd>${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
         </dl>
         ${logs.length ? `
-          <details>
+          <details data-role="round-logs" data-round-idx="${idx}" ${logsOpen ? "open" : ""}>
             <summary>Logs (${logs.length})</summary>
             ${logs.map((l) => renderLogEntry(l)).join("")}
           </details>` : `<p class="muted small">No logs.</p>`}
