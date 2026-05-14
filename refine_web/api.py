@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from refine_shared import activity, db, gaps as shared_gaps, reporters
@@ -690,6 +691,44 @@ def list_activity(*, limit: int = 100, gap_id: str | None = None,
     finally:
         conn.close()
     return 200, body
+
+
+_LOG_RETENTION_OPTIONS = (0, 7, 30, 60, 90, 365)
+
+
+def cleanup_logs(body: dict) -> tuple[int, dict]:
+    """Delete activity entries older than `days` days.
+
+    `days == 0` deletes the whole activity table (operator chose
+    "don't keep any"). Anything else uses an ISO-timestamp cutoff
+    computed against `now`. Returns the number of rows deleted.
+    """
+    raw = body.get("days")
+    try:
+        days = int(raw)
+    except (TypeError, ValueError):
+        return err(400, "days must be an integer")
+    if days not in _LOG_RETENTION_OPTIONS:
+        return err(
+            400,
+            f"days must be one of {sorted(_LOG_RETENTION_OPTIONS)}",
+        )
+    conn = _conn()
+    try:
+        if days == 0:
+            cur = conn.execute("DELETE FROM activity")
+        else:
+            cutoff = (
+                datetime.now(timezone.utc) - timedelta(days=days)
+            ).strftime("%Y-%m-%dT%H:%M:%SZ")
+            cur = conn.execute(
+                "DELETE FROM activity WHERE datetime < ?", (cutoff,),
+            )
+        deleted = cur.rowcount or 0
+        conn.commit()
+    finally:
+        conn.close()
+    return 200, {"deleted": deleted, "days_kept": days}
 
 
 def dashboard_summary() -> tuple[int, dict]:

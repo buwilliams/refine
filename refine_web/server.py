@@ -162,6 +162,11 @@ def _h_activity(_h, _m, _b, q):
     )
 
 
+@route("POST", r"/api/activity/cleanup")
+def _h_activity_cleanup(_h, _m, body, _q):
+    return api.cleanup_logs(body or {})
+
+
 @route("POST", r"/api/import/extract")
 def _h_import_extract(_h, _m, body, _q):
     return api.import_extract(body or {})

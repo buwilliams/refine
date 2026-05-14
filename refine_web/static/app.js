@@ -2524,6 +2524,22 @@ function drawSettings(s, diag, reps) {
     </div>
 
     <div class="card" style="margin-top:16px">
+      <h3>Logs retention</h3>
+      <p class="muted small">
+        Delete activity entries older than the chosen window. Newer entries
+        and gap state are untouched.
+      </p>
+      <div class="actions">
+        <label for="logs-cleanup-days" class="muted small">Keep</label>
+        <select id="logs-cleanup-days">
+          ${[0, 7, 30, 60, 90, 365].map((n) =>
+            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
+        </select>
+        <button class="danger" id="logs-cleanup">Clean up old logs</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
       <h3>IPC diagnostics</h3>
       <dl class="kv">
         <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
@@ -2551,6 +2567,24 @@ function drawSettings(s, diag, reps) {
       try {
         const r = await api("POST", "/api/settings/recheck-auth");
         toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#logs-cleanup").addEventListener("click", async () => {
+    const days = parseInt($("#logs-cleanup-days").value, 10);
+    const human = days === 0
+      ? "Delete ALL activity log entries? This cannot be undone."
+      : `Delete activity log entries older than ${days} day${days === 1 ? "" : "s"}? This cannot be undone.`;
+    const ok = await modalConfirm(human, {
+      title: "Clean up old logs",
+      okLabel: days === 0 ? "Delete all" : "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    await withButtonBusy($("#logs-cleanup"), "Cleaning…", async () => {
+      try {
+        const r = await api("POST", "/api/activity/cleanup", { days });
+        toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
       } catch (e) { toast(e.message, "error"); }
     });
   });
