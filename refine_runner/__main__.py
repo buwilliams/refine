@@ -1,6 +1,8 @@
 """Run the refine-runner daemon on the host.
 
-Invoked as `uv run refine start` (the CLI dispatcher).
+Invoked as `uv run refine runner` — directly by the systemd --user unit, or
+interactively when you want runner logs in the foreground. `uv run refine
+start` is the higher-level command that asks systemd to start this for you.
 """
 from __future__ import annotations
 

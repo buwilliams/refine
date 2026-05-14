@@ -1,11 +1,15 @@
 """argparse-based CLI for refine.
 
 Subcommands:
-- init    — write refine.toml + run/ + gaps/ in a chosen volume root
-- start   — start the host-native runner daemon (alias: `runner`, deprecated)
-- stop    — stop the running runner daemon
-- web     — start the webapp (rarely invoked directly; Docker wraps it)
-- doctor  — diagnostic snapshot (config, IPC, claude, git)
+- init    — write refine.toml + run/ + gaps/ in a chosen volume root,
+            then write + enable a systemd --user unit for the runner.
+- start   — bring up runner (systemd) + webapp (docker compose).
+- stop    — stop runner + webapp.
+- status  — show what's running (read-only).
+- runner  — start the runner daemon in-process (used by the systemd unit
+            and for interactive debugging; not the daily verb).
+- web     — start the webapp (rarely invoked directly; Docker wraps it).
+- doctor  — deeper diagnostic snapshot (config, IPC, claude, git).
 """
 from __future__ import annotations
 
@@ -16,9 +20,14 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from refine_shared import config
+
+
+SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
+COMPOSE_SERVICE = "refine-web"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,9 +43,8 @@ def main(argv: list[str] | None = None) -> int:
         help="Initialize refine for a client repo and bind this refine clone to it.",
         description=(
             "Bootstraps a client repo: creates <client>/.refine/refine.toml + "
-            "run/ + gaps/, and (when run from a refine source dir) writes a "
-            ".refine-binding + .env so subsequent commands target the same "
-            "client without arguments."
+            "run/ + gaps/, writes a .refine-binding + .env, and registers a "
+            "systemd --user unit so the runner survives terminal close."
         ),
     )
     p_init.add_argument(
@@ -44,41 +52,49 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to the client repo. Defaults to cwd (back-compat).",
     )
     p_init.add_argument("--force", action="store_true",
-                        help="Overwrite an existing refine.toml / .refine-binding.")
+                        help="Overwrite an existing refine.toml / .refine-binding / unit file.")
     p_init.set_defaults(fn=cmd_init)
 
-    # `runner` kept as a hidden alias for the old name so existing systemd
-    # units / scripts keep working.
-    p_runner = sub.add_parser(
-        "start", aliases=["runner"],
-        help="Start the host runner daemon.",
+    p_start = sub.add_parser(
+        "start",
+        help="Start runner + webapp.",
+        description=(
+            "Rebuilds the web image if source files are newer than the image, "
+            "brings the webapp up via docker compose, starts the runner via "
+            "systemd --user, and prints a status block."
+        ),
     )
-    p_runner.add_argument(
-        "--foreground", "-f", action="store_true",
-        help="Stay attached to the terminal instead of detaching. Useful for "
-             "debugging and required for systemd Type=simple units.",
+    p_start.add_argument(
+        "--rebuild", action="store_true",
+        help="Force a `docker compose build` before starting.",
     )
-    p_runner.set_defaults(fn=cmd_runner)
+    p_start.add_argument(
+        "--no-rebuild", action="store_true",
+        help="Skip the rebuild staleness check entirely.",
+    )
+    p_start.set_defaults(fn=cmd_start)
 
     p_stop = sub.add_parser(
         "stop",
-        help="Stop the host runner daemon if one is running.",
-        description=(
-            "Reads run/runner.pid from the bound client's .refine/ directory "
-            "and sends SIGTERM; falls back to SIGKILL after a timeout."
-        ),
-    )
-    p_stop.add_argument(
-        "--timeout", "-t", type=float, default=10.0,
-        help="Seconds to wait for graceful exit before SIGKILL (default 10).",
-    )
-    p_stop.add_argument(
-        "--force", action="store_true",
-        help="Skip SIGTERM and go straight to SIGKILL.",
+        help="Stop runner + webapp.",
     )
     p_stop.set_defaults(fn=cmd_stop)
 
-    p_web = sub.add_parser("web", help="Start the webapp.")
+    p_status = sub.add_parser(
+        "status",
+        help="Show what's running (read-only).",
+    )
+    p_status.set_defaults(fn=cmd_status)
+
+    # The systemd unit invokes this directly. Also useful interactively when
+    # you want runner logs in the foreground.
+    p_runner = sub.add_parser(
+        "runner",
+        help="Run the runner daemon in the foreground (used by the systemd unit).",
+    )
+    p_runner.set_defaults(fn=cmd_runner_foreground)
+
+    p_web = sub.add_parser("web", help="Start the webapp (in-process; Docker wraps it).")
     p_web.set_defaults(fn=cmd_web)
 
     p_doctor = sub.add_parser("doctor", help="Print a diagnostic snapshot.")
@@ -112,12 +128,12 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"refine init: {e}", file=sys.stderr)
         return 1
 
-    # When running from a refine source dir (i.e., the dir containing
-    # pyproject.toml and the `refine` package), write a binding + .env so
-    # subsequent commands target this client without arguments. Detect by
-    # presence of pyproject.toml in cwd.
+    # The systemd unit + binding only make sense when init is run from a
+    # refine source dir. The "inside the client repo" workflow doesn't use
+    # docker compose or the unit — it's there for one-off debugging.
     binding_written = None
     env_written = None
+    unit_path = None
     if _is_refine_source_dir(cwd):
         binding_path = cwd / config.BINDING_FILENAME
         if binding_path.exists() and not args.force:
@@ -134,25 +150,36 @@ def cmd_init(args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
 
+        try:
+            unit_path = _write_and_enable_unit(cwd, client_repo, force=args.force)
+        except _InitError as e:
+            print(f"refine init: {e}", file=sys.stderr)
+            return 1
+
     print(f"Wrote {cfg_path}")
     print(f"Created directories: {target}/run, {target}/gaps")
     if binding_written:
         print(f"Bound this refine source dir → {client_repo}")
         print(f"Wrote {binding_written}")
         print(f"Wrote {env_written}")
+    if unit_path:
+        print(f"Installed systemd unit: {unit_path}")
     print()
     print("Next steps:")
     if binding_written:
-        print(f"  1. uv run refine start            # in one terminal (from {cwd})")
-        print(f"  2. docker compose up              # in another (from {cwd})")
-        print(f"  3. uv run refine doctor           # whenever something looks off")
-        print(f"     (uv run refine stop            # to stop the runner)")
+        print(f"  uv run refine start          # webapp + runner, one command")
+        print(f"  uv run refine status         # check it's healthy")
+        print(f"  uv run refine stop           # tear it all down")
+        print()
+        print("To survive logout / reboot:")
+        print(f"  loginctl enable-linger $USER  # one-time, sudo-prompts as needed")
     else:
-        print(f"  1. cd {client_repo}")
-        print(f"  2. refine start                   # in one terminal")
-        print(f"  3. docker compose up              # in another")
-        print(f"  4. refine doctor                  # whenever something looks off")
-        print(f"     (refine stop                   # to stop the runner)")
+        print(f"  cd {client_repo}")
+        print(f"  refine doctor                 # sanity check the config")
+        print()
+        print("Note: full refine start/stop/status orchestration requires running")
+        print("`refine init` from inside a refine source dir (so docker compose and")
+        print("the systemd unit can be wired up).")
     return 0
 
 
@@ -161,227 +188,181 @@ def _is_refine_source_dir(p: Path) -> bool:
     return (p / "pyproject.toml").is_file() and (p / "refine" / "cli.py").is_file()
 
 
-# ----- runner -----------------------------------------------------------------
+class _InitError(Exception):
+    """Surface a clean error message from init helpers."""
 
-def cmd_runner(args: argparse.Namespace) -> int:
+
+def _write_and_enable_unit(clone_dir: Path, client_repo: Path, *, force: bool) -> Path:
+    """Write ~/.config/systemd/user/<unit>.service, daemon-reload, enable.
+
+    Refuses if a unit by the same name already points at a different clone,
+    unless --force is given (in which case it's overwritten).
+    """
+    unit_name = config.unit_name_for(clone_dir)
+    unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
+    SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
+
+    if unit_path.exists() and not force:
+        existing_wd = _grep_first(unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
+        if existing_wd and existing_wd != str(clone_dir):
+            raise _InitError(
+                f"systemd unit {unit_name} already exists for a different clone:\n"
+                f"  existing WorkingDirectory: {existing_wd}\n"
+                f"  this clone:                {clone_dir}\n"
+                f"Use --force to overwrite, or rename one of the clones."
+            )
+
+    uv = shutil.which("uv")
+    if uv is None:
+        raise _InitError(
+            "could not find `uv` on PATH; install it before running `refine init` "
+            "(the systemd unit needs an absolute path to invoke it)."
+        )
+
+    unit_body = (
+        "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
+        "# `refine init --force` to regenerate.\n"
+        "[Unit]\n"
+        f"Description=refine runner — {clone_dir} → {client_repo}\n"
+        "After=network.target\n"
+        "\n"
+        "[Service]\n"
+        "Type=simple\n"
+        f"WorkingDirectory={clone_dir}\n"
+        f"ExecStart={uv} run refine runner\n"
+        "Restart=on-failure\n"
+        "RestartSec=2s\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+    unit_path.write_text(unit_body, encoding="utf-8")
+
+    rc, out = _systemctl("daemon-reload")
+    if rc != 0:
+        raise _InitError(f"systemctl --user daemon-reload failed: {out.strip()}")
+    rc, out = _systemctl("enable", unit_name)
+    if rc != 0:
+        raise _InitError(f"systemctl --user enable {unit_name} failed: {out.strip()}")
+
+    return unit_path
+
+
+def _grep_first(text: str, prefix: str) -> str | None:
+    for line in text.splitlines():
+        if line.startswith(prefix):
+            return line[len(prefix):].strip()
+    return None
+
+
+# ----- start / stop / status -------------------------------------------------
+
+def cmd_start(args: argparse.Namespace) -> int:
+    clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
 
-    if args.foreground:
-        from refine_runner.__main__ import main as runner_main
-        return runner_main()
+    if args.rebuild:
+        rc = _docker_compose(clone, "build")
+        if rc != 0:
+            return rc
+    elif not args.no_rebuild and _image_is_stale(clone):
+        print("Web image is stale (source newer than image) — rebuilding…")
+        rc = _docker_compose(clone, "build")
+        if rc != 0:
+            return rc
 
-    pid_path = _runner_pid_path(cfg)
-    log_path = _runner_log_path(cfg)
+    print("Starting webapp (docker compose up -d)…")
+    rc = _docker_compose(clone, "up", "-d")
+    if rc != 0:
+        return rc
 
-    existing_pid = _read_pid(pid_path)
-    if existing_pid is not None and _pid_alive(existing_pid):
+    if not _wait_for_port(cfg.web_host, cfg.web_port, timeout=20.0):
         print(
-            f"refine start: already running (pid {existing_pid}).\n"
-            f"  socket: {cfg.runner_socket}\n"
-            f"  logs:   {log_path}\n"
-            f"  stop:   uv run refine stop",
+            f"refine start: webapp did not start listening on "
+            f"{cfg.web_host}:{cfg.web_port} within 20s. "
+            f"Check `docker compose logs {COMPOSE_SERVICE}`.",
             file=sys.stderr,
         )
         return 1
-    if existing_pid is not None and not _pid_alive(existing_pid):
-        try:
-            pid_path.unlink()
-        except FileNotFoundError:
-            pass
 
-    log_path.parent.mkdir(parents=True, exist_ok=True)
+    print(f"Starting runner (systemctl --user start {unit})…")
+    rc, out = _systemctl("start", unit)
+    if rc != 0:
+        print(f"refine start: {out.strip()}", file=sys.stderr)
+        return 1
 
-    pid = os.fork()
-    if pid > 0:
-        # Parent: poll briefly for the socket file (= daemon is listening).
-        # Surface a crash if the child dies before binding.
-        import time
-        deadline = time.time() + 5.0
-        bound = False
-        while time.time() < deadline:
-            if not _pid_alive(pid):
-                print(
-                    f"refine start: child {pid} exited before binding the socket. "
-                    f"See {log_path}.",
-                    file=sys.stderr,
-                )
-                return 1
-            if cfg.runner_socket.exists():
-                bound = True
-                break
-            time.sleep(0.1)
-        if not bound:
-            print(
-                f"refine start: child {pid} alive but socket did not appear within 5s. "
-                f"See {log_path}.",
-                file=sys.stderr,
-            )
-            return 1
-        print(f"refine runner started (pid {pid})")
-        print(f"  socket: {cfg.runner_socket}")
-        print(f"  logs:   {log_path}")
-        print(f"  stop:   uv run refine stop")
-        return 0
+    if not _wait_for_socket(cfg.runner_socket, timeout=10.0):
+        print(
+            f"refine start: runner did not bind {cfg.runner_socket} within 10s. "
+            f"Check `journalctl --user -u {unit} -n 200`.",
+            file=sys.stderr,
+        )
+        return 1
 
-    # --- Child: detach from controlling terminal, redirect I/O, run the daemon.
-    import signal
-    os.setsid()
-    log_fd = os.open(str(log_path), os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
-    devnull_fd = os.open(os.devnull, os.O_RDONLY)
-    os.dup2(log_fd, 1)        # stdout → log file
-    os.dup2(log_fd, 2)        # stderr → log file
-    os.dup2(devnull_fd, 0)    # stdin  → /dev/null
-    os.close(log_fd)
-    os.close(devnull_fd)
-
-    pid_path.write_text(f"{os.getpid()}\n")
-
-    def _cleanup_pid_file(*_a):
-        try:
-            pid_path.unlink()
-        except FileNotFoundError:
-            pass
-
-    import atexit
-    atexit.register(_cleanup_pid_file)
-
-    from refine_runner.__main__ import main as runner_main
-    sys.exit(runner_main())
+    _print_status_block(clone, unit, cfg)
+    return 0
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
-    import signal
-    import time
+    clone, unit = _resolve_clone_and_unit_or_exit()
 
-    _load_config_or_exit(args)
-    cfg = config.get()
-    pid_path = _runner_pid_path(cfg)
+    print(f"Stopping runner (systemctl --user stop {unit})…")
+    rc, out = _systemctl("stop", unit)
+    if rc != 0:
+        # Non-fatal: maybe it wasn't running. Continue to compose down.
+        print(f"  (systemctl: {out.strip()})", file=sys.stderr)
 
-    pid = _read_pid(pid_path)
-    if pid is None:
-        # No pidfile — but the socket might be live from an older process
-        # that didn't write one. Tell the user what we see.
-        if cfg.runner_socket.exists():
-            print(
-                f"refine stop: no {pid_path} but socket {cfg.runner_socket} "
-                f"exists. The runner was probably started another way; stop "
-                f"it manually.",
-                file=sys.stderr,
-            )
-            return 1
-        print("refine stop: no runner is running (no pidfile, no socket).")
-        return 0
-    if not _pid_alive(pid):
-        print(f"refine stop: stale pidfile (pid {pid} is not running); removing.")
-        try:
-            pid_path.unlink()
-        except FileNotFoundError:
-            pass
-        return 0
+    print("Stopping webapp (docker compose down)…")
+    rc = _docker_compose(clone, "down")
+    if rc != 0:
+        return rc
 
-    sig = signal.SIGKILL if args.force else signal.SIGTERM
-    sig_name = "SIGKILL" if args.force else "SIGTERM"
+    print("Stopped.")
+    return 0
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    clone, unit = _resolve_clone_and_unit_or_exit()
     try:
-        os.kill(pid, sig)
-    except PermissionError:
-        print(
-            f"refine stop: pid {pid} is not owned by this user. "
-            f"Try sudo or run as the user that started the runner.",
-            file=sys.stderr,
-        )
+        cfg = config.get(path=args.config) if args.config else config.get()
+    except config.ConfigError as e:
+        print(f"refine status: {e}", file=sys.stderr)
         return 1
-    except ProcessLookupError:
-        print(f"refine stop: pid {pid} disappeared before signal landed.")
-        try:
-            pid_path.unlink()
-        except FileNotFoundError:
-            pass
-        return 0
-    print(f"refine stop: sent {sig_name} to pid {pid}; waiting up to {args.timeout:.0f}s…")
-
-    deadline = time.time() + args.timeout
-    while time.time() < deadline:
-        if not _pid_alive(pid):
-            print(f"refine stop: pid {pid} exited cleanly.")
-            try:
-                pid_path.unlink()
-            except FileNotFoundError:
-                pass
-            return 0
-        time.sleep(0.1)
-
-    if args.force:
-        # Already sent SIGKILL; nothing else to escalate to.
-        print(f"refine stop: pid {pid} still alive after SIGKILL — giving up.",
-              file=sys.stderr)
-        return 1
-
-    print(f"refine stop: pid {pid} did not exit after SIGTERM; escalating to SIGKILL.")
-    try:
-        os.kill(pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    # Short wait after SIGKILL to confirm.
-    deadline = time.time() + 3.0
-    while time.time() < deadline:
-        if not _pid_alive(pid):
-            try:
-                pid_path.unlink()
-            except FileNotFoundError:
-                pass
-            print(f"refine stop: pid {pid} killed.")
-            return 0
-        time.sleep(0.1)
-    print(f"refine stop: pid {pid} still alive after SIGKILL.", file=sys.stderr)
-    return 1
+    _print_status_block(clone, unit, cfg)
+    return 0
 
 
-def _runner_state_dir(cfg: "config.Config") -> Path:
-    """Where to keep the runner pidfile and log file.
+def _print_status_block(clone: Path, unit: str, cfg: "config.Config") -> None:
+    web_up = _port_open(cfg.web_host, cfg.web_port)
+    sock_up = _ipc_ping_quick(cfg.runner_socket)
+    runner_active = _systemctl_is_active(unit)
 
-    Prefer the refine source dir (the directory containing `.refine-binding`,
-    typically the user's refine clone). The bound client's `.refine/` lives
-    inside a bind-mounted volume that's exposed to the webapp container — and
-    daemon state shouldn't leak in there. Fall back to the volume root when
-    no binding is in scope (the inside-client-repo workflow).
+    print()
+    print(_bold("refine"))
+    print(f"  clone:    {clone}")
+    print(f"  client:   {cfg.client_repo}")
+    print(f"  web:      {_dot(web_up)} http://{_displayable_host(cfg.web_host)}:{cfg.web_port}")
+    print(f"  runner:   {_dot(runner_active and sock_up)} systemd unit `{unit}` "
+          f"({'active' if runner_active else 'inactive'}, "
+          f"socket {'reachable' if sock_up else 'unreachable'})")
+    print(f"  logs:     journalctl --user -u {unit} -f")
+    print(f"  stop:     uv run refine stop")
+    print()
+
+
+# ----- runner / web -----------------------------------------------------------
+
+def cmd_runner_foreground(args: argparse.Namespace) -> int:
+    """Run the runner daemon in-process. Used by the systemd unit.
+
+    No fork/setsid/pidfile dance — systemd owns the lifecycle. Stdout/stderr
+    flow to journald, which is where logs are read from.
     """
-    binding = config.find_binding()
-    if binding is not None:
-        d = binding.parent / "run"
-    else:
-        d = cfg.volume_root / "run"
-    d.mkdir(parents=True, exist_ok=True)
-    return d
+    _load_config_or_exit(args)
+    from refine_runner.__main__ import main as runner_main
+    return runner_main()
 
-
-def _runner_pid_path(cfg: "config.Config") -> Path:
-    return _runner_state_dir(cfg) / "runner.pid"
-
-
-def _runner_log_path(cfg: "config.Config") -> Path:
-    return _runner_state_dir(cfg) / "runner.log"
-
-
-def _read_pid(p: Path) -> int | None:
-    try:
-        return int(p.read_text().strip())
-    except (FileNotFoundError, ValueError):
-        return None
-
-
-def _pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        # Process exists; we just don't own it.
-        return True
-
-
-# ----- web --------------------------------------------------------------------
 
 def cmd_web(args: argparse.Namespace) -> int:
     _load_config_or_exit(args)
@@ -463,6 +444,161 @@ def _load_config_or_exit(args: argparse.Namespace) -> None:
         sys.exit(1)
 
 
+def _resolve_clone_and_unit_or_exit() -> tuple[Path, str]:
+    """Find the binding for the current cwd and return (clone_dir, unit_name).
+
+    start/stop/status only make sense when run from a bound refine source dir.
+    """
+    binding = config.find_binding()
+    if binding is None:
+        print(
+            "refine: no .refine-binding in scope. Run `refine init <client-repo>` "
+            "from a refine source dir first.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    clone = binding.parent.resolve()
+    unit = config.read_binding_unit(binding) or config.unit_name_for(clone)
+    return clone, unit
+
+
+def _docker_compose(clone: Path, *args: str) -> int:
+    cmd = ["docker", "compose", *args]
+    try:
+        return subprocess.run(cmd, cwd=str(clone)).returncode
+    except FileNotFoundError:
+        print("refine: `docker` not found on PATH.", file=sys.stderr)
+        return 1
+
+
+def _image_is_stale(clone: Path) -> bool:
+    """True if any tracked source file is newer than the web image.
+
+    If the image doesn't exist yet, treat as stale (we need to build).
+    """
+    image = _compose_image_id(clone)
+    if image is None:
+        return True
+    created = _image_created_epoch(image)
+    if created is None:
+        return True
+    watched = [
+        clone / "Dockerfile",
+        clone / "pyproject.toml",
+        clone / "refine",
+        clone / "refine_shared",
+        clone / "refine_runner",
+        clone / "refine_web",
+    ]
+    for p in watched:
+        if _newest_mtime(p) > created:
+            return True
+    return False
+
+
+def _compose_image_id(clone: Path) -> str | None:
+    try:
+        out = subprocess.run(
+            ["docker", "compose", "images", "-q", COMPOSE_SERVICE],
+            cwd=str(clone),
+            capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    line = out.stdout.strip().splitlines()
+    return line[0].strip() if line else None
+
+
+def _image_created_epoch(image: str) -> float | None:
+    try:
+        out = subprocess.run(
+            ["docker", "image", "inspect", image, "--format", "{{.Created}}"],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if out.returncode != 0:
+        return None
+    raw = out.stdout.strip()
+    from datetime import datetime, timezone
+    stem = raw.split(".")[0].rstrip("Z")
+    try:
+        dt = datetime.strptime(stem, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return dt.timestamp()
+
+
+def _newest_mtime(p: Path) -> float:
+    try:
+        if p.is_file():
+            return p.stat().st_mtime
+        if p.is_dir():
+            newest = 0.0
+            for child in p.rglob("*"):
+                if child.is_file():
+                    try:
+                        m = child.stat().st_mtime
+                    except OSError:
+                        continue
+                    if m > newest:
+                        newest = m
+            return newest
+    except OSError:
+        pass
+    return 0.0
+
+
+def _systemctl(*args: str) -> tuple[int, str]:
+    try:
+        out = subprocess.run(
+            ["systemctl", "--user", *args],
+            capture_output=True, text=True, timeout=10,
+        )
+    except FileNotFoundError:
+        return 127, "systemctl not found (systemd --user required)"
+    except subprocess.TimeoutExpired:
+        return 124, "systemctl timed out"
+    return out.returncode, (out.stderr or out.stdout)
+
+
+def _systemctl_is_active(unit: str) -> bool:
+    rc, _ = _systemctl("is-active", "--quiet", unit)
+    return rc == 0
+
+
+def _wait_for_port(host: str, port: int, *, timeout: float) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if _port_open(host, port):
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def _port_open(host: str, port: int) -> bool:
+    target = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    try:
+        with socket.create_connection((target, port), timeout=1.0):
+            return True
+    except OSError:
+        return False
+
+
+def _wait_for_socket(path: Path, *, timeout: float) -> bool:
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if path.exists() and _ipc_ping_quick(path):
+            return True
+        time.sleep(0.2)
+    return False
+
+
+def _ipc_ping_quick(socket_path: Path) -> bool:
+    ok, _ = _ipc_ping(socket_path)
+    return ok
+
+
 def _ipc_ping(socket_path: Path) -> tuple[bool, str | None]:
     if not socket_path.exists():
         return False, f"socket file not found: {socket_path}"
@@ -524,6 +660,10 @@ def _count_gap_files(gaps_dir: Path) -> int:
     return sum(1 for _ in gaps_dir.rglob("gap.json"))
 
 
+def _displayable_host(h: str) -> str:
+    return "localhost" if h in ("0.0.0.0", "::") else h
+
+
 def _section(title: str) -> str:
     return f"\n{_bold(title)}\n" + "-" * len(title)
 
@@ -534,6 +674,10 @@ def _kv(label: str, value) -> None:  # noqa: ANN001
 
 def _bool(b: bool) -> str:
     return _green("yes") if b else _red("no")
+
+
+def _dot(b: bool) -> str:
+    return _green("●") if b else _red("○")
 
 
 def _bold(s: str) -> str:

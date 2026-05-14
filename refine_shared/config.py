@@ -32,6 +32,43 @@ except ModuleNotFoundError:
 CONFIG_FILENAME = "refine.toml"
 BINDING_FILENAME = ".refine-binding"
 
+# Marker line in the binding file recording the systemd --user unit name
+# associated with this refine clone, so `refine start/stop/status` don't
+# need to re-derive it (and so a future rename of the clone dir doesn't
+# silently produce a second, orphan unit).
+_BINDING_UNIT_MARKER = "# unit:"
+
+
+def unit_name_for(clone_dir: Path) -> str:
+    """Return the systemd --user unit name for a refine clone.
+
+    Derived from the clone directory's basename, lowercased, with anything
+    outside [a-z0-9._-] collapsed to '-'. The prefix `refine-` is added
+    if the basename does not already start with it, so
+    `systemctl --user list-units 'refine-*'` lists every refine instance.
+    """
+    import re
+    base = clone_dir.resolve().name.lower()
+    base = re.sub(r"[^a-z0-9._-]+", "-", base).strip("-") or "instance"
+    if not base.startswith("refine-"):
+        base = f"refine-{base}"
+    return base
+
+
+def read_binding_unit(binding_path: Path) -> str | None:
+    """Return the unit name recorded in a binding file, if any."""
+    try:
+        text = binding_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith(_BINDING_UNIT_MARKER):
+            name = s[len(_BINDING_UNIT_MARKER):].strip()
+            if name:
+                return name
+    return None
+
 
 class ConfigError(Exception):
     """Raised when no config can be found or it is malformed."""
@@ -171,13 +208,19 @@ def read_binding(binding_path: Path) -> Path:
 def write_binding(refine_source_dir: Path, client_repo: Path) -> Path:
     """Write `.refine-binding` in the refine source dir pointing at a client.
 
+    Also records the systemd --user unit name so `refine start/stop/status`
+    can look it up without re-deriving from the directory basename (which
+    might drift if the clone is later renamed).
+
     Returns the absolute path to the written binding file.
     """
     refine_source_dir = refine_source_dir.resolve()
     binding = refine_source_dir / BINDING_FILENAME
+    unit = unit_name_for(refine_source_dir)
     binding.write_text(
         f"# refine binding — this refine clone targets the client repo below.\n"
         f"# Created by `refine init`. Re-run `refine init <other_path>` to rebind.\n"
+        f"{_BINDING_UNIT_MARKER} {unit}\n"
         f"{client_repo.resolve()}\n",
         encoding="utf-8",
     )

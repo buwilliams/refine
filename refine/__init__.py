@@ -1,7 +1,8 @@
 """refine CLI entry point.
 
-Provides `refine init`, `refine start`, `refine stop`, `refine web`, and
-`refine doctor` — launchable via `uv run refine <subcommand>`.
+Provides `refine init`, `refine start`, `refine stop`, `refine status`,
+`refine runner`, `refine web`, and `refine doctor` — launchable via
+`uv run refine <subcommand>`.
 
 Components live in the sibling packages:
 - refine_shared: storage + IPC types + config + friendly summaries

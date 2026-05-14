@@ -28,11 +28,10 @@ the host, so operators rarely need to think about either.
 
 ```
 refine/
-├── refine/               # the `refine` CLI: init, runner, web, doctor
+├── refine/               # the `refine` CLI: init, start, stop, status, runner, web, doctor
 ├── refine_shared/        # storage, IPC, friendly summaries, config loader
 ├── refine_runner/        # host-native daemon (subprocess + git + gap.json owner)
 ├── refine_web/           # Dockerized webapp + static HTML/JS
-├── scripts/              # refine-runner.service (example systemd unit)
 ├── Dockerfile            # builds refine-web
 ├── docker-compose.yml    # runs refine-web (relative bind mounts, no env vars)
 ├── pyproject.toml        # makes `refine` a real console script
@@ -65,6 +64,9 @@ This:
 - Writes `/opt/refine-acme/.refine-binding` so future commands from
   `/opt/refine-acme` target this client.
 - Writes `/opt/refine-acme/.env` so `docker compose` reads the bind-mount path.
+- Installs and enables `~/.config/systemd/user/refine-acme.service` so the
+  runner is managed by systemd (survives terminal close; one unit per clone,
+  named after the clone basename).
 
 Commit the new files in the client repo when you're ready:
 
@@ -80,20 +82,32 @@ git commit -m "add refine"
 cd /opt/refine-acme
 
 claude login                       # one-time, as the operator user
-uv run refine start                # daemonizes; prints pid, socket, log path
-docker compose up                  # webapp, reads the .env
-uv run refine doctor               # config + IPC + claude + git status report
-uv run refine stop                 # stop the runner when you're done
+uv run refine start                # webapp + runner, one command
+uv run refine status               # check it's healthy
+uv run refine stop                 # tear it all down
 ```
 
 Open <http://localhost:8080>.
+
+`refine start` rebuilds the web image if any source file is newer than the
+image, brings the webapp up with `docker compose up -d`, starts the runner
+via `systemctl --user start refine-acme`, and waits for both to be reachable
+before returning. Runner logs go to journald — tail with
+`journalctl --user -u refine-acme -f`.
+
+To survive logout / reboot, run once:
+
+```bash
+loginctl enable-linger $USER       # systemd keeps user units alive across logout
+```
 
 UI edits are picked up live — `refine_web/static/` is bind-mounted into
 the container, so changes to `index.html`, `app.js`, or `style.css` are
 visible on the next browser refresh without rebuilding the image.
 
 For a different client, `cd /opt/refine-globex` (or wherever) and run the
-same commands. Each clone tracks its own binding.
+same commands. Each clone tracks its own binding and its own systemd unit
+(named after the clone's directory basename).
 
 ### Re-binding
 
@@ -104,13 +118,9 @@ cd /opt/refine-acme
 uv run refine init /srv/clients/other-client --force
 ```
 
-`--force` is required because a binding already exists.
-
-### Production runner
-
-Install `scripts/refine-runner.service` as a systemd unit (edit `User`,
-`Group`, and `WorkingDirectory` first). The unit runs `uv run refine start
---foreground` from your refine clone. Zero env vars.
+`--force` is required because a binding already exists. The unit file is
+rewritten in place; the clone's directory name — and thus its unit name —
+does not change.
 
 ## How it talks to itself
 
@@ -167,13 +177,15 @@ the UI's Settings page.
 
 ## CLI reference
 
-| Command                       | What it does                                                       |
-|-------------------------------|--------------------------------------------------------------------|
-| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/` in `<path>`; bind this clone. |
-| `uv run refine start`         | Start the host-native runner daemon (alias: `runner`).            |
-| `uv run refine stop`          | Stop the running runner (SIGTERM, escalates to SIGKILL on timeout). |
-| `uv run refine web`           | Start the webapp (rarely used directly — Docker wraps it).         |
-| `uv run refine doctor`        | Show config, IPC, claude auth, and git status.                     |
+| Command                       | What it does                                                                                                |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------|
+| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, bind this clone, install + enable a systemd --user unit.    |
+| `uv run refine start`         | Rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy.  |
+| `uv run refine stop`          | `systemctl --user stop <unit>` + `docker compose down`.                                                     |
+| `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |
+| `uv run refine runner`        | Run the runner in the foreground (what the systemd unit invokes).                                           |
+| `uv run refine web`           | Start the webapp in-process (rarely used directly — Docker wraps it).                                       |
+| `uv run refine doctor`        | Deeper diagnostic snapshot: config, IPC, claude auth, git status.                                           |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.
 
