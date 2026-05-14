@@ -3163,26 +3163,6 @@ function drawSettings(s, diag, reps, feats) {
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   $("#settings-content").innerHTML = `
     <div class="card">
-      <h3>Agent CLI</h3>
-      <div class="form-row"><label>Which CLI refine drives
-        <span class="muted small">— used for Gap agent runs, conflict resolution, and pre-flight. <strong>Chat always uses Claude</strong> because of its session-resume support; Codex / Gemini don't have an equivalent.</span></label>
-        <select id="s-cli">
-          ${cliOption("claude", "Claude Code (default)")}
-          ${cliOption("codex", "OpenAI Codex")}
-          ${cliOption("gemini", "Gemini")}
-        </select></div>
-      <p class="muted small" style="margin-top:6px">
-        After switching: re-check auth below to confirm the chosen CLI
-        is installed and authed on the host. Round logs are rich for
-        Claude (tool summaries, live Idle counter); Codex / Gemini fall
-        back to plain stdout passthrough.
-      </p>
-      <div class="actions"><button id="s-save-cli">Save</button></div>
-    </div>
-
-    ${renderFeatureFlagsCard(feats)}
-
-    <div class="card" style="margin-top:16px">
       <h3>Runtime configuration</h3>
       <div class="form-row"><label>Parallel-run cap</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
@@ -3217,6 +3197,26 @@ function drawSettings(s, diag, reps, feats) {
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
       <div class="actions"><button id="s-save-scope">Save</button></div>
     </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Agent CLI</h3>
+      <div class="form-row"><label>Which CLI refine drives
+        <span class="muted small">— used for Gap agent runs, conflict resolution, and pre-flight. <strong>Chat always uses Claude</strong> because of its session-resume support; Codex / Gemini don't have an equivalent.</span></label>
+        <select id="s-cli">
+          ${cliOption("claude", "Claude Code (default)")}
+          ${cliOption("codex", "OpenAI Codex")}
+          ${cliOption("gemini", "Gemini")}
+        </select></div>
+      <p class="muted small" style="margin-top:6px">
+        After switching: re-check auth below to confirm the chosen CLI
+        is installed and authed on the host. Round logs are rich for
+        Claude (tool summaries, live Idle counter); Codex / Gemini fall
+        back to plain stdout passthrough.
+      </p>
+      <div class="actions"><button id="s-save-cli">Save</button></div>
+    </div>
+
+    ${renderFeatureFlagsCard(feats)}
 
     <div class="card" style="margin-top:16px">
       <h3>Auth</h3>
