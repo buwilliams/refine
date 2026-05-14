@@ -216,7 +216,15 @@ class Merger:
             self._current_started = time.monotonic()
         try:
             try:
-                result = verify_op.perform_verify(conn, gap_id, actor="runner")
+                # Auto-merge lands the branch but parks the Gap in
+                # `review` — a human approves before it moves to
+                # `done`. The user-triggered Verify path
+                # (`verify_now`) is what eventually flips review →
+                # done.
+                result = verify_op.perform_verify(
+                    conn, gap_id, actor="runner",
+                    final_status="review",
+                )
             except Exception as e:
                 activity.append(
                     conn,
@@ -230,7 +238,12 @@ class Merger:
             with self._snap_lock:
                 self._current_gap_id = None
                 self._current_started = None
-                self._last_outcome = "done" if result.get("ok") else "review"
+                # Both the happy path (auto-merge succeeded → review)
+                # and the failure path (auto-merge couldn't complete
+                # → review) land the Gap in `review`. So the
+                # snapshot's `last_outcome` is always `review` from
+                # the auto-merger's perspective.
+                self._last_outcome = "review"
 
         if result.get("ok"):
             # verify_op already moved the Gap to `done`. Nothing else

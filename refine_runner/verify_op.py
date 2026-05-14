@@ -15,8 +15,18 @@ from . import conflict_resolver, gap_writer, git_ops
 
 
 def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
-                   actor: str = "refine") -> dict:
-    """Run the merge+push sequence for a Gap currently in `review`.
+                   actor: str = "refine",
+                   final_status: str = "done") -> dict:
+    """Run the merge+push sequence for a Gap, then transition it.
+
+    `final_status` is the status the Gap moves to on a clean run:
+      - The Merger calls with `final_status="review"` — auto-merge
+        completes the merge but parks the Gap in `review` so a human
+        approves it before it lands in `done`.
+      - User-triggered Verify (review → done bookkeeping) calls with
+        `final_status="done"`. If the Gap's branch is already gone
+        (the Merger already merged + cleaned up), this is a pure
+        bookkeeping transition with no git work.
 
     Returns a dict with keys: ok, stage, message, details.
     """
@@ -28,7 +38,9 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
     # `ready-merge` is the system-owned entry status used by the
     # Merger after a successful agent run. `review` is the user-
     # triggered entry status used when the operator clicks Verify
-    # after an earlier verify failure. Any other status is a mis-call.
+    # after an earlier verify failure or after the Merger auto-merged
+    # and parked the Gap for human approval. Any other status is a
+    # mis-call.
     if row["status"] not in ("review", "ready-merge"):
         return {"ok": False, "stage": "lookup",
                 "message": f"Gap is not verifiable (status={row['status']})"}
@@ -37,6 +49,31 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
     if not branch:
         return {"ok": False, "stage": "lookup",
                 "message": "Gap has no branch_name recorded"}
+
+    # Auto-merge clean-up deletes the Gap's branch on success. A later
+    # user-triggered Verify on such a Gap (in `review`, awaiting human
+    # approval) has nothing to git-merge — the merge already landed.
+    # Short-circuit to a bookkeeping-only transition.
+    if not git_ops.local_branch_exists(branch):
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
+                (final_status, now_iso(), gap_id),
+            )
+        _log(conn, gap_id,
+             f"Gap branch `{branch}` already merged + cleaned up — "
+             f"transitioned to `{final_status}`",
+             severity="info", category="state", actor=actor)
+        activity.append(
+            conn,
+            message=f"Gap approved by user — transitioned to `{final_status}`"
+                    if final_status == "done"
+                    else f"Gap transitioned to `{final_status}`",
+            severity="info", category="state",
+            gap_id=gap_id, actor=actor,
+        )
+        return {"ok": True, "stage": "noop",
+                "message": f"Already merged; transitioned to `{final_status}`"}
 
     # Pre-check: resolve the merge target.
     host_branch = git_ops.current_branch()
@@ -163,7 +200,8 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
 
     try:
         return _verify_body(conn, gap_id, target, branch,
-                              has_upstream=has_upstream, actor=actor)
+                              has_upstream=has_upstream, actor=actor,
+                              final_status=final_status)
     finally:
         if stashed:
             pop = git_ops.stash_pop()
@@ -220,7 +258,8 @@ def _restore_host_branch_and_return(conn, gap_id, switched_from,
 
 
 def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
-                 branch: str, *, has_upstream: bool, actor: str) -> dict:
+                 branch: str, *, has_upstream: bool, actor: str,
+                 final_status: str = "done") -> dict:
     # 1. fetch (only if there's a remote-tracking upstream).
     if has_upstream:
         r = git_ops.fetch()
@@ -315,17 +354,21 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
                     "message": "Push failed", "details": r.stderr}
         pushed = True
 
-    # Done; clean up branch + worktree.
+    # Merge landed; clean up branch + worktree and transition to the
+    # caller's chosen final status. The Merger uses `review` (so a human
+    # approves before the Gap is marked `done`); a user-triggered Verify
+    # uses `done` directly.
     with db.transaction(conn):
         conn.execute(
-            "UPDATE gaps_index SET status = 'done', updated = ? WHERE id = ?",
-            (now_iso(), gap_id),
+            "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
+            (final_status, now_iso(), gap_id),
         )
     git_ops.remove_worktree(gap_id)
     git_ops.delete_branch(branch)
-    done_msg = ("Gap merged + pushed; transitioned to done" if pushed
-                else "Gap merged locally (no upstream — push skipped); "
-                     "transitioned to done")
+    pushed_part = "merged + pushed" if pushed else (
+        "merged locally (no upstream — push skipped)"
+    )
+    done_msg = (f"Gap {pushed_part}; transitioned to `{final_status}`")
     activity.append(
         conn,
         message=done_msg,
@@ -334,7 +377,8 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
     return {"ok": True, "stage": "done",
             "message": "Merged and pushed" if pushed
                        else "Merged locally (no upstream — push skipped)",
-            "pushed": pushed}
+            "pushed": pushed,
+            "final_status": final_status}
 
 
 def _log(conn: sqlite3.Connection, gap_id: str, message: str, *,
