@@ -225,6 +225,16 @@ def _h_chat_stop(_h, m, _b, _q):
 # ---- Target application ------------------------------------------------------
 
 
+@route("GET", r"/api/project/status")
+def _h_project_status(_h, _m, _b, _q):
+    return api.project_status()
+
+
+@route("POST", r"/api/project/attach")
+def _h_project_attach(_h, _m, body, _q):
+    return api.project_attach(body or {})
+
+
 @route("GET", r"/api/target-app/status")
 def _h_target_app_status(_h, _m, _b, _q):
     return api.target_app_status()

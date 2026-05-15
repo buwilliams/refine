@@ -118,6 +118,7 @@ function drawSettings(s, diag, reps, feats) {
   // localStorage key and DOM hook. Same order as the linear stack was
   // before this refactor.
   const tabs = [
+    { slug: "project",      label: "Project" },
     { slug: "reporters",    label: "Reporters" },
     { slug: "runtime",      label: "Runtime" },
     { slug: "cli",          label: "AI Provider" },
@@ -136,6 +137,22 @@ function drawSettings(s, diag, reps, feats) {
              data-tab-pane="${slug}">${body}</section>`;
   $("#settings-content").innerHTML = `
     ${tabStrip}
+    ${pane("project", `
+    <div class="card">
+      <h3>Project</h3>
+      <p class="muted small">
+        Current app: <code>${htmlEscape(state.project?.client_repo || "Not attached")}</code>
+      </p>
+      <div class="form-row"><label>Attach app path
+        <span class="muted small">— existing repo or new directory to create and initialize.</span></label>
+        <input type="text" id="s-project-path"
+               placeholder="/path/to/app"
+               value="${htmlEscape(state.project?.client_repo || "")}"></div>
+      <div class="actions">
+        <button class="warn" id="s-project-attach">Attach app</button>
+      </div>
+    </div>`)}
+
     ${pane("runtime", `
     <div class="card">
       <h3>Runtime configuration</h3>
@@ -356,6 +373,27 @@ function drawSettings(s, diag, reps, feats) {
   // Tab click handlers — purely DOM-local, no re-fetch.
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
     btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
+  });
+  $("#s-project-attach")?.addEventListener("click", async () => {
+    const path = ($("#s-project-path")?.value || "").trim();
+    if (!path) return;
+    const ok = await modalConfirm(
+      "Attach refine to this app path? If the directory does not exist, refine will create it and run git init.",
+      { title: "Attach app", okLabel: "Attach" },
+    );
+    if (!ok) return;
+    await withButtonBusy($("#s-project-attach"), "Attaching…", async () => {
+      try {
+        const result = await api("POST", "/api/project/attach", { path });
+        state.project = result;
+        if (result.runner && result.runner.started === false && result.runner.message) {
+          toast(result.runner.message, "warn");
+        } else {
+          toast("Project attached", "success");
+        }
+        window.location.reload();
+      } catch (e) { toast(e.details || e.message, "error"); }
+    });
   });
   $("#s-save").addEventListener("click", async () => {
     await withButtonBusy($("#s-save"), "Saving…", async () => {

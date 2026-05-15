@@ -6,6 +6,7 @@ const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 const state = {
   reporters: [],
   lastReporter: localStorage.getItem("refine_last_reporter") || "",
+  project: null,
   dashboard: null,
   needsAttentionBanners: [],
   currentRoute: null,
@@ -94,6 +95,83 @@ function toast(message, kind = "info") {
   el.textContent = message;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 4000);
+}
+
+// ---- Project attach/setup ---------------------------------------------------
+
+async function ensureProjectAttached() {
+  let snap = null;
+  try {
+    snap = await api("GET", "/api/project/status");
+  } catch (e) {
+    toast(e.message || "Could not check project status", "error");
+    return false;
+  }
+  if (snap.attached) {
+    state.project = snap;
+    return true;
+  }
+  await openProjectAttachModal(snap.message || "No refine project is attached.");
+  return false;
+}
+
+function openProjectAttachModal(message) {
+  return new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop project-setup-backdrop";
+    root.innerHTML = `
+      <div class="modal project-setup-modal" role="dialog" aria-modal="true" aria-labelledby="project-setup-title">
+        <form id="project-setup-form">
+          <div class="modal-title" id="project-setup-title">Choose project</div>
+          <div class="modal-body">
+            <p class="muted">${htmlEscape(message)}</p>
+            <label for="project-setup-path">Project path</label>
+            <input id="project-setup-path" name="path" type="text" class="modal-input"
+                   placeholder="/path/to/app" autocomplete="off" required>
+            <p class="muted small">
+              If the directory does not exist, refine will create it, run git init,
+              and add the .refine configuration.
+            </p>
+            <div class="form-error" id="project-setup-error" style="display:none"></div>
+          </div>
+          <div class="modal-actions">
+            <button type="submit" id="project-setup-submit">Attach project</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(root);
+
+    const form = root.querySelector("#project-setup-form");
+    const input = root.querySelector("#project-setup-path");
+    const error = root.querySelector("#project-setup-error");
+    const button = root.querySelector("#project-setup-submit");
+    input.focus();
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const path = input.value.trim();
+      if (!path) return;
+      error.style.display = "none";
+      button.disabled = true;
+      button.textContent = "Attaching...";
+      try {
+        const result = await api("POST", "/api/project/attach", { path });
+        state.project = result;
+        if (result.runner && result.runner.started === false && result.runner.message) {
+          toast(result.runner.message, "warn");
+        } else {
+          toast("Project attached", "success");
+        }
+        window.location.reload();
+        resolve(result);
+      } catch (err) {
+        error.textContent = err.details || err.message || "Could not attach project";
+        error.style.display = "";
+        button.disabled = false;
+        button.textContent = "Attach project";
+      }
+    });
+  });
 }
 
 // ---- Modals (replace native prompt / confirm) -------------------------------

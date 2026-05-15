@@ -8,9 +8,10 @@ import json
 import re
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
-from refine_shared import activity, db, gaps as shared_gaps, reporters
+from refine_shared import activity, config, db, gaps as shared_gaps, reporters
 from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
@@ -22,6 +23,7 @@ from refine_shared.ipc_protocol import (
 from refine_shared.ulid import new_ulid
 
 from .ipc_client import IpcError, get_client
+from . import runtime
 
 
 # --- error helpers ------------------------------------------------------------
@@ -35,6 +37,109 @@ def err(code: int, message: str, details: str | None = None) -> tuple[int, dict]
 
 def _conn() -> sqlite3.Connection:
     return db.connect()
+
+
+# --- Project attach/setup -----------------------------------------------------
+
+def project_status() -> tuple[int, dict]:
+    """Return whether this web process is attached to a refine project."""
+    cfg_path = config.find_config()
+    if cfg_path is None:
+        return 200, {
+            "attached": False,
+            "message": "No refine project is attached.",
+        }
+    try:
+        cfg = config.get(reload=True)
+    except config.ConfigError as e:
+        return 200, {
+            "attached": False,
+            "config_path": str(cfg_path),
+            "message": str(e),
+        }
+    return 200, {
+        "attached": True,
+        "client_repo": str(cfg.client_repo),
+        "volume_root": str(cfg.volume_root),
+        "config_path": str(cfg.config_path),
+    }
+
+
+def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
+    """Create or rebind this refine clone to a client repo path."""
+    raw_path = (body.get("path") or "").strip()
+    if not raw_path:
+        return err(400, "Enter a project path.")
+
+    clone_dir = Path.cwd().resolve()
+    client_repo = Path(raw_path).expanduser()
+
+    try:
+        from refine.cli import (
+            _InitError, _is_refine_source_dir, _systemctl, _wait_for_socket,
+            bootstrap_client_repo,
+        )
+
+        if not _is_refine_source_dir(clone_dir):
+            return err(
+                409,
+                "Project setup must run from the host refine source directory.",
+                (
+                    f"The web process is running in {clone_dir}. Start refine from "
+                    "the source checkout with `uv run refine start` so it can "
+                    "create host directories and write the binding."
+                ),
+            )
+
+        install_unit = body.get("install_unit") is not False
+        result = bootstrap_client_repo(
+            client_repo,
+            clone_dir=clone_dir,
+            force=True,
+            create=True,
+            init_git=True,
+            reuse_existing_config=True,
+            install_unit=install_unit,
+        )
+        cfg = runtime.load_configured(
+            result["config_path"],
+            start_poller=body.get("start_poller") is not False,
+        )
+    except (config.ConfigError, _InitError, OSError, TimeoutError) as e:
+        return err(400, str(e))
+
+    runner = {"started": False, "message": ""}
+    if body.get("start_runner") is not False and result.get("unit_path"):
+        unit = config.unit_name_for(clone_dir)
+        rc, out = _systemctl("restart", unit)
+        if rc == 0 and _wait_for_socket(cfg.runner_socket, timeout=10.0):
+            runner = {"started": True, "message": f"Runner started via {unit}."}
+        elif rc == 0:
+            runner = {
+                "started": False,
+                "message": (
+                    f"Runner service {unit} started, but {cfg.runner_socket} "
+                    "was not reachable within 10 seconds."
+                ),
+            }
+        else:
+            runner = {
+                "started": False,
+                "message": (out or f"systemctl --user restart {unit} failed").strip(),
+            }
+
+    return 200, {
+        "attached": True,
+        "client_repo": str(cfg.client_repo),
+        "volume_root": str(cfg.volume_root),
+        "config_path": str(cfg.config_path),
+        "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
+        "env_path": str(result["env_path"]) if result.get("env_path") else "",
+        "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
+        "git_initialized": bool(result.get("git_initialized")),
+        "config_created": bool(result.get("config_created")),
+        "runner": runner,
+    }
 
 
 # --- Gap endpoints ------------------------------------------------------------

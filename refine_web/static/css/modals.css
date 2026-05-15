@@ -29,6 +29,20 @@
   color: var(--fg);
 }
 .modal-body input[type="text"] { margin-top: 8px; }
+.project-setup-backdrop {
+  background: rgba(17, 24, 39, 0.62);
+}
+.project-setup-modal {
+  max-width: 520px;
+}
+.project-setup-modal .small {
+  margin: 8px 0 0;
+}
+.form-error {
+  margin-top: 10px;
+  color: var(--error);
+  font-size: 13px;
+}
 .modal-actions {
   display: flex;
   gap: 8px;

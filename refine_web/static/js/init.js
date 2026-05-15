@@ -16,6 +16,8 @@ function tickRunningCells() {
 }
 
 async function init() {
+  const attached = await ensureProjectAttached();
+  if (!attached) return;
   try {
     await refreshReporters();
   } catch (e) {

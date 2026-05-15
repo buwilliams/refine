@@ -107,6 +107,18 @@ git add .refine/refine.toml .refine/.gitignore
 git commit -m "add refine"
 ```
 
+You can also skip this CLI init step for a new clone:
+
+```bash
+cd /opt/refine-acme
+uv run refine start
+```
+
+When no project is attached, refine starts a host-native setup UI. Open the
+shown URL, enter an existing app path or a new directory path, and refine will
+create missing directories, run `git init` when needed, write the same
+`.refine/` files as `refine init`, bind the clone, and start the runner.
+
 ### 3. Run from the refine source dir
 
 ```bash
@@ -238,7 +250,7 @@ the UI's Settings page.
 |-------------------------------|-------------------------------------------------------------------------------------------------------------|
 | `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, bind this clone, install + enable a systemd --user unit.    |
 | `uv run refine reset`         | Undo `init` in this clone: stop services, disable + remove the systemd unit, delete `.refine-binding` + `.env`. Add `--purge` (+ `-y` to skip prompt) to also delete the bound client's `.refine/` data. |
-| `uv run refine start`         | Rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy.  |
+| `uv run refine start`         | If initialized: rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy. If no project is attached yet: start the host-native setup UI. |
 | `uv run refine stop`          | `systemctl --user stop <unit>` + `docker compose down`.                                                     |
 | `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands. Same `--rebuild` / `--no-rebuild` flags as `start`. |
 | `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |

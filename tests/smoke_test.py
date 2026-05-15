@@ -171,6 +171,33 @@ def main() -> int:
     assert stopped["ok"] and stopped["state"] == "stopped", stopped
     print("[ok] target-app command runtime + config normalization")
 
+    # --- UI project bootstrap helper ----------------------------------------
+    from refine.cli import bootstrap_client_repo
+    clone = tmp / "refine-clone"
+    (clone / "refine").mkdir(parents=True)
+    (clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
+    (clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    ui_client = tmp / "ui-created-client"
+    boot = bootstrap_client_repo(
+        ui_client,
+        clone_dir=clone,
+        force=True,
+        create=True,
+        init_git=True,
+        reuse_existing_config=True,
+        install_unit=False,
+    )
+    assert ui_client.is_dir()
+    assert (ui_client / ".git").exists()
+    assert (ui_client / ".refine" / "refine.toml").is_file()
+    assert (ui_client / ".refine" / "run").is_dir()
+    assert (ui_client / ".refine" / "gaps").is_dir()
+    assert (clone / ".refine-binding").read_text(encoding="utf-8").strip().endswith(str(ui_client))
+    assert f"REFINE_CLIENT_REFINE_DIR={ui_client / '.refine'}" in (clone / ".env").read_text(encoding="utf-8")
+    assert boot["git_initialized"] is True
+    assert boot["config_created"] is True
+    print("[ok] UI project bootstrap creates git repo + refine binding")
+
     # --- Reporters -----------------------------------------------------------
     jane = reporters.add(conn, "Jane Doe")
     again = reporters.add(conn, "Jane Doe")  # idempotent

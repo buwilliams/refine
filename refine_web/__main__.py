@@ -1,28 +1,35 @@
 """Webapp entry point.
 
-Loads refine.toml, initializes SQLite, starts the SSE poller, and serves HTTP.
+Loads refine.toml when available, initializes SQLite, starts the SSE poller,
+and serves HTTP. Without config, it serves a host-native setup UI so the user
+can create or attach a project from the browser.
 Invoked as `uv run refine web` (the CLI dispatcher).
 """
 from __future__ import annotations
 
+import os
 import sys
 
-from refine_shared import config, db
+from refine_shared import config
 
-from .poller import SqlitePoller
+from . import runtime
 from .server import run
 
 
 def main() -> int:
-    cfg = config.get()
-    db.init_db()
-    poller = SqlitePoller(interval=1.0)
-    poller.start()
     try:
-        run(host=cfg.web_host, port=cfg.web_port)
+        cfg = runtime.load_configured()
+        host = cfg.web_host
+        port = cfg.web_port
+    except config.ConfigError as e:
+        host = os.environ.get("REFINE_WEB_HOST", "127.0.0.1")
+        port = int(os.environ.get("REFINE_WEB_PORT", "8080"))
+        sys.stderr.write(f"[refine-web] setup mode: {e}\n")
+    try:
+        run(host=host, port=port)
     except KeyboardInterrupt:
         sys.stderr.write("\n[refine-web] shutting down\n")
-        poller.stop()
+        runtime.stop_poller()
     return 0
 
 

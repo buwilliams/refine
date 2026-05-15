@@ -364,3 +364,6 @@ select {
   box-shadow: var(--shadow);
   z-index: 150;   /* above chat dock (100), below modals (200) */
 }
+.toast.success { background: var(--ok); }
+.toast.warn { background: var(--warn); }
+.toast.error { background: var(--error); }
