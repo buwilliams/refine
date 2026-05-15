@@ -1,7 +1,7 @@
 """Sole owner of gap.json writes. Serializes per-Gap with a lock map.
 
 Backend handlers, subprocess supervisor, and dispatcher call into this module
-to mutate gap.json. Reads happen elsewhere via refine_shared.gaps.
+to mutate gap.json. Reads happen elsewhere via refine_server.gaps.
 """
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from refine_shared import gaps as shared_gaps
-from refine_shared.gaps import now_iso
+from refine_server import gaps as shared_gaps
+from refine_server.gaps import now_iso
 
 _locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
 _locks_master = threading.Lock()
@@ -189,7 +189,7 @@ def update_name(gap_id: str, name: str) -> None:
 
 def delete_gap_file(gap_id: str) -> None:
     """Remove gap.json and the containing dir. (SQLite cleanup is separate.)"""
-    from refine_shared.paths import gap_dir, gap_json_path
+    from refine_server.paths import gap_dir, gap_json_path
     with _lock_for(gap_id):
         p = gap_json_path(gap_id)
         if p.exists():

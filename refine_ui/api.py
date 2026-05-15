@@ -12,16 +12,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from refine_shared import activity, config, db, gaps as shared_gaps, project_registry, reporters
-from refine_shared.gaps import now_iso
-from refine_shared.backend_protocol import (
+from refine_server import activity, config, db, gaps as shared_gaps, project_registry, reporters
+from refine_server.gaps import now_iso
+from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
-from refine_shared.ulid import new_ulid
+from refine_server.ulid import new_ulid
 
 from .backend_client import BackendError, get_client
 from . import runtime
@@ -941,7 +941,7 @@ def list_features() -> tuple[int, dict]:
     """Provider-scoped feature flag matrix. Used by the Settings UI
     to render the Feature flags card and by client-side gating of
     Chat / Import affordances."""
-    from refine_shared import features
+    from refine_server import features
     conn = _conn()
     try:
         return 200, features.get_matrix(conn)
@@ -954,7 +954,7 @@ def set_feature_override(body: dict) -> tuple[int, dict]:
         {"provider": "codex", "feature": "chat", "enabled": true|false|null}
     `enabled=null` clears the override so the code-defined default
     re-applies."""
-    from refine_shared import features
+    from refine_server import features
     if not isinstance(body, dict):
         return err(400, "expected an object")
     provider = (body.get("provider") or "").strip().lower()

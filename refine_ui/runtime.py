@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from refine_shared import config, db
+from refine_server import config, db
 
 from .poller import SqlitePoller
 

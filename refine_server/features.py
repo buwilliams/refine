@@ -50,9 +50,8 @@ FEATURES = {
     },
 }
 
-# Canonical provider list — kept in sync with `agent_cli.CLI_NAMES`
-# (we don't import from `refine_server` here to avoid a layer
-# violation; refine_shared sits below refine_server).
+# Canonical provider list — kept in sync with `agent_cli.CLI_NAMES`.
+# Keep this literal to avoid importing CLI-launch code during settings reads.
 PROVIDERS = ("claude", "codex", "gemini")
 DEFAULT_PROVIDER = "claude"
 

@@ -26,7 +26,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from refine_shared import config, project_registry
+from refine_server import config, project_registry
 
 
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"

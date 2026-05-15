@@ -40,7 +40,7 @@ def main() -> int:
         if mod.startswith("refine"):
             del sys.modules[mod]
 
-    from refine_shared import config
+    from refine_server import config
 
     # Equivalent of `refine init`
     cfg_path = config.write_defaults(client / ".refine")
@@ -49,9 +49,9 @@ def main() -> int:
     print(f"volume root:  {cfg.volume_root}")
     print(f"client repo:  {cfg.client_repo}")
 
-    from refine_shared import db, reporters, activity, gaps as shared_gaps
-    from refine_shared.ulid import new_ulid, is_ulid
-    from refine_shared.friendly import classify_subprocess_failure, classify_git_failure
+    from refine_server import db, reporters, activity, gaps as shared_gaps
+    from refine_server.ulid import new_ulid, is_ulid
+    from refine_server.friendly import classify_subprocess_failure, classify_git_failure
     from refine_server import agent_cli, gap_writer
 
     # --- DB ------------------------------------------------------------------
@@ -295,7 +295,7 @@ def main() -> int:
     assert len(gap["rounds"]) == 1
     assert gap["rounds"][0]["reporter"] == "Jane Doe"
 
-    from refine_shared.paths import relative_gap_path
+    from refine_server.paths import relative_gap_path
     with db.transaction(conn):
         conn.execute(
             "INSERT INTO gaps_index (id, name, status, created, updated, json_path) "

@@ -10,8 +10,8 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 
-from refine_shared import activity, db
-from refine_shared.gaps import now_iso
+from refine_server import activity, db
+from refine_server.gaps import now_iso
 
 from . import agent_cli
 

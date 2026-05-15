@@ -20,7 +20,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["refine*", "refine_shared*", "refine_server*", "refine_ui*"]
+include = ["refine_cli*", "refine_server*", "refine_ui*"]
 
 [tool.setuptools.package-data]
 refine_ui = ["static/*", "static/css/*", "static/js/*", "static/js/features/*"]

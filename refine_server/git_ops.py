@@ -27,7 +27,7 @@ _LOG_FIELD_SEP = "\x1f"
 
 def client_repo_path() -> Path:
     """The client repo, as configured in refine.toml."""
-    from refine_shared import config
+    from refine_server import config
     return config.get().client_repo
 
 

@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import sqlite3
 
-from refine_shared import activity, db
-from refine_shared.gaps import now_iso
+from refine_server import activity, db
+from refine_server.gaps import now_iso
 
 from . import conflict_resolver, gap_writer, git_ops
 
@@ -389,7 +389,7 @@ def _log(conn: sqlite3.Connection, gap_id: str, message: str, *,
         "SELECT json_path FROM gaps_index WHERE id = ?", (gap_id,),
     ).fetchone()
     if row:
-        from refine_shared.gaps import read_gap_json
+        from refine_server.gaps import read_gap_json
         gap = read_gap_json(gap_id)
         if gap and gap.get("rounds"):
             try:
@@ -421,7 +421,7 @@ def _build_merge_message(conn: sqlite3.Connection, gap_id: str,
 
         Refine Gap: <gap_id>
     """
-    from refine_shared.gaps import read_gap_json
+    from refine_server.gaps import read_gap_json
     from . import git_ops
 
     # Gap name from SQLite.

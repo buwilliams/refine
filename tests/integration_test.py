@@ -34,7 +34,7 @@ def main() -> int:
         if mod.startswith("refine"):
             del sys.modules[mod]
 
-    from refine_shared import config
+    from refine_server import config
 
     # Write the config (equivalent to `refine init`). Override the web port
     # so we don't collide with any local 8080.
@@ -46,7 +46,7 @@ def main() -> int:
     )
     cfg = config.get(reload=True)
 
-    from refine_shared.backend_protocol import M_PING
+    from refine_server.backend_protocol import M_PING
     from refine_ui import runtime
     from refine_ui import server as web_server
 

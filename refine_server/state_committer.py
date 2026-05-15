@@ -15,7 +15,7 @@ from __future__ import annotations
 import threading
 from typing import Callable
 
-from refine_shared import activity
+from refine_server import activity
 
 from . import git_ops
 

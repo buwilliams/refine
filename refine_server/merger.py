@@ -43,8 +43,8 @@ import sqlite3
 import threading
 import time
 
-from refine_shared import activity, db
-from refine_shared.gaps import now_iso
+from refine_server import activity, db
+from refine_server.gaps import now_iso
 
 from . import git_ops, subprocess_mgr, verify_op
 

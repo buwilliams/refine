@@ -116,7 +116,7 @@ def main() -> int:
         assert snap["apps"][0]["path"] == str(client)
         print("[ok] attached project is visible to the UI status check")
 
-        from refine_shared import config
+        from refine_server import config
 
         existing = tmp / "existing-client"
         existing.mkdir()

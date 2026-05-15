@@ -13,7 +13,7 @@ class BackendError(Exception):
 class BackendClient:
     def call(self, method: str, params: dict | None = None, *, timeout: float = 30.0) -> dict:  # noqa: ARG002
         from . import runtime
-        from refine_shared import config
+        from refine_server import config
 
         try:
             return runtime.runner_call(method, params or {})

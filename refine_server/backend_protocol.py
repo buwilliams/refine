@@ -1,4 +1,4 @@
-"""Direct backend method names shared by refine_ui and refine_server."""
+"""Direct backend method names used by refine_ui and refine_server."""
 from __future__ import annotations
 
 

@@ -14,8 +14,8 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from refine_shared import activity, db
-from refine_shared.gaps import now_iso, read_gap_json
+from refine_server import activity, db
+from refine_server.gaps import now_iso, read_gap_json
 
 from . import gap_writer, git_ops, preflight, subprocess_mgr
 from .friendly_outcome import classify_outcome

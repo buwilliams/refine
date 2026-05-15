@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from refine_shared import activity, db
-from refine_shared.gaps import now_iso
+from refine_server import activity, db
+from refine_server.gaps import now_iso
 
 from . import gap_writer  # local module; sole owner of gap.json writes
 

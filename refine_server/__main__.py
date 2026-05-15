@@ -9,7 +9,7 @@ import signal
 import sys
 import threading
 
-from refine_shared import config
+from refine_server import config
 
 from .runner import Runner
 

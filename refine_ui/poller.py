@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import time
 
-from refine_shared import activity, db
+from refine_server import activity, db
 
 from . import sse
 

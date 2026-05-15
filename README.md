@@ -63,8 +63,7 @@ auth, so operators rarely need to think about either.
 ```
 refine/
 ├── refine_cli/           # the `refine` CLI: init, start, stop, status, server, ui, doctor
-├── refine_shared/        # storage, backend method names, friendly summaries, config loader
-├── refine_server/        # backend server component (subprocess + git + gap.json owner)
+├── refine_server/        # server logic, storage, config, subprocesses, git, gap.json owner
 ├── refine_ui/            # host-native UI backend + static HTML/JS
 ├── pyproject.toml        # makes `refine` a real console script
 └── spec.md               # the design document

@@ -10,9 +10,9 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_shared import activity, db, features, gaps as shared_gaps, reporters
-from refine_shared.gaps import now_iso
-from refine_shared.backend_protocol import (
+from refine_server import activity, db, features, gaps as shared_gaps, reporters
+from refine_server.gaps import now_iso
+from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
@@ -32,7 +32,7 @@ class Runner:
         # Use a single shared connection — sqlite3 connections are not strictly
         # thread-safe by default, but with check_same_thread=False and our own
         # lock around transactions, it's fine for our usage pattern.
-        from refine_shared.paths import sqlite_path
+        from refine_server.paths import sqlite_path
         self._conn = sqlite3.connect(str(sqlite_path()), check_same_thread=False,
                                      isolation_level=None, timeout=5.0)
         self._conn.row_factory = sqlite3.Row
@@ -212,7 +212,7 @@ class Runner:
         )
         gap = gap_writer.create_gap(gap_id=gap_id, name=name, initial_round=round_obj)
 
-        from refine_shared.paths import relative_gap_path
+        from refine_server.paths import relative_gap_path
         with db.transaction(self._conn):
             self._conn.execute(
                 "INSERT INTO gaps_index "

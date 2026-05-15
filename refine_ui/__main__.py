@@ -11,7 +11,7 @@ import os
 import signal
 import sys
 
-from refine_shared import config
+from refine_server import config
 
 from . import runtime
 from .server import run

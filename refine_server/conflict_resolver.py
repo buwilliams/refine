@@ -23,7 +23,7 @@ import threading
 import time
 from pathlib import Path
 
-from refine_shared import db
+from refine_server import db
 
 from . import agent_cli, git_ops
 from .chat_mgr import _chat_env
