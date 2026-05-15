@@ -6,9 +6,10 @@ Refine turns software gaps (features and bugs) into verified software
 through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap. New Gaps land in
-**backlog**, where they sit idle until someone promotes them to
-**todo**. From there refine launches the configured agent CLI in a git
-worktree to close it; a human reviews the diff and the live behavior;
+**backlog**, then move to **todo** either when someone promotes them or when
+the Settings auto-promote rule fires (default: 1 hour). From there refine
+launches the configured agent CLI in a git worktree to close it; a human
+reviews the diff and the live behavior;
 only after that review does **verify** merge the work to the
 configured target branch and push. Gaps move
 `backlog → todo → in-progress → review → done`, with `failed` and

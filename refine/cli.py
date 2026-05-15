@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import socket
 import subprocess
@@ -30,6 +31,8 @@ from refine_shared import config, project_registry
 
 
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
+_LOGIN_PATH_CACHE: str | None = None
+_LOGIN_PATH_RESOLVED = False
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -303,11 +306,12 @@ def _write_and_enable_units(
                     f"Use --force to overwrite, or rename one of the checkouts."
                 )
 
-    uv = shutil.which("uv")
+    uv = _find_host_command("uv")
     if uv is None:
         raise _InitError(
-            "could not find `uv` on PATH; install it before running `refine init` "
-            "(the systemd units need an absolute path to invoke it)."
+            "could not find `uv` on PATH or the login-shell PATH; install it "
+            "before running `refine init` (the systemd units need an absolute "
+            "path to invoke it)."
         )
 
     runner_body = (
@@ -707,6 +711,45 @@ def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
 
 def _web_unit_name(runner_unit: str) -> str:
     return f"{runner_unit}-web"
+
+
+def _find_host_command(name: str) -> str | None:
+    """Resolve a host command using the current PATH, then the user's login PATH."""
+    direct = shutil.which(name)
+    if direct:
+        return direct
+    login_path = _user_login_path()
+    if login_path:
+        return shutil.which(name, path=login_path)
+    return None
+
+
+def _user_login_path() -> str | None:
+    """Return the PATH an interactive login shell sees.
+
+    systemd --user services often run with a minimal PATH that misses uv
+    installs in ~/.local/bin, ~/.cargo/bin, asdf/mise shims, Homebrew, etc.
+    Project setup may run inside the host-native web service, so resolving uv
+    must match the operator's terminal rather than systemd's stripped env.
+    """
+    global _LOGIN_PATH_CACHE, _LOGIN_PATH_RESOLVED
+    if _LOGIN_PATH_RESOLVED:
+        return _LOGIN_PATH_CACHE
+    _LOGIN_PATH_RESOLVED = True
+    shell = os.environ.get("SHELL") or "/bin/bash"
+    for flag in ("-lic", "-lc"):
+        try:
+            out = subprocess.run(
+                [shell, flag, 'printf %s "$PATH"'],
+                capture_output=True, text=True, timeout=5,
+            )
+        except Exception:
+            continue
+        path = (out.stdout or "").strip()
+        if out.returncode == 0 and path:
+            _LOGIN_PATH_CACHE = path
+            break
+    return _LOGIN_PATH_CACHE
 
 
 def _ensure_host_units_installed(clone: Path, cfg: "config.Config", runner_unit: str) -> None:

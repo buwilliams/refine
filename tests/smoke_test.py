@@ -208,17 +208,33 @@ def main() -> int:
     (unit_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
     (unit_clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
     unit_client = tmp / "unit-client"
+    fake_uv_bin = tmp / "login-bin"
+    fake_uv_bin.mkdir()
+    fake_uv = fake_uv_bin / "uv"
+    fake_uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_uv.chmod(0o755)
     old_systemd_dir = refine_cli.SYSTEMD_USER_DIR
     old_systemctl = refine_cli._systemctl
+    old_which = refine_cli.shutil.which
+    old_login_path = refine_cli._user_login_path
     systemctl_calls: list[tuple[str, ...]] = []
 
     def fake_systemctl(*args: str) -> tuple[int, str]:
         systemctl_calls.append(args)
         return 0, ""
 
+    def fake_which(name: str, path: str | None = None) -> str | None:
+        if name == "uv" and path == str(fake_uv_bin):
+            return str(fake_uv)
+        if name == "uv":
+            return None
+        return old_which(name, path=path)
+
     try:
         refine_cli.SYSTEMD_USER_DIR = tmp / "systemd-user"
         refine_cli._systemctl = fake_systemctl
+        refine_cli.shutil.which = fake_which
+        refine_cli._user_login_path = lambda: str(fake_uv_bin)
         unit_boot = bootstrap_client_repo(
             unit_client,
             clone_dir=unit_clone,
@@ -231,12 +247,15 @@ def main() -> int:
     finally:
         refine_cli.SYSTEMD_USER_DIR = old_systemd_dir
         refine_cli._systemctl = old_systemctl
+        refine_cli.shutil.which = old_which
+        refine_cli._user_login_path = old_login_path
     runner_unit = Path(unit_boot["unit_path"])
     web_unit = Path(unit_boot["web_unit_path"])
     assert runner_unit.is_file()
     assert web_unit.is_file()
     unit_text = runner_unit.read_text(encoding="utf-8") + web_unit.read_text(encoding="utf-8")
-    assert "ExecStart=" in unit_text and " run refine web" in unit_text
+    assert f"ExecStart={fake_uv} run refine runner" in unit_text
+    assert f"ExecStart={fake_uv} run refine web" in unit_text
     assert "docker" not in unit_text.lower()
     assert ("enable", "refine-unit-clone") in systemctl_calls
     assert ("enable", "refine-unit-clone-web") in systemctl_calls
