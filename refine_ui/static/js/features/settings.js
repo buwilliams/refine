@@ -131,7 +131,6 @@ function drawSettings(s, diag, reps, feats) {
     { slug: "reporters",    label: "Reporters" },
     { slug: "runtime",      label: "Runtime" },
     { slug: "cli",          label: "AI Provider" },
-    { slug: "target-app",   label: "Target App" },
     { slug: "diagnostics",  label: "Diagnostics" },
   ];
   const activeSlug = readSettingsTab(tabs);
@@ -274,7 +273,7 @@ function drawSettings(s, diag, reps, feats) {
       </p>
     </div>`)}
 
-    ${pane("target-app", `
+    ${pane("project", `
     <div class="card">
       <h3>Current status</h3>
       <div id="target-app-status-block" class="muted">Loading…</div>
@@ -571,7 +570,7 @@ function drawSettings(s, diag, reps, feats) {
     catch (e) { toast(e.message, "error"); }
   });
 
-  // --- Target application tab ----------------------------------------------
+  // --- Target application controls on the Project tab -----------------------
   $("#s-save-target")?.addEventListener("click", async () => {
     await withButtonBusy($("#s-save-target"), "Saving…", async () => {
       try {
