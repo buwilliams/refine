@@ -68,6 +68,8 @@ def project_status() -> tuple[int, dict]:
         }
     if registry_enabled:
         apps = project_registry.upsert_app(clone_dir, cfg.client_repo, make_current=True)
+    else:
+        apps = _ensure_current_app(apps, cfg.client_repo)
     return 200, {
         "attached": True,
         "apps": apps,
@@ -81,12 +83,15 @@ def project_status() -> tuple[int, dict]:
 def project_list() -> tuple[int, dict]:
     clone_dir = Path.cwd().resolve()
     current = ""
+    apps = project_registry.list_apps(clone_dir) if _project_registry_enabled(clone_dir) else []
     try:
-        current = str(config.get(reload=True).client_repo)
+        current_repo = config.get(reload=True).client_repo
+        current = str(current_repo)
+        apps = _ensure_current_app(apps, current_repo)
     except config.ConfigError:
         pass
     return 200, {
-        "apps": project_registry.list_apps(clone_dir) if _project_registry_enabled(clone_dir) else [],
+        "apps": apps,
         "current": current,
     }
 
@@ -110,7 +115,7 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
 
 
 def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
-    """Create or rebind this refine clone to a client repo path."""
+    """Create or attach a target app path and make it active."""
     raw_path = (body.get("path") or "").strip()
     if not raw_path:
         return err(400, "Enter a project path.")
@@ -184,8 +189,8 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "volume_root": str(cfg.volume_root),
         "config_path": str(cfg.config_path),
         "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
-        "env_path": str(result["env_path"]) if result.get("env_path") else "",
         "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
+        "web_unit_path": str(result["web_unit_path"]) if result.get("web_unit_path") else "",
         "git_initialized": bool(result.get("git_initialized")),
         "config_created": bool(result.get("config_created")),
         "apps": project_registry.list_apps(clone_dir),
@@ -197,6 +202,22 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
 
 def _project_registry_enabled(clone_dir: Path) -> bool:
     return (clone_dir / "pyproject.toml").is_file() and (clone_dir / "refine" / "cli.py").is_file()
+
+
+def _ensure_current_app(apps: list[dict[str, str]], client_repo: Path) -> list[dict[str, str]]:
+    """Always include the active app, even when the clone-local registry is unavailable."""
+    current = str(client_repo.resolve())
+    if any(app.get("path") == current for app in apps):
+        return apps
+    return [
+        *apps,
+        {
+            "name": client_repo.name or current,
+            "path": current,
+            "added_at": "",
+            "last_used_at": "",
+        },
+    ]
 
 
 class _SwitchBlocked(Exception):
@@ -213,7 +234,7 @@ def _current_client_repo() -> Path | None:
 
 
 def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
-    """Stop active agents and leave the current client repo clean before rebind."""
+    """Stop active agents and leave the current target app clean before switching."""
     from refine.cli import _ipc_ping, _systemctl
 
     warnings: list[str] = []

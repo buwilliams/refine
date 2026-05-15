@@ -9,7 +9,7 @@ __pycache__/
 build/
 dist/
 
-# Per-clone refine binding (links this refine source dir to a client repo).
+# Per-checkout refine binding (links this refine source dir to a target app).
 # Created by `refine init`; host-specific; do not commit.
 .refine-binding
 .refine-apps.json
@@ -18,7 +18,6 @@ dist/
 /run/
 
 # Local volume root if anyone tries refine against this repo itself
-/refine-data/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

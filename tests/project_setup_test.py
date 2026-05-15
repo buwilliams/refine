@@ -106,7 +106,7 @@ def main() -> int:
         assert (client / ".git").exists()
         assert (client / ".refine" / "refine.toml").is_file()
         assert (clone / ".refine-binding").is_file()
-        assert (clone / ".env").is_file()
+        assert not (clone / ".refine-current").exists()
         print("[ok] project attach creates repo + refine init artifacts")
 
         status, snap = get_json("/api/project/status")
@@ -135,6 +135,7 @@ def main() -> int:
         assert switched["client_repo"] == str(existing)
         assert switched["git_initialized"] is True
         assert switched["config_created"] is False
+        assert not (clone / ".refine-current").exists()
         assert "# sentinel: keep me" in cfg_path.read_text(encoding="utf-8")
         assert len(switched["apps"]) == 2
         dirty = subprocess.run(

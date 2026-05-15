@@ -726,10 +726,9 @@ class Runner:
         """Probe the configured health URL from the host.
 
         Runs in the runner process so `localhost` and 127.0.0.1 in the
-        URL resolve to the host the target app is bound on, not the
-        webapp's Docker container. The caller supplies the URL (the
-        webapp reads it from the same SQLite settings table either
-        way; passing it in keeps the handler stateless).
+        URL resolve to the host where the target app is bound. The caller
+        supplies the URL (the webapp reads it from the same SQLite settings
+        table either way; passing it in keeps the handler stateless).
         """
         url = (params.get("url") or "").strip()
         timeout = float(params.get("timeout") or 5.0)

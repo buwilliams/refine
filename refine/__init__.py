@@ -7,5 +7,5 @@ Provides `refine init`, `refine start`, `refine stop`, `refine status`,
 Components live in the sibling packages:
 - refine_shared: storage + IPC types + config + friendly summaries
 - refine_runner: host-native daemon
-- refine_web:    Dockerized webapp
+- refine_web:    host-native webapp
 """

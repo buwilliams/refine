@@ -1,4 +1,4 @@
-"""IPC protocol between refine-web (Docker) and refine-runner (host).
+"""IPC protocol between refine-web and refine-runner.
 
 Wire format: line-delimited JSON over Unix domain socket. Each request is one
 JSON object on its own line; each response is one JSON object on its own line.

@@ -160,7 +160,7 @@ function drawSettings(s, diag, reps, feats) {
         </p>`}
       <div class="form-row"><label>Known apps
         <span class="muted small">— add an existing repo or a new directory, then switch between apps here.</span></label>
-        <select id="s-project-select" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>
+        <select id="s-project-select" ${projectApps.length ? "" : "disabled"}>
           ${appOptions || `<option value="">No apps yet</option>`}
         </select></div>
       <div class="actions">

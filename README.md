@@ -44,7 +44,7 @@ auth, so operators rarely need to think about either.
 
 ## Components
 
-- **`refine-web`** — Python webapp in Docker (UI + JSON API + SSE).
+- **`refine-web`** — host-native Python webapp (UI + JSON API + SSE).
 - **`refine-runner`** — host-native daemon that owns CLI subprocesses, git
   operations, and `gap.json` writes. Runs natively so it inherits the host's
   agent auth, SSH keys, and git config. Agent subprocesses additionally strip
@@ -52,8 +52,9 @@ auth, so operators rarely need to think about either.
   `CLAUDE_API_KEY`, and `OPENAI_API_KEY`, then resolve CLIs via the user's
   interactive login-shell `PATH`, so they use `claude login` / `codex login`
   credentials instead of a service manager's stripped or injected env.
-- They communicate over a Unix-domain socket inside the volume root, which is
-  bind-mounted into the webapp container.
+- They communicate over a Unix-domain socket inside the active app's `.refine/`
+  directory. Both processes run on the host, so there is no container path
+  mapping or duplicated environment to manage.
 
 ## Layout
 
@@ -62,30 +63,28 @@ refine/
 ├── refine/               # the `refine` CLI: init, start, stop, status, runner, web, doctor
 ├── refine_shared/        # storage, IPC, friendly summaries, config loader
 ├── refine_runner/        # host-native daemon (subprocess + git + gap.json owner)
-├── refine_web/           # Dockerized webapp + static HTML/JS
-├── Dockerfile            # builds refine-web
-├── docker-compose.yml    # runs refine-web (bind mounts target .refine from .env)
+├── refine_web/           # host-native webapp + static HTML/JS
 ├── pyproject.toml        # makes `refine` a real console script
 └── spec.md               # the design document
 ```
 
 ## Quick start
 
-### 1. Clone refine
+### 1. Clone refine once on the host
 
 ```bash
-git clone https://github.com/buwilliams/refine.git /opt/refine-acme
+git clone https://github.com/buwilliams/refine.git /opt/refine
 ```
 
-One clone can know about multiple apps and switch between them from
-Settings → Project. Only one app is active at a time. You can still use
-multiple refine clones if you want separate systemd unit names, ports, or
-operational boundaries.
+One checkout can know about multiple apps and switch between them from
+Settings → Project. Only one app is active at a time, but the same refine
+instance owns the runner, web UI, app registry, and active-app binding for all
+target apps on that host.
 
-### 2. Bind the clone to the client repo
+### 2. Add the first target app
 
 ```bash
-cd /opt/refine-acme
+cd /opt/refine
 uv run refine init /srv/clients/acme-app
 ```
 
@@ -93,16 +92,15 @@ This:
 - Creates `/srv/clients/acme-app/.refine/refine.toml` + `run/` + `gaps/` +
   `.gitignore` (the client's volume root — hidden by convention, since it's
   system-utility state, not project source).
-- Writes `/opt/refine-acme/.refine-binding` so future commands from
-  `/opt/refine-acme` target this client.
-- Writes `/opt/refine-acme/.refine-apps.json` with the clone's known apps list
+- Writes `/opt/refine/.refine-binding` so future commands from
+  `/opt/refine` target the active app.
+- Writes `/opt/refine/.refine-apps.json` with the known apps list
   used by Settings → Project.
-- Writes `/opt/refine-acme/.env` so `docker compose` reads the bind-mount path.
-- Installs and enables `~/.config/systemd/user/refine-acme.service` so the
-  runner is managed by systemd (survives terminal close; one unit per clone,
-  named after the clone basename).
+- Installs and enables `~/.config/systemd/user/refine.service` and
+  `~/.config/systemd/user/refine-web.service` so the runner and webapp are
+  managed by systemd and survive terminal close.
 
-Commit the new files in the client repo when you're ready:
+Commit the new files in the target app repo when you're ready:
 
 ```bash
 cd /srv/clients/acme-app
@@ -110,20 +108,20 @@ git add .refine/refine.toml .refine/.gitignore
 git commit -m "add refine"
 ```
 
-You can also skip this CLI init step for a new clone:
+You can also skip this CLI init step for a new checkout:
 
 ```bash
-cd /opt/refine-acme
+cd /opt/refine
 uv run refine start
 ```
 
-When no project is attached, refine starts a host-native setup UI instead of
-Docker compose. Open the shown URL, enter an existing app path or a new
+When no project is attached, refine starts a temporary host-native setup UI.
+Open the shown URL, enter an existing app path or a new
 directory path, and refine will create missing directories, run `git init`
-when needed, write the same `.refine/` files as `refine init`, bind the clone,
-and start the runner. If the app already has `.refine/refine.toml`, refine
+when needed, write the same `.refine/` files as `refine init`, bind the
+checkout, and start the runner. If the app already has `.refine/refine.toml`, refine
 preserves it and only makes sure required support directories exist.
-After that first attach, Settings → Project keeps a clone-local known-apps
+After that first attach, Settings → Project keeps a checkout-local known-apps
 list. Add another app from the same modal, remove entries from the list without
 deleting project files, or switch the active app. Switching stops the runner,
 commits pending `.refine/` state when needed, refuses to proceed if the current
@@ -133,7 +131,7 @@ app has other uncommitted changes, then performs the same binding work as
 ### 3. Run from the refine source dir
 
 ```bash
-cd /opt/refine-acme
+cd /opt/refine
 
 claude login                       # or: codex login / gemini auth login
 uv run refine start                # webapp + runner, one command
@@ -143,13 +141,16 @@ uv run refine stop                 # tear it all down
 
 Open <http://localhost:8080>.
 
-If a project is already attached, `refine start` rebuilds the web image if any
-source file is newer than the image, brings the webapp up with
-`docker compose up -d`, starts the runner via
-`systemctl --user start refine-acme`, and waits for both to be reachable before
-returning. If no project is attached yet, it serves the setup UI directly from
-the host so it can create or attach app directories. Runner logs go to
-journald — tail with `journalctl --user -u refine-acme -f`.
+If a project is already attached, `refine start` starts `refine-web.service`
+and `refine.service`, then waits for the HTTP server and runner socket to be
+reachable before returning. If no project is attached yet, it serves the setup
+UI directly from the host so it can create or attach app directories. Logs go
+to journald:
+
+```bash
+journalctl --user -u refine -f       # runner
+journalctl --user -u refine-web -f   # webapp
+```
 
 To survive logout / reboot, run once:
 
@@ -157,13 +158,12 @@ To survive logout / reboot, run once:
 loginctl enable-linger $USER       # systemd keeps user units alive across logout
 ```
 
-UI edits are picked up live — `refine_web/static/` is bind-mounted into
-the container, so changes to `index.html`, `js/`, or `css/` are visible
-on the next browser refresh without rebuilding the image.
+UI edits are picked up live from the checkout. Changes to
+`refine_web/static/index.html`, `js/`, or `css/` are visible on the next
+browser refresh; Python changes require `uv run refine restart`.
 
-To work on a different app from the same clone, use Settings → Project. Each
-clone tracks its own known-app list, active binding, and systemd unit (named
-after the clone's directory basename).
+To work on a different app, use Settings → Project. The same refine instance
+updates its known-app list and active binding.
 
 ### Switching / Re-binding
 
@@ -176,28 +176,28 @@ in the selected app, and then performs the same binding work as
 The CLI can still overwrite the binding in place:
 
 ```bash
-cd /opt/refine-acme
+cd /opt/refine
 uv run refine init /srv/clients/other-client --force
 ```
 
 `--force` is required because a binding already exists. This CLI path is an
 explicit re-initialization path: if the target app already has
 `.refine/refine.toml`, it may be overwritten. The unit file is rewritten in
-place; the clone's directory name — and thus its unit name — does not change.
+place; the checkout's directory name — and thus its unit names — does not change.
 
-Or wipe the clone's binding first and `init` fresh:
+Or wipe the checkout's binding first and `init` fresh:
 
 ```bash
-cd /opt/refine-acme
-uv run refine reset                                # stop services, disable unit, remove binding + .env + known-app list
-uv run refine init /srv/clients/other-client       # bind to the new client
+cd /opt/refine
+uv run refine reset                                # stop services, disable units, remove binding + known-app list
+uv run refine init /srv/clients/other-client       # attach the new app
 
 # To also delete the old client's .refine/ data (gap.json files, sqlite index):
 uv run refine reset --purge -y
 ```
 
-`reset` never touches the client repo's source tree, and without `--purge`
-the previous client's `.refine/` directory stays intact — so you can rebind
+`reset` never touches the target app's source tree, and without `--purge`
+the previous app's `.refine/` directory stays intact — so you can rebind
 to that path later and pick up where you left off.
 
 ## How it talks to itself
@@ -205,9 +205,9 @@ to that path later and pick up where you left off.
 ```
 ┌─────────────────┐                ┌─────────────────────┐
 │  refine-web     │ ── IPC ──────► │  refine-runner      │
-│  (Docker)       │  (Unix sock)   │  (host process)     │
+│  (host process) │  (Unix sock)   │  (host process)     │
 │                 │ ◄── SQLite ──► │                     │
-└─────────────────┘   (bind mount) └─────────────────────┘
+└─────────────────┘                └─────────────────────┘
         ▲                                    │
         │                                    ▼
         └─── reads gap.json ─────────► writes gap.json (sole writer)
@@ -267,14 +267,14 @@ the UI's Settings page.
 
 | Command                       | What it does                                                                                                |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------|
-| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, bind this clone, install + enable a systemd --user unit.    |
-| `uv run refine reset`         | Undo `init` in this clone: stop services, disable + remove the systemd unit, delete `.refine-binding`, `.refine-apps.json`, and `.env`. Add `--purge` (+ `-y` to skip prompt) to also delete the bound client's `.refine/` data. |
-| `uv run refine start`         | If initialized: rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy. If no project is attached yet: start the host-native setup UI. |
-| `uv run refine stop`          | `systemctl --user stop <unit>` + `docker compose down`.                                                     |
-| `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands. Same `--rebuild` / `--no-rebuild` flags as `start`. |
+| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, make the app active, install + enable runner and web systemd --user units. |
+| `uv run refine reset`         | Undo `init` in this checkout: stop services, disable + remove the systemd units, delete `.refine-binding` and `.refine-apps.json` (plus legacy Docker artifacts if present). Add `--purge` (+ `-y` to skip prompt) to also delete the active app's `.refine/` data. |
+| `uv run refine start`         | If initialized: `systemctl --user start <web-unit>` + `systemctl --user start <runner-unit>` → wait for HTTP + runner socket. If no project is attached yet: start the host-native setup UI. |
+| `uv run refine stop`          | `systemctl --user stop <runner-unit>` + `systemctl --user stop <web-unit>`.                                  |
+| `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands.                       |
 | `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |
 | `uv run refine runner`        | Run the runner in the foreground (what the systemd unit invokes).                                           |
-| `uv run refine web`           | Start the webapp in-process (rarely used directly — Docker wraps it).                                       |
+| `uv run refine web`           | Start the webapp in-process (what the systemd web unit invokes).                                            |
 | `uv run refine doctor`        | Deeper diagnostic snapshot: config, IPC, selected agent CLI, git status.                                   |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.

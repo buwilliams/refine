@@ -172,11 +172,14 @@ def main() -> int:
     print("[ok] target-app command runtime + config normalization")
 
     # --- UI project bootstrap helper ----------------------------------------
-    from refine.cli import bootstrap_client_repo
+    from refine import cli as refine_cli
+    from refine.cli import bootstrap_client_repo, _sync_bound_project_registry
     clone = tmp / "refine-clone"
     (clone / "refine").mkdir(parents=True)
     (clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
     (clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    (clone / ".env").write_text("REFINE_CLIENT_REFINE_DIR=/old/path\n", encoding="utf-8")
+    (clone / ".refine-current").symlink_to(tmp / "old-refine-data", target_is_directory=True)
     ui_client = tmp / "ui-created-client"
     boot = bootstrap_client_repo(
         ui_client,
@@ -194,10 +197,64 @@ def main() -> int:
     assert (ui_client / ".refine" / "gaps").is_dir()
     assert (clone / ".refine-binding").read_text(encoding="utf-8").strip().endswith(str(ui_client))
     assert str(ui_client) in (clone / ".refine-apps.json").read_text(encoding="utf-8")
-    assert f"REFINE_CLIENT_REFINE_DIR={ui_client / '.refine'}" in (clone / ".env").read_text(encoding="utf-8")
+    assert not (clone / ".env").exists()
+    assert not (clone / ".refine-current").exists()
     assert boot["git_initialized"] is True
     assert boot["config_created"] is True
-    print("[ok] UI project bootstrap creates git repo + refine binding")
+    print("[ok] UI project bootstrap creates git repo + host-native refine binding")
+
+    unit_clone = tmp / "refine-unit-clone"
+    (unit_clone / "refine").mkdir(parents=True)
+    (unit_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
+    (unit_clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    unit_client = tmp / "unit-client"
+    old_systemd_dir = refine_cli.SYSTEMD_USER_DIR
+    old_systemctl = refine_cli._systemctl
+    systemctl_calls: list[tuple[str, ...]] = []
+
+    def fake_systemctl(*args: str) -> tuple[int, str]:
+        systemctl_calls.append(args)
+        return 0, ""
+
+    try:
+        refine_cli.SYSTEMD_USER_DIR = tmp / "systemd-user"
+        refine_cli._systemctl = fake_systemctl
+        unit_boot = bootstrap_client_repo(
+            unit_client,
+            clone_dir=unit_clone,
+            force=True,
+            create=True,
+            init_git=True,
+            reuse_existing_config=True,
+            install_unit=True,
+        )
+    finally:
+        refine_cli.SYSTEMD_USER_DIR = old_systemd_dir
+        refine_cli._systemctl = old_systemctl
+    runner_unit = Path(unit_boot["unit_path"])
+    web_unit = Path(unit_boot["web_unit_path"])
+    assert runner_unit.is_file()
+    assert web_unit.is_file()
+    unit_text = runner_unit.read_text(encoding="utf-8") + web_unit.read_text(encoding="utf-8")
+    assert "ExecStart=" in unit_text and " run refine web" in unit_text
+    assert "docker" not in unit_text.lower()
+    assert ("enable", "refine-unit-clone") in systemctl_calls
+    assert ("enable", "refine-unit-clone-web") in systemctl_calls
+    print("[ok] refine init writes host-native runner + web systemd units")
+
+    old_clone = tmp / "old-refine-clone"
+    (old_clone / "refine").mkdir(parents=True)
+    (old_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
+    (old_clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    old_client = tmp / "old-single-app-client"
+    old_client.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=old_client, check=True)
+    old_cfg_path = config.write_defaults(old_client / ".refine")
+    config.write_binding(old_clone, old_client)
+    assert not (old_clone / ".refine-apps.json").exists()
+    _sync_bound_project_registry(old_clone, config.Config.load(old_cfg_path))
+    assert str(old_client) in (old_clone / ".refine-apps.json").read_text(encoding="utf-8")
+    print("[ok] old single-app binding migrates into known-app registry")
 
     # --- Reporters -----------------------------------------------------------
     jane = reporters.add(conn, "Jane Doe")

@@ -2,24 +2,23 @@
 
 Subcommands:
 - init    — write refine.toml + run/ + gaps/ in a chosen volume root,
-            then write + enable a systemd --user unit for the runner.
-- reset   — undo `init` in this clone (stop services, disable unit,
-            remove binding); optional --purge also deletes the client's
-            .refine/ data so you can re-`init` against a different repo.
-- start   — bring up runner (systemd) + webapp (docker compose).
+            then write + enable systemd --user units for the runner + webapp.
+- reset   — undo `init` in this checkout (stop services, disable units,
+            remove binding); optional --purge also deletes the active app's
+            .refine/ data so you can attach a different app.
+- start   — bring up runner + webapp as host-native systemd services.
 - stop    — stop runner + webapp.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
 - runner  — start the runner daemon in-process (used by the systemd unit
             and for interactive debugging; not the daily verb).
-- web     — start the webapp (rarely invoked directly; Docker wraps it).
+- web     — start the webapp in-process (used by the systemd unit).
 - doctor  — deeper diagnostic snapshot (config, IPC, agent CLI, git).
 """
 from __future__ import annotations
 
 import argparse
 import json
-import os
 import shutil
 import socket
 import subprocess
@@ -31,7 +30,6 @@ from refine_shared import config, project_registry
 
 
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
-COMPOSE_SERVICE = "refine-web"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -44,16 +42,17 @@ def main(argv: list[str] | None = None) -> int:
 
     p_init = sub.add_parser(
         "init",
-        help="Initialize refine for a client repo and bind this refine clone to it.",
+        help="Initialize/add a target app and make it active.",
         description=(
-            "Bootstraps a client repo: creates <client>/.refine/refine.toml + "
-            "run/ + gaps/, writes a .refine-binding + .env, and registers a "
-            "systemd --user unit so the runner survives terminal close."
+            "Bootstraps a target app: creates <app>/.refine/refine.toml + "
+            "run/ + gaps/, writes the active-app binding, records the app in "
+            "the known-apps list, and registers systemd --user units for the "
+            "host-native runner and web server."
         ),
     )
     p_init.add_argument(
         "path", nargs="?", default=None,
-        help="Path to the client repo. Defaults to cwd (back-compat).",
+        help="Path to the target app repo. Defaults to cwd (back-compat).",
     )
     p_init.add_argument("--force", action="store_true",
                         help="Overwrite an existing refine.toml / .refine-binding / unit file.")
@@ -61,17 +60,17 @@ def main(argv: list[str] | None = None) -> int:
 
     p_reset = sub.add_parser(
         "reset",
-        help="Undo `refine init` in this clone so it can be pointed at a different repo.",
+        help="Undo `refine init` in this checkout so it can attach a different app.",
         description=(
-            "Stops the runner + webapp, removes the .refine-binding and .env "
-            "files from this clone, disables + removes the systemd --user "
-            "unit, and (with --purge) wipes the bound client repo's .refine/ "
-            "directory. The client repo itself is never touched."
+            "Stops the runner + webapp, removes the .refine-binding and "
+            ".refine-apps.json files from this checkout, disables + removes "
+            "the systemd --user units, and (with --purge) wipes the active "
+            "app's .refine/ directory. The app source tree is never touched."
         ),
     )
     p_reset.add_argument(
         "--purge", action="store_true",
-        help="Also delete the bound client repo's .refine/ directory "
+        help="Also delete the active target app's .refine/ directory "
              "(gap.json files, sqlite index, run/, .gitignore). DATA LOSS.",
     )
     p_reset.add_argument(
@@ -84,18 +83,9 @@ def main(argv: list[str] | None = None) -> int:
         "start",
         help="Start runner + webapp.",
         description=(
-            "Rebuilds the web image if source files are newer than the image, "
-            "brings the webapp up via docker compose, starts the runner via "
-            "systemd --user, and prints a status block."
+            "Starts the host-native webapp and runner via systemd --user, "
+            "then prints a status block."
         ),
-    )
-    p_start.add_argument(
-        "--rebuild", action="store_true",
-        help="Force a `docker compose build` before starting.",
-    )
-    p_start.add_argument(
-        "--no-rebuild", action="store_true",
-        help="Skip the rebuild staleness check entirely.",
     )
     p_start.set_defaults(fn=cmd_start)
 
@@ -103,17 +93,8 @@ def main(argv: list[str] | None = None) -> int:
         "restart",
         help="Stop runner + webapp, then start them again.",
         description=(
-            "Equivalent to `refine stop && refine start`. Accepts the same "
-            "rebuild flags as `start` for the post-stop bring-up."
+            "Equivalent to `refine stop && refine start`."
         ),
-    )
-    p_restart.add_argument(
-        "--rebuild", action="store_true",
-        help="Force a `docker compose build` between stop and start.",
-    )
-    p_restart.add_argument(
-        "--no-rebuild", action="store_true",
-        help="Skip the rebuild staleness check on the post-stop start.",
     )
     p_restart.set_defaults(fn=cmd_restart)
 
@@ -137,7 +118,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_runner.set_defaults(fn=cmd_runner_foreground)
 
-    p_web = sub.add_parser("web", help="Start the webapp (in-process; Docker wraps it).")
+    p_web = sub.add_parser("web", help="Start the webapp in the foreground.")
     p_web.set_defaults(fn=cmd_web)
 
     p_doctor = sub.add_parser("doctor", help="Print a diagnostic snapshot.")
@@ -170,16 +151,17 @@ def cmd_init(args: argparse.Namespace) -> int:
     cfg_path = result["config_path"]
     target = result["volume_root"]
     binding_written = result.get("binding_path")
-    env_written = result.get("env_path")
     unit_path = result.get("unit_path")
+    web_unit_path = result.get("web_unit_path")
     print(f"Wrote {cfg_path}")
     print(f"Created directories: {target}/run, {target}/gaps")
     if binding_written:
-        print(f"Bound this refine source dir → {client_repo}")
+        print(f"Set active target app → {client_repo}")
         print(f"Wrote {binding_written}")
-        print(f"Wrote {env_written}")
     if unit_path:
-        print(f"Installed systemd unit: {unit_path}")
+        print(f"Installed runner unit: {unit_path}")
+    if web_unit_path:
+        print(f"Installed web unit: {web_unit_path}")
     print()
     print("Next steps:")
     if binding_written:
@@ -194,8 +176,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"  refine doctor                 # sanity check the config")
         print()
         print("Note: full refine start/stop/status orchestration requires running")
-        print("`refine init` from inside a refine source dir (so docker compose and")
-        print("the systemd unit can be wired up).")
+        print("`refine init` from inside a refine source dir so the systemd user")
+        print("units can be wired up.")
     return 0
 
 
@@ -217,8 +199,8 @@ def bootstrap_client_repo(
     init_git: bool,
     reuse_existing_config: bool,
     install_unit: bool,
-) -> dict[str, Path | bool]:
-    """Create/bind a client repo using the same files as `refine init`.
+) -> dict[str, Path | bool | None]:
+    """Create or attach a target app using the same files as `refine init`.
 
     `refine init` calls this with strict preconditions. The web UI calls it
     with `create=True` and `init_git=True` so a first-run user can point refine
@@ -262,8 +244,8 @@ def bootstrap_client_repo(
         config_created = True
 
     binding_written = None
-    env_written = None
     unit_path = None
+    web_unit_path = None
     if _is_refine_source_dir(clone_dir):
         binding_path = clone_dir / config.BINDING_FILENAME
         if binding_path.exists() and not force:
@@ -271,14 +253,11 @@ def bootstrap_client_repo(
                 f"{binding_path} already exists (use --force to rebind)"
             )
         binding_written = config.write_binding(clone_dir, client_repo)
-        env_written = clone_dir / ".env"
-        env_written.write_text(
-            f"# Auto-generated by `refine init`. Read by docker-compose.\n"
-            f"REFINE_CLIENT_REFINE_DIR={target}\n",
-            encoding="utf-8",
-        )
+        _remove_legacy_docker_artifacts(clone_dir)
         if install_unit:
-            unit_path = _write_and_enable_unit(clone_dir, client_repo, force=force)
+            unit_path, web_unit_path = _write_and_enable_units(
+                clone_dir, client_repo, force=force
+            )
         project_registry.upsert_app(clone_dir, client_repo, make_current=True)
 
     return {
@@ -286,41 +265,52 @@ def bootstrap_client_repo(
         "volume_root": target,
         "config_path": cfg_path,
         "binding_path": binding_written,
-        "env_path": env_written,
         "unit_path": unit_path,
+        "web_unit_path": web_unit_path,
         "git_initialized": git_initialized,
         "config_created": config_created,
     }
 
 
-def _write_and_enable_unit(clone_dir: Path, client_repo: Path, *, force: bool) -> Path:
-    """Write ~/.config/systemd/user/<unit>.service, daemon-reload, enable.
+def _write_and_enable_units(
+    clone_dir: Path,
+    client_repo: Path,
+    *,
+    force: bool,
+    runner_unit_name: str | None = None,
+) -> tuple[Path, Path]:
+    """Write runner + web systemd user units, daemon-reload, and enable both.
 
-    Refuses if a unit by the same name already points at a different clone,
+    Refuses if a unit by the same name already points at a different checkout,
     unless --force is given (in which case it's overwritten).
     """
-    unit_name = config.unit_name_for(clone_dir)
-    unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
+    runner_unit = runner_unit_name or config.unit_name_for(clone_dir)
+    web_unit = _web_unit_name(runner_unit)
+    runner_unit_path = SYSTEMD_USER_DIR / f"{runner_unit}.service"
+    web_unit_path = SYSTEMD_USER_DIR / f"{web_unit}.service"
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
 
-    if unit_path.exists() and not force:
-        existing_wd = _grep_first(unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
-        if existing_wd and existing_wd != str(clone_dir):
-            raise _InitError(
-                f"systemd unit {unit_name} already exists for a different clone:\n"
-                f"  existing WorkingDirectory: {existing_wd}\n"
-                f"  this clone:                {clone_dir}\n"
-                f"Use --force to overwrite, or rename one of the clones."
-            )
+    if not force:
+        for unit_name, unit_path in ((runner_unit, runner_unit_path), (web_unit, web_unit_path)):
+            if not unit_path.exists():
+                continue
+            existing_wd = _grep_first(unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
+            if existing_wd and existing_wd != str(clone_dir):
+                raise _InitError(
+                    f"systemd unit {unit_name} already exists for a different checkout:\n"
+                    f"  existing WorkingDirectory: {existing_wd}\n"
+                    f"  this checkout:             {clone_dir}\n"
+                    f"Use --force to overwrite, or rename one of the checkouts."
+                )
 
     uv = shutil.which("uv")
     if uv is None:
         raise _InitError(
             "could not find `uv` on PATH; install it before running `refine init` "
-            "(the systemd unit needs an absolute path to invoke it)."
+            "(the systemd units need an absolute path to invoke it)."
         )
 
-    unit_body = (
+    runner_body = (
         "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
         "# `refine init --force` to regenerate.\n"
         "[Unit]\n"
@@ -348,16 +338,36 @@ def _write_and_enable_unit(clone_dir: Path, client_repo: Path, *, force: bool) -
         "[Install]\n"
         "WantedBy=default.target\n"
     )
-    unit_path.write_text(unit_body, encoding="utf-8")
+    web_body = (
+        "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
+        "# `refine init --force` to regenerate.\n"
+        "[Unit]\n"
+        f"Description=refine web — {clone_dir} → {client_repo}\n"
+        "After=network.target\n"
+        "\n"
+        "[Service]\n"
+        "Type=simple\n"
+        f"WorkingDirectory={clone_dir}\n"
+        f"ExecStart={uv} run refine web\n"
+        "Restart=on-failure\n"
+        "RestartSec=2s\n"
+        "TimeoutStopSec=30s\n"
+        "\n"
+        "[Install]\n"
+        "WantedBy=default.target\n"
+    )
+    runner_unit_path.write_text(runner_body, encoding="utf-8")
+    web_unit_path.write_text(web_body, encoding="utf-8")
 
     rc, out = _systemctl("daemon-reload")
     if rc != 0:
         raise _InitError(f"systemctl --user daemon-reload failed: {out.strip()}")
-    rc, out = _systemctl("enable", unit_name)
-    if rc != 0:
-        raise _InitError(f"systemctl --user enable {unit_name} failed: {out.strip()}")
+    for unit_name in (runner_unit, web_unit):
+        rc, out = _systemctl("enable", unit_name)
+        if rc != 0:
+            raise _InitError(f"systemctl --user enable {unit_name} failed: {out.strip()}")
 
-    return unit_path
+    return runner_unit_path, web_unit_path
 
 
 def _grep_first(text: str, prefix: str) -> str | None:
@@ -381,27 +391,25 @@ def cmd_start(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
+    _sync_bound_project_registry(clone, cfg)
+    try:
+        _ensure_host_units_installed(clone, cfg, unit)
+    except _InitError as e:
+        print(f"refine start: {e}", file=sys.stderr)
+        return 1
+    web_unit = _web_unit_name(unit)
 
-    if args.rebuild:
-        rc = _docker_compose(clone, "build")
-        if rc != 0:
-            return rc
-    elif not args.no_rebuild and _image_is_stale(clone):
-        print("Web image is stale (source newer than image) — rebuilding…")
-        rc = _docker_compose(clone, "build")
-        if rc != 0:
-            return rc
-
-    print("Starting webapp (docker compose up -d)…")
-    rc = _docker_compose(clone, "up", "-d")
+    print(f"Starting webapp (systemctl --user start {web_unit})…")
+    rc, out = _systemctl("start", web_unit)
     if rc != 0:
-        return rc
+        print(f"refine start: {out.strip()}", file=sys.stderr)
+        return 1
 
     if not _wait_for_port(cfg.web_host, cfg.web_port, timeout=20.0):
         print(
             f"refine start: webapp did not start listening on "
             f"{cfg.web_host}:{cfg.web_port} within 20s. "
-            f"Check `docker compose logs {COMPOSE_SERVICE}`.",
+            f"Check `journalctl --user -u {web_unit} -n 200`.",
             file=sys.stderr,
         )
         return 1
@@ -426,31 +434,32 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
+    web_unit = _web_unit_name(unit)
 
     print(f"Stopping runner (systemctl --user stop {unit})…")
     rc, out = _systemctl("stop", unit)
     if rc != 0:
-        # Non-fatal: maybe it wasn't running. Continue to compose down.
+        # Non-fatal: maybe it wasn't running. Continue to stop the web service.
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
         if rc == 124:
             # The wrapper's own timeout fired. Most common cause: the
-            # installed unit predates `KillMode=process`, so systemd is
+            # installed runner unit predates `KillMode=process`, so systemd is
             # waiting for child processes (the target-app agent's
             # nohup'd subprocess, for example) before it considers the
             # unit stopped. Point the operator at the fix.
             print(
                 "  Hint: the unit may be waiting for nohup'd child processes "
                 "to exit. Re-run `refine init --force` to regenerate the "
-                "systemd unit with KillMode=process, then try stopping "
+                "runner unit with KillMode=process, then try stopping "
                 "again. If the runner is wedged in the meantime, force-kill "
                 f"it with `systemctl --user kill -s SIGKILL {unit}`.",
                 file=sys.stderr,
             )
 
-    print("Stopping webapp (docker compose down)…")
-    rc = _docker_compose(clone, "down")
+    print(f"Stopping webapp (systemctl --user stop {web_unit})…")
+    rc, out = _systemctl("stop", web_unit)
     if rc != 0:
-        return rc
+        print(f"  (systemctl: {out.strip()})", file=sys.stderr)
 
     print("Stopped.")
     return 0
@@ -458,8 +467,8 @@ def cmd_stop(args: argparse.Namespace) -> int:
 
 def cmd_restart(args: argparse.Namespace) -> int:
     """`refine stop && refine start` — picks up source changes the
-    running processes haven't loaded yet (runner Python code, webapp
-    image rebuilds) without forcing the operator to run two commands."""
+    running host processes haven't loaded yet without forcing the operator
+    to run two commands."""
     rc = cmd_stop(args)
     if rc != 0:
         return rc
@@ -468,15 +477,15 @@ def cmd_restart(args: argparse.Namespace) -> int:
 
 
 def cmd_reset(args: argparse.Namespace) -> int:
-    """Undo `refine init` in this clone.
+    """Undo `refine init` in this checkout.
 
-    The reverse of init: stop services, disable + remove the systemd unit,
-    delete `.refine-binding` and `.env` from the clone dir, and optionally
-    purge the client's `.refine/` directory. Leaves the client repo's
+    The reverse of init: stop services, disable + remove the systemd units,
+    delete `.refine-binding` and `.refine-apps.json` from the checkout, and
+    optionally purge the active app's `.refine/` directory. Leaves the app
     source tree untouched.
 
-    After this, the clone is fresh and can be re-`init`'d against any
-    other client repo.
+    After this, the checkout is fresh and can be attached to any other
+    target app.
     """
     cwd = Path.cwd().resolve()
     binding_path = cwd / config.BINDING_FILENAME
@@ -489,6 +498,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
         return 1
 
     unit = config.read_binding_unit(binding_path) or config.unit_name_for(cwd)
+    web_unit = _web_unit_name(unit)
     try:
         client_repo = config.read_binding(binding_path)
     except config.ConfigError:
@@ -515,44 +525,47 @@ def cmd_reset(args: argparse.Namespace) -> int:
     rc, out = _systemctl("stop", unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
-    print("Stopping webapp (docker compose down)…")
-    _docker_compose(cwd, "down")
-
-    # 2. Disable + remove the systemd unit.
-    rc, out = _systemctl("disable", unit)
+    print(f"Stopping webapp (systemctl --user stop {web_unit})…")
+    rc, out = _systemctl("stop", web_unit)
     if rc != 0:
-        # If it wasn't enabled or doesn't exist, that's fine.
-        print(f"  (systemctl disable: {out.strip()})", file=sys.stderr)
-    unit_path = SYSTEMD_USER_DIR / f"{unit}.service"
-    if unit_path.exists():
-        unit_path.unlink()
-        print(f"Removed {unit_path}")
+        print(f"  (systemctl: {out.strip()})", file=sys.stderr)
+
+    # 2. Disable + remove the systemd units.
+    removed_units = False
+    for unit_name in (unit, web_unit):
+        rc, out = _systemctl("disable", unit_name)
+        if rc != 0:
+            # If it wasn't enabled or doesn't exist, that's fine.
+            print(f"  (systemctl disable {unit_name}: {out.strip()})", file=sys.stderr)
+        unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
+        if unit_path.exists():
+            unit_path.unlink()
+            removed_units = True
+            print(f"Removed {unit_path}")
+    if removed_units:
         _systemctl("daemon-reload")
 
-    # 3. Remove binding + .env + known-app registry from the clone.
+    # 3. Remove binding + known-app registry from the checkout.
     binding_path.unlink()
     print(f"Removed {binding_path}")
-    env_path = cwd / ".env"
-    if env_path.exists():
-        env_path.unlink()
-        print(f"Removed {env_path}")
+    _remove_legacy_docker_artifacts(cwd, verbose=True)
     registry_path = project_registry.registry_path(cwd)
     if registry_path.exists():
         registry_path.unlink()
         print(f"Removed {registry_path}")
 
-    # 4. Optional: purge the client repo's .refine/ directory.
+    # 4. Optional: purge the target app's .refine/ directory.
     if args.purge and client_refine_dir and client_refine_dir.is_dir():
         shutil.rmtree(client_refine_dir)
         print(f"Removed {client_refine_dir}")
 
     print()
-    print("Reset complete. To bind this clone to a different repo:")
+    print("Reset complete. To attach a target app:")
     print(f"  cd {cwd}")
-    print(f"  uv run refine init <path/to/new-client-repo>")
+    print(f"  uv run refine init <path/to/target-app>")
     if client_refine_dir and client_refine_dir.is_dir() and not args.purge:
         print()
-        print(f"The previous client's data is preserved at:")
+        print(f"The previous app's refine data is preserved at:")
         print(f"  {client_refine_dir}")
         print("Re-running `refine init` against that path will pick it up again.")
     return 0
@@ -565,24 +578,31 @@ def cmd_status(args: argparse.Namespace) -> int:
     except config.ConfigError as e:
         print(f"refine status: {e}", file=sys.stderr)
         return 1
+    _sync_bound_project_registry(clone, cfg)
     _print_status_block(clone, unit, cfg)
     return 0
 
 
 def _print_status_block(clone: Path, unit: str, cfg: "config.Config") -> None:
+    web_unit = _web_unit_name(unit)
     web_up = _port_open(cfg.web_host, cfg.web_port)
     sock_up = _ipc_ping_quick(cfg.runner_socket)
     runner_active = _systemctl_is_active(unit)
+    web_active = _systemctl_is_active(web_unit)
 
     print()
     print(_bold("refine"))
-    print(f"  clone:    {clone}")
-    print(f"  client:   {cfg.client_repo}")
-    print(f"  web:      {_dot(web_up)} http://{_displayable_host(cfg.web_host)}:{cfg.web_port}")
+    print(f"  checkout: {clone}")
+    print(f"  app:      {cfg.client_repo}")
+    print(f"  web:      {_dot(web_active and web_up)} systemd unit `{web_unit}` "
+          f"({'active' if web_active else 'inactive'}, "
+          f"http {'reachable' if web_up else 'unreachable'} at "
+          f"http://{_displayable_host(cfg.web_host)}:{cfg.web_port})")
     print(f"  runner:   {_dot(runner_active and sock_up)} systemd unit `{unit}` "
           f"({'active' if runner_active else 'inactive'}, "
           f"socket {'reachable' if sock_up else 'unreachable'})")
     print(f"  logs:     journalctl --user -u {unit} -f")
+    print(f"  web logs: journalctl --user -u {web_unit} -f")
     print(f"  stop:     uv run refine stop")
     print()
 
@@ -615,13 +635,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print(_red("No refine configuration found."))
         print(f"  {e}")
         print()
-        print("Run `refine init` in the client repo to create one.")
+        print("Run `refine init <target-app>` from the refine checkout to create one.")
         return 1
 
     print(_section("Configuration"))
     _kv("config file",   cfg.config_path)
     _kv("volume root",   cfg.volume_root)
-    _kv("client repo",   cfg.client_repo)
+    _kv("target app",    cfg.client_repo)
     _kv("runner socket", cfg.runner_socket)
     _kv("web host:port", f"{cfg.web_host}:{cfg.web_port}")
 
@@ -665,10 +685,54 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     print()
     ok_all = reachable and ok and (repo / ".git").exists()
     print(_green("doctor: ok") if ok_all else _red("doctor: issues to address (see above)"))
+    binding = config.find_binding()
+    if binding is not None:
+        _sync_bound_project_registry(binding.parent.resolve(), cfg)
     return 0 if ok_all else 1
 
 
 # ----- helpers ----------------------------------------------------------------
+
+def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
+    """Migrate an old single-app binding into the clone-local app registry."""
+    if not _is_refine_source_dir(clone):
+        return
+    try:
+        project_registry.upsert_app(clone, cfg.client_repo, make_current=True)
+    except (OSError, config.ConfigError):
+        # Registry migration is best-effort; startup/status should not fail
+        # because the source checkout is unexpectedly read-only.
+        pass
+
+
+def _web_unit_name(runner_unit: str) -> str:
+    return f"{runner_unit}-web"
+
+
+def _ensure_host_units_installed(clone: Path, cfg: "config.Config", runner_unit: str) -> None:
+    web_unit = _web_unit_name(runner_unit)
+    runner_path = SYSTEMD_USER_DIR / f"{runner_unit}.service"
+    web_path = SYSTEMD_USER_DIR / f"{web_unit}.service"
+    if runner_path.exists() and web_path.exists():
+        return
+    _write_and_enable_units(clone, cfg.client_repo, force=True, runner_unit_name=runner_unit)
+
+
+def _remove_legacy_docker_artifacts(clone: Path, *, verbose: bool = False) -> None:
+    env_path = clone / ".env"
+    try:
+        text = env_path.read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    if text and "REFINE_CLIENT_REFINE_DIR=" in text:
+        env_path.unlink()
+        if verbose:
+            print(f"Removed legacy {env_path}")
+    current_link = clone / ".refine-current"
+    if current_link.is_symlink() or current_link.exists():
+        current_link.unlink()
+        if verbose:
+            print(f"Removed legacy {current_link}")
 
 def _load_config_or_exit(args: argparse.Namespace) -> None:
     try:
@@ -689,7 +753,7 @@ def _resolve_clone_and_unit_or_exit() -> tuple[Path, str]:
     binding = config.find_binding()
     if binding is None:
         print(
-            "refine: no .refine-binding in scope. Run `refine init <client-repo>` "
+            "refine: no .refine-binding in scope. Run `refine init <target-app>` "
             "from a refine source dir first.",
             file=sys.stderr,
         )
@@ -697,93 +761,6 @@ def _resolve_clone_and_unit_or_exit() -> tuple[Path, str]:
     clone = binding.parent.resolve()
     unit = config.read_binding_unit(binding) or config.unit_name_for(clone)
     return clone, unit
-
-
-def _docker_compose(clone: Path, *args: str) -> int:
-    cmd = ["docker", "compose", *args]
-    try:
-        return subprocess.run(cmd, cwd=str(clone)).returncode
-    except FileNotFoundError:
-        print("refine: `docker` not found on PATH.", file=sys.stderr)
-        return 1
-
-
-def _image_is_stale(clone: Path) -> bool:
-    """True if any tracked source file is newer than the web image.
-
-    If the image doesn't exist yet, treat as stale (we need to build).
-    """
-    image = _compose_image_id(clone)
-    if image is None:
-        return True
-    created = _image_created_epoch(image)
-    if created is None:
-        return True
-    watched = [
-        clone / "Dockerfile",
-        clone / "pyproject.toml",
-        clone / "refine",
-        clone / "refine_shared",
-        clone / "refine_runner",
-        clone / "refine_web",
-    ]
-    for p in watched:
-        if _newest_mtime(p) > created:
-            return True
-    return False
-
-
-def _compose_image_id(clone: Path) -> str | None:
-    try:
-        out = subprocess.run(
-            ["docker", "compose", "images", "-q", COMPOSE_SERVICE],
-            cwd=str(clone),
-            capture_output=True, text=True, timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-    line = out.stdout.strip().splitlines()
-    return line[0].strip() if line else None
-
-
-def _image_created_epoch(image: str) -> float | None:
-    try:
-        out = subprocess.run(
-            ["docker", "image", "inspect", image, "--format", "{{.Created}}"],
-            capture_output=True, text=True, timeout=10,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-    if out.returncode != 0:
-        return None
-    raw = out.stdout.strip()
-    from datetime import datetime, timezone
-    stem = raw.split(".")[0].rstrip("Z")
-    try:
-        dt = datetime.strptime(stem, "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
-    except ValueError:
-        return None
-    return dt.timestamp()
-
-
-def _newest_mtime(p: Path) -> float:
-    try:
-        if p.is_file():
-            return p.stat().st_mtime
-        if p.is_dir():
-            newest = 0.0
-            for child in p.rglob("*"):
-                if child.is_file():
-                    try:
-                        m = child.stat().st_mtime
-                    except OSError:
-                        continue
-                    if m > newest:
-                        newest = m
-            return newest
-    except OSError:
-        pass
-    return 0.0
 
 
 def _systemctl(*args: str) -> tuple[int, str]:

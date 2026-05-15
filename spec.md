@@ -4,29 +4,29 @@
 
 A web application for managing background Claude Code agents that autonomously modify an existing application.
 
-Deployed per project by a consulting firm — each client codebase gets its own refine instance (a single client may have several). The client's QA / Product team uses refine to describe Gaps between current and desired behavior; refine drives Claude Code agents to close those Gaps so the consulting firm is not the bottleneck for issues that domain experts can describe and that admit manual verification.
+Deployed once on a host by a consulting firm; that one refine checkout can know about and switch between multiple client codebases. The client's QA / Product team uses refine to describe Gaps between current and desired behavior; refine drives Claude Code agents to close those Gaps so the consulting firm is not the bottleneck for issues that domain experts can describe and that admit manual verification.
 
 Refine is always available: when a Gap enters `todo`, refine launches an agent CLI subprocess for it immediately (subject to a configurable parallel-run cap).
 
 ## Architecture
 
-- **Runtime split:** Docker hosts only the webapp. Agent CLI subprocesses, git operations, and flat-file I/O run natively on the host, so they inherit the host's Claude Code auth, SSH credentials, git config, and filesystem permissions. See **Runtime topology** below.
+- **Runtime split:** Both the webapp and runner run natively on the host as systemd --user services. Agent CLI subprocesses, git operations, web requests, IPC, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
 - **Storage:** Single SQLite file (`status`, run state, settings, reporters, activity, ID→path index) plus flat JSON files (one per Gap). All committed to the client application's repository — **including the SQLite file** — so refine's state travels with the codebase.
-- **Settings:** All application settings live in SQLite, editable from the UI, scoped per refine instance / client project.
+- **Settings:** All application settings live in SQLite, editable from the UI, scoped to the active target app.
 - **External dependencies:** None at runtime beyond the Claude Code CLI and the local git binary, both installed on the host. Stand-alone — no third-party SaaS.
 - **Auth:** None for refine itself. Refine assumes deployment on a trusted private network.
 
 ## Runtime topology
 
-Refine runs as two co-located components on the same machine: a Dockerized webapp and a host-native runner.
+Refine runs as two co-located host-native components on the same machine: a webapp and a runner.
 
-**In Docker (`refine-web`):**
+**Host web service (`refine-web`):**
 
 - Python web server (UI + JSON API + SSE).
-- **Reads** the SQLite database and gap JSON files via a bind mount onto the host filesystem. **Writes** SQLite directly for settings, reporters, the pause flag, `status` transitions driven by user actions that don't require the runner (e.g. Cancel from non-running states, new-round submissions), and user-action activity-feed entries. Does **not** write gap JSON files — routes those edits through the runner via IPC.
-- Talks to the host runner over a local IPC channel (e.g. Unix domain socket mounted into the container — concrete wire protocol TBD) for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
+- **Reads** the SQLite database and gap JSON files directly from the active app's `.refine/` directory. **Writes** SQLite directly for settings, reporters, the pause flag, `status` transitions driven by user actions that don't require the runner (e.g. Cancel from non-running states, new-round submissions), and user-action activity-feed entries. Does **not** write gap JSON files — routes those edits through the runner via IPC.
+- Talks to the runner over a local Unix-domain socket for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
 
 **On the host (`refine-runner`):**
 
@@ -37,9 +37,9 @@ Refine runs as two co-located components on the same machine: a Dockerized webap
 
 **Shared filesystem state:**
 
-- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The webapp container bind-mounts the volume root; the runner accesses it natively. Both processes read these files. **Write ownership differs:** `gap.json` is runner-only (the webapp routes edits through IPC). SQLite is shared — webapp writes settings, reporters, and user-action state changes; runner writes subprocess and git-event state. WAL mode plus per-table ownership keeps the writers from contending.
+- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The webapp and runner both access it natively. **Write ownership differs:** `gap.json` is runner-only (the webapp routes edits through IPC). SQLite is shared — webapp writes settings, reporters, and user-action state changes; runner writes subprocess and git-event state. WAL mode plus per-table ownership keeps the writers from contending.
 
-**Why this split:** Running CLI subprocesses inside the webapp container would mean either baking host credentials into the image or volume-mounting `~/.claude`, SSH keys, and git config in — fragile and surprising. Running them natively on the host means refine reuses whatever auth and tooling the operator already has set up.
+**Why this split:** The runner owns subprocess and file-write decisions while the webapp owns HTTP/UI concerns. Running both natively avoids container path mapping, duplicated environment setup, and credential forwarding; refine reuses whatever auth and tooling the operator already has set up.
 
 ## Core entity — Gap
 
@@ -282,7 +282,7 @@ Sticky banners visible on every page until the underlying condition clears:
 
 - **Host runner unreachable** — *"Host runner unreachable (`<socket-path>`). Retrying every Xs. Last contact: <timestamp>."*
 - **Claude auth pre-flight failed** — *"Refine cannot reach Claude — run `claude login` on the host."* Action: **Re-check auth**.
-- **Volume root not writable** — *"Volume root not writable as UID N. Fix `user:` in docker-compose."* (Typically surfaces in container logs; webapp may not fully start.)
+- **Volume root not writable** — *"Volume root not writable. Check filesystem permissions for `<path>`."*
 - **Disk usage critical** — *"Volume root partition is N% full."* Warn at 85%, error at 95%.
 
 ### Per-failure recovery reference
@@ -299,7 +299,7 @@ Sticky banners visible on every page until the underlying condition clears:
 | Dirty working copy | Inline on Verify | "Working copy has uncommitted changes on `<branch>`" | Open Chat / Verify once clean |
 | No upstream / detached HEAD | Banner + Gap (`todo`) | "Branch `<n>` has no upstream — run `git push -u origin <n>`" | (operator fix; auto-resumes) |
 | Runner down | Banner | "Host runner unreachable" | (operator fix; auto-resumes) |
-| UID mismatch | Container won't start | "Volume root not writable as UID N" | Fix `user:` in docker-compose |
+| Permission mismatch | Webapp or runner won't start | "Volume root not writable" | Fix host filesystem ownership/permissions |
 | Race / stale UI | Inline toast | "This Gap changed since you loaded it — refreshing" | (auto-refresh; user retries) |
 | Import extraction failed | Import dialog | "Could not extract Gaps — review raw output and create manually" | Show raw output / Manual entry |
 | Stale `localStorage` reporter | Reporter dropdown | (silent) | (clear; force fresh pick) |
@@ -370,10 +370,10 @@ All application settings live in the SQLite database and are editable from the *
 
 **Reporters list:** the set of known reporter names that backs the round-submission dropdown. Managed from the Settings → Reporters page. See **Reporters** for the full semantics.
 
-**Deploy-time configuration** (set in docker-compose / runner startup, not in SQLite):
+**Deploy-time configuration** (set by `refine init` / systemd unit startup, not in SQLite):
 
-- Volume root — host path mounted into the webapp container; lives inside the client repo.
-- Host runner IPC path — where the webapp can reach the host runner.
+- Active app binding — checkout-local `.refine-binding` points to the active target app.
+- Host runner IPC path — where the host-native webapp can reach the host runner.
 
 ## Out of scope (initial version)
 

@@ -143,6 +143,14 @@ def main() -> int:
         assert "parallel_run_cap" in s["settings"]
         print("[ok] /api/settings")
 
+        status, project = get_json("/api/project/status")
+        assert status == 200
+        assert project["attached"] is True
+        assert project["client_repo"] == str(client)
+        assert [app["path"] for app in project["apps"]] == [str(client)]
+        assert project["registry_enabled"] is False
+        print("[ok] /api/project/status includes current app without registry")
+
         status, d = get_json("/api/diagnostics")
         assert status == 200
         assert d.get("reachable") is True

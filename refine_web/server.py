@@ -382,8 +382,8 @@ class RefineHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        # Static files are bind-mounted into the container in dev so edits
-        # show up on refresh — no caching, no stale assets.
+        # Static files are served from the checkout in dev so edits show up on
+        # refresh; avoid stale browser-cached assets.
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)

@@ -1,1 +1,1 @@
-"""refine-web — Dockerized webapp serving UI + JSON API + SSE."""
+"""refine-web — host-native webapp serving UI + JSON API + SSE."""
