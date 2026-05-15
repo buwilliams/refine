@@ -1,0 +1,85 @@
+/* --- Notes ------------------------------------------------------------ */
+.notes-card.card { padding: 0; }
+.notes-card > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius);
+}
+.notes-card > summary::-webkit-details-marker { display: none; }
+.notes-card > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 11px;
+  transition: transform 0.1s ease-out;
+}
+.notes-card[open] > summary::before { transform: rotate(90deg); }
+.notes-card > summary:hover { background: var(--code-bg); }
+.notes-card > div { padding: 0 16px 14px; }
+
+.note {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.note > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+.note > summary::-webkit-details-marker { display: none; }
+.note > summary::before {
+  content: "▸";
+  color: var(--muted);
+  font-size: 10px;
+  transition: transform 0.1s ease-out;
+}
+.note[open] > summary::before { transform: rotate(90deg); }
+.note > summary:hover { background: var(--code-bg); }
+.note-preview { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-meta { white-space: nowrap; }
+.note-body {
+  padding: 8px 12px 4px 26px;
+  font-size: 13px;
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.note .actions { padding: 0 12px 10px 26px; }
+.note-composer > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+/* Loading row: spinner + "Loading…" message, used during LLM calls. */
+.loading-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.loading-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

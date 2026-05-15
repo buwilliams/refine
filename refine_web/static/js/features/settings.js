@@ -1,0 +1,678 @@
+// ---- Settings ---------------------------------------------------------------
+
+async function renderSettings() {
+  renderBanners([]);
+  // First-paint scaffold only; subsequent refreshes route through
+  // `refreshSettings` so SSE / post-save reloads don't flash `Loading…`.
+  if (!document.getElementById("settings-content")) {
+    $("#main").innerHTML = `<h2>Settings</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
+  }
+  await refreshSettings();
+}
+
+async function refreshSettings() {
+  if (state.currentRoute !== "settings") return;
+  try {
+    const [s, diag, reps, feats] = await Promise.all([
+      api("GET", "/api/settings"),
+      api("GET", "/api/diagnostics"),
+      api("GET", "/api/reporters"),
+      api("GET", "/api/features"),
+    ]);
+    // Keep the cached matrix fresh so gates elsewhere react too.
+    state.features = feats;
+    drawSettings(s.settings || {}, diag, reps.reporters || [], feats);
+  } catch (e) {
+    const root = document.getElementById("settings-content");
+    if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+  }
+}
+
+const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
+
+function readSettingsTab(tabs) {
+  const stored = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
+  if (stored && tabs.some((t) => t.slug === stored)) return stored;
+  return tabs[0]?.slug;
+}
+
+function setSettingsTab(slug) {
+  localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, slug);
+  // Toggle classes in place — no re-render so input focus / scroll
+  // position survive when the user clicks between tabs.
+  $$("[data-tab-pane]").forEach((pane) => {
+    pane.classList.toggle("active", pane.dataset.tabPane === slug);
+  });
+  $$(".settings-tab").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.tabTarget === slug);
+  });
+}
+
+function renderFeatureFlagsCard(feats) {
+  if (!feats || !feats.features?.length) return "";
+  const providers = feats.providers || [];
+  const current = feats.current_provider;
+  const cell = (provider, featureKey) => {
+    const slot = feats.matrix?.[`${provider}.${featureKey}`] || {};
+    const enabled = !!slot.enabled;
+    const overridden = !!slot.override;
+    const isCurrent = provider === current;
+    return `
+      <td class="${isCurrent ? "feature-current-col" : ""}">
+        <label class="feature-toggle ${enabled ? "on" : "off"}"
+               title="${overridden ? "Operator override" : "Default"}">
+          <input type="checkbox"
+                 data-feature-cell="${provider}.${featureKey}"
+                 data-provider="${htmlEscape(provider)}"
+                 data-feature="${htmlEscape(featureKey)}"
+                 ${enabled ? "checked" : ""}>
+          <span class="feature-toggle-state">${enabled ? "on" : "off"}</span>
+        </label>
+        ${overridden
+          ? `<button class="link-button"
+                     data-feature-clear="${provider}.${featureKey}"
+                     data-provider="${htmlEscape(provider)}"
+                     data-feature="${htmlEscape(featureKey)}"
+                     title="Clear override and use the code-defined default">
+              clear override
+            </button>`
+          : ""}
+      </td>`;
+  };
+  return `
+    <div class="card" style="margin-top:16px">
+      <h3>Feature flags</h3>
+      <p class="muted small" style="margin-top:0">
+        Provider-scoped capability matrix. The current provider is
+        <strong>${htmlEscape(current)}</strong>. Defaults are the
+        code-defined set of features known to work; overriding a cell
+        is experimental and may produce errors at runtime.
+      </p>
+      <table class="table">
+        <thead><tr>
+          <th>Feature</th>
+          ${providers.map((p) => `
+            <th class="${p === current ? "feature-current-col" : ""}">
+              ${htmlEscape(p)}${p === current ? " (current)" : ""}
+            </th>`).join("")}
+        </tr></thead>
+        <tbody>
+          ${feats.features.map((f) => `
+            <tr>
+              <td>
+                <div><strong>${htmlEscape(f.label)}</strong></div>
+                <div class="muted small">${htmlEscape(f.description)}</div>
+              </td>
+              ${providers.map((p) => cell(p, f.key)).join("")}
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function drawSettings(s, diag, reps, feats) {
+  const cli = (s.agent_cli || "claude").toLowerCase();
+  const cliOption = (value, label) =>
+    `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
+  // Tab definitions. Order here drives the tab strip; `slug` is the
+  // localStorage key and DOM hook. Same order as the linear stack was
+  // before this refactor.
+  const tabs = [
+    { slug: "reporters",    label: "Reporters" },
+    { slug: "runtime",      label: "Runtime" },
+    { slug: "cli",          label: "AI Provider" },
+    { slug: "target-app",   label: "Target App" },
+    { slug: "diagnostics",  label: "Diagnostics" },
+  ];
+  const activeSlug = readSettingsTab(tabs);
+  const tabStrip = `
+    <nav class="settings-tabs" id="settings-tabs">
+      ${tabs.map((t) => `
+        <button class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
+                data-tab-target="${t.slug}">${htmlEscape(t.label)}</button>`).join("")}
+    </nav>`;
+  const pane = (slug, body) => `
+    <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
+             data-tab-pane="${slug}">${body}</section>`;
+  $("#settings-content").innerHTML = `
+    ${tabStrip}
+    ${pane("runtime", `
+    <div class="card">
+      <h3>Runtime configuration</h3>
+      <div class="form-row"><label>Parallel-run cap</label>
+        <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
+      <div class="form-row"><label>Branch name pattern</label>
+        <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
+      <div class="form-row"><label>Agent idle timeout (seconds)</label>
+        <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
+      <div class="form-row"><label>Agent hard cap (seconds)</label>
+        <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
+      <div class="form-row"><label>Standalone chat idle timeout (seconds)
+        <span class="muted small">— set to 0 to disable auto-close</span></label>
+        <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
+      <div class="form-row"><label>Auto-promote backlog → todo
+        <span class="muted small">— how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.</span></label>
+        <select id="s-backlog-promote">
+          ${[
+            ["-1",    "Never"],
+            ["0",     "Instant"],
+            ["300",   "5 minutes"],
+            ["1800",  "30 minutes"],
+            ["3600",  "1 hour"],
+            ["10800", "3 hours"],
+            ["21600", "6 hours"],
+            ["86400", "24 hours"],
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
+      <div class="actions"><button id="s-save">Save</button></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Scope</h3>
+      <p class="muted small">
+        Where refine's agent work lands inside the client repo. The base
+        repo location still owns all git plumbing — worktree create, fetch,
+        merge, push.
+      </p>
+      <div class="form-row"><label>Agent subpath
+        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.</span></label>
+        <input type="text" id="s-subpath"
+               placeholder="e.g. apps/web"
+               value="${htmlEscape(s.agent_subpath || "")}"></div>
+      <div class="form-row"><label>Merge target branch
+        <span class="muted small">— branch all Gap worktrees are based on and all <code>verify</code> merges land on. Leave blank to follow the host's currently-checked-out branch. When set, <code>verify</code> auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
+        <input type="text" id="s-merge-target"
+               placeholder="e.g. main"
+               value="${htmlEscape(s.merge_target_branch || "")}"></div>
+      <div class="actions"><button id="s-save-scope">Save</button></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Auth</h3>
+      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
+      <button id="s-recheck">Re-check auth</button>
+    </div>`)}
+
+    ${pane("cli", `
+    <div class="card">
+      <h3>AI Provider</h3>
+      <div class="form-row"><label>Which AI provider refine drives
+        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code and Codex.</span></label>
+        <select id="s-cli">
+          ${cliOption("claude", "Claude Code (default)")}
+          ${cliOption("codex", "OpenAI Codex")}
+          ${cliOption("gemini", "Gemini")}
+        </select></div>
+      <p class="muted small" style="margin-top:6px">
+        After switching: re-check auth on the Runtime tab to confirm the
+        chosen provider is installed and authed on the host. Round logs
+        are structured for Claude Code and Codex where their CLIs expose
+        machine-readable events; Gemini falls back to plain stdout passthrough.
+      </p>
+      <div class="actions"><button id="s-save-cli">Save</button></div>
+    </div>
+    ${renderFeatureFlagsCard(feats)
+      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — runner unreachable.</p></div>`}`)}
+
+    ${pane("reporters", `
+    <div class="card">
+      <h3>Reporters</h3>
+      <table class="table">
+        <thead><tr><th>Name</th><th></th></tr></thead>
+        <tbody>
+          ${reps.map((r) => `<tr>
+            <td>${htmlEscape(r.name)}</td>
+            <td class="actions">
+              <button class="secondary" data-rename="${r.id}" data-name="${htmlEscape(r.name)}">Rename</button>
+              <button class="danger" data-rdel="${r.id}">Remove</button>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="actions" style="margin-top:8px">
+        <button id="r-add">+ Add reporter</button>
+      </div>
+      <p class="muted small" style="margin-top:6px">
+        Renaming a reporter cascades through every Gap's rounds so historical
+        data stays in sync. Removing a reporter only affects the dropdown —
+        historical rounds keep their original reporter string so audit
+        history is preserved.
+      </p>
+    </div>`)}
+
+    ${pane("target-app", `
+    <div class="card">
+      <h3>Current status</h3>
+      <div id="target-app-status-block" class="muted">Loading…</div>
+      <div class="actions" style="margin-top:10px">
+        <button id="s-target-run-start">Start application</button>
+        <button class="danger" id="s-target-run-stop">Stop application</button>
+        <span class="spacer"></span>
+        <button class="secondary" id="s-target-health-now">Check status now</button>
+      </div>
+      <p class="muted small" style="margin-top:6px">
+        Start / Stop live here on purpose — the indicator next to the
+        reporter dropdown is read-only so typical users can't take the
+        application down by accident.
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Target application</h3>
+      <p class="muted small" style="margin-top:0">
+        The AI provider drafts this configuration from the codebase.
+        Refine then runs the saved shell commands directly on the host
+        and checks status through CLI / HTTP / TCP / process probes.
+      </p>
+      ${(s.target_app_start_instructions || s.target_app_stop_instructions || s.target_app_health_url) ? `
+        <p class="muted small" style="color:var(--warn)">
+          Legacy prose target-app settings are present. Generate from codebase
+          to convert them into structured commands, then Save.
+        </p>` : ""}
+      <div class="actions" style="margin-bottom:10px">
+        <button class="secondary" id="s-target-generate">Generate from codebase</button>
+        <span class="muted small">Review generated fields before saving.</span>
+      </div>
+      <div class="form-row"><label>Start command
+        <span class="muted small">— one-line shell command that starts the app and returns promptly.</span></label>
+        <input type="text" id="s-target-start-command"
+               placeholder="nohup npm run dev > /tmp/refine-target.log 2>&1 &"
+               value="${htmlEscape(s.target_app_start_command || "")}"></div>
+      <div class="form-row"><label>Stop command
+        <span class="muted small">— one-line shell command that stops the app; should be idempotent when practical.</span></label>
+        <input type="text" id="s-target-stop-command"
+               placeholder="pkill -f 'npm run dev' || true"
+               value="${htmlEscape(s.target_app_stop_command || "")}"></div>
+      <div class="form-row"><label>Status command
+        <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>
+        <input type="text" id="s-target-status-command"
+               placeholder="pgrep -f 'npm run dev' >/dev/null"
+               value="${htmlEscape(s.target_app_status_command || "")}"></div>
+      <div class="form-row"><label>Working directory
+        <span class="muted small">— repo-relative path, or blank for repo root.</span></label>
+        <input type="text" id="s-target-cwd"
+               placeholder="."
+               value="${htmlEscape(s.target_app_cwd || "")}"></div>
+      <div class="form-row"><label>Environment overrides
+        <span class="muted small">— JSON object merged into the host environment.</span></label>
+        <textarea id="s-target-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea></div>
+      <div class="form-grid two">
+        <div class="form-row"><label>Start timeout (s)</label>
+          <input type="number" id="s-target-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
+        <div class="form-row"><label>Stop timeout (s)</label>
+          <input type="number" id="s-target-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
+        <div class="form-row"><label>Status timeout (s)</label>
+          <input type="number" id="s-target-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
+        <div class="form-row"><label>Log path</label>
+          <input type="text" id="s-target-log-path" value="${htmlEscape(s.target_app_log_path || "")}"></div>
+      </div>
+      <h4 style="margin:16px 0 8px">Optional checks</h4>
+      <div class="form-row"><label>HTTP check URL
+        <span class="muted small">— optional; 2xx means healthy. Runs on the host.</span></label>
+        <input type="text" id="s-target-http-url"
+               placeholder="http://localhost:3000/health"
+               value="${htmlEscape(s.target_app_http_check_url || s.target_app_health_url || "")}"></div>
+      <div class="form-grid two">
+        <div class="form-row"><label>TCP host</label>
+          <input type="text" id="s-target-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}"></div>
+        <div class="form-row"><label>TCP port</label>
+          <input type="number" id="s-target-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}"></div>
+      </div>
+      <div class="form-row"><label>Process check command
+        <span class="muted small">— optional one-line command; exit 0 when the expected process exists.</span></label>
+        <input type="text" id="s-target-process-command"
+               value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
+      <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
+        <p class="muted small" id="s-target-notes"></p></div>
+      <div class="actions"><button id="s-save-target">Save</button></div>
+    </div>`)}
+
+    ${pane("diagnostics", `
+    <div class="card">
+      <h3>IPC diagnostics</h3>
+      <dl class="kv">
+        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
+        ${diag.socket_path ? `<dt>Socket</dt><dd><code>${htmlEscape(diag.socket_path)}</code></dd>` : ""}
+        ${diag.last_contact_at ? `<dt>Last contact</dt><dd>${fmtTime(diag.last_contact_at)}</dd>` : ""}
+      </dl>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Logs retention</h3>
+      <p class="muted small">
+        Delete activity entries older than the chosen window. Newer entries
+        and gap state are untouched.
+      </p>
+      <div class="actions">
+        <label for="logs-cleanup-days" class="muted small">Keep</label>
+        <select id="logs-cleanup-days">
+          ${[0, 7, 30, 60, 90, 365].map((n) =>
+            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
+        </select>
+        <button class="danger" id="logs-cleanup">Clean up old logs</button>
+      </div>
+    </div>`)}
+  `;
+  // Tab click handlers — purely DOM-local, no re-fetch.
+  $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
+    btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
+  });
+  $("#s-save").addEventListener("click", async () => {
+    await withButtonBusy($("#s-save"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
+          parallel_run_cap: $("#s-cap").value,
+          branch_name_pattern: $("#s-pattern").value,
+          agent_idle_timeout_seconds: $("#s-idle").value,
+          agent_hard_cap_seconds: $("#s-hard").value,
+          chat_idle_timeout_seconds: $("#s-chat-idle").value,
+          backlog_promote_after_seconds: $("#s-backlog-promote").value,
+        });
+        toast("Saved", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-save-cli").addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-cli"), "Saving…", async () => {
+      try {
+        const chosen = $("#s-cli").value;
+        await api("PATCH", "/api/settings", { agent_cli: chosen });
+        // Pull the matrix for the new provider and surface what
+        // changed. Chat / Import will be hidden or labeled disabled
+        // immediately by the gates.
+        await refreshFeatures();
+        const matrix = state.features?.matrix || {};
+        const disabled = (state.features?.features || [])
+          .filter((f) => !(matrix[`${chosen}.${f.key}`] || {}).enabled)
+          .map((f) => f.label);
+        if (disabled.length) {
+          toast(
+            `Saved. Disabled for ${chosen}: ${disabled.join(", ")}. ` +
+            "See Feature flags on this tab.",
+            "info",
+          );
+        } else {
+          toast("Saved — re-check auth to confirm the new CLI is reachable", "info");
+        }
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  // Feature flag toggles.
+  $$("[data-feature-cell]").forEach((box) => {
+    box.addEventListener("change", async (e) => {
+      const { provider, feature } = box.dataset;
+      const enabled = box.checked;
+      try {
+        await api("POST", "/api/features/override", {
+          provider, feature, enabled,
+        });
+        await refreshFeatures();
+      } catch (err) {
+        toast(err.message, "error");
+        box.checked = !enabled; // revert UI on failure
+      }
+    });
+  });
+  $$("[data-feature-clear]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const { provider, feature } = btn.dataset;
+      try {
+        await api("POST", "/api/features/override", {
+          provider, feature, enabled: null,
+        });
+        await refreshFeatures();
+      } catch (err) { toast(err.message, "error"); }
+    });
+  });
+  $("#s-save-scope").addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-scope"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
+          agent_subpath: $("#s-subpath").value,
+          merge_target_branch: $("#s-merge-target").value,
+        });
+        toast("Saved", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-recheck").addEventListener("click", async () => {
+    await withButtonBusy($("#s-recheck"), "Re-checking…", async () => {
+      try {
+        const r = await api("POST", "/api/settings/recheck-auth");
+        toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#logs-cleanup").addEventListener("click", async () => {
+    const days = parseInt($("#logs-cleanup-days").value, 10);
+    const human = days === 0
+      ? "Delete ALL activity log entries? This cannot be undone."
+      : `Delete activity log entries older than ${days} day${days === 1 ? "" : "s"}? This cannot be undone.`;
+    const ok = await modalConfirm(human, {
+      title: "Clean up old logs",
+      okLabel: days === 0 ? "Delete all" : "Delete",
+      danger: true,
+    });
+    if (!ok) return;
+    await withButtonBusy($("#logs-cleanup"), "Cleaning…", async () => {
+      try {
+        const r = await api("POST", "/api/activity/cleanup", { days });
+        toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
+    const ok = await modalConfirm(
+      "Remove this reporter from the dropdown? Historical rounds keep their original reporter string.",
+      { title: "Remove reporter", okLabel: "Remove", danger: true },
+    );
+    if (!ok) return;
+    try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await renderSettings(); }
+    catch (e) { toast(e.message, "error"); }
+  }));
+  $$("[data-rename]").forEach((b) => b.addEventListener("click", async () => {
+    const oldName = b.dataset.name;
+    const name = await modalPrompt("New name", oldName,
+                                   { title: "Rename reporter" });
+    if (!name || !name.trim()) return;
+    const newName = name.trim();
+    try {
+      await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: newName });
+      if (state.lastReporter === oldName) setLastReporter(newName);
+      await refreshReporters();
+      await renderSettings();
+    } catch (e) { toast(e.message, "error"); }
+  }));
+  $("#r-add").addEventListener("click", async () => {
+    const name = await modalPrompt("Reporter name", "",
+                                   { title: "Add reporter" });
+    if (!name || !name.trim()) return;
+    try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
+    catch (e) { toast(e.message, "error"); }
+  });
+
+  // --- Target application tab ----------------------------------------------
+  $("#s-save-target")?.addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-target"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/settings", {
+          target_app_start_command: $("#s-target-start-command").value,
+          target_app_stop_command: $("#s-target-stop-command").value,
+          target_app_status_command: $("#s-target-status-command").value,
+          target_app_cwd: $("#s-target-cwd").value,
+          target_app_env_json: $("#s-target-env").value,
+          target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
+          target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
+          target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
+          target_app_log_path: $("#s-target-log-path").value,
+          target_app_http_check_url: $("#s-target-http-url").value,
+          target_app_tcp_check_host: $("#s-target-tcp-host").value,
+          target_app_tcp_check_port: $("#s-target-tcp-port").value,
+          target_app_process_check_command: $("#s-target-process-command").value,
+        });
+        toast("Saved", "info");
+        refreshTargetAppStatus();
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-target-generate")?.addEventListener("click", async () => {
+    const btn = $("#s-target-generate");
+    const ok = await modalConfirm(
+      "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the fields above.",
+      { title: "Generate target-app config", okLabel: "Generate" },
+    );
+    if (!ok) return;
+    await withButtonBusy(btn, "Generating…", async () => {
+      try {
+        const r = await api("POST", "/api/target-app/generate-instructions",
+                            { kind: "all" });
+        if (r.ok && r.config) {
+          applyGeneratedTargetAppConfig(r.config);
+          toast("Generated — review and click Save to persist", "info");
+        } else {
+          toast("Generation produced no configuration", "error");
+        }
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-target-run-start")?.addEventListener("click", async () => {
+    const btn = $("#s-target-run-start");
+    await withButtonBusy(btn, "Starting…", async () => {
+      await runTargetAppAction("start");
+    });
+  });
+  $("#s-target-run-stop")?.addEventListener("click", async () => {
+    const btn = $("#s-target-run-stop");
+    await withButtonBusy(btn, "Stopping…", async () => {
+      await runTargetAppAction("stop");
+    });
+  });
+  $("#s-target-health-now")?.addEventListener("click", async () => {
+    const btn = $("#s-target-health-now");
+    await withButtonBusy(btn, "Probing…", async () => {
+      try {
+        const r = await api("POST", "/api/target-app/health");
+        const ok = "last_check_ok" in r ? r.last_check_ok : r.last_health_ok;
+        toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"),
+              ok ? "info" : "error");
+        drawTargetAppStatusBlock(r);
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  // Kick off the initial status load (and let SSE refresh later).
+  refreshTargetAppStatus();
+}
+
+function applyGeneratedTargetAppConfig(cfg) {
+  const set = (id, value) => {
+    const el = $(id);
+    if (el) el.value = value == null ? "" : String(value);
+  };
+  set("#s-target-start-command", cfg.start_command || "");
+  set("#s-target-stop-command", cfg.stop_command || "");
+  set("#s-target-status-command", cfg.status_command || "");
+  set("#s-target-cwd", cfg.cwd || "");
+  set("#s-target-env", JSON.stringify(cfg.env || {}, null, 2));
+  set("#s-target-start-timeout", cfg.start_timeout_seconds || 120);
+  set("#s-target-stop-timeout", cfg.stop_timeout_seconds || 60);
+  set("#s-target-status-timeout", cfg.status_timeout_seconds || 10);
+  set("#s-target-log-path", cfg.log_path || "");
+  set("#s-target-http-url", cfg.http_check_url || "");
+  set("#s-target-tcp-host", cfg.tcp_check_host || "");
+  set("#s-target-tcp-port", cfg.tcp_check_port || "");
+  set("#s-target-process-command", cfg.process_check_command || "");
+  const notesRow = $("#s-target-notes-row");
+  const notes = $("#s-target-notes");
+  if (notesRow && notes) {
+    notes.textContent = cfg.notes || "";
+    notesRow.style.display = cfg.notes ? "" : "none";
+  }
+}
+
+// Re-fetch + repaint the target-app status block inside the Settings panel.
+// Cheap to call from anywhere — silently no-ops if Settings isn't rendered.
+async function refreshTargetAppStatus() {
+  const block = document.getElementById("target-app-status-block");
+  if (!block) return;
+  try {
+    const r = await api("GET", "/api/target-app/status");
+    drawTargetAppStatusBlock(r);
+  } catch (e) {
+    block.innerHTML = `<span class="muted">Status unavailable: ${htmlEscape(e.message)}</span>`;
+  }
+}
+
+function drawTargetAppStatusBlock(snap) {
+  const block = document.getElementById("target-app-status-block");
+  if (!block) return;
+  const stateLabel = {
+    running:  "Running",
+    degraded: "Degraded",
+    starting: "Starting…",
+    stopping: "Stopping…",
+    stopped:  "Stopped",
+    failed:   "Failed",
+    unknown:  "Unknown",
+  }[snap.state] || snap.state || "Unknown";
+  const checkAt = snap.last_check_at || snap.last_health_at || "";
+  const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
+  const checkMessage = snap.last_check_message || snap.last_health_message || "";
+  const healthBits = checkAt
+    ? `Last status check: ${checkOk ? "OK" : "FAIL"} · ${fmtTime(checkAt)}`
+    : "No status checks yet.";
+  const healthDetail = checkMessage && !checkOk
+    ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Check: ${htmlEscape(checkMessage)}</p>`
+    : "";
+  const op = snap.last_operation
+    ? `<p class="muted small" style="margin-top:6px">Last operation: ${htmlEscape(snap.last_operation.kind)} → ${htmlEscape(snap.last_operation.state)} · ${fmtTime(snap.last_operation.finished_at)}</p>`
+    : "";
+  block.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="target-app-dot" data-status-dot></span>
+      <strong>${htmlEscape(stateLabel)}</strong>
+      ${snap.has_status_checks ? `<span class="muted small">status checks configured</span>` : `<span class="muted small">No status checks configured</span>`}
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
+    ${healthDetail}
+    ${op}
+    ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
+    ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
+  `;
+  // Apply dot colour from the parent state via a CSS hook — the .target-app-dot
+  // colour rules key off `data-state` on an ancestor, so set it here too.
+  const dot = block.querySelector("[data-status-dot]");
+  if (dot) {
+    dot.style.background = ({
+      running:  "#1f9d4d",
+      degraded: "#d4a106",
+      stopped:  "#c63838",
+      starting: "#d4a106",
+      stopping: "#d4a106",
+      failed:   "#c63838",
+    }[snap.state]) || "#b8bcc6";
+  }
+  // Reflect state on the Start / Stop buttons: only one applies at a
+  // time. Both are disabled while a transition is in flight so the
+  // user can't fire a second action mid-agent-run.
+  const startBtn = document.getElementById("s-target-run-start");
+  const stopBtn  = document.getElementById("s-target-run-stop");
+  if (startBtn && stopBtn) {
+    const isRunning  = snap.state === "running" || snap.state === "degraded";
+    const isStopped  = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
+    const inFlight   = snap.state === "starting" || snap.state === "stopping";
+    startBtn.style.display = (isStopped || inFlight) ? "" : "none";
+    stopBtn.style.display  = (isRunning || inFlight) ? "" : "none";
+    startBtn.disabled = inFlight || !snap.has_start_command;
+    stopBtn.disabled  = inFlight || !snap.has_stop_command;
+    if (!snap.has_start_command) {
+      startBtn.title = "Configure a start command above first.";
+    } else {
+      startBtn.title = "";
+    }
+    if (!snap.has_stop_command) {
+      stopBtn.title = "Configure a stop command above first.";
+    } else {
+      stopBtn.title = "";
+    }
+  }
+}
