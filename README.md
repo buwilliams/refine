@@ -1,6 +1,6 @@
 # refine
 
-Refine turns software gaps (features and bugs) into verified software
+Turn software gaps (features and bugs) into verified software
 through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap. Refine runs the configured host
@@ -22,19 +22,19 @@ auth, so operators rarely need to think about either.
 ## Quick Start
 
 ```bash
-git clone https://github.com/buwilliams/refine.git /opt/refine
+git clone https://github.com/buwilliams/refine.git <refine-checkout>
 claude login                       # or: codex login / gemini auth login
-cd /opt/refine
-uv run refine init /srv/clients/acme-app
-cd /srv/clients/acme-app
+cd <refine-checkout>
+uv run refine init <target-app>
+cd <target-app>
 git add .refine/refine.toml .refine/.gitignore
 git commit -m "add refine"
-cd /opt/refine
+cd <refine-checkout>
 uv run refine start
 uv run refine status               # exact unit name and log command
 # open http://localhost:8080
 # optional: loginctl enable-linger $USER
-# switch apps: uv run refine init /srv/clients/other-client --force
+# switch apps: uv run refine init <other-target-app> --force
 # reset binding: uv run refine reset
 # purge active app refine data: uv run refine reset --purge -y
 ```
