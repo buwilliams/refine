@@ -3997,27 +3997,27 @@ function drawTargetAppStatusBlock(snap) {
 
 const TUTORIAL_STEPS = [
   {
-    image: "/static/ss-1.png",
+    image: "/static/ss-1-dashboard.png",
     title: "Verified software, by ordinary people enhanced by agents",
     body: "Refine turns software gaps — features and bugs — into verified software. QA, Product, support, customers: anyone who can articulate what the app does today vs what it should do instead submits a Gap.",
   },
   {
-    image: "/static/ss-2.png",
+    image: "/static/ss-2-gaps.png",
     title: "Describe the gap, not the fix",
     body: "The unit of work is a Gap: a name, what the app does today, and what it should do instead. You don't need to know how to fix it — you need to describe the gap between the two. The agent handles the “how.”",
   },
   {
-    image: "/static/ss-3.png",
+    image: "/static/ss-3-logs.png",
     title: "Stay in the loop without becoming an engineer",
     body: "Every action — agent runs, git operations, merges, status transitions — streams to a filterable Logs view in real time. Watch the agent work, or read the transcript after.",
   },
   {
-    image: "/static/ss-4.png",
+    image: "/static/ss-4-changes.png",
     title: "The human gate",
     body: "Each Gap runs in its own git worktree and produces a diff. The Changes view is where you look at what the agent did. A Gap doesn't close until someone verifies it — the agent never marks its own work done.",
   },
   {
-    image: "/static/ss-5.png",
+    image: "/static/ss-5-chat.png",
     title: "Talk to the work",
     body: "Open a Gap and the chat dock primes an agent session with that Gap's full context. Ask “why did you change this?” or “what about edge case X?” without re-explaining anything. The conversation lives next to the work.",
   },

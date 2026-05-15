@@ -1,5 +1,7 @@
 # refine
 
+![Refine dashboard](refine_web/static/ss-1-dashboard.png)
+
 Refine turns software gaps (features and bugs) into verified software
 through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
@@ -33,6 +35,8 @@ You drive everything from a web UI:
 Active filters are surfaced visually: matching dropdowns/inputs pick up an
 accent border, a "FILTERED" pill appears next to the count, and the results
 table grows an accent stripe + tinted header.
+
+![Refine gaps list](refine_web/static/ss-2-gaps.png)
 
 Refine handles the git plumbing — worktrees, fetch, merge, push,
 auto-committing its own state — and inherits the selected agent CLI's host
