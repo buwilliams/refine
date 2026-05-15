@@ -89,12 +89,18 @@ def main() -> int:
     from refine_runner.chat_mgr import _chat_env
     old_openai_key = os.environ.get("OPENAI_API_KEY")
     old_openai_base = os.environ.get("OPENAI_BASE_URL")
+    old_codex_ci = os.environ.get("CODEX_CI")
+    old_codex_thread = os.environ.get("CODEX_THREAD_ID")
     try:
         os.environ["OPENAI_API_KEY"] = "sk-test-should-not-leak"
         os.environ["OPENAI_BASE_URL"] = "https://example.invalid/v1"
+        os.environ["CODEX_CI"] = "1"
+        os.environ["CODEX_THREAD_ID"] = "test-thread"
         chat_env = _chat_env()
         assert "OPENAI_API_KEY" not in chat_env
         assert "OPENAI_BASE_URL" not in chat_env
+        assert "CODEX_CI" not in chat_env
+        assert "CODEX_THREAD_ID" not in chat_env
     finally:
         if old_openai_key is None:
             os.environ.pop("OPENAI_API_KEY", None)
@@ -104,6 +110,14 @@ def main() -> int:
             os.environ.pop("OPENAI_BASE_URL", None)
         else:
             os.environ["OPENAI_BASE_URL"] = old_openai_base
+        if old_codex_ci is None:
+            os.environ.pop("CODEX_CI", None)
+        else:
+            os.environ["CODEX_CI"] = old_codex_ci
+        if old_codex_thread is None:
+            os.environ.pop("CODEX_THREAD_ID", None)
+        else:
+            os.environ["CODEX_THREAD_ID"] = old_codex_thread
     print("[ok] codex CLI args + JSONL parsing")
 
     # --- Target-app command/check runtime -----------------------------------

@@ -29,10 +29,11 @@ from typing import Callable, Deque
 from . import agent_cli
 
 
-# Env vars that, if set, would make provider CLIs use API-key auth or
-# otherwise diverge from the host CLI's login session. Strip them before
-# spawn so agent subprocesses behave like the user's interactive CLI in
-# a clean terminal — e.g. `claude login` / `codex login`.
+# Env vars that, if set, would make provider CLIs use API-key auth, inherit
+# another agent's session context, or otherwise diverge from the host CLI's
+# login session. Strip them before spawn so agent subprocesses behave like
+# the user's interactive CLI in a clean terminal — e.g. `claude login` /
+# `codex login`.
 # How long to wait for the provider CLI to actually exit after it emits its
 # terminal `result` event. Past this point, something is almost
 # certainly holding the stdio pipes open — typically a backgrounded
@@ -78,6 +79,9 @@ _AUTH_OVERRIDE_VARS = (
     "CLAUDE_CODE_SESSION_ID",
     "CLAUDE_CODE_EXECPATH",
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS",
+    "CODEX_CI",
+    "CODEX_MANAGED_BY_NPM",
+    "CODEX_THREAD_ID",
     "AI_AGENT",
     "CLAUDE_EFFORT",
 )
