@@ -249,17 +249,14 @@ def main() -> int:
         refine_cli._systemctl = old_systemctl
         refine_cli.shutil.which = old_which
         refine_cli._user_login_path = old_login_path
-    runner_unit = Path(unit_boot["unit_path"])
     web_unit = Path(unit_boot["web_unit_path"])
-    assert runner_unit.is_file()
     assert web_unit.is_file()
-    unit_text = runner_unit.read_text(encoding="utf-8") + web_unit.read_text(encoding="utf-8")
-    assert f"ExecStart={fake_uv} run refine runner" in unit_text
+    assert unit_boot.get("unit_path") is None
+    unit_text = web_unit.read_text(encoding="utf-8")
     assert f"ExecStart={fake_uv} run refine web" in unit_text
     assert "docker" not in unit_text.lower()
-    assert ("enable", "refine-unit-clone") in systemctl_calls
     assert ("enable", "refine-unit-clone-web") in systemctl_calls
-    print("[ok] refine init writes host-native runner + web systemd units")
+    print("[ok] refine init writes host-native web backend systemd unit")
 
     old_clone = tmp / "old-refine-clone"
     (old_clone / "refine").mkdir(parents=True)

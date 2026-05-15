@@ -5,7 +5,7 @@ Provides `refine init`, `refine start`, `refine stop`, `refine status`,
 `uv run refine <subcommand>`.
 
 Components live in the sibling packages:
-- refine_shared: storage + IPC types + config + friendly summaries
-- refine_runner: host-native daemon
-- refine_web:    host-native webapp
+- refine_shared: storage + backend method names + config + friendly summaries
+- refine_runner: host-native backend runner
+- refine_web:    host-native web backend
 """

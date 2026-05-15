@@ -1,4 +1,4 @@
-"""Spin up the runner + webapp on temp paths and validate the wiring.
+"""Spin up the web backend + in-process runner on temp paths and validate the wiring.
 
 This is a "does the whole thing boot and respond to pings" test. It does NOT
 exercise a real agent CLI or push to a remote — those need a configured
@@ -46,22 +46,17 @@ def main() -> int:
     )
     cfg = config.get(reload=True)
 
-    from refine_runner.runner import Runner
-    from refine_web.ipc_client import RunnerClient
+    from refine_shared.backend_protocol import M_PING
+    from refine_web import runtime
     from refine_web import server as web_server
-    from refine_web.poller import SqlitePoller
 
-    runner = Runner()
-    runner.start()
-    print("[ok] runner started")
+    runtime.load_configured(cfg_path)
+    print("[ok] backend runner started in web process")
     try:
-        client_ipc = RunnerClient()
-        resp = client_ipc.ping()
+        resp = runtime.runner_call(M_PING, {})
         assert resp.get("pong") is True
-        print("[ok] IPC ping → pong")
+        print("[ok] direct backend ping → pong")
 
-        poller = SqlitePoller(interval=0.5)
-        poller.start()
         web_thread = threading.Thread(
             target=lambda: web_server.run(host=cfg.web_host, port=cfg.web_port),
             daemon=True,
@@ -96,7 +91,7 @@ def main() -> int:
         status, dash = get_json("/api/dashboard")
         assert status == 200, dash
         assert dash["runner_reachable"] is True
-        print("[ok] /api/dashboard → 200, runner reachable")
+        print("[ok] /api/dashboard → 200, backend runner reachable")
 
         status, rep = post_json("/api/reporters", {"name": "Jane Doe"})
         assert status == 201
@@ -157,7 +152,7 @@ def main() -> int:
         print("[ok] /api/diagnostics")
 
     finally:
-        runner.shutdown()
+        runtime.stop_all()
         time.sleep(0.2)
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)

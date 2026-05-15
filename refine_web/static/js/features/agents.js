@@ -73,7 +73,7 @@ function drawAgents(dash, settings) {
         ? `<p class="muted small" style="margin-top:8px">Merger: ${merger.state}${merger.last_outcome ? ` · last outcome <code>${htmlEscape(merger.last_outcome)}</code>` : ""}.</p>`
         : "");
   const mergerUnreachable = !merger
-    ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — runner unreachable.</p>`
+    ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — backend runner unavailable.</p>`
     : "";
   root.innerHTML = `
     <div class="card">
@@ -93,7 +93,7 @@ function drawAgents(dash, settings) {
         worktree, cleans up any half-finished git operation, and merges
         <code>ready-merge</code> Gaps one at a time so concurrent agent
         runs can't race on <code>git merge</code>. Runtime limits and
-        IPC diagnostics live on the <a href="#/settings">Settings</a> page.
+        backend diagnostics live on the <a href="#/settings">Settings</a> page.
       </p>
     </div>
 

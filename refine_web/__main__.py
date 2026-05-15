@@ -8,6 +8,7 @@ Invoked as `uv run refine web` (the CLI dispatcher).
 from __future__ import annotations
 
 import os
+import signal
 import sys
 
 from refine_shared import config
@@ -17,6 +18,12 @@ from .server import run
 
 
 def main() -> int:
+    def _shutdown(signum, _frame):  # noqa: ANN001
+        sys.stderr.write(f"\n[refine-web] caught signal {signum}, shutting down\n")
+        runtime.stop_all()
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _shutdown)
     try:
         cfg = runtime.load_configured()
         host = cfg.web_host
@@ -29,7 +36,7 @@ def main() -> int:
         run(host=host, port=port)
     except KeyboardInterrupt:
         sys.stderr.write("\n[refine-web] shutting down\n")
-        runtime.stop_poller()
+        runtime.stop_all()
     return 0
 
 

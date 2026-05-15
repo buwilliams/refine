@@ -4,7 +4,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import socket
 import sys
 import time
 from http import HTTPStatus
@@ -167,7 +166,7 @@ def _h_set_feature_override(_h, _m, body, _q):
 
 @route("GET", r"/api/diagnostics")
 def _h_diag(_h, _m, _b, _q):
-    return api.ipc_diagnostics()
+    return api.backend_diagnostics()
 
 
 @route("GET", r"/api/activity")
@@ -415,7 +414,7 @@ class RefineHandler(BaseHTTPRequestHandler):
                 evt_id, evt_type, data = item
                 self.wfile.write(sse.format_event(evt_id, evt_type, data))
                 self.wfile.flush()
-        except (BrokenPipeError, ConnectionResetError, socket.error):
+        except (BrokenPipeError, ConnectionResetError, OSError):
             pass
         finally:
             sse.unsubscribe(q)

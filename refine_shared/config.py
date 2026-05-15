@@ -10,7 +10,6 @@ are resolved relative to that directory (unless absolute).
 Schema (TOML):
 
     client_repo  = ".."
-    runner_socket = "./run/runner.sock"
 
     [web]
     host = "0.0.0.0"
@@ -32,7 +31,7 @@ except ModuleNotFoundError:
 CONFIG_FILENAME = "refine.toml"
 BINDING_FILENAME = ".refine-binding"
 
-# Marker line in the binding file recording the systemd --user runner unit name
+# Marker line in the binding file recording the systemd --user service base name
 # associated with this refine checkout, so `refine start/stop/status` don't
 # need to re-derive it (and so a future rename of the checkout dir doesn't
 # silently produce a second, orphan unit).
@@ -79,7 +78,6 @@ class Config:
     config_path: Path        # absolute path to refine.toml
     volume_root: Path        # absolute path; directory containing refine.toml
     client_repo: Path        # absolute path
-    runner_socket: Path      # absolute path
     web_host: str
     web_port: int
 
@@ -111,7 +109,6 @@ class Config:
     def _from_raw(cls, path: Path, raw: dict) -> "Config":
         volume_root = path.parent
         client_repo_rel = raw.get("client_repo", "..")
-        socket_rel = raw.get("runner_socket", "./run/runner.sock")
         web = raw.get("web") or {}
         web_host = str(web.get("host", "0.0.0.0"))
         web_port = int(web.get("port", 8080))
@@ -119,7 +116,6 @@ class Config:
             config_path=path,
             volume_root=volume_root,
             client_repo=_resolve(volume_root, client_repo_rel),
-            runner_socket=_resolve(volume_root, socket_rel),
             web_host=web_host,
             web_port=web_port,
         )
@@ -202,7 +198,7 @@ def read_binding(binding_path: Path) -> Path:
 def write_binding(refine_source_dir: Path, client_repo: Path) -> Path:
     """Write `.refine-binding` in the refine source dir pointing at the active app.
 
-    Also records the systemd --user runner unit name so `refine start/stop/status`
+    Also records the systemd --user service base name so `refine start/stop/status`
     can look it up without re-deriving from the directory basename (which
     might drift if the checkout is later renamed).
 
@@ -227,10 +223,6 @@ DEFAULT_TOML = """# refine — per-project configuration. Commit this file along
 # inside the target app repo).
 client_repo = ".."
 
-# Unix domain socket where the host runner listens. The host-native webapp
-# uses this socket to request runner-owned writes and agent lifecycle changes.
-runner_socket = "./run/runner.sock"
-
 [web]
 host = "0.0.0.0"
 port = 8080
@@ -240,9 +232,9 @@ port = 8080
 def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     """Write a default refine.toml to `volume_root` (creating the directory).
 
-    Also creates the runner socket directory. Adds a `.gitignore` next to the
-    config that excludes the SQLite + socket files (the gap JSON files and
-    refine.toml itself stay committed).
+    Also creates runtime directories. Adds a `.gitignore` next to the config
+    that excludes SQLite and run state (the gap JSON files and refine.toml
+    itself stay committed).
 
     Returns the absolute path to the new config file.
     """

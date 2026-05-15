@@ -1,7 +1,7 @@
 """Sole owner of gap.json writes. Serializes per-Gap with a lock map.
 
-All other modules (webapp via IPC, subprocess supervisor, dispatcher) call into
-this module to mutate gap.json. Reads happen elsewhere via refine_shared.gaps.
+Backend handlers, subprocess supervisor, and dispatcher call into this module
+to mutate gap.json. Reads happen elsewhere via refine_shared.gaps.
 """
 from __future__ import annotations
 

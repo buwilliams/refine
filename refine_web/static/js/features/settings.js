@@ -246,7 +246,7 @@ function drawSettings(s, diag, reps, feats) {
       <div class="actions"><button id="s-save-cli">Save</button></div>
     </div>
     ${renderFeatureFlagsCard(feats)
-      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — runner unreachable.</p></div>`}`)}
+      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></div>`}`)}
 
     ${pane("reporters", `
     <div class="card">
@@ -363,11 +363,11 @@ function drawSettings(s, diag, reps, feats) {
 
     ${pane("diagnostics", `
     <div class="card">
-      <h3>IPC diagnostics</h3>
+      <h3>Backend diagnostics</h3>
       <dl class="kv">
         <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.socket_path ? `<dt>Socket</dt><dd><code>${htmlEscape(diag.socket_path)}</code></dd>` : ""}
-        ${diag.last_contact_at ? `<dt>Last contact</dt><dd>${fmtTime(diag.last_contact_at)}</dd>` : ""}
+        ${diag.mode ? `<dt>Mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
+        ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
       </dl>
     </div>
 

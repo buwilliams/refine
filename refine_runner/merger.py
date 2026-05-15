@@ -68,7 +68,7 @@ class Merger:
         self._thread: threading.Thread | None = None
         # Serializes anything that touches the host worktree. Held by
         # both the background tick and any synchronous `verify_now`
-        # call from the IPC thread (user Verify click).
+        # call from an HTTP handler (user Verify click).
         self._host_lock = threading.Lock()
         # Snapshot state for the Agents screen. Updated as the merger
         # picks up / releases each Gap so the UI can render the
@@ -92,7 +92,7 @@ class Merger:
 
     def wake(self) -> None:
         """Dispatcher calls this when an agent run finishes successfully;
-        IPC handlers call it after edits that might unblock a Gap (Retry,
+        backend handlers call it after edits that might unblock a Gap (Retry,
         new round). Just sets the event — the loop scans the next tick."""
         self._wake.set()
 

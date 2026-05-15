@@ -8,14 +8,13 @@ import json
 import re
 import sqlite3
 import subprocess
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from refine_shared import activity, config, db, gaps as shared_gaps, project_registry, reporters
 from refine_shared.gaps import now_iso
-from refine_shared.ipc_protocol import (
+from refine_shared.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
@@ -24,7 +23,7 @@ from refine_shared.ipc_protocol import (
 )
 from refine_shared.ulid import new_ulid
 
-from .ipc_client import IpcError, get_client
+from .backend_client import BackendError, get_client
 from . import runtime
 
 
@@ -125,8 +124,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
 
     try:
         from refine.cli import (
-            _InitError, _is_refine_source_dir, _systemctl, _wait_for_socket,
-            bootstrap_client_repo,
+            _InitError, _is_refine_source_dir, bootstrap_client_repo,
         )
 
         if not _is_refine_source_dir(clone_dir):
@@ -157,6 +155,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         cfg = runtime.load_configured(
             result["config_path"],
             start_poller=body.get("start_poller") is not False,
+            start_runner=body.get("start_runner") is not False,
         )
     except (config.ConfigError, _InitError, OSError, TimeoutError) as e:
         return err(400, str(e))
@@ -164,24 +163,8 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         return err(409, str(e), e.details)
 
     runner = {"started": False, "message": ""}
-    if body.get("start_runner") is not False and result.get("unit_path"):
-        unit = config.unit_name_for(clone_dir)
-        rc, out = _systemctl("restart", unit)
-        if rc == 0 and _wait_for_socket(cfg.runner_socket, timeout=10.0):
-            runner = {"started": True, "message": f"Runner started via {unit}."}
-        elif rc == 0:
-            runner = {
-                "started": False,
-                "message": (
-                    f"Runner service {unit} started, but {cfg.runner_socket} "
-                    "was not reachable within 10 seconds."
-                ),
-            }
-        else:
-            runner = {
-                "started": False,
-                "message": (out or f"systemctl --user restart {unit} failed").strip(),
-            }
+    if body.get("start_runner") is not False:
+        runner = {"started": True, "message": "Backend runner started in the web process."}
 
     return 200, {
         "attached": True,
@@ -235,27 +218,9 @@ def _current_client_repo() -> Path | None:
 
 def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     """Stop active agents and leave the current target app clean before switching."""
-    from refine.cli import _ipc_ping, _systemctl
-
     warnings: list[str] = []
     cfg = config.get(reload=True)
-    unit = config.read_binding_unit(clone_dir / config.BINDING_FILENAME) or config.unit_name_for(clone_dir)
-
-    rc, out = _systemctl("stop", unit)
-    if rc != 0:
-        warnings.append((out or f"systemctl --user stop {unit} failed").strip())
-
-    deadline = time.time() + 10.0
-    while time.time() < deadline:
-        ok, _ = _ipc_ping(cfg.runner_socket)
-        if not ok:
-            break
-        time.sleep(0.2)
-    else:
-        raise _SwitchBlocked(
-            "Runner is still reachable after stop; refusing to switch apps.",
-            f"Socket still responds at {cfg.runner_socket}. Stop the runner and try again.",
-        )
+    runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)
     dirty = _git_stdout(cfg.client_repo, ["status", "--porcelain"])
@@ -517,8 +482,8 @@ def create_gap(body: dict) -> tuple[int, dict]:
             "gap_id": gap_id, "name": name, "priority": priority,
             "reporter": reporter, "actual": actual, "target": target,
         })
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 201, result
 
 
@@ -584,15 +549,15 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             return err(400, "notes must be a list of {id, author, body, ...} objects")
         try:
             get_client().call(M_SET_NOTES, {"gap_id": gap_id, "notes": notes})
-        except IpcError as e:
-            return _ipc_err(e)
+        except BackendError as e:
+            return _backend_err(e)
     elif sql_fields:
         # nudge gap.json's mtime to match the index update.
         try:
             get_client().call(M_EDIT_ROUND, {
                 "gap_id": gap_id, "actual": None, "target": None, "reporter": None,
             })
-        except IpcError:
+        except BackendError:
             pass
     return 200, {"ok": True}
 
@@ -600,8 +565,8 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
 def delete_gap(gap_id: str) -> tuple[int, dict]:
     try:
         result = get_client().call(M_DELETE_GAP, {"gap_id": gap_id})
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
@@ -683,7 +648,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                     "actual": None, "target": None, "reporter": None,
                 })
                 updated_ids.append(gid)
-            except IpcError:
+            except BackendError:
                 updated_ids.append(gid)
     else:  # reporter — rewrite the latest round's reporter on each gap
         for gid in gap_ids:
@@ -694,7 +659,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                     "reporter": value,
                 })
                 updated_ids.append(gid)
-            except IpcError:
+            except BackendError:
                 # Skip gaps the runner refused (no rounds yet, etc.) and
                 # keep going. The response count reflects what stuck.
                 continue
@@ -739,7 +704,7 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
             )
             if res.get("deleted"):
                 deleted_ids.append(gid)
-        except IpcError as e:
+        except BackendError as e:
             failures.append({"id": gid, "error": str(e)})
     return 200, {
         "deleted": len(deleted_ids),
@@ -778,8 +743,8 @@ def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
             "gap_id": gap_id, "reporter": reporter,
             "actual": actual, "target": target,
         })
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 201, result
 
 
@@ -803,16 +768,16 @@ def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
             "target": body.get("target"),
             "reporter": body.get("reporter"),
         })
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
 def verify(gap_id: str) -> tuple[int, dict]:
     try:
         result = get_client().call(M_VERIFY, {"gap_id": gap_id}, timeout=120.0)
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
@@ -823,8 +788,8 @@ def list_changes(*, limit: int = 50) -> tuple[int, dict]:
         result = get_client().call(
             M_LIST_CHANGES, {"limit": int(limit)}, timeout=15.0,
         )
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
@@ -840,8 +805,8 @@ def undo_change(body: dict) -> tuple[int, dict]:
         result = get_client().call(
             M_UNDO_GAP, {"commit": commit}, timeout=120.0,
         )
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     code = 200 if result.get("ok") else 409
     return code, result
 
@@ -877,8 +842,8 @@ def retry(gap_id: str) -> tuple[int, dict]:
                 if not pf.get("ok"):
                     return err(409, "Auth pre-flight still failing — Reopen blocked",
                                pf.get("message"))
-            except IpcError as e:
-                return _ipc_err(e)
+            except BackendError as e:
+                return _backend_err(e)
         with db.transaction(conn):
             conn.execute(
                 "UPDATE gaps_index SET status = 'todo', updated = ? WHERE id = ?",
@@ -908,8 +873,8 @@ def cancel(gap_id: str) -> tuple[int, dict]:
         return err(409, f"Already terminal (status={row['status']})")
     try:
         result = get_client().call(M_CANCEL, {"gap_id": gap_id})
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
@@ -948,8 +913,8 @@ def rename_reporter(rid: int, body: dict) -> tuple[int, dict]:
         result = get_client().call(
             M_RENAME_REPORTER, {"rid": rid, "new_name": name}, timeout=60.0,
         )
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, {"ok": True, **result}
 
 
@@ -1158,15 +1123,15 @@ def update_settings(body: dict) -> tuple[int, dict]:
 def recheck_auth() -> tuple[int, dict]:
     try:
         result = get_client().call(M_PREFLIGHT, {}, timeout=30.0)
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
-def ipc_diagnostics() -> tuple[int, dict]:
+def backend_diagnostics() -> tuple[int, dict]:
     try:
         result = get_client().call(M_DIAGNOSTICS, {}, timeout=5.0)
-    except IpcError as e:
+    except BackendError as e:
         return 200, {"reachable": False, "error": {"message": e.message,
                                                     "code": e.code}}
     result["reachable"] = True
@@ -1251,7 +1216,7 @@ def dashboard_summary() -> tuple[int, dict]:
             r = get_client().call(M_RUNNING, {}, timeout=5.0)
             running = r.get("running", [])
             merger_snap = r.get("merger")
-        except IpcError:
+        except BackendError:
             running = []
         pf = conn.execute(
             "SELECT ok, checked_at, message FROM preflight WHERE id = 1"
@@ -1330,7 +1295,7 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
     if not runner_reachable:
         items.append({
             "kind": "banner", "severity": "error",
-            "message": "Host runner unreachable",
+            "message": "Backend runner unavailable",
         })
     if preflight and not preflight.get("ok"):
         login_hint = {
@@ -1366,8 +1331,8 @@ def import_extract(body: dict) -> tuple[int, dict]:
         result = get_client().call(
             M_EXTRACT_GAPS, {"text": raw}, timeout=200.0,
         )
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     if result.get("ok") is False and result.get("code") == "feature_disabled":
         return 409, result
     return 200, {"drafts": result.get("drafts") or []}
@@ -1395,8 +1360,8 @@ def import_persist(body: dict) -> tuple[int, dict]:
                 "actual": actual, "target": target,
             })
             created.append(gap_id)
-        except IpcError as e:
-            return _ipc_err(e)
+        except BackendError as e:
+            return _backend_err(e)
     return 201, {"created": created, "count": len(created)}
 
 
@@ -1405,8 +1370,8 @@ def import_persist(body: dict) -> tuple[int, dict]:
 def chat_start(body: dict) -> tuple[int, dict]:
     try:
         result = get_client().call(M_CHAT_START, {"gap_id": body.get("gap_id")})
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     if result.get("ok") is False and result.get("code") == "feature_disabled":
         return 409, result
     return 201, result
@@ -1416,24 +1381,24 @@ def chat_input(sid: str, body: dict) -> tuple[int, dict]:
     text = body.get("text", "")
     try:
         result = get_client().call(M_CHAT_INPUT, {"session_id": sid, "text": text})
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
 def chat_read(sid: str) -> tuple[int, dict]:
     try:
         result = get_client().call(M_CHAT_READ, {"session_id": sid})
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
 def chat_stop(sid: str) -> tuple[int, dict]:
     try:
         result = get_client().call(M_CHAT_STOP, {"session_id": sid})
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 
@@ -1546,9 +1511,9 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
             {"kind": kind, "config": cfg},
             timeout=900.0,
         )
-    except IpcError as e:
+    except BackendError as e:
         _target_app_record_failure(kind, e.message)
-        return _ipc_err(e)
+        return _backend_err(e)
 
     ok = bool(result.get("ok"))
     final_state = result.get("state") or ("running" if kind == "start" else "stopped")
@@ -1631,9 +1596,9 @@ def target_app_check(_body: dict | None = None) -> tuple[int, dict]:
             {"kind": "status", "config": cfg, "quiet": quiet},
             timeout=60.0,
         )
-    except IpcError as e:
+    except BackendError as e:
         _target_app_record_failure("status", e.message)
-        return _ipc_err(e)
+        return _backend_err(e)
     if result.get("busy") and quiet:
         conn = _conn()
         try:
@@ -1693,8 +1658,8 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
         result = get_client().call(
             M_TARGET_APP_GENERATE, {"kind": kind}, timeout=600.0,
         )
-    except IpcError as e:
-        return _ipc_err(e)
+    except BackendError as e:
+        return _backend_err(e)
     if not result.get("ok"):
         return 502, {"error": {"message": result.get("message") or "generation failed"}}
     return 200, {
@@ -1707,7 +1672,7 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
 
 # --- helpers ------------------------------------------------------------------
 
-def _ipc_err(e: IpcError) -> tuple[int, dict]:
-    code = 502 if e.code == "runner_unreachable" else 500
+def _backend_err(e: BackendError) -> tuple[int, dict]:
+    code = 502 if e.code == "backend_unavailable" else 500
     return code, {"error": {"code": e.code, "message": e.message,
                             "details": e.details}}

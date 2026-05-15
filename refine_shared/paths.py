@@ -5,7 +5,7 @@ Spec:
     <volume-root>/
       refine.toml
       index.sqlite
-      run/runner.sock
+      run/
       gaps/<first 2 chars>/<remaining ULID>/gap.json
 """
 from __future__ import annotations

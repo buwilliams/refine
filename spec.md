@@ -10,7 +10,7 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 
 ## Architecture
 
-- **Runtime split:** Both the webapp and runner run natively on the host as systemd --user services. Agent CLI subprocesses, git operations, web requests, IPC, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
+- **Runtime split:** The web backend runs natively on the host as a systemd --user service and owns the runner in-process. Agent CLI subprocesses, git operations, web requests, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
 - **Storage:** Single SQLite file (`status`, run state, settings, reporters, activity, ID→path index) plus flat JSON files (one per Gap). All committed to the client application's repository — **including the SQLite file** — so refine's state travels with the codebase.
@@ -20,26 +20,26 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 
 ## Runtime topology
 
-Refine runs as two co-located host-native components on the same machine: a webapp and a runner.
+Refine runs as one host-native web backend on the same machine as the target app. The backend owns a runner object in-process.
 
 **Host web service (`refine-web`):**
 
 - Python web server (UI + JSON API + SSE).
-- **Reads** the SQLite database and gap JSON files directly from the active app's `.refine/` directory. **Writes** SQLite directly for settings, reporters, the pause flag, `status` transitions driven by user actions that don't require the runner (e.g. Cancel from non-running states, new-round submissions), and user-action activity-feed entries. Does **not** write gap JSON files — routes those edits through the runner via IPC.
-- Talks to the runner over a local Unix-domain socket for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
+- **Reads** the SQLite database and gap JSON files directly from the active app's `.refine/` directory. **Writes** SQLite directly for settings, reporters, the pause flag, `status` transitions driven by user actions that don't require the runner (e.g. Cancel from non-running states, new-round submissions), and user-action activity-feed entries. Does **not** write gap JSON files directly — calls the in-process runner for those edits.
+- Calls the runner directly for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
 
 **On the host (`refine-runner`):**
 
 - Spawns Claude Code CLI subprocesses (`claude --print ...`) directly on the host — they inherit the host's `~/.claude/` auth, PATH, and shell.
 - Runs every `git` operation against the client repo — fetch, branch, worktree, merge, push — using the host's SSH keys and git config.
-- **Owns all `gap.json` writes.** Serializes them per-Gap with an atomic temp-file-plus-rename. Applies round submissions, round edits, and log appends sent over IPC by the webapp, plus its own log appends from agent subprocesses and git events.
-- Reports state changes back to the webapp via the IPC channel and by writing to SQLite (which the webapp's SSE stream surfaces).
+- **Owns all `gap.json` writes.** Serializes them per-Gap with an atomic temp-file-plus-rename. Applies round submissions, round edits, and log appends requested by HTTP handlers, plus its own log appends from agent subprocesses and git events.
+- Reports state changes by writing to SQLite, which the web backend's SSE stream surfaces.
 
 **Shared filesystem state:**
 
-- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The webapp and runner both access it natively. **Write ownership differs:** `gap.json` is runner-only (the webapp routes edits through IPC). SQLite is shared — webapp writes settings, reporters, and user-action state changes; runner writes subprocess and git-event state. WAL mode plus per-table ownership keeps the writers from contending.
+- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The web backend and in-process runner both access it natively. **Write ownership differs:** `gap.json` is runner-only. SQLite is shared — HTTP handlers write settings, reporters, and user-action state changes; runner writes subprocess and git-event state. WAL mode plus per-table ownership keeps the writers from contending.
 
-**Why this split:** The runner owns subprocess and file-write decisions while the webapp owns HTTP/UI concerns. Running both natively avoids container path mapping, duplicated environment setup, and credential forwarding; refine reuses whatever auth and tooling the operator already has set up.
+**Why this split:** The runner owns subprocess and file-write decisions while the web backend owns HTTP/UI concerns. Running everything natively in one backend process avoids container path mapping, interprocess transport overhead, duplicated environment setup, and credential forwarding; refine reuses whatever auth and tooling the operator already has set up.
 
 ## Core entity — Gap
 
@@ -149,7 +149,7 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 
 ### Mechanism
 
-- The **host runner** (see **Runtime topology**) shells out to the **Claude Code CLI** (`claude --print` / headless mode) directly on the host. The webapp requests a launch over IPC; the runner spawns and supervises the subprocess.
+- The **host runner** (see **Runtime topology**) shells out to the **Claude Code CLI** (`claude --print` / headless mode) directly on the host. The web backend calls the runner directly; the runner spawns and supervises the subprocess.
 - **Pre-flight check.** At runner startup, and before spawning a subprocess after a prior auth failure, the runner issues a fast `claude --version` (or equivalent no-op) to confirm CLI presence and valid auth. Failure surfaces as the **Claude auth pre-flight failed** banner; humans can re-run it on demand from Settings.
 - **One fresh CLI invocation per unaddressed round.** No session is resumed; the agent has no memory of prior rounds. The latest round's `actual` / `target` becomes the prompt.
 - **Cross-round continuity carries through the Gap's branch**, not through a Claude session. Each round's agent starts with the worktree exactly as the prior round's commits left it.
@@ -212,7 +212,7 @@ Every failure must tell the user what happened in plain language and offer a rec
 3. **Two reading levels** — friendly summary on top; **Show details** reveals raw stderr / paths / exit code.
 4. **Self-heal silently** — stale `localStorage` reporters, orphan worktrees, runner-restart fail-marking — fixed without notifying.
 5. **Chat is the universal escape hatch** — for anything refine cannot auto-resolve (merge conflict, dirty working copy, push race, hook failure, auth issue), the recovery affordance is always **Open Chat** attached to the Gap.
-6. **Banners for systemic problems** — auth missing, runner unreachable, disk near full — visible on every page until resolved.
+6. **Banners for systemic problems** — auth missing, backend runner unavailable, disk near full — visible on every page until resolved.
 
 ### Activity entry shape
 
@@ -280,7 +280,7 @@ No "Error: failed" dead-ends.
 
 Sticky banners visible on every page until the underlying condition clears:
 
-- **Host runner unreachable** — *"Host runner unreachable (`<socket-path>`). Retrying every Xs. Last contact: <timestamp>."*
+- **Backend runner unavailable** — *"Backend runner unavailable. Restart refine-web and check logs."*
 - **Claude auth pre-flight failed** — *"Refine cannot reach Claude — run `claude login` on the host."* Action: **Re-check auth**.
 - **Volume root not writable** — *"Volume root not writable. Check filesystem permissions for `<path>`."*
 - **Disk usage critical** — *"Volume root partition is N% full."* Warn at 85%, error at 95%.
@@ -298,7 +298,7 @@ Sticky banners visible on every page until the underlying condition clears:
 | Push race | Gap detail (`review`) | "Another developer pushed; merge needs to be redone" | Verify |
 | Dirty working copy | Inline on Verify | "Working copy has uncommitted changes on `<branch>`" | Open Chat / Verify once clean |
 | No upstream / detached HEAD | Banner + Gap (`todo`) | "Branch `<n>` has no upstream — run `git push -u origin <n>`" | (operator fix; auto-resumes) |
-| Runner down | Banner | "Host runner unreachable" | (operator fix; auto-resumes) |
+| Backend runner unavailable | Banner | "Backend runner unavailable" | Restart refine-web / check logs |
 | Permission mismatch | Webapp or runner won't start | "Volume root not writable" | Fix host filesystem ownership/permissions |
 | Race / stale UI | Inline toast | "This Gap changed since you loaded it — refreshing" | (auto-refresh; user retries) |
 | Import extraction failed | Import dialog | "Could not extract Gaps — review raw output and create manually" | Show raw output / Manual entry |
@@ -345,7 +345,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 - **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.
 - **Re-check auth** — on-demand re-run of the host runner's Claude auth pre-flight; clears the auth banner if it now passes.
-- **IPC diagnostics** — runner socket path, last-contact timestamp, recent IPC errors.
+- **Backend diagnostics** — in-process runner mode, last call timestamp, recent backend errors.
 - Changes take effect immediately.
 
 ## UI
@@ -373,7 +373,7 @@ All application settings live in the SQLite database and are editable from the *
 **Deploy-time configuration** (set by `refine init` / systemd unit startup, not in SQLite):
 
 - Active app binding — checkout-local `.refine-binding` points to the active target app.
-- Host runner IPC path — where the host-native webapp can reach the host runner.
+- Web backend unit — checkout-local systemd unit that starts `uv run refine web`.
 
 ## Out of scope (initial version)
 

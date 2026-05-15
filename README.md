@@ -45,26 +45,27 @@ auth, so operators rarely need to think about either.
 
 ## Components
 
-- **`refine-web`** — host-native Python webapp (UI + JSON API + SSE).
-- **`refine-runner`** — host-native daemon that owns CLI subprocesses, git
-  operations, and `gap.json` writes. Runs natively so it inherits the host's
-  agent auth, SSH keys, and git config. Agent subprocesses additionally strip
+- **`refine-web`** — host-native Python backend (UI + JSON API + SSE) that
+  owns the runner in-process.
+- **`refine-runner`** — backend component that owns CLI subprocesses, git
+  operations, and `gap.json` writes. It runs inside the web process in normal
+  operation, so it inherits the host's agent auth, SSH keys, and git config.
+  Agent subprocesses additionally strip
   provider API-key override vars such as `ANTHROPIC_API_KEY`,
   `CLAUDE_API_KEY`, and `OPENAI_API_KEY`, then resolve CLIs via the user's
   interactive login-shell `PATH`, so they use `claude login` / `codex login`
   credentials instead of a service manager's stripped or injected env.
-- They communicate over a Unix-domain socket inside the active app's `.refine/`
-  directory. Both processes run on the host, so there is no container path
-  mapping or duplicated environment to manage.
+- The browser calls the backend's normal JSON API; the backend calls runner
+  methods directly and streams updates back to the browser over SSE.
 
 ## Layout
 
 ```
 refine/
 ├── refine/               # the `refine` CLI: init, start, stop, status, runner, web, doctor
-├── refine_shared/        # storage, IPC, friendly summaries, config loader
-├── refine_runner/        # host-native daemon (subprocess + git + gap.json owner)
-├── refine_web/           # host-native webapp + static HTML/JS
+├── refine_shared/        # storage, backend method names, friendly summaries, config loader
+├── refine_runner/        # backend runner (subprocess + git + gap.json owner)
+├── refine_web/           # host-native backend + static HTML/JS
 ├── pyproject.toml        # makes `refine` a real console script
 └── spec.md               # the design document
 ```
@@ -97,9 +98,8 @@ This:
   `/opt/refine` target the active app.
 - Writes `/opt/refine/.refine-apps.json` with the known apps list
   used by Settings → Project.
-- Installs and enables `~/.config/systemd/user/refine.service` and
-  `~/.config/systemd/user/refine-web.service` so the runner and webapp are
-  managed by systemd and survive terminal close.
+- Installs and enables `~/.config/systemd/user/refine-web.service` so the
+  backend is managed by systemd and survives terminal close.
 
 Commit the new files in the target app repo when you're ready:
 
@@ -120,11 +120,11 @@ When no project is attached, refine starts a temporary host-native setup UI.
 Open the shown URL, enter an existing app path or a new
 directory path, and refine will create missing directories, run `git init`
 when needed, write the same `.refine/` files as `refine init`, bind the
-checkout, and start the runner. If the app already has `.refine/refine.toml`, refine
+checkout, and start the in-process runner. If the app already has `.refine/refine.toml`, refine
 preserves it and only makes sure required support directories exist.
 After that first attach, Settings → Project keeps a checkout-local known-apps
 list. Add another app from the same modal, remove entries from the list without
-deleting project files, or switch the active app. Switching stops the runner,
+deleting project files, or switch the active app. Switching stops the in-process runner,
 commits pending `.refine/` state when needed, refuses to proceed if the current
 app has other uncommitted changes, then performs the same binding work as
 `uv run refine init <path>` for the selected app.
@@ -135,22 +135,21 @@ app has other uncommitted changes, then performs the same binding work as
 cd /opt/refine
 
 claude login                       # or: codex login / gemini auth login
-uv run refine start                # webapp + runner, one command
+uv run refine start                # backend + runner, one command
 uv run refine status               # check it's healthy
 uv run refine stop                 # tear it all down
 ```
 
 Open <http://localhost:8080>.
 
-If a project is already attached, `refine start` starts `refine-web.service`
-and `refine.service`, then waits for the HTTP server and runner socket to be
-reachable before returning. If no project is attached yet, it serves the setup
-UI directly from the host so it can create or attach app directories. Logs go
-to journald:
+If a project is already attached, `refine start` starts `refine-web.service`,
+then waits for the HTTP server to be reachable before returning. The web
+backend starts the runner in-process. If no project is attached yet, it serves
+the setup UI directly from the host so it can create or attach app directories.
+Logs go to journald:
 
 ```bash
-journalctl --user -u refine -f       # runner
-journalctl --user -u refine-web -f   # webapp
+journalctl --user -u refine-web -f
 ```
 
 To survive logout / reboot, run once:
@@ -168,7 +167,7 @@ updates its known-app list and active binding.
 
 ### Switching / Re-binding
 
-For normal retargeting, use Settings → Project. The UI stops the runner,
+For normal retargeting, use Settings → Project. The UI stops the in-process runner,
 commits pending `.refine/` state when needed, refuses to switch if the current
 app has other uncommitted changes, preserves an existing `.refine/refine.toml`
 in the selected app, and then performs the same binding work as
@@ -190,7 +189,7 @@ Or wipe the checkout's binding first and `init` fresh:
 
 ```bash
 cd /opt/refine
-uv run refine reset                                # stop services, disable units, remove binding + known-app list
+uv run refine reset                                # stop service, disable unit, remove binding + known-app list
 uv run refine init /srv/clients/other-client       # attach the new app
 
 # To also delete the old client's .refine/ data (gap.json files, sqlite index):
@@ -205,21 +204,20 @@ to that path later and pick up where you left off.
 
 ```
 ┌─────────────────┐                ┌─────────────────────┐
-│  refine-web     │ ── IPC ──────► │  refine-runner      │
-│  (host process) │  (Unix sock)   │  (host process)     │
-│                 │ ◄── SQLite ──► │                     │
-└─────────────────┘                └─────────────────────┘
-        ▲                                    │
-        │                                    ▼
-        └─── reads gap.json ─────────► writes gap.json (sole writer)
+│  Browser UI     │ ── JSON API ──► │  refine-web backend │
+│                 │ ◄── SSE ─────── │  + in-process runner│
+└─────────────────┘                 └─────────────────────┘
+                                               │
+                                               ▼
+                                    CLI subprocesses + git
 ```
 
-- **`gap.json` writes** are runner-only — the webapp sends round
-  submissions / edits / log appends to the runner over IPC.
+- **`gap.json` writes** are runner-only — HTTP handlers call the in-process
+  runner for round submissions / edits / log appends.
 - **SQLite** is shared (WAL + busy retry). Webapp owns settings, reporters,
   pause flag, and `status` for non-runner user transitions; runner owns run
   state, agent-driven status changes, and most activity entries.
-- **SSE** is fed by a webapp-side poller that tails the SQLite `activity`
+- **SSE** is fed by a backend-side poller that tails the SQLite `activity`
   table and watches `gaps_index` status changes.
 
 ## Configuration
@@ -229,7 +227,6 @@ A single TOML file is the only thing operators edit:
 ```toml
 # .refine/refine.toml (created by `refine init`)
 client_repo  = ".."                  # relative to this file (= the client repo root)
-runner_socket = "./run/runner.sock"
 [web]
 host = "0.0.0.0"
 port = 8080
@@ -268,15 +265,15 @@ the UI's Settings page.
 
 | Command                       | What it does                                                                                                |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------|
-| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, make the app active, install + enable runner and web systemd --user units. |
-| `uv run refine reset`         | Undo `init` in this checkout: stop services, disable + remove the systemd units, delete `.refine-binding` and `.refine-apps.json` (plus legacy Docker artifacts if present). Add `--purge` (+ `-y` to skip prompt) to also delete the active app's `.refine/` data. |
-| `uv run refine start`         | If initialized: `systemctl --user start <web-unit>` + `systemctl --user start <runner-unit>` → wait for HTTP + runner socket. If no project is attached yet: start the host-native setup UI. |
-| `uv run refine stop`          | `systemctl --user stop <runner-unit>` + `systemctl --user stop <web-unit>`.                                  |
+| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, make the app active, install + enable the web backend systemd --user unit. |
+| `uv run refine reset`         | Undo `init` in this checkout: stop the web backend, disable + remove the systemd unit, delete `.refine-binding` and `.refine-apps.json` (plus legacy Docker artifacts if present). Add `--purge` (+ `-y` to skip prompt) to also delete the active app's `.refine/` data. |
+| `uv run refine start`         | If initialized: `systemctl --user start <web-unit>` → wait for HTTP. If no project is attached yet: start the host-native setup UI. |
+| `uv run refine stop`          | `systemctl --user stop <web-unit>`.                                                                         |
 | `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands.                       |
-| `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |
-| `uv run refine runner`        | Run the runner in the foreground (what the systemd unit invokes).                                           |
-| `uv run refine web`           | Start the webapp in-process (what the systemd web unit invokes).                                            |
-| `uv run refine doctor`        | Deeper diagnostic snapshot: config, IPC, selected agent CLI, git status.                                   |
+| `uv run refine status`        | Read-only: show backend state and where to tail logs.                                                       |
+| `uv run refine runner`        | Run the runner in the foreground for debugging.                                                             |
+| `uv run refine web`           | Start the web backend in-process (what the systemd unit invokes).                                           |
+| `uv run refine doctor`        | Deeper diagnostic snapshot: config, selected agent CLI, git status.                                        |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.
 
@@ -285,12 +282,12 @@ All commands accept `--config /path/to/refine.toml` to bypass discovery.
 ```bash
 uv run python tests/smoke_test.py        # data-layer + storage
 uv run python tests/project_setup_test.py # first-run setup + app switching
-uv run python tests/integration_test.py   # runner + webapp end-to-end
+uv run python tests/integration_test.py   # backend + in-process runner end-to-end
 ```
 
-The integration test boots a real runner and webapp on a temp directory and
-exercises the full HTTP + IPC stack (excluding real agent CLI work and git
-remotes, both of which need a configured host).
+The integration test boots the web backend with its in-process runner on a temp
+directory and exercises the full HTTP + direct-backend stack (excluding real
+agent CLI work and git remotes, both of which need a configured host).
 
 ## Caveats / known scope
 

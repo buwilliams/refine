@@ -105,7 +105,7 @@ def read_gap_json(gap_id: str) -> dict[str, Any] | None:
 def write_gap_json(gap: dict[str, Any]) -> None:
     """Atomic write: temp file in same directory + rename + fsync directory.
 
-    RUNNER ONLY. The webapp must route writes through IPC.
+    RUNNER ONLY. Web HTTP handlers must route writes through the backend runner.
     """
     gid = gap["id"]
     d = gap_dir(gid)

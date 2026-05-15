@@ -1,5 +1,4 @@
-"""Main runner orchestrator — ties IPC server, dispatcher, subprocess manager
-together, and routes IPC methods to the right handler.
+"""Main runner orchestrator for dispatcher, subprocess manager, and backend calls.
 
 The runner is the sole writer of gap.json.
 """
@@ -13,19 +12,18 @@ from typing import Any
 
 from refine_shared import activity, db, features, gaps as shared_gaps, reporters
 from refine_shared.gaps import now_iso
-from refine_shared.ipc_protocol import (
+from refine_shared.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
     M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
-    M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY, default_socket_path,
+    M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 
 from . import dispatcher as _dispatcher
 from . import gap_writer, git_ops, llm, merger as _merger, preflight, recovery, state_committer, subprocess_mgr, target_app, verify_op
 from .chat_mgr import ChatManager
-from .ipc_server import IpcServer
 
 
 class Runner:
@@ -53,7 +51,6 @@ class Runner:
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
             on_run_finished=lambda _gid: self.merger.wake(),
         )
-        self.ipc = IpcServer(default_socket_path(), self._dispatch_method)
         self.chat = ChatManager(
             get_standalone_idle_timeout=lambda: db.get_setting_int(
                 self._conn, "chat_idle_timeout_seconds", 300,
@@ -63,6 +60,9 @@ class Runner:
             get_conn=self._get_conn,
         )
         self._target_app_lock = threading.Lock()
+        self._diag_lock = threading.Lock()
+        self._last_call_at: str | None = None
+        self._recent_errors: list[str] = []
 
     def _get_conn(self) -> sqlite3.Connection:
         return self._conn
@@ -76,14 +76,12 @@ class Runner:
         self.dispatcher.start()
         self.merger.start()
         self.state_committer.start()
-        self.ipc.start()
         activity.append(
             self._conn, message="refine-runner started",
             severity="info", category="state", actor="runner",
         )
 
     def shutdown(self) -> None:
-        self.ipc.stop()
         self.chat.shutdown()
         self.sub_mgr.cancel_all("shutdown")
         try:
@@ -98,7 +96,17 @@ class Runner:
             severity="info", category="state", actor="runner",
         )
 
-    # ---- IPC routing ---------------------------------------------------------
+    # ---- direct backend routing ---------------------------------------------
+
+    def call(self, method: str, params: dict | None = None) -> dict:
+        with self._diag_lock:
+            self._last_call_at = now_iso()
+        try:
+            return self._dispatch_method(method, params or {})
+        except Exception as e:
+            with self._diag_lock:
+                self._recent_errors.append(f"{now_iso()} {method}: {e!r}")
+            raise
 
     def _dispatch_method(self, method: str, params: dict) -> dict:
         handlers = {
@@ -149,7 +157,12 @@ class Runner:
         }
 
     def _h_diagnostics(self, _: dict) -> dict:
-        return self.ipc.diagnostics()
+        with self._diag_lock:
+            return {
+                "mode": "in-process",
+                "last_call_at": self._last_call_at,
+                "recent_errors": list(self._recent_errors[-10:]),
+            }
 
     def _h_launch(self, params: dict) -> dict:
         # The dispatcher launches automatically; this method is a no-op that

@@ -2,29 +2,28 @@
 
 Subcommands:
 - init    — write refine.toml + run/ + gaps/ in a chosen volume root,
-            then write + enable systemd --user units for the runner + webapp.
-- reset   — undo `init` in this checkout (stop services, disable units,
+            then write + enable a systemd --user unit for the web backend.
+- reset   — undo `init` in this checkout (stop service, disable unit,
             remove binding); optional --purge also deletes the active app's
             .refine/ data so you can attach a different app.
-- start   — bring up runner + webapp as host-native systemd services.
-- stop    — stop runner + webapp.
+- start   — bring up the host-native web backend.
+- stop    — stop the web backend.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
-- runner  — start the runner daemon in-process (used by the systemd unit
-            and for interactive debugging; not the daily verb).
-- web     — start the webapp in-process (used by the systemd unit).
-- doctor  — deeper diagnostic snapshot (config, IPC, agent CLI, git).
+- runner  — start the runner in the foreground for interactive debugging.
+- web     — start the web backend in-process (used by the systemd unit).
+- doctor  — deeper diagnostic snapshot (config, agent CLI, git).
 """
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
 import time
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 from refine_shared import config, project_registry
@@ -49,8 +48,8 @@ def main(argv: list[str] | None = None) -> int:
         description=(
             "Bootstraps a target app: creates <app>/.refine/refine.toml + "
             "run/ + gaps/, writes the active-app binding, records the app in "
-            "the known-apps list, and registers systemd --user units for the "
-            "host-native runner and web server."
+            "the known-apps list, and registers a systemd --user unit for the "
+            "host-native web backend."
         ),
     )
     p_init.add_argument(
@@ -65,9 +64,9 @@ def main(argv: list[str] | None = None) -> int:
         "reset",
         help="Undo `refine init` in this checkout so it can attach a different app.",
         description=(
-            "Stops the runner + webapp, removes the .refine-binding and "
+            "Stops the web backend, removes the .refine-binding and "
             ".refine-apps.json files from this checkout, disables + removes "
-            "the systemd --user units, and (with --purge) wipes the active "
+            "the systemd --user web unit, and (with --purge) wipes the active "
             "app's .refine/ directory. The app source tree is never touched."
         ),
     )
@@ -84,17 +83,17 @@ def main(argv: list[str] | None = None) -> int:
 
     p_start = sub.add_parser(
         "start",
-        help="Start runner + webapp.",
+        help="Start the web backend.",
         description=(
-            "Starts the host-native webapp and runner via systemd --user, "
-            "then prints a status block."
+            "Starts the host-native web backend via systemd --user, then "
+            "prints a status block. The backend owns the runner in-process."
         ),
     )
     p_start.set_defaults(fn=cmd_start)
 
     p_restart = sub.add_parser(
         "restart",
-        help="Stop runner + webapp, then start them again.",
+        help="Stop the web backend, then start it again.",
         description=(
             "Equivalent to `refine stop && refine start`."
         ),
@@ -103,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_stop = sub.add_parser(
         "stop",
-        help="Stop runner + webapp.",
+        help="Stop the web backend.",
     )
     p_stop.set_defaults(fn=cmd_stop)
 
@@ -113,15 +112,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_status.set_defaults(fn=cmd_status)
 
-    # The systemd unit invokes this directly. Also useful interactively when
-    # you want runner logs in the foreground.
+    # Useful interactively when you want runner logs in the foreground.
     p_runner = sub.add_parser(
         "runner",
-        help="Run the runner daemon in the foreground (used by the systemd unit).",
+        help="Run the runner in the foreground for debugging.",
     )
     p_runner.set_defaults(fn=cmd_runner_foreground)
 
-    p_web = sub.add_parser("web", help="Start the webapp in the foreground.")
+    p_web = sub.add_parser("web", help="Start the web backend in the foreground.")
     p_web.set_defaults(fn=cmd_web)
 
     p_doctor = sub.add_parser("doctor", help="Print a diagnostic snapshot.")
@@ -154,21 +152,18 @@ def cmd_init(args: argparse.Namespace) -> int:
     cfg_path = result["config_path"]
     target = result["volume_root"]
     binding_written = result.get("binding_path")
-    unit_path = result.get("unit_path")
     web_unit_path = result.get("web_unit_path")
     print(f"Wrote {cfg_path}")
     print(f"Created directories: {target}/run, {target}/gaps")
     if binding_written:
         print(f"Set active target app → {client_repo}")
         print(f"Wrote {binding_written}")
-    if unit_path:
-        print(f"Installed runner unit: {unit_path}")
     if web_unit_path:
-        print(f"Installed web unit: {web_unit_path}")
+        print(f"Installed web backend unit: {web_unit_path}")
     print()
     print("Next steps:")
     if binding_written:
-        print(f"  uv run refine start          # webapp + runner, one command")
+        print(f"  uv run refine start          # web backend + runner, one command")
         print(f"  uv run refine status         # check it's healthy")
         print(f"  uv run refine stop           # tear it all down")
         print()
@@ -247,7 +242,6 @@ def bootstrap_client_repo(
         config_created = True
 
     binding_written = None
-    unit_path = None
     web_unit_path = None
     if _is_refine_source_dir(clone_dir):
         binding_path = clone_dir / config.BINDING_FILENAME
@@ -258,9 +252,7 @@ def bootstrap_client_repo(
         binding_written = config.write_binding(clone_dir, client_repo)
         _remove_legacy_docker_artifacts(clone_dir)
         if install_unit:
-            unit_path, web_unit_path = _write_and_enable_units(
-                clone_dir, client_repo, force=force
-            )
+            web_unit_path = _write_and_enable_web_unit(clone_dir, client_repo, force=force)
         project_registry.upsert_app(clone_dir, client_repo, make_current=True)
 
     return {
@@ -268,39 +260,36 @@ def bootstrap_client_repo(
         "volume_root": target,
         "config_path": cfg_path,
         "binding_path": binding_written,
-        "unit_path": unit_path,
         "web_unit_path": web_unit_path,
         "git_initialized": git_initialized,
         "config_created": config_created,
     }
 
 
-def _write_and_enable_units(
+def _write_and_enable_web_unit(
     clone_dir: Path,
     client_repo: Path,
     *,
     force: bool,
     runner_unit_name: str | None = None,
-) -> tuple[Path, Path]:
-    """Write runner + web systemd user units, daemon-reload, and enable both.
+) -> Path:
+    """Write the web backend systemd user unit, daemon-reload, and enable it.
 
     Refuses if a unit by the same name already points at a different checkout,
     unless --force is given (in which case it's overwritten).
     """
     runner_unit = runner_unit_name or config.unit_name_for(clone_dir)
     web_unit = _web_unit_name(runner_unit)
-    runner_unit_path = SYSTEMD_USER_DIR / f"{runner_unit}.service"
     web_unit_path = SYSTEMD_USER_DIR / f"{web_unit}.service"
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
+    _remove_legacy_runner_unit(runner_unit)
 
     if not force:
-        for unit_name, unit_path in ((runner_unit, runner_unit_path), (web_unit, web_unit_path)):
-            if not unit_path.exists():
-                continue
-            existing_wd = _grep_first(unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
+        if web_unit_path.exists():
+            existing_wd = _grep_first(web_unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
             if existing_wd and existing_wd != str(clone_dir):
                 raise _InitError(
-                    f"systemd unit {unit_name} already exists for a different checkout:\n"
+                    f"systemd unit {web_unit} already exists for a different checkout:\n"
                     f"  existing WorkingDirectory: {existing_wd}\n"
                     f"  this checkout:             {clone_dir}\n"
                     f"Use --force to overwrite, or rename one of the checkouts."
@@ -310,43 +299,15 @@ def _write_and_enable_units(
     if uv is None:
         raise _InitError(
             "could not find `uv` on PATH or the login-shell PATH; install it "
-            "before running `refine init` (the systemd units need an absolute "
+            "before running `refine init` (the systemd unit needs an absolute "
             "path to invoke it)."
         )
 
-    runner_body = (
-        "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
-        "# `refine init --force` to regenerate.\n"
-        "[Unit]\n"
-        f"Description=refine runner — {clone_dir} → {client_repo}\n"
-        "After=network.target\n"
-        "\n"
-        "[Service]\n"
-        "Type=simple\n"
-        f"WorkingDirectory={clone_dir}\n"
-        f"ExecStart={uv} run refine runner\n"
-        "Restart=on-failure\n"
-        "RestartSec=2s\n"
-        # KillMode=process so the runner's child processes — most
-        # importantly, any nohup'd target application the agent
-        # backgrounded — survive `systemctl stop` instead of getting
-        # SIGTERM'd as cgroup members. The runner only signals its
-        # own pid; child processes are deliberately orphaned.
-        "KillMode=process\n"
-        # Cap systemd's own stop window so it doesn't sit there for the
-        # default 90s if the runner hangs. The runner's shutdown path
-        # is non-blocking by design (all worker threads are daemons),
-        # so anything past a few seconds is a real bug worth surfacing.
-        "TimeoutStopSec=30s\n"
-        "\n"
-        "[Install]\n"
-        "WantedBy=default.target\n"
-    )
     web_body = (
         "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
         "# `refine init --force` to regenerate.\n"
         "[Unit]\n"
-        f"Description=refine web — {clone_dir} → {client_repo}\n"
+        f"Description=refine web backend — {clone_dir} → {client_repo}\n"
         "After=network.target\n"
         "\n"
         "[Service]\n"
@@ -360,18 +321,16 @@ def _write_and_enable_units(
         "[Install]\n"
         "WantedBy=default.target\n"
     )
-    runner_unit_path.write_text(runner_body, encoding="utf-8")
     web_unit_path.write_text(web_body, encoding="utf-8")
 
     rc, out = _systemctl("daemon-reload")
     if rc != 0:
         raise _InitError(f"systemctl --user daemon-reload failed: {out.strip()}")
-    for unit_name in (runner_unit, web_unit):
-        rc, out = _systemctl("enable", unit_name)
-        if rc != 0:
-            raise _InitError(f"systemctl --user enable {unit_name} failed: {out.strip()}")
+    rc, out = _systemctl("enable", web_unit)
+    if rc != 0:
+        raise _InitError(f"systemctl --user enable {web_unit} failed: {out.strip()}")
 
-    return runner_unit_path, web_unit_path
+    return web_unit_path
 
 
 def _grep_first(text: str, prefix: str) -> str | None:
@@ -397,13 +356,13 @@ def cmd_start(args: argparse.Namespace) -> int:
     cfg = config.get()
     _sync_bound_project_registry(clone, cfg)
     try:
-        _ensure_host_units_installed(clone, cfg, unit)
+        _ensure_host_unit_installed(clone, cfg, unit)
     except _InitError as e:
         print(f"refine start: {e}", file=sys.stderr)
         return 1
     web_unit = _web_unit_name(unit)
 
-    print(f"Starting webapp (systemctl --user start {web_unit})…")
+    print(f"Starting web backend (systemctl --user start {web_unit})…")
     rc, out = _systemctl("start", web_unit)
     if rc != 0:
         print(f"refine start: {out.strip()}", file=sys.stderr)
@@ -411,23 +370,9 @@ def cmd_start(args: argparse.Namespace) -> int:
 
     if not _wait_for_port(cfg.web_host, cfg.web_port, timeout=20.0):
         print(
-            f"refine start: webapp did not start listening on "
+            f"refine start: web backend did not start listening on "
             f"{cfg.web_host}:{cfg.web_port} within 20s. "
             f"Check `journalctl --user -u {web_unit} -n 200`.",
-            file=sys.stderr,
-        )
-        return 1
-
-    print(f"Starting runner (systemctl --user start {unit})…")
-    rc, out = _systemctl("start", unit)
-    if rc != 0:
-        print(f"refine start: {out.strip()}", file=sys.stderr)
-        return 1
-
-    if not _wait_for_socket(cfg.runner_socket, timeout=10.0):
-        print(
-            f"refine start: runner did not bind {cfg.runner_socket} within 10s. "
-            f"Check `journalctl --user -u {unit} -n 200`.",
             file=sys.stderr,
         )
         return 1
@@ -440,27 +385,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     web_unit = _web_unit_name(unit)
 
-    print(f"Stopping runner (systemctl --user stop {unit})…")
-    rc, out = _systemctl("stop", unit)
-    if rc != 0:
-        # Non-fatal: maybe it wasn't running. Continue to stop the web service.
-        print(f"  (systemctl: {out.strip()})", file=sys.stderr)
-        if rc == 124:
-            # The wrapper's own timeout fired. Most common cause: the
-            # installed runner unit predates `KillMode=process`, so systemd is
-            # waiting for child processes (the target-app agent's
-            # nohup'd subprocess, for example) before it considers the
-            # unit stopped. Point the operator at the fix.
-            print(
-                "  Hint: the unit may be waiting for nohup'd child processes "
-                "to exit. Re-run `refine init --force` to regenerate the "
-                "runner unit with KillMode=process, then try stopping "
-                "again. If the runner is wedged in the meantime, force-kill "
-                f"it with `systemctl --user kill -s SIGKILL {unit}`.",
-                file=sys.stderr,
-            )
-
-    print(f"Stopping webapp (systemctl --user stop {web_unit})…")
+    print(f"Stopping web backend (systemctl --user stop {web_unit})…")
     rc, out = _systemctl("stop", web_unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
@@ -483,7 +408,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
 def cmd_reset(args: argparse.Namespace) -> int:
     """Undo `refine init` in this checkout.
 
-    The reverse of init: stop services, disable + remove the systemd units,
+    The reverse of init: stop service, disable + remove the systemd web unit,
     delete `.refine-binding` and `.refine-apps.json` from the checkout, and
     optionally purge the active app's `.refine/` directory. Leaves the app
     source tree untouched.
@@ -515,7 +440,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
             print("refine reset: --purge: no client .refine/ directory to delete.")
         elif not args.yes:
             print(f"--purge will DELETE {client_refine_dir}")
-            print("This removes ALL gap data, the sqlite index, and the runner socket.")
+            print("This removes ALL gap data, the sqlite index, and run state.")
             try:
                 answer = input("Type 'yes' to confirm: ").strip().lower()
             except EOFError:
@@ -524,17 +449,14 @@ def cmd_reset(args: argparse.Namespace) -> int:
                 print("Aborted.")
                 return 1
 
-    # 1. Stop services (best-effort — keep going if they were already down).
-    print(f"Stopping runner (systemctl --user stop {unit})…")
-    rc, out = _systemctl("stop", unit)
-    if rc != 0:
-        print(f"  (systemctl: {out.strip()})", file=sys.stderr)
-    print(f"Stopping webapp (systemctl --user stop {web_unit})…")
+    # 1. Stop service (best-effort — keep going if it was already down).
+    print(f"Stopping web backend (systemctl --user stop {web_unit})…")
     rc, out = _systemctl("stop", web_unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
 
-    # 2. Disable + remove the systemd units.
+    # 2. Disable + remove the web unit. Also remove the legacy runner unit if
+    # present from older installs.
     removed_units = False
     for unit_name in (unit, web_unit):
         rc, out = _systemctl("disable", unit_name)
@@ -590,8 +512,6 @@ def cmd_status(args: argparse.Namespace) -> int:
 def _print_status_block(clone: Path, unit: str, cfg: "config.Config") -> None:
     web_unit = _web_unit_name(unit)
     web_up = _port_open(cfg.web_host, cfg.web_port)
-    sock_up = _ipc_ping_quick(cfg.runner_socket)
-    runner_active = _systemctl_is_active(unit)
     web_active = _systemctl_is_active(web_unit)
 
     print()
@@ -602,11 +522,8 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config") -> None:
           f"({'active' if web_active else 'inactive'}, "
           f"http {'reachable' if web_up else 'unreachable'} at "
           f"http://{_displayable_host(cfg.web_host)}:{cfg.web_port})")
-    print(f"  runner:   {_dot(runner_active and sock_up)} systemd unit `{unit}` "
-          f"({'active' if runner_active else 'inactive'}, "
-          f"socket {'reachable' if sock_up else 'unreachable'})")
-    print(f"  logs:     journalctl --user -u {unit} -f")
-    print(f"  web logs: journalctl --user -u {web_unit} -f")
+    print(f"  runner:   {_dot(web_active and web_up)} in-process with web backend")
+    print(f"  logs:     journalctl --user -u {web_unit} -f")
     print(f"  stop:     uv run refine stop")
     print()
 
@@ -614,10 +531,9 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config") -> None:
 # ----- runner / web -----------------------------------------------------------
 
 def cmd_runner_foreground(args: argparse.Namespace) -> int:
-    """Run the runner daemon in-process. Used by the systemd unit.
+    """Run the runner in the foreground for debugging.
 
-    No fork/setsid/pidfile dance — systemd owns the lifecycle. Stdout/stderr
-    flow to journald, which is where logs are read from.
+    The production path is `refine web`, which owns the runner in-process.
     """
     _load_config_or_exit(args)
     from refine_runner.__main__ import main as runner_main
@@ -646,7 +562,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _kv("config file",   cfg.config_path)
     _kv("volume root",   cfg.volume_root)
     _kv("target app",    cfg.client_repo)
-    _kv("runner socket", cfg.runner_socket)
     _kv("web host:port", f"{cfg.web_host}:{cfg.web_port}")
 
     print(_section("Volume root"))
@@ -654,15 +569,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     _kv("index.sqlite",  f"{cfg.sqlite_path} ({'present' if sqlite_present else 'missing'})")
     gap_count = _count_gap_files(cfg.gaps_dir)
     _kv("gaps/ files",   f"{gap_count} gap.json file(s)")
-    _kv("runner socket dir", cfg.runner_socket.parent)
-
-    print(_section("Host runner"))
-    reachable, ping_msg = _ipc_ping(cfg.runner_socket)
-    _kv("socket reachable", _bool(reachable))
-    if not reachable:
-        _kv("error", ping_msg or "")
-    else:
-        _kv("ping ok", "pong")
 
     print(_section("Agent CLI"))
     agent_cli = _configured_agent_cli(cfg.sqlite_path)
@@ -752,13 +658,26 @@ def _user_login_path() -> str | None:
     return _LOGIN_PATH_CACHE
 
 
-def _ensure_host_units_installed(clone: Path, cfg: "config.Config", runner_unit: str) -> None:
+def _ensure_host_unit_installed(clone: Path, cfg: "config.Config", runner_unit: str) -> None:
     web_unit = _web_unit_name(runner_unit)
-    runner_path = SYSTEMD_USER_DIR / f"{runner_unit}.service"
     web_path = SYSTEMD_USER_DIR / f"{web_unit}.service"
-    if runner_path.exists() and web_path.exists():
+    _remove_legacy_runner_unit(runner_unit)
+    if web_path.exists():
         return
-    _write_and_enable_units(clone, cfg.client_repo, force=True, runner_unit_name=runner_unit)
+    _write_and_enable_web_unit(clone, cfg.client_repo, force=True, runner_unit_name=runner_unit)
+
+
+def _remove_legacy_runner_unit(runner_unit: str) -> None:
+    unit_path = SYSTEMD_USER_DIR / f"{runner_unit}.service"
+    if not unit_path.exists():
+        return
+    _systemctl("stop", runner_unit)
+    _systemctl("disable", runner_unit)
+    try:
+        unit_path.unlink()
+    except OSError:
+        return
+    _systemctl("daemon-reload")
 
 
 def _remove_legacy_docker_artifacts(clone: Path, *, verbose: bool = False) -> None:
@@ -843,50 +762,10 @@ def _wait_for_port(host: str, port: int, *, timeout: float) -> bool:
 def _port_open(host: str, port: int) -> bool:
     target = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     try:
-        with socket.create_connection((target, port), timeout=1.0):
+        with urllib.request.urlopen(f"http://{target}:{port}/api/project/status", timeout=1.0):
             return True
-    except OSError:
+    except (OSError, urllib.error.URLError):
         return False
-
-
-def _wait_for_socket(path: Path, *, timeout: float) -> bool:
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if path.exists() and _ipc_ping_quick(path):
-            return True
-        time.sleep(0.2)
-    return False
-
-
-def _ipc_ping_quick(socket_path: Path) -> bool:
-    ok, _ = _ipc_ping(socket_path)
-    return ok
-
-
-def _ipc_ping(socket_path: Path) -> tuple[bool, str | None]:
-    if not socket_path.exists():
-        return False, f"socket file not found: {socket_path}"
-    try:
-        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
-            s.settimeout(3.0)
-            s.connect(str(socket_path))
-            envelope = {"id": "doctor", "method": "ping", "params": {}}
-            s.sendall((json.dumps(envelope) + "\n").encode("utf-8"))
-            buf = b""
-            while b"\n" not in buf:
-                chunk = s.recv(65536)
-                if not chunk:
-                    break
-                buf += chunk
-        line, _, _ = buf.partition(b"\n")
-        resp = json.loads(line.decode("utf-8"))
-        if resp.get("ok") and resp.get("result", {}).get("pong"):
-            return True, None
-        return False, f"unexpected response: {resp}"
-    except (ConnectionRefusedError, PermissionError, FileNotFoundError) as e:
-        return False, repr(e)
-    except Exception as e:
-        return False, repr(e)
 
 
 def _configured_agent_cli(sqlite_path: Path) -> str:
