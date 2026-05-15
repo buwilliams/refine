@@ -112,7 +112,9 @@ pre {
   flex: 0 0 auto;
 }
 .target-app-indicator[data-state="running"] .target-app-dot { background: #1f9d4d; }
-.target-app-indicator[data-state="stopped"] .target-app-dot { background: #c63838; }
+.target-app-indicator[data-state="degraded"] .target-app-dot { background: #d4a106; }
+.target-app-indicator[data-state="stopped"] .target-app-dot,
+.target-app-indicator[data-state="failed"] .target-app-dot { background: #c63838; }
 .target-app-indicator[data-state="starting"] .target-app-dot,
 .target-app-indicator[data-state="stopping"] .target-app-dot {
   background: #d4a106;
@@ -121,6 +123,15 @@ pre {
 @keyframes target-app-pulse {
   0%, 100% { opacity: 1; }
   50%      { opacity: 0.35; }
+}
+
+.form-grid.two {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+@media (max-width: 720px) {
+  .form-grid.two { grid-template-columns: 1fr; }
 }
 
 .banners { padding: 0 20px; }

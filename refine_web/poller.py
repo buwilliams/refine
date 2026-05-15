@@ -135,23 +135,30 @@ class SqlitePoller:
                 pass
 
     def _run_target_app_health_check(self) -> None:
-        """Probe the configured health URL and persist the result.
+        """Probe configured target-app status checks and persist the result.
 
         Imports locally so an unconfigured webapp doesn't pull in the
         runner module on every tick. The api helper handles the
-        no-URL-configured case as a no-op probe.
+        no-checks-configured case as a no-op probe.
         """
         from . import api as web_api
         conn = self._conn()
         try:
-            url = (db.get_setting(conn, "target_app_health_url") or "").strip()
+            settings = db.list_settings(conn)
+            has_checks = any((
+                (settings.get("target_app_status_command") or "").strip(),
+                (settings.get("target_app_http_check_url") or settings.get("target_app_health_url") or "").strip(),
+                (settings.get("target_app_tcp_check_host") or "").strip()
+                and (settings.get("target_app_tcp_check_port") or "").strip(),
+                (settings.get("target_app_process_check_command") or "").strip(),
+            ))
         finally:
             conn.close()
-        if not url:
+        if not has_checks:
             return
         snap = web_api._target_app_run_health_check()  # noqa: SLF001
         sse.publish("target_app_health", {
-            "ok": snap.get("last_health_ok"),
-            "at": snap.get("last_health_at"),
+            "ok": snap.get("last_check_ok", snap.get("last_health_ok")),
+            "at": snap.get("last_check_at", snap.get("last_health_at")),
             "state": snap.get("state"),
         })

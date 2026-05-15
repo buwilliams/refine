@@ -47,11 +47,11 @@ auth, so operators rarely need to think about either.
 - **`refine-web`** — Python webapp in Docker (UI + JSON API + SSE).
 - **`refine-runner`** — host-native daemon that owns CLI subprocesses, git
   operations, and `gap.json` writes. Runs natively so it inherits the host's
-  agent auth, SSH keys, and git config. Claude subprocesses
-  additionally strip `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` (+ a few related
-  vars) and resolve `claude` via the user's interactive login-shell `PATH`,
-  so they behave like the user's terminal `claude` regardless of the
-  systemd-user manager's stripped env.
+  agent auth, SSH keys, and git config. Agent subprocesses additionally strip
+  provider API-key override vars such as `ANTHROPIC_API_KEY`,
+  `CLAUDE_API_KEY`, and `OPENAI_API_KEY`, then resolve CLIs via the user's
+  interactive login-shell `PATH`, so they use `claude login` / `codex login`
+  credentials instead of a service manager's stripped or injected env.
 - They communicate over a Unix-domain socket inside the volume root, which is
   bind-mounted into the webapp container.
 
@@ -229,9 +229,8 @@ the UI's Settings page.
   dropdown and historical data stay in sync; removing a reporter deliberately
   does *not* cascade, so audit history of who submitted what is preserved.
 - **Agent auth** lives on the host. Claude uses `~/.claude/` from
-  `claude login`; Codex uses `codex login` / `~/.codex/auth.json` or
-  supported API-key auth; Gemini uses its own CLI auth. Re-check auth from
-  Settings after changing providers.
+  `claude login`; Codex uses `codex login` / `~/.codex/auth.json`; Gemini
+  uses its own CLI auth. Re-check auth from Settings after changing providers.
 
 ## CLI reference
 

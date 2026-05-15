@@ -29,10 +29,10 @@ from typing import Callable, Deque
 from . import agent_cli
 
 
-# Env vars that, if set, would make `claude` use API-key auth or otherwise
-# diverge from the host CLI's OAuth login. Strip all of them before spawn so
-# chat behaves exactly like the user's interactive `claude` in a clean
-# terminal — which uses the credentials persisted by `claude login`.
+# Env vars that, if set, would make provider CLIs use API-key auth or
+# otherwise diverge from the host CLI's login session. Strip them before
+# spawn so agent subprocesses behave like the user's interactive CLI in
+# a clean terminal — e.g. `claude login` / `codex login`.
 # How long to wait for the provider CLI to actually exit after it emits its
 # terminal `result` event. Past this point, something is almost
 # certainly holding the stdio pipes open — typically a backgrounded
@@ -58,9 +58,16 @@ _AUTH_OVERRIDE_VARS = (
     "ANTHROPIC_API_KEY",
     "CLAUDE_API_KEY",
     "ANTHROPIC_AUTH_TOKEN",
+    "OPENAI_API_KEY",
+    "OPENAI_ORG_ID",
+    "OPENAI_ORGANIZATION",
+    "OPENAI_PROJECT",
     # Endpoint redirects that would aim a valid key at the wrong service
     "ANTHROPIC_BASE_URL",
     "ANTHROPIC_VERSION",
+    "OPENAI_BASE_URL",
+    "OPENAI_API_BASE",
+    "OPENAI_API_HOST",
     # Alternate cloud providers — force the user's Anthropic OAuth login
     "CLAUDE_CODE_USE_BEDROCK",
     "CLAUDE_CODE_USE_VERTEX",
@@ -116,11 +123,11 @@ def _user_login_path() -> str | None:
 def _chat_env() -> dict[str, str]:
     """Build the environment agent subprocesses run with.
 
-    For Claude, strip API-key and inherited Claude-Code-agent vars so
-    the CLI uses the user's normal `claude login` OAuth session. For all
-    providers, override PATH with the user's interactive-login-shell PATH
-    (cached after the first call) so `claude`, `codex`, or `gemini`
-    resolve the same way they do in the user's terminal.
+    Strip API-key and inherited agent vars so provider CLIs use the
+    user's normal login session. For all providers, override PATH with
+    the user's interactive-login-shell PATH (cached after the first
+    call) so `claude`, `codex`, or `gemini` resolve the same way they
+    do in the user's terminal.
     """
     env = os.environ.copy()
     for key in _AUTH_OVERRIDE_VARS:

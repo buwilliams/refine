@@ -5,6 +5,7 @@ The runner is the sole writer of gap.json.
 """
 from __future__ import annotations
 
+import json
 import sqlite3
 import threading
 from pathlib import Path
@@ -61,6 +62,7 @@ class Runner:
         self.state_committer = state_committer.StateCommitter(
             get_conn=self._get_conn,
         )
+        self._target_app_lock = threading.Lock()
 
     def _get_conn(self) -> sqlite3.Connection:
         return self._conn
@@ -670,43 +672,49 @@ class Runner:
     # ---- target-app ----------------------------------------------------------
 
     def _h_target_app_run(self, params: dict) -> dict:
-        """Run a target-app start/stop prompt as a Standalone agent.
-
-        Params: `{kind: "start"|"stop", prompt: str}` — the caller
-        sends the actual prompt text so the runner doesn't need to
-        re-read SQLite (settings live in the same DB but rounds via
-        the webapp keep that round-trip in one place).
-
-        Logs lifecycle to the activity feed and returns the agent's
-        captured stdout/stderr so the webapp can surface details.
-        """
+        """Run a deterministic target-app start/stop/status operation."""
         kind = (params.get("kind") or "").strip().lower()
-        if kind not in ("start", "stop"):
-            raise ValueError("kind must be 'start' or 'stop'")
-        prompt = params.get("prompt") or ""
-        activity.append(
-            self._conn,
-            message=f"target-app: {kind} requested",
-            severity="info", category="target_app", actor="refine",
-        )
-        provider = db.get_setting(self._conn, "agent_cli")
-        result = target_app.run_instructions(prompt, provider=provider)
-        sev = "info" if result["ok"] else "error"
-        msg = (
-            f"target-app: {kind} {'completed' if result['ok'] else 'failed'} — {result['message']}"
-        )
-        details_parts = []
-        if result.get("stdout"):
-            details_parts.append("stdout:\n" + result["stdout"])
-        if result.get("stderr"):
-            details_parts.append("stderr:\n" + result["stderr"])
-        details = "\n\n".join(details_parts) if details_parts else None
-        activity.append(
-            self._conn, message=msg, severity=sev,
-            category="target_app", actor="refine",
-            details=details,
-        )
-        return result
+        if kind not in ("start", "stop", "status"):
+            raise ValueError("kind must be 'start', 'stop', or 'status'")
+        config = params.get("config") if isinstance(params.get("config"), dict) else {}
+        quiet = bool(params.get("quiet"))
+        if not self._target_app_lock.acquire(blocking=False):
+            return {"ok": False, "busy": True, "state": "unknown",
+                    "message": "another target-app operation is already running",
+                    "checks": []}
+        if not quiet:
+            activity.append(
+                self._conn,
+                message=f"target-app: {kind} requested",
+                severity="info", category="target_app", actor="refine",
+            )
+        try:
+            result = target_app.run_operation(kind, config)
+            sev = "info" if result.get("ok") else "error"
+            msg = (
+                f"target-app: {kind} "
+                f"{'completed' if result.get('ok') else 'failed'}"
+                f" — {result.get('message') or ''}"
+            )
+            details_parts = []
+            if result.get("stdout_tail"):
+                details_parts.append("stdout:\n" + result["stdout_tail"])
+            if result.get("stderr_tail"):
+                details_parts.append("stderr:\n" + result["stderr_tail"])
+            if result.get("checks"):
+                details_parts.append(
+                    "checks:\n" + json.dumps(result["checks"], indent=2)
+                )
+            details = "\n\n".join(details_parts) if details_parts else None
+            if not quiet:
+                activity.append(
+                    self._conn, message=msg, severity=sev,
+                    category="target_app", actor="refine",
+                    details=details,
+                )
+            return result
+        finally:
+            self._target_app_lock.release()
 
     def _h_target_app_health(self, params: dict) -> dict:
         """Probe the configured health URL from the host.
@@ -722,25 +730,25 @@ class Runner:
         return target_app.http_health(url, timeout=timeout)
 
     def _h_target_app_generate(self, params: dict) -> dict:
-        """Generate start or stop instructions via an agent analysis pass.
+        """Generate structured target-app config via an agent analysis pass.
 
-        Returns `{ok, text, message}`. The webapp stores `text` as the
-        new instructions if `ok` is True.
+        Returns `{ok, config, message}`. The webapp lets the operator
+        review and save `config` if `ok` is True.
         """
-        kind = (params.get("kind") or "").strip().lower()
-        if kind not in ("start", "stop"):
-            raise ValueError("kind must be 'start' or 'stop'")
+        kind = (params.get("kind") or "all").strip().lower()
+        if kind not in ("all", "start", "stop", "status"):
+            raise ValueError("kind must be 'all', 'start', 'stop', or 'status'")
         activity.append(
             self._conn,
             message=f"target-app: generating {kind} instructions",
             severity="info", category="target_app", actor="refine",
         )
         provider = db.get_setting(self._conn, "agent_cli")
-        result = target_app.generate_instructions(kind, provider=provider)
+        result = target_app.generate_config(provider=provider)
         sev = "info" if result["ok"] else "warn"
         activity.append(
             self._conn,
-            message=(f"target-app: {kind} instructions "
+            message=(f"target-app: {kind} configuration "
                      f"{'generated' if result['ok'] else 'generation failed'} — {result['message']}"),
             severity=sev, category="target_app", actor="refine",
         )

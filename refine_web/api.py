@@ -753,12 +753,25 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "agent_subpath", "merge_target_branch",
         "agent_cli",
         "paused",
-        # Target-app prompts + health URL. The state fields
+        # Target-app configuration. The state fields
         # (target_app_state etc.) are owned by the system and are
         # mutated via the /api/target-app/* endpoints, not Settings.
         "target_app_start_instructions",
         "target_app_stop_instructions",
         "target_app_health_url",
+        "target_app_start_command",
+        "target_app_stop_command",
+        "target_app_status_command",
+        "target_app_cwd",
+        "target_app_env_json",
+        "target_app_start_timeout_seconds",
+        "target_app_stop_timeout_seconds",
+        "target_app_status_timeout_seconds",
+        "target_app_log_path",
+        "target_app_http_check_url",
+        "target_app_tcp_check_host",
+        "target_app_tcp_check_port",
+        "target_app_process_check_command",
     }
     valid_agent_clis = ("claude", "codex", "gemini")
     normalized: dict[str, str] = {}
@@ -795,6 +808,50 @@ def update_settings(body: dict) -> tuple[int, dict]:
                 return err(400,
                     f"agent_cli must be one of {', '.join(valid_agent_clis)}")
             normalized[k] = choice
+        elif k == "target_app_cwd":
+            cwd = str(v or "").strip()
+            if cwd and "\0" in cwd:
+                return err(400, "target_app_cwd contains an invalid character")
+            if cwd.startswith("~"):
+                return err(400, "target_app_cwd must be absolute or relative to the repo root")
+            if cwd and not cwd.startswith("/"):
+                parts = [p for p in cwd.replace("\\", "/").split("/") if p]
+                if any(p == ".." for p in parts):
+                    return err(400, "target_app_cwd must not contain `..` components")
+                cwd = "/".join(parts)
+            normalized[k] = cwd
+        elif k == "target_app_env_json":
+            raw = str(v or "{}").strip() or "{}"
+            try:
+                env_obj = json.loads(raw)
+            except json.JSONDecodeError:
+                return err(400, "target_app_env_json must be a JSON object")
+            if not isinstance(env_obj, dict):
+                return err(400, "target_app_env_json must be a JSON object")
+            normalized[k] = json.dumps({str(ek): str(ev) for ek, ev in env_obj.items()})
+        elif k in {
+            "target_app_start_timeout_seconds",
+            "target_app_stop_timeout_seconds",
+            "target_app_status_timeout_seconds",
+        }:
+            try:
+                n = int(v)
+            except (TypeError, ValueError):
+                return err(400, f"{k} must be an integer")
+            if n < 1 or n > 3600:
+                return err(400, f"{k} must be between 1 and 3600")
+            normalized[k] = str(n)
+        elif k == "target_app_tcp_check_port":
+            port = str(v or "").strip()
+            if port:
+                try:
+                    n = int(port)
+                except ValueError:
+                    return err(400, "target_app_tcp_check_port must be an integer")
+                if n < 1 or n > 65535:
+                    return err(400, "target_app_tcp_check_port must be between 1 and 65535")
+                port = str(n)
+            normalized[k] = port
         elif k == "backlog_promote_after_seconds":
             # -1 = never, 0 = instant, otherwise seconds. Restrict to the
             # canonical set shown in the UI so a stale client can't smuggle
@@ -1114,7 +1171,10 @@ def chat_stop(sid: str) -> tuple[int, dict]:
 # Standalone agent. State transitions are recorded in SQLite settings so
 # every browser tab sees the same status.
 
-_TARGET_APP_STATES = ("stopped", "starting", "running", "stopping", "unknown")
+_TARGET_APP_STATES = (
+    "unknown", "starting", "running", "degraded",
+    "stopping", "stopped", "failed",
+)
 
 
 def target_app_status() -> tuple[int, dict]:
@@ -1129,48 +1189,71 @@ def target_app_status() -> tuple[int, dict]:
 
 def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
     state = db.get_setting(conn, "target_app_state") or "unknown"
+    settings = db.list_settings(conn)
+    cfg = _target_app_config(settings)
+    last_op = conn.execute(
+        "SELECT id, kind, state, started_at, finished_at, exit_code, message "
+        "FROM target_app_operations ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    legacy_start = (settings.get("target_app_start_instructions") or "").strip()
+    legacy_stop = (settings.get("target_app_stop_instructions") or "").strip()
     return {
         "state": state if state in _TARGET_APP_STATES else "unknown",
-        "health_url": db.get_setting(conn, "target_app_health_url") or "",
-        "has_start_instructions": bool(
-            (db.get_setting(conn, "target_app_start_instructions") or "").strip()
-        ),
-        "has_stop_instructions": bool(
-            (db.get_setting(conn, "target_app_stop_instructions") or "").strip()
-        ),
-        "last_health_at": db.get_setting(conn, "target_app_last_health_at") or "",
-        "last_health_ok": (db.get_setting(conn, "target_app_last_health_ok") or "0") == "1",
-        "last_health_message": db.get_setting(conn, "target_app_last_health_message") or "",
-        "last_error": db.get_setting(conn, "target_app_last_error") or "",
+        "health_url": cfg.get("http_check_url") or "",
+        "has_start_command": bool(cfg.get("start_command")),
+        "has_stop_command": bool(cfg.get("stop_command")),
+        "has_status_checks": _has_status_checks(cfg),
+        # Back-compat names for older JS during upgrades.
+        "has_start_instructions": bool(cfg.get("start_command") or legacy_start),
+        "has_stop_instructions": bool(cfg.get("stop_command") or legacy_stop),
+        "last_check_at": settings.get("target_app_last_check_at") or "",
+        "last_check_ok": (settings.get("target_app_last_check_ok") or "0") == "1",
+        "last_check_message": settings.get("target_app_last_check_message") or "",
+        "last_health_at": settings.get("target_app_last_check_at") or settings.get("target_app_last_health_at") or "",
+        "last_health_ok": (settings.get("target_app_last_check_ok") or settings.get("target_app_last_health_ok") or "0") == "1",
+        "last_health_message": settings.get("target_app_last_check_message") or settings.get("target_app_last_health_message") or "",
+        "last_error": settings.get("target_app_last_error") or "",
+        "last_operation_id": settings.get("target_app_last_operation_id") or "",
+        "last_operation": dict(last_op) if last_op else None,
+        "legacy_config_present": bool(legacy_start or legacy_stop or (settings.get("target_app_health_url") or "").strip()),
     }
 
 
-def target_app_start(_body: dict | None = None) -> tuple[int, dict]:
-    """Run the configured start instructions via the host runner.
+def _target_app_config(settings: dict[str, str]) -> dict[str, Any]:
+    from refine_runner import target_app as target_app_runtime
+    return target_app_runtime.config_from_settings(settings)
 
-    Transitions state stopped/unknown → starting, fires the agent, then
-    transitions to running on success (or back to stopped on failure).
-    Long-running because the agent typically takes a minute or two.
-    """
+
+def _has_status_checks(cfg: dict[str, Any]) -> bool:
+    return any((
+        (cfg.get("status_command") or "").strip(),
+        (cfg.get("http_check_url") or "").strip(),
+        (cfg.get("tcp_check_host") or "").strip() and (cfg.get("tcp_check_port") or "").strip(),
+        (cfg.get("process_check_command") or "").strip(),
+    ))
+
+
+def target_app_start(_body: dict | None = None) -> tuple[int, dict]:
+    """Run the configured start command via the host runner."""
     return _target_app_run("start")
 
 
 def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
-    """Run the configured stop instructions via the host runner."""
+    """Run the configured stop command via the host runner."""
     return _target_app_run("stop")
 
 
 def _target_app_run(kind: str) -> tuple[int, dict]:
     conn = _conn()
     try:
-        key = f"target_app_{kind}_instructions"
-        prompt = (db.get_setting(conn, key) or "").strip()
-        if not prompt:
+        settings = db.list_settings(conn)
+        cfg = _target_app_config(settings)
+        command = (cfg.get(f"{kind}_command") or "").strip()
+        if not command:
             return err(400,
-                f"No {kind} instructions configured. "
-                f"Add them on Settings → Target Application, or use "
-                f"the Generate button to draft them.")
-        # Optimistic transition. The agent run is synchronous but long;
+                f"No {kind} command configured. "
+                f"Generate or enter target-app configuration in Settings first.")
+        # Optimistic transition. The command run is synchronous but may be long;
         # SSE listeners see the in-flight state via /api/target-app/status.
         next_pending = "starting" if kind == "start" else "stopping"
         db.set_setting(conn, "target_app_state", next_pending)
@@ -1186,7 +1269,7 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
     try:
         result = get_client().call(
             M_TARGET_APP_RUN,
-            {"kind": kind, "prompt": prompt},
+            {"kind": kind, "config": cfg},
             timeout=900.0,
         )
     except IpcError as e:
@@ -1194,36 +1277,128 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
         return _ipc_err(e)
 
     ok = bool(result.get("ok"))
-    final_state = ("running" if ok else "stopped") if kind == "start" \
-                  else ("stopped" if ok else "running")
-    err_msg = "" if ok else (result.get("message") or "agent run failed")
+    final_state = result.get("state") or ("running" if kind == "start" else "stopped")
+    if final_state not in _TARGET_APP_STATES:
+        final_state = "failed" if not ok else "unknown"
+    err_msg = "" if ok else (result.get("message") or "target-app operation failed")
     conn = _conn()
     try:
         db.set_setting(conn, "target_app_state", final_state)
         db.set_setting(conn, "target_app_last_error", err_msg)
+        op_id = _record_target_app_operation(conn, kind, result, final_state)
+        db.set_setting(conn, "target_app_last_operation_id", str(op_id))
+        if result.get("checks_configured"):
+            _persist_check_settings(conn, result.get("checks") or [], result.get("message") or "")
+        snap = _target_app_snapshot(conn)
     finally:
         conn.close()
-    # Trigger an immediate health check so the UI doesn't sit at the
-    # optimistic state until the next poll. Only meaningful when start
-    # succeeded; for stop, the health check is expected to fail.
-    if ok and kind == "start":
-        _target_app_run_health_check()
 
     status = 200 if ok else 502
-    return status, {
+    snap.update({
         "ok": ok,
         "state": final_state,
         "message": result.get("message") or "",
-        "details": (result.get("stderr") or result.get("stdout") or "")[:8000],
-    }
+        "details": (
+            result.get("stderr_tail")
+            or result.get("stdout_tail")
+            or json.dumps(result.get("checks") or [])
+        )[:8000],
+    })
+    return status, snap
+
+
+def _record_target_app_operation(conn: sqlite3.Connection, kind: str,
+                                 result: dict, state: str) -> int:
+    cur = conn.execute(
+        "INSERT INTO target_app_operations "
+        "(kind, state, started_at, finished_at, command, cwd, exit_code, "
+        "message, stdout_tail, stderr_tail, checks_json) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            kind, state,
+            result.get("started_at") or now_iso(),
+            result.get("finished_at") or now_iso(),
+            result.get("command") or "",
+            result.get("cwd") or "",
+            result.get("exit_code"),
+            result.get("message") or "",
+            result.get("stdout_tail") or "",
+            result.get("stderr_tail") or "",
+            json.dumps(result.get("checks") or []),
+        ),
+    )
+    return int(cur.lastrowid)
+
+
+def _persist_check_settings(conn: sqlite3.Connection, checks: list[dict],
+                            message: str) -> None:
+    ok = bool(checks) and all(bool(c.get("ok")) for c in checks)
+    db.set_setting(conn, "target_app_last_check_at", now_iso())
+    db.set_setting(conn, "target_app_last_check_ok", "1" if ok else "0")
+    db.set_setting(conn, "target_app_last_check_message", message or "")
+    # Back-compat mirrors.
+    db.set_setting(conn, "target_app_last_health_at", db.get_setting(conn, "target_app_last_check_at") or "")
+    db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0")
+    db.set_setting(conn, "target_app_last_health_message", message or "")
+
+
+def target_app_check(_body: dict | None = None) -> tuple[int, dict]:
+    """Force an immediate deterministic status check."""
+    quiet = bool((_body or {}).get("quiet"))
+    conn = _conn()
+    try:
+        settings = db.list_settings(conn)
+        cfg = _target_app_config(settings)
+    finally:
+        conn.close()
+    try:
+        result = get_client().call(
+            M_TARGET_APP_RUN,
+            {"kind": "status", "config": cfg, "quiet": quiet},
+            timeout=60.0,
+        )
+    except IpcError as e:
+        _target_app_record_failure("status", e.message)
+        return _ipc_err(e)
+    if result.get("busy") and quiet:
+        conn = _conn()
+        try:
+            return 200, _target_app_snapshot(conn)
+        finally:
+            conn.close()
+    final_state = result.get("state") if result.get("state") in _TARGET_APP_STATES else "unknown"
+    conn = _conn()
+    try:
+        db.set_setting(conn, "target_app_state", final_state)
+        db.set_setting(conn, "target_app_last_error", "" if result.get("ok") else (result.get("message") or "status check failed"))
+        if not quiet:
+            op_id = _record_target_app_operation(conn, "status", result, final_state)
+            db.set_setting(conn, "target_app_last_operation_id", str(op_id))
+        _persist_check_settings(conn, result.get("checks") or [], result.get("message") or "")
+        snap = _target_app_snapshot(conn)
+    finally:
+        conn.close()
+    snap.update({"ok": bool(result.get("ok")), "probe_message": result.get("message") or ""})
+    return 200, snap
+
+
+def target_app_health(_body: dict | None = None) -> tuple[int, dict]:
+    """Back-compatible route name for a target-app status check."""
+    return target_app_check(_body)
+
+
+def _target_app_run_health_check() -> dict:
+    """Back-compatible poller hook for deterministic target-app status."""
+    status, snap = target_app_check({"quiet": True})
+    return snap if status == 200 else {"state": "unknown", "last_check_ok": False}
 
 
 def _target_app_record_failure(kind: str, message: str) -> None:
     conn = _conn()
     try:
-        # Roll the optimistic transition back to the opposite terminal so
-        # the UI doesn't show a stuck "starting" forever.
-        rollback = "stopped" if kind == "start" else "running"
+        rollback = "stopped" if kind == "start" else (
+            "running" if kind == "stop" else "unknown"
+        )
         db.set_setting(conn, "target_app_state", rollback)
         db.set_setting(conn, "target_app_last_error", message)
         activity.append(
@@ -1236,15 +1411,10 @@ def _target_app_record_failure(kind: str, message: str) -> None:
 
 
 def target_app_generate(body: dict) -> tuple[int, dict]:
-    """Use the agent to draft start or stop instructions for this codebase.
-
-    Body: `{kind: "start" | "stop"}`. Returns the generated text without
-    persisting — the operator reviews it in the UI and saves via the
-    regular settings PATCH if happy.
-    """
-    kind = (body.get("kind") or "").strip().lower()
-    if kind not in ("start", "stop"):
-        return err(400, "kind must be 'start' or 'stop'")
+    """Use the agent to draft structured target-app config for this codebase."""
+    kind = (body.get("kind") or "all").strip().lower()
+    if kind not in ("all", "start", "stop", "status"):
+        return err(400, "kind must be 'all', 'start', 'stop', or 'status'")
     try:
         result = get_client().call(
             M_TARGET_APP_GENERATE, {"kind": kind}, timeout=600.0,
@@ -1253,65 +1423,12 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
         return _ipc_err(e)
     if not result.get("ok"):
         return 502, {"error": {"message": result.get("message") or "generation failed"}}
-    return 200, {"ok": True, "text": result.get("text") or ""}
-
-
-def target_app_health(_body: dict | None = None) -> tuple[int, dict]:
-    """Force an immediate health check and return the result."""
-    snap = _target_app_run_health_check()
-    return 200, snap
-
-
-def _target_app_run_health_check() -> dict:
-    """Issue one health probe and update the snapshot in SQLite.
-
-    The probe runs on the **host** via the runner (IPC) rather than
-    inside the webapp container, so URLs that reference `localhost`
-    or `127.0.0.1` resolve to the host the target application is
-    actually listening on (not the webapp container, where nothing
-    of the operator's app is running).
-    """
-    conn = _conn()
-    try:
-        url = (db.get_setting(conn, "target_app_health_url") or "").strip()
-    finally:
-        conn.close()
-    if not url:
-        return _persist_health_result(False, "no health URL configured", probed=False)
-    try:
-        res = get_client().call(
-            M_TARGET_APP_HEALTH, {"url": url}, timeout=10.0,
-        )
-    except IpcError as e:
-        # If the runner is unreachable, the runner-unreachable banner
-        # already surfaces that fact globally — don't double-report
-        # via the target-app block, just record the failure.
-        return _persist_health_result(False, f"runner unreachable: {e.message}")
-    return _persist_health_result(bool(res.get("ok")), res.get("message") or "")
-
-
-def _persist_health_result(ok: bool, message: str, *, probed: bool = True) -> dict:
-    """Update the singleton health row + transition state when appropriate."""
-    conn = _conn()
-    try:
-        if probed:
-            db.set_setting(conn, "target_app_last_health_at", now_iso())
-            db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0")
-            db.set_setting(conn, "target_app_last_health_message", message or "")
-        cur_state = db.get_setting(conn, "target_app_state") or "unknown"
-        # Auto-transition based on health-check outcome — but don't
-        # clobber explicit user transitions in flight (starting/stopping
-        # stay until the agent finishes). The webapp moves out of those
-        # states from `_target_app_run` once the agent returns.
-        if probed and cur_state not in ("starting", "stopping"):
-            new_state = "running" if ok else "stopped"
-            if new_state != cur_state:
-                db.set_setting(conn, "target_app_state", new_state)
-        snap = _target_app_snapshot(conn)
-    finally:
-        conn.close()
-    snap["probe_message"] = message
-    return snap
+    return 200, {
+        "ok": True,
+        "config": result.get("config") or {},
+        "notes": (result.get("config") or {}).get("notes") or "",
+        "raw": result.get("raw") or "",
+    }
 
 
 # --- helpers ------------------------------------------------------------------

@@ -274,9 +274,9 @@ class SubprocessManager:
         from the supervisor thread when the subprocess exits.
         """
         # Reuse the same env + PATH plumbing the chat subprocess uses:
-        # strip Claude API-key vars for Claude OAuth, and resolve the
-        # selected provider binary via the user's interactive login-shell
-        # PATH rather than systemd-user's stripped PATH.
+        # strip provider API-key override vars for CLI login auth, and
+        # resolve the selected provider binary via the user's interactive
+        # login-shell PATH rather than systemd-user's stripped PATH.
         from .chat_mgr import _chat_env
         from . import agent_cli
         env = _chat_env()

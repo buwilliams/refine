@@ -3580,7 +3580,7 @@ function drawSettings(s, diag, reps, feats) {
 
     <div class="card" style="margin-top:16px">
       <h3>Auth</h3>
-      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>) — or check that the matching <code>API_KEY</code> env var is exported.</p>
+      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
       <button id="s-recheck">Re-check auth</button>
     </div>`)}
 
@@ -3635,34 +3635,70 @@ function drawSettings(s, diag, reps, feats) {
     <div class="card">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
-        Plain-language prompts sent to a Standalone agent in the client
-        repo to bring the application up or take it down. Refine doesn't
-        own the running process — the prompt does (background it with
-        <code>nohup … &amp;</code> or hand off to a process manager so it
-        survives the agent's exit). Refine tracks whether the app is
-        alive by polling the health URL below.
+        The AI provider drafts this configuration from the codebase.
+        Refine then runs the saved shell commands directly on the host
+        and checks status through CLI / HTTP / TCP / process probes.
       </p>
-      <div class="form-row"><label>Health check URL
-        <span class="muted small">— refine GETs this every ${"~15s"}. 2xx = healthy. The probe runs on the <strong>host</strong> (via the runner), so <code>localhost</code> resolves to the host the target app is bound on — not the webapp container. Leave blank to skip health checks.</span></label>
-        <input type="text" id="s-target-health-url"
+      ${(s.target_app_start_instructions || s.target_app_stop_instructions || s.target_app_health_url) ? `
+        <p class="muted small" style="color:var(--warn)">
+          Legacy prose target-app settings are present. Generate from codebase
+          to convert them into structured commands, then Save.
+        </p>` : ""}
+      <div class="actions" style="margin-bottom:10px">
+        <button class="secondary" id="s-target-generate">Generate from codebase</button>
+        <span class="muted small">Review generated fields before saving.</span>
+      </div>
+      <div class="form-row"><label>Start command
+        <span class="muted small">— one-line shell command that starts the app and returns promptly.</span></label>
+        <input type="text" id="s-target-start-command"
+               placeholder="nohup npm run dev > /tmp/refine-target.log 2>&1 &"
+               value="${htmlEscape(s.target_app_start_command || "")}"></div>
+      <div class="form-row"><label>Stop command
+        <span class="muted small">— one-line shell command that stops the app; should be idempotent when practical.</span></label>
+        <input type="text" id="s-target-stop-command"
+               placeholder="pkill -f 'npm run dev' || true"
+               value="${htmlEscape(s.target_app_stop_command || "")}"></div>
+      <div class="form-row"><label>Status command
+        <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>
+        <input type="text" id="s-target-status-command"
+               placeholder="pgrep -f 'npm run dev' >/dev/null"
+               value="${htmlEscape(s.target_app_status_command || "")}"></div>
+      <div class="form-row"><label>Working directory
+        <span class="muted small">— repo-relative path, or blank for repo root.</span></label>
+        <input type="text" id="s-target-cwd"
+               placeholder="."
+               value="${htmlEscape(s.target_app_cwd || "")}"></div>
+      <div class="form-row"><label>Environment overrides
+        <span class="muted small">— JSON object merged into the host environment.</span></label>
+        <textarea id="s-target-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea></div>
+      <div class="form-grid two">
+        <div class="form-row"><label>Start timeout (s)</label>
+          <input type="number" id="s-target-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
+        <div class="form-row"><label>Stop timeout (s)</label>
+          <input type="number" id="s-target-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
+        <div class="form-row"><label>Status timeout (s)</label>
+          <input type="number" id="s-target-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
+        <div class="form-row"><label>Log path</label>
+          <input type="text" id="s-target-log-path" value="${htmlEscape(s.target_app_log_path || "")}"></div>
+      </div>
+      <h4 style="margin:16px 0 8px">Optional checks</h4>
+      <div class="form-row"><label>HTTP check URL
+        <span class="muted small">— optional; 2xx means healthy. Runs on the host.</span></label>
+        <input type="text" id="s-target-http-url"
                placeholder="http://localhost:3000/health"
-               value="${htmlEscape(s.target_app_health_url || "")}"></div>
-      <div class="form-row"><label>Start instructions
-        <span class="muted small">— what the agent should do to bring the app up (install / build / launch). Click <strong>Generate</strong> to have the agent draft this by analysing the repo.</span></label>
-        <textarea id="s-target-start" rows="6"
-                  placeholder="e.g. Run \`npm install\` if node_modules is missing, then \`nohup npm run dev > /tmp/app.log 2>&1 &\`. Wait 5s and confirm http://localhost:3000/health returns 200.">${htmlEscape(s.target_app_start_instructions || "")}</textarea>
-        <div class="actions" style="margin-top:6px">
-          <button class="secondary" id="s-target-gen-start">Generate from codebase</button>
-        </div>
+               value="${htmlEscape(s.target_app_http_check_url || s.target_app_health_url || "")}"></div>
+      <div class="form-grid two">
+        <div class="form-row"><label>TCP host</label>
+          <input type="text" id="s-target-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}"></div>
+        <div class="form-row"><label>TCP port</label>
+          <input type="number" id="s-target-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}"></div>
       </div>
-      <div class="form-row"><label>Stop instructions
-        <span class="muted small">— what the agent should do to shut the app down.</span></label>
-        <textarea id="s-target-stop" rows="6"
-                  placeholder="e.g. Find the process listening on port 3000 (\`lsof -ti:3000\`), send SIGTERM, wait 3s, SIGKILL if still alive.">${htmlEscape(s.target_app_stop_instructions || "")}</textarea>
-        <div class="actions" style="margin-top:6px">
-          <button class="secondary" id="s-target-gen-stop">Generate from codebase</button>
-        </div>
-      </div>
+      <div class="form-row"><label>Process check command
+        <span class="muted small">— optional one-line command; exit 0 when the expected process exists.</span></label>
+        <input type="text" id="s-target-process-command"
+               value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
+      <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
+        <p class="muted small" id="s-target-notes"></p></div>
       <div class="actions"><button id="s-save-target">Save</button></div>
     </div>
 
@@ -3670,10 +3706,10 @@ function drawSettings(s, diag, reps, feats) {
       <h3>Current status</h3>
       <div id="target-app-status-block" class="muted">Loading…</div>
       <div class="actions" style="margin-top:10px">
-        <button id="s-target-start">Start application</button>
-        <button class="danger" id="s-target-stop">Stop application</button>
+        <button id="s-target-run-start">Start application</button>
+        <button class="danger" id="s-target-run-stop">Stop application</button>
         <span class="spacer"></span>
-        <button class="secondary" id="s-target-health-now">Run health check now</button>
+        <button class="secondary" id="s-target-health-now">Check status now</button>
       </div>
       <p class="muted small" style="margin-top:6px">
         Start / Stop live here on purpose — the indicator next to the
@@ -3851,48 +3887,53 @@ function drawSettings(s, diag, reps, feats) {
     await withButtonBusy($("#s-save-target"), "Saving…", async () => {
       try {
         await api("PATCH", "/api/settings", {
-          target_app_health_url: $("#s-target-health-url").value,
-          target_app_start_instructions: $("#s-target-start").value,
-          target_app_stop_instructions: $("#s-target-stop").value,
+          target_app_start_command: $("#s-target-start-command").value,
+          target_app_stop_command: $("#s-target-stop-command").value,
+          target_app_status_command: $("#s-target-status-command").value,
+          target_app_cwd: $("#s-target-cwd").value,
+          target_app_env_json: $("#s-target-env").value,
+          target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
+          target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
+          target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
+          target_app_log_path: $("#s-target-log-path").value,
+          target_app_http_check_url: $("#s-target-http-url").value,
+          target_app_tcp_check_host: $("#s-target-tcp-host").value,
+          target_app_tcp_check_port: $("#s-target-tcp-port").value,
+          target_app_process_check_command: $("#s-target-process-command").value,
         });
         toast("Saved", "info");
         refreshTargetAppStatus();
       } catch (e) { toast(e.message, "error"); }
     });
   });
-  const wireGenerate = (btnId, kind, textareaId) => {
-    $(btnId)?.addEventListener("click", async () => {
-      const btn = $(btnId);
-      const ok = await modalConfirm(
-        `Ask the agent to analyse the codebase and draft ${kind} instructions? `
-        + `This can take a minute or two, and overwrites the text in the box.`,
-        { title: `Generate ${kind} instructions`, okLabel: "Generate" },
-      );
-      if (!ok) return;
-      await withButtonBusy(btn, "Generating…", async () => {
-        try {
-          const r = await api("POST", "/api/target-app/generate-instructions",
-                              { kind });
-          if (r.ok && r.text) {
-            $(textareaId).value = r.text;
-            toast(`Generated — review and click Save to persist`, "info");
-          } else {
-            toast("Generation produced no text", "error");
-          }
-        } catch (e) { toast(e.message, "error"); }
-      });
+  $("#s-target-generate")?.addEventListener("click", async () => {
+    const btn = $("#s-target-generate");
+    const ok = await modalConfirm(
+      "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the fields above.",
+      { title: "Generate target-app config", okLabel: "Generate" },
+    );
+    if (!ok) return;
+    await withButtonBusy(btn, "Generating…", async () => {
+      try {
+        const r = await api("POST", "/api/target-app/generate-instructions",
+                            { kind: "all" });
+        if (r.ok && r.config) {
+          applyGeneratedTargetAppConfig(r.config);
+          toast("Generated — review and click Save to persist", "info");
+        } else {
+          toast("Generation produced no configuration", "error");
+        }
+      } catch (e) { toast(e.message, "error"); }
     });
-  };
-  wireGenerate("#s-target-gen-start", "start", "#s-target-start");
-  wireGenerate("#s-target-gen-stop",  "stop",  "#s-target-stop");
-  $("#s-target-start")?.addEventListener("click", async () => {
-    const btn = $("#s-target-start");
+  });
+  $("#s-target-run-start")?.addEventListener("click", async () => {
+    const btn = $("#s-target-run-start");
     await withButtonBusy(btn, "Starting…", async () => {
       await runTargetAppAction("start");
     });
   });
-  $("#s-target-stop")?.addEventListener("click", async () => {
-    const btn = $("#s-target-stop");
+  $("#s-target-run-stop")?.addEventListener("click", async () => {
+    const btn = $("#s-target-run-stop");
     await withButtonBusy(btn, "Stopping…", async () => {
       await runTargetAppAction("stop");
     });
@@ -3902,14 +3943,41 @@ function drawSettings(s, diag, reps, feats) {
     await withButtonBusy(btn, "Probing…", async () => {
       try {
         const r = await api("POST", "/api/target-app/health");
-        toast(r.last_health_ok ? "Health check OK" : (r.probe_message || "Unhealthy"),
-              r.last_health_ok ? "info" : "error");
+        const ok = "last_check_ok" in r ? r.last_check_ok : r.last_health_ok;
+        toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"),
+              ok ? "info" : "error");
         drawTargetAppStatusBlock(r);
       } catch (e) { toast(e.message, "error"); }
     });
   });
   // Kick off the initial status load (and let SSE refresh later).
   refreshTargetAppStatus();
+}
+
+function applyGeneratedTargetAppConfig(cfg) {
+  const set = (id, value) => {
+    const el = $(id);
+    if (el) el.value = value == null ? "" : String(value);
+  };
+  set("#s-target-start-command", cfg.start_command || "");
+  set("#s-target-stop-command", cfg.stop_command || "");
+  set("#s-target-status-command", cfg.status_command || "");
+  set("#s-target-cwd", cfg.cwd || "");
+  set("#s-target-env", JSON.stringify(cfg.env || {}, null, 2));
+  set("#s-target-start-timeout", cfg.start_timeout_seconds || 120);
+  set("#s-target-stop-timeout", cfg.stop_timeout_seconds || 60);
+  set("#s-target-status-timeout", cfg.status_timeout_seconds || 10);
+  set("#s-target-log-path", cfg.log_path || "");
+  set("#s-target-http-url", cfg.http_check_url || "");
+  set("#s-target-tcp-host", cfg.tcp_check_host || "");
+  set("#s-target-tcp-port", cfg.tcp_check_port || "");
+  set("#s-target-process-command", cfg.process_check_command || "");
+  const notesRow = $("#s-target-notes-row");
+  const notes = $("#s-target-notes");
+  if (notesRow && notes) {
+    notes.textContent = cfg.notes || "";
+    notesRow.style.display = cfg.notes ? "" : "none";
+  }
 }
 
 // Re-fetch + repaint the target-app status block inside the Settings panel.
@@ -3930,26 +3998,36 @@ function drawTargetAppStatusBlock(snap) {
   if (!block) return;
   const stateLabel = {
     running:  "Running",
+    degraded: "Degraded",
     starting: "Starting…",
     stopping: "Stopping…",
     stopped:  "Stopped",
+    failed:   "Failed",
     unknown:  "Unknown",
   }[snap.state] || snap.state || "Unknown";
-  const healthBits = snap.last_health_at
-    ? `Last health check: ${snap.last_health_ok ? "OK" : "FAIL"} · ${fmtTime(snap.last_health_at)}`
-    : "No health checks yet.";
-  const healthDetail = snap.last_health_message && !snap.last_health_ok
-    ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Probe: ${htmlEscape(snap.last_health_message)}</p>`
+  const checkAt = snap.last_check_at || snap.last_health_at || "";
+  const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
+  const checkMessage = snap.last_check_message || snap.last_health_message || "";
+  const healthBits = checkAt
+    ? `Last status check: ${checkOk ? "OK" : "FAIL"} · ${fmtTime(checkAt)}`
+    : "No status checks yet.";
+  const healthDetail = checkMessage && !checkOk
+    ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Check: ${htmlEscape(checkMessage)}</p>`
+    : "";
+  const op = snap.last_operation
+    ? `<p class="muted small" style="margin-top:6px">Last operation: ${htmlEscape(snap.last_operation.kind)} → ${htmlEscape(snap.last_operation.state)} · ${fmtTime(snap.last_operation.finished_at)}</p>`
     : "";
   block.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px">
       <span class="target-app-dot" data-status-dot></span>
       <strong>${htmlEscape(stateLabel)}</strong>
-      ${snap.health_url ? `<span class="muted small">${htmlEscape(snap.health_url)}</span>` : `<span class="muted small">No health URL configured</span>`}
+      ${snap.has_status_checks ? `<span class="muted small">status checks configured</span>` : `<span class="muted small">No status checks configured</span>`}
     </div>
     <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
     ${healthDetail}
+    ${op}
     ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
+    ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
   `;
   // Apply dot colour from the parent state via a CSS hook — the .target-app-dot
   // colour rules key off `data-state` on an ancestor, so set it here too.
@@ -3957,31 +4035,33 @@ function drawTargetAppStatusBlock(snap) {
   if (dot) {
     dot.style.background = ({
       running:  "#1f9d4d",
+      degraded: "#d4a106",
       stopped:  "#c63838",
       starting: "#d4a106",
       stopping: "#d4a106",
+      failed:   "#c63838",
     }[snap.state]) || "#b8bcc6";
   }
   // Reflect state on the Start / Stop buttons: only one applies at a
   // time. Both are disabled while a transition is in flight so the
   // user can't fire a second action mid-agent-run.
-  const startBtn = document.getElementById("s-target-start");
-  const stopBtn  = document.getElementById("s-target-stop");
+  const startBtn = document.getElementById("s-target-run-start");
+  const stopBtn  = document.getElementById("s-target-run-stop");
   if (startBtn && stopBtn) {
-    const isRunning  = snap.state === "running";
-    const isStopped  = snap.state === "stopped" || snap.state === "unknown";
+    const isRunning  = snap.state === "running" || snap.state === "degraded";
+    const isStopped  = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
     const inFlight   = snap.state === "starting" || snap.state === "stopping";
     startBtn.style.display = (isStopped || inFlight) ? "" : "none";
     stopBtn.style.display  = (isRunning || inFlight) ? "" : "none";
-    startBtn.disabled = inFlight || !snap.has_start_instructions;
-    stopBtn.disabled  = inFlight || !snap.has_stop_instructions;
-    if (!snap.has_start_instructions) {
-      startBtn.title = "Configure start instructions above first.";
+    startBtn.disabled = inFlight || !snap.has_start_command;
+    stopBtn.disabled  = inFlight || !snap.has_stop_command;
+    if (!snap.has_start_command) {
+      startBtn.title = "Configure a start command above first.";
     } else {
       startBtn.title = "";
     }
-    if (!snap.has_stop_instructions) {
-      stopBtn.title = "Configure stop instructions above first.";
+    if (!snap.has_stop_command) {
+      stopBtn.title = "Configure a stop command above first.";
     } else {
       stopBtn.title = "";
     }
@@ -4218,14 +4298,18 @@ function applyTargetAppSnapshot(snap) {
   indicator.dataset.state = appState;
   const label = {
     running:  "App: running",
+    degraded: "App: degraded",
     stopped:  "App: stopped",
     starting: "App: starting…",
     stopping: "App: stopping…",
+    failed:   "App: failed",
     unknown:  "App: unknown",
   }[appState] || "App";
+  const checkAt = snap.last_check_at || snap.last_health_at || "";
+  const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
   indicator.title = label
-    + (snap.last_health_at
-        ? ` · last check ${snap.last_health_ok ? "OK" : "FAIL"} at ${fmtTime(snap.last_health_at)}`
+    + (checkAt
+        ? ` · last check ${checkOk ? "OK" : "FAIL"} at ${fmtTime(checkAt)}`
         : "")
     + (snap.last_error ? ` · ${snap.last_error}` : "")
     + " — click to manage in Settings";
@@ -4242,11 +4326,11 @@ async function runTargetAppAction(action) {
   // action is "start" or "stop". Called from the buttons on Settings.
   const snap = _targetAppSnapshot || {};
   const hasPrompt = action === "start"
-    ? snap.has_start_instructions
-    : snap.has_stop_instructions;
+    ? snap.has_start_command
+    : snap.has_stop_command;
   if (!hasPrompt) {
     toast(
-      `No ${action} instructions configured. Set them above, then click Save.`,
+      `No ${action} command configured. Set it above, then click Save.`,
       "error",
     );
     return;
@@ -4255,7 +4339,7 @@ async function runTargetAppAction(action) {
   const ok = await modalConfirm(
     isStop
       ? "Stop the target application now?"
-      : "Start the target application now? This may take a minute or two while the agent installs / builds.",
+      : "Start the target application now? Refine will run the saved start command on the host.",
     { title: isStop ? "Stop application" : "Start application",
       okLabel: isStop ? "Stop" : "Start",
       danger: isStop },

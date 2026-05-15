@@ -77,6 +77,23 @@ CREATE TABLE IF NOT EXISTS preflight (
     checked_at   TEXT NOT NULL,
     message      TEXT
 );
+
+CREATE TABLE IF NOT EXISTS target_app_operations (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind          TEXT NOT NULL,
+    state         TEXT NOT NULL,
+    started_at    TEXT NOT NULL,
+    finished_at   TEXT NOT NULL,
+    command       TEXT,
+    cwd           TEXT,
+    exit_code     INTEGER,
+    message       TEXT,
+    stdout_tail   TEXT,
+    stderr_tail   TEXT,
+    checks_json   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_target_app_operations_started
+    ON target_app_operations(started_at DESC);
 """
 
 DEFAULT_SETTINGS = {
@@ -106,26 +123,36 @@ DEFAULT_SETTINGS = {
     # to this branch (auto-stashing any WIP) and restore the host's
     # original branch afterward.
     "merge_target_branch": "",
-    # Target-application management. Plain-language prompts the operator
-    # writes (or generates via the agent) that get sent to a Standalone
-    # agent subprocess to bring the client's application up or take it
-    # down. Refine doesn't own the process — the prompt does (e.g.
-    # `nohup npm run dev &` so it survives the agent's exit). Refine
-    # learns whether the app is alive by polling `target_app_health_url`.
+    # Target-application management. New installs use structured one-line
+    # shell commands and checks. The legacy prose settings stay present so
+    # old databases can display and convert existing configuration.
     "target_app_start_instructions": "",
     "target_app_stop_instructions": "",
     "target_app_health_url": "",
-    # Latest known status. "stopped" | "starting" | "running" |
-    # "stopping" | "unknown". The webapp transitions through these
-    # based on user actions + health-check outcomes.
+    "target_app_start_command": "",
+    "target_app_stop_command": "",
+    "target_app_status_command": "",
+    "target_app_cwd": "",
+    "target_app_env_json": "{}",
+    "target_app_start_timeout_seconds": "120",
+    "target_app_stop_timeout_seconds": "60",
+    "target_app_status_timeout_seconds": "10",
+    "target_app_log_path": "",
+    "target_app_http_check_url": "",
+    "target_app_tcp_check_host": "",
+    "target_app_tcp_check_port": "",
+    "target_app_process_check_command": "",
+    # Latest known status. "unknown" | "starting" | "running" |
+    # "degraded" | "stopping" | "stopped" | "failed".
     "target_app_state": "unknown",
-    "target_app_last_health_at": "",     # ISO timestamp
-    "target_app_last_health_ok": "0",    # "1" / "0"
-    # Last health-probe message (e.g. "HTTP 200", "unreachable: …",
-    # "runner unreachable: …"). Surfaced in Settings so the operator
-    # can see WHY a probe is failing without scanning the activity feed.
+    "target_app_last_check_at": "",
+    "target_app_last_check_ok": "0",
+    "target_app_last_check_message": "",
+    # Back-compat names surfaced to older clients.
+    "target_app_last_health_at": "",
+    "target_app_last_health_ok": "0",
     "target_app_last_health_message": "",
-    # Last-operation log: error message if start/stop failed, else "".
+    "target_app_last_operation_id": "",
     "target_app_last_error": "",
 }
 

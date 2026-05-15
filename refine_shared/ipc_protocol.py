@@ -40,9 +40,9 @@ M_RENAME_REPORTER = "rename_reporter"     # rename in reporters table + cascade 
 M_RENAME_REPORTER_STRINGS = "rename_reporter_strings"  # cascade through gap.json only (maintenance)
 M_LIST_CHANGES = "list_changes"           # list refine merge commits on the target branch
 M_UNDO_GAP = "undo_gap"                   # revert a refine merge commit + transition the Gap to cancelled
-M_TARGET_APP_RUN = "target_app_run"       # run target-app start/stop instructions via Standalone agent
-M_TARGET_APP_GENERATE = "target_app_generate"  # ask the agent to analyze the codebase and write start/stop instructions
-M_TARGET_APP_HEALTH = "target_app_health"  # probe the configured health URL FROM THE HOST (not the webapp container)
+M_TARGET_APP_RUN = "target_app_run"       # run deterministic target-app start/stop/status commands
+M_TARGET_APP_GENERATE = "target_app_generate"  # ask the agent to analyze the codebase and draft structured config
+M_TARGET_APP_HEALTH = "target_app_health"  # legacy/direct HTTP probe FROM THE HOST
 
 
 def envelope_ok(req_id: str, result: dict | None = None) -> dict:

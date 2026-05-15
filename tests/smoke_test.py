@@ -86,7 +86,54 @@ def main() -> int:
         "type": "item.completed",
         "item": {"type": "agent_message", "text": "done"},
     }) == ["done"]
+    from refine_runner.chat_mgr import _chat_env
+    old_openai_key = os.environ.get("OPENAI_API_KEY")
+    old_openai_base = os.environ.get("OPENAI_BASE_URL")
+    try:
+        os.environ["OPENAI_API_KEY"] = "sk-test-should-not-leak"
+        os.environ["OPENAI_BASE_URL"] = "https://example.invalid/v1"
+        chat_env = _chat_env()
+        assert "OPENAI_API_KEY" not in chat_env
+        assert "OPENAI_BASE_URL" not in chat_env
+    finally:
+        if old_openai_key is None:
+            os.environ.pop("OPENAI_API_KEY", None)
+        else:
+            os.environ["OPENAI_API_KEY"] = old_openai_key
+        if old_openai_base is None:
+            os.environ.pop("OPENAI_BASE_URL", None)
+        else:
+            os.environ["OPENAI_BASE_URL"] = old_openai_base
     print("[ok] codex CLI args + JSONL parsing")
+
+    # --- Target-app command/check runtime -----------------------------------
+    from refine_runner import target_app
+    tcfg = {
+        "start_command": "true",
+        "stop_command": "true",
+        "status_command": "true",
+        "cwd": "",
+        "env": {},
+        "start_timeout_seconds": 5,
+        "stop_timeout_seconds": 5,
+        "status_timeout_seconds": 5,
+    }
+    tres = target_app.run_operation("start", tcfg)
+    assert tres["ok"] and tres["state"] == "running", tres
+    sres = target_app.run_operation("status", tcfg)
+    assert sres["ok"] and sres["state"] == "running", sres
+    stop_cfg = {**tcfg, "status_command": "false"}
+    xres = target_app.run_operation("stop", stop_cfg)
+    assert xres["ok"] and xres["state"] == "stopped", xres
+    gen = target_app.normalize_generated_config({
+        "start_command": "npm run dev\n",
+        "stop_command": "pkill -f dev || true",
+        "status_command": "pgrep -f dev",
+        "env": {"PORT": 3000},
+    })
+    assert gen["start_command"] == "npm run dev"
+    assert gen["env"]["PORT"] == "3000"
+    print("[ok] target-app command runtime + config normalization")
 
     # --- Reporters -----------------------------------------------------------
     jane = reporters.add(conn, "Jane Doe")
