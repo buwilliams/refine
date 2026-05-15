@@ -47,7 +47,7 @@ def ensure_runner():
     global _runner
     if _runner is not None:
         return _runner
-    from refine_runner.runner import Runner
+    from refine_server.runner import Runner
 
     _runner = Runner()
     _runner.start()

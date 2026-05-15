@@ -1,7 +1,7 @@
-"""Run the refine-runner daemon on the host.
+"""Run the refine-server component on the host.
 
-Invoked as `uv run refine runner` when you want runner logs in the foreground.
-The production path is `uv run refine web`, which owns a runner in-process.
+Invoked as `uv run refine server` when you want server logs in the foreground.
+The production path is `uv run refine ui`, which owns a runner in-process.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def main() -> int:
     stop_event = threading.Event()
 
     def _on_signal(signum, _frame):  # noqa: ARG001
-        sys.stderr.write(f"\n[refine-runner] caught signal {signum}, shutting down\n")
+        sys.stderr.write(f"\n[refine-server] caught signal {signum}, shutting down\n")
         stop_event.set()
 
     signal.signal(signal.SIGINT, _on_signal)

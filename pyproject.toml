@@ -13,14 +13,14 @@ authors = [{name = "buwilliams"}]
 # Stdlib-only at runtime. No dependencies declared on purpose.
 
 [project.scripts]
-refine = "refine.cli:main"
+refine = "refine_cli.cli:main"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["refine*", "refine_shared*", "refine_runner*", "refine_web*"]
+include = ["refine*", "refine_shared*", "refine_server*", "refine_ui*"]
 
 [tool.setuptools.package-data]
-refine_web = ["static/*"]
+refine_ui = ["static/*", "static/css/*", "static/js/*", "static/js/features/*"]

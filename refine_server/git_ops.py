@@ -16,7 +16,7 @@ from typing import Callable
 
 
 # Merge commits made by refine's verify path end with a `Refine Gap: <id>`
-# trailer (see refine_runner.verify_op._build_merge_message). We use the
+# trailer (see refine_server.verify_op._build_merge_message). We use the
 # trailer to recover gap_id from a merge commit on the target branch.
 _REFINE_GAP_FOOTER = re.compile(
     r"^\s*Refine Gap:\s*([0-9A-Za-z]{26})\s*$", re.MULTILINE,

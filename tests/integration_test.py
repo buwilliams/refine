@@ -1,4 +1,4 @@
-"""Spin up the web backend + in-process runner on temp paths and validate the wiring.
+"""Spin up the UI backend + in-process runner on temp paths and validate the wiring.
 
 This is a "does the whole thing boot and respond to pings" test. It does NOT
 exercise a real agent CLI or push to a remote — those need a configured
@@ -47,11 +47,11 @@ def main() -> int:
     cfg = config.get(reload=True)
 
     from refine_shared.backend_protocol import M_PING
-    from refine_web import runtime
-    from refine_web import server as web_server
+    from refine_ui import runtime
+    from refine_ui import server as web_server
 
     runtime.load_configured(cfg_path)
-    print("[ok] backend runner started in web process")
+    print("[ok] backend runner started in UI process")
     try:
         resp = runtime.runner_call(M_PING, {})
         assert resp.get("pong") is True

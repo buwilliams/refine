@@ -1,1 +1,1 @@
-"""Shared modules used by both refine_web and refine_runner."""
+"""Shared modules used by both refine_ui and refine_server."""

@@ -43,7 +43,7 @@ def _conn() -> sqlite3.Connection:
 # --- Project attach/setup -----------------------------------------------------
 
 def project_status() -> tuple[int, dict]:
-    """Return whether this web process is attached to a refine project."""
+    """Return whether this UI process is attached to a refine project."""
     clone_dir = Path.cwd().resolve()
     registry_enabled = _project_registry_enabled(clone_dir)
     apps = project_registry.list_apps(clone_dir) if registry_enabled else []
@@ -123,7 +123,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     client_repo = Path(raw_path).expanduser()
 
     try:
-        from refine.cli import (
+        from refine_cli.cli import (
             _InitError, _is_refine_source_dir, bootstrap_client_repo,
         )
 
@@ -132,7 +132,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 409,
                 "Project setup must run from the host refine source directory.",
                 (
-                    f"The web process is running in {clone_dir}. Start refine from "
+                    f"The UI process is running in {clone_dir}. Start refine from "
                     "the source checkout with `uv run refine start` so it can "
                     "create host directories and write the binding."
                 ),
@@ -164,7 +164,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
 
     runner = {"started": False, "message": ""}
     if body.get("start_runner") is not False:
-        runner = {"started": True, "message": "Backend runner started in the web process."}
+        runner = {"started": True, "message": "Backend runner started in the UI process."}
 
     return 200, {
         "attached": True,
@@ -173,7 +173,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "config_path": str(cfg.config_path),
         "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
         "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
-        "web_unit_path": str(result["web_unit_path"]) if result.get("web_unit_path") else "",
+        "ui_unit_path": str(result["ui_unit_path"]) if result.get("ui_unit_path") else "",
         "git_initialized": bool(result.get("git_initialized")),
         "config_created": bool(result.get("config_created")),
         "apps": project_registry.list_apps(clone_dir),
@@ -184,7 +184,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
 
 
 def _project_registry_enabled(clone_dir: Path) -> bool:
-    return (clone_dir / "pyproject.toml").is_file() and (clone_dir / "refine" / "cli.py").is_file()
+    return (clone_dir / "pyproject.toml").is_file() and (clone_dir / "refine_cli" / "cli.py").is_file()
 
 
 def _ensure_current_app(apps: list[dict[str, str]], client_repo: Path) -> list[dict[str, str]]:
@@ -1459,7 +1459,7 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
 
 
 def _target_app_config(settings: dict[str, str]) -> dict[str, Any]:
-    from refine_runner import target_app as target_app_runtime
+    from refine_server import target_app as target_app_runtime
     return target_app_runtime.config_from_settings(settings)
 
 

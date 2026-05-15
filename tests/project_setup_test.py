@@ -18,16 +18,16 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="refine-setup-"))
     print(f"using tmp dir: {tmp}")
     clone = tmp / "refine-clone"
-    (clone / "refine").mkdir(parents=True)
+    (clone / "refine_cli").mkdir(parents=True)
     (clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
-    (clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
     os.chdir(clone)
 
     for mod in list(sys.modules):
         if mod.startswith("refine"):
             del sys.modules[mod]
 
-    from refine_web import server as web_server
+    from refine_ui import server as web_server
 
     host = "127.0.0.1"
     port = 18123

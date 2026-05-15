@@ -52,7 +52,7 @@ def main() -> int:
     from refine_shared import db, reporters, activity, gaps as shared_gaps
     from refine_shared.ulid import new_ulid, is_ulid
     from refine_shared.friendly import classify_subprocess_failure, classify_git_failure
-    from refine_runner import agent_cli, gap_writer
+    from refine_server import agent_cli, gap_writer
 
     # --- DB ------------------------------------------------------------------
     db.init_db()
@@ -75,8 +75,8 @@ def main() -> int:
     assert codex.chat_args("/bin/codex", "hi", session_id="abc")[:3] == [
         "/bin/codex", "exec", "resume",
     ]
-    from refine_runner.llm import _extract_final_text
-    from refine_runner.subprocess_mgr import _summarize_codex_event
+    from refine_server.llm import _extract_final_text
+    from refine_server.subprocess_mgr import _summarize_codex_event
     codex_jsonl = (
         '{"type":"item.completed","item":{"type":"agent_message",'
         '"text":"[{\\\"name\\\":\\\"N\\\",\\\"actual\\\":\\\"A\\\",'
@@ -87,7 +87,7 @@ def main() -> int:
         "type": "item.completed",
         "item": {"type": "agent_message", "text": "done"},
     }) == ["done"]
-    from refine_runner.chat_mgr import _chat_env
+    from refine_server.chat_mgr import _chat_env
     old_openai_key = os.environ.get("OPENAI_API_KEY")
     old_openai_base = os.environ.get("OPENAI_BASE_URL")
     old_codex_ci = os.environ.get("CODEX_CI")
@@ -122,7 +122,7 @@ def main() -> int:
     print("[ok] codex CLI args + JSONL parsing")
 
     # --- Target-app command/check runtime -----------------------------------
-    from refine_runner import target_app
+    from refine_server import target_app
     tcfg = {
         "start_command": "true",
         "stop_command": "true",
@@ -172,12 +172,12 @@ def main() -> int:
     print("[ok] target-app command runtime + config normalization")
 
     # --- UI project bootstrap helper ----------------------------------------
-    from refine import cli as refine_cli
-    from refine.cli import bootstrap_client_repo, _sync_bound_project_registry
+    from refine_cli import cli as refine_cli
+    from refine_cli.cli import bootstrap_client_repo, _sync_bound_project_registry
     clone = tmp / "refine-clone"
-    (clone / "refine").mkdir(parents=True)
+    (clone / "refine_cli").mkdir(parents=True)
     (clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
-    (clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
     (clone / ".env").write_text("REFINE_CLIENT_REFINE_DIR=/old/path\n", encoding="utf-8")
     (clone / ".refine-current").symlink_to(tmp / "old-refine-data", target_is_directory=True)
     ui_client = tmp / "ui-created-client"
@@ -204,9 +204,9 @@ def main() -> int:
     print("[ok] UI project bootstrap creates git repo + host-native refine binding")
 
     unit_clone = tmp / "refine-unit-clone"
-    (unit_clone / "refine").mkdir(parents=True)
+    (unit_clone / "refine_cli").mkdir(parents=True)
     (unit_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
-    (unit_clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    (unit_clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
     unit_client = tmp / "unit-client"
     fake_uv_bin = tmp / "login-bin"
     fake_uv_bin.mkdir()
@@ -249,19 +249,19 @@ def main() -> int:
         refine_cli._systemctl = old_systemctl
         refine_cli.shutil.which = old_which
         refine_cli._user_login_path = old_login_path
-    web_unit = Path(unit_boot["web_unit_path"])
-    assert web_unit.is_file()
+    ui_unit = Path(unit_boot["ui_unit_path"])
+    assert ui_unit.is_file()
     assert unit_boot.get("unit_path") is None
-    unit_text = web_unit.read_text(encoding="utf-8")
-    assert f"ExecStart={fake_uv} run refine web" in unit_text
+    unit_text = ui_unit.read_text(encoding="utf-8")
+    assert f"ExecStart={fake_uv} run refine ui" in unit_text
     assert "docker" not in unit_text.lower()
-    assert ("enable", "refine-unit-clone-web") in systemctl_calls
-    print("[ok] refine init writes host-native web backend systemd unit")
+    assert ("enable", "refine-unit-clone-ui") in systemctl_calls
+    print("[ok] refine init writes host-native UI backend systemd unit")
 
     old_clone = tmp / "old-refine-clone"
-    (old_clone / "refine").mkdir(parents=True)
+    (old_clone / "refine_cli").mkdir(parents=True)
     (old_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
-    (old_clone / "refine" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    (old_clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
     old_client = tmp / "old-single-app-client"
     old_client.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=old_client, check=True)
@@ -347,7 +347,7 @@ def main() -> int:
     print(f"[ok] activity feed has {len(feed)} entries")
 
     # --- Friendly outcome ----------------------------------------------------
-    from refine_runner.friendly_outcome import classify_outcome
+    from refine_server.friendly_outcome import classify_outcome
     assert classify_outcome(exit_code=0, killed_reason=None, no_new_commits=False).kind == "success"
     assert classify_outcome(exit_code=0, killed_reason=None, no_new_commits=True).kind == "failure"
     assert classify_outcome(exit_code=0, killed_reason="idle", no_new_commits=False).kind == "failure"
@@ -372,12 +372,12 @@ def main() -> int:
     print("[ok] subprocess outcome classification")
 
     # --- Pre-flight ---------------------------------------------------------
-    from refine_runner import preflight
+    from refine_server import preflight
     ok, msg = preflight.check(conn)
     print(f"[ok] preflight ran (ok={ok}, msg={'set' if msg else 'none'})")
 
     # --- Runner instantiation -----------------------------------------------
-    from refine_runner.runner import Runner
+    from refine_server.runner import Runner
     r = Runner()
     assert r.sub_mgr is not None
     assert r.dispatcher is not None

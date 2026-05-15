@@ -3,7 +3,7 @@
 Loads refine.toml when available, initializes SQLite, starts the SSE poller,
 and serves HTTP. Without config, it serves a host-native setup UI so the user
 can create or attach a project from the browser.
-Invoked as `uv run refine web` (the CLI dispatcher).
+Invoked as `uv run refine ui` (the CLI dispatcher).
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from .server import run
 
 def main() -> int:
     def _shutdown(signum, _frame):  # noqa: ANN001
-        sys.stderr.write(f"\n[refine-web] caught signal {signum}, shutting down\n")
+        sys.stderr.write(f"\n[refine-ui] caught signal {signum}, shutting down\n")
         runtime.stop_all()
         raise SystemExit(0)
 
@@ -29,13 +29,13 @@ def main() -> int:
         host = cfg.web_host
         port = cfg.web_port
     except config.ConfigError as e:
-        host = os.environ.get("REFINE_WEB_HOST", "127.0.0.1")
-        port = int(os.environ.get("REFINE_WEB_PORT", "8080"))
-        sys.stderr.write(f"[refine-web] setup mode: {e}\n")
+        host = os.environ.get("REFINE_UI_HOST", "127.0.0.1")
+        port = int(os.environ.get("REFINE_UI_PORT", "8080"))
+        sys.stderr.write(f"[refine-ui] setup mode: {e}\n")
     try:
         run(host=host, port=port)
     except KeyboardInterrupt:
-        sys.stderr.write("\n[refine-web] shutting down\n")
+        sys.stderr.write("\n[refine-ui] shutting down\n")
         runtime.stop_all()
     return 0
 

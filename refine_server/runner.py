@@ -43,7 +43,7 @@ class Runner:
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
         # The merger owns the host worktree — everything that merges,
         # auto-resolves conflicts, or cleans stale git op state goes
-        # through it. See refine_runner/merger.py for the rationale.
+        # through it. See refine_server/merger.py for the rationale.
         self.merger = _merger.Merger(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
         )
@@ -77,7 +77,7 @@ class Runner:
         self.merger.start()
         self.state_committer.start()
         activity.append(
-            self._conn, message="refine-runner started",
+            self._conn, message="refine-server started",
             severity="info", category="state", actor="runner",
         )
 
@@ -92,7 +92,7 @@ class Runner:
         self.merger.stop()
         self.dispatcher.stop()
         activity.append(
-            self._conn, message="refine-runner stopping",
+            self._conn, message="refine-server stopping",
             severity="info", category="state", actor="runner",
         )
 

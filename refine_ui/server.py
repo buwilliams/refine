@@ -295,10 +295,10 @@ def _read_body(handler: BaseHTTPRequestHandler) -> dict | None:
 
 
 class RefineHandler(BaseHTTPRequestHandler):
-    server_version = "refine-web/1.0"
+    server_version = "refine-ui/1.0"
 
     def log_message(self, fmt, *args):  # noqa: D401, ARG002
-        sys.stderr.write("[refine-web] " + (fmt % args) + "\n")
+        sys.stderr.write("[refine-ui] " + (fmt % args) + "\n")
 
     # one handler per method that all delegate to _dispatch
     def do_GET(self) -> None:  # noqa: N802
@@ -435,5 +435,5 @@ def _guess_type(path: Path) -> str:
 
 def run(host: str = "0.0.0.0", port: int = 8080) -> None:
     httpd = ThreadingHTTPServer((host, port), RefineHandler)
-    sys.stderr.write(f"[refine-web] listening on http://{host}:{port}\n")
+    sys.stderr.write(f"[refine-ui] listening on http://{host}:{port}\n")
     httpd.serve_forever()

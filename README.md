@@ -1,6 +1,6 @@
 # refine
 
-![Refine dashboard](refine_web/static/ss-1-dashboard.png)
+![Refine dashboard](refine_ui/static/ss-1-dashboard.png)
 
 Refine turns software gaps (features and bugs) into verified software
 through ordinary people enhanced by agents. QA, Product, support,
@@ -37,7 +37,7 @@ Active filters are surfaced visually: matching dropdowns/inputs pick up an
 accent border, a "FILTERED" pill appears next to the count, and the results
 table grows an accent stripe + tinted header.
 
-![Refine gaps list](refine_web/static/ss-2-gaps.png)
+![Refine gaps list](refine_ui/static/ss-2-gaps.png)
 
 Refine handles the git plumbing — worktrees, fetch, merge, push,
 auto-committing its own state — and inherits the selected agent CLI's host
@@ -45,10 +45,10 @@ auth, so operators rarely need to think about either.
 
 ## Components
 
-- **`refine-web`** — host-native Python backend (UI + JSON API + SSE) that
+- **`refine_ui`** — host-native Python backend (UI + JSON API + SSE) that
   owns the runner in-process.
-- **`refine-runner`** — backend component that owns CLI subprocesses, git
-  operations, and `gap.json` writes. It runs inside the web process in normal
+- **`refine_server`** — backend component that owns CLI subprocesses, git
+  operations, and `gap.json` writes. It runs inside the UI process in normal
   operation, so it inherits the host's agent auth, SSH keys, and git config.
   Agent subprocesses additionally strip
   provider API-key override vars such as `ANTHROPIC_API_KEY`,
@@ -62,10 +62,10 @@ auth, so operators rarely need to think about either.
 
 ```
 refine/
-├── refine/               # the `refine` CLI: init, start, stop, status, runner, web, doctor
+├── refine_cli/           # the `refine` CLI: init, start, stop, status, server, ui, doctor
 ├── refine_shared/        # storage, backend method names, friendly summaries, config loader
-├── refine_runner/        # backend runner (subprocess + git + gap.json owner)
-├── refine_web/           # host-native backend + static HTML/JS
+├── refine_server/        # backend server component (subprocess + git + gap.json owner)
+├── refine_ui/            # host-native UI backend + static HTML/JS
 ├── pyproject.toml        # makes `refine` a real console script
 └── spec.md               # the design document
 ```
@@ -98,7 +98,7 @@ This:
   `/opt/refine` target the active app.
 - Writes `/opt/refine/.refine-apps.json` with the known apps list
   used by Settings → Project.
-- Installs and enables `~/.config/systemd/user/refine-web.service` so the
+- Installs and enables `~/.config/systemd/user/refine-ui.service` so the
   backend is managed by systemd and survives terminal close.
 
 Commit the new files in the target app repo when you're ready:
@@ -135,21 +135,21 @@ app has other uncommitted changes, then performs the same binding work as
 cd /opt/refine
 
 claude login                       # or: codex login / gemini auth login
-uv run refine start                # backend + runner, one command
+uv run refine start                # UI backend + server, one command
 uv run refine status               # check it's healthy
 uv run refine stop                 # tear it all down
 ```
 
 Open <http://localhost:8080>.
 
-If a project is already attached, `refine start` starts `refine-web.service`,
-then waits for the HTTP server to be reachable before returning. The web
+If a project is already attached, `refine start` starts `refine-ui.service`,
+then waits for the HTTP server to be reachable before returning. The UI
 backend starts the runner in-process. If no project is attached yet, it serves
 the setup UI directly from the host so it can create or attach app directories.
 Logs go to journald:
 
 ```bash
-journalctl --user -u refine-web -f
+journalctl --user -u refine-ui -f
 ```
 
 To survive logout / reboot, run once:
@@ -159,7 +159,7 @@ loginctl enable-linger $USER       # systemd keeps user units alive across logou
 ```
 
 UI edits are picked up live from the checkout. Changes to
-`refine_web/static/index.html`, `js/`, or `css/` are visible on the next
+`refine_ui/static/index.html`, `js/`, or `css/` are visible on the next
 browser refresh; Python changes require `uv run refine restart`.
 
 To work on a different app, use Settings → Project. The same refine instance
@@ -204,7 +204,7 @@ to that path later and pick up where you left off.
 
 ```
 ┌─────────────────┐                ┌─────────────────────┐
-│  Browser UI     │ ── JSON API ──► │  refine-web backend │
+│  Browser UI     │ ── JSON API ──► │  refine_ui backend │
 │                 │ ◄── SSE ─────── │  + in-process runner│
 └─────────────────┘                 └─────────────────────┘
                                                │
@@ -265,14 +265,14 @@ the UI's Settings page.
 
 | Command                       | What it does                                                                                                |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------|
-| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, make the app active, install + enable the web backend systemd --user unit. |
-| `uv run refine reset`         | Undo `init` in this checkout: stop the web backend, disable + remove the systemd unit, delete `.refine-binding` and `.refine-apps.json` (plus legacy Docker artifacts if present). Add `--purge` (+ `-y` to skip prompt) to also delete the active app's `.refine/` data. |
-| `uv run refine start`         | If initialized: `systemctl --user start <web-unit>` → wait for HTTP. If no project is attached yet: start the host-native setup UI. |
-| `uv run refine stop`          | `systemctl --user stop <web-unit>`.                                                                         |
+| `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, make the app active, install + enable the UI backend systemd --user unit. |
+| `uv run refine reset`         | Undo `init` in this checkout: stop the UI backend, disable + remove the systemd unit, delete `.refine-binding` and `.refine-apps.json` (plus legacy Docker artifacts if present). Add `--purge` (+ `-y` to skip prompt) to also delete the active app's `.refine/` data. |
+| `uv run refine start`         | If initialized: `systemctl --user start <ui-unit>` → wait for HTTP. If no project is attached yet: start the host-native setup UI. |
+| `uv run refine stop`          | `systemctl --user stop <ui-unit>`.                                                                          |
 | `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands.                       |
 | `uv run refine status`        | Read-only: show backend state and where to tail logs.                                                       |
-| `uv run refine runner`        | Run the runner in the foreground for debugging.                                                             |
-| `uv run refine web`           | Start the web backend in-process (what the systemd unit invokes).                                           |
+| `uv run refine server`        | Run the server component in the foreground for debugging.                                                   |
+| `uv run refine ui`            | Start the UI backend in-process (what the systemd unit invokes).                                            |
 | `uv run refine doctor`        | Deeper diagnostic snapshot: config, selected agent CLI, git status.                                        |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.
@@ -285,7 +285,7 @@ uv run python tests/project_setup_test.py # first-run setup + app switching
 uv run python tests/integration_test.py   # backend + in-process runner end-to-end
 ```
 
-The integration test boots the web backend with its in-process runner on a temp
+The integration test boots the UI backend with its in-process runner on a temp
 directory and exercises the full HTTP + direct-backend stack (excluding real
 agent CLI work and git remotes, both of which need a configured host).
 

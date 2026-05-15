@@ -2,16 +2,16 @@
 
 Subcommands:
 - init    — write refine.toml + run/ + gaps/ in a chosen volume root,
-            then write + enable a systemd --user unit for the web backend.
+            then write + enable a systemd --user unit for the UI backend.
 - reset   — undo `init` in this checkout (stop service, disable unit,
             remove binding); optional --purge also deletes the active app's
             .refine/ data so you can attach a different app.
-- start   — bring up the host-native web backend.
-- stop    — stop the web backend.
+- start   — bring up the host-native UI backend.
+- stop    — stop the UI backend.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
-- runner  — start the runner in the foreground for interactive debugging.
-- web     — start the web backend in-process (used by the systemd unit).
+- server  — start the server component in the foreground for debugging.
+- ui      — start the UI backend in-process (used by the systemd unit).
 - doctor  — deeper diagnostic snapshot (config, agent CLI, git).
 """
 from __future__ import annotations
@@ -40,7 +40,11 @@ def main(argv: list[str] | None = None) -> int:
         "--config", "-c",
         help="Path to refine.toml (defaults to walking up from cwd).",
     )
-    sub = parser.add_subparsers(dest="command", required=True)
+    sub = parser.add_subparsers(
+        dest="command",
+        required=True,
+        metavar="{init,reset,start,restart,stop,status,server,ui,doctor}",
+    )
 
     p_init = sub.add_parser(
         "init",
@@ -49,7 +53,7 @@ def main(argv: list[str] | None = None) -> int:
             "Bootstraps a target app: creates <app>/.refine/refine.toml + "
             "run/ + gaps/, writes the active-app binding, records the app in "
             "the known-apps list, and registers a systemd --user unit for the "
-            "host-native web backend."
+            "host-native UI backend."
         ),
     )
     p_init.add_argument(
@@ -64,9 +68,9 @@ def main(argv: list[str] | None = None) -> int:
         "reset",
         help="Undo `refine init` in this checkout so it can attach a different app.",
         description=(
-            "Stops the web backend, removes the .refine-binding and "
+            "Stops the UI backend, removes the .refine-binding and "
             ".refine-apps.json files from this checkout, disables + removes "
-            "the systemd --user web unit, and (with --purge) wipes the active "
+            "the systemd --user UI unit, and (with --purge) wipes the active "
             "app's .refine/ directory. The app source tree is never touched."
         ),
     )
@@ -83,9 +87,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p_start = sub.add_parser(
         "start",
-        help="Start the web backend.",
+        help="Start the UI backend.",
         description=(
-            "Starts the host-native web backend via systemd --user, then "
+            "Starts the host-native UI backend via systemd --user, then "
             "prints a status block. The backend owns the runner in-process."
         ),
     )
@@ -93,7 +97,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_restart = sub.add_parser(
         "restart",
-        help="Stop the web backend, then start it again.",
+        help="Stop the UI backend, then start it again.",
         description=(
             "Equivalent to `refine stop && refine start`."
         ),
@@ -102,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_stop = sub.add_parser(
         "stop",
-        help="Stop the web backend.",
+        help="Stop the UI backend.",
     )
     p_stop.set_defaults(fn=cmd_stop)
 
@@ -112,15 +116,19 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_status.set_defaults(fn=cmd_status)
 
-    # Useful interactively when you want runner logs in the foreground.
-    p_runner = sub.add_parser(
-        "runner",
-        help="Run the runner in the foreground for debugging.",
+    # Useful interactively when you want server logs in the foreground.
+    p_server = sub.add_parser(
+        "server",
+        help="Run the server component in the foreground for debugging.",
     )
-    p_runner.set_defaults(fn=cmd_runner_foreground)
+    p_server.set_defaults(fn=cmd_server_foreground)
 
-    p_web = sub.add_parser("web", help="Start the web backend in the foreground.")
-    p_web.set_defaults(fn=cmd_web)
+    p_ui = sub.add_parser("ui", help="Start the UI backend in the foreground.")
+    p_ui.set_defaults(fn=cmd_ui)
+
+    # Backwards-compatible aliases without advertising the old names in help.
+    sub._name_parser_map["runner"] = p_server  # noqa: SLF001
+    sub._name_parser_map["web"] = p_ui  # noqa: SLF001
 
     p_doctor = sub.add_parser("doctor", help="Print a diagnostic snapshot.")
     p_doctor.set_defaults(fn=cmd_doctor)
@@ -152,18 +160,18 @@ def cmd_init(args: argparse.Namespace) -> int:
     cfg_path = result["config_path"]
     target = result["volume_root"]
     binding_written = result.get("binding_path")
-    web_unit_path = result.get("web_unit_path")
+    ui_unit_path = result.get("ui_unit_path")
     print(f"Wrote {cfg_path}")
     print(f"Created directories: {target}/run, {target}/gaps")
     if binding_written:
         print(f"Set active target app → {client_repo}")
         print(f"Wrote {binding_written}")
-    if web_unit_path:
-        print(f"Installed web backend unit: {web_unit_path}")
+    if ui_unit_path:
+        print(f"Installed UI backend unit: {ui_unit_path}")
     print()
     print("Next steps:")
     if binding_written:
-        print(f"  uv run refine start          # web backend + runner, one command")
+        print(f"  uv run refine start          # UI backend + server, one command")
         print(f"  uv run refine status         # check it's healthy")
         print(f"  uv run refine stop           # tear it all down")
         print()
@@ -180,8 +188,8 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 
 def _is_refine_source_dir(p: Path) -> bool:
-    """Heuristic: cwd is a refine source dir if it has pyproject.toml and a `refine/` package."""
-    return (p / "pyproject.toml").is_file() and (p / "refine" / "cli.py").is_file()
+    """Heuristic: cwd is a refine source dir if it has pyproject.toml and refine_cli."""
+    return (p / "pyproject.toml").is_file() and (p / "refine_cli" / "cli.py").is_file()
 
 
 class _InitError(Exception):
@@ -242,7 +250,7 @@ def bootstrap_client_repo(
         config_created = True
 
     binding_written = None
-    web_unit_path = None
+    ui_unit_path = None
     if _is_refine_source_dir(clone_dir):
         binding_path = clone_dir / config.BINDING_FILENAME
         if binding_path.exists() and not force:
@@ -252,7 +260,7 @@ def bootstrap_client_repo(
         binding_written = config.write_binding(clone_dir, client_repo)
         _remove_legacy_docker_artifacts(clone_dir)
         if install_unit:
-            web_unit_path = _write_and_enable_web_unit(clone_dir, client_repo, force=force)
+            ui_unit_path = _write_and_enable_ui_unit(clone_dir, client_repo, force=force)
         project_registry.upsert_app(clone_dir, client_repo, make_current=True)
 
     return {
@@ -260,36 +268,36 @@ def bootstrap_client_repo(
         "volume_root": target,
         "config_path": cfg_path,
         "binding_path": binding_written,
-        "web_unit_path": web_unit_path,
+        "ui_unit_path": ui_unit_path,
         "git_initialized": git_initialized,
         "config_created": config_created,
     }
 
 
-def _write_and_enable_web_unit(
+def _write_and_enable_ui_unit(
     clone_dir: Path,
     client_repo: Path,
     *,
     force: bool,
     runner_unit_name: str | None = None,
 ) -> Path:
-    """Write the web backend systemd user unit, daemon-reload, and enable it.
+    """Write the UI backend systemd user unit, daemon-reload, and enable it.
 
     Refuses if a unit by the same name already points at a different checkout,
     unless --force is given (in which case it's overwritten).
     """
     runner_unit = runner_unit_name or config.unit_name_for(clone_dir)
-    web_unit = _web_unit_name(runner_unit)
-    web_unit_path = SYSTEMD_USER_DIR / f"{web_unit}.service"
+    ui_unit = _ui_unit_name(runner_unit)
+    ui_unit_path = SYSTEMD_USER_DIR / f"{ui_unit}.service"
     SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
-    _remove_legacy_runner_unit(runner_unit)
+    _remove_legacy_runtime_units(runner_unit)
 
     if not force:
-        if web_unit_path.exists():
-            existing_wd = _grep_first(web_unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
+        if ui_unit_path.exists():
+            existing_wd = _grep_first(ui_unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
             if existing_wd and existing_wd != str(clone_dir):
                 raise _InitError(
-                    f"systemd unit {web_unit} already exists for a different checkout:\n"
+                    f"systemd unit {ui_unit} already exists for a different checkout:\n"
                     f"  existing WorkingDirectory: {existing_wd}\n"
                     f"  this checkout:             {clone_dir}\n"
                     f"Use --force to overwrite, or rename one of the checkouts."
@@ -303,17 +311,17 @@ def _write_and_enable_web_unit(
             "path to invoke it)."
         )
 
-    web_body = (
+    ui_body = (
         "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
         "# `refine init --force` to regenerate.\n"
         "[Unit]\n"
-        f"Description=refine web backend — {clone_dir} → {client_repo}\n"
+        f"Description=refine UI backend — {clone_dir} → {client_repo}\n"
         "After=network.target\n"
         "\n"
         "[Service]\n"
         "Type=simple\n"
         f"WorkingDirectory={clone_dir}\n"
-        f"ExecStart={uv} run refine web\n"
+        f"ExecStart={uv} run refine ui\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
         "TimeoutStopSec=30s\n"
@@ -321,16 +329,16 @@ def _write_and_enable_web_unit(
         "[Install]\n"
         "WantedBy=default.target\n"
     )
-    web_unit_path.write_text(web_body, encoding="utf-8")
+    ui_unit_path.write_text(ui_body, encoding="utf-8")
 
     rc, out = _systemctl("daemon-reload")
     if rc != 0:
         raise _InitError(f"systemctl --user daemon-reload failed: {out.strip()}")
-    rc, out = _systemctl("enable", web_unit)
+    rc, out = _systemctl("enable", ui_unit)
     if rc != 0:
-        raise _InitError(f"systemctl --user enable {web_unit} failed: {out.strip()}")
+        raise _InitError(f"systemctl --user enable {ui_unit} failed: {out.strip()}")
 
-    return web_unit_path
+    return ui_unit_path
 
 
 def _grep_first(text: str, prefix: str) -> str | None:
@@ -348,8 +356,8 @@ def cmd_start(args: argparse.Namespace) -> int:
         print("No refine project is attached yet.")
         print("Starting the host-native setup UI at http://127.0.0.1:8080")
         print("Use the browser to create or attach a target app path.")
-        from refine_web.__main__ import main as web_main
-        return web_main()
+        from refine_ui.__main__ import main as ui_main
+        return ui_main()
 
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
@@ -360,19 +368,19 @@ def cmd_start(args: argparse.Namespace) -> int:
     except _InitError as e:
         print(f"refine start: {e}", file=sys.stderr)
         return 1
-    web_unit = _web_unit_name(unit)
+    ui_unit = _ui_unit_name(unit)
 
-    print(f"Starting web backend (systemctl --user start {web_unit})…")
-    rc, out = _systemctl("start", web_unit)
+    print(f"Starting UI backend (systemctl --user start {ui_unit})…")
+    rc, out = _systemctl("start", ui_unit)
     if rc != 0:
         print(f"refine start: {out.strip()}", file=sys.stderr)
         return 1
 
     if not _wait_for_port(cfg.web_host, cfg.web_port, timeout=20.0):
         print(
-            f"refine start: web backend did not start listening on "
+            f"refine start: UI backend did not start listening on "
             f"{cfg.web_host}:{cfg.web_port} within 20s. "
-            f"Check `journalctl --user -u {web_unit} -n 200`.",
+            f"Check `journalctl --user -u {ui_unit} -n 200`.",
             file=sys.stderr,
         )
         return 1
@@ -383,12 +391,16 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 def cmd_stop(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
-    web_unit = _web_unit_name(unit)
+    ui_unit = _ui_unit_name(unit)
 
-    print(f"Stopping web backend (systemctl --user stop {web_unit})…")
-    rc, out = _systemctl("stop", web_unit)
+    print(f"Stopping UI backend (systemctl --user stop {ui_unit})…")
+    rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
+    legacy_unit = _legacy_pre_ui_unit_name(unit)
+    rc, out = _systemctl("stop", legacy_unit)
+    if rc != 0:
+        print(f"  (legacy systemctl: {out.strip()})", file=sys.stderr)
 
     print("Stopped.")
     return 0
@@ -408,7 +420,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
 def cmd_reset(args: argparse.Namespace) -> int:
     """Undo `refine init` in this checkout.
 
-    The reverse of init: stop service, disable + remove the systemd web unit,
+    The reverse of init: stop service, disable + remove the systemd UI unit,
     delete `.refine-binding` and `.refine-apps.json` from the checkout, and
     optionally purge the active app's `.refine/` directory. Leaves the app
     source tree untouched.
@@ -427,7 +439,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
         return 1
 
     unit = config.read_binding_unit(binding_path) or config.unit_name_for(cwd)
-    web_unit = _web_unit_name(unit)
+    ui_unit = _ui_unit_name(unit)
     try:
         client_repo = config.read_binding(binding_path)
     except config.ConfigError:
@@ -450,15 +462,15 @@ def cmd_reset(args: argparse.Namespace) -> int:
                 return 1
 
     # 1. Stop service (best-effort — keep going if it was already down).
-    print(f"Stopping web backend (systemctl --user stop {web_unit})…")
-    rc, out = _systemctl("stop", web_unit)
+    print(f"Stopping UI backend (systemctl --user stop {ui_unit})…")
+    rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
 
-    # 2. Disable + remove the web unit. Also remove the legacy runner unit if
+    # 2. Disable + remove the UI unit. Also remove legacy runtime units if
     # present from older installs.
     removed_units = False
-    for unit_name in (unit, web_unit):
+    for unit_name in (unit, _legacy_pre_ui_unit_name(unit), ui_unit):
         rc, out = _systemctl("disable", unit_name)
         if rc != 0:
             # If it wasn't enabled or doesn't exist, that's fine.
@@ -510,39 +522,39 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def _print_status_block(clone: Path, unit: str, cfg: "config.Config") -> None:
-    web_unit = _web_unit_name(unit)
+    ui_unit = _ui_unit_name(unit)
     web_up = _port_open(cfg.web_host, cfg.web_port)
-    web_active = _systemctl_is_active(web_unit)
+    web_active = _systemctl_is_active(ui_unit)
 
     print()
     print(_bold("refine"))
     print(f"  checkout: {clone}")
     print(f"  app:      {cfg.client_repo}")
-    print(f"  web:      {_dot(web_active and web_up)} systemd unit `{web_unit}` "
+    print(f"  ui:       {_dot(web_active and web_up)} systemd unit `{ui_unit}` "
           f"({'active' if web_active else 'inactive'}, "
           f"http {'reachable' if web_up else 'unreachable'} at "
           f"http://{_displayable_host(cfg.web_host)}:{cfg.web_port})")
-    print(f"  runner:   {_dot(web_active and web_up)} in-process with web backend")
-    print(f"  logs:     journalctl --user -u {web_unit} -f")
+    print(f"  server:   {_dot(web_active and web_up)} in-process with UI backend")
+    print(f"  logs:     journalctl --user -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop")
     print()
 
 
-# ----- runner / web -----------------------------------------------------------
+# ----- server / ui ------------------------------------------------------------
 
-def cmd_runner_foreground(args: argparse.Namespace) -> int:
-    """Run the runner in the foreground for debugging.
+def cmd_server_foreground(args: argparse.Namespace) -> int:
+    """Run the server component in the foreground for debugging.
 
-    The production path is `refine web`, which owns the runner in-process.
+    The production path is `refine ui`, which owns the runner in-process.
     """
     _load_config_or_exit(args)
-    from refine_runner.__main__ import main as runner_main
-    return runner_main()
+    from refine_server.__main__ import main as server_main
+    return server_main()
 
 
-def cmd_web(args: argparse.Namespace) -> int:
-    from refine_web.__main__ import main as web_main
-    return web_main()
+def cmd_ui(args: argparse.Namespace) -> int:
+    from refine_ui.__main__ import main as ui_main
+    return ui_main()
 
 
 # ----- doctor -----------------------------------------------------------------
@@ -615,7 +627,11 @@ def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
         pass
 
 
-def _web_unit_name(runner_unit: str) -> str:
+def _ui_unit_name(runner_unit: str) -> str:
+    return f"{runner_unit}-ui"
+
+
+def _legacy_pre_ui_unit_name(runner_unit: str) -> str:
     return f"{runner_unit}-web"
 
 
@@ -635,7 +651,7 @@ def _user_login_path() -> str | None:
 
     systemd --user services often run with a minimal PATH that misses uv
     installs in ~/.local/bin, ~/.cargo/bin, asdf/mise shims, Homebrew, etc.
-    Project setup may run inside the host-native web service, so resolving uv
+    Project setup may run inside the host-native UI service, so resolving uv
     must match the operator's terminal rather than systemd's stripped env.
     """
     global _LOGIN_PATH_CACHE, _LOGIN_PATH_RESOLVED
@@ -659,20 +675,25 @@ def _user_login_path() -> str | None:
 
 
 def _ensure_host_unit_installed(clone: Path, cfg: "config.Config", runner_unit: str) -> None:
-    web_unit = _web_unit_name(runner_unit)
-    web_path = SYSTEMD_USER_DIR / f"{web_unit}.service"
-    _remove_legacy_runner_unit(runner_unit)
-    if web_path.exists():
+    ui_unit = _ui_unit_name(runner_unit)
+    ui_path = SYSTEMD_USER_DIR / f"{ui_unit}.service"
+    _remove_legacy_runtime_units(runner_unit)
+    if ui_path.exists():
         return
-    _write_and_enable_web_unit(clone, cfg.client_repo, force=True, runner_unit_name=runner_unit)
+    _write_and_enable_ui_unit(clone, cfg.client_repo, force=True, runner_unit_name=runner_unit)
 
 
-def _remove_legacy_runner_unit(runner_unit: str) -> None:
-    unit_path = SYSTEMD_USER_DIR / f"{runner_unit}.service"
+def _remove_legacy_runtime_units(runner_unit: str) -> None:
+    for unit_name in (runner_unit, _legacy_pre_ui_unit_name(runner_unit)):
+        _remove_unit(unit_name)
+
+
+def _remove_unit(unit_name: str) -> None:
+    unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
     if not unit_path.exists():
         return
-    _systemctl("stop", runner_unit)
-    _systemctl("disable", runner_unit)
+    _systemctl("stop", unit_name)
+    _systemctl("disable", unit_name)
     try:
         unit_path.unlink()
     except OSError:
