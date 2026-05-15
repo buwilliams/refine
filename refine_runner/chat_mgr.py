@@ -102,9 +102,10 @@ def _user_login_path() -> str | None:
 
     Rather than hardcode any particular install location (which would
     break on macOS, NixOS, asdf/mise setups, etc.), we ask the user's
-    login shell exactly once for its PATH. Whatever that shell prints is
-    what `claude` resolves against in interactive use — matching it makes
-    chat behave like the user's terminal.
+    interactive login shell exactly once for its PATH. Whatever that
+    shell prints is what `claude` / `codex` resolve against in
+    interactive use — matching it makes agent subprocesses behave like
+    the user's terminal.
     """
     global _login_path_cache, _login_path_resolved
     if _login_path_resolved:
@@ -113,9 +114,14 @@ def _user_login_path() -> str | None:
     shell = os.environ.get("SHELL") or "/bin/bash"
     try:
         out = subprocess.run(
-            [shell, "-lc", "printf %s \"$PATH\""],
+            [shell, "-lic", "printf %s \"$PATH\""],
             capture_output=True, text=True, timeout=5,
         )
+        if out.returncode != 0 or not (out.stdout or "").strip():
+            out = subprocess.run(
+                [shell, "-lc", "printf %s \"$PATH\""],
+                capture_output=True, text=True, timeout=5,
+            )
     except Exception:
         return None
     path = (out.stdout or "").strip()
