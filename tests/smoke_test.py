@@ -67,8 +67,8 @@ def main() -> int:
     cargs = codex.agent_args("/bin/codex", "do it", cwd=client)
     assert cargs[:2] == ["/bin/codex", "exec"]
     assert "--dangerously-bypass-approvals-and-sandbox" in cargs
-    assert "--ask-for-approval" in cargs and "never" in cargs
-    assert "--sandbox" in cargs and "danger-full-access" in cargs
+    assert "--ask-for-approval" not in cargs
+    assert "--sandbox" not in cargs
     assert "--json" in cargs and "-C" in cargs
     assert "--full-auto" not in cargs
     assert codex.chat_args("/bin/codex", "hi", session_id="abc")[:3] == [

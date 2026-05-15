@@ -153,8 +153,6 @@ class _CodexSpec(CliSpec):
     def _automation_flags() -> list[str]:
         return [
             "--dangerously-bypass-approvals-and-sandbox",
-            "--ask-for-approval", "never",
-            "--sandbox", "danger-full-access",
             "--color", "never",
         ]
 
