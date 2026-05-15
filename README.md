@@ -21,65 +21,22 @@ auth, so operators rarely need to think about either.
 
 ## Quick Start
 
-1. Clone refine once on the host.
 ```bash
 git clone https://github.com/buwilliams/refine.git /opt/refine
-```
-
-2. Authenticate the agent CLI you want refine to use.
-```bash
 claude login                       # or: codex login / gemini auth login
-```
-
-3. Attach the first target app.
-```bash
 cd /opt/refine
 uv run refine init /srv/clients/acme-app
-```
-
-4. Commit the target app's refine config when you are ready.
-```bash
 cd /srv/clients/acme-app
 git add .refine/refine.toml .refine/.gitignore
 git commit -m "add refine"
-```
-
-5. Start refine from the refine checkout.
-```bash
 cd /opt/refine
 uv run refine start
-```
-
-6. Open the UI.
-```bash
-http://localhost:8080
-```
-
-7. Check status or find the exact systemd unit and log command.
-```bash
-uv run refine status
-```
-
-8. Keep refine running after logout if needed.
-```bash
-loginctl enable-linger $USER       # systemd keeps user units alive across logout
-```
-
-9. Switch apps from Settings → Project, or force a CLI rebind.
-```bash
-cd /opt/refine
-uv run refine init /srv/clients/other-client --force
-```
-
-10. Reset the checkout binding when you want to start fresh.
-```bash
-cd /opt/refine
-uv run refine reset
-```
-
-11. Purge the active app's refine data only when you intend to delete it.
-```bash
-uv run refine reset --purge -y
+uv run refine status               # exact unit name and log command
+# open http://localhost:8080
+# optional: loginctl enable-linger $USER
+# switch apps: uv run refine init /srv/clients/other-client --force
+# reset binding: uv run refine reset
+# purge active app refine data: uv run refine reset --purge -y
 ```
 
 If you skip `refine init` and run `uv run refine start` in a fresh checkout,
