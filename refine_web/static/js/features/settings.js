@@ -13,14 +13,16 @@ async function renderSettings() {
 async function refreshSettings() {
   if (state.currentRoute !== "settings") return;
   try {
-    const [s, diag, reps, feats] = await Promise.all([
+    const [s, diag, reps, feats, project] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
       api("GET", "/api/features"),
+      api("GET", "/api/project/status"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
+    state.project = project;
     drawSettings(s.settings || {}, diag, reps.reporters || [], feats);
   } catch (e) {
     const root = document.getElementById("settings-content");
@@ -112,6 +114,13 @@ function renderFeatureFlagsCard(feats) {
 
 function drawSettings(s, diag, reps, feats) {
   const cli = (s.agent_cli || "claude").toLowerCase();
+  const projectApps = state.project?.apps || [];
+  const currentProject = state.project?.client_repo || "";
+  const projectRegistryEnabled = state.project?.registry_enabled !== false;
+  const appOptions = projectApps.map((app) => `
+    <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
+      ${htmlEscape(app.name || app.path)}
+    </option>`).join("");
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   // Tab definitions. Order here drives the tab strip; `slug` is the
@@ -139,17 +148,25 @@ function drawSettings(s, diag, reps, feats) {
     ${tabStrip}
     ${pane("project", `
     <div class="card">
-      <h3>Project</h3>
+      <h3>Applications</h3>
       <p class="muted small">
         Current app: <code>${htmlEscape(state.project?.client_repo || "Not attached")}</code>
       </p>
-      <div class="form-row"><label>Attach app path
-        <span class="muted small">— existing repo or new directory to create and initialize.</span></label>
-        <input type="text" id="s-project-path"
-               placeholder="/path/to/app"
-               value="${htmlEscape(state.project?.client_repo || "")}"></div>
+      ${projectRegistryEnabled ? "" : `
+        <p class="muted small" style="color:var(--warn)">
+          App switching requires the host-native setup UI. Start from the refine
+          source checkout with <code>uv run refine start</code> before a project
+          is attached.
+        </p>`}
+      <div class="form-row"><label>Known apps
+        <span class="muted small">— add an existing repo or a new directory, then switch between apps here.</span></label>
+        <select id="s-project-select" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>
+          ${appOptions || `<option value="">No apps yet</option>`}
+        </select></div>
       <div class="actions">
-        <button class="warn" id="s-project-attach">Attach app</button>
+        <button class="secondary" id="s-project-add" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
+        <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
+        <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
     </div>`)}
 
@@ -374,15 +391,23 @@ function drawSettings(s, diag, reps, feats) {
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
     btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
   });
-  $("#s-project-attach")?.addEventListener("click", async () => {
-    const path = ($("#s-project-path")?.value || "").trim();
-    if (!path) return;
+  $("#s-project-add")?.addEventListener("click", async () => {
+    await openProjectAttachModal({
+      message: "Add an existing app path or a new directory to create and initialize.",
+      title: "Add app",
+      okLabel: "Add and switch",
+      reloadOnSuccess: true,
+    });
+  });
+  $("#s-project-switch")?.addEventListener("click", async () => {
+    const path = ($("#s-project-select")?.value || "").trim();
+    if (!path || path === currentProject) return;
     const ok = await modalConfirm(
-      "Attach refine to this app path? If the directory does not exist, refine will create it and run git init.",
-      { title: "Attach app", okLabel: "Attach" },
+      "Switch refine to the selected app? Running agents will be stopped and the current app must be clean.",
+      { title: "Switch app", okLabel: "Switch" },
     );
     if (!ok) return;
-    await withButtonBusy($("#s-project-attach"), "Attaching…", async () => {
+    await withButtonBusy($("#s-project-switch"), "Switching…", async () => {
       try {
         const result = await api("POST", "/api/project/attach", { path });
         state.project = result;
@@ -392,6 +417,23 @@ function drawSettings(s, diag, reps, feats) {
           toast("Project attached", "success");
         }
         window.location.reload();
+      } catch (e) { toast(e.details || e.message, "error"); }
+    });
+  });
+  $("#s-project-remove")?.addEventListener("click", async () => {
+    const path = ($("#s-project-select")?.value || "").trim();
+    if (!path) return;
+    const ok = await modalConfirm(
+      "Remove this app from the known-apps list? This does not delete files.",
+      { title: "Remove app", okLabel: "Remove", danger: true },
+    );
+    if (!ok) return;
+    await withButtonBusy($("#s-project-remove"), "Removing…", async () => {
+      try {
+        const result = await api("DELETE", "/api/projects", { path });
+        state.project = { ...(state.project || {}), apps: result.apps || [] };
+        toast("App removed", "info");
+        await refreshSettings();
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });

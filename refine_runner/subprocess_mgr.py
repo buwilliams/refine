@@ -343,6 +343,14 @@ class SubprocessManager:
         self._kill(h, "cancel")
         return True
 
+    def cancel_all(self, reason: str = "shutdown") -> int:
+        """Kill every running Gap subprocess and return how many were signaled."""
+        with self._lock:
+            handles = list(self._runs.values())
+        for h in handles:
+            self._kill(h, reason)
+        return len(handles)
+
     def is_running(self, gap_id: str) -> bool:
         with self._lock:
             return gap_id in self._runs

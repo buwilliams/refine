@@ -27,7 +27,7 @@ import sys
 import time
 from pathlib import Path
 
-from refine_shared import config
+from refine_shared import config, project_registry
 
 
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
@@ -279,6 +279,7 @@ def bootstrap_client_repo(
         )
         if install_unit:
             unit_path = _write_and_enable_unit(clone_dir, client_repo, force=force)
+        project_registry.upsert_app(clone_dir, client_repo, make_current=True)
 
     return {
         "client_repo": client_repo,
@@ -528,13 +529,17 @@ def cmd_reset(args: argparse.Namespace) -> int:
         print(f"Removed {unit_path}")
         _systemctl("daemon-reload")
 
-    # 3. Remove binding + .env from the clone.
+    # 3. Remove binding + .env + known-app registry from the clone.
     binding_path.unlink()
     print(f"Removed {binding_path}")
     env_path = cwd / ".env"
     if env_path.exists():
         env_path.unlink()
         print(f"Removed {env_path}")
+    registry_path = project_registry.registry_path(cwd)
+    if registry_path.exists():
+        registry_path.unlink()
+        print(f"Removed {registry_path}")
 
     # 4. Optional: purge the client repo's .refine/ directory.
     if args.purge and client_refine_dir and client_refine_dir.is_dir():

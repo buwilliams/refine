@@ -230,9 +230,19 @@ def _h_project_status(_h, _m, _b, _q):
     return api.project_status()
 
 
+@route("GET", r"/api/projects")
+def _h_project_list(_h, _m, _b, _q):
+    return api.project_list()
+
+
 @route("POST", r"/api/project/attach")
 def _h_project_attach(_h, _m, body, _q):
     return api.project_attach(body or {})
+
+
+@route("DELETE", r"/api/projects")
+def _h_project_remove(_h, _m, body, _q):
+    return api.project_remove(body or {})
 
 
 @route("GET", r"/api/target-app/status")

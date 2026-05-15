@@ -94,6 +94,8 @@ This:
   system-utility state, not project source).
 - Writes `/opt/refine-acme/.refine-binding` so future commands from
   `/opt/refine-acme` target this client.
+- Writes `/opt/refine-acme/.refine-apps.json` with the clone's known apps list
+  used by Settings → Project.
 - Writes `/opt/refine-acme/.env` so `docker compose` reads the bind-mount path.
 - Installs and enables `~/.config/systemd/user/refine-acme.service` so the
   runner is managed by systemd (survives terminal close; one unit per clone,
@@ -118,6 +120,12 @@ When no project is attached, refine starts a host-native setup UI. Open the
 shown URL, enter an existing app path or a new directory path, and refine will
 create missing directories, run `git init` when needed, write the same
 `.refine/` files as `refine init`, bind the clone, and start the runner.
+After that first attach, Settings → Project keeps a clone-local known-apps
+list. Add another app from the same modal, remove entries from the list without
+deleting project files, or switch the active app. Switching stops the runner,
+commits pending `.refine/` state when needed, refuses to proceed if the current
+app has other uncommitted changes, then performs the same binding work as
+`uv run refine init <path>` for the selected app.
 
 ### 3. Run from the refine source dir
 
@@ -170,7 +178,7 @@ Or wipe the clone's binding first and `init` fresh:
 
 ```bash
 cd /opt/refine-acme
-uv run refine reset                                # stop services, disable unit, remove binding + .env
+uv run refine reset                                # stop services, disable unit, remove binding + .env + known-app list
 uv run refine init /srv/clients/other-client       # bind to the new client
 
 # To also delete the old client's .refine/ data (gap.json files, sqlite index):
@@ -249,7 +257,7 @@ the UI's Settings page.
 | Command                       | What it does                                                                                                |
 |-------------------------------|-------------------------------------------------------------------------------------------------------------|
 | `uv run refine init <path>`   | Write `.refine/refine.toml` + `run/` + `gaps/`, bind this clone, install + enable a systemd --user unit.    |
-| `uv run refine reset`         | Undo `init` in this clone: stop services, disable + remove the systemd unit, delete `.refine-binding` + `.env`. Add `--purge` (+ `-y` to skip prompt) to also delete the bound client's `.refine/` data. |
+| `uv run refine reset`         | Undo `init` in this clone: stop services, disable + remove the systemd unit, delete `.refine-binding`, `.refine-apps.json`, and `.env`. Add `--purge` (+ `-y` to skip prompt) to also delete the bound client's `.refine/` data. |
 | `uv run refine start`         | If initialized: rebuild image if stale → `docker compose up -d` → `systemctl --user start <unit>` → wait for both healthy. If no project is attached yet: start the host-native setup UI. |
 | `uv run refine stop`          | `systemctl --user stop <unit>` + `docker compose down`.                                                     |
 | `uv run refine restart`       | `refine stop && refine start` — picks up source changes without forcing two commands. Same `--rebuild` / `--no-rebuild` flags as `start`. |

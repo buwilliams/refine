@@ -12,6 +12,7 @@ dist/
 # Per-clone refine binding (links this refine source dir to a client repo).
 # Created by `refine init`; host-specific; do not commit.
 .refine-binding
+.refine-apps.json
 
 # Host runner state (pidfile + log) for this clone. Host-specific; do not commit.
 /run/

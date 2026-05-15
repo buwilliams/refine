@@ -204,6 +204,11 @@ class ChatManager:
 
     def shutdown(self) -> None:
         self._supervisor_stop.set()
+        with self._lock:
+            sessions = list(self._sessions.values())
+            self._sessions.clear()
+        for session in sessions:
+            self._terminate(session, reason="shutdown")
 
     def start(self, cwd: Path, *, is_standalone: bool = True,
               provider: str | None = None,

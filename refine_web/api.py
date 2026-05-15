@@ -7,11 +7,13 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+import subprocess
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from refine_shared import activity, config, db, gaps as shared_gaps, reporters
+from refine_shared import activity, config, db, gaps as shared_gaps, project_registry, reporters
 from refine_shared.gaps import now_iso
 from refine_shared.ipc_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
@@ -43,10 +45,15 @@ def _conn() -> sqlite3.Connection:
 
 def project_status() -> tuple[int, dict]:
     """Return whether this web process is attached to a refine project."""
+    clone_dir = Path.cwd().resolve()
+    registry_enabled = _project_registry_enabled(clone_dir)
+    apps = project_registry.list_apps(clone_dir) if registry_enabled else []
     cfg_path = config.find_config()
     if cfg_path is None:
         return 200, {
             "attached": False,
+            "apps": apps,
+            "registry_enabled": registry_enabled,
             "message": "No refine project is attached.",
         }
     try:
@@ -54,15 +61,52 @@ def project_status() -> tuple[int, dict]:
     except config.ConfigError as e:
         return 200, {
             "attached": False,
+            "apps": apps,
+            "registry_enabled": registry_enabled,
             "config_path": str(cfg_path),
             "message": str(e),
         }
+    if registry_enabled:
+        apps = project_registry.upsert_app(clone_dir, cfg.client_repo, make_current=True)
     return 200, {
         "attached": True,
+        "apps": apps,
+        "registry_enabled": registry_enabled,
         "client_repo": str(cfg.client_repo),
         "volume_root": str(cfg.volume_root),
         "config_path": str(cfg.config_path),
     }
+
+
+def project_list() -> tuple[int, dict]:
+    clone_dir = Path.cwd().resolve()
+    current = ""
+    try:
+        current = str(config.get(reload=True).client_repo)
+    except config.ConfigError:
+        pass
+    return 200, {
+        "apps": project_registry.list_apps(clone_dir) if _project_registry_enabled(clone_dir) else [],
+        "current": current,
+    }
+
+
+def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
+    raw_path = (body.get("path") or "").strip()
+    if not raw_path:
+        return err(400, "Choose an app to remove.")
+    clone_dir = Path.cwd().resolve()
+    if not _project_registry_enabled(clone_dir):
+        return err(409, "Known-apps list is only available from the host refine source checkout.")
+    target = Path(raw_path).expanduser().resolve()
+    try:
+        current = config.get(reload=True).client_repo
+    except config.ConfigError:
+        current = None
+    if current is not None and current == target:
+        return err(409, "Cannot remove the currently attached app. Switch to another app first.")
+    apps = project_registry.remove_app(clone_dir, target)
+    return 200, {"apps": apps}
 
 
 def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
@@ -91,6 +135,10 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 ),
             )
 
+        current_before = _current_client_repo()
+        switching = current_before is not None and current_before != client_repo.resolve()
+        prep = _prepare_current_project_for_switch(clone_dir) if switching else {"warnings": []}
+
         install_unit = body.get("install_unit") is not False
         result = bootstrap_client_repo(
             client_repo,
@@ -107,6 +155,8 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         )
     except (config.ConfigError, _InitError, OSError, TimeoutError) as e:
         return err(400, str(e))
+    except _SwitchBlocked as e:
+        return err(409, str(e), e.details)
 
     runner = {"started": False, "message": ""}
     if body.get("start_runner") is not False and result.get("unit_path"):
@@ -138,8 +188,106 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
         "git_initialized": bool(result.get("git_initialized")),
         "config_created": bool(result.get("config_created")),
+        "apps": project_registry.list_apps(clone_dir),
+        "registry_enabled": True,
+        "switch_warnings": prep.get("warnings", []),
         "runner": runner,
     }
+
+
+def _project_registry_enabled(clone_dir: Path) -> bool:
+    return (clone_dir / "pyproject.toml").is_file() and (clone_dir / "refine" / "cli.py").is_file()
+
+
+class _SwitchBlocked(Exception):
+    def __init__(self, message: str, details: str | None = None) -> None:
+        super().__init__(message)
+        self.details = details
+
+
+def _current_client_repo() -> Path | None:
+    try:
+        return config.get(reload=True).client_repo
+    except config.ConfigError:
+        return None
+
+
+def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
+    """Stop active agents and leave the current client repo clean before rebind."""
+    from refine.cli import _ipc_ping, _systemctl
+
+    warnings: list[str] = []
+    cfg = config.get(reload=True)
+    unit = config.read_binding_unit(clone_dir / config.BINDING_FILENAME) or config.unit_name_for(clone_dir)
+
+    rc, out = _systemctl("stop", unit)
+    if rc != 0:
+        warnings.append((out or f"systemctl --user stop {unit} failed").strip())
+
+    deadline = time.time() + 10.0
+    while time.time() < deadline:
+        ok, _ = _ipc_ping(cfg.runner_socket)
+        if not ok:
+            break
+        time.sleep(0.2)
+    else:
+        raise _SwitchBlocked(
+            "Runner is still reachable after stop; refusing to switch apps.",
+            f"Socket still responds at {cfg.runner_socket}. Stop the runner and try again.",
+        )
+
+    _commit_refine_state(cfg.client_repo)
+    dirty = _git_stdout(cfg.client_repo, ["status", "--porcelain"])
+    if dirty.strip():
+        raise _SwitchBlocked(
+            "Current app has uncommitted changes.",
+            (
+                "Commit, stash, or discard changes in the current app before switching:\n"
+                + dirty.strip()
+            ),
+        )
+    return {"warnings": warnings}
+
+
+def _commit_refine_state(repo: Path) -> None:
+    dirty_refine = _git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
+    if not dirty_refine.strip():
+        return
+    _git_checked(repo, ["add", ".refine"])
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--quiet"],
+        cwd=str(repo), capture_output=True, text=True, timeout=30,
+    )
+    if staged.returncode == 0:
+        return
+    _git_checked(repo, [
+        "-c", "user.email=refine@localhost",
+        "-c", "user.name=refine",
+        "commit", "-m", "refine: persist state before switch",
+    ])
+
+
+def _git_stdout(repo: Path, args: list[str]) -> str:
+    out = subprocess.run(
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, timeout=30,
+    )
+    if out.returncode != 0:
+        raise _SwitchBlocked(
+            "Could not inspect current app git state.",
+            (out.stderr or out.stdout or f"git {' '.join(args)} failed").strip(),
+        )
+    return out.stdout
+
+
+def _git_checked(repo: Path, args: list[str]) -> None:
+    out = subprocess.run(
+        ["git", *args], cwd=str(repo), capture_output=True, text=True, timeout=30,
+    )
+    if out.returncode != 0:
+        raise _SwitchBlocked(
+            "Could not prepare current app for switching.",
+            (out.stderr or out.stdout or f"git {' '.join(args)} failed").strip(),
+        )
 
 
 # --- Gap endpoints ------------------------------------------------------------

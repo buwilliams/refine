@@ -84,6 +84,12 @@ class Runner:
 
     def shutdown(self) -> None:
         self.ipc.stop()
+        self.chat.shutdown()
+        self.sub_mgr.cancel_all("shutdown")
+        try:
+            self.state_committer.commit_now()
+        except Exception:
+            pass
         self.state_committer.stop()
         self.merger.stop()
         self.dispatcher.stop()

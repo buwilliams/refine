@@ -193,6 +193,7 @@ def main() -> int:
     assert (ui_client / ".refine" / "run").is_dir()
     assert (ui_client / ".refine" / "gaps").is_dir()
     assert (clone / ".refine-binding").read_text(encoding="utf-8").strip().endswith(str(ui_client))
+    assert str(ui_client) in (clone / ".refine-apps.json").read_text(encoding="utf-8")
     assert f"REFINE_CLIENT_REFINE_DIR={ui_client / '.refine'}" in (clone / ".env").read_text(encoding="utf-8")
     assert boot["git_initialized"] is True
     assert boot["config_created"] is True

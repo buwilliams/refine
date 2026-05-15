@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -61,6 +62,20 @@ def main() -> int:
         except urllib.error.HTTPError as e:
             return e.code, json.loads(e.read() or b"{}")
 
+    def delete_json(path: str, body: dict) -> tuple[int, dict]:
+        data = json.dumps(body).encode("utf-8")
+        req = urllib.request.Request(
+            f"http://{host}:{port}{path}",
+            data=data,
+            method="DELETE",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=5) as r:
+                return r.status, json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read() or b"{}")
+
     try:
         for _ in range(30):
             try:
@@ -87,6 +102,7 @@ def main() -> int:
         assert attached["client_repo"] == str(client)
         assert attached["git_initialized"] is True
         assert attached["config_created"] is True
+        assert len(attached["apps"]) == 1
         assert (client / ".git").exists()
         assert (client / ".refine" / "refine.toml").is_file()
         assert (clone / ".refine-binding").is_file()
@@ -97,7 +113,45 @@ def main() -> int:
         assert status == 200, snap
         assert snap["attached"] is True
         assert snap["client_repo"] == str(client)
+        assert snap["apps"][0]["path"] == str(client)
         print("[ok] attached project is visible to the UI status check")
+
+        from refine_shared import config
+
+        existing = tmp / "existing-client"
+        existing.mkdir()
+        cfg_path = config.write_defaults(existing / ".refine")
+        cfg_path.write_text(
+            cfg_path.read_text(encoding="utf-8") + "\n# sentinel: keep me\n",
+            encoding="utf-8",
+        )
+        status, switched = post_json("/api/project/attach", {
+            "path": str(existing),
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
+        assert status == 200, switched
+        assert switched["client_repo"] == str(existing)
+        assert switched["git_initialized"] is True
+        assert switched["config_created"] is False
+        assert "# sentinel: keep me" in cfg_path.read_text(encoding="utf-8")
+        assert len(switched["apps"]) == 2
+        dirty = subprocess.run(
+            ["git", "-C", str(client), "status", "--porcelain"],
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+        assert dirty == "", dirty
+        print("[ok] switching preserves existing .refine and cleans previous app")
+
+        status, removed = delete_json("/api/projects", {"path": str(client)})
+        assert status == 200, removed
+        assert [app["path"] for app in removed["apps"]] == [str(existing)]
+        print("[ok] app registry remove works")
+
+        status, rejected = delete_json("/api/projects", {"path": str(existing)})
+        assert status == 409, rejected
+        print("[ok] current app cannot be removed from registry")
     finally:
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)

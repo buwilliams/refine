@@ -100,34 +100,50 @@ function toast(message, kind = "info") {
 // ---- Project attach/setup ---------------------------------------------------
 
 async function ensureProjectAttached() {
+  const snap = await refreshProjectStatus();
+  if (!snap) return false;
+  if (snap.attached) return true;
+  await openProjectAttachModal({
+    message: snap.message || "No refine project is attached.",
+    title: "Choose project",
+    okLabel: "Attach project",
+    reloadOnSuccess: true,
+  });
+  return false;
+}
+
+async function refreshProjectStatus() {
   let snap = null;
   try {
     snap = await api("GET", "/api/project/status");
   } catch (e) {
     toast(e.message || "Could not check project status", "error");
-    return false;
+    return null;
   }
-  if (snap.attached) {
-    state.project = snap;
-    return true;
-  }
-  await openProjectAttachModal(snap.message || "No refine project is attached.");
-  return false;
+  state.project = snap;
+  return snap;
 }
 
-function openProjectAttachModal(message) {
+function openProjectAttachModal({
+  message = "",
+  title = "Choose project",
+  okLabel = "Attach project",
+  defaultPath = "",
+  reloadOnSuccess = true,
+} = {}) {
   return new Promise((resolve) => {
     const root = document.createElement("div");
     root.className = "modal-backdrop project-setup-backdrop";
     root.innerHTML = `
       <div class="modal project-setup-modal" role="dialog" aria-modal="true" aria-labelledby="project-setup-title">
         <form id="project-setup-form">
-          <div class="modal-title" id="project-setup-title">Choose project</div>
+          <div class="modal-title" id="project-setup-title">${htmlEscape(title)}</div>
           <div class="modal-body">
             <p class="muted">${htmlEscape(message)}</p>
             <label for="project-setup-path">Project path</label>
             <input id="project-setup-path" name="path" type="text" class="modal-input"
-                   placeholder="/path/to/app" autocomplete="off" required>
+                   placeholder="/path/to/app" autocomplete="off" required
+                   value="${htmlEscape(defaultPath)}">
             <p class="muted small">
               If the directory does not exist, refine will create it, run git init,
               and add the .refine configuration.
@@ -135,7 +151,8 @@ function openProjectAttachModal(message) {
             <div class="form-error" id="project-setup-error" style="display:none"></div>
           </div>
           <div class="modal-actions">
-            <button type="submit" id="project-setup-submit">Attach project</button>
+            <button class="secondary" type="button" id="project-setup-cancel">Cancel</button>
+            <button type="submit" id="project-setup-submit">${htmlEscape(okLabel)}</button>
           </div>
         </form>
       </div>`;
@@ -145,7 +162,12 @@ function openProjectAttachModal(message) {
     const input = root.querySelector("#project-setup-path");
     const error = root.querySelector("#project-setup-error");
     const button = root.querySelector("#project-setup-submit");
+    root.querySelector("#project-setup-cancel").addEventListener("click", () => {
+      root.remove();
+      resolve(null);
+    });
     input.focus();
+    input.select();
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -162,13 +184,17 @@ function openProjectAttachModal(message) {
         } else {
           toast("Project attached", "success");
         }
-        window.location.reload();
+        if (reloadOnSuccess) {
+          window.location.reload();
+        } else {
+          root.remove();
+        }
         resolve(result);
       } catch (err) {
         error.textContent = err.details || err.message || "Could not attach project";
         error.style.display = "";
         button.disabled = false;
-        button.textContent = "Attach project";
+        button.textContent = okLabel;
       }
     });
   });
