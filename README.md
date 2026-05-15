@@ -64,22 +64,23 @@ refine/
 ├── refine_runner/        # host-native daemon (subprocess + git + gap.json owner)
 ├── refine_web/           # Dockerized webapp + static HTML/JS
 ├── Dockerfile            # builds refine-web
-├── docker-compose.yml    # runs refine-web (relative bind mounts, no env vars)
+├── docker-compose.yml    # runs refine-web (bind mounts target .refine from .env)
 ├── pyproject.toml        # makes `refine` a real console script
 └── spec.md               # the design document
 ```
 
 ## Quick start
 
-### 1. Clone refine once per client
+### 1. Clone refine
 
 ```bash
 git clone https://github.com/buwilliams/refine.git /opt/refine-acme
 ```
 
-(You can have multiple clones if you're working across clients —
-`/opt/refine-acme`, `/opt/refine-globex`, etc. Each is paired with one
-client.)
+One clone can know about multiple apps and switch between them from
+Settings → Project. Only one app is active at a time. You can still use
+multiple refine clones if you want separate systemd unit names, ports, or
+operational boundaries.
 
 ### 2. Bind the clone to the client repo
 
@@ -116,10 +117,12 @@ cd /opt/refine-acme
 uv run refine start
 ```
 
-When no project is attached, refine starts a host-native setup UI. Open the
-shown URL, enter an existing app path or a new directory path, and refine will
-create missing directories, run `git init` when needed, write the same
-`.refine/` files as `refine init`, bind the clone, and start the runner.
+When no project is attached, refine starts a host-native setup UI instead of
+Docker compose. Open the shown URL, enter an existing app path or a new
+directory path, and refine will create missing directories, run `git init`
+when needed, write the same `.refine/` files as `refine init`, bind the clone,
+and start the runner. If the app already has `.refine/refine.toml`, refine
+preserves it and only makes sure required support directories exist.
 After that first attach, Settings → Project keeps a clone-local known-apps
 list. Add another app from the same modal, remove entries from the list without
 deleting project files, or switch the active app. Switching stops the runner,
@@ -140,11 +143,13 @@ uv run refine stop                 # tear it all down
 
 Open <http://localhost:8080>.
 
-`refine start` rebuilds the web image if any source file is newer than the
-image, brings the webapp up with `docker compose up -d`, starts the runner
-via `systemctl --user start refine-acme`, and waits for both to be reachable
-before returning. Runner logs go to journald — tail with
-`journalctl --user -u refine-acme -f`.
+If a project is already attached, `refine start` rebuilds the web image if any
+source file is newer than the image, brings the webapp up with
+`docker compose up -d`, starts the runner via
+`systemctl --user start refine-acme`, and waits for both to be reachable before
+returning. If no project is attached yet, it serves the setup UI directly from
+the host so it can create or attach app directories. Runner logs go to
+journald — tail with `journalctl --user -u refine-acme -f`.
 
 To survive logout / reboot, run once:
 
@@ -156,23 +161,29 @@ UI edits are picked up live — `refine_web/static/` is bind-mounted into
 the container, so changes to `index.html`, `js/`, or `css/` are visible
 on the next browser refresh without rebuilding the image.
 
-For a different client, `cd /opt/refine-globex` (or wherever) and run the
-same commands. Each clone tracks its own binding and its own systemd unit
-(named after the clone's directory basename).
+To work on a different app from the same clone, use Settings → Project. Each
+clone tracks its own known-app list, active binding, and systemd unit (named
+after the clone's directory basename).
 
-### Re-binding
+### Switching / Re-binding
 
-To point an existing refine clone at a different client, either overwrite the
-binding in place:
+For normal retargeting, use Settings → Project. The UI stops the runner,
+commits pending `.refine/` state when needed, refuses to switch if the current
+app has other uncommitted changes, preserves an existing `.refine/refine.toml`
+in the selected app, and then performs the same binding work as
+`uv run refine init <path>`.
+
+The CLI can still overwrite the binding in place:
 
 ```bash
 cd /opt/refine-acme
 uv run refine init /srv/clients/other-client --force
 ```
 
-`--force` is required because a binding already exists. The unit file is
-rewritten in place; the clone's directory name — and thus its unit name —
-does not change.
+`--force` is required because a binding already exists. This CLI path is an
+explicit re-initialization path: if the target app already has
+`.refine/refine.toml`, it may be overwritten. The unit file is rewritten in
+place; the clone's directory name — and thus its unit name — does not change.
 
 Or wipe the clone's binding first and `init` fresh:
 
@@ -272,6 +283,7 @@ All commands accept `--config /path/to/refine.toml` to bypass discovery.
 
 ```bash
 uv run python tests/smoke_test.py        # data-layer + storage
+uv run python tests/project_setup_test.py # first-run setup + app switching
 uv run python tests/integration_test.py   # runner + webapp end-to-end
 ```
 
