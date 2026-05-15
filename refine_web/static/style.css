@@ -1009,7 +1009,7 @@ body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for 
 }
 
 /* Bordered container that wraps the chat output and the pending indicator
-   so "Claude is thinking…" sits inside the same box as the transcript. */
+   so "Agent is thinking…" sits inside the same box as the transcript. */
 .chat-output-box {
   background: var(--card);
   border: 1px solid var(--border);

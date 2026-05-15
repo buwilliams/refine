@@ -13,7 +13,7 @@ Subcommands:
 - runner  — start the runner daemon in-process (used by the systemd unit
             and for interactive debugging; not the daily verb).
 - web     — start the webapp (rarely invoked directly; Docker wraps it).
-- doctor  — deeper diagnostic snapshot (config, IPC, claude, git).
+- doctor  — deeper diagnostic snapshot (config, IPC, agent CLI, git).
 """
 from __future__ import annotations
 
@@ -571,11 +571,13 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     else:
         _kv("ping ok", "pong")
 
-    print(_section("Claude CLI"))
-    claude_path = shutil.which("claude") or "(not on PATH)"
-    _kv("claude path", claude_path)
-    ok, msg = _claude_version(claude_path)
-    _kv("claude --version", _bool(ok))
+    print(_section("Agent CLI"))
+    agent_cli = _configured_agent_cli(cfg.sqlite_path)
+    cli_path = shutil.which(agent_cli) or "(not on PATH)"
+    _kv("provider", agent_cli)
+    _kv(f"{agent_cli} path", cli_path)
+    ok, msg = _cli_version(cli_path, agent_cli)
+    _kv(f"{agent_cli} --version", _bool(ok))
     if not ok:
         _kv("error", msg or "")
 
@@ -798,10 +800,27 @@ def _ipc_ping(socket_path: Path) -> tuple[bool, str | None]:
         return False, repr(e)
 
 
-def _claude_version(claude_path: str) -> tuple[bool, str | None]:
+def _configured_agent_cli(sqlite_path: Path) -> str:
+    if not sqlite_path.is_file():
+        return "claude"
+    try:
+        import sqlite3
+        conn = sqlite3.connect(str(sqlite_path))
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = 'agent_cli'",
+        ).fetchone()
+        conn.close()
+        value = (row[0] if row else "claude") or "claude"
+        value = str(value).strip().lower()
+        return value if value in ("claude", "codex", "gemini") else "claude"
+    except Exception:
+        return "claude"
+
+
+def _cli_version(cli_path: str, binary: str) -> tuple[bool, str | None]:
     try:
         out = subprocess.run(
-            [claude_path, "--version"],
+            [cli_path, "--version"],
             capture_output=True, text=True, timeout=10,
         )
         if out.returncode == 0:
@@ -811,7 +830,7 @@ def _claude_version(claude_path: str) -> tuple[bool, str | None]:
     except FileNotFoundError as e:
         return False, repr(e)
     except subprocess.TimeoutExpired:
-        return False, "claude --version timed out (10s)"
+        return False, f"{binary} --version timed out (10s)"
     except Exception as e:
         return False, repr(e)
 

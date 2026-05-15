@@ -19,7 +19,7 @@ def default_socket_path() -> str:
 
 # Method names
 M_PING = "ping"
-M_PREFLIGHT = "preflight"                # runner runs claude pre-flight
+M_PREFLIGHT = "preflight"                # runner runs selected agent CLI pre-flight
 M_LAUNCH = "launch"                       # launch a CLI subprocess for a Gap's latest round
 M_CANCEL = "cancel"                       # kill a Gap's running subprocess
 M_VERIFY = "verify"                       # run merge+push for a Gap (review→done)
@@ -29,7 +29,7 @@ M_EDIT_ROUND = "edit_round"               # webapp asks runner to edit the lates
 M_LOG_APPEND = "log_append"               # append a {datetime, severity, category, message} entry
 M_DELETE_GAP = "delete_gap"               # remove gap.json + worktree as appropriate
 M_SET_NOTES = "set_notes"                  # save freeform Gap-level notes
-M_CHAT_START = "chat_start"               # spawn an interactive `claude` subprocess in a worktree
+M_CHAT_START = "chat_start"               # start provider-backed chat in a worktree
 M_CHAT_INPUT = "chat_input"               # feed input line to running chat
 M_CHAT_READ = "chat_read"                 # drain queued output lines + liveness
 M_CHAT_STOP = "chat_stop"                 # end a chat session

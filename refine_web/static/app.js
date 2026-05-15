@@ -228,11 +228,11 @@ function htmlEscape(s) {
 
 // ---- Minimal Markdown → HTML ------------------------------------------------
 //
-// Used to render chat transcripts. Inputs come from the Claude CLI's
+// Used to render chat transcripts. Inputs come from the selected agent CLI's
 // stream-json `assistant.content[].text` blocks (text only — never raw HTML),
 // plus the user-echoed `> message` lines we synthesize locally. We html-escape
 // every text fragment before substitution and only emit a small whitelist of
-// inline tags, so even if claude's text contained literal HTML we'd render it
+// inline tags, so even if agent text contained literal HTML we'd render it
 // as literal text.
 //
 // Block-level: code fences (```), headings (#…######), unordered (- / *) and
@@ -675,7 +675,7 @@ function drawDashboard(d, opts = {}) {
     .map((x) => ({
       severity: x.severity || "error",
       message: x.message,
-      action: x.message.includes("Claude") ? {
+      action: /Refine cannot reach/i.test(x.message) ? {
         label: "Re-check auth",
         onClick: async () => {
           try {
@@ -1722,7 +1722,7 @@ function drawGapDetail(gap) {
                             gap.status === "failed");
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
   // Chat is always available — the value is the Gap context the runner
-  // primes into claude's session. The chat runs in the Gap's worktree
+  // primes into the provider session. The chat runs in the Gap's worktree
   // when one exists and falls back to the client repo when it doesn't.
 
   // Dynamic workflow buttons: each state shows the previous/next state
@@ -1807,7 +1807,7 @@ function drawGapDetail(gap) {
             <summary>+ Add a note</summary>
             <div class="form-row" style="margin-top:8px">
               <textarea id="new-note-body" rows="3"
-                        placeholder="Anything Claude or the team should know — links to specs, prior decisions, constraints, related code paths."></textarea>
+                        placeholder="Anything the agent or team should know — links to specs, prior decisions, constraints, related code paths."></textarea>
             </div>
             <div class="actions">
               <button id="btn-add-note">Save note</button>
@@ -2356,7 +2356,7 @@ function openImportModal() {
       draftsRoot.innerHTML = `
         <div class="loading-row">
           <span class="loading-spinner"></span>
-          <span>Loading… asking Claude to extract Gaps from your text. This may take up to a minute.</span>
+          <span>Loading… asking the selected AI provider to extract Gaps from your text. This may take up to a minute.</span>
         </div>`;
     }
     await withButtonBusy(btn, "Extracting…", async () => {
@@ -2808,7 +2808,7 @@ function observeChatDockSize() {
 // Wired up by the "Open Chat" button on the gap detail page and by any
 // surviving `#/chat?gap=...` deep links. For gap tabs with no live session,
 // kicks off a chat session immediately so the runner can inject the Gap
-// context into claude's session memory before the user types.
+// context into the provider session before the user types.
 function openChatDock({ gapId = null } = {}) {
   ensureStandaloneTab();
   if (gapId) {
@@ -2883,8 +2883,8 @@ function drawChatDock() {
       <div class="chat-dock-body" style="padding:14px">
         <p class="muted">
           Chat is disabled for the <code>${htmlEscape(providerName)}</code>
-          AI provider. It depends on session-resume features only Claude
-          Code currently provides. Switch the provider on
+          AI provider. It depends on provider session-resume support.
+          Switch the provider on
           <a href="#/settings">Settings → AI Provider</a>, or enable the
           override on the same tab's <strong>Feature flags</strong> section
           (experimental).
@@ -2966,7 +2966,7 @@ function drawChatDock() {
         <div id="chat-output" class="chat-output">${mdToHtml(active.output || "")}</div>
         <div id="chat-pending" class="chat-pending" hidden>
           <span class="chat-pending-dots"><span></span><span></span><span></span></span>
-          Claude is thinking…
+          Agent is thinking…
         </div>
       </div>
       <div class="actions" style="margin-top:8px">
@@ -3104,7 +3104,7 @@ async function clearActiveChat() {
   const btn = $("#btn-chat-clear");
   const ok = await modalConfirm(
     "Clear this chat's history? Any active session will be stopped and " +
-    "the transcript wiped. Starting again gives Claude a fresh conversation.",
+    "the transcript wiped. Starting again gives the agent a fresh conversation.",
     { title: "Clear chat history", okLabel: "Clear", danger: true,
       cancelLabel: "Keep history" },
   );
@@ -3176,7 +3176,7 @@ async function pollChat() {
       saveChatStateToStorage();
     }
     // Pending state is authoritative from the runner: `in_flight` is true
-    // while a `claude --print` subprocess is running for this session.
+    // while an agent CLI subprocess is running for this session.
     const wasPending = !!t.pending;
     t.pending = !!r.in_flight;
     if (wasPending !== t.pending) applyPendingIndicator(t);
@@ -3588,7 +3588,7 @@ function drawSettings(s, diag, reps, feats) {
     <div class="card">
       <h3>AI Provider</h3>
       <div class="form-row"><label>Which AI provider refine drives
-        <span class="muted small">— used for Gap agent runs, conflict resolution, and pre-flight. <strong>Chat always uses Claude</strong> because of its session-resume support; Codex / Gemini don't have an equivalent.</span></label>
+        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code and Codex.</span></label>
         <select id="s-cli">
           ${cliOption("claude", "Claude Code (default)")}
           ${cliOption("codex", "OpenAI Codex")}
@@ -3597,8 +3597,8 @@ function drawSettings(s, diag, reps, feats) {
       <p class="muted small" style="margin-top:6px">
         After switching: re-check auth on the Runtime tab to confirm the
         chosen provider is installed and authed on the host. Round logs
-        are rich for Claude (tool summaries, live Idle counter); Codex /
-        Gemini fall back to plain stdout passthrough.
+        are structured for Claude Code and Codex where their CLIs expose
+        machine-readable events; Gemini falls back to plain stdout passthrough.
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
     </div>
@@ -4019,7 +4019,7 @@ const TUTORIAL_STEPS = [
   {
     image: "/static/ss-5.png",
     title: "Talk to the work",
-    body: "Open a Gap and the chat dock primes a Claude session with that Gap's full context. Ask “why did you change this?” or “what about edge case X?” without re-explaining anything. The conversation lives next to the work.",
+    body: "Open a Gap and the chat dock primes an agent session with that Gap's full context. Ask “why did you change this?” or “what about edge case X?” without re-explaining anything. The conversation lives next to the work.",
   },
 ];
 

@@ -260,7 +260,7 @@ class Dispatcher:
         # The agent runs inside the operator-configured sub-project when set
         # (e.g. a monorepo's `apps/web`). Worktree creation + base_ref + on-
         # finished git plumbing all stay at the worktree root above; only
-        # the Claude subprocess cwd changes.
+        # the agent subprocess cwd changes.
         worktree_root = git_ops.gap_worktree_path(gap_id)
         agent_subpath = db.get_setting(conn, "agent_subpath") or ""
         agent_cwd = git_ops.apply_agent_subpath(

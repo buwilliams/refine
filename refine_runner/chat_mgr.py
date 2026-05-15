@@ -1,17 +1,13 @@
 """Lightweight management of interactive Chat sessions.
 
-A Chat session = an ongoing conversation with `claude` in some directory
-(client repo for standalone; the Gap's worktree for attached). Each session
-has a unique refine `session_id`; the underlying claude session ID is
-discovered from claude's own stream-json output on the first send and reused
-via `--resume <id>` for subsequent messages — this avoids depending on the
-`--session-id` flag, which older claude binaries don't recognize.
+A Chat session = an ongoing conversation with the selected provider CLI in
+some directory (client repo for standalone; the Gap's worktree for attached).
+Each session has a unique refine `session_id`; the underlying provider
+session ID is discovered from structured output on the first send and reused
+for subsequent messages.
 
-`claude` switches to non-interactive mode whenever stdout isn't a TTY (e.g.,
-piped from a subprocess), so we can't drive an interactive REPL through pipes
-directly. Instead, each user message launches `claude --print` with
-`--output-format=stream-json --verbose` and we parse the structured events
-back into chat output.
+Each user message launches a non-interactive CLI turn and we parse the
+structured events back into chat output.
 
 Standalone sessions auto-close after `chat_idle_timeout_seconds` of no
 activity (default 300s); attached sessions stay open until the Gap finishes.
@@ -20,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import signal
 import subprocess
 import threading
@@ -31,12 +26,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Deque
 
+from . import agent_cli
+
 
 # Env vars that, if set, would make `claude` use API-key auth or otherwise
 # diverge from the host CLI's OAuth login. Strip all of them before spawn so
 # chat behaves exactly like the user's interactive `claude` in a clean
 # terminal — which uses the credentials persisted by `claude login`.
-# How long to wait for `claude` to actually exit after it emits its
+# How long to wait for the provider CLI to actually exit after it emits its
 # terminal `result` event. Past this point, something is almost
 # certainly holding the stdio pipes open — typically a backgrounded
 # bash subprocess the agent spawned ("python -m http.server &"). We
@@ -45,13 +42,13 @@ from typing import Callable, Deque
 # runner's _RESULT_EXIT_GRACE_SECONDS in subprocess_mgr.py.
 _RESULT_EXIT_GRACE_SECONDS = 10.0
 
-# Per-turn stdout-idle watchdog. If `claude --print` produces no output
+# Per-turn stdout-idle watchdog. If the provider CLI produces no output
 # for this long while it's still running, we treat the turn as wedged
 # and SIGTERM the process group. Catches the case where the agent
 # kicked off a backgrounded bash and then never emitted a `result`
 # event — the result-grace watchdog above can't fire because no
 # result ever arrives. 60s is generous enough for legitimate thinking
-# (claude streams events as it works, including tool_use / tool_result
+# (structured CLIs stream events as they work, including tool_use / tool_result
 # pairs) but tight enough that the chat self-heals quickly.
 _TURN_STDOUT_IDLE_SECONDS = 60.0
 
@@ -117,22 +114,13 @@ def _user_login_path() -> str | None:
 
 
 def _chat_env() -> dict[str, str]:
-    """Build the environment chat subprocesses run with.
+    """Build the environment agent subprocesses run with.
 
-    Chat is supposed to behave like the host CLI `claude` the user runs in
-    a clean terminal — which uses the OAuth login stored under
-    `~/.claude/`, not an API key. Any of `_AUTH_OVERRIDE_VARS` that leak in
-    from the runner's process env would derail that: a stale API key
-    yields "Invalid API key · Please run /login", a base-URL override
-    points the key at the wrong service, and the Claude-Code-agent
-    inheritance bits make claude believe it's running inside another
-    session. Strip all of them so we always fall through to the user's
-    logged-in auth.
-
-    We also override PATH with the user's interactive-login-shell PATH
-    (cached after the first call) so `shutil.which("claude")` resolves
-    to whatever binary the user's terminal would resolve — wherever they
-    happen to have it installed, on any OS.
+    For Claude, strip API-key and inherited Claude-Code-agent vars so
+    the CLI uses the user's normal `claude login` OAuth session. For all
+    providers, override PATH with the user's interactive-login-shell PATH
+    (cached after the first call) so `claude`, `codex`, or `gemini`
+    resolve the same way they do in the user's terminal.
     """
     env = os.environ.copy()
     for key in _AUTH_OVERRIDE_VARS:
@@ -143,9 +131,10 @@ def _chat_env() -> dict[str, str]:
     return env
 
 
-def _resolve_claude(env: dict[str, str]) -> str:
-    """Find the `claude` binary on the chat env's PATH, not the runner's."""
-    return shutil.which("claude", path=env.get("PATH")) or "claude"
+def _resolve_agent(provider: str | None,
+                   env: dict[str, str]) -> tuple[agent_cli.CliSpec, str]:
+    spec = agent_cli.get_spec(provider)
+    return spec, agent_cli.resolve_binary(spec, env)
 
 
 @dataclass
@@ -154,9 +143,10 @@ class ChatSession:
     cwd: Path
     is_standalone: bool
     last_activity_ts: float        # monotonic timestamp of last user activity
-    # Discovered from claude's stream-json `system init` event after the
-    # first send; reused via `--resume` to thread context.
-    claude_session_id: str | None = None
+    provider: str = "claude"
+    # Discovered from provider structured output after the first send;
+    # reused by provider-specific resume args to thread context.
+    provider_session_id: str | None = None
     out_lines: Deque[str] = field(default_factory=lambda: deque(maxlen=10_000))
     out_lock: threading.Lock = field(default_factory=threading.Lock)
     proc_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -199,6 +189,7 @@ class ChatManager:
         self._supervisor_stop.set()
 
     def start(self, cwd: Path, *, is_standalone: bool = True,
+              provider: str | None = None,
               priming_prompt: str | None = None,
               priming_intro: str | None = None) -> str:
         sid = uuid.uuid4().hex[:12]
@@ -206,6 +197,7 @@ class ChatManager:
             session_id=sid,
             cwd=cwd,
             is_standalone=is_standalone,
+            provider=agent_cli.get_spec(provider).name,
             last_activity_ts=time.monotonic(),
             pending_priming_text=priming_prompt or None,
         )
@@ -215,7 +207,7 @@ class ChatManager:
         with self._lock:
             self._sessions[sid] = session
         # If we have a Gap-context priming prompt, eagerly inject it into
-        # claude's session memory in a background subprocess. This way the
+        # the provider's session memory in a background subprocess. This way the
         # user's first real message resumes a context-aware session instead
         # of having to carry the priming text bundled into the prompt.
         if priming_prompt:
@@ -223,16 +215,14 @@ class ChatManager:
         return sid
 
     def _inject_priming(self, s: ChatSession, priming_text: str) -> None:
-        """Run claude with the priming text as its prompt, capture the
-        session id from the stream-json `system init` event, then discard
-        the rest of the output (the user shouldn't see claude's reply to
+        """Run the provider with the priming text as its prompt, capture the
+        session id from structured output, then discard
+        the rest of the output (the user shouldn't see the agent's reply to
         the priming itself)."""
         def runner() -> None:
             env = _chat_env()
-            claude = _resolve_claude(env)
-            args = [claude, "--print",
-                    "--output-format=stream-json", "--verbose",
-                    priming_text]
+            spec, binary = _resolve_agent(s.provider, env)
+            args = spec.chat_args(binary, priming_text, cwd=s.cwd)
             try:
                 proc = subprocess.Popen(
                     args,
@@ -255,7 +245,7 @@ class ChatManager:
                 s.proc = proc
             s.last_activity_ts = time.monotonic()
             # Use the same JSON-buffered consumer as user-facing chat, but
-            # ask it to suppress assistant text so claude's reply to the
+            # ask it to suppress assistant text so the priming reply doesn't
             # priming doesn't leak into the user-visible chat buffer.
             if proc.stdout is not None:
                 self._consume_chat_output(
@@ -268,8 +258,8 @@ class ChatManager:
             with s.proc_lock:
                 if s.proc is proc:
                     s.proc = None
-            if s.claude_session_id:
-                # Context is now resident in claude's session; the lazy
+            if s.provider_session_id:
+                # Context is now resident in the provider's session; the lazy
                 # fallback in send() is no longer needed.
                 s.pending_priming_text = None
                 with s.out_lock:
@@ -301,25 +291,22 @@ class ChatManager:
             if s.proc is not None and s.proc.poll() is None:
                 return False
             env = _chat_env()
-            claude = _resolve_claude(env)
-            # `--output-format=stream-json` (with required `--verbose`) emits
-            # structured events we parse in `_pump_output`, including the
-            # `system init` event that carries claude's session id.
-            args = [claude, "--print",
-                    "--output-format=stream-json", "--verbose"]
+            spec, binary = _resolve_agent(s.provider, env)
             # On the first send of an attached chat, prepend the Gap context
-            # so claude has the full picture in one shot. The user only sees
+            # so the agent has the full picture in one shot. The user only sees
             # their own text echoed back in the UI.
             effective_prompt = text
-            if s.pending_priming_text and not s.claude_session_id:
+            if s.pending_priming_text and not s.provider_session_id:
                 effective_prompt = (
                     f"{s.pending_priming_text}\n\n---\n\n"
                     f"Now, my first question:\n{text}"
                 )
                 s.pending_priming_text = None
-            if s.claude_session_id:
-                args.extend(["--resume", s.claude_session_id])
-            args.append(effective_prompt)
+            args = spec.chat_args(
+                binary, effective_prompt,
+                session_id=s.provider_session_id,
+                cwd=s.cwd,
+            )
             try:
                 s.proc = subprocess.Popen(
                     args,
@@ -334,7 +321,9 @@ class ChatManager:
                 )
             except (OSError, FileNotFoundError) as e:
                 with s.out_lock:
-                    s.out_lines.append(f"[refine] failed to launch claude: {e}")
+                    s.out_lines.append(
+                        f"[refine] failed to launch {spec.binary}: {e}"
+                    )
                 return False
             s.last_activity_ts = time.monotonic()
             proc = s.proc
@@ -344,7 +333,7 @@ class ChatManager:
             name=f"refine-chat-{session_id}", daemon=True,
         )
         s.pump.start()
-        # Per-turn idle watchdog: catches the case where claude streams
+        # Per-turn idle watchdog: catches the case where the agent streams
         # an assistant message, kicks off a backgrounded subprocess,
         # and never emits a `result` event — the result-grace watchdog
         # only arms on a real `result`, so without this fallback the
@@ -403,9 +392,9 @@ class ChatManager:
         return True
 
     def _pump_output(self, s: ChatSession, proc: subprocess.Popen) -> None:
-        """Parse claude's `--output-format=stream-json` events into chat lines.
+        """Parse provider structured events into chat lines.
 
-        Different claude versions format stream-json differently — some emit
+        Different provider versions format JSON differently — some emit
         one compact JSON event per line, others pretty-print each event over
         many lines. We use `json.JSONDecoder.raw_decode` to walk a growing
         buffer and extract every complete JSON object regardless of where
@@ -419,7 +408,8 @@ class ChatManager:
         - Older: `{"role":"assistant","content":[{"type":"text",...}], ...}`
                  followed by `{"role":"system","cost_usd":...}`.
 
-        Anything that doesn't look like JSON is passed through verbatim
+        Codex `exec --json` item events are also recognized. Anything that
+        doesn't look like JSON is passed through verbatim
         (line-by-line) so plain-text CLI errors still reach the user.
         """
         if proc.stdout is None:
@@ -436,7 +426,7 @@ class ChatManager:
                 if not chunk:
                     break
                 # Liveness signal for the idle-watchdog: any byte from
-                # claude resets the wedged-turn countdown.
+                # any provider output resets the wedged-turn countdown.
                 s.last_chunk_at = time.monotonic()
                 buf += chunk
                 buf = self._drain_json_objects(
@@ -500,11 +490,35 @@ class ChatManager:
         role = evt.get("role")
 
         # ---- session id capture -----------------------------------------
+        for key in ("session_id", "conversation_id", "thread_id"):
+            sid = evt.get(key)
+            if sid and not s.provider_session_id:
+                s.provider_session_id = str(sid)
+                break
         if t == "system" and evt.get("subtype") == "init":
             sid = evt.get("session_id")
-            if sid and not s.claude_session_id:
-                s.claude_session_id = sid
+            if sid and not s.provider_session_id:
+                s.provider_session_id = sid
             return
+
+        # ---- Codex JSONL item events ------------------------------------
+        item = evt.get("item") if isinstance(evt.get("item"), dict) else None
+        if item is not None:
+            sid = item.get("session_id") or item.get("conversation_id")
+            if sid and not s.provider_session_id:
+                s.provider_session_id = str(sid)
+            item_type = item.get("type")
+            text = item.get("text") or item.get("content")
+            if item_type in ("agent_message", "assistant_message") and text:
+                if not suppress_assistant:
+                    self._emit_text(s, str(text))
+                return
+            if item_type == "error" or t == "error":
+                err = item.get("error") or evt.get("error") or text \
+                    or "Codex returned an error."
+                with s.out_lock:
+                    s.out_lines.append(f"[refine] {err}")
+                return
 
         # ---- assistant message (new wrapped shape) ----------------------
         if t == "assistant":
@@ -519,10 +533,10 @@ class ChatManager:
         if t == "result":
             if evt.get("is_error"):
                 err = (evt.get("error") or evt.get("result")
-                       or "Claude returned an error.")
+                       or "Agent returned an error.")
                 with s.out_lock:
                     s.out_lines.append(f"[refine] {err}")
-            # Once the agent has logically finished, give claude a short
+            # Once the agent has logically finished, give the CLI a short
             # grace to exit; if a backgrounded subprocess (HTTP server,
             # file watcher, …) is keeping the stdio pipes open, kill
             # the process group so the chat doesn't hang in-flight.
@@ -558,18 +572,20 @@ class ChatManager:
                     chunks.append(text)
         if not chunks:
             return
+        self._emit_text(s, "\n".join(chunks))
+
+    def _emit_text(self, s: ChatSession, text: str) -> None:
         with s.out_lock:
             # Visually separate consecutive turns with a blank line.
             if s.out_lines and s.out_lines[-1]:
                 s.out_lines.append("")
-            for chunk in chunks:
-                for ln in chunk.split("\n"):
-                    s.out_lines.append(ln)
+            for ln in text.split("\n"):
+                s.out_lines.append(ln)
 
     def _arm_result_watchdog(self, s: ChatSession) -> None:
         """Schedule a one-shot watchdog for the currently in-flight chat
         proc: wait the grace period, then SIGTERM the process group if
-        claude hasn't exited on its own. Idempotent per-proc — repeated
+        the CLI hasn't exited on its own. Idempotent per-proc — repeated
         result events (shouldn't happen, but defensive) don't double-arm."""
         with s.proc_lock:
             proc = s.proc
@@ -620,7 +636,7 @@ class ChatManager:
 
     def _result_watchdog(self, s: ChatSession,
                           proc: subprocess.Popen) -> None:
-        # Brief grace for claude to exit on its own.
+        # Brief grace for the provider CLI to exit on its own.
         try:
             proc.wait(timeout=_RESULT_EXIT_GRACE_SECONDS)
             return  # clean exit

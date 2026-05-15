@@ -90,12 +90,12 @@ DEFAULT_SETTINGS = {
     # 0 = instant (promote on next tick).
     "backlog_promote_after_seconds": "3600",
     "paused": "0",
-    # Which agent CLI refine drives for Gap runs, conflict
-    # resolution, and pre-flight. One of: claude | codex | gemini.
-    # Chat still uses claude regardless (relies on `--resume`).
+    # Which agent CLI refine drives for Gap runs, conflict resolution,
+    # chat, import extraction, target-app actions, and pre-flight.
+    # One of: claude | codex | gemini.
     "agent_cli": "claude",
     # Subdirectory of the client repo (and per-Gap worktree) used as the cwd
-    # for *agent* + *chat* Claude subprocesses. Lets a monorepo host claude
+    # for agent + chat subprocesses. Lets a monorepo host agent
     # operations focused on one sub-project while git plumbing — worktree
     # create, fetch, merge, push — still happens at the base repo root.
     # Empty = use the worktree / client repo root (default).

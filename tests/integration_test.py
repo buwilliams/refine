@@ -1,7 +1,7 @@
 """Spin up the runner + webapp on temp paths and validate the wiring.
 
 This is a "does the whole thing boot and respond to pings" test. It does NOT
-exercise the real Claude CLI or push to a remote — those need a configured
+exercise a real agent CLI or push to a remote — those need a configured
 host.
 """
 from __future__ import annotations

@@ -237,7 +237,7 @@ def apply_agent_subpath(root: Path, subpath: str | None,
     repo-relative path). When non-empty and the resolved subdir exists
     under `root`, return that joined path; otherwise return `root` and
     optionally log a warning. Git plumbing always stays at `root` —
-    only the Claude subprocess `cwd` changes.
+    only the agent subprocess `cwd` changes.
     """
     if not subpath:
         return root

@@ -5,7 +5,7 @@ through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap. New Gaps land in
 **backlog**, where they sit idle until someone promotes them to
-**todo**. From there refine launches a Claude Code agent in a git
+**todo**. From there refine launches the configured agent CLI in a git
 worktree to close it; a human reviews the diff and the live behavior;
 only after that review does **verify** merge the work to the
 configured target branch and push. Gaps move
@@ -24,9 +24,9 @@ You drive everything from a web UI:
 - A **persistent Chat dock** at the bottom of every page — collapsible,
   vertically resizable, with a fullscreen toggle. Tabs for a standalone chat
   and one per Gap; opening Chat against an in-progress Gap eagerly primes the
-  claude session with the Gap's context so the user's first message gets a
+  agent session with the Gap's context so the user's first message gets a
   context-aware answer. Transcripts render markdown.
-- Import-from-text uses an **LLM call** (via the host `claude` CLI) to extract
+- Import-from-text uses an **LLM call** (via the selected host agent CLI) to extract
   `{name, actual, target}` drafts from free-form paste-dumps; a loading
   indicator shows while the model runs.
 
@@ -35,15 +35,15 @@ accent border, a "FILTERED" pill appears next to the count, and the results
 table grows an accent stripe + tinted header.
 
 Refine handles the git plumbing — worktrees, fetch, merge, push,
-auto-committing its own state — and inherits Claude Code auth from the host,
-so operators rarely need to think about either.
+auto-committing its own state — and inherits the selected agent CLI's host
+auth, so operators rarely need to think about either.
 
 ## Components
 
 - **`refine-web`** — Python webapp in Docker (UI + JSON API + SSE).
 - **`refine-runner`** — host-native daemon that owns CLI subprocesses, git
   operations, and `gap.json` writes. Runs natively so it inherits the host's
-  `~/.claude/` auth, SSH keys, and git config. Chat and Import subprocesses
+  agent auth, SSH keys, and git config. Claude subprocesses
   additionally strip `ANTHROPIC_API_KEY` / `CLAUDE_API_KEY` (+ a few related
   vars) and resolve `claude` via the user's interactive login-shell `PATH`,
   so they behave like the user's terminal `claude` regardless of the
@@ -108,7 +108,7 @@ git commit -m "add refine"
 ```bash
 cd /opt/refine-acme
 
-claude login                       # one-time, as the operator user
+claude login                       # or: codex login / gemini auth login
 uv run refine start                # webapp + runner, one command
 uv run refine status               # check it's healthy
 uv run refine stop                 # tear it all down
@@ -200,7 +200,7 @@ port = 8080
 ```
 
 Almost everything else — parallel-run cap, idle timeout, hard cap, branch
-naming, **scope** (an optional `agent_subpath` the Claude subprocesses
+naming, **scope** (an optional `agent_subpath` the agent subprocesses
 `cd` into, and an optional `merge_target_branch` that all Gap worktrees are
 based on and all `verify` merges land on — useful for monorepos hosting
 multiple sub-projects), reporters — lives in the SQLite settings table and
@@ -224,9 +224,10 @@ the UI's Settings page.
   Settings cascades through every Gap's `rounds[].reporter` strings so the
   dropdown and historical data stay in sync; removing a reporter deliberately
   does *not* cascade, so audit history of who submitted what is preserved.
-- **Claude auth** uses the OAuth login persisted under `~/.claude/` by
-  `claude login` on the host. Chat and Import explicitly strip API-key env
-  vars so a stale `ANTHROPIC_API_KEY` can't override the OAuth session.
+- **Agent auth** lives on the host. Claude uses `~/.claude/` from
+  `claude login`; Codex uses `codex login` / `~/.codex/auth.json` or
+  supported API-key auth; Gemini uses its own CLI auth. Re-check auth from
+  Settings after changing providers.
 
 ## CLI reference
 
@@ -240,7 +241,7 @@ the UI's Settings page.
 | `uv run refine status`        | Read-only: show webapp + runner state and where to tail logs.                                               |
 | `uv run refine runner`        | Run the runner in the foreground (what the systemd unit invokes).                                           |
 | `uv run refine web`           | Start the webapp in-process (rarely used directly — Docker wraps it).                                       |
-| `uv run refine doctor`        | Deeper diagnostic snapshot: config, IPC, claude auth, git status.                                           |
+| `uv run refine doctor`        | Deeper diagnostic snapshot: config, IPC, selected agent CLI, git status.                                   |
 
 All commands accept `--config /path/to/refine.toml` to bypass discovery.
 
@@ -252,8 +253,8 @@ uv run python tests/integration_test.py   # runner + webapp end-to-end
 ```
 
 The integration test boots a real runner and webapp on a temp directory and
-exercises the full HTTP + IPC stack (excluding actual Claude CLI subprocesses
-and git remotes, both of which need a configured host).
+exercises the full HTTP + IPC stack (excluding real agent CLI work and git
+remotes, both of which need a configured host).
 
 ## Caveats / known scope
 

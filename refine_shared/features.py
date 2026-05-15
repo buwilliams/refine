@@ -1,8 +1,8 @@
 """Provider-scoped feature flags.
 
-Some refine features (Chat, Import) depend on Claude-Code-specific
-capabilities — session-resume threading, structured JSON extraction
-prompts. Codex and Gemini don't have equivalents yet. Rather than
+Some refine features (Chat, Import) depend on provider-specific
+capabilities — session-resume threading and structured JSON extraction
+prompts. Rather than
 silently failing when the operator switches `agent_cli`, every such
 feature is gated through `is_enabled(conn, feature)` and the Settings
 page surfaces the matrix.
@@ -35,7 +35,7 @@ FEATURES = {
         "description": (
             "Interactive chat sessions, both the standalone tab and "
             "the per-Gap `Open Chat` affordance. Requires the CLI's "
-            "equivalent of `claude --resume <session-id>` to thread "
+            "session-resume support to thread "
             "context across turns."
         ),
     },
@@ -58,13 +58,12 @@ DEFAULT_PROVIDER = "claude"
 
 
 # (provider, feature) → enabled by default.
-# Codex and Gemini get a row of `False`s today; flip a cell to True
-# once refine learns to drive that CLI for that feature.
+# Provider defaults reflect what refine knows how to drive directly.
 _DEFAULTS: dict[tuple[str, str], bool] = {
     ("claude", "chat"):        True,
     ("claude", "import_gaps"): True,
-    ("codex",  "chat"):        False,
-    ("codex",  "import_gaps"): False,
+    ("codex",  "chat"):        True,
+    ("codex",  "import_gaps"): True,
     ("gemini", "chat"):        False,
     ("gemini", "import_gaps"): False,
 }

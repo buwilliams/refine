@@ -49,9 +49,9 @@ def classify_subprocess_failure(
     if killed_reason == "hard_cap":
         return Summary("cli", "error", "Agent exceeded the {hard_cap} run cap")
     if stderr and any(p.search(stderr) for p in _AUTH_PATTERNS):
-        return Summary("auth", "error", "Claude auth issue — run `claude login` on the host")
+        return Summary("auth", "error", "Agent auth issue — re-check provider login on the host")
     if stderr and _RATELIMIT.search(stderr):
-        return Summary("cli", "warn", "Claude rate-limited — try again shortly")
+        return Summary("cli", "warn", "Agent provider rate-limited — try again shortly")
     if no_new_commits:
         return Summary(
             "cli", "warn",

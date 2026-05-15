@@ -292,7 +292,7 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
             stderr = r.stderr + ("\n" + r.stdout if r.stdout else "")
             if "CONFLICT" in stderr or "conflict" in stderr.lower():
                 _log(conn, gap_id,
-                     "Merge conflict — attempting auto-resolve via Claude",
+                     "Merge conflict — attempting auto-resolve via agent",
                      details=stderr, severity="warn", category="git",
                      actor=actor)
                 resolve = conflict_resolver.attempt_auto_resolve(

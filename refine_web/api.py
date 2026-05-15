@@ -941,6 +941,7 @@ def dashboard_summary() -> tuple[int, dict]:
             "GROUP BY reporter, status"
         ).fetchall()
         known_reporters = [r["name"] for r in reporters.list_all(conn)]
+        provider = (db.get_setting(conn, "agent_cli") or "claude").strip().lower()
     finally:
         conn.close()
     reporter_stats = _compute_reporter_stats(stat_rows, known_reporters)
@@ -953,8 +954,9 @@ def dashboard_summary() -> tuple[int, dict]:
         "activity": feed,
         "runner_reachable": runner_reachable,
         "reporter_stats": reporter_stats,
-        "needs_attention": _compute_needs_attention(counts, preflight,
-                                                    runner_reachable),
+        "needs_attention": _compute_needs_attention(
+            counts, preflight, runner_reachable, provider,
+        ),
     }
 
 
@@ -991,7 +993,8 @@ def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]
 
 
 def _compute_needs_attention(counts: dict, preflight: dict | None,
-                              runner_reachable: bool) -> list[dict]:
+                              runner_reachable: bool,
+                              provider: str = "claude") -> list[dict]:
     items: list[dict] = []
     if not runner_reachable:
         items.append({
@@ -999,9 +1002,14 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
             "message": "Host runner unreachable",
         })
     if preflight and not preflight.get("ok"):
+        login_hint = {
+            "claude": "claude login",
+            "codex": "codex login",
+            "gemini": "gemini auth login",
+        }.get(provider, f"{provider} login")
         items.append({
             "kind": "banner", "severity": "error",
-            "message": "Refine cannot reach Claude — run `claude login` on the host",
+            "message": f"Refine cannot reach {provider} — run `{login_hint}` on the host",
         })
     if counts.get("failed", 0):
         items.append({
@@ -1015,7 +1023,7 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
 # --- Import (LLM extraction) --------------------------------------------------
 
 def import_extract(body: dict) -> tuple[int, dict]:
-    """LLM-driven extraction: hand the raw text to the host claude CLI
+    """LLM-driven extraction: hand the raw text to the host agent CLI
     via the runner and return the parsed `{name, actual, target}` drafts
     for the user to review before persisting. Times out generously since
     the model call can take 30–90s for longer pastes.

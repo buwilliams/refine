@@ -332,14 +332,16 @@ class Runner:
                 "provider": provider,
                 "message": (
                     f"Import (LLM extraction) is disabled for the "
-                    f"`{provider}` provider. Switch to Claude Code on "
-                    f"Settings → AI Provider, or enable the override on "
+                    f"`{provider}` provider. Pick a supported provider on "
+                    f"Settings -> AI Provider, or enable the override on "
                     f"the same tab's Feature flags section (experimental)."
                 ),
                 "drafts": [],
             }
         text = params.get("text") or ""
-        drafts = llm.extract_gaps(text)
+        drafts = llm.extract_gaps(
+            text, provider=db.get_setting(self._conn, "agent_cli"),
+        )
         return {"drafts": drafts}
 
     def _h_rename_reporter(self, params: dict) -> dict:
@@ -608,7 +610,7 @@ class Runner:
                 "provider": provider,
                 "message": (
                     f"Chat is disabled for the `{provider}` provider. "
-                    f"Switch to Claude Code on Settings → AI Provider, or "
+                    f"Pick a supported provider on Settings -> AI Provider, or "
                     f"enable the override on the same tab's Feature "
                     f"flags section (experimental)."
                 ),
@@ -647,6 +649,7 @@ class Runner:
         )
         sid = self.chat.start(
             cwd, is_standalone=is_standalone,
+            provider=db.get_setting(self._conn, "agent_cli"),
             priming_prompt=priming_prompt,
             priming_intro=priming_intro,
         )
@@ -686,7 +689,8 @@ class Runner:
             message=f"target-app: {kind} requested",
             severity="info", category="target_app", actor="refine",
         )
-        result = target_app.run_instructions(prompt)
+        provider = db.get_setting(self._conn, "agent_cli")
+        result = target_app.run_instructions(prompt, provider=provider)
         sev = "info" if result["ok"] else "error"
         msg = (
             f"target-app: {kind} {'completed' if result['ok'] else 'failed'} — {result['message']}"
@@ -731,7 +735,8 @@ class Runner:
             message=f"target-app: generating {kind} instructions",
             severity="info", category="target_app", actor="refine",
         )
-        result = target_app.generate_instructions(kind)
+        provider = db.get_setting(self._conn, "agent_cli")
+        result = target_app.generate_instructions(kind, provider=provider)
         sev = "info" if result["ok"] else "warn"
         activity.append(
             self._conn,
@@ -761,7 +766,7 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     """Build a context preamble for an attached-chat session.
 
     Returns (priming_prompt, user_intro_line). The priming prompt is sent to
-    claude with output discarded so it lives in claude's session memory
+    the selected provider with output discarded so it lives in session memory
     silently; the intro line is appended to the user-visible chat buffer so
     the user knows context was loaded.
 
@@ -769,7 +774,7 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     Gap's git worktree still exists (in-progress / todo / review / failed
     Gaps), False when it's already been cleaned up (done / cancelled).
     In the latter case the chat runs in the client repo for retrospective
-    Q&A — and the preamble tells claude that explicitly.
+    Q&A — and the preamble tells the agent that explicitly.
     """
     row = conn.execute(
         "SELECT name, status, branch_name FROM gaps_index WHERE id = ?",

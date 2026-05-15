@@ -1,4 +1,4 @@
-"""Spawn and supervise `claude --print` subprocesses.
+"""Spawn and supervise agent CLI subprocesses.
 
 Per spec:
 - One fresh CLI invocation per unaddressed round (no session resume).
@@ -26,7 +26,7 @@ from refine_shared.gaps import now_iso
 from . import gap_writer  # local module; sole owner of gap.json writes
 
 
-# How long to wait for claude to exit after it emits its `result` event
+# How long to wait for Claude to exit after it emits its `result` event
 # before SIGTERMing the process group. Long enough for normal cleanup,
 # short enough that the user doesn't watch the dashboard stall when the
 # agent kicked off a backgrounded HTTP server (or similar) that's now
@@ -94,6 +94,58 @@ def _summarize_agent_event(evt: dict) -> list[str]:
     return []
 
 
+def _summarize_codex_event(evt: dict) -> list[str]:
+    """Translate one Codex `exec --json` event into round-log entries.
+
+    Codex's JSONL event names have changed across releases, so this parser
+    keys mostly off the embedded `item.type` shape and falls back to common
+    top-level fields.
+    """
+    if not isinstance(evt, dict):
+        return []
+    out: list[str] = []
+    t = str(evt.get("type") or "")
+    item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
+    it = str(item.get("type") or evt.get("item_type") or "")
+
+    if t.endswith("started") and ("session_id" in evt or "id" in evt):
+        sid = str(evt.get("session_id") or evt.get("id") or "")[:8]
+        if "session" in t and sid:
+            return [f"[session] init — provider=codex session={sid}"]
+
+    text = (
+        item.get("text") or item.get("content") or item.get("message")
+        or evt.get("text") or evt.get("message")
+    )
+    if it in ("agent_message", "assistant_message", "message") and text:
+        out.extend(str(text).strip().splitlines())
+
+    command = (
+        item.get("command") or item.get("cmd") or item.get("input")
+        or evt.get("command")
+    )
+    if it in ("tool_call", "function_call", "local_shell_call",
+              "command_execution", "exec_command") and command:
+        first = str(command).splitlines()[0]
+        out.append(f"[tool] {first[:160]}")
+
+    result = (
+        item.get("output") or item.get("result") or item.get("content")
+        or evt.get("output")
+    )
+    if it in ("tool_result", "function_call_output",
+              "local_shell_call_output", "command_output") and result:
+        first = _first_nonempty_line(result)
+        if first:
+            out.append(f"[tool result] {first[:160]}")
+
+    if t == "error" or it == "error":
+        err = evt.get("error") or item.get("error") or text or "Codex error"
+        out.append(f"[error] {str(err)[:200]}")
+
+    return [s for s in out if s]
+
+
 def _summarize_tool_input(name: str, inp: dict) -> str:
     """Short, human-readable description of a tool_use input block."""
     if not isinstance(inp, dict):
@@ -138,6 +190,27 @@ def _summarize_tool_result(content) -> str:
     return ""
 
 
+def _first_nonempty_line(value) -> str:
+    if isinstance(value, list):
+        for block in value:
+            if isinstance(block, dict):
+                text = block.get("text") or block.get("content")
+                if text:
+                    found = _first_nonempty_line(text)
+                    if found:
+                        return found
+            elif block:
+                found = _first_nonempty_line(str(block))
+                if found:
+                    return found
+        return ""
+    for ln in str(value).splitlines():
+        ln = ln.strip()
+        if ln:
+            return ln
+    return ""
+
+
 @dataclass
 class RunHandle:
     gap_id: str
@@ -149,15 +222,11 @@ class RunHandle:
     last_output: float
     cwd: Path              # worktree path
     base_ref: str          # commit before the run, for "no commits produced" detection
-    # Whether the CLI emits parseable stream-json events refine can
-    # translate into rich round-log entries (with tool summaries and
-    # a terminal `result` event). True for Claude only today; non-
-    # structured CLIs fall through to line-by-line passthrough.
-    structured_output: bool = True
+    output_format: str = "plain"
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
     # Set to time.monotonic() when stream-json emits a `result` event.
-    # The supervisor uses this to bound how long we wait for claude to
+    # The supervisor uses this to bound how long we wait for Claude to
     # actually exit after it's logically done — if it's still alive a
     # short grace period later (because a backgrounded subprocess is
     # holding its stdio pipes open), we SIGTERM the process group.
@@ -199,34 +268,27 @@ class SubprocessManager:
         hard_cap: int,
         on_finished: Callable[..., None] | None = None,
     ) -> int:
-        """Spawn a `claude --print` subprocess in the Gap's worktree.
+        """Spawn an agent CLI subprocess in the Gap's worktree.
 
         Returns the PID. on_finished(gap_id, exit_code, killed_reason) is invoked
         from the supervisor thread when the subprocess exits.
         """
-        # Reuse the same env + PATH plumbing the chat subprocess uses
-        # (chat_mgr._chat_env / _resolve_claude): strip API-key vars so
-        # OAuth from `~/.claude/` wins, and resolve `claude` via the
-        # user's interactive login-shell PATH so we hit the
-        # `~/.local/bin/claude` they've actually logged into — not
-        # whatever stale `claude` happens to be on systemd-user's
-        # stripped PATH. Without this, `~/.claude/settings.json`
-        # (and its `skipDangerousModePermissionPrompt`) is invisible
-        # to the agent and `--dangerously-skip-permissions` hits its
-        # "must be accepted in an interactive session first" gate.
+        # Reuse the same env + PATH plumbing the chat subprocess uses:
+        # strip Claude API-key vars for Claude OAuth, and resolve the
+        # selected provider binary via the user's interactive login-shell
+        # PATH rather than systemd-user's stripped PATH.
         from .chat_mgr import _chat_env
         from . import agent_cli
         env = _chat_env()
         # The CLI to drive is operator-configurable (claude / codex /
         # gemini); we look up the binary on the user's interactive-
         # login PATH that `_chat_env` already provides. Stream-json
-        # parsing in `_drain_stdout` is gated on `spec.structured_output`
-        # so non-Claude CLIs fall back to plain line-by-line logging.
+        # parsing in `_drain_stdout` is gated on `spec.output_format`.
         spec = agent_cli.get_spec(
             db.get_setting(self._get_conn(), "agent_cli")
         )
         bin_path = agent_cli.resolve_binary(spec, env)
-        args = spec.agent_args(bin_path, prompt)
+        args = spec.agent_args(bin_path, prompt, cwd=cwd)
         proc = subprocess.Popen(
             args,
             cwd=str(cwd),
@@ -249,7 +311,7 @@ class SubprocessManager:
             last_output=now,
             cwd=cwd,
             base_ref=base_ref,
-            structured_output=spec.structured_output,
+            output_format=spec.output_format,
         )
         with self._lock:
             self._runs[gap_id] = handle
@@ -325,7 +387,7 @@ class SubprocessManager:
                     self._kill(h, "idle")
                     break
                 # Bound the post-result wait. Once the agent has emitted
-                # its terminal `result` event, give claude a short grace
+                # its terminal `result` event, give Claude a short grace
                 # period to exit cleanly; if it doesn't, a backgrounded
                 # subprocess (HTTP server, watcher, etc.) is almost
                 # certainly holding the stdio pipes open. SIGTERM the
@@ -339,6 +401,9 @@ class SubprocessManager:
                 if h.finished.wait(timeout=2.0):
                     break  # already finished
             exit_code = h.proc.wait()
+            if (h.output_format == "codex_json" and exit_code == 0
+                    and h.agent_reported_success is None):
+                h.agent_reported_success = True
         except Exception:
             exit_code = -1
 
@@ -374,7 +439,7 @@ class SubprocessManager:
                 )
 
     def _drain_stdout(self, h: RunHandle) -> None:
-        """Translate stream-json events from claude into round-log lines.
+        """Translate structured events from the agent into round-log lines.
 
         With `--output-format=stream-json --verbose`, each stdout line is
         a JSON event: `system/init`, `assistant` (with text + tool_use
@@ -384,7 +449,7 @@ class SubprocessManager:
         stream-json) pass through verbatim.
 
         When a `result` event arrives, stamp `h.result_seen_at` so the
-        supervisor can SIGTERM the process group if claude doesn't
+        supervisor can SIGTERM the process group if Claude doesn't
         actually exit shortly after — happens when the agent kicked off
         a backgrounded subprocess that's holding the stdio pipes open.
         """
@@ -395,8 +460,8 @@ class SubprocessManager:
                 line = raw.rstrip("\n")
                 if not line:
                     continue
-                if not h.structured_output:
-                    # Codex / Gemini / any non-Claude CLI: plain
+                if h.output_format == "plain":
+                    # Gemini / any plain-output CLI: line passthrough.
                     # passthrough. The line goes verbatim into the
                     # round log; idle / hard-cap still work via the
                     # `last_output` tick above. No `result` event, so
@@ -407,14 +472,28 @@ class SubprocessManager:
                 try:
                     evt = json.loads(line)
                 except json.JSONDecodeError:
-                    # Wasn't JSON — could be a `claude` CLI error or
-                    # plain stderr message merged in via stderr=STDOUT.
+                    # Wasn't JSON — could be a CLI error or plain stderr
+                    # message merged in via stderr=STDOUT.
                     self._write_log_entry(h, line)
                     continue
-                for s in _summarize_agent_event(evt):
+                if h.output_format == "codex_json":
+                    summaries = _summarize_codex_event(evt)
+                    if isinstance(evt, dict):
+                        t = str(evt.get("type") or "")
+                        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
+                        if t == "error" or item.get("type") == "error":
+                            h.agent_reported_success = False
+                        elif t in ("turn.completed", "session.completed",
+                                   "exec.completed"):
+                            h.agent_reported_success = True
+                else:
+                    summaries = _summarize_agent_event(evt)
+                for s in summaries:
                     if s:
                         self._write_log_entry(h, s)
-                if isinstance(evt, dict) and evt.get("type") == "result":
+                if (h.output_format == "claude_json"
+                        and isinstance(evt, dict)
+                        and evt.get("type") == "result"):
                     h.result_seen_at = time.monotonic()
                     h.agent_reported_success = not bool(evt.get("is_error"))
         finally:

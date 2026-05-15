@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "refine"
 version = "0.1.0"
-description = "Background Claude Code agents that close behavior Gaps in client codebases."
+description = "Background AI coding agents that close behavior Gaps in client codebases."
 requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"

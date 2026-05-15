@@ -1,4 +1,4 @@
-"""End-to-end smoke test (no real Claude CLI / git remote required).
+"""End-to-end smoke test (no real agent CLI / git remote required).
 
 Validates:
 - `refine init`-equivalent config bootstrap
@@ -51,7 +51,7 @@ def main() -> int:
     from refine_shared import db, reporters, activity, gaps as shared_gaps
     from refine_shared.ulid import new_ulid, is_ulid
     from refine_shared.friendly import classify_subprocess_failure, classify_git_failure
-    from refine_runner import gap_writer
+    from refine_runner import agent_cli, gap_writer
 
     # --- DB ------------------------------------------------------------------
     db.init_db()
@@ -61,6 +61,32 @@ def main() -> int:
     assert settings["agent_idle_timeout_seconds"] == "900"
     assert settings["agent_hard_cap_seconds"] == "86400"
     print("[ok] DB init + defaults seeded")
+
+    # --- Agent CLI abstraction ---------------------------------------------
+    codex = agent_cli.get_spec("codex")
+    cargs = codex.agent_args("/bin/codex", "do it", cwd=client)
+    assert cargs[:2] == ["/bin/codex", "exec"]
+    assert "--dangerously-bypass-approvals-and-sandbox" in cargs
+    assert "--ask-for-approval" in cargs and "never" in cargs
+    assert "--sandbox" in cargs and "danger-full-access" in cargs
+    assert "--json" in cargs and "-C" in cargs
+    assert "--full-auto" not in cargs
+    assert codex.chat_args("/bin/codex", "hi", session_id="abc")[:3] == [
+        "/bin/codex", "exec", "resume",
+    ]
+    from refine_runner.llm import _extract_final_text
+    from refine_runner.subprocess_mgr import _summarize_codex_event
+    codex_jsonl = (
+        '{"type":"item.completed","item":{"type":"agent_message",'
+        '"text":"[{\\\"name\\\":\\\"N\\\",\\\"actual\\\":\\\"A\\\",'
+        '\\"target\\\":\\\"T\\\"}]"}}\n'
+    )
+    assert _extract_final_text(codex_jsonl).startswith("[")
+    assert _summarize_codex_event({
+        "type": "item.completed",
+        "item": {"type": "agent_message", "text": "done"},
+    }) == ["done"]
+    print("[ok] codex CLI args + JSONL parsing")
 
     # --- Reporters -----------------------------------------------------------
     jane = reporters.add(conn, "Jane Doe")

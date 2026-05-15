@@ -1,20 +1,24 @@
-"""One-shot LLM calls via the host `claude` CLI.
+"""One-shot LLM calls via the configured host agent CLI.
 
 Currently provides `extract_gaps(text)` for the Import-from-free-text
-workflow: hand claude a paste-dump (transcript, bug report, feedback)
+workflow: hand the agent a paste-dump (transcript, bug report, feedback)
 and get back a list of `{name, actual, target}` drafts the user can
 review before persisting.
 
-Shares the env/PATH plumbing with `chat_mgr` so we use the same OAuth
-login the user's interactive `claude` does — no API keys involved.
+Shares the env/PATH plumbing with `chat_mgr` so we use the same host auth
+the user's interactive CLI does.
 """
 from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
+from pathlib import Path
 from typing import Any
 
-from .chat_mgr import _chat_env, _resolve_claude
+from . import git_ops
+from .agent_cli import get_spec, resolve_binary
+from .chat_mgr import _chat_env
 
 
 _EXTRACT_PROMPT_TEMPLATE = """\
@@ -51,40 +55,67 @@ Source text:
 """
 
 
-def extract_gaps(text: str) -> list[dict]:
-    """Call `claude --print` with a structured extraction prompt and parse
+def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
+    """Call the configured agent CLI with a structured extraction prompt and parse
     its response as a JSON array of `{name, actual, target}` drafts.
 
-    Raises `RuntimeError` if claude can't be invoked or exits non-zero.
-    Returns an empty list when claude's response has no parseable JSON
+    Raises `RuntimeError` if the CLI can't be invoked or exits non-zero.
+    Returns an empty list when the response has no parseable JSON
     array (the import UI handles that as "no drafts extracted").
     """
     text = (text or "").strip()
     if not text:
         return []
     env = _chat_env()
-    claude = _resolve_claude(env)
+    spec = get_spec(provider)
+    binary = resolve_binary(spec, env)
     prompt = _EXTRACT_PROMPT_TEMPLATE.format(text=text)
+    cwd = git_ops.client_repo_path()
+    output_last_message: Path | None = None
+    tmp: tempfile.TemporaryDirectory | None = None
+    if spec.name == "codex":
+        tmp = tempfile.TemporaryDirectory(prefix="refine-codex-import-")
+        tdir = Path(tmp.name)
+        output_last_message = tdir / "last_message.txt"
+    args = spec.one_shot_args(
+        binary, prompt, cwd=cwd,
+        output_last_message=output_last_message,
+        json_output=spec.output_format == "codex_json",
+    )
     try:
         out = subprocess.run(
-            [claude, "--print", prompt],
+            args,
             capture_output=True, text=True, timeout=180, env=env,
+            cwd=str(cwd),
         )
     except subprocess.TimeoutExpired as e:
-        raise RuntimeError("claude timed out after 180s") from e
+        if tmp is not None:
+            tmp.cleanup()
+        raise RuntimeError(f"{spec.binary} timed out after 180s") from e
     except (OSError, FileNotFoundError) as e:
-        raise RuntimeError(f"could not launch claude: {e}") from e
+        if tmp is not None:
+            tmp.cleanup()
+        raise RuntimeError(f"could not launch {spec.binary}: {e}") from e
     if out.returncode != 0:
         msg = (out.stdout or "").strip() or (out.stderr or "").strip() \
-              or f"claude exited {out.returncode}"
+              or f"{spec.binary} exited {out.returncode}"
+        if tmp is not None:
+            tmp.cleanup()
         raise RuntimeError(msg)
-    return _normalize_drafts(_parse_json_array(out.stdout or ""))
+    raw = ""
+    if output_last_message is not None and output_last_message.exists():
+        raw = output_last_message.read_text(encoding="utf-8", errors="replace")
+    if not raw:
+        raw = _extract_final_text(out.stdout or "")
+    if tmp is not None:
+        tmp.cleanup()
+    return _normalize_drafts(_parse_json_array(raw))
 
 
 def _parse_json_array(text: str) -> list[Any]:
     """Find the first top-level JSON array in `text`.
 
-    Claude almost always honors "JSON only" but occasionally wraps the
+    Agents usually honor "JSON only" but can occasionally wrap the
     response in a markdown code fence or prefixes a sentence. We walk
     each `[` candidate until one parses cleanly. Returns an empty list
     if nothing parseable is found.
@@ -122,3 +153,21 @@ def _normalize_drafts(raw: list[Any]) -> list[dict]:
             "preview": (target or actual).split("\n", 1)[0],
         })
     return out
+
+
+def _extract_final_text(stdout: str) -> str:
+    """Return final assistant text from Codex JSONL, or raw stdout."""
+    if not stdout.lstrip().startswith("{"):
+        return stdout
+    last = ""
+    for line in stdout.splitlines():
+        try:
+            evt = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
+        text = item.get("text") or evt.get("text")
+        item_type = item.get("type")
+        if text and item_type in ("agent_message", "assistant_message"):
+            last = str(text)
+    return last or stdout

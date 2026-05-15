@@ -1,7 +1,7 @@
 # refine-web — webapp container.
 #
 # Only the webapp runs in Docker. The host-side runner is started natively on
-# the host so CLI subprocesses inherit ~/.claude auth, SSH keys, git config,
+# the host so CLI subprocesses inherit host agent auth, SSH keys, git config,
 # and filesystem permissions.
 #
 # Source lives at /app and is on PYTHONPATH so docker-compose can bind-mount

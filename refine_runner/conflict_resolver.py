@@ -1,4 +1,4 @@
-"""Auto-resolve a merge conflict by spawning a Claude Code subprocess
+"""Auto-resolve a merge conflict by spawning an agent CLI subprocess
 in the host's main client repo, mid-merge.
 
 Called by `verify_op` when `git merge` produces conflict markers. The
@@ -66,18 +66,17 @@ def attempt_auto_resolve(
         return {"ok": False, "message":
                 "auto-resolve called with no unmerged paths"}
 
-    log(f"Attempting to auto-resolve merge conflict in {len(files)} "
-        f"file{'' if len(files) == 1 else 's'} via Claude Code…",
-        severity="info", category="git")
-
     prompt = _build_prompt(branch=branch, target=target, files=files)
 
     env = _chat_env()
     spec = agent_cli.get_spec(db.get_setting(conn, "agent_cli"))
     bin_path = agent_cli.resolve_binary(spec, env)
+    log(f"Attempting to auto-resolve merge conflict in {len(files)} "
+        f"file{'' if len(files) == 1 else 's'} via {spec.display_name}...",
+        severity="info", category="git")
     try:
         proc = subprocess.Popen(
-            spec.agent_args(bin_path, prompt),
+            spec.agent_args(bin_path, prompt, cwd=repo),
             cwd=str(repo),
             env=env,
             stdin=subprocess.DEVNULL,
@@ -91,7 +90,7 @@ def attempt_auto_resolve(
         return {"ok": False,
                 "message": f"could not launch {spec.binary} for auto-resolve: {e}"}
 
-    _stream_and_supervise(proc, log)
+    _stream_and_supervise(proc, log, output_format=spec.output_format)
 
     return _finalize(merge_message=merge_message, log=log)
 
@@ -136,8 +135,9 @@ CRITICAL CONSTRAINTS — failure to follow these will be flagged:
 """
 
 
-def _stream_and_supervise(proc: subprocess.Popen, log) -> None:
-    """Read stream-json from the agent, log assistant text + tool calls,
+def _stream_and_supervise(proc: subprocess.Popen, log, *,
+                          output_format: str) -> None:
+    """Read structured output from the agent, log assistant text + tool calls,
     and SIGTERM the pgroup on idle/hard-cap. Returns when the proc has
     exited (cleanly or by our hand)."""
     started = time.monotonic()
@@ -158,7 +158,7 @@ def _stream_and_supervise(proc: subprocess.Popen, log) -> None:
                     log(f"[auto-resolve] {line[:200]}",
                         severity="info", category="git")
                     continue
-                for entry in _summarize_event(evt):
+                for entry in _summarize_event(evt, output_format=output_format):
                     log(entry, severity="info", category="git")
         finally:
             done.set()
@@ -199,11 +199,15 @@ def _stream_and_supervise(proc: subprocess.Popen, log) -> None:
     t.join(timeout=2.0)
 
 
-def _summarize_event(evt: dict) -> list[str]:
+def _summarize_event(evt: dict, *, output_format: str) -> list[str]:
     """One-line summaries for the gap.json log — same shape as the
     Gap-runner's stream-json translator, but trimmed for our scope."""
     if not isinstance(evt, dict):
         return []
+    if output_format == "codex_json":
+        from .subprocess_mgr import _summarize_codex_event
+        return [f"[auto-resolve] {s[:200]}" for s in _summarize_codex_event(evt)]
+
     t = evt.get("type")
     if t == "assistant":
         msg = evt.get("message") or {}

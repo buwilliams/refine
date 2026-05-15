@@ -1,7 +1,7 @@
 """Target-application management — one-shot agent invocations.
 
 The operator writes plain-language prompts that, when sent to a
-Standalone Claude Code agent in the client repo, bring the target
+Standalone agent in the client repo, bring the target
 application up or take it down. Refine doesn't own the running
 process — the prompt does (e.g. it should background the app with
 `nohup … &` or hand off to systemd so the process survives the
@@ -24,7 +24,7 @@ Three call shapes:
     configured health URL and report ok/not-ok.
 
 Shares env/PATH plumbing with chat_mgr so the agent uses the same
-OAuth login as the operator's interactive `claude` does.
+host auth as the operator's interactive CLI does.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ from refine_shared import db
 
 from . import git_ops
 from .agent_cli import get_spec, resolve_binary
-from .chat_mgr import _chat_env, _resolve_claude
+from .chat_mgr import _chat_env
 
 
 _GENERATE_PROMPT = """\
@@ -65,23 +65,24 @@ _REBUILD_START = " (install/rebuild if needed, then start in the background, the
 _REBUILD_STOP = " (find the running process, terminate it gracefully, confirm it's gone)"
 
 
-def _agent_command(prompt: str) -> tuple[list[str], dict[str, str]]:
-    """Build the `claude --print …` argv for a one-shot Standalone agent run.
+def _agent_command(prompt: str, *, provider: str | None) -> tuple[list[str], dict[str, str]]:
+    """Build argv for a one-shot Standalone agent run.
 
-    Mirrors the env scrubbing chat_mgr does so the subprocess uses the
-    operator's interactive OAuth login, not whatever env vars happen to
-    be inherited from the runner process.
+    Mirrors the env/PATH plumbing chat_mgr uses so the subprocess behaves
+    like the operator's interactive CLI, not the runner's stripped service env.
     """
     env = _chat_env()
-    claude = _resolve_claude(env)
-    # --dangerously-skip-permissions is required so the agent can run
-    # the shell commands the prompt describes without an interactive
-    # confirmation step (no TTY in this code path).
-    args = [claude, "--print", "--dangerously-skip-permissions", prompt]
+    spec = get_spec(provider)
+    binary = resolve_binary(spec, env)
+    cwd = git_ops.client_repo_path()
+    args = spec.one_shot_args(
+        binary, prompt, cwd=cwd, json_output=spec.output_format == "codex_json",
+    )
     return args, env
 
 
-def run_instructions(prompt: str, *, timeout: float = 600.0) -> dict[str, Any]:
+def run_instructions(prompt: str, *, provider: str | None = None,
+                     timeout: float = 600.0) -> dict[str, Any]:
     """Run a start/stop prompt as a Standalone agent in the client repo.
 
     Returns `{ok, stdout, stderr, exit_code, message}`. `ok` is True iff
@@ -93,7 +94,7 @@ def run_instructions(prompt: str, *, timeout: float = 600.0) -> dict[str, Any]:
         return {"ok": False, "stdout": "", "stderr": "",
                 "exit_code": None,
                 "message": "No instructions configured."}
-    args, env = _agent_command(prompt)
+    args, env = _agent_command(prompt, provider=provider)
     cwd = git_ops.client_repo_path()
     try:
         out = subprocess.run(
@@ -122,7 +123,8 @@ def run_instructions(prompt: str, *, timeout: float = 600.0) -> dict[str, Any]:
     }
 
 
-def generate_instructions(kind: str, *, timeout: float = 300.0) -> dict[str, Any]:
+def generate_instructions(kind: str, *, provider: str | None = None,
+                          timeout: float = 300.0) -> dict[str, Any]:
     """Use the agent to write a start or stop prompt based on the codebase.
 
     Returns `{ok, text, message}`. On success, `text` holds the prompt
@@ -136,11 +138,11 @@ def generate_instructions(kind: str, *, timeout: float = 300.0) -> dict[str, Any
     meta_prompt = _GENERATE_PROMPT.format(
         action=action, extra=extra, rebuild_clause=rebuild,
     )
-    result = run_instructions(meta_prompt, timeout=timeout)
+    result = run_instructions(meta_prompt, provider=provider, timeout=timeout)
     if not result["ok"]:
         return {"ok": False, "text": "", "message": result["message"]}
     # Strip leading/trailing whitespace + accidental ``` fences.
-    text = (result["stdout"] or "").strip()
+    text = _last_agent_text(result["stdout"] or "").strip()
     if text.startswith("```"):
         # Drop the first fence line and any trailing fence line.
         lines = text.splitlines()
@@ -153,6 +155,26 @@ def generate_instructions(kind: str, *, timeout: float = 300.0) -> dict[str, Any
         return {"ok": False, "text": "",
                 "message": "agent produced no instructions"}
     return {"ok": True, "text": text, "message": "generated"}
+
+
+def _last_agent_text(stdout: str) -> str:
+    """Extract final assistant text from Codex JSONL, or return plain stdout."""
+    if not stdout.lstrip().startswith("{"):
+        return stdout
+    import json
+    last = ""
+    for line in stdout.splitlines():
+        try:
+            evt = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
+        text = item.get("text") or evt.get("text")
+        typ = item.get("type") or evt.get("type")
+        if text and typ in ("agent_message", "assistant_message",
+                            "item.completed"):
+            last = str(text)
+    return last or stdout
 
 
 def http_health(url: str, *, timeout: float = 5.0) -> dict[str, Any]:
