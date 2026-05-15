@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -147,6 +148,27 @@ def main() -> int:
     })
     assert gen["start_command"] == "npm run dev"
     assert gen["env"]["PORT"] == "3000"
+    ready_file = client / ".refine" / "ready"
+    delayed_cfg = {
+        "start_command": (
+            "mkdir -p .refine; "
+            "sh -c 'sleep 1; touch .refine/ready' >/dev/null 2>&1 &"
+        ),
+        "stop_command": "rm -f .refine/ready",
+        "status_command": "test -f .refine/ready",
+        "cwd": "",
+        "env": {},
+        "start_timeout_seconds": 5,
+        "stop_timeout_seconds": 5,
+        "status_timeout_seconds": 1,
+    }
+    t0 = time.monotonic()
+    delayed = target_app.run_operation("start", delayed_cfg)
+    assert delayed["ok"] and delayed["state"] == "running", delayed
+    assert time.monotonic() - t0 >= 1.0
+    assert ready_file.exists()
+    stopped = target_app.run_operation("stop", delayed_cfg)
+    assert stopped["ok"] and stopped["state"] == "stopped", stopped
     print("[ok] target-app command runtime + config normalization")
 
     # --- Reporters -----------------------------------------------------------

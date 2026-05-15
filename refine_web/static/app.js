@@ -3633,6 +3633,22 @@ function drawSettings(s, diag, reps, feats) {
 
     ${pane("target-app", `
     <div class="card">
+      <h3>Current status</h3>
+      <div id="target-app-status-block" class="muted">Loading…</div>
+      <div class="actions" style="margin-top:10px">
+        <button id="s-target-run-start">Start application</button>
+        <button class="danger" id="s-target-run-stop">Stop application</button>
+        <span class="spacer"></span>
+        <button class="secondary" id="s-target-health-now">Check status now</button>
+      </div>
+      <p class="muted small" style="margin-top:6px">
+        Start / Stop live here on purpose — the indicator next to the
+        reporter dropdown is read-only so typical users can't take the
+        application down by accident.
+      </p>
+    </div>
+
+    <div class="card" style="margin-top:16px">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
         The AI provider drafts this configuration from the codebase.
@@ -3700,22 +3716,6 @@ function drawSettings(s, diag, reps, feats) {
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
         <p class="muted small" id="s-target-notes"></p></div>
       <div class="actions"><button id="s-save-target">Save</button></div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>Current status</h3>
-      <div id="target-app-status-block" class="muted">Loading…</div>
-      <div class="actions" style="margin-top:10px">
-        <button id="s-target-run-start">Start application</button>
-        <button class="danger" id="s-target-run-stop">Stop application</button>
-        <span class="spacer"></span>
-        <button class="secondary" id="s-target-health-now">Check status now</button>
-      </div>
-      <p class="muted small" style="margin-top:6px">
-        Start / Stop live here on purpose — the indicator next to the
-        reporter dropdown is read-only so typical users can't take the
-        application down by accident.
-      </p>
     </div>`)}
 
     ${pane("diagnostics", `

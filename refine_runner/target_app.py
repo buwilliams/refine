@@ -11,6 +11,7 @@ import json
 import os
 import socket
 import subprocess
+import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
@@ -138,7 +139,7 @@ def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
             "checks": [],
         }
 
-    checks = run_checks(config)
+    checks = wait_for_lifecycle_checks(kind, config, timeout=timeout)
     state = state_after_lifecycle(kind, checks)
     ok = state in ("running", "stopped", "unknown")
     msg = checks["message"] if checks["configured"] else f"{kind} command completed"
@@ -155,6 +156,25 @@ def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
         "checks_configured": checks["configured"],
         "checks": checks["checks"],
     }
+
+
+def wait_for_lifecycle_checks(kind: str, config: dict[str, Any],
+                              timeout: int) -> dict[str, Any]:
+    """Poll checks after start/stop until the requested lifecycle state settles."""
+    deadline = time.monotonic() + max(1, timeout)
+    last = run_checks(config)
+    if not last["configured"]:
+        return last
+    while True:
+        state = state_after_lifecycle(kind, last)
+        if (kind == "start" and state == "running") or (
+            kind == "stop" and state == "stopped"
+        ):
+            return last
+        if time.monotonic() >= deadline:
+            return last
+        time.sleep(0.5)
+        last = run_checks(config)
 
 
 def run_checks(config: dict[str, Any]) -> dict[str, Any]:
