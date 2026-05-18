@@ -16,7 +16,7 @@ auth, so operators rarely need to think about either.
 - Logs view with filters for agent output, git events, and system activity.
 - Persistent Chat dock for standalone questions and Gap-specific follow-up.
 - Import-from-text flow that extracts Gap drafts from free-form notes.
-- Multi-app setup and switching from Settings → Project.
+- Multi-app setup and switching from Settings → Application.
 - Host-native operation that reuses local agent auth, SSH keys, git config, and PATH.
 
 ## Quick Start

@@ -187,15 +187,12 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   // Tab definitions. Order here drives the tab strip; `slug` is the
-  // localStorage key and DOM hook. Same order as the linear stack was
-  // before this refactor.
+  // localStorage key and DOM hook.
   const tabs = [
-    { slug: "project",      label: "Project" },
+    { slug: "project",      label: "Application" },
     { slug: "reporters",    label: "Reporters" },
-    { slug: "runtime",      label: "Runtime" },
     { slug: "governance",   label: "Governance" },
-    { slug: "cli",          label: "AI Provider" },
-    { slug: "diagnostics",  label: "Diagnostics" },
+    { slug: "runtime",      label: "Runtime" },
   ];
   const activeSlug = readSettingsTab(tabs);
   const tabStrip = `
@@ -231,6 +228,26 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
         <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Scope</h3>
+      <p class="muted small">
+        Where refine's agent work lands inside the client repo. The base
+        repo location still owns all git plumbing — worktree create, fetch,
+        merge, push.
+      </p>
+      <div class="form-row"><label>Agent subpath
+        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.</span></label>
+        <input type="text" id="s-subpath"
+               placeholder="e.g. apps/web"
+               value="${htmlEscape(s.agent_subpath || "")}"></div>
+      <div class="form-row"><label>Merge target branch
+        <span class="muted small">— branch all Gap worktrees are based on and all <code>verify</code> merges land on. Leave blank to follow the host's currently-checked-out branch. When set, <code>verify</code> auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
+        <input type="text" id="s-merge-target"
+               placeholder="e.g. main"
+               value="${htmlEscape(s.merge_target_branch || "")}"></div>
+      <div class="actions"><button id="s-save-scope">Save</button></div>
     </div>`)}
 
     ${pane("runtime", `
@@ -265,33 +282,6 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
     </div>
 
     <div class="card" style="margin-top:16px">
-      <h3>Scope</h3>
-      <p class="muted small">
-        Where refine's agent work lands inside the client repo. The base
-        repo location still owns all git plumbing — worktree create, fetch,
-        merge, push.
-      </p>
-      <div class="form-row"><label>Agent subpath
-        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.</span></label>
-        <input type="text" id="s-subpath"
-               placeholder="e.g. apps/web"
-               value="${htmlEscape(s.agent_subpath || "")}"></div>
-      <div class="form-row"><label>Merge target branch
-        <span class="muted small">— branch all Gap worktrees are based on and all <code>verify</code> merges land on. Leave blank to follow the host's currently-checked-out branch. When set, <code>verify</code> auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
-        <input type="text" id="s-merge-target"
-               placeholder="e.g. main"
-               value="${htmlEscape(s.merge_target_branch || "")}"></div>
-      <div class="actions"><button id="s-save-scope">Save</button></div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>Auth</h3>
-      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
-      <button id="s-recheck">Re-check auth</button>
-    </div>`)}
-
-    ${pane("cli", `
-    <div class="card">
       <h3>AI Provider</h3>
       <div class="form-row"><label>Which AI provider refine drives
         <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code and Codex.</span></label>
@@ -301,15 +291,47 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
           ${cliOption("gemini", "Gemini")}
         </select></div>
       <p class="muted small" style="margin-top:6px">
-        After switching: re-check auth on the Runtime tab to confirm the
-        chosen provider is installed and authed on the host. Round logs
-        are structured for Claude Code and Codex where their CLIs expose
-        machine-readable events; Gemini falls back to plain stdout passthrough.
+        After switching: re-check auth below to confirm the chosen provider is
+        installed and authed on the host. Round logs are structured for Claude
+        Code and Codex where their CLIs expose machine-readable events; Gemini
+        falls back to plain stdout passthrough.
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
     </div>
+
     ${renderFeatureFlagsCard(feats)
-      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></div>`}`)}
+      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></div>`}
+
+    <div class="card" style="margin-top:16px">
+      <h3>Auth</h3>
+      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
+      <button id="s-recheck">Re-check auth</button>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Backend diagnostics</h3>
+      <dl class="kv">
+        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
+        ${diag.mode ? `<dt>Mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
+        ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
+      </dl>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Logs retention</h3>
+      <p class="muted small">
+        Delete activity entries older than the chosen window. Newer entries
+        and gap state are untouched.
+      </p>
+      <div class="actions">
+        <label for="logs-cleanup-days" class="muted small">Keep</label>
+        <select id="logs-cleanup-days">
+          ${[0, 7, 30, 60, 90, 365].map((n) =>
+            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
+        </select>
+        <button class="danger" id="logs-cleanup">Clean up old logs</button>
+      </div>
+    </div>`)}
 
     ${pane("governance", `
     <div class="card">
@@ -374,7 +396,7 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
     </div>`)}
 
     ${pane("project", `
-    <div class="card">
+    <div class="card" style="margin-top:16px">
       <h3>Current status</h3>
       <div id="target-app-status-block" class="muted">Loading…</div>
       <div class="actions" style="margin-top:10px">
@@ -458,32 +480,6 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
         <p class="muted small" id="s-target-notes"></p></div>
       <div class="actions"><button id="s-save-target">Save</button></div>
-    </div>`)}
-
-    ${pane("diagnostics", `
-    <div class="card">
-      <h3>Backend diagnostics</h3>
-      <dl class="kv">
-        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.mode ? `<dt>Mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
-        ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
-      </dl>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>Logs retention</h3>
-      <p class="muted small">
-        Delete activity entries older than the chosen window. Newer entries
-        and gap state are untouched.
-      </p>
-      <div class="actions">
-        <label for="logs-cleanup-days" class="muted small">Keep</label>
-        <select id="logs-cleanup-days">
-          ${[0, 7, 30, 60, 90, 365].map((n) =>
-            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
-        </select>
-        <button class="danger" id="logs-cleanup">Clean up old logs</button>
-      </div>
     </div>`)}
   `;
   // Tab click handlers — purely DOM-local, no re-fetch.
@@ -703,7 +699,7 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
     catch (e) { toast(e.message, "error"); }
   });
 
-  // --- Target application controls on the Project tab -----------------------
+  // --- Target application controls on the Application tab -------------------
   $("#s-save-target")?.addEventListener("click", async () => {
     await withButtonBusy($("#s-save-target"), "Saving…", async () => {
       try {
