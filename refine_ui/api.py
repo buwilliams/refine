@@ -323,12 +323,17 @@ def _gaps_order_clause(sort: str | None, direction: str | None) -> str:
     return f"{expr} {d}{tiebreaker}"
 
 
+def _page_bounds(limit: int, offset: int = 0) -> tuple[int, int]:
+    return max(1, int(limit)), max(0, int(offset))
+
+
 def list_gaps(*, status: str | None = None, q: str | None = None,
               severity: str | None = None,
               category: str | None = None,
               actor: str | None = None,
               reporter: str | None = None,
               limit: int = 200,
+              offset: int = 0,
               sort: str | None = None,
               direction: str | None = None,
               include_facets: bool = False) -> tuple[int, dict]:
@@ -337,6 +342,10 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     the indexed `gaps_index.reporter` column, which the runner keeps in
     sync with the latest round's reporter on every write.
     """
+    page_limit, page_offset = _page_bounds(limit, offset)
+    needs_round_search = bool(
+        q and not (severity or category or actor or reporter)
+    )
     sql = [
         "SELECT id, name, status, priority, reporter, "
         "created, updated, branch_name "
@@ -374,8 +383,13 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         args.extend(sub_args)
     if where:
         sql.append("WHERE " + " AND ".join(where))
-    sql.append("ORDER BY " + _gaps_order_clause(sort, direction) + " LIMIT ?")
-    args.append(limit)
+    sql.append("ORDER BY " + _gaps_order_clause(sort, direction))
+    if needs_round_search:
+        sql.append("LIMIT ?")
+        args.append(page_limit + page_offset + 1)
+    else:
+        sql.append("LIMIT ? OFFSET ?")
+        args.extend([page_limit + 1, page_offset])
     conn = _conn()
     try:
         rows = [dict(r) for r in conn.execute(" ".join(sql), args)]
@@ -390,9 +404,20 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     # Round-content search only kicks in when the only non-q filters are
     # the existing ones — the activity-side subquery already constrains
     # the candidate id set.
-    if q and len(rows) < limit and not (severity or category or actor or reporter):
-        rows = _augment_with_round_search(rows, q, limit)
-    body: dict = {"gaps": rows}
+    if needs_round_search and len(rows) < page_limit + page_offset + 1:
+        rows = _augment_with_round_search(rows, q, page_limit + page_offset + 1)
+    if needs_round_search:
+        rows = rows[page_offset:]
+    has_more = len(rows) > page_limit
+    rows = rows[:page_limit]
+    body: dict = {
+        "gaps": rows,
+        "page": {
+            "limit": page_limit,
+            "offset": page_offset,
+            "has_more": has_more,
+        },
+    }
     if facets is not None:
         body["facets"] = facets
     return 200, body
@@ -789,12 +814,23 @@ def verify(gap_id: str) -> tuple[int, dict]:
     return 200, result
 
 
-def list_changes(*, limit: int = 50) -> tuple[int, dict]:
+def list_changes(*, limit: int = 50, offset: int = 0,
+                 q: str | None = None, status: str | None = None,
+                 priority: str | None = None) -> tuple[int, dict]:
     """List refine merge commits on the target branch (plus the Gap
     metadata for each). Used by the Changes screen."""
+    page_limit, page_offset = _page_bounds(limit, offset)
     try:
         result = get_client().call(
-            M_LIST_CHANGES, {"limit": int(limit)}, timeout=15.0,
+            M_LIST_CHANGES,
+            {
+                "limit": page_limit,
+                "offset": page_offset,
+                "q": q or "",
+                "status": status or "",
+                "priority": priority or "",
+            },
+            timeout=15.0,
         )
     except BackendError as e:
         return _backend_err(e)
@@ -1218,14 +1254,25 @@ def list_activity(*, limit: int = 100, gap_id: str | None = None,
                   category: str | None = None,
                   actor: str | None = None,
                   q: str | None = None,
+                  offset: int = 0,
                   include_facets: bool = False) -> tuple[int, dict]:
+    page_limit, page_offset = _page_bounds(limit, offset)
     conn = _conn()
     try:
         entries = activity.recent(
-            conn, limit=limit, gap_id=gap_id, since_id=since_id,
+            conn, limit=page_limit + 1, offset=page_offset,
+            gap_id=gap_id, since_id=since_id,
             severity=severity, category=category, actor=actor, q=q,
         )
-        body: dict = {"activity": entries}
+        has_more = len(entries) > page_limit
+        body: dict = {
+            "activity": entries[:page_limit],
+            "page": {
+                "limit": page_limit,
+                "offset": page_offset,
+                "has_more": has_more,
+            },
+        }
         if include_facets:
             body["facets"] = {
                 "categories": activity.distinct_categories(conn),

@@ -11,7 +11,6 @@ const routes = {
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
-  tutorial: renderTutorial,
 };
 
 function parseHash() {
@@ -33,7 +32,6 @@ function parseHash() {
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "changes") return { route: "changes" };
   if (parts[0] === "settings") return { route: "settings" };
-  if (parts[0] === "tutorial") return { route: "tutorial" };
   return { route: "dashboard" };
 }
 
@@ -54,10 +52,6 @@ function navigate() {
   if (prevRoute === "gaps" && r.route !== "gaps") {
     gapsExcludedIds.clear();
   }
-  if (prevRoute === "tutorial" && r.route !== "tutorial") {
-    closeTutorialModal();
-  }
-
   if (r.route === "gaps_detail") {
     // Gap detail is now a modal layered on top of the current screen, so
     // the user keeps their underlying context (Dashboard, Gaps list, etc.)

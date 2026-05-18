@@ -361,7 +361,8 @@ def push_current(cwd: Path | None = None) -> GitResult:
 
 
 def list_refine_merges(branch: str, limit: int = 50,
-                        *, cwd: Path | None = None) -> list[dict]:
+                        *, offset: int = 0,
+                        cwd: Path | None = None) -> list[dict]:
     """Walk `branch` for merge commits refine produced.
 
     A refine merge has the trailer `Refine Gap: <gap_id>` in its body
@@ -372,6 +373,7 @@ def list_refine_merges(branch: str, limit: int = 50,
     r = _run([
         "log", "--first-parent", "--merges",
         f"--max-count={int(limit)}",
+        f"--skip={max(0, int(offset))}",
         f"--pretty=format:{fmt}",
         branch,
     ], cwd=cwd or client_repo_path())

@@ -46,6 +46,7 @@ def recent(
     conn: sqlite3.Connection,
     *,
     limit: int = 100,
+    offset: int = 0,
     gap_id: str | None = None,
     since_id: int | None = None,
     severity: str | None = None,
@@ -80,8 +81,8 @@ def recent(
         args.extend([like, like])
     if where:
         sql.append("WHERE " + " AND ".join(where))
-    sql.append("ORDER BY id DESC LIMIT ?")
-    args.append(limit)
+    sql.append("ORDER BY id DESC LIMIT ? OFFSET ?")
+    args.extend([limit, max(0, int(offset))])
     out = []
     for r in conn.execute(" ".join(sql), args):
         out.append(_row_to_entry(r))

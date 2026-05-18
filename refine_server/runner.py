@@ -451,12 +451,68 @@ class Runner:
         (name + current status). Powers the Changes screen.
         """
         target = self._effective_target_branch()
+        limit = max(1, int(params.get("limit") or 50))
+        offset = max(0, int(params.get("offset") or 0))
+        q = str(params.get("q") or "").strip().lower()
+        status = str(params.get("status") or "").strip()
+        priority = str(params.get("priority") or "").strip()
         if not target:
-            return {"branch": None, "changes": []}
-        limit = int(params.get("limit") or 50)
-        merges = git_ops.list_refine_merges(target, limit=limit)
+            return {
+                "branch": None,
+                "changes": [],
+                "page": {"limit": limit, "offset": offset, "has_more": False},
+            }
+        if q or status or priority:
+            fetched = self._filtered_refine_merges(
+                target, q=q, status=status, priority=priority,
+                needed=offset + limit + 1,
+            )
+            page_rows = fetched[offset:]
+        else:
+            page_rows = git_ops.list_refine_merges(
+                target, limit=limit + 1, offset=offset,
+            )
+            self._enrich_refine_merges(page_rows)
+        has_more = len(page_rows) > limit
+        merges = page_rows[:limit]
         if not merges:
-            return {"branch": target, "changes": []}
+            return {
+                "branch": target,
+                "changes": [],
+                "page": {"limit": limit, "offset": offset, "has_more": False},
+            }
+        return {
+            "branch": target,
+            "changes": merges,
+            "page": {"limit": limit, "offset": offset, "has_more": has_more},
+        }
+
+    def _filtered_refine_merges(self, target: str, *, q: str, status: str,
+                                priority: str, needed: int) -> list[dict]:
+        matches: list[dict] = []
+        scan_offset = 0
+        chunk_size = 200
+        while len(matches) < needed:
+            chunk = git_ops.list_refine_merges(
+                target, limit=chunk_size, offset=scan_offset,
+            )
+            if not chunk:
+                break
+            self._enrich_refine_merges(chunk)
+            for row in chunk:
+                if self._refine_merge_matches(row, q=q, status=status,
+                                              priority=priority):
+                    matches.append(row)
+                    if len(matches) >= needed:
+                        break
+            scan_offset += len(chunk)
+            if len(chunk) < chunk_size:
+                break
+        return matches
+
+    def _enrich_refine_merges(self, merges: list[dict]) -> None:
+        if not merges:
+            return
         ids = [m["gap_id"] for m in merges]
         placeholders = ",".join("?" * len(ids))
         rows = self._conn.execute(
@@ -470,7 +526,21 @@ class Runner:
             m["name"] = row["name"] if row else None
             m["status"] = row["status"] if row else None
             m["priority"] = row["priority"] if row else None
-        return {"branch": target, "changes": merges}
+
+    @staticmethod
+    def _refine_merge_matches(row: dict, *, q: str, status: str,
+                              priority: str) -> bool:
+        if status and row.get("status") != status:
+            return False
+        if priority and row.get("priority") != priority:
+            return False
+        if q:
+            haystack = " ".join(str(row.get(k) or "") for k in (
+                "commit", "gap_id", "subject", "name", "status", "priority",
+            )).lower()
+            if q not in haystack:
+                return False
+        return True
 
     def _h_governance_get(self, params: dict) -> dict:
         settings = governance.load_settings(self._conn)

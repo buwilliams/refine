@@ -324,6 +324,35 @@ function fmtCount(n) {
   return String(n);
 }
 
+function renderPaginationControls(idPrefix, pageMeta = {}, itemCount = 0,
+                                  noun = "entry") {
+  const limit = Math.max(1, parseInt(pageMeta.limit || itemCount || 1, 10));
+  const offset = Math.max(0, parseInt(pageMeta.offset || 0, 10));
+  const page = Math.floor(offset / limit) + 1;
+  const hasPrev = offset > 0;
+  const hasNext = !!pageMeta.has_more;
+  if (!hasPrev && !hasNext) return "";
+  const start = itemCount ? offset + 1 : offset;
+  const end = offset + itemCount;
+  const label = itemCount
+    ? `${start}-${end} ${noun}${itemCount === 1 ? "" : "s"}`
+    : `Page ${page}`;
+  return `
+    <div class="pagination" id="${htmlEscape(idPrefix)}-pagination">
+      <span class="muted small">${htmlEscape(label)}</span>
+      <span class="spacer"></span>
+      <button class="secondary small" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>Previous</button>
+      <span class="muted small">Page ${page}</span>
+      <button class="secondary small" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Next</button>
+    </div>`;
+}
+
+function bindPaginationControls(root, idPrefix, onPage) {
+  $$(`#${idPrefix}-pagination [data-page]`, root).forEach((btn) => {
+    btn.addEventListener("click", () => onPage(parseInt(btn.dataset.page, 10)));
+  });
+}
+
 function htmlEscape(s) {
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",

@@ -18,6 +18,7 @@ function gapsHash(parts) {
   if (parts.category) next.set("category", parts.category);
   if (parts.actor)    next.set("actor", parts.actor);
   if (parts.limit && parts.limit !== GAPS_DEFAULT_LIMIT) next.set("limit", String(parts.limit));
+  if (parts.page && parts.page > 1) next.set("page", String(parts.page));
   if (parts.sort)     next.set("sort", parts.sort);
   if (parts.dir)      next.set("dir", parts.dir);
   return "#/gaps" + (next.toString() ? "?" + next : "");
@@ -92,20 +93,23 @@ async function renderGapsList() {
   // keystroke. Sort-header clicks go through the same path
   // (`refreshGapsTable`); see drawGapsTable.
   $("#search").addEventListener("input", debounce(() => {
-    updateGapsFilter({ q: $("#search").value });
+    updateGapsFilter({ q: $("#search").value, page: 1 });
   }, 250));
   $("#filter-status").addEventListener("change", (e) =>
-    updateGapsFilter({ status: e.target.value }));
+    updateGapsFilter({ status: e.target.value, page: 1 }));
   $("#filter-reporter").addEventListener("change", (e) =>
-    updateGapsFilter({ reporter: e.target.value }));
+    updateGapsFilter({ reporter: e.target.value, page: 1 }));
   $("#gaps-severity").addEventListener("change", (e) =>
-    updateGapsFilter({ severity: e.target.value }));
+    updateGapsFilter({ severity: e.target.value, page: 1 }));
   $("#gaps-category").addEventListener("change", (e) =>
-    updateGapsFilter({ category: e.target.value }));
+    updateGapsFilter({ category: e.target.value, page: 1 }));
   $("#gaps-actor").addEventListener("change", (e) =>
-    updateGapsFilter({ actor: e.target.value }));
+    updateGapsFilter({ actor: e.target.value, page: 1 }));
   $("#gaps-limit").addEventListener("change", (e) =>
-    updateGapsFilter({ limit: parseInt(e.target.value, 10) || GAPS_DEFAULT_LIMIT }));
+    updateGapsFilter({
+      limit: parseInt(e.target.value, 10) || GAPS_DEFAULT_LIMIT,
+      page: 1,
+    }));
   $("#gaps-clear").addEventListener("click", () => {
     history.replaceState(null, "", "#/gaps");
     renderGapsList();
@@ -144,6 +148,7 @@ function gapsFilterFromHash() {
     actor: hashQs.get("actor") || "",
     limit: parseInt(hashQs.get("limit") || String(GAPS_DEFAULT_LIMIT), 10)
            || GAPS_DEFAULT_LIMIT,
+    page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
     sort, dir,
     effectiveSort, effectiveDir,
   };
@@ -162,6 +167,7 @@ function updateGapsFilter(patch) {
     category: "category" in patch ? patch.category : current.category,
     actor: "actor" in patch ? patch.actor : current.actor,
     limit: "limit" in patch ? patch.limit : current.limit,
+    page: "page" in patch ? patch.page : current.page,
     sort: "sort" in patch ? patch.sort : current.sort,
     dir: "dir" in patch ? patch.dir : current.dir,
   };
@@ -180,6 +186,7 @@ async function refreshGapsTable() {
   if (f.category) params.set("category", f.category);
   if (f.actor) params.set("actor", f.actor);
   if (f.limit) params.set("limit", String(f.limit));
+  params.set("offset", String((f.page - 1) * f.limit));
   if (f.sort) params.set("sort", f.sort);
   if (f.dir) params.set("dir", f.dir);
   params.set("facets", "1");
@@ -209,6 +216,11 @@ async function refreshGapsTable() {
     const renderState = {
       q: f.q, status: f.status,
       sort: f.effectiveSort, dir: f.effectiveDir,
+      page: data.page || {
+        limit: f.limit,
+        offset: (f.page - 1) * f.limit,
+        has_more: false,
+      },
     };
     _lastGapsRender = { gaps, state: renderState };
     drawGapsTable(gaps, renderState);
@@ -238,7 +250,11 @@ function drawGapsTable(gaps, state) {
   const showSelection = !!(shell && shell.open);
 
   if (!gaps.length) {
-    root.innerHTML = `<p class="muted">No gaps match the current filters.</p>`;
+    root.innerHTML = `
+      <p class="muted">No gaps match the current filters.</p>
+      ${renderPaginationControls("gaps", state.page, 0, "gap")}`;
+    bindPaginationControls(root, "gaps", (page) =>
+      updateGapsFilter({ page }));
     return;
   }
   const columns = [
@@ -291,8 +307,11 @@ function drawGapsTable(gaps, state) {
           </tr>`;
         }).join("")}
       </tbody>
-    </table>
-  `;
+	    </table>
+      ${renderPaginationControls("gaps", state.page, gaps.length, "gap")}
+	  `;
+  bindPaginationControls(root, "gaps", (page) =>
+    updateGapsFilter({ page }));
   // Row click navigates to gap detail — but a click on the checkbox (or
   // its surrounding td) should toggle selection, not navigate.
   $$(".table tbody tr", root).forEach((row) => {
@@ -338,7 +357,7 @@ function drawGapsTable(gaps, state) {
         // New column — use its natural default direction.
         nextDir = GAPS_DEFAULT_DIR[key] || "desc";
       }
-      updateGapsFilter({ sort: key, dir: nextDir });
+      updateGapsFilter({ sort: key, dir: nextDir, page: 1 });
     });
   });
 }

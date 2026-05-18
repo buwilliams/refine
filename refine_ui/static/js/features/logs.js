@@ -1,6 +1,7 @@
 // ---- Logs -------------------------------------------------------------------
 
 const LOGS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+const LOGS_DEFAULT_LIMIT = 100;
 
 function logsFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
@@ -10,15 +11,23 @@ function logsFiltersFromHash() {
     actor: hashQs.get("actor") || "",
     gap_id: hashQs.get("gap_id") || "",
     q: hashQs.get("q") || "",
-    limit: parseInt(hashQs.get("limit") || "100", 10) || 100,
+    limit: parseInt(hashQs.get("limit") || String(LOGS_DEFAULT_LIMIT), 10)
+           || LOGS_DEFAULT_LIMIT,
+    page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
   };
 }
 
 function logsHashFromFilters(f) {
   const next = new URLSearchParams();
-  for (const [k, v] of Object.entries(f)) {
-    if (v && !(k === "limit" && v === 100)) next.set(k, String(v));
+  if (f.severity) next.set("severity", f.severity);
+  if (f.category) next.set("category", f.category);
+  if (f.actor) next.set("actor", f.actor);
+  if (f.gap_id) next.set("gap_id", f.gap_id);
+  if (f.q) next.set("q", f.q);
+  if (f.limit && f.limit !== LOGS_DEFAULT_LIMIT) {
+    next.set("limit", String(f.limit));
   }
+  if (f.page && f.page > 1) next.set("page", String(f.page));
   return "#/logs" + (next.toString() ? "?" + next : "");
 }
 
@@ -88,9 +97,15 @@ function navigateLogs() {
     actor: $("#logs-actor").value,
     gap_id: $("#logs-gap-id").value.trim(),
     q: $("#logs-q").value,
-    limit: parseInt($("#logs-limit").value, 10) || 100,
+    limit: parseInt($("#logs-limit").value, 10) || LOGS_DEFAULT_LIMIT,
+    page: 1,
   };
   location.hash = logsHashFromFilters(next);
+}
+
+function navigateLogsPage(page) {
+  const f = logsFiltersFromHash();
+  location.hash = logsHashFromFilters({ ...f, page });
 }
 
 async function loadLogs() {
@@ -103,6 +118,7 @@ async function loadLogs() {
   if (f.gap_id) params.set("gap_id", f.gap_id);
   if (f.q) params.set("q", f.q);
   params.set("limit", String(f.limit));
+  params.set("offset", String((f.page - 1) * f.limit));
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/activity?" + params);
@@ -115,6 +131,11 @@ async function loadLogs() {
 function drawLogsList(data, f) {
   const entries = data.activity || [];
   const facets = data.facets || {};
+  const pageMeta = data.page || {
+    limit: f.limit,
+    offset: (f.page - 1) * f.limit,
+    has_more: false,
+  };
   // Re-populate facet dropdowns from server-side distinct values.
   const catSel = $("#logs-category");
   if (catSel) {
@@ -135,10 +156,17 @@ function drawLogsList(data, f) {
   applyLogsFilterIndicator(f);
   const root = $("#logs-list");
   if (!entries.length) {
-    root.innerHTML = `<p class="muted">No log entries match the current filters.</p>`;
+    root.innerHTML = `
+      <p class="muted">No log entries match the current filters.</p>
+      ${renderPaginationControls("logs", pageMeta, 0, "entry")}`;
+    bindPaginationControls(root, "logs", navigateLogsPage);
     return;
   }
-  root.innerHTML = renderActivityList(entries);
+  root.innerHTML = `
+    ${renderActivityList(entries)}
+    ${renderPaginationControls("logs", pageMeta, entries.length, "entry")}
+  `;
+  bindPaginationControls(root, "logs", navigateLogsPage);
 }
 
 // Mirror of applyGapsFilterIndicator for the Logs screen.
@@ -149,7 +177,7 @@ function applyLogsFilterIndicator(f) {
     "logs-severity": !!f.severity,
     "logs-category": !!f.category,
     "logs-actor": !!f.actor,
-    "logs-limit": f.limit !== 100,
+    "logs-limit": f.limit !== LOGS_DEFAULT_LIMIT,
   };
   let anyActive = false;
   for (const [id, on] of Object.entries(active)) {

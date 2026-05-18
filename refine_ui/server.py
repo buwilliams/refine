@@ -48,6 +48,7 @@ def _h_list_gaps(_h, _m, _b, q):
         actor=_get_one(q, "actor"),
         reporter=_get_one(q, "reporter"),
         limit=int(_get_one(q, "limit", "200")),
+        offset=int(_get_one(q, "offset", "0")),
         sort=_get_one(q, "sort"),
         direction=_get_one(q, "dir"),
         include_facets=bool(facets and facets != "0"),
@@ -111,7 +112,13 @@ def _h_cancel(_h, m, _b, _q):
 
 @route("GET", r"/api/changes")
 def _h_list_changes(_h, _m, _b, q):
-    return api.list_changes(limit=int(_get_one(q, "limit", "50")))
+    return api.list_changes(
+        limit=int(_get_one(q, "limit", "50")),
+        offset=int(_get_one(q, "offset", "0")),
+        q=_get_one(q, "q"),
+        status=_get_one(q, "status"),
+        priority=_get_one(q, "priority"),
+    )
 
 
 @route("POST", r"/api/changes/undo")
@@ -197,6 +204,7 @@ def _h_activity(_h, _m, _b, q):
         category=_get_one(q, "category"),
         actor=_get_one(q, "actor"),
         q=_get_one(q, "q"),
+        offset=int(_get_one(q, "offset", "0")),
         include_facets=bool(facets and facets != "0"),
     )
 

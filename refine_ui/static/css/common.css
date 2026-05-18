@@ -328,6 +328,13 @@ select {
 .filter-row input[type="text"] { width: auto; }
 .filter-row .filter-grow { flex: 1; min-width: 240px; }
 .filter-row .filter-gap-id { width: 220px; }
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
 
 .gap-detail h2 { font-size: 22px; }
 .round { border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 14px; background: var(--card); overflow: hidden; }
