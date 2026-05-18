@@ -7,7 +7,6 @@ const routes = {
   gaps: renderGapsList,
   gaps_new: renderGapNew,
   gaps_import: renderGapImport,
-  agents: renderAgents,
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
@@ -27,7 +26,6 @@ function parseHash() {
     if (parts[1] === "import") return { route: "gaps_import" };
     return { route: "gaps_detail", id: parts[1] };
   }
-  if (parts[0] === "agents") return { route: "agents" };
   if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "changes") return { route: "changes" };

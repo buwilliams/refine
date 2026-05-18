@@ -602,7 +602,6 @@ function initSSE() {
     // screen doesn't blink back to `Loading…` on every event.
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "logs") loadLogs();
-    if (state.currentRoute === "agents") refreshAgents();
     if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       try {
@@ -617,10 +616,10 @@ function initSSE() {
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    // Spawn/finish transitions are what populate the "Currently running"
-    // table on the Agents screen — refresh when one fires so the row
-    // appears or disappears without a manual reload.
-    if (state.currentRoute === "agents") refreshAgents();
+    if (state.currentRoute === "settings" &&
+        document.querySelector('[data-tab-pane="runtime"].active')) {
+      refreshSettings();
+    }
     // Changes screen: a Gap moving to `done` lands a new merge commit
     // here; a cancellation flips an existing row's Undo button state.
     if (state.currentRoute === "changes") loadChanges();

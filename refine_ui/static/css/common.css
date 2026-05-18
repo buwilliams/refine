@@ -48,10 +48,7 @@
 .settings-pane { display: none; }
 .settings-pane.active { display: block; }
 
-/* Worker role pill — Agents screen's "Currently running" table now
-   shows both kinds of workers (agent subprocess + merger). The pill
-   sits in front of the Gap link so users can tell at a glance which
-   worker is acting on each row. */
+/* Worker role pill for runtime "Currently running" tables. */
 .role-pill {
   display: inline-block;
   padding: 2px 8px;

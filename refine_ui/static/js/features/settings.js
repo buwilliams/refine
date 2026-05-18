@@ -13,18 +13,19 @@ async function renderSettings() {
 async function refreshSettings() {
   if (state.currentRoute !== "settings") return;
   try {
-    const [s, diag, reps, feats, project, gov] = await Promise.all([
+    const [s, diag, reps, feats, project, gov, dash] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
       api("GET", "/api/features"),
       api("GET", "/api/project/status"),
       api("GET", "/api/governance"),
+      api("GET", "/api/dashboard"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
     state.project = project;
-    drawSettings(s.settings || {}, diag, reps.reporters || [], feats, gov || {});
+    drawSettings(s.settings || {}, diag, reps.reporters || [], feats, gov || {}, dash || {});
   } catch (e) {
     const root = document.getElementById("settings-content");
     if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
@@ -175,7 +176,105 @@ function addGovernanceRuleRow(text = "") {
   row.querySelector("input")?.focus();
 }
 
-function drawSettings(s, diag, reps, feats, gov = {}) {
+function renderRuntimeAgentCards(dash, settings, diag) {
+  const paused = settings.paused === "1";
+  const merger = dash.merger || null;
+  const governance = dash.governance || null;
+  const agents = dash.running || [];
+  const mergerActive = !!(merger && merger.state === "merging" && merger.gap_id);
+  const governanceActive = !!(governance && governance.state === "reviewing" && governance.gap_id);
+  const mergerQueued = merger?.queued || 0;
+  const governanceQueued = governance?.queued || 0;
+  const hasWork = mergerActive || governanceActive || agents.length > 0;
+  const anchorMs = Date.now();
+  const mergerRow = mergerActive ? `
+    <tr class="merger-row">
+      <td>
+        <span class="role-pill merger">merger</span>
+        <a href="#/gaps/${htmlEscape(merger.gap_id)}">${htmlEscape(merger.gap_id.slice(0, 10))}...</a>
+      </td>
+      <td class="js-elapsed-tick"
+          data-base="${merger.elapsed_seconds || 0}"
+          data-anchor-ms="${anchorMs}">${fmtElapsed(merger.elapsed_seconds || 0)}</td>
+      <td class="muted small">-</td>
+      <td><span class="muted small">verifying merge</span></td>
+    </tr>` : "";
+  const governanceRow = governanceActive ? `
+    <tr class="governance-row">
+      <td>
+        <span class="role-pill merger">governance</span>
+        <a href="#/gaps/${htmlEscape(governance.gap_id)}">${htmlEscape(governance.gap_id.slice(0, 10))}...</a>
+      </td>
+      <td class="js-elapsed-tick"
+          data-base="${governance.elapsed_seconds || 0}"
+          data-anchor-ms="${anchorMs}">${fmtElapsed(governance.elapsed_seconds || 0)}</td>
+      <td class="muted small">-</td>
+      <td><span class="muted small">reviewing governance</span></td>
+    </tr>` : "";
+  const agentRows = agents.map((r) => `
+    <tr>
+      <td>
+        <span class="role-pill agent">agent</span>
+        <a href="#/gaps/${htmlEscape(r.gap_id)}">${htmlEscape(r.gap_id.slice(0, 10))}...</a>
+      </td>
+      <td class="js-elapsed-tick"
+          data-base="${r.elapsed_seconds}"
+          data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
+      <td class="js-idle-tick"
+          data-base="${r.idle_seconds}"
+          data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
+      <td><button class="danger" data-cancel-agent="${r.gap_id}">Cancel</button></td>
+    </tr>`).join("");
+  const queueLine = mergerQueued > 0
+    ? `<p class="muted small" style="margin-top:8px">Merger queue: ${mergerQueued} Gap${mergerQueued === 1 ? "" : "s"} waiting.</p>`
+    : (merger
+        ? `<p class="muted small" style="margin-top:8px">Merger: ${merger.state}${merger.last_outcome ? ` · last outcome <code>${htmlEscape(merger.last_outcome)}</code>` : ""}.</p>`
+        : "");
+  const mergerUnreachable = !merger
+    ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — backend runner unavailable.</p>`
+    : "";
+  const governanceLine = governance
+    ? `<p class="muted small" style="margin-top:8px">Governance: ${governance.configured ? governance.state : "not configured"}${governanceQueued ? ` · queue ${governanceQueued}` : ""}${governance.last_outcome ? ` · last outcome <code>${htmlEscape(governance.last_outcome)}</code>` : ""}.</p>`
+    : "";
+  return `
+    <div class="card">
+      <h3>Agents</h3>
+      <div class="actions">
+        <button id="btn-pause" class="${paused ? "" : "secondary"}">
+          ${paused ? "Resume" : "Pause"} agents
+        </button>
+        <span class="muted small">
+          ${paused
+            ? "Paused — agent subprocesses are stopped, new subprocesses won't launch, and the merger won't pick up new merges."
+            : "Active — new subprocesses launch on demand and the merger processes Gaps as they finish."}
+        </span>
+      </div>
+      <p class="muted small" style="margin-top:8px">
+        The merger is a single-threaded worker that owns the host worktree,
+        cleans up any half-finished git operation, and merges
+        <code>ready-merge</code> Gaps one at a time so concurrent agent runs
+        can't race on <code>git merge</code>.
+      </p>
+
+      <dl class="kv" style="margin-top:12px">
+        <dt>Backend reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
+        ${diag.mode ? `<dt>Backend mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
+        ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
+      </dl>
+
+      <h4 style="margin:16px 0 8px">Currently running</h4>
+      ${hasWork ? `
+        <table class="table">
+          <thead><tr><th>Worker</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead>
+          <tbody>${governanceRow}${mergerRow}${agentRows}</tbody>
+        </table>` : `<p class="muted">Nothing running.</p>`}
+      ${governanceLine}
+      ${queueLine}
+      ${mergerUnreachable}
+    </div>`;
+}
+
+function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const projectApps = state.project?.apps || [];
   const currentProject = state.project?.client_repo || "";
@@ -251,7 +350,9 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
     </div>`)}
 
     ${pane("runtime", `
-    <div class="card">
+    ${renderRuntimeAgentCards(dash, s, diag)}
+
+    <div class="card" style="margin-top:16px">
       <h3>Runtime configuration</h3>
       <div class="form-row"><label>Parallel-run cap</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
@@ -297,25 +398,12 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
         falls back to plain stdout passthrough.
       </p>
       <div class="actions"><button id="s-save-cli">Save</button></div>
+      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
+      <button id="s-recheck">Re-check auth</button>
     </div>
 
     ${renderFeatureFlagsCard(feats)
       || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></div>`}
-
-    <div class="card" style="margin-top:16px">
-      <h3>Auth</h3>
-      <p class="muted">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
-      <button id="s-recheck">Re-check auth</button>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>Backend diagnostics</h3>
-      <dl class="kv">
-        <dt>Reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.mode ? `<dt>Mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
-        ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
-      </dl>
-    </div>
 
     <div class="card" style="margin-top:16px">
       <h3>Logs retention</h3>
@@ -485,6 +573,32 @@ function drawSettings(s, diag, reps, feats, gov = {}) {
   // Tab click handlers — purely DOM-local, no re-fetch.
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
     btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
+  });
+  $("#btn-pause")?.addEventListener("click", async () => {
+    const paused = s.paused === "1";
+    await withButtonBusy($("#btn-pause"), paused ? "Resuming…" : "Pausing…", async () => {
+      try {
+        await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
+        await refreshSettings();
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $$("[data-cancel-agent]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const id = b.dataset.cancelAgent;
+      const ok = await modalConfirm(
+        "Cancel this Gap's running subprocess?",
+        { title: "Cancel run", okLabel: "Cancel run", danger: true,
+          cancelLabel: "Keep running" },
+      );
+      if (!ok) return;
+      await withButtonBusy(b, "Cancelling…", async () => {
+        try {
+          await api("POST", `/api/gaps/${id}/cancel`);
+          await refreshSettings();
+        } catch (e) { toast(e.message, "error"); }
+      });
+    });
   });
   bindGovernanceRuleButtons();
   $("#s-governance-add-rule")?.addEventListener("click", () => addGovernanceRuleRow());

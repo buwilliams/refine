@@ -1,7 +1,7 @@
 // ---- Init -------------------------------------------------------------------
 
 // Increment the live "Elapsed" / "Idle" cells once per second so the
-// dashboard and Agents page feel responsive even between SSE refreshes.
+// dashboard and Settings runtime feel responsive even between SSE refreshes.
 // Cells without `.js-elapsed-tick` / `.js-idle-tick` no-op cheaply.
 function tickRunningCells() {
   const now = Date.now();
