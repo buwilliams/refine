@@ -10,6 +10,7 @@ Subcommands:
 - stop    — stop the UI backend.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
+- test    — run the repository's script-style test suite.
 - server  — start the server component in the foreground for debugging.
 - ui      — start the UI backend in-process (used by the systemd unit).
 - doctor  — deeper diagnostic snapshot (config, agent CLI, git).
@@ -43,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(
         dest="command",
         required=True,
-        metavar="{init,reset,start,restart,stop,status,server,ui,doctor}",
+        metavar="{init,reset,start,restart,stop,status,test,server,ui,doctor}",
     )
 
     p_init = sub.add_parser(
@@ -116,6 +117,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_status.set_defaults(fn=cmd_status)
 
+    p_test = sub.add_parser(
+        "test",
+        help="Run the full test suite.",
+        description=(
+            "Runs every top-level tests/*_test.py script sequentially with "
+            "the current Python interpreter. Returns non-zero if any test "
+            "script fails."
+        ),
+    )
+    p_test.set_defaults(fn=cmd_test)
+
     # Useful interactively when you want server logs in the foreground.
     p_server = sub.add_parser(
         "server",
@@ -184,6 +196,32 @@ def cmd_init(args: argparse.Namespace) -> int:
         print("Note: full refine start/stop/status orchestration requires running")
         print("`refine init` from inside a refine source dir so the systemd user")
         print("units can be wired up.")
+    return 0
+
+
+def cmd_test(_args: argparse.Namespace) -> int:
+    root = Path(__file__).resolve().parents[1]
+    tests_dir = root / "tests"
+    tests = sorted(tests_dir.glob("*_test.py"))
+    if not tests:
+        print(f"refine test: no tests found in {tests_dir}", file=sys.stderr)
+        return 1
+
+    failures: list[Path] = []
+    print(f"Running {len(tests)} test scripts")
+    for test in tests:
+        rel = test.relative_to(root)
+        print(f"\n=== {rel} ===", flush=True)
+        result = subprocess.run([sys.executable, str(test)], cwd=str(root))
+        if result.returncode != 0:
+            failures.append(rel)
+
+    if failures:
+        print("\nFAILED:")
+        for failed in failures:
+            print(f"  {failed}")
+        return 1
+    print("\nALL TESTS OK")
     return 0
 
 
