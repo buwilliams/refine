@@ -654,12 +654,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     });
   });
   $("#s-project-add")?.addEventListener("click", async () => {
-    await openProjectAttachModal({
-      message: "Add an existing app path or a new directory to create and initialize.",
-      title: "Add app",
-      okLabel: "Add and switch",
-      reloadOnSuccess: false,
-    });
+    await openAddAppModal();
   });
   $("#s-project-switch")?.addEventListener("click", async () => {
     const path = ($("#s-project-select")?.value || "").trim();

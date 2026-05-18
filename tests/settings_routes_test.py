@@ -17,6 +17,9 @@ def main() -> int:
     index_html = (root / "refine_ui/static/index.html").read_text(
         encoding="utf-8",
     )
+    common_css = (root / "refine_ui/static/css/common.css").read_text(
+        encoding="utf-8",
+    )
 
     settings_tab_block = re.search(
         r"const SETTINGS_TABS = \[(.*?)\];",
@@ -31,6 +34,17 @@ def main() -> int:
     assert "function activeSettingsTabFromRoute()" in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
+    settings_tabs_css = re.search(r"\.settings-tabs \{(.*?)\}", common_css, re.S)
+    settings_tab_css = re.search(r"\.settings-tab \{(.*?)\}", common_css, re.S)
+    settings_tab_active_css = re.search(
+        r"\.settings-tab\.active \{(.*?)\}",
+        common_css,
+        re.S,
+    )
+    assert settings_tabs_css and "border-bottom" not in settings_tabs_css.group(1)
+    assert settings_tab_css and "border: 1px solid var(--border)" in settings_tab_css.group(1)
+    assert "text-decoration: none" in settings_tab_css.group(1)
+    assert settings_tab_active_css and "border-bottom-color: var(--card)" in settings_tab_active_css.group(1)
 
     for slug in slugs:
         assert f'pane("{slug}",' in settings_js

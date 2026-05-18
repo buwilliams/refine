@@ -14,6 +14,21 @@ def test_client_switch_path(root: Path) -> None:
     settings_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
     chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
 
+    assert "function openAddAppModal(options = {})" in common_js
+    add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
+    add_app_body = add_app_body.split("\n}", 1)[0]
+    for expected in (
+        'title: "Add app"',
+        'okLabel: "Add and switch"',
+        "reloadOnSuccess: false",
+    ):
+        assert expected in add_app_body, expected
+
+    first_run_body = common_js.split("async function ensureProjectAttached()", 1)[1]
+    first_run_body = first_run_body.split("\n}", 1)[0]
+    assert "openAddAppModal(" in first_run_body
+    assert "return !!result" in first_run_body
+
     assert "async function applyProjectAttachResult(result)" in common_js
     switch_body = common_js.split("async function applyProjectAttachResult(result)", 1)[1]
     switch_body = switch_body.split("\n}", 1)[0]
@@ -31,6 +46,7 @@ def test_client_switch_path(root: Path) -> None:
     assert "function reconcileLastReporter" in common_js
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
     assert "function resetChatForProjectSwitch()" in chat_js
+    assert "await openAddAppModal()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
     assert "window.location.reload()" not in settings_js
 

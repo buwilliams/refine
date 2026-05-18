@@ -103,13 +103,10 @@ async function ensureProjectAttached() {
   const snap = await refreshProjectStatus();
   if (!snap) return false;
   if (snap.attached) return true;
-  await openProjectAttachModal({
-    message: snap.message || "No refine project is attached.",
-    title: "Choose project",
-    okLabel: "Attach project",
-    reloadOnSuccess: true,
+  const result = await openAddAppModal({
+    message: snap.message || "Add an existing app path or a new directory to create and initialize.",
   });
-  return false;
+  return !!result;
 }
 
 async function refreshProjectStatus() {
@@ -194,6 +191,16 @@ function openProjectAttachModal({
         button.textContent = okLabel;
       }
     });
+  });
+}
+
+function openAddAppModal(options = {}) {
+  return openProjectAttachModal({
+    message: "Add an existing app path or a new directory to create and initialize.",
+    title: "Add app",
+    okLabel: "Add and switch",
+    reloadOnSuccess: false,
+    ...options,
   });
 }
 

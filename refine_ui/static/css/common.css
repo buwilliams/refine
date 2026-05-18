@@ -23,26 +23,40 @@
 .status-pill.in-progress { background: #fff4d0; color: #875e00; }
 .status-pill.ready-merge { background: #ffeac2; color: #7a4500; }
 
-/* System screen tab strip. Horizontal scroll on narrow viewports
-   so a long set of tabs degrades gracefully without wrapping into
-   two rows. The active tab gets a thicker underline so the
-   currently-selected section is obvious at a glance. */
+/* System screen tab strip. Mirrors the Chat dock tabs so Settings
+   sections read as tabs instead of plain text links. */
 .settings-tabs {
-  display: flex; gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 14px;
-  overflow-x: auto;
+  display: flex;
+  gap: 4px;
+  margin-bottom: -1px;
+  flex-wrap: wrap;
 }
 .settings-tab {
-  background: transparent; border: 0; padding: 8px 14px;
-  font: inherit; color: var(--muted);
-  border-bottom: 2px solid transparent;
-  cursor: pointer; white-space: nowrap;
+  height: auto;
+  padding: 6px 12px;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.settings-tab:hover { color: inherit; }
+.settings-tab:hover {
+  background: var(--code-bg);
+  color: var(--fg);
+  text-decoration: none;
+}
 .settings-tab.active {
-  color: inherit;
-  border-bottom-color: var(--accent, #2563eb);
+  background: var(--card);
+  color: var(--fg);
+  border-bottom-color: var(--card);
   font-weight: 600;
 }
 .settings-pane { display: none; }
