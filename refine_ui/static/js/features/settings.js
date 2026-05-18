@@ -34,13 +34,14 @@ async function refreshSettings() {
 
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
-  { slug: "project",      label: "Application" },
+  { slug: "application",  label: "Application" },
   { slug: "reporters",    label: "Reporters" },
   { slug: "governance",   label: "Governance" },
   { slug: "runtime",      label: "Runtime" },
 ];
 
 function normalizeSettingsTab(slug) {
+  if (slug === "project") return "application";
   return SETTINGS_TABS.some((t) => t.slug === slug) ? slug : null;
 }
 
@@ -56,7 +57,13 @@ function readSettingsTab(tabs = SETTINGS_TABS) {
     return routed;
   }
   const stored = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-  if (stored && tabs.some((t) => t.slug === stored)) return stored;
+  const normalizedStored = normalizeSettingsTab(stored);
+  if (normalizedStored && tabs.some((t) => t.slug === normalizedStored)) {
+    if (normalizedStored !== stored) {
+      localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, normalizedStored);
+    }
+    return normalizedStored;
+  }
   return tabs[0]?.slug;
 }
 
@@ -91,6 +98,9 @@ function renderFeatureFlagsCard(feats) {
                  data-feature-cell="${provider}.${featureKey}"
                  data-provider="${htmlEscape(provider)}"
                  data-feature="${htmlEscape(featureKey)}"
+                 data-feature-default="${slot.default ? "1" : "0"}"
+                 data-feature-original-enabled="${enabled ? "1" : "0"}"
+                 data-feature-original-override="${overridden ? "1" : "0"}"
                  ${enabled ? "checked" : ""}>
           <span class="feature-toggle-state">${enabled ? "on" : "off"}</span>
         </label>
@@ -99,7 +109,8 @@ function renderFeatureFlagsCard(feats) {
                      data-feature-clear="${provider}.${featureKey}"
                      data-provider="${htmlEscape(provider)}"
                      data-feature="${htmlEscape(featureKey)}"
-                     title="Clear override and use the code-defined default">
+                     type="button"
+                     title="Clear override and use the code-defined default on save">
               clear override
             </button>`
           : ""}
@@ -133,7 +144,19 @@ function renderFeatureFlagsCard(feats) {
             </tr>`).join("")}
         </tbody>
       </table>
+      <p class="muted small" style="margin-top:8px">
+        Feature flag changes are saved with Save runtime.
+      </p>
     </section>`;
+}
+
+function updateFeatureToggleLabel(box) {
+  const label = box.closest(".feature-toggle");
+  const text = label?.querySelector(".feature-toggle-state");
+  if (!label || !text) return;
+  label.classList.toggle("on", box.checked);
+  label.classList.toggle("off", !box.checked);
+  text.textContent = box.checked ? "on" : "off";
 }
 
 function renderGovernanceRuleRows(rules) {
@@ -325,7 +348,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     </section>`;
   $("#settings-content").innerHTML = `
     ${tabStrip}
-    ${pane("project", `
+    ${pane("application", `
     <section class="settings-section">
       <h3>Applications</h3>
       <p class="muted small">
@@ -366,7 +389,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
         <input type="text" id="s-merge-target"
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
-      <div class="actions"><button id="s-save-scope">Save</button></div>
     </section>
 
     <section class="settings-section">
@@ -452,7 +474,10 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
                value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
         <p class="muted small" id="s-target-notes"></p></div>
-      <div class="actions"><button id="s-save-target">Save</button></div>
+    </section>
+
+    <section class="settings-section settings-save-section">
+      <div class="actions"><button id="s-save-application">Save application</button></div>
     </section>`)}
 
     ${pane("runtime", `
@@ -485,7 +510,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
             ["86400", "24 hours"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
-      <div class="actions"><button id="s-save">Save</button></div>
     </section>
 
     <section class="settings-section">
@@ -503,7 +527,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
         Code and Codex where their CLIs expose machine-readable events; Gemini
         falls back to plain stdout passthrough.
       </p>
-      <div class="actions"><button id="s-save-cli">Save</button></div>
       <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
       <button id="s-recheck">Re-check auth</button>
     </section>
@@ -525,6 +548,10 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
         </select>
         <button class="danger" id="logs-cleanup">Clean up old logs</button>
       </div>
+    </section>
+
+    <section class="settings-section settings-save-section">
+      <div class="actions"><button id="s-save-runtime">Save runtime</button></div>
     </section>`)}
 
     ${pane("governance", `
@@ -690,9 +717,10 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });
-  $("#s-save").addEventListener("click", async () => {
-    await withButtonBusy($("#s-save"), "Saving…", async () => {
+  $("#s-save-runtime")?.addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-runtime"), "Saving…", async () => {
       try {
+        const chosen = $("#s-cli").value;
         await api("PATCH", "/api/settings", {
           parallel_run_cap: $("#s-cap").value,
           branch_name_pattern: $("#s-pattern").value,
@@ -700,16 +728,18 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
           agent_hard_cap_seconds: $("#s-hard").value,
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
           backlog_promote_after_seconds: $("#s-backlog-promote").value,
+          agent_cli: chosen,
         });
-        toast("Saved", "info");
-      } catch (e) { toast(e.message, "error"); }
-    });
-  });
-  $("#s-save-cli").addEventListener("click", async () => {
-    await withButtonBusy($("#s-save-cli"), "Saving…", async () => {
-      try {
-        const chosen = $("#s-cli").value;
-        await api("PATCH", "/api/settings", { agent_cli: chosen });
+        for (const box of $$("[data-feature-cell]")) {
+          const { provider, feature } = box.dataset;
+          const enabled = box.checked;
+          const wasEnabled = box.dataset.featureOriginalEnabled === "1";
+          const clearPending = box.dataset.featureClearPending === "1";
+          if (!clearPending && enabled === wasEnabled) continue;
+          await api("POST", "/api/features/override", {
+            provider, feature, enabled: clearPending ? null : enabled,
+          });
+        }
         // Pull the matrix for the new provider and surface what
         // changed. Chat / Import will be hidden or labeled disabled
         // immediately by the gates.
@@ -732,40 +762,20 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
   });
   // Feature flag toggles.
   $$("[data-feature-cell]").forEach((box) => {
-    box.addEventListener("change", async (e) => {
-      const { provider, feature } = box.dataset;
-      const enabled = box.checked;
-      try {
-        await api("POST", "/api/features/override", {
-          provider, feature, enabled,
-        });
-        await refreshFeatures();
-      } catch (err) {
-        toast(err.message, "error");
-        box.checked = !enabled; // revert UI on failure
-      }
+    box.addEventListener("change", () => {
+      delete box.dataset.featureClearPending;
+      updateFeatureToggleLabel(box);
     });
   });
   $$("[data-feature-clear]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const { provider, feature } = btn.dataset;
-      try {
-        await api("POST", "/api/features/override", {
-          provider, feature, enabled: null,
-        });
-        await refreshFeatures();
-      } catch (err) { toast(err.message, "error"); }
-    });
-  });
-  $("#s-save-scope").addEventListener("click", async () => {
-    await withButtonBusy($("#s-save-scope"), "Saving…", async () => {
-      try {
-        await api("PATCH", "/api/settings", {
-          agent_subpath: $("#s-subpath").value,
-          merge_target_branch: $("#s-merge-target").value,
-        });
-        toast("Saved", "info");
-      } catch (e) { toast(e.message, "error"); }
+      const box = $(`[data-feature-cell="${provider}.${feature}"]`);
+      if (!box) return;
+      box.checked = box.dataset.featureDefault === "1";
+      box.dataset.featureClearPending = "1";
+      updateFeatureToggleLabel(box);
+      btn.textContent = "clear on save";
     });
   });
   $("#s-recheck").addEventListener("click", async () => {
@@ -825,10 +835,12 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
   });
 
   // --- Target application controls on the Application tab -------------------
-  $("#s-save-target")?.addEventListener("click", async () => {
-    await withButtonBusy($("#s-save-target"), "Saving…", async () => {
+  $("#s-save-application")?.addEventListener("click", async () => {
+    await withButtonBusy($("#s-save-application"), "Saving…", async () => {
       try {
         await api("PATCH", "/api/settings", {
+          agent_subpath: $("#s-subpath").value,
+          merge_target_branch: $("#s-merge-target").value,
           target_app_start_command: $("#s-target-start-command").value,
           target_app_stop_command: $("#s-target-stop-command").value,
           target_app_status_command: $("#s-target-status-command").value,
@@ -861,7 +873,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
                             { kind: "all" });
         if (r.ok && r.config) {
           applyGeneratedTargetAppConfig(r.config);
-          toast("Generated — review and click Save to persist", "info");
+          toast("Generated — review and click Save application to persist", "info");
         } else {
           toast("Generation produced no configuration", "error");
         }
