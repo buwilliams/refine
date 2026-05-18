@@ -157,8 +157,6 @@ def _normalize_drafts(raw: list[Any]) -> list[dict]:
 
 def _extract_final_text(stdout: str) -> str:
     """Return final assistant text from Codex JSONL, or raw stdout."""
-    if not stdout.lstrip().startswith("{"):
-        return stdout
     last = ""
     for line in stdout.splitlines():
         try:

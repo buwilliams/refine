@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import random
 import sqlite3
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -162,6 +163,27 @@ DEFAULT_SETTINGS = {
     "target_app_last_error": "",
 }
 
+_TRANSACTION_LOCKS: dict[int, threading.RLock] = {}
+_TRANSACTION_LOCKS_GUARD = threading.Lock()
+_SAVEPOINT_SEQ = 0
+
+
+def _transaction_lock(conn: sqlite3.Connection) -> threading.RLock:
+    ident = id(conn)
+    with _TRANSACTION_LOCKS_GUARD:
+        lock = _TRANSACTION_LOCKS.get(ident)
+        if lock is None:
+            lock = threading.RLock()
+            _TRANSACTION_LOCKS[ident] = lock
+        return lock
+
+
+def _next_savepoint_name() -> str:
+    global _SAVEPOINT_SEQ
+    with _TRANSACTION_LOCKS_GUARD:
+        _SAVEPOINT_SEQ += 1
+        return f"refine_tx_{_SAVEPOINT_SEQ}"
+
 
 def connect(path: Path | None = None) -> sqlite3.Connection:
     p = path or sqlite_path()
@@ -239,26 +261,39 @@ def _backfill_reporter(conn: sqlite3.Connection) -> None:
 @contextmanager
 def transaction(conn: sqlite3.Connection) -> Iterator[None]:
     """Short transaction with bounded busy-retry."""
-    delays = [0.01, 0.05, 0.25, 0.5]
-    last_err: Exception | None = None
-    for delay in [0.0, *delays]:
-        if delay:
-            time.sleep(delay * (0.5 + random.random()))
-        try:
-            conn.execute("BEGIN IMMEDIATE")
+    with _transaction_lock(conn):
+        if conn.in_transaction:
+            savepoint = _next_savepoint_name()
+            conn.execute(f"SAVEPOINT {savepoint}")
             try:
                 yield
-                conn.execute("COMMIT")
+                conn.execute(f"RELEASE SAVEPOINT {savepoint}")
                 return
             except Exception:
-                conn.execute("ROLLBACK")
+                conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                conn.execute(f"RELEASE SAVEPOINT {savepoint}")
                 raise
-        except sqlite3.OperationalError as e:
-            if "locked" in str(e) or "busy" in str(e):
-                last_err = e
-                continue
-            raise
-    raise last_err or sqlite3.OperationalError("transaction busy-retry exhausted")
+
+        delays = [0.01, 0.05, 0.25, 0.5]
+        last_err: Exception | None = None
+        for delay in [0.0, *delays]:
+            if delay:
+                time.sleep(delay * (0.5 + random.random()))
+            try:
+                conn.execute("BEGIN IMMEDIATE")
+                try:
+                    yield
+                    conn.execute("COMMIT")
+                    return
+                except Exception:
+                    conn.execute("ROLLBACK")
+                    raise
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e) or "busy" in str(e):
+                    last_err = e
+                    continue
+                raise
+        raise last_err or sqlite3.OperationalError("transaction busy-retry exhausted")
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str | None = None) -> str | None:

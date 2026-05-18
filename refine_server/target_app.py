@@ -419,8 +419,6 @@ def _parse_json_object(text: str) -> dict[str, Any] | None:
 
 def _last_agent_text(stdout: str) -> str:
     """Extract final assistant text from Codex JSONL, or return plain stdout."""
-    if not stdout.lstrip().startswith("{"):
-        return stdout
     last = ""
     for line in stdout.splitlines():
         try:
