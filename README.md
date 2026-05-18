@@ -3,13 +3,7 @@
 Turn software gaps (features and bugs) into verified software
 through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
-*what it should do instead* — submits a Gap. Refine runs the configured host
-agent CLI in git worktrees, then keeps the result in review until a human
-verifies it.
-
-Refine handles the git plumbing — worktrees, fetch, merge, push,
-auto-committing its own state — and inherits the selected agent CLI's host
-auth, so operators rarely need to think about either.
+*what it should do instead* — submits a Gap.
 
 - Dashboard for run status, reporter stats, and work needing attention.
 - Gaps list with search, filters, sorting, and bulk updates.
@@ -19,6 +13,8 @@ auth, so operators rarely need to think about either.
 - Gap Governance for Product, Constitution, and Rules checks before work starts.
 - Multi-app setup and switching from System → Application.
 - Host-native operation that reuses local agent auth, SSH keys, git config, and PATH.
+- Runs the configured host agent CLI in git worktrees, then keeps the result in review until a human verifies it.
+- Handles the git plumbing — worktrees, fetch, merge, push, auto-committing its own state — so operators rarely need to think about it.
 
 ## Quick Start
 
