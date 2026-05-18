@@ -104,6 +104,15 @@ def latest_log_messages(gap_id: str) -> list[str]:
     return [log["message"] for log in gap["rounds"][-1]["logs"]]
 
 
+def wait_for_log(gap_id: str, fragment: str, *, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if any(fragment in msg for msg in latest_log_messages(gap_id)):
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"{gap_id} missing log fragment: {fragment}")
+
+
 def main() -> int:
     tmp, client = make_client_repo("refine-subprocess-")
     conn = init_refine(client)
@@ -155,32 +164,32 @@ def main() -> int:
         run = latest_run(conn, gid_success)
         assert run["status"] == "finished"
         assert run["failure_category"] is None
-        assert any("Agent run completed" in msg for msg in latest_log_messages(gid_success))
+        wait_for_log(gid_success, "Agent run completed")
 
         gid_fail = "01SUBPROCESSFAILRUNAAAAA"
         assert run_gap(gid_fail) == "failed"
         run = latest_run(conn, gid_fail)
         assert run["status"] == "finished"
         assert run["failure_category"] is None
-        assert any("exit 7" in msg for msg in latest_log_messages(gid_fail))
+        wait_for_log(gid_fail, "exit 7")
 
         gid_noop = "01SUBPROCESSNOOPRUNAAAAA"
         assert run_gap(gid_noop) == "ready-merge"
-        assert any("already met" in msg for msg in latest_log_messages(gid_noop))
+        wait_for_log(gid_noop, "already met")
 
         gid_idle = "01SUBPROCESSIDLERUNAAAAA"
         assert run_gap(gid_idle, idle=1, hard=60) == "failed"
         run = latest_run(conn, gid_idle)
         assert run["status"] == "killed"
         assert run["failure_category"] == "idle"
-        assert any("stuck" in msg for msg in latest_log_messages(gid_idle))
+        wait_for_log(gid_idle, "stuck")
 
         gid_hard = "01SUBPROCESSHARDRUNAAAAA"
         assert run_gap(gid_hard, idle=0, hard=1) == "failed"
         run = latest_run(conn, gid_hard)
         assert run["status"] == "killed"
         assert run["failure_category"] == "hard_cap"
-        assert any("wall-clock cap" in msg for msg in latest_log_messages(gid_hard))
+        wait_for_log(gid_hard, "wall-clock cap")
 
         gid_cancel = "01SUBPROCESSCANCELRUNAAA"
         db.set_setting(conn, "agent_idle_timeout_seconds", "0")
@@ -193,7 +202,7 @@ def main() -> int:
         run = latest_run(conn, gid_cancel)
         assert run["status"] == "killed"
         assert run["failure_category"] == "cancel"
-        assert any("cancelled" in msg for msg in latest_log_messages(gid_cancel))
+        wait_for_log(gid_cancel, "cancelled")
     finally:
         conn.close()
         cleanup_tmp(tmp)

@@ -33,22 +33,44 @@ async function refreshSettings() {
 }
 
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
+const SETTINGS_TABS = [
+  { slug: "project",      label: "Application" },
+  { slug: "reporters",    label: "Reporters" },
+  { slug: "governance",   label: "Governance" },
+  { slug: "runtime",      label: "Runtime" },
+];
 
-function readSettingsTab(tabs) {
+function normalizeSettingsTab(slug) {
+  return SETTINGS_TABS.some((t) => t.slug === slug) ? slug : null;
+}
+
+function activeSettingsTabFromRoute() {
+  const parsed = typeof parseHash === "function" ? parseHash() : {};
+  return parsed.route === "settings" ? normalizeSettingsTab(parsed.tab) : null;
+}
+
+function readSettingsTab(tabs = SETTINGS_TABS) {
+  const routed = activeSettingsTabFromRoute();
+  if (routed) {
+    localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, routed);
+    return routed;
+  }
   const stored = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
   if (stored && tabs.some((t) => t.slug === stored)) return stored;
   return tabs[0]?.slug;
 }
 
 function setSettingsTab(slug) {
-  localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, slug);
-  // Toggle classes in place — no re-render so input focus / scroll
-  // position survive when the user clicks between tabs.
+  const normalized = normalizeSettingsTab(slug);
+  if (!normalized) return;
+  localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, normalized);
+  // Toggle classes immediately; hashchange handles normal linked tab
+  // navigation, and this keeps repeated clicks on the current hash responsive.
   $$("[data-tab-pane]").forEach((pane) => {
-    pane.classList.toggle("active", pane.dataset.tabPane === slug);
+    pane.classList.toggle("active", pane.dataset.tabPane === normalized);
   });
   $$(".settings-tab").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.tabTarget === slug);
+    btn.classList.toggle("active", btn.dataset.tabTarget === normalized);
   });
 }
 
@@ -286,19 +308,15 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   // Tab definitions. Order here drives the tab strip; `slug` is the
-  // localStorage key and DOM hook.
-  const tabs = [
-    { slug: "project",      label: "Application" },
-    { slug: "reporters",    label: "Reporters" },
-    { slug: "governance",   label: "Governance" },
-    { slug: "runtime",      label: "Runtime" },
-  ];
+  // localStorage key, route segment, and DOM hook.
+  const tabs = SETTINGS_TABS;
   const activeSlug = readSettingsTab(tabs);
   const tabStrip = `
     <nav class="settings-tabs" id="settings-tabs">
       ${tabs.map((t) => `
-        <button class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
-                data-tab-target="${t.slug}">${htmlEscape(t.label)}</button>`).join("")}
+        <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
+           href="#/system/${t.slug}"
+           data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
     </nav>`;
   const pane = (slug, body) => `
     <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
@@ -572,7 +590,9 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
   `;
   // Tab click handlers — purely DOM-local, no re-fetch.
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
-    btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
+    btn.addEventListener("click", () => {
+      setSettingsTab(btn.dataset.tabTarget);
+    });
   });
   $("#btn-pause")?.addEventListener("click", async () => {
     const paused = s.paused === "1";
