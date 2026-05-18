@@ -9,13 +9,10 @@ customers — anyone who can articulate *what the app does today* vs
 - **Gaps** - searchable, filterable backlog with sorting and bulk updates.
 - **Logs** - filtered audit trail for agent output, git events, and system activity.
 - **Chat** - persistent dock for standalone questions and Gap-specific follow-up.
-- **Import** - extraction flow that turns free-form notes into Gap drafts.
 - **Governance** - Product, Constitution, and Rules checks before work starts.
 - **System** - multi-app setup, runtime controls, provider settings, and diagnostics.
-- **Host-native auth** - reuse local agent auth, SSH keys, git config, and PATH.
-- **Agent worktrees** - run the configured host agent CLI away from the main checkout.
-- **Merge agent** - handle worktrees, fetch, merge, push, and Refine state commits.
-- **Human review** - keep completed work in review until a human verifies it.
+- **Workflow** - move Gaps from report to agent work to human review.
+- **Merge** - integrate completed Gap branches through a single serialized agent.
 
 ## Quick Start
 
