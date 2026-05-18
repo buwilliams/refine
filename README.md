@@ -16,9 +16,7 @@ customers — anyone who can articulate *what the app does today* vs
 ## Quick Start
 
 ```bash
-git clone https://github.com/buwilliams/refine.git <refine-checkout>
-cd <refine-checkout>
-uv run refine start
+git clone https://github.com/buwilliams/refine.git <refine-checkout> && cd <refine-checkout> && uv run refine start
 ```
 
 ## Workflow
