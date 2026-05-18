@@ -5,16 +5,17 @@ through ordinary people enhanced by agents. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap.
 
-- Dashboard for run status, reporter stats, and work needing attention.
-- Gaps list with search, filters, sorting, and bulk updates.
-- Logs view with filters for agent output, git events, and system activity.
-- Persistent Chat dock for standalone questions and Gap-specific follow-up.
-- Import-from-text flow that extracts Gap drafts from free-form notes.
-- Gap Governance for Product, Constitution, and Rules checks before work starts.
-- Multi-app setup and switching from System → Application.
-- Host-native operation that reuses local agent auth, SSH keys, git config, and PATH.
-- Runs the configured host agent CLI in git worktrees, then keeps the result in review until a human verifies it.
-- Handles the git plumbing — worktrees, fetch, merge, push, auto-committing its own state — so operators rarely need to think about it.
+- **Dashboard** - consolidated space for run status, reporter stats, and work needing attention.
+- **Gaps** - searchable, filterable backlog with sorting and bulk updates.
+- **Logs** - filtered audit trail for agent output, git events, and system activity.
+- **Chat** - persistent dock for standalone questions and Gap-specific follow-up.
+- **Import** - extraction flow that turns free-form notes into Gap drafts.
+- **Governance** - Product, Constitution, and Rules checks before work starts.
+- **System** - multi-app setup, runtime controls, provider settings, and diagnostics.
+- **Host-native auth** - reuse local agent auth, SSH keys, git config, and PATH.
+- **Agent worktrees** - run the configured host agent CLI away from the main checkout.
+- **Merge agent** - handle worktrees, fetch, merge, push, and Refine state commits.
+- **Human review** - keep completed work in review until a human verifies it.
 
 ## Quick Start
 
