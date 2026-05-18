@@ -178,15 +178,12 @@ function openProjectAttachModal({
       button.textContent = "Attaching...";
       try {
         const result = await api("POST", "/api/project/attach", { path });
-        state.project = result;
-        if (result.runner && result.runner.started === false && result.runner.message) {
-          toast(result.runner.message, "warn");
-        } else {
-          toast("Project attached", "success");
-        }
         if (reloadOnSuccess) {
+          state.project = result;
+          showProjectAttachToast(result);
           window.location.reload();
         } else {
+          await applyProjectAttachResult(result);
           root.remove();
         }
         resolve(result);
@@ -198,6 +195,35 @@ function openProjectAttachModal({
       }
     });
   });
+}
+
+function showProjectAttachToast(result) {
+  if (result.runner && result.runner.started === false && result.runner.message) {
+    toast(result.runner.message, "warn");
+  } else {
+    toast("Project attached", "success");
+  }
+}
+
+async function applyProjectAttachResult(result) {
+  state.project = result;
+  state.dashboard = null;
+  state.currentGap = null;
+  state.underlayHash = "#/system/project";
+  if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
+  showProjectAttachToast(result);
+  resetChatForProjectSwitch();
+  initSSE();
+  await refreshFeatures();
+  await refreshReporters({ selectFallback: true });
+  await refreshTargetAppToggle();
+  if (location.hash !== "#/system/project") {
+    location.hash = "#/system/project";
+  } else if (state.currentRoute === "settings") {
+    await refreshSettings();
+  } else {
+    navigate();
+  }
 }
 
 // ---- Modals (replace native prompt / confirm) -------------------------------
@@ -467,10 +493,18 @@ function mdInline(text) {
 
 // ---- reporter dropdown ------------------------------------------------------
 
-async function refreshReporters() {
+async function refreshReporters({ selectFallback = false } = {}) {
   const data = await api("GET", "/api/reporters");
   state.reporters = data.reporters || [];
+  reconcileLastReporter({ selectFallback });
   populateAllReporterDropdowns();
+}
+
+function reconcileLastReporter({ selectFallback = false } = {}) {
+  const names = state.reporters.map((r) => r.name).filter(Boolean);
+  if (state.lastReporter && names.includes(state.lastReporter)) return;
+  const next = selectFallback ? (names[0] || "") : "";
+  setLastReporter(next);
 }
 
 function populateAllReporterDropdowns() {
@@ -524,7 +558,8 @@ async function handleReporterAdd(sel) {
 function setLastReporter(name) {
   const wasEmpty = !state.lastReporter;
   state.lastReporter = name;
-  localStorage.setItem("refine_last_reporter", name);
+  if (name) localStorage.setItem("refine_last_reporter", name);
+  else localStorage.removeItem("refine_last_reporter");
   const g = $("#global-reporter");
   if (g) g.value = name;
   // Keep any in-page "Submitting as X" indicator in sync without re-rendering

@@ -9,6 +9,7 @@ from .poller import SqlitePoller
 
 _poller: SqlitePoller | None = None
 _runner = None
+_loaded_config_path: Path | None = None
 
 
 def load_configured(
@@ -18,7 +19,13 @@ def load_configured(
     start_runner: bool = True,
 ) -> config.Config:
     """Load config, initialize SQLite, and ensure background services run."""
+    global _loaded_config_path
+    requested_path = Path(path).resolve() if path is not None else config.find_config()
+    if (_loaded_config_path is not None and requested_path is not None
+            and requested_path.resolve() != _loaded_config_path):
+        stop_all()
     cfg = config.get(path=path, reload=True)
+    _loaded_config_path = cfg.config_path
     db.init_db()
     if start_poller:
         ensure_poller()

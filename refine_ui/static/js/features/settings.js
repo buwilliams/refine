@@ -658,7 +658,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
       message: "Add an existing app path or a new directory to create and initialize.",
       title: "Add app",
       okLabel: "Add and switch",
-      reloadOnSuccess: true,
+      reloadOnSuccess: false,
     });
   });
   $("#s-project-switch")?.addEventListener("click", async () => {
@@ -672,13 +672,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     await withButtonBusy($("#s-project-switch"), "Switching…", async () => {
       try {
         const result = await api("POST", "/api/project/attach", { path });
-        state.project = result;
-        if (result.runner && result.runner.started === false && result.runner.message) {
-          toast(result.runner.message, "warn");
-        } else {
-          toast("Project attached", "success");
-        }
-        window.location.reload();
+        await applyProjectAttachResult(result);
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });

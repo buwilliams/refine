@@ -86,6 +86,20 @@ function initChatDock() {
   observeTopbarHeight();
 }
 
+function resetChatForProjectSwitch() {
+  if (chatState.pollTimer) {
+    clearInterval(chatState.pollTimer);
+    chatState.pollTimer = null;
+  }
+  chatState.tabs = {};
+  chatState.activeTabId = "standalone";
+  chatState.open = false;
+  chatState.fullscreen = false;
+  ensureStandaloneTab();
+  saveChatStateToStorage();
+  drawChatDock();
+}
+
 // Publish the topbar's actual height as --topbar-height on <html> so the
 // fullscreen chat dock can anchor its top edge just below the main nav.
 function observeTopbarHeight() {
