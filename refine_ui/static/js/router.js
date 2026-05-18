@@ -29,7 +29,7 @@ function parseHash() {
   if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "changes") return { route: "changes" };
-  if (parts[0] === "settings") return { route: "settings" };
+  if (parts[0] === "system" || parts[0] === "settings") return { route: "settings" };
   return { route: "dashboard" };
 }
 

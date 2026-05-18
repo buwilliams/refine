@@ -1,8 +1,8 @@
-// ---- Target application status (topbar indicator + Settings controls) ------
+// ---- Target application status (topbar indicator + System controls) --------
 //
 // The topbar dot is a *read-only* status indicator (deliberately not a
 // one-click toggle, so typical users can't take the app down by
-// accident). It links to Settings, where the actual Start / Stop
+// accident). It links to System, where the actual Start / Stop
 // button lives. The dot's colour reflects the current state
 // (green=running, red=stopped, amber=in-flight, grey=unknown) and is
 // refreshed via SSE plus a 30s safety poll in case SSE is wedged.
@@ -50,18 +50,18 @@ function applyTargetAppSnapshot(snap) {
         ? ` · last check ${checkOk ? "OK" : "FAIL"} at ${fmtTime(checkAt)}`
         : "")
     + (snap.last_error ? ` · ${snap.last_error}` : "")
-    + " — click to manage in Settings";
+    + " — click to manage in System";
   const lbl = indicator.querySelector(".target-app-label");
   if (lbl) lbl.textContent = label.replace(/^App: /, "");
-  // Repaint the Settings status block (and the start/stop button)
-  // whenever the Settings screen is visible.
+  // Repaint the System status block (and the start/stop button)
+  // whenever the System screen is visible.
   if (state.currentRoute === "settings") {
     drawTargetAppStatusBlock(snap);
   }
 }
 
 async function runTargetAppAction(action) {
-  // action is "start" or "stop". Called from the buttons on Settings.
+  // action is "start" or "stop". Called from the buttons on System.
   const snap = _targetAppSnapshot || {};
   const hasPrompt = action === "start"
     ? snap.has_start_command

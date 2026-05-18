@@ -85,7 +85,7 @@ pre {
 }
 
 /* Target-app status indicator in the topbar — read-only. Clicking it
-   opens Settings (where the actual start/stop controls live), but it
+   opens System (where the actual start/stop controls live), but it
    is deliberately NOT a one-click toggle so typical users can't take
    the app down by accident. Dot colour is the status (green=running,
    red=stopped, amber=in-flight, grey=unknown). */

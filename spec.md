@@ -14,7 +14,7 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
 - **Storage:** Single SQLite file (`status`, run state, settings, reporters, activity, ID→path index) plus flat JSON files (one per Gap). All committed to the client application's repository — **including the SQLite file** — so refine's state travels with the codebase.
-- **Settings:** All application settings live in SQLite, editable from the UI, scoped to the active target app.
+- **System:** All application settings live in SQLite, editable from the UI, scoped to the active target app.
 - **External dependencies:** None at runtime beyond the Claude Code CLI and the local git binary, both installed on the host. Stand-alone — no third-party SaaS.
 - **Auth:** None for refine itself. Refine assumes deployment on a trusted private network.
 
@@ -99,7 +99,7 @@ Priorities gate executable work. `high` blocks `medium` and `low`; `medium` bloc
 ### Governance
 
 Governance is an optional pre-dispatch review layer. It is configured from
-Settings → Governance with three inputs:
+System → Governance with three inputs:
 
 - **Product:** who the product is for, what problems it solves, and what
   success looks like.
@@ -124,7 +124,7 @@ Only rounds with `rule_state=passed`, `product_state=pass`, and
 governance reviews move the Gap back to `backlog` with a governance message;
 the user edits the latest round and resubmits it to `todo`. Governance may
 auto-apply rule add/edit/remove actions when Product and Constitution both
-pass. Rules can also be generated from Product + Constitution in Settings and
+pass. Rules can also be generated from Product + Constitution in System and
 reviewed before saving.
 
 Transitions:
@@ -158,7 +158,7 @@ Every round records who submitted it. Refine has no authentication; reporters ar
 
 **Management:**
 
-- Settings includes a Reporters page for renaming or removing names from the dropdown. Historical rounds retain their original reporter string.
+- System includes a Reporters page for renaming or removing names from the dropdown. Historical rounds retain their original reporter string.
 
 ## Storage layout
 
@@ -183,14 +183,14 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 ### Mechanism
 
 - The **host runner** (see **Runtime topology**) shells out to the **Claude Code CLI** (`claude --print` / headless mode) directly on the host. The UI backend calls the runner directly; the runner spawns and supervises the subprocess.
-- **Pre-flight check.** At runner startup, and before spawning a subprocess after a prior auth failure, the runner issues a fast `claude --version` (or equivalent no-op) to confirm CLI presence and valid auth. Failure surfaces as the **Claude auth pre-flight failed** banner; humans can re-run it on demand from Settings.
+- **Pre-flight check.** At runner startup, and before spawning a subprocess after a prior auth failure, the runner issues a fast `claude --version` (or equivalent no-op) to confirm CLI presence and valid auth. Failure surfaces as the **Claude auth pre-flight failed** banner; humans can re-run it on demand from System.
 - **One fresh CLI invocation per unaddressed round.** No session is resumed; the agent has no memory of prior rounds. The latest round's `actual` / `target` becomes the prompt.
 - **Cross-round continuity carries through the Gap's branch**, not through a Claude session. Each round's agent starts with the worktree exactly as the prior round's commits left it.
 - Consequence: round descriptions must be self-contained. A follow-up round cannot say "do what we discussed before" — humans must restate the relevant context in the round body.
 
 ### Concurrency
 
-- **Parallel-run cap** — at most N agent CLI subprocesses may run at once across all Gaps (default `3`, configurable from the Settings page). There is no persistent worker pool; subprocesses are spawned on demand when there is work to do, and the process exits when its round finishes.
+- **Parallel-run cap** — at most N agent CLI subprocesses may run at once across all Gaps (default `3`, configurable from the System page). There is no persistent worker pool; subprocesses are spawned on demand when there is work to do, and the process exits when its round finishes.
 - **Per-Gap lock** — a Gap may have at most one running subprocess at a time.
 - When a Gap enters `todo`, refine launches a subprocess for it immediately if a slot is available under the cap. Otherwise the Gap waits in `todo` and is picked up the moment a running subprocess finishes.
 
@@ -373,7 +373,7 @@ Chat sessions are human-driven, not rounds: they do **not** count toward the par
 
 Both modes share the same chat UI; entry points differ (top nav vs Gap detail page).
 
-### Settings
+### System
 
 - **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.
@@ -389,7 +389,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 ## Application settings
 
-All application settings live in the SQLite database and are editable from the **Settings** page in the UI, so each client project has its own configuration. Defaults are seeded on first run.
+All application settings live in the SQLite database and are editable from the **System** page in the UI, so each client project has its own configuration. Defaults are seeded on first run.
 
 **Runtime configuration:**
 
@@ -401,7 +401,7 @@ All application settings live in the SQLite database and are editable from the *
 | Agent idle timeout    | `15 min`                                   | Kill the subprocess if it produces no output for this long. Primary stuck-detector. Set to `0` to disable. |
 | Agent hard cap        | `24 h`                                     | Maximum wall-clock runtime per agent invocation. Ultimate stop-gap for runaway runs. Set to `0` to disable. |
 
-**Reporters list:** the set of known reporter names that backs the round-submission dropdown. Managed from the Settings → Reporters page. See **Reporters** for the full semantics.
+**Reporters list:** the set of known reporter names that backs the round-submission dropdown. Managed from the System → Reporters page. See **Reporters** for the full semantics.
 
 **Deploy-time configuration** (set by `refine init` / systemd unit startup, not in SQLite):
 

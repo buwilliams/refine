@@ -146,7 +146,7 @@ function drawChanges(data, f) {
     root.innerHTML = `
       <p class="muted">
         No merge target branch resolved. Set <code>merge_target_branch</code>
-        in <a href="#/settings">Settings → Application</a>, or check that the host
+        in <a href="#/system">System → Application</a>, or check that the host
         repo has a branch checked out.
       </p>`;
     return;

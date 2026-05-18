@@ -1,11 +1,11 @@
-// ---- Settings ---------------------------------------------------------------
+// ---- System -----------------------------------------------------------------
 
 async function renderSettings() {
   renderBanners([]);
   // First-paint scaffold only; subsequent refreshes route through
   // `refreshSettings` so SSE / post-save reloads don't flash `Loading…`.
   if (!document.getElementById("settings-content")) {
-    $("#main").innerHTML = `<h2>Settings</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
+    $("#main").innerHTML = `<h2>System</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
   }
   await refreshSettings();
 }
@@ -911,8 +911,8 @@ function applyGeneratedTargetAppConfig(cfg) {
   }
 }
 
-// Re-fetch + repaint the target-app status block inside the Settings panel.
-// Cheap to call from anywhere — silently no-ops if Settings isn't rendered.
+// Re-fetch + repaint the target-app status block inside the System panel.
+// Cheap to call from anywhere — silently no-ops if System isn't rendered.
 async function refreshTargetAppStatus() {
   const block = document.getElementById("target-app-status-block");
   if (!block) return;

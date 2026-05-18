@@ -17,7 +17,7 @@ const state = {
   // is what they land back on.
   underlayHash: "#/",
   // Provider-scoped feature flag matrix from `/api/features`. Refreshed
-  // on app start and after any Settings save. UI helpers below read
+  // on app start and after any System save. UI helpers below read
   // `state.features` to gate Chat / Import affordances.
   features: null,
 };

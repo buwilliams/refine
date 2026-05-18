@@ -205,7 +205,7 @@ function drawChatDock() {
           Chat is disabled for the <code>${htmlEscape(providerName)}</code>
           AI provider. It depends on provider session-resume support.
           Switch the provider on
-          <a href="#/settings">Settings → Runtime</a>, or enable the
+          <a href="#/system">System → Runtime</a>, or enable the
           override on the Runtime tab's <strong>Feature flags</strong> section
           (experimental).
         </p>
