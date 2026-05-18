@@ -21,6 +21,15 @@ cd <refine-checkout>
 uv run refine start
 ```
 
+## Workflow
+
+1. A person adds a Gap; it starts in the Backlog.
+2. A person or automation moves the Gap to the Todo list when it is ready for work.
+3. Governance validates the request against the Product, Constitution, and Rules.
+4. AI agents work Todo Gaps in parallel.
+5. People review the result; if it misses the target, they submit another Round.
+6. Approval closes the Gap.
+
 ## License
 
 [MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No
