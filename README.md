@@ -13,6 +13,8 @@ customers — anyone who can articulate *what the app does today* vs
 - **Merge** - integrate completed Gap branches through a single serialized agent.
 - **Logs** - filtered audit trail for agent output, git events, and system activity.
 
+![Refine dashboard](refine_ui/static/screenshot.png)
+
 ## Quick Start
 
 ```bash
