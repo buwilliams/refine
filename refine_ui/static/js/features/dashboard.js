@@ -1,5 +1,9 @@
 // ---- Dashboard --------------------------------------------------------------
 
+const dashboardReviewSelectedIds = new Set();
+let dashboardReviewSelectedReporter = "";
+let dashboardRefreshSeq = 0;
+
 async function renderDashboard() {
   // First paint only: lay out the outer chrome and a `Loading…`
   // placeholder. SSE-triggered refreshes route through `refreshDashboard`
@@ -18,6 +22,7 @@ async function refreshDashboard() {
   // by both the route handler (after the first-paint scaffold above) and
   // every SSE handler that wants the dashboard to track live state.
   if (state.currentRoute !== "dashboard") return;
+  const refreshSeq = ++dashboardRefreshSeq;
   try {
     const reporter = state.lastReporter || "";
     const [d, reviews] = await Promise.all([
@@ -26,9 +31,11 @@ async function refreshDashboard() {
         ? api("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + "&limit=200")
         : Promise.resolve({ gaps: [] }),
     ]);
+    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
     state.dashboard = d;
     drawDashboard(d, { reviewsForReporter: reviews.gaps || [], reporter });
   } catch (e) {
+    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
     const dash = document.getElementById("dash");
     if (dash) dash.innerHTML = `<p class="muted">Failed to load: ${htmlEscape(e.message)}</p>`;
   }
@@ -37,6 +44,11 @@ async function refreshDashboard() {
 function drawDashboard(d, opts = {}) {
   const reviewsForReporter = opts.reviewsForReporter || [];
   const reviewReporter = opts.reporter || "";
+  if (dashboardReviewSelectedReporter !== reviewReporter) {
+    dashboardReviewSelectedIds.clear();
+    dashboardReviewSelectedReporter = reviewReporter;
+  }
+  if (!reviewsForReporter.length) dashboardReviewSelectedIds.clear();
   // Global banners
   const banners = (d.needs_attention || []).filter((x) => x.kind === "banner")
     .map((x) => ({
@@ -154,31 +166,6 @@ function drawDashboard(d, opts = {}) {
           </table>`}
     </section>` : ""}
 
-    <section class="card">
-      <h3>Currently running</h3>
-      <div class="card-scroll">
-        ${(d.running || []).length === 0
-          ? `<p class="muted">No agent subprocesses running.</p>`
-          : (() => {
-              // Anchor seconds-at-fetch + a single `data-anchor-ms`
-              // timestamp so the tick can compute a live value
-              // without re-fetching: shown = base + (now - anchor) / 1000.
-              const anchorMs = Date.now();
-              return `<table class="table"><thead><tr><th>Gap</th><th>Elapsed</th><th>Idle</th><th>PID</th></tr></thead><tbody>
-                ${d.running.map((r) => `<tr onclick="location.hash='#/gaps/${r.gap_id}'">
-                  <td><code>${r.gap_id.slice(0,8)}…</code></td>
-                  <td class="js-elapsed-tick"
-                      data-base="${r.elapsed_seconds}"
-                      data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
-                  <td class="js-idle-tick"
-                      data-base="${r.idle_seconds}"
-                      data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
-                  <td class="muted small">${r.pid}</td>
-                </tr>`).join("")}
-                </tbody></table>`;
-            })()}
-      </div>
-    </section>
   `;
   // Click any reporter row → deep-link into the Gaps list filtered by
   // that reporter. We use data-reporter + a delegated listener so the
@@ -196,24 +183,42 @@ function wireReviewsForReporter(reviews) {
   if (!reviews || !reviews.length) return;
   const card = document.getElementById("reviews-for-reporter-card");
   if (!card) return;
+  const reviewIds = new Set(reviews.map((g) => g.id));
+  for (const id of Array.from(dashboardReviewSelectedIds)) {
+    if (!reviewIds.has(id)) dashboardReviewSelectedIds.delete(id);
+  }
   const checks = () => $$(".rev-row-check", card);
-  const selected = () => checks().filter((c) => c.checked).map((c) => c.dataset.revId);
+  const selected = () => reviews
+    .map((g) => g.id)
+    .filter((id) => dashboardReviewSelectedIds.has(id));
   const syncBulkButton = () => {
     const btn = $("#rev-bulk-verify", card);
     if (!btn) return;
     const n = selected().length;
     btn.disabled = n === 0;
     btn.textContent = n === 0 ? "Verify selected" : `Verify selected (${n})`;
+    if (selectAll) {
+      selectAll.checked = n > 0 && n === checks().length;
+      selectAll.indeterminate = n > 0 && n < checks().length;
+    }
   };
   const selectAll = $("#rev-select-all", card);
   selectAll?.addEventListener("change", () => {
-    checks().forEach((c) => { c.checked = selectAll.checked; });
+    checks().forEach((c) => {
+      c.checked = selectAll.checked;
+      if (selectAll.checked) dashboardReviewSelectedIds.add(c.dataset.revId);
+      else dashboardReviewSelectedIds.delete(c.dataset.revId);
+    });
     syncBulkButton();
   });
-  checks().forEach((c) => c.addEventListener("change", () => {
-    if (!c.checked && selectAll) selectAll.checked = false;
-    syncBulkButton();
-  }));
+  checks().forEach((c) => {
+    c.checked = dashboardReviewSelectedIds.has(c.dataset.revId);
+    c.addEventListener("change", () => {
+      if (c.checked) dashboardReviewSelectedIds.add(c.dataset.revId);
+      else dashboardReviewSelectedIds.delete(c.dataset.revId);
+      syncBulkButton();
+    });
+  });
 
   $$("[data-rev-verify]", card).forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -223,6 +228,7 @@ function wireReviewsForReporter(reviews) {
           const r = await api("POST", `/api/gaps/${id}/verify`);
           if (r.ok) toast(r.message || "Verified", "info");
           else toast(r.message || "Verify did not complete", "error");
+          if (r.ok) dashboardReviewSelectedIds.delete(id);
         } catch (e) { toast(e.message, "error"); }
         await refreshDashboard();
       });
@@ -254,6 +260,7 @@ function wireReviewsForReporter(reviews) {
         try {
           const r = await api("POST", `/api/gaps/${id}/verify`);
           if (!r.ok) failed++;
+          else dashboardReviewSelectedIds.delete(id);
         } catch (_e) { failed++; }
         done++;
       }
