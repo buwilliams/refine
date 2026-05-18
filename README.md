@@ -16,6 +16,7 @@ auth, so operators rarely need to think about either.
 - Logs view with filters for agent output, git events, and system activity.
 - Persistent Chat dock for standalone questions and Gap-specific follow-up.
 - Import-from-text flow that extracts Gap drafts from free-form notes.
+- Gap Governance for Product, Constitution, and Rules checks before work starts.
 - Multi-app setup and switching from System → Application.
 - Host-native operation that reuses local agent auth, SSH keys, git config, and PATH.
 
@@ -23,24 +24,9 @@ auth, so operators rarely need to think about either.
 
 ```bash
 git clone https://github.com/buwilliams/refine.git <refine-checkout>
-claude login                       # or: codex login / gemini auth login
-cd <refine-checkout>
-uv run refine init <target-app>
-cd <target-app>
-git add .refine/refine.toml .refine/.gitignore
-git commit -m "add refine"
 cd <refine-checkout>
 uv run refine start
-uv run refine status               # exact unit name and log command
-# open http://localhost:8080
-# optional: loginctl enable-linger $USER
-# switch apps: uv run refine init <other-target-app> --force
-# reset binding: uv run refine reset
-# purge active app refine data: uv run refine reset --purge -y
 ```
-
-If you skip `refine init` and run `uv run refine start` in a fresh checkout,
-refine serves a setup UI where you can create or attach the first target app.
 
 ## Layout
 
@@ -56,9 +42,10 @@ refine/
 ## Operational assumptions
 
 - The host running refine is dedicated to refine — no human edits the client
-  repo's working copy directly; all local commits come from refine agents.
+  repo's working copy directly; Refine owns local commits on that checkout.
 - The client's developers push from their own machines; refine sees those
-  commits via `fetch` and folds them in during `verify`.
+  commits via `fetch` and folds them in through the Merge agent while Gaps are
+  in `ready-merge`.
 
 ## License
 
