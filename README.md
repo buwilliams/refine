@@ -7,12 +7,11 @@ customers — anyone who can articulate *what the app does today* vs
 
 - **Dashboard** - consolidated space for run status, reporter stats, and work needing attention.
 - **Gaps** - searchable, filterable backlog with sorting and bulk updates.
-- **Logs** - filtered audit trail for agent output, git events, and system activity.
 - **Chat** - persistent dock for standalone questions and Gap-specific follow-up.
-- **Governance** - Product, Constitution, and Rules checks before work starts.
-- **System** - multi-app setup, runtime controls, provider settings, and diagnostics.
 - **Workflow** - move Gaps from report to agent work to human review.
+- **Governance** - Product, Constitution, and Rules checks before work starts.
 - **Merge** - integrate completed Gap branches through a single serialized agent.
+- **Logs** - filtered audit trail for agent output, git events, and system activity.
 
 ## Quick Start
 
