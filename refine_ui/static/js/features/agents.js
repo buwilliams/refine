@@ -84,7 +84,7 @@ function drawAgents(dash, settings) {
         </button>
         <span class="muted small">
           ${paused
-            ? "Paused — new subprocesses won't launch and the merger won't pick up new merges. In-flight work continues."
+            ? "Paused — agent subprocesses are stopped, new subprocesses won't launch, and the merger won't pick up new merges."
             : "Active — new subprocesses launch on demand and the merger processes Gaps as they finish."}
         </span>
       </div>

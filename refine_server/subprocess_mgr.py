@@ -334,13 +334,13 @@ class SubprocessManager:
         t.start()
         return proc.pid
 
-    def cancel(self, gap_id: str) -> bool:
+    def cancel(self, gap_id: str, reason: str = "cancel") -> bool:
         """Kill the running subprocess for a Gap, if any."""
         with self._lock:
             h = self._runs.get(gap_id)
         if not h:
             return False
-        self._kill(h, "cancel")
+        self._kill(h, reason)
         return True
 
     def cancel_all(self, reason: str = "shutdown") -> int:

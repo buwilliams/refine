@@ -5,6 +5,7 @@ from __future__ import annotations
 M_PING = "ping"
 M_PREFLIGHT = "preflight"
 M_LAUNCH = "launch"
+M_ENFORCE_SCHEDULING = "enforce_scheduling"
 M_CANCEL = "cancel"
 M_VERIFY = "verify"
 M_CREATE_GAP = "create_gap"

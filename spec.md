@@ -6,7 +6,7 @@ A web application for managing background Claude Code agents that autonomously m
 
 Deployed once on a host by a consulting firm; that one refine checkout can know about and switch between multiple client codebases. The client's QA / Product team uses refine to describe Gaps between current and desired behavior; refine drives Claude Code agents to close those Gaps so the consulting firm is not the bottleneck for issues that domain experts can describe and that admit manual verification.
 
-Refine is always available: when a Gap enters `todo`, refine launches an agent CLI subprocess for it immediately (subject to a configurable parallel-run cap).
+Refine is always available: when a Gap enters `todo`, refine launches an agent CLI subprocess for it immediately (subject to a configurable parallel-run cap and priority ordering).
 
 ## Architecture
 
@@ -93,6 +93,8 @@ Refine runs as one host-native UI backend on the same machine as the target app.
 | `done`         | Human has Verified. Refine has merged the Gap's branch into the client repo's current branch and pushed upstream. Terminal.                                                                                                  |
 | `failed`       | The agent run did not produce a successful result — errored, hit the idle timeout, exceeded the hard cap, exited with no commits, or was reconciled by a runner restart. Worktree and branch retained for a Retry. |
 | `cancelled`    | User cancelled the Gap. Worktree and branch cleaned up. Terminal.                                                                                                         |
+
+Priorities gate executable work. `high` blocks `medium` and `low`; `medium` blocks `low`. A higher-priority Gap blocks lower-priority agent work only while it is in `todo`, `in-progress`, or `ready-merge`; `backlog`, `review`, `done`, `failed`, and `cancelled` do not block. If higher-priority blocking work appears while a lower-priority agent is running, refine kills the lower-priority CLI process, discards its partial worktree/branch, and moves that Gap back to `todo` so it can rerun after higher-priority dependencies land.
 
 Transitions:
 - `todo → in-progress` — automatic when refine launches an agent subprocess for the Gap.

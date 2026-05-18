@@ -16,9 +16,13 @@ from datetime import datetime, timedelta, timezone
 
 from refine_server import activity, db
 from refine_server.gaps import now_iso, read_gap_json
+from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
 from . import gap_writer, git_ops, preflight, subprocess_mgr
 from .friendly_outcome import classify_outcome
+
+
+_RESET_TO_TODO_REASONS = {"priority_preempted", "paused"}
 
 
 @dataclass
@@ -36,9 +40,11 @@ class Dispatcher:
 
     _stop: threading.Event = None  # type: ignore[assignment]
     _thread: threading.Thread = None  # type: ignore[assignment]
+    _tick_lock: threading.Lock = None  # type: ignore[assignment]
 
     def start(self) -> None:
         self._stop = threading.Event()
+        self._tick_lock = threading.Lock()
         self._thread = threading.Thread(
             target=self._loop, name="refine-dispatcher", daemon=True,
         )
@@ -51,7 +57,7 @@ class Dispatcher:
     def _loop(self) -> None:
         while not self._stop.is_set():
             try:
-                self._tick()
+                self.enforce_now()
             except Exception as e:
                 conn = self.get_conn()
                 activity.append(
@@ -61,28 +67,35 @@ class Dispatcher:
                 )
             self._stop.wait(self.poll_interval)
 
+    def enforce_now(self) -> None:
+        if self._tick_lock is None:
+            self._tick_lock = threading.Lock()
+        with self._tick_lock:
+            self._tick()
+
     def _tick(self) -> None:
         conn = self.get_conn()
         paused = db.get_setting_int(conn, "paused", 0)
         if paused:
+            self._stop_running_agents(reason="paused")
             return
         self._promote_backlog(conn)
+
+        active_rank = self._highest_blocking_priority_rank(conn)
+        if active_rank is None:
+            return
+        if self._preempt_lower_priority_runs(conn, active_rank):
+            return
+
         cap = db.get_setting_int(conn, "parallel_run_cap", 3)
         running = len(self.sub_mgr.running_snapshot())
         if running >= cap:
             return
-        # High → Medium → Low, then oldest-updated first within a tier.
-        # SQLite sorts text alphabetically, which would put high < low < medium —
-        # wrong order — so we explicitly map priority to an integer rank.
         rows = conn.execute(
             "SELECT id, name, branch_name FROM gaps_index "
-            "WHERE status = 'todo' "
-            "ORDER BY CASE priority "
-            "  WHEN 'high'   THEN 0 "
-            "  WHEN 'medium' THEN 1 "
-            "  ELSE 2 "
-            "END, updated ASC LIMIT ?",
-            (cap - running,),
+            f"WHERE status = 'todo' AND {priority_case_sql()} = ? "
+            "ORDER BY updated ASC LIMIT ?",
+            (active_rank, cap - running),
         ).fetchall()
         for row in rows:
             gid = row["id"]
@@ -90,6 +103,44 @@ class Dispatcher:
             if self.sub_mgr.is_running(gid):
                 continue
             self._launch_one(conn, gid, row["branch_name"])
+
+    def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
+        placeholders = ",".join("?" * len(BLOCKING_STATUSES))
+        row = conn.execute(
+            f"SELECT {priority_case_sql()} AS rank FROM gaps_index "
+            f"WHERE status IN ({placeholders}) "
+            "ORDER BY rank ASC LIMIT 1",
+            BLOCKING_STATUSES,
+        ).fetchone()
+        return int(row["rank"]) if row else None
+
+    def _preempt_lower_priority_runs(self, conn: sqlite3.Connection,
+                                     active_rank: int) -> int:
+        running = self.sub_mgr.running_snapshot()
+        ids = [r["gap_id"] for r in running if r.get("gap_id")]
+        if not ids:
+            return 0
+        placeholders = ",".join("?" * len(ids))
+        rows = conn.execute(
+            f"SELECT id, priority FROM gaps_index WHERE id IN ({placeholders})",
+            ids,
+        ).fetchall()
+        by_id = {r["id"]: r["priority"] for r in rows}
+        preempted = 0
+        for gid in ids:
+            if priority_rank(by_id.get(gid)) <= active_rank:
+                continue
+            if self.sub_mgr.cancel(gid, reason="priority_preempted"):
+                preempted += 1
+        return preempted
+
+    def _stop_running_agents(self, *, reason: str) -> int:
+        stopped = 0
+        for run in self.sub_mgr.running_snapshot():
+            gid = run.get("gap_id")
+            if gid and self.sub_mgr.cancel(gid, reason=reason):
+                stopped += 1
+        return stopped
 
     def _promote_backlog(self, conn: sqlite3.Connection) -> None:
         """Auto-promote `backlog` Gaps to `todo` once they've sat idle for
@@ -369,6 +420,10 @@ class Dispatcher:
                      killed_reason: str | None, base_commit: str,
                      *, agent_reported_success: bool | None = None) -> None:
         conn = self.get_conn()
+        if killed_reason in _RESET_TO_TODO_REASONS:
+            self._reset_stopped_run_to_todo(conn, gap_id, round_idx, killed_reason)
+            return
+
         cwd = git_ops.gap_worktree_path(gap_id)
         new_commits = git_ops.commits_on_branch_since(base_commit, cwd)
         no_new_commits = new_commits == 0
@@ -391,10 +446,13 @@ class Dispatcher:
         # `ready-merge -> review` (verify needed human attention).
         next_status = "ready-merge" if success else "failed"
         with db.transaction(conn):
-            conn.execute(
-                "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = ?, updated = ? "
+                "WHERE id = ? AND status = 'in-progress'",
                 (next_status, now_iso(), gap_id),
             )
+        if cur.rowcount == 0:
+            return
 
         try:
             gap_writer.append_round_log(
@@ -430,6 +488,57 @@ class Dispatcher:
                 self.on_run_finished(gap_id)
             except Exception:
                 pass
+
+    def _reset_stopped_run_to_todo(self, conn: sqlite3.Connection, gap_id: str,
+                                   round_idx: int, reason: str) -> None:
+        row = conn.execute(
+            "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gap_id,),
+        ).fetchone()
+        if not row:
+            return
+
+        branch_name = row["branch_name"]
+        if row["status"] == "in-progress":
+            with db.transaction(conn):
+                conn.execute(
+                    "UPDATE gaps_index SET status = 'todo', branch_name = NULL, "
+                    "updated = ? WHERE id = ? AND status = 'in-progress'",
+                    (now_iso(), gap_id),
+                )
+
+        git_ops.remove_worktree(gap_id)
+        if branch_name:
+            git_ops.delete_branch(branch_name)
+
+        if reason == "priority_preempted":
+            message = (
+                "Agent run stopped because higher-priority Gap work is blocking "
+                "lower priorities — moved back to todo and discarded partial work."
+            )
+        else:
+            message = (
+                "Agent run stopped because agents were paused — moved back to "
+                "todo and discarded partial work."
+            )
+        try:
+            gap_writer.append_round_log(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                severity="warn",
+                category="state",
+                actor="runner",
+                message=message,
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message=message,
+            severity="warn",
+            category="state",
+            gap_id=gap_id,
+            actor="runner",
+        )
 
 
 def _format_prompt(round_obj: dict) -> str:

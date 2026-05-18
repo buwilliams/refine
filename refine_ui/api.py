@@ -17,7 +17,7 @@ from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
+    M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -521,10 +521,8 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     if "status" in body:
         # Per-Gap status updates power the workflow back/forward buttons
         # on the detail page. The transitions are bookkeeping-only — they
-        # don't kick off agent runs, cancel running subprocesses, or
-        # touch the worktree. (The agent picks up Gaps in `todo`; the
-        # `verify` endpoint still owns the merge+push that lands a Gap
-        # in `done`.)
+        # don't directly touch worktrees. The runner is nudged after the
+        # write so priority gates and `todo` pickup are enforced promptly.
         s = (body.get("status") or "").strip().lower()
         if s not in _VALID_STATUSES:
             return err(400, "invalid status")
@@ -557,6 +555,11 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             get_client().call(M_EDIT_ROUND, {
                 "gap_id": gap_id, "actual": None, "target": None, "reporter": None,
             })
+        except BackendError:
+            pass
+    if "priority" in sql_fields or "status" in sql_fields:
+        try:
+            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:
             pass
     return 200, {"ok": True}
@@ -650,6 +653,10 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                 updated_ids.append(gid)
             except BackendError:
                 updated_ids.append(gid)
+        try:
+            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+        except BackendError:
+            pass
     else:  # reporter — rewrite the latest round's reporter on each gap
         for gid in gap_ids:
             try:
@@ -856,6 +863,10 @@ def retry(gap_id: str) -> tuple[int, dict]:
         )
     finally:
         conn.close()
+    try:
+        get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+    except BackendError:
+        pass
     return 200, {"ok": True}
 
 
@@ -1117,6 +1128,11 @@ def update_settings(body: dict) -> tuple[int, dict]:
         )
     finally:
         conn.close()
+    if "paused" in normalized:
+        try:
+            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+        except BackendError as e:
+            return _backend_err(e)
     return 200, {"ok": True}
 
 

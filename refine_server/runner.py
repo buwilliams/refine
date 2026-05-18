@@ -15,7 +15,7 @@ from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
+    M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
     M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
@@ -115,6 +115,7 @@ class Runner:
             M_RUNNING: self._h_running,
             M_DIAGNOSTICS: self._h_diagnostics,
             M_LAUNCH: self._h_launch,
+            M_ENFORCE_SCHEDULING: self._h_enforce_scheduling,
             M_CANCEL: self._h_cancel,
             M_VERIFY: self._h_verify,
             M_CREATE_GAP: self._h_create_gap,
@@ -165,11 +166,14 @@ class Runner:
             }
 
     def _h_launch(self, params: dict) -> dict:
-        # The dispatcher launches automatically; this method is a no-op that
-        # exists mostly so the webapp can nudge the loop after a status change.
-        # Status changes (failed→todo via Retry, etc.) are written by the webapp;
-        # the dispatcher picks them up on its next tick.
+        # The dispatcher launches automatically; this method exists mostly so
+        # the webapp can nudge scheduling after a status change.
+        self.dispatcher.enforce_now()
         return {"queued": True}
+
+    def _h_enforce_scheduling(self, params: dict) -> dict:
+        self.dispatcher.enforce_now()
+        return {"ok": True}
 
     def _h_cancel(self, params: dict) -> dict:
         gap_id = params["gap_id"]
@@ -259,6 +263,7 @@ class Runner:
             severity="info", category="state",
             gap_id=gap_id, actor=params["reporter"],
         )
+        self.dispatcher.enforce_now()
         return {"gap": gap}
 
     def _h_edit_round(self, params: dict) -> dict:
