@@ -34,6 +34,8 @@ def main() -> int:
     assert "function activeSettingsTabFromRoute()" in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
+    assert '<div class="card settings-tab-card">${body}</div>' in settings_js
+    assert settings_js.count('<div class="card') == 1
     settings_tabs_css = re.search(r"\.settings-tabs \{(.*?)\}", common_css, re.S)
     settings_tab_css = re.search(r"\.settings-tab \{(.*?)\}", common_css, re.S)
     settings_tab_active_css = re.search(
@@ -41,13 +43,19 @@ def main() -> int:
         common_css,
         re.S,
     )
+    settings_section_css = re.search(
+        r"\.settings-section:not\(:first-child\) \{(.*?)\}",
+        common_css,
+        re.S,
+    )
     assert settings_tabs_css and "border-bottom" not in settings_tabs_css.group(1)
     assert settings_tab_css and "border: 1px solid var(--border)" in settings_tab_css.group(1)
     assert "text-decoration: none" in settings_tab_css.group(1)
     assert settings_tab_active_css and "border-bottom-color: var(--card)" in settings_tab_active_css.group(1)
+    assert settings_section_css and "border-top: 1px solid var(--border)" in settings_section_css.group(1)
 
     for slug in slugs:
-        assert f'pane("{slug}",' in settings_js
+        assert settings_js.count(f'pane("{slug}",') == 1
 
     assert 'href="#/system/project"' in index_html
 

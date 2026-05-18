@@ -106,7 +106,7 @@ function renderFeatureFlagsCard(feats) {
       </td>`;
   };
   return `
-    <div class="card" style="margin-top:16px">
+    <section class="settings-section">
       <h3>Feature flags</h3>
       <p class="muted small" style="margin-top:0">
         Provider-scoped capability matrix. The current provider is
@@ -133,7 +133,7 @@ function renderFeatureFlagsCard(feats) {
             </tr>`).join("")}
         </tbody>
       </table>
-    </div>`;
+    </section>`;
 }
 
 function renderGovernanceRuleRows(rules) {
@@ -259,7 +259,7 @@ function renderRuntimeAgentCards(dash, settings, diag) {
     ? `<p class="muted small" style="margin-top:8px">Governance: ${governance.configured ? governance.state : "not configured"}${governanceQueued ? ` · queue ${governanceQueued}` : ""}${governance.last_outcome ? ` · last outcome <code>${htmlEscape(governance.last_outcome)}</code>` : ""}.</p>`
     : "";
   return `
-    <div class="card">
+    <section class="settings-section">
       <h3>Agents</h3>
       <div class="actions">
         <button id="btn-pause" class="${paused ? "" : "secondary"}">
@@ -293,7 +293,7 @@ function renderRuntimeAgentCards(dash, settings, diag) {
       ${governanceLine}
       ${queueLine}
       ${mergerUnreachable}
-    </div>`;
+    </section>`;
 }
 
 function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
@@ -320,11 +320,13 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     </nav>`;
   const pane = (slug, body) => `
     <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
-             data-tab-pane="${slug}">${body}</section>`;
+             data-tab-pane="${slug}">
+      <div class="card settings-tab-card">${body}</div>
+    </section>`;
   $("#settings-content").innerHTML = `
     ${tabStrip}
     ${pane("project", `
-    <div class="card">
+    <section class="settings-section">
       <h3>Applications</h3>
       <p class="muted small">
         Current app: <code>${htmlEscape(state.project?.client_repo || "Not attached")}</code>
@@ -345,9 +347,9 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
         <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
-    </div>
+    </section>
 
-    <div class="card" style="margin-top:16px">
+    <section class="settings-section">
       <h3>Scope</h3>
       <p class="muted small">
         Where refine's agent work lands inside the client repo. The base
@@ -365,144 +367,9 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
       <div class="actions"><button id="s-save-scope">Save</button></div>
-    </div>`)}
+    </section>
 
-    ${pane("runtime", `
-    ${renderRuntimeAgentCards(dash, s, diag)}
-
-    <div class="card" style="margin-top:16px">
-      <h3>Runtime configuration</h3>
-      <div class="form-row"><label>Parallel-run cap</label>
-        <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
-      <div class="form-row"><label>Branch name pattern</label>
-        <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
-      <div class="form-row"><label>Agent idle timeout (seconds)</label>
-        <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
-      <div class="form-row"><label>Agent hard cap (seconds)</label>
-        <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
-      <div class="form-row"><label>Standalone chat idle timeout (seconds)
-        <span class="muted small">— set to 0 to disable auto-close</span></label>
-        <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
-      <div class="form-row"><label>Auto-promote backlog → todo
-        <span class="muted small">— how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.</span></label>
-        <select id="s-backlog-promote">
-          ${[
-            ["-1",    "Never"],
-            ["0",     "Instant"],
-            ["300",   "5 minutes"],
-            ["1800",  "30 minutes"],
-            ["3600",  "1 hour"],
-            ["10800", "3 hours"],
-            ["21600", "6 hours"],
-            ["86400", "24 hours"],
-          ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
-        </select></div>
-      <div class="actions"><button id="s-save">Save</button></div>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>AI Provider</h3>
-      <div class="form-row"><label>Which AI provider refine drives
-        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code and Codex.</span></label>
-        <select id="s-cli">
-          ${cliOption("claude", "Claude Code (default)")}
-          ${cliOption("codex", "OpenAI Codex")}
-          ${cliOption("gemini", "Gemini")}
-        </select></div>
-      <p class="muted small" style="margin-top:6px">
-        After switching: re-check auth below to confirm the chosen provider is
-        installed and authed on the host. Round logs are structured for Claude
-        Code and Codex where their CLIs expose machine-readable events; Gemini
-        falls back to plain stdout passthrough.
-      </p>
-      <div class="actions"><button id="s-save-cli">Save</button></div>
-      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
-      <button id="s-recheck">Re-check auth</button>
-    </div>
-
-    ${renderFeatureFlagsCard(feats)
-      || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></div>`}
-
-    <div class="card" style="margin-top:16px">
-      <h3>Logs retention</h3>
-      <p class="muted small">
-        Delete activity entries older than the chosen window. Newer entries
-        and gap state are untouched.
-      </p>
-      <div class="actions">
-        <label for="logs-cleanup-days" class="muted small">Keep</label>
-        <select id="logs-cleanup-days">
-          ${[0, 7, 30, 60, 90, 365].map((n) =>
-            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
-        </select>
-        <button class="danger" id="logs-cleanup">Clean up old logs</button>
-      </div>
-    </div>`)}
-
-    ${pane("governance", `
-    <div class="card">
-      <h3>Product</h3>
-      <p class="muted small" style="margin-top:0">
-        The what and why: who the product is for, what problems it solves,
-        and what success looks like.
-      </p>
-      <textarea id="s-governance-product" rows="7">${htmlEscape(gov.product || "")}</textarea>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>Constitution</h3>
-      <p class="muted small" style="margin-top:0">
-        Non-negotiable principles for the entire project.
-      </p>
-      <textarea id="s-governance-constitution" rows="7">${htmlEscape(gov.constitution || "")}</textarea>
-    </div>
-
-    <div class="card" style="margin-top:16px">
-      <h3>Rules</h3>
-      <p class="muted small" style="margin-top:0">
-        One-line rules the Governance agent applies before implementation.
-      </p>
-      ${gov.configured ? "" : `
-        <p class="muted small" style="color:var(--warn)">
-          Governance is incomplete. Gap execution continues until Product and Constitution are both filled in.
-        </p>`}
-      ${renderGovernanceRules(gov.rules || [])}
-      <div class="actions" style="margin-top:10px">
-        <button class="secondary" id="s-governance-add-rule">Add rule</button>
-        <button class="secondary" id="s-governance-generate">Generate rules</button>
-        <span class="spacer"></span>
-        <button id="s-governance-save">Save governance</button>
-      </div>
-    </div>`)}
-
-    ${pane("reporters", `
-    <div class="card">
-      <h3>Reporters</h3>
-      <table class="table">
-        <thead><tr><th>Name</th><th></th></tr></thead>
-        <tbody>
-          ${reps.map((r) => `<tr>
-            <td>${htmlEscape(r.name)}</td>
-            <td class="actions">
-              <button class="secondary" data-rename="${r.id}" data-name="${htmlEscape(r.name)}">Rename</button>
-              <button class="danger" data-rdel="${r.id}">Remove</button>
-            </td>
-          </tr>`).join("")}
-        </tbody>
-      </table>
-      <div class="actions" style="margin-top:8px">
-        <button id="r-add">+ Add reporter</button>
-      </div>
-      <p class="muted small" style="margin-top:6px">
-        Renaming a reporter cascades through every Gap's rounds so historical
-        data stays in sync. Removing a reporter only affects the dropdown —
-        historical rounds keep their original reporter string so audit
-        history is preserved.
-      </p>
-    </div>`)}
-
-    ${pane("project", `
-    <div class="card" style="margin-top:16px">
+    <section class="settings-section">
       <h3>Current status</h3>
       <div id="target-app-status-block" class="muted">Loading…</div>
       <div class="actions" style="margin-top:10px">
@@ -516,9 +383,9 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
         reporter dropdown is read-only so typical users can't take the
         application down by accident.
       </p>
-    </div>
+    </section>
 
-    <div class="card" style="margin-top:16px">
+    <section class="settings-section">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
         The AI provider drafts this configuration from the codebase.
@@ -586,7 +453,142 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
         <p class="muted small" id="s-target-notes"></p></div>
       <div class="actions"><button id="s-save-target">Save</button></div>
-    </div>`)}
+    </section>`)}
+
+    ${pane("runtime", `
+    ${renderRuntimeAgentCards(dash, s, diag)}
+
+    <section class="settings-section">
+      <h3>Runtime configuration</h3>
+      <div class="form-row"><label>Parallel-run cap</label>
+        <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
+      <div class="form-row"><label>Branch name pattern</label>
+        <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
+      <div class="form-row"><label>Agent idle timeout (seconds)</label>
+        <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
+      <div class="form-row"><label>Agent hard cap (seconds)</label>
+        <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
+      <div class="form-row"><label>Standalone chat idle timeout (seconds)
+        <span class="muted small">— set to 0 to disable auto-close</span></label>
+        <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
+      <div class="form-row"><label>Auto-promote backlog → todo
+        <span class="muted small">— how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.</span></label>
+        <select id="s-backlog-promote">
+          ${[
+            ["-1",    "Never"],
+            ["0",     "Instant"],
+            ["300",   "5 minutes"],
+            ["1800",  "30 minutes"],
+            ["3600",  "1 hour"],
+            ["10800", "3 hours"],
+            ["21600", "6 hours"],
+            ["86400", "24 hours"],
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
+      <div class="actions"><button id="s-save">Save</button></div>
+    </section>
+
+    <section class="settings-section">
+      <h3>AI Provider</h3>
+      <div class="form-row"><label>Which AI provider refine drives
+        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code and Codex.</span></label>
+        <select id="s-cli">
+          ${cliOption("claude", "Claude Code (default)")}
+          ${cliOption("codex", "OpenAI Codex")}
+          ${cliOption("gemini", "Gemini")}
+        </select></div>
+      <p class="muted small" style="margin-top:6px">
+        After switching: re-check auth below to confirm the chosen provider is
+        installed and authed on the host. Round logs are structured for Claude
+        Code and Codex where their CLIs expose machine-readable events; Gemini
+        falls back to plain stdout passthrough.
+      </p>
+      <div class="actions"><button id="s-save-cli">Save</button></div>
+      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
+      <button id="s-recheck">Re-check auth</button>
+    </section>
+
+    ${renderFeatureFlagsCard(feats)
+      || `<section class="settings-section"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></section>`}
+
+    <section class="settings-section">
+      <h3>Logs retention</h3>
+      <p class="muted small">
+        Delete activity entries older than the chosen window. Newer entries
+        and gap state are untouched.
+      </p>
+      <div class="actions">
+        <label for="logs-cleanup-days" class="muted small">Keep</label>
+        <select id="logs-cleanup-days">
+          ${[0, 7, 30, 60, 90, 365].map((n) =>
+            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
+        </select>
+        <button class="danger" id="logs-cleanup">Clean up old logs</button>
+      </div>
+    </section>`)}
+
+    ${pane("governance", `
+    <section class="settings-section">
+      <h3>Product</h3>
+      <p class="muted small" style="margin-top:0">
+        The what and why: who the product is for, what problems it solves,
+        and what success looks like.
+      </p>
+      <textarea id="s-governance-product" rows="7">${htmlEscape(gov.product || "")}</textarea>
+    </section>
+
+    <section class="settings-section">
+      <h3>Constitution</h3>
+      <p class="muted small" style="margin-top:0">
+        Non-negotiable principles for the entire project.
+      </p>
+      <textarea id="s-governance-constitution" rows="7">${htmlEscape(gov.constitution || "")}</textarea>
+    </section>
+
+    <section class="settings-section">
+      <h3>Rules</h3>
+      <p class="muted small" style="margin-top:0">
+        One-line rules the Governance agent applies before implementation.
+      </p>
+      ${gov.configured ? "" : `
+        <p class="muted small" style="color:var(--warn)">
+          Governance is incomplete. Gap execution continues until Product and Constitution are both filled in.
+        </p>`}
+      ${renderGovernanceRules(gov.rules || [])}
+      <div class="actions" style="margin-top:10px">
+        <button class="secondary" id="s-governance-add-rule">Add rule</button>
+        <button class="secondary" id="s-governance-generate">Generate rules</button>
+        <span class="spacer"></span>
+        <button id="s-governance-save">Save governance</button>
+      </div>
+    </section>`)}
+
+    ${pane("reporters", `
+    <section class="settings-section">
+      <h3>Reporters</h3>
+      <table class="table">
+        <thead><tr><th>Name</th><th></th></tr></thead>
+        <tbody>
+          ${reps.map((r) => `<tr>
+            <td>${htmlEscape(r.name)}</td>
+            <td class="actions">
+              <button class="secondary" data-rename="${r.id}" data-name="${htmlEscape(r.name)}">Rename</button>
+              <button class="danger" data-rdel="${r.id}">Remove</button>
+            </td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="actions" style="margin-top:8px">
+        <button id="r-add">+ Add reporter</button>
+      </div>
+      <p class="muted small" style="margin-top:6px">
+        Renaming a reporter cascades through every Gap's rounds so historical
+        data stays in sync. Removing a reporter only affects the dropdown —
+        historical rounds keep their original reporter string so audit
+        history is preserved.
+      </p>
+    </section>`)}
+
   `;
   // Tab click handlers — purely DOM-local, no re-fetch.
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
