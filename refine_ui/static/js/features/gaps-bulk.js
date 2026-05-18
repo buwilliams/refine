@@ -194,8 +194,8 @@ function debounce(fn, ms) {
 }
 
 // Run `fn` while the button shows a busy label and is disabled. Used for
-// operations that may take noticeable time (verify, fetch+merge+push, auth
-// recheck, etc.) so the user sees that something is happening and can't
+// operations that may take noticeable time (verify, auth recheck, etc.)
+// so the user sees that something is happening and can't
 // accidentally double-fire the request.
 async function withButtonBusy(btn, busyLabel, fn) {
   if (!btn) return await fn();

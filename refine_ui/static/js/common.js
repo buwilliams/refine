@@ -620,8 +620,8 @@ function initSSE() {
         document.querySelector('[data-tab-pane="runtime"].active')) {
       refreshSettings();
     }
-    // Changes screen: a Gap moving to `done` lands a new merge commit
-    // here; a cancellation flips an existing row's Undo button state.
+    // Changes screen: the Merge agent can land a new merge commit;
+    // a cancellation flips an existing row's Undo button state.
     if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);

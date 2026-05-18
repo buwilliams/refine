@@ -197,7 +197,7 @@ function renderRuntimeAgentCards(dash, settings, diag) {
           data-base="${merger.elapsed_seconds || 0}"
           data-anchor-ms="${anchorMs}">${fmtElapsed(merger.elapsed_seconds || 0)}</td>
       <td class="muted small">-</td>
-      <td><span class="muted small">verifying merge</span></td>
+      <td><span class="muted small">merging</span></td>
     </tr>` : "";
   const governanceRow = governanceActive ? `
     <tr class="governance-row">
@@ -342,7 +342,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
                placeholder="e.g. apps/web"
                value="${htmlEscape(s.agent_subpath || "")}"></div>
       <div class="form-row"><label>Merge target branch
-        <span class="muted small">— branch all Gap worktrees are based on and all <code>verify</code> merges land on. Leave blank to follow the host's currently-checked-out branch. When set, <code>verify</code> auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
+        <span class="muted small">— branch all Gap worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch. When set, the Merge agent auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
         <input type="text" id="s-merge-target"
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>

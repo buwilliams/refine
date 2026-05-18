@@ -4,8 +4,9 @@ Per spec: on startup, any Gap in `in-progress` without a live subprocess is move
 to `failed` with a "runner restarted" log entry. Worktrees and branches are
 preserved so the human can Retry.
 
-Also handles mid-merge/mid-push crashes — Gaps in `review` whose Verify started
-but didn't finish stay in `review` with a log entry recording how far it got.
+Also handles mid-merge/mid-push crashes — Gaps in `review` whose Merge-agent
+work started but didn't finish stay in `review` with a log entry recording how
+far it got.
 """
 from __future__ import annotations
 

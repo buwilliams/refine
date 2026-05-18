@@ -1,8 +1,8 @@
-"""review → done transition: fetch, pull --ff-only, merge, push.
+"""Merge-agent merge operation plus user review approval.
 
-If any step fails, the Gap stays in `review` with an explanatory log entry.
-On push failure (after a successful local merge), the Gap remains in `review`
-per spec — push failure is an environment issue, not a Gap-completion event.
+The Merge agent owns fetch, pull, merge, push, and cleanup while a Gap is in
+`ready-merge`. User-triggered Verify only approves a Gap that is already in
+`review`; it does not run git merge.
 """
 from __future__ import annotations
 
@@ -16,17 +16,13 @@ from . import conflict_resolver, gap_writer, git_ops
 
 def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
                    actor: str = "refine",
-                   final_status: str = "done") -> dict:
-    """Run the merge+push sequence for a Gap, then transition it.
+                   final_status: str = "review") -> dict:
+    """Run the merge+push sequence for a `ready-merge` Gap, then transition it.
 
     `final_status` is the status the Gap moves to on a clean run:
       - The Merger calls with `final_status="review"` — auto-merge
         completes the merge but parks the Gap in `review` so a human
         approves it before it lands in `done`.
-      - User-triggered Verify (review → done bookkeeping) calls with
-        `final_status="done"`. If the Gap's branch is already gone
-        (the Merger already merged + cleaned up), this is a pure
-        bookkeeping transition with no git work.
 
     Returns a dict with keys: ok, stage, message, details.
     """
@@ -36,44 +32,17 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
     if not row:
         return {"ok": False, "stage": "lookup", "message": "Gap not found"}
     # `ready-merge` is the system-owned entry status used by the
-    # Merger after a successful agent run. `review` is the user-
-    # triggered entry status used when the operator clicks Verify
-    # after an earlier verify failure or after the Merger auto-merged
-    # and parked the Gap for human approval. Any other status is a
-    # mis-call.
-    if row["status"] not in ("review", "ready-merge"):
+    # Merger after a successful agent run. User-triggered Verify does
+    # not call this merge operation anymore; it only approves `review`
+    # Gaps through `approve_review`.
+    if row["status"] != "ready-merge":
         return {"ok": False, "stage": "lookup",
-                "message": f"Gap is not verifiable (status={row['status']})"}
+                "message": f"Gap is not ready to merge (status={row['status']})"}
 
     branch = row["branch_name"]
     if not branch:
         return {"ok": False, "stage": "lookup",
                 "message": "Gap has no branch_name recorded"}
-
-    # Auto-merge clean-up deletes the Gap's branch on success. A later
-    # user-triggered Verify on such a Gap (in `review`, awaiting human
-    # approval) has nothing to git-merge — the merge already landed.
-    # Short-circuit to a bookkeeping-only transition.
-    if not git_ops.local_branch_exists(branch):
-        with db.transaction(conn):
-            conn.execute(
-                "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
-                (final_status, now_iso(), gap_id),
-            )
-        _log(conn, gap_id,
-             f"Gap branch `{branch}` already merged + cleaned up — "
-             f"transitioned to `{final_status}`",
-             severity="info", category="state", actor=actor)
-        activity.append(
-            conn,
-            message=f"Gap approved by user — transitioned to `{final_status}`"
-                    if final_status == "done"
-                    else f"Gap transitioned to `{final_status}`",
-            severity="info", category="state",
-            gap_id=gap_id, actor=actor,
-        )
-        return {"ok": True, "stage": "noop",
-                "message": f"Already merged; transitioned to `{final_status}`"}
 
     # Pre-check: resolve the merge target.
     host_branch = git_ops.current_branch()
@@ -92,14 +61,14 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
             _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
             return {"ok": False, "stage": "precheck", "message": msg}
         target = host_branch
-    # An upstream is nice-to-have, not required. With one, verify runs
-    # the full fetch → pull → merge → push pipeline. Without one, it
+    # An upstream is nice-to-have, not required. With one, the Merge
+    # agent runs the full fetch → pull → merge → push pipeline. Without one, it
     # falls back to a local-only merge (no fetch, no pull, no push) so
     # repos that don't have a remote yet still work end-to-end.
     has_upstream = git_ops.upstream_branch(target) is not None
     if not has_upstream:
         _log(conn, gap_id,
-             f"Branch `{target}` has no upstream — verify will merge "
+             f"Branch `{target}` has no upstream — Merge agent will merge "
              f"locally and skip the push.",
              severity="info", category="git", actor=actor)
 
@@ -257,9 +226,50 @@ def _restore_host_branch_and_return(conn, gap_id, switched_from,
     return ret
 
 
+def approve_review(conn: sqlite3.Connection, gap_id: str, *,
+                   actor: str = "refine") -> dict:
+    """Approve a reviewed Gap without running any merge operation.
+
+    `review` can mean either:
+      - the Merge agent already merged and cleaned up the branch; or
+      - the dispatcher skipped implementation because this round's merge
+        commit was already present.
+
+    If the Gap still has a local branch, it has not completed Merge-agent
+    cleanup, so Verify refuses to mark it done.
+    """
+    row = conn.execute(
+        "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gap_id,),
+    ).fetchone()
+    if not row:
+        return {"ok": False, "stage": "lookup", "message": "Gap not found"}
+    if row["status"] != "review":
+        return {"ok": False, "stage": "lookup",
+                "message": f"Gap is not awaiting review (status={row['status']})"}
+
+    branch = row["branch_name"]
+    if branch and git_ops.local_branch_exists(branch):
+        msg = (
+            "Gap has not been merged and cleaned up by the Merge agent yet; "
+            "Verify only approves Gaps already awaiting review."
+        )
+        _log(conn, gap_id, msg, severity="warn", category="state", actor=actor)
+        return {"ok": False, "stage": "not_merged", "message": msg}
+
+    with db.transaction(conn):
+        conn.execute(
+            "UPDATE gaps_index SET status = 'done', updated = ? WHERE id = ?",
+            (now_iso(), gap_id),
+        )
+    _log(conn, gap_id, "Gap approved by user — transitioned to `done`",
+         severity="info", category="state", actor=actor)
+    return {"ok": True, "stage": "approved",
+            "message": "Approved; transitioned to `done`"}
+
+
 def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
                  branch: str, *, has_upstream: bool, actor: str,
-                 final_status: str = "done") -> dict:
+                 final_status: str = "review") -> dict:
     # 1. fetch (only if there's a remote-tracking upstream).
     if has_upstream:
         r = git_ops.fetch()
@@ -349,15 +359,13 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
             _log(conn, gap_id,
                  "Push failed — environment issue; Gap stays in `review`",
                  details=r.stderr, severity="error", category="git", actor=actor)
-            # Per spec: gap STAYS IN REVIEW, does NOT transition to done.
+            # Per spec: gap STAYS IN REVIEW.
             return {"ok": False, "stage": "push",
                     "message": "Push failed", "details": r.stderr}
         pushed = True
 
-    # Merge landed; clean up branch + worktree and transition to the
-    # caller's chosen final status. The Merger uses `review` (so a human
-    # approves before the Gap is marked `done`); a user-triggered Verify
-    # uses `done` directly.
+    # Merge landed; clean up branch + worktree and park the Gap in
+    # `review` so a human can approve it.
     with db.transaction(conn):
         conn.execute(
             "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",

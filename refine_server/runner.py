@@ -214,11 +214,10 @@ class Runner:
         return {"killed_subprocess": killed}
 
     def _h_verify(self, params: dict) -> dict:
-        # Route through the merger so a user-triggered Verify can't race
-        # with an in-flight auto-verify of another Gap. The merger's
-        # single lock serializes everything that touches the host
-        # worktree.
-        return self.merger.verify_now(params["gap_id"])
+        # Verify is user approval for a Gap already parked in `review`.
+        # The Merge agent owns all git merge work while Gaps are in
+        # `ready-merge`.
+        return verify_op.approve_review(self._conn, params["gap_id"])
 
     def _h_create_gap(self, params: dict) -> dict:
         gap_id = params["gap_id"]
@@ -593,9 +592,9 @@ class Runner:
         """Revert a refine merge commit and transition the Gap to
         `cancelled` with a log entry.
 
-        Routes through the merger's host lock so a concurrent auto-
-        merge or user Verify can't race with us on the shared host
-        worktree. The merger also runs its cleanup-worktree pass
+        Routes through the merger's host lock so a concurrent Merge-agent
+        operation can't race with us on the shared host worktree. The
+        merger also runs its cleanup-worktree pass
         before AND after — aborting any leftover stuck
         `merge`/`rebase` from a prior failure so the revert doesn't
         trip on stale state, and tearing down any partial revert if

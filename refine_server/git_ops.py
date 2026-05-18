@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Callable
 
 
-# Merge commits made by refine's verify path end with a `Refine Gap: <id>`
+# Merge commits made by refine's Merge agent end with a `Refine Gap: <id>`
 # trailer (see refine_server.verify_op._build_merge_message). We use the
 # trailer to recover gap_id from a merge commit on the target branch.
 _REFINE_GAP_FOOTER = re.compile(
@@ -338,7 +338,7 @@ def commits_on_branch_since(base_ref: str, cwd: Path) -> int:
         return 0
 
 
-# ---- merge & push (review → done) --------------------------------------------
+# ---- merge & push (ready-merge → review) -------------------------------------
 
 def pull_ff_only(cwd: Path | None = None) -> GitResult:
     return _run(["pull", "--ff-only", "--no-rebase"], cwd=cwd or client_repo_path())

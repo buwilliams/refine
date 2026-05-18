@@ -212,11 +212,11 @@ class Dispatcher:
                 return
 
         # Pre-checks: target branch + upstream. The agent's worktree is
-        # based off the same branch `verify` will merge back into — by
-        # default that's the host's checked-out branch, but the operator
-        # can pin it via the `merge_target_branch` setting (e.g. on a
-        # monorepo where you want all Gaps to merge to `main` regardless
-        # of what the host happens to be on).
+        # based off the same branch the Merge agent will merge back into
+        # — by default that's the host's checked-out branch, but the
+        # operator can pin it via the `merge_target_branch` setting
+        # (e.g. on a monorepo where you want all Gaps to merge to `main`
+        # regardless of what the host happens to be on).
         target = (db.get_setting(conn, "merge_target_branch") or "").strip()
         if target:
             if not git_ops.local_branch_exists(target):
@@ -450,9 +450,8 @@ class Dispatcher:
         # Success path: transition to `ready-merge`. That's the
         # system-owned status — picked up by the Merger, never set or
         # cleared by the user. The dispatcher owns the
-        # `in-progress -> ready-merge` flip; the merger owns
-        # `ready-merge -> done` (clean verify) and
-        # `ready-merge -> review` (verify needed human attention).
+        # `in-progress -> ready-merge` flip; the merger owns the
+        # `ready-merge -> review` merge step.
         next_status = "ready-merge" if success else "failed"
         with db.transaction(conn):
             cur = conn.execute(
@@ -485,13 +484,12 @@ class Dispatcher:
             details=outcome.details,
         )
 
-        # Auto-verify is owned by the Merger now — a single-threaded
-        # worker that serializes every operation on the host worktree.
+        # Merging is owned by the Merger now — a single-threaded worker
+        # that serializes every operation on the host worktree.
         # The dispatcher just flipped the Gap to `ready-merge`; tell
         # the merger to scan promptly instead of waiting on its
         # periodic tick. The Gap stays in `ready-merge` until the
-        # merger lands it in `done` (clean verify) or punts it to
-        # `review` (verify needed human attention).
+        # merger parks it in `review`.
         if success and self.on_run_finished is not None:
             try:
                 self.on_run_finished(gap_id)

@@ -156,7 +156,7 @@ function drawChanges(data, f) {
       <p class="muted">
         ${f.q || f.status || f.priority
           ? `No changes match the current filters on <code>${htmlEscape(branch)}</code>.`
-          : `No refine merges on <code>${htmlEscape(branch)}</code> yet. When a Gap moves <em>review → done</em>, its merge commit shows up here.`}
+          : `No refine merges on <code>${htmlEscape(branch)}</code> yet. When the Merge agent lands a Gap, its merge commit shows up here.`}
       </p>
       ${renderPaginationControls("changes", pageMeta, 0, "change")}`;
     bindPaginationControls(root, "changes", (page) =>

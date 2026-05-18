@@ -100,10 +100,10 @@ async function loadGapDetail(gapId) {
 // `back` and `forward` neighbors. Two states have no user buttons —
 // `in-progress` (dispatcher owns) and `ready-merge` (merger owns) —
 // because they're system-driven phases the agent passes through
-// automatically (todo → in-progress → ready-merge → done | review).
+// automatically (todo → in-progress → ready-merge → review).
 // Forward from `review` goes through the dedicated /verify endpoint
-// (real git merge + push); every other transition is a status PATCH
-// with no workflow side effects.
+// for approval; every other transition is a status PATCH with no
+// workflow side effects.
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
@@ -161,9 +161,8 @@ function drawGapDetail(gap) {
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow
   // skips `in-progress` (the dispatcher owns that). Forward from review
-  // goes through the existing `verify` endpoint (the only transition
-  // with real git side effects); everything else is a bookkeeping
-  // status update via PATCH /api/gaps/<id>.
+  // goes through the existing `verify` endpoint for approval; everything
+  // else is a bookkeeping status update via PATCH /api/gaps/<id>.
   const workflow = GAP_WORKFLOW[gap.status] || {};
   const backBtn = workflow.back ? `
     <button id="btn-state-back">${htmlEscape(workflow.back.label)}</button>
@@ -262,8 +261,8 @@ function drawGapDetail(gap) {
   });
 
   // Workflow back / forward buttons. Forward from `review` calls the
-  // existing /verify endpoint (the only transition with real git side
-  // effects); every other arrow is a plain status PATCH.
+  // existing /verify endpoint for approval; every other arrow is a plain
+  // status PATCH.
   const wireWorkflow = (btnId, target) => {
     if (!target) return;
     $(btnId)?.addEventListener("click", async () => {

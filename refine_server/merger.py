@@ -1,9 +1,7 @@
-"""Single-threaded merger that owns the host worktree.
+"""Single-threaded Merge agent that owns the host worktree.
 
-Everything that touches the host repo's `HEAD` / index — auto-verify
-after a Gap's agent finishes, user-triggered Verify clicks, conflict-
-resolver runs — is serialized through this one component. The two
-problems it solves:
+Everything that touches the host repo's `HEAD` / index for Gap merging
+is serialized through this one component. The two problems it solves:
 
 1. **Race condition.** Multiple agent runs finishing in close
    succession used to each fire their own `verify_op.perform_verify`
@@ -26,10 +24,10 @@ Status semantics:
   dispatcher owns that flip). `ready-merge` is system-owned: the
   user never sets or clears it. The merger's `_find_one_ready()`
   query picks up any `ready-merge` Gap, oldest-finished first.
-- The merger calls `verify_op.perform_verify`. On success, verify
-  transitions the Gap to `done`. On failure, the merger transitions
-  the Gap to `review` so the operator has a recovery path, and
-  cleans the host worktree so the next ready Gap can proceed.
+- The merger calls `verify_op.perform_verify`. On success, it parks
+  the Gap in `review` for human approval. On failure, the merger also
+  transitions the Gap to `review` so the operator has a recovery path,
+  and cleans the host worktree so the next ready Gap can proceed.
 
 On runner restart, `recovery.reconcile_on_start` distinguishes "agent
 crashed mid-run" (orphan → `failed`) from "agent finished, awaiting
@@ -66,9 +64,8 @@ class Merger:
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
-        # Serializes anything that touches the host worktree. Held by
-        # both the background tick and any synchronous `verify_now`
-        # call from an HTTP handler (user Verify click).
+        # Serializes anything that mutates the host worktree for merge,
+        # undo, or conflict resolution.
         self._host_lock = threading.Lock()
         # Snapshot state for the Agents screen. Updated as the merger
         # picks up / releases each Gap so the UI can render the
@@ -140,7 +137,7 @@ class Merger:
 
     def run_under_host_lock(self, thunk, *, label: str) -> dict:
         """Serialize an arbitrary host-worktree operation through the
-        same lock the merger holds during auto-verify. Before invoking
+        same lock the merger holds during merge work. Before invoking
         `thunk`, abort any leftover half-finished `merge`/`rebase`/etc.
         After a failed thunk, run cleanup again so the next op starts
         clean. Used by Undo (Changes screen) and could be used by any
@@ -159,32 +156,6 @@ class Merger:
                           "message": f"{label} raised: {e!r}"}
             if not result.get("ok"):
                 self._cleanup_worktree(reason=f"post-{label} failure cleanup")
-            return result
-
-    def verify_now(self, gap_id: str, *, actor: str = "refine") -> dict:
-        """Synchronously run verify for a Gap. Serializes with the
-        background tick so a user-triggered Verify can't race with
-        an auto-verify of another Gap. The result dict mirrors
-        `verify_op.perform_verify`'s return."""
-        with self._host_lock:
-            self._cleanup_worktree(reason="pre-verify cleanup")
-            try:
-                result = verify_op.perform_verify(
-                    self._get_conn(), gap_id, actor=actor,
-                )
-            except Exception as e:
-                activity.append(
-                    self._get_conn(),
-                    message=f"Verify raised: {e!r}",
-                    severity="error", category="git",
-                    gap_id=gap_id, actor=actor,
-                )
-                result = {"ok": False, "stage": "internal",
-                          "message": f"verify raised: {e!r}"}
-            # On any failure, clean up so the next attempt starts
-            # from a clean tree — exactly the user's stated rule.
-            if not result.get("ok"):
-                self._cleanup_worktree(reason="post-failure cleanup")
             return result
 
     # ---- internals -----------------------------------------------------------
@@ -208,8 +179,8 @@ class Merger:
     def _tick(self) -> None:
         # Honor the same `paused` toggle as the dispatcher: when paused,
         # don't pick up new merges (or auto-cleanup). User-triggered
-        # Verify clicks still go through `verify_now`, which doesn't
-        # consult this flag — the user is explicitly asking for work.
+        # Manual Verify is review approval only and does not run merge
+        # work; pause only gates this Merge-agent loop.
         if db.get_setting_int(self._get_conn(), "paused", 0):
             return
         with self._host_lock:
@@ -241,9 +212,7 @@ class Merger:
             try:
                 # Auto-merge lands the branch but parks the Gap in
                 # `review` — a human approves before it moves to
-                # `done`. The user-triggered Verify path
-                # (`verify_now`) is what eventually flips review →
-                # done.
+                # `done`.
                 result = verify_op.perform_verify(
                     conn, gap_id, actor="runner",
                     final_status="review",
@@ -251,12 +220,12 @@ class Merger:
             except Exception as e:
                 activity.append(
                     conn,
-                    message=f"Auto-verify raised: {e!r}",
+                    message=f"Merge raised: {e!r}",
                     severity="error", category="git",
                     gap_id=gap_id, actor="runner",
                 )
                 result = {"ok": False, "stage": "internal",
-                          "message": f"verify raised: {e!r}"}
+                          "message": f"merge raised: {e!r}"}
         finally:
             with self._snap_lock:
                 self._current_gap_id = None
@@ -265,15 +234,15 @@ class Merger:
                 # and the failure path (auto-merge couldn't complete
                 # → review) land the Gap in `review`. So the
                 # snapshot's `last_outcome` is always `review` from
-                # the auto-merger's perspective.
+                # the Merge agent's perspective.
                 self._last_outcome = "review"
 
         if result.get("ok"):
-            # verify_op already moved the Gap to `done`. Nothing else
-            # to do.
+            # verify_op already parked the Gap in `review`. Nothing
+            # else to do.
             return
 
-        # Verify failed somewhere recoverable. Clean up any new stuck
+        # Merge failed somewhere recoverable. Clean up any new stuck
         # state left behind by this attempt, then move the Gap to
         # `review` so the operator can investigate without blocking
         # the rest of the queue.
@@ -291,7 +260,7 @@ class Merger:
             activity.append(
                 conn,
                 message=(result.get("message")
-                         or "Auto-verify failed — moved Gap to review"),
+                         or "Merge failed — moved Gap to review"),
                 severity="warn", category="state",
                 gap_id=gap_id, actor="runner",
                 details=result.get("details"),
