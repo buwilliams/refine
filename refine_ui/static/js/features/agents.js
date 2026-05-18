@@ -33,10 +33,13 @@ function drawAgents(dash, settings) {
   const root = document.getElementById("agents-content");
   if (!root) return;  // late SSE refresh after navigation away
   const merger = dash.merger || null;
+  const governance = dash.governance || null;
   const agents = dash.running || [];
   const mergerActive = !!(merger && merger.state === "merging" && merger.gap_id);
+  const governanceActive = !!(governance && governance.state === "reviewing" && governance.gap_id);
   const mergerQueued = merger?.queued || 0;
-  const hasWork = mergerActive || agents.length > 0;
+  const governanceQueued = governance?.queued || 0;
+  const hasWork = mergerActive || governanceActive || agents.length > 0;
   const anchorMs = Date.now();
   const mergerRow = mergerActive ? `
     <tr class="merger-row">
@@ -49,6 +52,18 @@ function drawAgents(dash, settings) {
           data-anchor-ms="${anchorMs}">${fmtElapsed(merger.elapsed_seconds || 0)}</td>
       <td class="muted small">—</td>
       <td><span class="muted small">verifying merge</span></td>
+    </tr>` : "";
+  const governanceRow = governanceActive ? `
+    <tr class="governance-row">
+      <td>
+        <span class="role-pill merger">governance</span>
+        <a href="#/gaps/${htmlEscape(governance.gap_id)}">${htmlEscape(governance.gap_id.slice(0, 10))}…</a>
+      </td>
+      <td class="js-elapsed-tick"
+          data-base="${governance.elapsed_seconds || 0}"
+          data-anchor-ms="${anchorMs}">${fmtElapsed(governance.elapsed_seconds || 0)}</td>
+      <td class="muted small">—</td>
+      <td><span class="muted small">reviewing governance</span></td>
     </tr>` : "";
   const agentRows = agents.map((r) => `
     <tr>
@@ -74,6 +89,9 @@ function drawAgents(dash, settings) {
         : "");
   const mergerUnreachable = !merger
     ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — backend runner unavailable.</p>`
+    : "";
+  const governanceLine = governance
+    ? `<p class="muted small" style="margin-top:8px">Governance: ${governance.configured ? governance.state : "not configured"}${governanceQueued ? ` · queue ${governanceQueued}` : ""}${governance.last_outcome ? ` · last outcome <code>${htmlEscape(governance.last_outcome)}</code>` : ""}.</p>`
     : "";
   root.innerHTML = `
     <div class="card">
@@ -102,8 +120,9 @@ function drawAgents(dash, settings) {
       ${hasWork ? `
         <table class="table">
           <thead><tr><th>Worker</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead>
-          <tbody>${mergerRow}${agentRows}</tbody>
+          <tbody>${governanceRow}${mergerRow}${agentRows}</tbody>
         </table>` : `<p class="muted">Nothing running.</p>`}
+      ${governanceLine}
       ${queueLine}
       ${mergerUnreachable}
     </div>

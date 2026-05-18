@@ -149,6 +149,21 @@ def _h_patch_settings(_h, _m, body, _q):
     return api.update_settings(body or {})
 
 
+@route("GET", r"/api/governance")
+def _h_governance_get(_h, _m, _b, _q):
+    return api.governance_get()
+
+
+@route("PATCH", r"/api/governance")
+def _h_governance_save(_h, _m, body, _q):
+    return api.governance_save(body or {})
+
+
+@route("POST", r"/api/governance/generate-rules")
+def _h_governance_generate_rules(_h, _m, body, _q):
+    return api.governance_generate_rules(body or {})
+
+
 @route("POST", r"/api/settings/recheck-auth")
 def _h_recheck(_h, _m, _b, _q):
     return api.recheck_auth()

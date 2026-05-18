@@ -13,17 +13,18 @@ async function renderSettings() {
 async function refreshSettings() {
   if (state.currentRoute !== "settings") return;
   try {
-    const [s, diag, reps, feats, project] = await Promise.all([
+    const [s, diag, reps, feats, project, gov] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
       api("GET", "/api/features"),
       api("GET", "/api/project/status"),
+      api("GET", "/api/governance"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
     state.project = project;
-    drawSettings(s.settings || {}, diag, reps.reporters || [], feats);
+    drawSettings(s.settings || {}, diag, reps.reporters || [], feats, gov || {});
   } catch (e) {
     const root = document.getElementById("settings-content");
     if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
@@ -112,7 +113,69 @@ function renderFeatureFlagsCard(feats) {
     </div>`;
 }
 
-function drawSettings(s, diag, reps, feats) {
+function renderGovernanceRuleRows(rules) {
+  const rows = (rules || []).map((rule) => `
+    <div class="governance-rule-row">
+      <input type="text" class="governance-rule-input"
+             value="${htmlEscape(rule.text || "")}"
+             data-rule-id="${htmlEscape(rule.id || "")}"
+             data-created="${htmlEscape(rule.created || "")}"
+             data-source="${htmlEscape(rule.source || "manual")}">
+      <button class="danger" data-governance-remove-rule>Remove</button>
+    </div>`).join("");
+  return rows || `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
+}
+
+function renderGovernanceRules(rules) {
+  return `
+    <div id="governance-rules-list">
+      ${renderGovernanceRuleRows(rules)}
+    </div>`;
+}
+
+function collectGovernanceRules() {
+  return $$(".governance-rule-input").map((input) => ({
+    id: input.dataset.ruleId || "",
+    text: (input.value || "").trim(),
+    created: input.dataset.created || "",
+    source: input.dataset.source || "manual",
+  })).filter((rule) => rule.text);
+}
+
+function bindGovernanceRuleButtons() {
+  $$("[data-governance-remove-rule]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      btn.closest(".governance-rule-row")?.remove();
+      if (!$(".governance-rule-input")) {
+        $("#governance-rules-list").innerHTML = `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
+      }
+    });
+  });
+}
+
+function addGovernanceRuleRow(text = "") {
+  const list = $("#governance-rules-list");
+  if (!list) return;
+  list.querySelector("[data-empty-governance-rules]")?.remove();
+  const row = document.createElement("div");
+  row.className = "governance-rule-row";
+  row.innerHTML = `
+    <input type="text" class="governance-rule-input"
+           value="${htmlEscape(text)}"
+           data-rule-id="" data-created="" data-source="manual">
+    <button class="danger" data-governance-remove-rule>Remove</button>
+  `;
+  list.appendChild(row);
+  row.querySelector("[data-governance-remove-rule]").addEventListener("click", () => {
+    row.remove();
+    if (!$(".governance-rule-input")) {
+      list.innerHTML = `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
+    }
+  });
+  row.querySelector("input")?.focus();
+}
+
+function drawSettings(s, diag, reps, feats, gov = {}) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const projectApps = state.project?.apps || [];
   const currentProject = state.project?.client_repo || "";
@@ -130,6 +193,7 @@ function drawSettings(s, diag, reps, feats) {
     { slug: "project",      label: "Project" },
     { slug: "reporters",    label: "Reporters" },
     { slug: "runtime",      label: "Runtime" },
+    { slug: "governance",   label: "Governance" },
     { slug: "cli",          label: "AI Provider" },
     { slug: "diagnostics",  label: "Diagnostics" },
   ];
@@ -246,6 +310,42 @@ function drawSettings(s, diag, reps, feats) {
     </div>
     ${renderFeatureFlagsCard(feats)
       || `<div class="card" style="margin-top:16px"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></div>`}`)}
+
+    ${pane("governance", `
+    <div class="card">
+      <h3>Product</h3>
+      <p class="muted small" style="margin-top:0">
+        The what and why: who the product is for, what problems it solves,
+        and what success looks like.
+      </p>
+      <textarea id="s-governance-product" rows="7">${htmlEscape(gov.product || "")}</textarea>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Constitution</h3>
+      <p class="muted small" style="margin-top:0">
+        Non-negotiable principles for the entire project.
+      </p>
+      <textarea id="s-governance-constitution" rows="7">${htmlEscape(gov.constitution || "")}</textarea>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3>Rules</h3>
+      <p class="muted small" style="margin-top:0">
+        One-line rules the Governance agent applies before implementation.
+      </p>
+      ${gov.configured ? "" : `
+        <p class="muted small" style="color:var(--warn)">
+          Governance is incomplete. Gap execution continues until Product and Constitution are both filled in.
+        </p>`}
+      ${renderGovernanceRules(gov.rules || [])}
+      <div class="actions" style="margin-top:10px">
+        <button class="secondary" id="s-governance-add-rule">Add rule</button>
+        <button class="secondary" id="s-governance-generate">Generate rules</button>
+        <span class="spacer"></span>
+        <button id="s-governance-save">Save governance</button>
+      </div>
+    </div>`)}
 
     ${pane("reporters", `
     <div class="card">
@@ -389,6 +489,39 @@ function drawSettings(s, diag, reps, feats) {
   // Tab click handlers — purely DOM-local, no re-fetch.
   $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
     btn.addEventListener("click", () => setSettingsTab(btn.dataset.tabTarget));
+  });
+  bindGovernanceRuleButtons();
+  $("#s-governance-add-rule")?.addEventListener("click", () => addGovernanceRuleRow());
+  $("#s-governance-save")?.addEventListener("click", async () => {
+    await withButtonBusy($("#s-governance-save"), "Saving…", async () => {
+      try {
+        await api("PATCH", "/api/governance", {
+          product: $("#s-governance-product").value,
+          constitution: $("#s-governance-constitution").value,
+          rules: collectGovernanceRules(),
+        });
+        toast("Governance saved", "info");
+        await refreshSettings();
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#s-governance-generate")?.addEventListener("click", async () => {
+    const product = ($("#s-governance-product")?.value || "").trim();
+    const constitution = ($("#s-governance-constitution")?.value || "").trim();
+    if (!product || !constitution) {
+      toast("Product and Constitution are required to generate rules", "error");
+      return;
+    }
+    await withButtonBusy($("#s-governance-generate"), "Generating…", async () => {
+      try {
+        const r = await api("POST", "/api/governance/generate-rules", {
+          product, constitution,
+        });
+        $("#governance-rules-list").innerHTML = renderGovernanceRuleRows(r.rules || []);
+        bindGovernanceRuleButtons();
+        toast("Rules generated — review and save", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
   $("#s-project-add")?.addEventListener("click", async () => {
     await openProjectAttachModal({

@@ -10,13 +10,14 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, db, features, gaps as shared_gaps, reporters
+from refine_server import activity, db, features, gaps as shared_gaps, governance, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
-    M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
+    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
+    M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
     M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -24,6 +25,7 @@ from refine_server.backend_protocol import (
 from . import dispatcher as _dispatcher
 from . import gap_writer, git_ops, llm, merger as _merger, preflight, recovery, state_committer, subprocess_mgr, target_app, verify_op
 from .chat_mgr import ChatManager
+from .governance_agent import GovernanceAgent
 
 
 class Runner:
@@ -51,6 +53,10 @@ class Runner:
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
             on_run_finished=lambda _gid: self.merger.wake(),
         )
+        self.governance_agent = GovernanceAgent(
+            get_conn=self._get_conn,
+            on_pass=lambda _gid: self.dispatcher.enforce_now(),
+        )
         self.chat = ChatManager(
             get_standalone_idle_timeout=lambda: db.get_setting_int(
                 self._conn, "chat_idle_timeout_seconds", 300,
@@ -73,6 +79,7 @@ class Runner:
         db.init_db()
         recovery.reconcile_on_start(self._conn)
         preflight.check(self._conn)
+        self.governance_agent.start()
         self.dispatcher.start()
         self.merger.start()
         self.state_committer.start()
@@ -89,6 +96,7 @@ class Runner:
         except Exception:
             pass
         self.state_committer.stop()
+        self.governance_agent.stop()
         self.merger.stop()
         self.dispatcher.stop()
         activity.append(
@@ -133,6 +141,10 @@ class Runner:
             M_RENAME_REPORTER_STRINGS: self._h_rename_reporter_strings,
             M_LIST_CHANGES: self._h_list_changes,
             M_UNDO_GAP: self._h_undo_gap,
+            M_GOVERNANCE_GET: self._h_governance_get,
+            M_GOVERNANCE_SAVE: self._h_governance_save,
+            M_GOVERNANCE_GENERATE_RULES: self._h_governance_generate_rules,
+            M_GOVERNANCE_WAKE: self._h_governance_wake,
             M_TARGET_APP_RUN: self._h_target_app_run,
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
             M_TARGET_APP_HEALTH: self._h_target_app_health,
@@ -155,6 +167,7 @@ class Runner:
         return {
             "running": self.sub_mgr.running_snapshot(),
             "merger": self.merger.snapshot(),
+            "governance": self.governance_agent.snapshot(),
         }
 
     def _h_diagnostics(self, _: dict) -> dict:
@@ -169,10 +182,12 @@ class Runner:
         # The dispatcher launches automatically; this method exists mostly so
         # the webapp can nudge scheduling after a status change.
         self.dispatcher.enforce_now()
+        self.governance_agent.wake()
         return {"queued": True}
 
     def _h_enforce_scheduling(self, params: dict) -> dict:
         self.dispatcher.enforce_now()
+        self.governance_agent.wake()
         return {"ok": True}
 
     def _h_cancel(self, params: dict) -> dict:
@@ -235,6 +250,7 @@ class Runner:
             severity="info", category="state",
             gap_id=gap_id, actor=params["reporter"],
         )
+        self.governance_agent.wake()
         return {"gap": gap}
 
     def _h_append_round(self, params: dict) -> dict:
@@ -264,6 +280,7 @@ class Runner:
             gap_id=gap_id, actor=params["reporter"],
         )
         self.dispatcher.enforce_now()
+        self.governance_agent.wake()
         return {"gap": gap}
 
     def _h_edit_round(self, params: dict) -> dict:
@@ -454,6 +471,53 @@ class Runner:
             m["status"] = row["status"] if row else None
             m["priority"] = row["priority"] if row else None
         return {"branch": target, "changes": merges}
+
+    def _h_governance_get(self, params: dict) -> dict:
+        settings = governance.load_settings(self._conn)
+        return {**settings, "configured": governance.is_configured(self._conn)}
+
+    def _h_governance_save(self, params: dict) -> dict:
+        settings = governance.save_settings(
+            self._conn,
+            product=params.get("product"),
+            constitution=params.get("constitution"),
+            rules=params.get("rules"),
+        )
+        activity.append(
+            self._conn,
+            message="Governance settings updated",
+            severity="info",
+            category="governance",
+            actor="refine",
+        )
+        self.governance_agent.wake()
+        self.dispatcher.enforce_now()
+        return {**settings, "configured": governance.is_configured(self._conn)}
+
+    def _h_governance_generate_rules(self, params: dict) -> dict:
+        product = str(params.get("product") or "").strip()
+        constitution = str(params.get("constitution") or "").strip()
+        if not product or not constitution:
+            raise ValueError("product and constitution are required")
+        provider = db.get_setting(self._conn, "agent_cli")
+        result = governance.generate_rules(
+            product, constitution, provider=provider,
+        )
+        activity.append(
+            self._conn,
+            message=(
+                f"Governance generated {len(result.get('rules') or [])} rule"
+                f"{'' if len(result.get('rules') or []) == 1 else 's'}"
+            ),
+            severity="info",
+            category="governance",
+            actor="refine",
+        )
+        return result
+
+    def _h_governance_wake(self, params: dict) -> dict:
+        self.governance_agent.wake()
+        return {"ok": True}
 
     def _h_undo_gap(self, params: dict) -> dict:
         """Revert a refine merge commit and transition the Gap to

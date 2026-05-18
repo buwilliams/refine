@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from refine_server import activity, db
+from refine_server import activity, db, governance
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
@@ -102,6 +102,11 @@ class Dispatcher:
             # already running? (race)
             if self.sub_mgr.is_running(gid):
                 continue
+            if governance.is_configured(conn):
+                gap = read_gap_json(gid)
+                latest = (gap.get("rounds") or [])[-1] if gap and gap.get("rounds") else None
+                if not latest or not governance.has_passed(latest):
+                    continue
             self._launch_one(conn, gid, row["branch_name"])
 
     def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
@@ -167,6 +172,10 @@ class Dispatcher:
         ts = now_iso()
         for row in rows:
             gid = row["id"]
+            if governance.is_configured(conn):
+                gap = read_gap_json(gid)
+                if governance.latest_round_is_governance_blocked(gap):
+                    continue
             with db.transaction(conn):
                 cur = conn.execute(
                     "UPDATE gaps_index SET status = 'todo', updated = ? "

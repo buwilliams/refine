@@ -123,6 +123,12 @@ DEFAULT_SETTINGS = {
     # to this branch (auto-stashing any WIP) and restore the host's
     # original branch afterward.
     "merge_target_branch": "",
+    # Gap Governance. Product + Constitution together enable governance
+    # review before Gap agent dispatch. Rules are stored as JSON array
+    # objects: {id, text, created, updated, source}.
+    "governance_product": "",
+    "governance_constitution": "",
+    "governance_rules_json": "[]",
     # Target-application management. New installs use structured one-line
     # shell commands and checks. The legacy prose settings stay present so
     # old databases can display and convert existing configuration.

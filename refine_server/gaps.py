@@ -16,6 +16,17 @@ from typing import Any
 from .paths import gap_dir, gap_json_path  # both consult the loaded Config
 
 
+RULE_STATES = (
+    "unclassified", "passed", "failed", "blocked", "needs_review",
+    "needs_context", "exception_requested",
+)
+META_RULE_STATES = (
+    "unclassified", "none", "candidate_rule", "rule_review_needed",
+    "ambiguous_rule", "stale_rule", "conflicting_rules",
+)
+GOVERNANCE_BINARY_STATES = ("unclassified", "pass", "fail")
+
+
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -81,7 +92,7 @@ def normalize_notes(value: Any) -> list[dict[str, Any]]:
 
 def new_round(reporter: str, actual: str, target: str) -> dict[str, Any]:
     now = now_iso()
-    return {
+    round_obj = {
         "reporter": reporter,
         "actual": actual,
         "target": target,
@@ -89,6 +100,47 @@ def new_round(reporter: str, actual: str, target: str) -> dict[str, Any]:
         "updated": now,
         "logs": [],
     }
+    reset_round_governance(round_obj)
+    return round_obj
+
+
+def default_round_governance() -> dict[str, Any]:
+    return {
+        "rule_state": "unclassified",
+        "meta_rule_state": "unclassified",
+        "product_state": "unclassified",
+        "constitution_state": "unclassified",
+        "governance_message": "",
+        "governance_details": "",
+        "governance_checked_at": "",
+        "governance_rule_actions": [],
+    }
+
+
+def normalize_round_governance(round_obj: dict[str, Any]) -> dict[str, Any]:
+    defaults = default_round_governance()
+    for key, default in defaults.items():
+        if key not in round_obj:
+            round_obj[key] = default.copy() if isinstance(default, list) else default
+    if round_obj.get("rule_state") not in RULE_STATES:
+        round_obj["rule_state"] = "unclassified"
+    if round_obj.get("meta_rule_state") not in META_RULE_STATES:
+        round_obj["meta_rule_state"] = "unclassified"
+    if round_obj.get("product_state") not in GOVERNANCE_BINARY_STATES:
+        round_obj["product_state"] = "unclassified"
+    if round_obj.get("constitution_state") not in GOVERNANCE_BINARY_STATES:
+        round_obj["constitution_state"] = "unclassified"
+    if not isinstance(round_obj.get("governance_rule_actions"), list):
+        round_obj["governance_rule_actions"] = []
+    for key in ("governance_message", "governance_details", "governance_checked_at"):
+        if round_obj.get(key) is None:
+            round_obj[key] = ""
+    return round_obj
+
+
+def reset_round_governance(round_obj: dict[str, Any]) -> dict[str, Any]:
+    round_obj.update(default_round_governance())
+    return round_obj
 
 
 def read_gap_json(gap_id: str) -> dict[str, Any] | None:
@@ -99,6 +151,9 @@ def read_gap_json(gap_id: str) -> dict[str, Any] | None:
         gap = json.loads(f.read().decode("utf-8"))
     # Transparent legacy-shape migration: notes used to be a single string.
     gap["notes"] = normalize_notes(gap.get("notes"))
+    for round_obj in gap.get("rounds") or []:
+        if isinstance(round_obj, dict):
+            normalize_round_governance(round_obj)
     return gap
 
 

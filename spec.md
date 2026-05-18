@@ -96,6 +96,37 @@ Refine runs as one host-native UI backend on the same machine as the target app.
 
 Priorities gate executable work. `high` blocks `medium` and `low`; `medium` blocks `low`. A higher-priority Gap blocks lower-priority agent work only while it is in `todo`, `in-progress`, or `ready-merge`; `backlog`, `review`, `done`, `failed`, and `cancelled` do not block. If higher-priority blocking work appears while a lower-priority agent is running, refine kills the lower-priority CLI process, discards its partial worktree/branch, and moves that Gap back to `todo` so it can rerun after higher-priority dependencies land.
 
+### Governance
+
+Governance is an optional pre-dispatch review layer. It is configured from
+Settings → Governance with three inputs:
+
+- **Product:** who the product is for, what problems it solves, and what
+  success looks like.
+- **Constitution:** non-negotiable project principles.
+- **Rules:** one-line rules the Governance agent applies to submitted Gaps.
+
+Governance is enabled only when Product and Constitution are both non-empty.
+Until then, Gap execution behaves as before. When enabled, a single
+Governance agent reviews `todo` Gaps before implementation agents can launch.
+The latest round records:
+
+- `rule_state`: `unclassified`, `passed`, `failed`, `blocked`,
+  `needs_review`, `needs_context`, or `exception_requested`.
+- `meta_rule_state`: `unclassified`, `none`, `candidate_rule`,
+  `rule_review_needed`, `ambiguous_rule`, `stale_rule`, or
+  `conflicting_rules`.
+- `product_state` / `constitution_state`: `unclassified`, `pass`, or `fail`.
+- Governance message/details, check timestamp, and any rule actions.
+
+Only rounds with `rule_state=passed`, `product_state=pass`, and
+`constitution_state=pass` may proceed to implementation. Failed or unclear
+governance reviews move the Gap back to `backlog` with a governance message;
+the user edits the latest round and resubmits it to `todo`. Governance may
+auto-apply rule add/edit/remove actions when Product and Constitution both
+pass. Rules can also be generated from Product + Constitution in Settings and
+reviewed before saving.
+
 Transitions:
 - `todo → in-progress` — automatic when refine launches an agent subprocess for the Gap.
 - `in-progress → ready-merge` — automatic on successful agent completion. The Gap joins the merger's queue.

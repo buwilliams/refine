@@ -148,6 +148,7 @@ function drawGapDetail(gap) {
   attachActivityToRounds(rounds, gap.activity || []);
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
+  const governanceBanner = computeGovernanceBanner(gap, latest);
 
   const isLatestEditable = (gap.status === "backlog" ||
                             gap.status === "todo" ||
@@ -199,6 +200,12 @@ function drawGapDetail(gap) {
           <span class="banner-msg">${htmlEscape(failureBanner.message)}</span>
           <span class="banner-actions">${failureBanner.actionsHtml}</span>
         </div>` : ""}
+      ${governanceBanner ? `
+        <div class="banner ${governanceBanner.severity}">
+          <span class="banner-msg">${htmlEscape(governanceBanner.message)}</span>
+        </div>` : ""}
+
+      ${latest ? renderGovernanceSummary(latest) : ""}
 
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
@@ -442,6 +449,9 @@ function renderRound(rnd, idx, isLatest, editable,
       <summary class="round-head">
         <strong>Round ${idx + 1}</strong>
         ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
+        ${isLatest && rnd.rule_state && rnd.rule_state !== "unclassified"
+          ? `<span class="status-pill ${rnd.rule_state === "passed" ? "done" : "failed"}">governance: ${htmlEscape(rnd.rule_state)}</span>`
+          : ""}
         <span class="spacer"></span>
         <span class="muted small">${htmlEscape(rnd.reporter || "(no reporter)")} · ${fmtTime(rnd.created)}</span>
       </summary>
@@ -458,6 +468,34 @@ function renderRound(rnd, idx, isLatest, editable,
       </div>
     </details>
   `;
+}
+
+function renderGovernanceSummary(round) {
+  if (!round || !round.rule_state || round.rule_state === "unclassified") {
+    return "";
+  }
+  const actions = round.governance_rule_actions || [];
+  return `
+    <div class="card" style="margin:0 0 14px">
+      <h3>Governance</h3>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <span class="status-pill ${round.rule_state === "passed" ? "done" : "failed"}">rules: ${htmlEscape(round.rule_state)}</span>
+        <span class="status-pill ${round.product_state === "pass" ? "done" : "failed"}">product: ${htmlEscape(round.product_state || "unclassified")}</span>
+        <span class="status-pill ${round.constitution_state === "pass" ? "done" : "failed"}">constitution: ${htmlEscape(round.constitution_state || "unclassified")}</span>
+        <span class="status-pill todo">meta: ${htmlEscape(round.meta_rule_state || "none")}</span>
+      </div>
+      ${round.governance_message ? `<p style="margin-bottom:6px">${htmlEscape(round.governance_message)}</p>` : ""}
+      ${round.governance_details ? `<details><summary>Details</summary><pre>${htmlEscape(round.governance_details)}</pre></details>` : ""}
+      ${actions.length ? `
+        <details style="margin-top:8px">
+          <summary>Rule actions (${actions.length})</summary>
+          ${actions.map((a) => `
+            <div class="log-entry info">
+              <div>${htmlEscape(a.action || "")}${a.text ? `: ${htmlEscape(a.text)}` : ""}</div>
+              ${a.reason ? `<div class="meta">${htmlEscape(a.reason)}</div>` : ""}
+            </div>`).join("")}
+        </details>` : ""}
+    </div>`;
 }
 
 function renderNote(n) {
@@ -572,6 +610,20 @@ function computeFailureBanner(gap, latest) {
     }
   }
   return null;
+}
+
+function computeGovernanceBanner(gap, latest) {
+  if (!latest || !latest.rule_state || latest.rule_state === "unclassified") {
+    return null;
+  }
+  const passed = latest.rule_state === "passed"
+    && latest.product_state === "pass"
+    && latest.constitution_state === "pass";
+  if (passed) return null;
+  return {
+    severity: gap.status === "backlog" ? "warn" : "error",
+    message: latest.governance_message || "Governance review requires changes before implementation.",
+  };
 }
 
 function bindFailureBannerActions(_gap) {

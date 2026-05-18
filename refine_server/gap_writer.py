@@ -97,6 +97,28 @@ def edit_latest_round(gap_id: str, *, actual: str | None = None,
             r["target"] = target
         if reporter is not None:
             r["reporter"] = reporter
+        if actual is not None or target is not None or reporter is not None:
+            shared_gaps.reset_round_governance(r)
+        r["updated"] = now_iso()
+        gap["updated"] = r["updated"]
+        shared_gaps.write_gap_json(gap)
+        return gap
+
+
+def set_latest_round_governance(gap_id: str, fields: dict[str, Any]) -> dict[str, Any]:
+    with _lock_for(gap_id):
+        gap = shared_gaps.read_gap_json(gap_id)
+        if gap is None:
+            raise FileNotFoundError(f"gap.json missing for {gap_id}")
+        if not gap["rounds"]:
+            raise ValueError("Gap has no rounds")
+        r = gap["rounds"][-1]
+        shared_gaps.normalize_round_governance(r)
+        allowed = set(shared_gaps.default_round_governance())
+        for key, value in fields.items():
+            if key in allowed:
+                r[key] = value
+        shared_gaps.normalize_round_governance(r)
         r["updated"] = now_iso()
         gap["updated"] = r["updated"]
         shared_gaps.write_gap_json(gap)

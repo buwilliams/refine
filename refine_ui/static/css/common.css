@@ -66,6 +66,14 @@
 .role-pill.merger { background: #ffeac2; color: #7a4500; }
 .merger-row td:last-child { color: var(--muted); }
 
+.governance-rule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
 /* Feature-flag matrix on Settings. Inline toggle + override badge,
    rendered inside table cells; .feature-current-col highlights the
    active provider's column so the operator can spot at a glance

@@ -12,12 +12,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, config, db, gaps as shared_gaps, project_registry, reporters
+from refine_server import activity, config, db, gaps as shared_gaps, governance, project_registry, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
+    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -1136,6 +1137,61 @@ def update_settings(body: dict) -> tuple[int, dict]:
     return 200, {"ok": True}
 
 
+def governance_get() -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        result = governance.load_settings(conn)
+        result["configured"] = governance.is_configured(conn)
+        return 200, result
+    finally:
+        conn.close()
+
+
+def governance_save(body: dict) -> tuple[int, dict]:
+    rules = body.get("rules")
+    if rules is not None and not isinstance(rules, list):
+        return err(400, "rules must be a list")
+    conn = _conn()
+    try:
+        result = governance.save_settings(
+            conn,
+            product=body.get("product"),
+            constitution=body.get("constitution"),
+            rules=rules,
+        )
+        result["configured"] = governance.is_configured(conn)
+        activity.append(
+            conn,
+            message="Governance settings updated",
+            severity="info",
+            category="governance",
+            actor="refine",
+        )
+    finally:
+        conn.close()
+    try:
+        get_client().call(M_GOVERNANCE_WAKE, {}, timeout=10.0)
+    except BackendError:
+        pass
+    return 200, result
+
+
+def governance_generate_rules(body: dict) -> tuple[int, dict]:
+    product = str(body.get("product") or "").strip()
+    constitution = str(body.get("constitution") or "").strip()
+    if not product or not constitution:
+        return err(400, "product and constitution are required")
+    try:
+        result = get_client().call(
+            M_GOVERNANCE_GENERATE_RULES,
+            {"product": product, "constitution": constitution},
+            timeout=600.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    return 200, result
+
+
 def recheck_auth() -> tuple[int, dict]:
     try:
         result = get_client().call(M_PREFLIGHT, {}, timeout=30.0)
@@ -1232,8 +1288,10 @@ def dashboard_summary() -> tuple[int, dict]:
             r = get_client().call(M_RUNNING, {}, timeout=5.0)
             running = r.get("running", [])
             merger_snap = r.get("merger")
+            governance_snap = r.get("governance")
         except BackendError:
             running = []
+            governance_snap = None
         pf = conn.execute(
             "SELECT ok, checked_at, message FROM preflight WHERE id = 1"
         ).fetchone()
@@ -1262,6 +1320,7 @@ def dashboard_summary() -> tuple[int, dict]:
         "counts": counts,
         "running": running,
         "merger": merger_snap,
+        "governance": governance_snap,
         "preflight": preflight,
         "activity": feed,
         "runner_reachable": runner_reachable,
