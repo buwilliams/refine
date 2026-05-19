@@ -102,7 +102,37 @@ function toast(message, kind = "info") {
 async function ensureProjectAttached() {
   const snap = await refreshProjectStatus();
   if (!snap) return false;
-  if (snap.attached) return true;
+  if (snap.attached) {
+    const schema = snap.schema || {};
+    if (schema.compatible !== false) return true;
+    if (schema.migration_required) {
+      const ok = await modalConfirm(
+        "This app uses an older Refine schema. Migrate .refine state and open it?",
+        { title: "Migrate app", okLabel: "Migrate and open" },
+      );
+      if (!ok) {
+        $("#main").innerHTML = `
+          <h2>Project migration required</h2>
+          <p class="muted">This app was not loaded because its .refine state needs migration.</p>`;
+        return false;
+      }
+      try {
+        const result = await api("POST", "/api/project/attach", {
+          path: snap.client_repo,
+          migrate: true,
+        });
+        await applyProjectAttachResult(result);
+        return true;
+      } catch (e) {
+        toast(e.details || e.message || "Migration failed", "error");
+        return false;
+      }
+    }
+    $("#main").innerHTML = `
+      <h2>Unsupported project schema</h2>
+      <p class="muted">This app was not loaded because its .refine state was written by a newer Refine version.</p>`;
+    return false;
+  }
   const result = await openAddAppModal({
     message: snap.message || "Add an existing app path or a new directory to create and initialize.",
   });

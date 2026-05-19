@@ -29,8 +29,13 @@ def main() -> int:
         host = cfg.web_host
         port = cfg.web_port
     except config.ConfigError as e:
-        host = os.environ.get("REFINE_UI_HOST", "127.0.0.1")
-        port = int(os.environ.get("REFINE_UI_PORT", "8080"))
+        try:
+            cfg = config.get(reload=True)
+            host = cfg.web_host
+            port = cfg.web_port
+        except config.ConfigError:
+            host = os.environ.get("REFINE_UI_HOST", "127.0.0.1")
+            port = int(os.environ.get("REFINE_UI_PORT", "8080"))
         sys.stderr.write(f"[refine-ui] setup mode: {e}\n")
     try:
         run(host=host, port=port)

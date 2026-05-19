@@ -41,6 +41,27 @@ def _conn() -> sqlite3.Connection:
     return db.connect()
 
 
+def _schema_block_response() -> tuple[int, dict] | None:
+    try:
+        cfg = config.get(reload=True)
+    except config.ConfigError:
+        return None
+    schema = project_state.schema_status(cfg.volume_root)
+    if schema.get("compatible"):
+        return None
+    if schema.get("migration_required"):
+        return err(
+            409,
+            "Project schema migration required.",
+            "Open this app from the browser and choose Migrate and open.",
+        )
+    return err(
+        409,
+        "Project schema is not supported by this Refine version.",
+        schema.get("reason") or "",
+    )
+
+
 # --- Project attach/setup -----------------------------------------------------
 
 def project_status() -> tuple[int, dict]:
@@ -124,6 +145,9 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
 # --- Instances ---------------------------------------------------------------
 
 def list_instances() -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
     conn = _conn()
     try:
         counts = {}
@@ -492,6 +516,9 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     the indexed `gaps_index.reporter` column, which the runner keeps in
     sync with the latest round's reporter on every write.
     """
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
     page_limit, page_offset = _page_bounds(limit, offset)
     needs_round_search = bool(
         q and not (severity or category or actor or reporter)
@@ -624,6 +651,9 @@ def _augment_with_round_search(initial: list[dict], q: str,
 
 
 def get_gap(gap_id: str) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
     conn = _conn()
     try:
         row = conn.execute(
@@ -1519,6 +1549,9 @@ def cleanup_logs(body: dict) -> tuple[int, dict]:
 
 
 def dashboard_summary() -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
     conn = _conn()
     try:
         counts = {}

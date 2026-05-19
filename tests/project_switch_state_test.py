@@ -47,6 +47,9 @@ def test_client_switch_path(root: Path) -> None:
 
     assert "function reconcileLastReporter" in common_js
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
+    assert "Migrate and open" in common_js
+    assert 'api("POST", "/api/project/attach", {' in common_js
+    assert "migrate: true" in common_js
     assert "function resetChatForProjectSwitch()" in chat_js
     assert "await openAddAppModal()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
@@ -176,6 +179,18 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         assert fake_runner.stopped is False
         assert fake_poller.stopped is False
         assert config.get(reload=True).client_repo == client1
+
+        config.write_binding(root, client2)
+        config.get(reload=True)
+        status, body = api.dashboard_summary()
+        assert status == 409, body
+        assert "migration required" in body["error"]["message"].lower()
+        status, body = api.list_gaps()
+        assert status == 409, body
+        status, body = api.list_instances()
+        assert status == 409, body
+        config.write_binding(root, client1)
+        config.get(reload=True)
 
         try:
             runtime.load_configured(
