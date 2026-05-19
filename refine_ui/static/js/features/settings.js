@@ -638,7 +638,9 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     <section class="settings-section">
       <h3>Transfer Gaps</h3>
       <p class="muted small" style="margin-top:0">
-        Transfers skip in-progress and ready-merge Gaps by default.
+        Transfers matching Gaps to another instance. If active work is present,
+        Refine pauses agents, stops agent processes, cancels in-progress and
+        ready-merge Gaps, then transfers them.
       </p>
       <div class="form-grid two">
         <div class="form-row"><label>From</label>
@@ -955,16 +957,28 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     const target = $("#instance-transfer-target")?.value || "";
     if (!target) return;
     const ok = await modalConfirm(
-      "Transfer matching Gaps to the selected instance?",
-      { title: "Transfer Gaps", okLabel: "Transfer" },
+      "Refine will pause agents, stop all running agent processes, mark matching " +
+      "in-progress and ready-merge Gaps as cancelled, then transfer all matching " +
+      "Gaps to the selected instance.",
+      {
+        title: "Transfer Gaps",
+        okLabel: "Pause, cancel, and transfer",
+        cancelLabel: "Keep Gaps unchanged",
+        danger: true,
+      },
     );
     if (!ok) return;
     try {
       const r = await api("POST", "/api/instances/transfer-gaps", {
         source_instance_id: source,
         target_instance_id: target,
+        cancel_active: true,
       });
-      toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
+      toast(
+        `Transferred ${r.updated}; cancelled ${r.cancelled || 0}; ` +
+        `stopped ${r.stopped_processes || 0} processes; skipped ${r.skipped}.`,
+        "info",
+      );
       await refreshSettings();
     } catch (e) { toast(e.message, "error"); }
   });

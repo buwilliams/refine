@@ -86,6 +86,9 @@ def main() -> int:
     assert 'href="#/system/application"' in index_html
     assert 'slug: "instances"' in settings_js
     assert 'api("GET", "/api/instances")' in settings_js
+    assert "Pause, cancel, and transfer" in settings_js
+    assert "cancel_active: true" in settings_js
+    assert "stopped ${r.stopped_processes || 0} processes" in settings_js
 
     print("settings route tests OK")
     return 0

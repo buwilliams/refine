@@ -15,7 +15,7 @@ from typing import Any
 from refine_server import activity, config, db, gaps as shared_gaps, governance, project_registry, project_state, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
-    M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
+    M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE,
@@ -246,6 +246,19 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
                 "skipped_details": [],
             }
     try:
+        cancelled = (
+            _cancel_active_transfer_gaps(source, gap_ids)
+            if body.get("cancel_active")
+            else {
+                "paused": False,
+                "stopped_processes": 0,
+                "cancelled": 0,
+                "cancelled_ids": [],
+            }
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    try:
         result = project_state.transfer_gaps(
             source, target, statuses=allowed, gap_ids=gap_ids,
         )
@@ -256,7 +269,61 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
         get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
     except BackendError:
         pass
+    result.update(cancelled)
     return 200, result
+
+
+def _cancel_active_transfer_gaps(
+    source_instance_id: str | None,
+    gap_ids: set[str] | None,
+) -> dict[str, Any]:
+    conn = _conn()
+    try:
+        project_state.set_setting("paused", "1")
+        db.set_setting(conn, "paused", "1")
+        where = ["status IN ('in-progress', 'ready-merge')"]
+        args: list[Any] = []
+        if source_instance_id:
+            where.append("instance_id = ?")
+            args.append(source_instance_id)
+        if gap_ids is not None:
+            if not gap_ids:
+                return {
+                    "paused": True,
+                    "stopped_processes": 0,
+                    "cancelled": 0,
+                    "cancelled_ids": [],
+                }
+            where.append("id IN (" + ",".join("?" * len(gap_ids)) + ")")
+            args.extend(sorted(gap_ids))
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE " + " AND ".join(where),
+            args,
+        ).fetchall()
+        active_ids = [r["id"] for r in rows]
+        activity.append(
+            conn,
+            message="Agents paused for instance transfer",
+            severity="warn",
+            category="state",
+            actor="refine",
+        )
+    finally:
+        conn.close()
+
+    stopped = 0
+    result = get_client().call(M_CANCEL_ALL, {"reason": "paused"}, timeout=10.0)
+    stopped = int(result.get("killed_subprocesses") or 0)
+    cancelled_ids: list[str] = []
+    for gid in active_ids:
+        get_client().call(M_CANCEL, {"gap_id": gid}, timeout=30.0)
+        cancelled_ids.append(gid)
+    return {
+        "paused": True,
+        "stopped_processes": stopped,
+        "cancelled": len(cancelled_ids),
+        "cancelled_ids": cancelled_ids,
+    }
 
 
 def _rebuild_cache() -> None:

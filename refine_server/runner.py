@@ -13,8 +13,8 @@ from typing import Any
 from refine_server import activity, db, features, gaps as shared_gaps, governance, project_state, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
-    M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
-    M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
+    M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
+    M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
@@ -125,6 +125,7 @@ class Runner:
             M_LAUNCH: self._h_launch,
             M_ENFORCE_SCHEDULING: self._h_enforce_scheduling,
             M_CANCEL: self._h_cancel,
+            M_CANCEL_ALL: self._h_cancel_all,
             M_VERIFY: self._h_verify,
             M_CREATE_GAP: self._h_create_gap,
             M_APPEND_ROUND: self._h_append_round,
@@ -206,12 +207,21 @@ class Runner:
             git_ops.remove_worktree(gap_id)
             if row["branch_name"]:
                 git_ops.delete_branch(row["branch_name"])
+            try:
+                gap_writer.update_fields(gap_id, status="cancelled")
+            except Exception:
+                pass
             activity.append(
                 self._conn, message="Gap cancelled",
                 severity="info", category="state",
                 gap_id=gap_id, actor="refine",
             )
         return {"killed_subprocess": killed}
+
+    def _h_cancel_all(self, params: dict) -> dict:
+        reason = params.get("reason") or "paused"
+        killed = self.sub_mgr.cancel_all(str(reason))
+        return {"killed_subprocesses": killed}
 
     def _h_verify(self, params: dict) -> dict:
         # Verify is user approval for a Gap already parked in `review`.
