@@ -853,8 +853,8 @@ class Runner:
     def _h_target_app_run(self, params: dict) -> dict:
         """Run a deterministic target-app start/stop/status operation."""
         kind = (params.get("kind") or "").strip().lower()
-        if kind not in ("start", "stop", "status"):
-            raise ValueError("kind must be 'start', 'stop', or 'status'")
+        if kind not in ("start", "stop", "rebuild", "status"):
+            raise ValueError("kind must be 'start', 'stop', 'rebuild', or 'status'")
         config = params.get("config") if isinstance(params.get("config"), dict) else {}
         quiet = bool(params.get("quiet"))
         if not self._target_app_lock.acquire(blocking=False):
@@ -914,8 +914,8 @@ class Runner:
         review and save `config` if `ok` is True.
         """
         kind = (params.get("kind") or "all").strip().lower()
-        if kind not in ("all", "start", "stop", "status"):
-            raise ValueError("kind must be 'all', 'start', 'stop', or 'status'")
+        if kind not in ("all", "start", "stop", "rebuild", "status"):
+            raise ValueError("kind must be 'all', 'start', 'stop', 'rebuild', or 'status'")
         activity.append(
             self._conn,
             message=f"target-app: generating {kind} instructions",

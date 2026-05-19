@@ -1375,11 +1375,13 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "target_app_health_url",
         "target_app_start_command",
         "target_app_stop_command",
+        "target_app_rebuild_command",
         "target_app_status_command",
         "target_app_cwd",
         "target_app_env_json",
         "target_app_start_timeout_seconds",
         "target_app_stop_timeout_seconds",
+        "target_app_rebuild_timeout_seconds",
         "target_app_status_timeout_seconds",
         "target_app_log_path",
         "target_app_http_check_url",
@@ -1446,6 +1448,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         elif k in {
             "target_app_start_timeout_seconds",
             "target_app_stop_timeout_seconds",
+            "target_app_rebuild_timeout_seconds",
             "target_app_status_timeout_seconds",
         }:
             try:
@@ -1863,7 +1866,7 @@ def chat_stop(sid: str) -> tuple[int, dict]:
 # every browser tab sees the same status.
 
 _TARGET_APP_STATES = (
-    "unknown", "starting", "running", "degraded",
+    "unknown", "starting", "rebuilding", "running", "degraded",
     "stopping", "stopped", "failed",
 )
 
@@ -1893,6 +1896,7 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
         "health_url": cfg.get("http_check_url") or "",
         "has_start_command": bool(cfg.get("start_command")),
         "has_stop_command": bool(cfg.get("stop_command")),
+        "has_rebuild_command": bool(cfg.get("rebuild_command")),
         "has_status_checks": _has_status_checks(cfg),
         # Back-compat names for older JS during upgrades.
         "has_start_instructions": bool(cfg.get("start_command") or legacy_start),
@@ -1934,6 +1938,11 @@ def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
     return _target_app_run("stop")
 
 
+def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
+    """Run the configured rebuild command via the host runner."""
+    return _target_app_run("rebuild")
+
+
 def _target_app_run(kind: str) -> tuple[int, dict]:
     conn = _conn()
     try:
@@ -1946,7 +1955,11 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
                 f"Generate or enter target-app configuration in Settings first.")
         # Optimistic transition. The command run is synchronous but may be long;
         # SSE listeners see the in-flight state via /api/target-app/status.
-        next_pending = "starting" if kind == "start" else "stopping"
+        next_pending = {
+            "start": "starting",
+            "stop": "stopping",
+            "rebuild": "rebuilding",
+        }.get(kind, "unknown")
         db.set_setting(conn, "target_app_state", next_pending)
         db.set_setting(conn, "target_app_last_error", "")
         activity.append(
@@ -2104,8 +2117,8 @@ def _target_app_record_failure(kind: str, message: str) -> None:
 def target_app_generate(body: dict) -> tuple[int, dict]:
     """Use the agent to draft structured target-app config for this codebase."""
     kind = (body.get("kind") or "all").strip().lower()
-    if kind not in ("all", "start", "stop", "status"):
-        return err(400, "kind must be 'all', 'start', 'stop', or 'status'")
+    if kind not in ("all", "start", "stop", "rebuild", "status"):
+        return err(400, "kind must be 'all', 'start', 'stop', 'rebuild', or 'status'")
     try:
         result = get_client().call(
             M_TARGET_APP_GENERATE, {"kind": kind}, timeout=600.0,

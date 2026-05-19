@@ -116,6 +116,7 @@ pre {
 .target-app-indicator[data-state="stopped"] .target-app-dot,
 .target-app-indicator[data-state="failed"] .target-app-dot { background: #c63838; }
 .target-app-indicator[data-state="starting"] .target-app-dot,
+.target-app-indicator[data-state="rebuilding"] .target-app-dot,
 .target-app-indicator[data-state="stopping"] .target-app-dot {
   background: #d4a106;
   animation: target-app-pulse 1.1s ease-in-out infinite;

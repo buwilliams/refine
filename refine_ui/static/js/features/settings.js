@@ -411,6 +411,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       <div id="target-app-status-block" class="muted">Loading…</div>
       <div class="actions" style="margin-top:10px">
         <button id="s-target-run-start">Start application</button>
+        <button class="secondary" id="s-target-run-rebuild">Rebuild application</button>
         <button class="danger" id="s-target-run-stop">Stop application</button>
         <span class="spacer"></span>
         <button class="secondary" id="s-target-health-now">Check status now</button>
@@ -448,6 +449,11 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <input type="text" id="s-target-stop-command"
                placeholder="pkill -f 'npm run dev' || true"
                value="${htmlEscape(s.target_app_stop_command || "")}"></div>
+      <div class="form-row"><label>Rebuild command
+        <span class="muted small">— one-line shell command that prepares generated artifacts for review.</span></label>
+        <input type="text" id="s-target-rebuild-command"
+               placeholder="npm run build"
+               value="${htmlEscape(s.target_app_rebuild_command || "")}"></div>
       <div class="form-row"><label>Status command
         <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>
         <input type="text" id="s-target-status-command"
@@ -466,6 +472,8 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           <input type="number" id="s-target-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
         <div class="form-row"><label>Stop timeout (s)</label>
           <input type="number" id="s-target-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
+        <div class="form-row"><label>Rebuild timeout (s)</label>
+          <input type="number" id="s-target-rebuild-timeout" value="${htmlEscape(s.target_app_rebuild_timeout_seconds || "300")}"></div>
         <div class="form-row"><label>Status timeout (s)</label>
           <input type="number" id="s-target-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
         <div class="form-row"><label>Log path</label>
@@ -992,11 +1000,13 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           merge_target_branch: $("#s-merge-target").value,
           target_app_start_command: $("#s-target-start-command").value,
           target_app_stop_command: $("#s-target-stop-command").value,
+          target_app_rebuild_command: $("#s-target-rebuild-command").value,
           target_app_status_command: $("#s-target-status-command").value,
           target_app_cwd: $("#s-target-cwd").value,
           target_app_env_json: $("#s-target-env").value,
           target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
           target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
+          target_app_rebuild_timeout_seconds: $("#s-target-rebuild-timeout").value,
           target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
           target_app_log_path: $("#s-target-log-path").value,
           target_app_http_check_url: $("#s-target-http-url").value,
@@ -1041,6 +1051,12 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       await runTargetAppAction("stop");
     });
   });
+  $("#s-target-run-rebuild")?.addEventListener("click", async () => {
+    const btn = $("#s-target-run-rebuild");
+    await withButtonBusy(btn, "Rebuilding…", async () => {
+      await runTargetAppAction("rebuild");
+    });
+  });
   $("#s-target-health-now")?.addEventListener("click", async () => {
     const btn = $("#s-target-health-now");
     await withButtonBusy(btn, "Probing…", async () => {
@@ -1064,11 +1080,13 @@ function applyGeneratedTargetAppConfig(cfg) {
   };
   set("#s-target-start-command", cfg.start_command || "");
   set("#s-target-stop-command", cfg.stop_command || "");
+  set("#s-target-rebuild-command", cfg.rebuild_command || "");
   set("#s-target-status-command", cfg.status_command || "");
   set("#s-target-cwd", cfg.cwd || "");
   set("#s-target-env", JSON.stringify(cfg.env || {}, null, 2));
   set("#s-target-start-timeout", cfg.start_timeout_seconds || 120);
   set("#s-target-stop-timeout", cfg.stop_timeout_seconds || 60);
+  set("#s-target-rebuild-timeout", cfg.rebuild_timeout_seconds || 300);
   set("#s-target-status-timeout", cfg.status_timeout_seconds || 10);
   set("#s-target-log-path", cfg.log_path || "");
   set("#s-target-http-url", cfg.http_check_url || "");
@@ -1103,6 +1121,7 @@ function drawTargetAppStatusBlock(snap) {
     running:  "Running",
     degraded: "Degraded",
     starting: "Starting…",
+    rebuilding: "Rebuilding…",
     stopping: "Stopping…",
     stopped:  "Stopped",
     failed:   "Failed",
@@ -1141,6 +1160,7 @@ function drawTargetAppStatusBlock(snap) {
       degraded: "#d4a106",
       stopped:  "#c63838",
       starting: "#d4a106",
+      rebuilding: "#d4a106",
       stopping: "#d4a106",
       failed:   "#c63838",
     }[snap.state]) || "#b8bcc6";
@@ -1149,14 +1169,16 @@ function drawTargetAppStatusBlock(snap) {
   // time. Both are disabled while a transition is in flight so the
   // user can't fire a second action mid-agent-run.
   const startBtn = document.getElementById("s-target-run-start");
+  const rebuildBtn = document.getElementById("s-target-run-rebuild");
   const stopBtn  = document.getElementById("s-target-run-stop");
-  if (startBtn && stopBtn) {
+  if (startBtn && stopBtn && rebuildBtn) {
     const isRunning  = snap.state === "running" || snap.state === "degraded";
     const isStopped  = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
-    const inFlight   = snap.state === "starting" || snap.state === "stopping";
+    const inFlight   = snap.state === "starting" || snap.state === "stopping" || snap.state === "rebuilding";
     startBtn.style.display = (isStopped || inFlight) ? "" : "none";
     stopBtn.style.display  = (isRunning || inFlight) ? "" : "none";
     startBtn.disabled = inFlight || !snap.has_start_command;
+    rebuildBtn.disabled = inFlight || !snap.has_rebuild_command;
     stopBtn.disabled  = inFlight || !snap.has_stop_command;
     if (!snap.has_start_command) {
       startBtn.title = "Configure a start command above first.";
@@ -1167,6 +1189,11 @@ function drawTargetAppStatusBlock(snap) {
       stopBtn.title = "Configure a stop command above first.";
     } else {
       stopBtn.title = "";
+    }
+    if (!snap.has_rebuild_command) {
+      rebuildBtn.title = "Configure a rebuild command above first.";
+    } else {
+      rebuildBtn.title = "";
     }
   }
 }

@@ -126,27 +126,33 @@ def main() -> int:
     tcfg = {
         "start_command": "true",
         "stop_command": "true",
+        "rebuild_command": "true",
         "status_command": "true",
         "cwd": "",
         "env": {},
         "start_timeout_seconds": 5,
         "stop_timeout_seconds": 5,
+        "rebuild_timeout_seconds": 5,
         "status_timeout_seconds": 5,
     }
     tres = target_app.run_operation("start", tcfg)
     assert tres["ok"] and tres["state"] == "running", tres
     sres = target_app.run_operation("status", tcfg)
     assert sres["ok"] and sres["state"] == "running", sres
+    rres = target_app.run_operation("rebuild", tcfg)
+    assert rres["ok"] and rres["state"] == "running", rres
     stop_cfg = {**tcfg, "status_command": "false"}
     xres = target_app.run_operation("stop", stop_cfg)
     assert xres["ok"] and xres["state"] == "stopped", xres
     gen = target_app.normalize_generated_config({
         "start_command": "npm run dev\n",
         "stop_command": "pkill -f dev || true",
+        "rebuild_command": "npm run build",
         "status_command": "pgrep -f dev",
         "env": {"PORT": 3000},
     })
     assert gen["start_command"] == "npm run dev"
+    assert gen["rebuild_command"] == "npm run build"
     assert gen["env"]["PORT"] == "3000"
     ready_file = client / ".refine" / "ready"
     delayed_cfg = {

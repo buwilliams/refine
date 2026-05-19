@@ -37,11 +37,13 @@ Return ONLY a JSON object with these keys:
 {
   "start_command": "one-line shell command that starts the app and returns promptly",
   "stop_command": "one-line shell command that stops the app and returns promptly",
+  "rebuild_command": "one-line shell command that rebuilds generated artifacts for review",
   "status_command": "one-line shell command; exit 0 only when the app is healthy/running",
   "cwd": "repo-relative working directory, or empty string for repo root",
   "env": {"NAME": "value"},
   "start_timeout_seconds": 120,
   "stop_timeout_seconds": 60,
+  "rebuild_timeout_seconds": 300,
   "status_timeout_seconds": 10,
   "log_path": "optional repo-relative or absolute log path",
   "http_check_url": "optional URL for web apps",
@@ -59,6 +61,8 @@ Rules:
 - The start command must not block forever. Use an existing process
   manager, docker compose detach mode, or backgrounding with logging.
 - The stop command must be idempotent when practical.
+- The rebuild command should prepare the app for review after code changes
+  without starting a long-running dev server.
 - The status command is required unless no reliable CLI check exists.
 - Use optional HTTP/TCP/process checks only when they add confidence.
 - Do not include markdown, comments, or prose outside the JSON object.
@@ -77,11 +81,13 @@ def config_from_settings(settings: dict[str, str]) -> dict[str, Any]:
     return {
         "start_command": (settings.get("target_app_start_command") or "").strip(),
         "stop_command": (settings.get("target_app_stop_command") or "").strip(),
+        "rebuild_command": (settings.get("target_app_rebuild_command") or "").strip(),
         "status_command": (settings.get("target_app_status_command") or "").strip(),
         "cwd": (settings.get("target_app_cwd") or "").strip(),
         "env": {str(k): str(v) for k, v in env_obj.items()},
         "start_timeout_seconds": _int_setting(settings, "target_app_start_timeout_seconds", 120),
         "stop_timeout_seconds": _int_setting(settings, "target_app_stop_timeout_seconds", 60),
+        "rebuild_timeout_seconds": _int_setting(settings, "target_app_rebuild_timeout_seconds", 300),
         "status_timeout_seconds": _int_setting(settings, "target_app_status_timeout_seconds", 10),
         "log_path": (settings.get("target_app_log_path") or "").strip(),
         "http_check_url": (
@@ -108,7 +114,7 @@ def _int_setting(settings: dict[str, str], key: str, default: int) -> int:
 def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
     """Run start/stop/status and any configured verification checks."""
     started_at = _now_iso()
-    if kind not in ("start", "stop", "status"):
+    if kind not in ("start", "stop", "rebuild", "status"):
         return {"ok": False, "message": f"unknown operation: {kind}"}
     command = (config.get(f"{kind}_command") or "").strip()
     if kind == "status":
@@ -164,6 +170,8 @@ def wait_for_lifecycle_checks(kind: str, config: dict[str, Any],
     deadline = time.monotonic() + max(1, timeout)
     last = run_checks(config)
     if not last["configured"]:
+        return last
+    if kind not in ("start", "stop"):
         return last
     while True:
         state = state_after_lifecycle(kind, last)
@@ -250,6 +258,8 @@ def state_after_lifecycle(kind: str, checks: dict[str, Any]) -> str:
         return "running" if state == "running" else "degraded"
     if kind == "stop":
         return "stopped" if state == "stopped" else "degraded"
+    if kind == "rebuild":
+        return state
     return state
 
 
@@ -367,11 +377,13 @@ def normalize_generated_config(obj: dict[str, Any]) -> dict[str, Any]:
     return {
         "start_command": _one_line(obj.get("start_command") or ""),
         "stop_command": _one_line(obj.get("stop_command") or ""),
+        "rebuild_command": _one_line(obj.get("rebuild_command") or ""),
         "status_command": _one_line(obj.get("status_command") or ""),
         "cwd": str(obj.get("cwd") or "").strip(),
         "env": {str(k): str(v) for k, v in env.items()},
         "start_timeout_seconds": _positive_int(obj.get("start_timeout_seconds"), 120),
         "stop_timeout_seconds": _positive_int(obj.get("stop_timeout_seconds"), 60),
+        "rebuild_timeout_seconds": _positive_int(obj.get("rebuild_timeout_seconds"), 300),
         "status_timeout_seconds": _positive_int(obj.get("status_timeout_seconds"), 10),
         "log_path": str(obj.get("log_path") or "").strip(),
         "http_check_url": str(obj.get("http_check_url") or "").strip(),

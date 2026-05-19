@@ -39,6 +39,7 @@ function applyTargetAppSnapshot(snap) {
     degraded: "App: degraded",
     stopped:  "App: stopped",
     starting: "App: starting…",
+    rebuilding: "App: rebuilding…",
     stopping: "App: stopping…",
     failed:   "App: failed",
     unknown:  "App: unknown",
@@ -61,11 +62,13 @@ function applyTargetAppSnapshot(snap) {
 }
 
 async function runTargetAppAction(action) {
-  // action is "start" or "stop". Called from the buttons on System.
+  // action is "start", "stop", or "rebuild". Called from the buttons on System.
   const snap = _targetAppSnapshot || {};
   const hasPrompt = action === "start"
     ? snap.has_start_command
-    : snap.has_stop_command;
+    : action === "stop"
+      ? snap.has_stop_command
+      : snap.has_rebuild_command;
   if (!hasPrompt) {
     toast(
       `No ${action} command configured. Set it above, then click Save.`,
@@ -74,19 +77,22 @@ async function runTargetAppAction(action) {
     return;
   }
   const isStop = action === "stop";
+  const isRebuild = action === "rebuild";
   const ok = await modalConfirm(
     isStop
       ? "Stop the target application now?"
-      : "Start the target application now? Refine will run the saved start command on the host.",
-    { title: isStop ? "Stop application" : "Start application",
-      okLabel: isStop ? "Stop" : "Start",
+      : isRebuild
+        ? "Rebuild the target application now? Refine will run the saved rebuild command on the host."
+        : "Start the target application now? Refine will run the saved start command on the host.",
+    { title: isStop ? "Stop application" : (isRebuild ? "Rebuild application" : "Start application"),
+      okLabel: isStop ? "Stop" : (isRebuild ? "Rebuild" : "Start"),
       danger: isStop },
   );
   if (!ok) return;
   // Optimistic UI flip so the dot transitions immediately.
   applyTargetAppSnapshot({
     ..._targetAppSnapshot,
-    state: isStop ? "stopping" : "starting",
+    state: isStop ? "stopping" : (isRebuild ? "rebuilding" : "starting"),
   });
   try {
     const r = await api("POST", `/api/target-app/${action}`);

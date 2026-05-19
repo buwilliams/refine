@@ -156,12 +156,16 @@ def main() -> int:
     )
     normalized_cfg = target_app.normalize_generated_config({
         "start_command": "npm run dev\n-- --host 0.0.0.0",
+        "rebuild_command": "npm run build\n-- --mode production",
         "stop_command": "",
+        "rebuild_timeout_seconds": "bad",
         "status_timeout_seconds": "bad",
         "tcp_check_port": 3000,
         "env": {"PORT": 3000},
     })
     assert normalized_cfg["start_command"] == "npm run dev -- --host 0.0.0.0"
+    assert normalized_cfg["rebuild_command"] == "npm run build -- --mode production"
+    assert normalized_cfg["rebuild_timeout_seconds"] == 300
     assert normalized_cfg["status_timeout_seconds"] == 10
     assert normalized_cfg["tcp_check_port"] == "3000"
     assert normalized_cfg["env"] == {"PORT": "3000"}

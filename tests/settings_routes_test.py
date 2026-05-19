@@ -89,6 +89,10 @@ def main() -> int:
     assert "Pause, cancel, and transfer" in settings_js
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
+    assert 'id="s-target-run-rebuild"' in settings_js
+    assert 'id="s-target-rebuild-command"' in settings_js
+    assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
+    assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
 
     print("settings route tests OK")
     return 0
