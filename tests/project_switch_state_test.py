@@ -29,6 +29,7 @@ def test_client_switch_path(root: Path) -> None:
     first_run_body = common_js.split("async function ensureProjectAttached()", 1)[1]
     first_run_body = first_run_body.split("\n}", 1)[0]
     assert "openAddAppModal(" in first_run_body
+    assert "await syncProjectUpdates({ silent: true })" in common_js
     assert "return !!result" in first_run_body
 
     assert "async function applyProjectAttachResult(result)" in common_js
@@ -38,6 +39,7 @@ def test_client_switch_path(root: Path) -> None:
         "state.project = result",
         "resetChatForProjectSwitch()",
         "initSSE()",
+        "await syncProjectUpdates({ silent: true })",
         "await refreshFeatures()",
         "await refreshReporters({ selectFallback: true })",
         "await refreshTargetAppToggle()",

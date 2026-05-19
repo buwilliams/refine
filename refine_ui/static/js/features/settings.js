@@ -412,6 +412,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <button class="secondary" id="s-target-run-rebuild">Rebuild application</button>
         <button class="danger" id="s-target-run-stop">Stop application</button>
         <span class="spacer"></span>
+        <button class="secondary" id="s-project-sync-now">Sync latest updates</button>
         <button class="secondary" id="s-target-health-now">Check status now</button>
       </div>
       <p class="muted small" style="margin-top:6px">
@@ -1053,6 +1054,18 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     const btn = $("#s-target-run-rebuild");
     await withButtonBusy(btn, "Rebuilding…", async () => {
       await runTargetAppAction("rebuild");
+    });
+  });
+  $("#s-project-sync-now")?.addEventListener("click", async () => {
+    const btn = $("#s-project-sync-now");
+    await withButtonBusy(btn, "Syncing…", async () => {
+      try {
+        await syncProjectUpdates();
+        await refreshReporters({ selectFallback: true });
+        await refreshSettings();
+      } catch {
+        // syncProjectUpdates already surfaced the specific git error.
+      }
     });
   });
   $("#s-target-health-now")?.addEventListener("click", async () => {

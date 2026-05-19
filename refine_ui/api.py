@@ -18,7 +18,7 @@ from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
-    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE,
+    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -140,6 +140,23 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
         return err(409, "Cannot remove the currently attached app. Switch to another app first.")
     apps = project_registry.remove_app(clone_dir, target)
     return 200, {"apps": apps}
+
+
+def project_sync(_: dict[str, Any] | None = None) -> tuple[int, dict]:
+    block = _schema_block_response()
+    if block:
+        return block
+    try:
+        result = get_client().call(M_PROJECT_SYNC, {}, timeout=120.0)
+    except BackendError as e:
+        return _backend_err(e)
+    if not result.get("ok"):
+        return err(
+            409,
+            result.get("message") or "Could not sync latest target-app updates.",
+            result.get("details") or "",
+        )
+    return 200, result
 
 
 # --- Instances ---------------------------------------------------------------

@@ -94,6 +94,8 @@ def main() -> int:
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
     assert 'id="s-target-run-rebuild"' in settings_js
+    assert 'id="s-project-sync-now"' in settings_js
+    assert 'await syncProjectUpdates();' in settings_js
     assert 'id="s-target-rebuild-command"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
@@ -104,6 +106,9 @@ def main() -> int:
     assert 'running: "running"' in target_app_js
     assert '"App: running"' not in target_app_js
     assert "label.replace(/^App: /, \"\")" not in target_app_js
+    assert '@route("POST", r"/api/project/sync")' in (
+        root / "refine_ui/server.py"
+    ).read_text(encoding="utf-8")
 
     print("settings route tests OK")
     return 0

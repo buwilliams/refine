@@ -268,6 +268,11 @@ def _h_project_remove(_h, _m, body, _q):
     return api.project_remove(body or {})
 
 
+@route("POST", r"/api/project/sync")
+def _h_project_sync(_h, _m, body, _q):
+    return api.project_sync(body or {})
+
+
 @route("GET", r"/api/instances")
 def _h_instances_list(_h, _m, _b, _q):
     return api.list_instances()

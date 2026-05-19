@@ -18,12 +18,12 @@ from refine_server.backend_protocol import (
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
-    M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
+    M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, merger as _merger, preflight, recovery, state_committer, subprocess_mgr, target_app, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, preflight, project_sync, recovery, state_committer, subprocess_mgr, target_app, verify_op
 from .chat_mgr import ChatManager
 from .governance_agent import GovernanceAgent
 
@@ -149,6 +149,7 @@ class Runner:
             M_TARGET_APP_RUN: self._h_target_app_run,
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
             M_TARGET_APP_HEALTH: self._h_target_app_health,
+            M_PROJECT_SYNC: self._h_project_sync,
         }
         h = handlers.get(method)
         if h is None:
@@ -163,6 +164,12 @@ class Runner:
     def _h_preflight(self, _: dict) -> dict:
         ok, msg = preflight.check(self._conn)
         return {"ok": ok, "message": msg}
+
+    def _h_project_sync(self, _: dict) -> dict:
+        return self.merger.run_under_host_lock(
+            lambda: project_sync.sync_latest(self._conn, actor="runner"),
+            label="project sync",
+        )
 
     def _h_running(self, _: dict) -> dict:
         return {

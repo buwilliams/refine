@@ -104,7 +104,10 @@ async function ensureProjectAttached() {
   if (!snap) return false;
   if (snap.attached) {
     const schema = snap.schema || {};
-    if (schema.compatible !== false) return true;
+    if (schema.compatible !== false) {
+      await syncProjectUpdates({ silent: true });
+      return true;
+    }
     if (schema.migration_required) {
       const ok = await modalConfirm(
         "This app uses an older Refine schema. Migrate .refine state and open it?",
@@ -149,6 +152,20 @@ async function refreshProjectStatus() {
   }
   state.project = snap;
   return snap;
+}
+
+async function syncProjectUpdates({ silent = false } = {}) {
+  try {
+    const result = await api("POST", "/api/project/sync", {});
+    await refreshProjectStatus();
+    if (!silent) toast(result.message || "Project updates synced", "info");
+    return result;
+  } catch (e) {
+    const message = e.details || e.message || "Could not sync latest project updates";
+    toast(message, silent ? "warn" : "error");
+    if (!silent) throw e;
+    return null;
+  }
 }
 
 function openProjectAttachModal({
@@ -274,6 +291,7 @@ async function applyProjectAttachResult(result) {
   showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
+  await syncProjectUpdates({ silent: true });
   await refreshFeatures();
   await refreshReporters({ selectFallback: true });
   await refreshTargetAppToggle();
