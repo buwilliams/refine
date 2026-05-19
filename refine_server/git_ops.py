@@ -23,6 +23,11 @@ _REFINE_GAP_FOOTER = re.compile(
 )
 _LOG_RECORD_SEP = "\x1e"
 _LOG_FIELD_SEP = "\x1f"
+REFINE_SQLITE_PATHS = (
+    ".refine/index.sqlite",
+    ".refine/index.sqlite-shm",
+    ".refine/index.sqlite-wal",
+)
 
 
 def client_repo_path() -> Path:
@@ -208,17 +213,56 @@ def dirty_paths_under(prefix: str) -> list[str]:
     return paths
 
 
+def is_refine_sqlite_path(path: str) -> bool:
+    return path.strip().strip('"') in REFINE_SQLITE_PATHS
+
+
+def untrack_refine_sqlite(*, cwd: Path | None = None) -> GitResult:
+    """Remove disposable SQLite cache files from Git while leaving them on disk."""
+    return _run(
+        ["rm", "--cached", "-f", "--ignore-unmatch", "--", *REFINE_SQLITE_PATHS],
+        cwd=cwd or client_repo_path(),
+    )
+
+
+def staged_refine_sqlite_removals(*, cwd: Path | None = None) -> list[str]:
+    r = _run(
+        [
+            "diff", "--cached", "--name-only", "--diff-filter=D",
+            "--", *REFINE_SQLITE_PATHS,
+        ],
+        cwd=cwd or client_repo_path(),
+    )
+    if not r.ok:
+        return []
+    return [line.strip() for line in r.stdout.splitlines() if line.strip()]
+
+
 def add_and_commit(paths: list[str], message: str,
                    *, cwd: Path | None = None) -> GitResult:
     """Stage the given paths and commit them. No-op if nothing to commit
     (we don't try `commit --allow-empty`)."""
-    if not paths:
+    should_untrack_sqlite = any(
+        p == ".refine" or p.startswith(".refine/") for p in paths
+    )
+    commit_paths = list(paths)
+    if should_untrack_sqlite:
+        rm = untrack_refine_sqlite(cwd=cwd or client_repo_path())
+        if not rm.ok:
+            return rm
+        commit_paths = [
+            p for p in commit_paths if not is_refine_sqlite_path(p)
+        ]
+        commit_paths.extend(staged_refine_sqlite_removals(cwd=cwd or client_repo_path()))
+    add_paths = [p for p in paths if not is_refine_sqlite_path(p)]
+    if not add_paths and not commit_paths:
         return GitResult(ok=True, stdout="", stderr="(nothing to commit)", code=0)
-    add = _run(["add", "--", *paths], cwd=cwd or client_repo_path())
-    if not add.ok:
-        return add
+    if add_paths:
+        add = _run(["add", "--", *add_paths], cwd=cwd or client_repo_path())
+        if not add.ok:
+            return add
     return _run(
-        ["commit", "-m", message, "--", *paths],
+        ["commit", "-m", message, "--", *commit_paths],
         cwd=cwd or client_repo_path(),
     )
 

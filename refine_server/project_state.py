@@ -163,6 +163,7 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
     (root / "gaps").mkdir(exist_ok=True)
     run_dir(root).mkdir(exist_ok=True)
     instances_dir(root).mkdir(exist_ok=True)
+    config.ensure_refine_gitignore(root)
     status = schema_status(root)
     if status["compatible"]:
         ensure_default_instance(root=root)
@@ -182,6 +183,7 @@ def migrate_legacy(conn: sqlite3.Connection | None = None, *,
     (root / "gaps").mkdir(exist_ok=True)
     run_dir(root).mkdir(exist_ok=True)
     instances_dir(root).mkdir(exist_ok=True)
+    config.ensure_refine_gitignore(root)
 
     from . import db
 

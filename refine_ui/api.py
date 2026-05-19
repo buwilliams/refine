@@ -504,6 +504,9 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
 
 
 def _commit_refine_state(repo: Path) -> None:
+    from refine_server import git_ops
+
+    git_ops.untrack_refine_sqlite(cwd=repo)
     dirty_refine = _git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
     if not dirty_refine.strip():
         return

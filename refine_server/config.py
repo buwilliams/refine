@@ -228,6 +228,29 @@ host = "0.0.0.0"
 port = 8080
 """
 
+REFINE_GITIGNORE_LINES = [
+    "# refine state - derived from gap.json files; not worth committing.",
+    "index.sqlite",
+    "index.sqlite-shm",
+    "index.sqlite-wal",
+    "run/",
+]
+
+
+def ensure_refine_gitignore(volume_root: Path) -> Path:
+    """Ensure generated Refine files under .refine are ignored."""
+    volume_root = volume_root.resolve()
+    volume_root.mkdir(parents=True, exist_ok=True)
+    path = volume_root / ".gitignore"
+    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    next_lines = list(existing)
+    for line in REFINE_GITIGNORE_LINES:
+        if line not in next_lines:
+            next_lines.append(line)
+    if next_lines != existing or not path.exists():
+        path.write_text("\n".join(next_lines).rstrip() + "\n", encoding="utf-8")
+    return path
+
 
 def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     """Write a default refine.toml to `volume_root` (creating the directory).
@@ -247,17 +270,7 @@ def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     (volume_root / "run").mkdir(exist_ok=True)
     (volume_root / "gaps").mkdir(exist_ok=True)
 
-    # Local .gitignore — excludes derived state but keeps gap.json + the config committed.
-    gi = volume_root / ".gitignore"
-    if not gi.exists():
-        gi.write_text(
-            "# refine state — derived from gap.json files; not worth committing.\n"
-            "index.sqlite\n"
-            "index.sqlite-wal\n"
-            "index.sqlite-shm\n"
-            "run/\n",
-            encoding="utf-8",
-        )
+    ensure_refine_gitignore(volume_root)
     return cfg
 
 

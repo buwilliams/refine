@@ -2,11 +2,18 @@
 from __future__ import annotations
 
 import sys
+import shutil
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo
+
+
+def assert_refine_gitignore(root: Path) -> None:
+    lines = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
+    for expected in ("index.sqlite", "index.sqlite-shm", "index.sqlite-wal"):
+        assert expected in lines, lines
 
 
 def main() -> int:
@@ -18,6 +25,7 @@ def main() -> int:
         root = client / ".refine"
         assert (root / "config.json").is_file()
         assert (root / "instances.json").is_file()
+        assert_refine_gitignore(root)
         active = project_state.active_instance_id()
         assert active == "default"
 
@@ -72,6 +80,33 @@ def main() -> int:
         assert result["updated"] == 1, result
         assert result["skipped"] == 1, result
         assert result["skipped_details"][0]["reason"] == "status:in-progress"
+
+        sqlite_paths = [
+            ".refine/index.sqlite",
+            ".refine/index.sqlite-shm",
+            ".refine/index.sqlite-wal",
+        ]
+        for rel in sqlite_paths:
+            p = client / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            if not p.exists():
+                p.write_text("tracked cache\n", encoding="utf-8")
+        git(client, "add", "-f", *sqlite_paths)
+        git(client, "commit", "-m", "track sqlite cache")
+        assert set(git(client, "ls-files", *sqlite_paths).stdout.splitlines()) == set(sqlite_paths)
+
+        (root / ".gitignore").unlink()
+        (root / "config.json").unlink()
+        (root / "instances.json").unlink()
+        shutil.rmtree(root / "instances", ignore_errors=True)
+        project_state.ensure_initialized(conn, migrate=True)
+        assert_refine_gitignore(root)
+        from refine_ui.api import _commit_refine_state
+
+        _commit_refine_state(client)
+        assert git(client, "ls-files", *sqlite_paths).stdout.strip() == ""
+        for rel in sqlite_paths:
+            assert (client / rel).exists(), rel
     finally:
         try:
             conn.close()
