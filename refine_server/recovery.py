@@ -64,6 +64,10 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
                     "updated = ? WHERE id = ?",
                     (now_iso(), gid),
                 )
+            try:
+                gap_writer.update_fields(gid, status="ready-merge")
+            except Exception:
+                pass
             activity.append(
                 conn,
                 message="Runner restarted while Gap was awaiting merge — "
@@ -85,6 +89,10 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
                 "WHERE gap_id = ? AND finished_at IS NULL",
                 (now_iso(), gid),
             )
+        try:
+            gap_writer.update_fields(gid, status="failed")
+        except Exception:
+            pass
 
         try:
             gap_writer.append_round_log(

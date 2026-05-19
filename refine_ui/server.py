@@ -47,6 +47,7 @@ def _h_list_gaps(_h, _m, _b, q):
         category=_get_one(q, "category"),
         actor=_get_one(q, "actor"),
         reporter=_get_one(q, "reporter"),
+        instance=_get_one(q, "instance"),
         limit=int(_get_one(q, "limit", "200")),
         offset=int(_get_one(q, "offset", "0")),
         sort=_get_one(q, "sort"),
@@ -265,6 +266,31 @@ def _h_project_attach(_h, _m, body, _q):
 @route("DELETE", r"/api/projects")
 def _h_project_remove(_h, _m, body, _q):
     return api.project_remove(body or {})
+
+
+@route("GET", r"/api/instances")
+def _h_instances_list(_h, _m, _b, _q):
+    return api.list_instances()
+
+
+@route("POST", r"/api/instances")
+def _h_instances_create(_h, _m, body, _q):
+    return api.create_instance(body or {})
+
+
+@route("PATCH", r"/api/instances/([^/]+)")
+def _h_instances_patch(_h, m, body, _q):
+    return api.update_instance(m.group(1), body or {})
+
+
+@route("POST", r"/api/instances/activate")
+def _h_instances_activate(_h, _m, body, _q):
+    return api.activate_instance(body or {})
+
+
+@route("POST", r"/api/instances/transfer-gaps")
+def _h_instances_transfer(_h, _m, body, _q):
+    return api.transfer_instance_gaps(body or {})
 
 
 @route("GET", r"/api/target-app/status")

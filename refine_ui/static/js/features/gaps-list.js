@@ -2,7 +2,7 @@
 
 const GAPS_DEFAULT_DIR = {
   name: "asc", status: "asc", priority: "asc",
-  reporter: "asc", updated: "desc", id: "desc",
+  reporter: "asc", instance: "asc", updated: "desc", id: "desc",
 };
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
@@ -14,6 +14,7 @@ function gapsHash(parts) {
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
   if (parts.reporter) next.set("reporter", parts.reporter);
+  if (parts.instance) next.set("instance", parts.instance);
   if (parts.severity) next.set("severity", parts.severity);
   if (parts.category) next.set("category", parts.category);
   if (parts.actor)    next.set("actor", parts.actor);
@@ -59,6 +60,13 @@ async function renderGapsList() {
           ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
+        <select id="filter-instance">
+          <option value="" ${f.instance === "" ? "selected" : ""}>all instances</option>
+          <option value="current" ${f.instance === "current" ? "selected" : ""}>current instance</option>
+          <option value="unknown" ${f.instance === "unknown" ? "selected" : ""}>unknown instance</option>
+          ${(state.project?.instances || []).map((inst) =>
+            `<option value="${htmlEscape(inst.id)}" ${inst.id === f.instance ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
+        </select>
         <select id="gaps-severity">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
           <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
@@ -99,6 +107,8 @@ async function renderGapsList() {
     updateGapsFilter({ status: e.target.value, page: 1 }));
   $("#filter-reporter").addEventListener("change", (e) =>
     updateGapsFilter({ reporter: e.target.value, page: 1 }));
+  $("#filter-instance").addEventListener("change", (e) =>
+    updateGapsFilter({ instance: e.target.value, page: 1 }));
   $("#gaps-severity").addEventListener("change", (e) =>
     updateGapsFilter({ severity: e.target.value, page: 1 }));
   $("#gaps-category").addEventListener("change", (e) =>
@@ -143,6 +153,7 @@ function gapsFilterFromHash() {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
     reporter: hashQs.get("reporter") || "",
+    instance: hashQs.get("instance") || "",
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
     actor: hashQs.get("actor") || "",
@@ -163,6 +174,7 @@ function updateGapsFilter(patch) {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
     reporter: "reporter" in patch ? patch.reporter : current.reporter,
+    instance: "instance" in patch ? patch.instance : current.instance,
     severity: "severity" in patch ? patch.severity : current.severity,
     category: "category" in patch ? patch.category : current.category,
     actor: "actor" in patch ? patch.actor : current.actor,
@@ -182,6 +194,7 @@ async function refreshGapsTable() {
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
   if (f.reporter) params.set("reporter", f.reporter);
+  if (f.instance) params.set("instance", f.instance);
   if (f.severity) params.set("severity", f.severity);
   if (f.category) params.set("category", f.category);
   if (f.actor) params.set("actor", f.actor);
@@ -262,6 +275,7 @@ function drawGapsTable(gaps, state) {
     { key: "status",   label: "Status",   sortable: true },
     { key: "priority", label: "Priority", sortable: true },
     { key: "reporter", label: "Reporter", sortable: true },
+    { key: "instance", label: "Instance", sortable: true },
     { key: "updated",  label: "Updated",  sortable: true },
   ];
   const sortHeads = columns.map((c) => {
@@ -303,6 +317,7 @@ function drawGapsTable(gaps, state) {
             <td><span class="status-pill ${g.status}">${g.status}</span></td>
             <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
+            <td class="muted small">${htmlEscape(g.instance_display_name || g.instance_id || "Unknown")}</td>
             <td class="muted small">${fmtTime(g.updated)}</td>
           </tr>`;
         }).join("")}

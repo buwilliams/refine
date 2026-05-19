@@ -44,7 +44,7 @@ import time
 from refine_server import activity, db
 from refine_server.gaps import now_iso
 
-from . import git_ops, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, subprocess_mgr, verify_op
 
 
 # How long the merger sleeps between scans when there's no signal. A
@@ -257,6 +257,10 @@ class Merger:
                     "WHERE id = ?",
                     (now_iso(), gap_id),
                 )
+            try:
+                gap_writer.update_fields(gap_id, status="review")
+            except Exception:
+                pass
             activity.append(
                 conn,
                 message=(result.get("message")

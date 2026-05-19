@@ -28,10 +28,12 @@ def main() -> int:
     )
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
-    assert slugs == ["application", "reporters", "governance", "runtime"], slugs
+    assert slugs == [
+        "project", "application", "instances", "reporters", "governance", "runtime",
+    ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
-    assert 'if (slug === "project") return "application";' in settings_js
+    assert 'if (slug === "system") return "project";' in settings_js
     assert "function activeSettingsTabFromRoute()" in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
@@ -82,7 +84,8 @@ def main() -> int:
         assert settings_js.count(f'pane("{slug}",') == 1
 
     assert 'href="#/system/application"' in index_html
-    assert "#/system/project" not in index_html
+    assert 'slug: "instances"' in settings_js
+    assert 'api("GET", "/api/instances")' in settings_js
 
     print("settings route tests OK")
     return 0

@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, db, features, gaps as shared_gaps, governance, reporters
+from refine_server import activity, db, features, gaps as shared_gaps, governance, project_state, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
@@ -223,21 +223,25 @@ class Runner:
         gap_id = params["gap_id"]
         name = params.get("name", "Untitled Gap")
         priority = _normalize_priority(params.get("priority"))
+        instance_id = project_state.active_instance_id()
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
             target=params.get("target", ""),
         )
-        gap = gap_writer.create_gap(gap_id=gap_id, name=name, initial_round=round_obj)
+        gap = gap_writer.create_gap(
+            gap_id=gap_id, name=name, initial_round=round_obj,
+            status="backlog", priority=priority, instance_id=instance_id,
+        )
 
         from refine_server.paths import relative_gap_path
         with db.transaction(self._conn):
             self._conn.execute(
                 "INSERT INTO gaps_index "
-                "(id, name, status, priority, reporter, created, updated, json_path) "
-                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?)",
+                "(id, name, status, priority, reporter, created, updated, instance_id, json_path) "
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?)",
                 (gap_id, name, priority, params["reporter"],
-                 gap["created"], gap["updated"], relative_gap_path(gap_id)),
+                 gap["created"], gap["updated"], instance_id, relative_gap_path(gap_id)),
             )
         # ensure reporter exists in dropdown list
         try:
@@ -269,6 +273,10 @@ class Runner:
                 "WHERE id = ?",
                 (params["reporter"], now_iso(), gap_id),
             )
+        try:
+            gap_writer.update_fields(gap_id, status="todo")
+        except Exception:
+            pass
         try:
             reporters.add(self._conn, params["reporter"])
         except Exception:
@@ -725,6 +733,10 @@ class Runner:
                 "UPDATE gaps_index SET status = 'cancelled', updated = ? WHERE id = ?",
                 (now_iso(), gap_id),
             )
+        try:
+            gap_writer.update_fields(gap_id, status="cancelled")
+        except Exception:
+            pass
         if pushed:
             revert_message = (
                 f"Gap undone — reverted merge `{commit_sha[:10]}…` on "

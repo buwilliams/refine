@@ -1,6 +1,11 @@
 """SQLite schema + connection helpers.
 
-SQLite holds: status, run state, settings, reporters, activity, ID→path index.
+SQLite is a disposable per-application cache. Canonical project state lives in
+JSON under .refine/ and is projected into SQLite on startup/app switch. The
+`activity`, `runs`, `preflight`, and `target_app_operations` tables are runtime
+history/observability only; losing index.sqlite loses that history but not
+canonical Gap/settings/instance state.
+
 WAL mode + busy retry to allow concurrent webapp and runner writers.
 """
 from __future__ import annotations
@@ -26,6 +31,7 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     created     TEXT NOT NULL,
     updated     TEXT NOT NULL,
     branch_name TEXT,
+    instance_id TEXT NOT NULL DEFAULT 'default',
     json_path   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gaps_status   ON gaps_index(status);
@@ -166,6 +172,7 @@ DEFAULT_SETTINGS = {
 _TRANSACTION_LOCKS: dict[int, threading.RLock] = {}
 _TRANSACTION_LOCKS_GUARD = threading.Lock()
 _SAVEPOINT_SEQ = 0
+_REBUILDING_CACHE = False
 
 
 def _transaction_lock(conn: sqlite3.Connection) -> threading.RLock:
@@ -206,6 +213,15 @@ def init_db(path: Path | None = None) -> None:
             conn.execute(
                 "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v)
             )
+        if path is None:
+            from . import project_state
+
+            global _REBUILDING_CACHE
+            _REBUILDING_CACHE = True
+            try:
+                project_state.rebuild_sqlite_cache(conn)
+            finally:
+                _REBUILDING_CACHE = False
     finally:
         conn.close()
 
@@ -223,6 +239,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE gaps_index ADD COLUMN reporter TEXT NOT NULL DEFAULT ''"
         )
         _backfill_reporter(conn)
+    if "instance_id" not in cols:
+        conn.execute(
+            "ALTER TABLE gaps_index ADD COLUMN instance_id TEXT NOT NULL DEFAULT 'default'"
+        )
     # Always (re-)assert indexes. CREATE INDEX IF NOT EXISTS is a no-op on
     # fresh databases (just after the executescript built the table) and on
     # already-migrated ones — so this is safe to run unconditionally.
@@ -231,6 +251,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_reporter ON gaps_index(reporter)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gaps_instance ON gaps_index(instance_id)"
     )
 
 
@@ -318,6 +341,13 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, value),
         )
+    if not _REBUILDING_CACHE:
+        try:
+            from . import project_state
+
+            project_state.set_setting(key, str(value))
+        except Exception:
+            pass
 
 
 def list_settings(conn: sqlite3.Connection) -> dict[str, str]:

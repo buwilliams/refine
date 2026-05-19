@@ -13,8 +13,8 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 - **Runtime split:** The UI backend runs natively on the host as a systemd --user service and owns the runner in-process. Agent CLI subprocesses, git operations, web requests, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
-- **Storage:** Single SQLite file (`status`, run state, settings, reporters, activity, ID→path index) plus flat JSON files (one per Gap). All committed to the client application's repository — **including the SQLite file** — so refine's state travels with the codebase.
-- **System:** All application settings live in SQLite, editable from the UI, scoped to the active target app.
+- **Storage:** Canonical project state lives in JSON under the client repo's `.refine/` directory. SQLite is a disposable per-application cache rebuilt from JSON on startup and app switch.
+- **System:** Settings are split between project-wide JSON and active-instance JSON, editable from the UI and scoped by the active target app/instance.
 - **External dependencies:** None at runtime beyond the Claude Code CLI and the local git binary, both installed on the host. Stand-alone — no third-party SaaS.
 - **Auth:** None for refine itself. Refine assumes deployment on a trusted private network.
 
@@ -25,7 +25,7 @@ Refine runs as one host-native UI backend on the same machine as the target app.
 **Host UI service (`refine_ui`):**
 
 - Python web server (UI + JSON API + SSE).
-- **Reads** the SQLite database and gap JSON files directly from the active app's `.refine/` directory. **Writes** SQLite directly for settings, reporters, the pause flag, `status` transitions driven by user actions that don't require the runner (e.g. Cancel from non-running states, new-round submissions), and user-action activity-feed entries. Does **not** write gap JSON files directly — calls the in-process runner for those edits.
+- **Reads** the SQLite cache and canonical JSON files directly from the active app's `.refine/` directory. **Writes** settings, reporters, instance state, and Gap workflow fields through JSON-backed helpers that refresh SQLite projections. User-action activity-feed entries are runtime history in SQLite only.
 - Calls the runner directly for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
 
 **On the host (`refine_server`):**
@@ -33,11 +33,11 @@ Refine runs as one host-native UI backend on the same machine as the target app.
 - Spawns Claude Code CLI subprocesses (`claude --print ...`) directly on the host — they inherit the host's `~/.claude/` auth, PATH, and shell.
 - Runs every `git` operation against the client repo — fetch, branch, worktree, merge, push — using the host's SSH keys and git config.
 - **Owns all `gap.json` writes.** Serializes them per-Gap with an atomic temp-file-plus-rename. Applies round submissions, round edits, and log appends requested by HTTP handlers, plus its own log appends from agent subprocesses and git events.
-- Reports state changes by writing to SQLite, which the UI backend's SSE stream surfaces.
+- Reports state changes by updating canonical `gap.json` where durable Gap state changes and by writing runtime history to SQLite for SSE and dashboard observability.
 
 **Shared filesystem state:**
 
-- The client repository lives on the host. Inside it sits refine's volume root (SQLite + gap JSON files). The UI backend and in-process runner both access it natively. **Write ownership differs:** `gap.json` is runner-only. SQLite is shared — HTTP handlers write settings, reporters, and user-action state changes; runner writes subprocess and git-event state. WAL mode plus per-table ownership keeps the writers from contending.
+- The client repository lives on the host. Inside it sits refine's volume root (`.refine/`). The UI backend and in-process runner both access it natively. JSON files are authoritative for project config, instances, instance settings/reporters, and Gap workflow state; SQLite is a shared cache plus runtime-history store. WAL mode plus short transactions keep runtime-history writers from contending.
 
 **Why this split:** The runner owns subprocess and file-write decisions while the UI backend owns HTTP/UI concerns. Running everything natively in one backend process avoids container path mapping, interprocess transport overhead, duplicated environment setup, and credential forwarding; refine reuses whatever auth and tooling the operator already has set up.
 
@@ -166,16 +166,26 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 
 ```
 <volume-root>/
-  index.sqlite                 # status, run state, settings, reporters, activity, ID→path index
+  config.json                  # schema version, project-wide settings, governance
+  instances.json               # canonical instance registry
+  index.sqlite                 # disposable cache + runtime history
   gaps/
     ab/                        # first 2 chars of Gap ULID
       cdef…/                   # remaining ULID
-        gap.json               # id, name, timestamps, rounds (with reporter, actual/target, logs)
+        gap.json               # id, name, status, priority, branch, instance, rounds/logs
+  instances/
+    <instance_id>/
+      application.json
+      reporters.json
+      runtime.json
+      target-app.json
 ```
 
 - **One JSON file per Gap.** All round content and logs live in `gap.json`.
-- **`gap.json` holds** identity and content: `id`, `name`, `created`, `updated`, and the `rounds` array (each round with `reporter`, `actual`, `target`, timestamps, and `logs[]`). `status` is **not** in `gap.json` — it lives only in SQLite, so a status transition does not require rewriting the file.
-- **SQLite holds** `status`, ephemeral run state (per-Gap locks, currently-running subprocesses, pause flag), runtime settings, the reporters list, and the activity feed. It also indexes Gaps (by `id`, `name`, `created`, `updated`) for fast list, filter, and search.
+- **`gap.json` holds** identity, workflow ownership, and content: `id`, `name`, `status`, `priority`, `branch_name`, `instance_id`, `created`, `updated`, and the `rounds` array (each round with `reporter`, `actual`, `target`, timestamps, and `logs[]`).
+- **Instance JSON holds** active-instance scoped application/runtime/target-app settings and reporter dropdown entries. `instances.json` is the source of truth for instance IDs and display names.
+- **Project JSON holds** schema version and project-wide Governance settings.
+- **SQLite holds rebuildable projections** for Gap lists, filters, counts, settings, and reporter dropdown reads. It also stores disposable runtime history and observability tables: `activity`, `runs`, `preflight`, and `target_app_operations`. Deleting `index.sqlite` loses that runtime history but not canonical project, instance, reporter, settings, or Gap state.
 - The volume root lives inside the client repo and is committed there.
 
 ## Agent execution
@@ -389,7 +399,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 ## Application settings
 
-All application settings live in the SQLite database and are editable from the **System** page in the UI, so each client project has its own configuration. Defaults are seeded on first run.
+Application settings live in `.refine/config.json` for project-wide policy and `.refine/instances/<instance_id>/` for instance-scoped runtime/application/reporters/target-app settings. SQLite mirrors the active instance's effective settings for fast reads and legacy code paths.
 
 **Runtime configuration:**
 

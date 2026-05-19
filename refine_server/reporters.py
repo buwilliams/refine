@@ -9,6 +9,7 @@ import sqlite3
 
 from .db import transaction
 from .gaps import now_iso
+from . import project_state
 
 
 def list_all(conn: sqlite3.Connection) -> list[dict]:
@@ -34,7 +35,9 @@ def add(conn: sqlite3.Connection, name: str) -> dict:
                 "SELECT id, created FROM reporters WHERE name = ?", (name,)
             ).fetchone()
             return {"id": row["id"], "name": name, "created": row["created"]}
-    return {"id": rid, "name": name, "created": now_iso()}
+    rep = {"id": rid, "name": name, "created": now_iso()}
+    _sync_from_db(conn)
+    return rep
 
 
 def rename(conn: sqlite3.Connection, rid: int, new_name: str) -> None:
@@ -43,13 +46,22 @@ def rename(conn: sqlite3.Connection, rid: int, new_name: str) -> None:
         raise ValueError("reporter name cannot be empty")
     with transaction(conn):
         conn.execute("UPDATE reporters SET name = ? WHERE id = ?", (new_name, rid))
+    _sync_from_db(conn)
 
 
 def remove(conn: sqlite3.Connection, rid: int) -> None:
     with transaction(conn):
         conn.execute("DELETE FROM reporters WHERE id = ?", (rid,))
+    _sync_from_db(conn)
 
 
 def exists(conn: sqlite3.Connection, name: str) -> bool:
     row = conn.execute("SELECT 1 FROM reporters WHERE name = ?", (name,)).fetchone()
     return row is not None
+
+
+def _sync_from_db(conn: sqlite3.Connection) -> None:
+    try:
+        project_state.write_reporters(list_all(conn))
+    except Exception:
+        pass

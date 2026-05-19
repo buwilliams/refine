@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from refine_server import activity, db, governance
+from refine_server import activity, db, governance, project_state
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
@@ -93,9 +93,9 @@ class Dispatcher:
             return
         rows = conn.execute(
             "SELECT id, name, branch_name FROM gaps_index "
-            f"WHERE status = 'todo' AND {priority_case_sql()} = ? "
+            f"WHERE status = 'todo' AND instance_id = ? AND {priority_case_sql()} = ? "
             "ORDER BY updated ASC LIMIT ?",
-            (active_rank, cap - running),
+            (project_state.active_instance_id(), active_rank, cap - running),
         ).fetchall()
         for row in rows:
             gid = row["id"]
@@ -113,9 +113,9 @@ class Dispatcher:
         placeholders = ",".join("?" * len(BLOCKING_STATUSES))
         row = conn.execute(
             f"SELECT {priority_case_sql()} AS rank FROM gaps_index "
-            f"WHERE status IN ({placeholders}) "
+            f"WHERE instance_id = ? AND status IN ({placeholders}) "
             "ORDER BY rank ASC LIMIT 1",
-            BLOCKING_STATUSES,
+            (project_state.active_instance_id(), *BLOCKING_STATUSES),
         ).fetchone()
         return int(row["rank"]) if row else None
 
@@ -156,7 +156,8 @@ class Dispatcher:
             return
         if n == 0:
             rows = conn.execute(
-                "SELECT id FROM gaps_index WHERE status = 'backlog'"
+                "SELECT id FROM gaps_index WHERE status = 'backlog' AND instance_id = ?",
+                (project_state.active_instance_id(),),
             ).fetchall()
         else:
             cutoff = (datetime.now(timezone.utc) - timedelta(seconds=n)).strftime(
@@ -164,8 +165,8 @@ class Dispatcher:
             )
             rows = conn.execute(
                 "SELECT id FROM gaps_index "
-                "WHERE status = 'backlog' AND updated <= ?",
-                (cutoff,),
+                "WHERE status = 'backlog' AND instance_id = ? AND updated <= ?",
+                (project_state.active_instance_id(), cutoff),
             ).fetchall()
         if not rows:
             return
@@ -183,6 +184,10 @@ class Dispatcher:
                     (ts, gid),
                 )
             if cur.rowcount:
+                try:
+                    gap_writer.update_fields(gid, status="todo")
+                except Exception:
+                    pass
                 activity.append(
                     conn,
                     message="Auto-promoted from backlog to todo",
@@ -308,6 +313,12 @@ class Dispatcher:
                 "WHERE id = ? AND status = 'todo'",
                 (now_iso(), branch_name, gap_id),
             )
+        try:
+            gap_writer.update_fields(
+                gap_id, status="in-progress", branch_name=branch_name,
+            )
+        except Exception:
+            pass
         activity.append(
             conn,
             message="Agent run started",
@@ -400,6 +411,10 @@ class Dispatcher:
                 "WHERE id = ? AND status = 'todo'",
                 (now_iso(), gap_id),
             )
+        try:
+            gap_writer.update_fields(gap_id, status="review")
+        except Exception:
+            pass
         activity.append(
             conn, message=msg,
             severity="info", category="state",
@@ -424,6 +439,10 @@ class Dispatcher:
                 "WHERE id = ? AND status = 'todo'",
                 (now_iso(), gap_id),
             )
+        try:
+            gap_writer.update_fields(gap_id, status="failed")
+        except Exception:
+            pass
 
     def _on_finished(self, gap_id: str, round_idx: int, exit_code: int,
                      killed_reason: str | None, base_commit: str,
@@ -461,6 +480,15 @@ class Dispatcher:
             )
         if cur.rowcount == 0:
             return
+        if success and self.on_run_finished is not None:
+            try:
+                self.on_run_finished(gap_id)
+            except Exception:
+                pass
+        try:
+            gap_writer.update_fields(gap_id, status=next_status)
+        except Exception:
+            pass
 
         try:
             gap_writer.append_round_log(
@@ -490,11 +518,6 @@ class Dispatcher:
         # the merger to scan promptly instead of waiting on its
         # periodic tick. The Gap stays in `ready-merge` until the
         # merger parks it in `review`.
-        if success and self.on_run_finished is not None:
-            try:
-                self.on_run_finished(gap_id)
-            except Exception:
-                pass
 
     def _reset_stopped_run_to_todo(self, conn: sqlite3.Connection, gap_id: str,
                                    round_idx: int, reason: str) -> None:
@@ -512,6 +535,10 @@ class Dispatcher:
                     "updated = ? WHERE id = ? AND status = 'in-progress'",
                     (now_iso(), gap_id),
                 )
+            try:
+                gap_writer.update_fields(gap_id, status="todo", branch_name=None)
+            except Exception:
+                pass
 
         git_ops.remove_worktree(gap_id)
         if branch_name:

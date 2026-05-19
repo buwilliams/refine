@@ -1,0 +1,654 @@
+"""Canonical per-application Refine state.
+
+SQLite is a rebuildable cache. This module owns the JSON files under
+``<app>/.refine`` that carry durable project, instance, reporter, settings,
+and Gap ownership state.
+"""
+from __future__ import annotations
+
+import json
+import os
+import sqlite3
+import tempfile
+from pathlib import Path
+from typing import Any
+
+from . import config
+from .gaps import now_iso
+
+
+CURRENT_SCHEMA_VERSION = 1
+MIN_SUPPORTED_SCHEMA_VERSION = 1
+DEFAULT_INSTANCE_ID = "default"
+
+PROJECT_SETTING_KEYS = {
+    "governance_product",
+    "governance_constitution",
+    "governance_rules_json",
+}
+
+APPLICATION_SETTING_KEYS = {
+    "agent_subpath",
+    "merge_target_branch",
+}
+
+RUNTIME_SETTING_KEYS = {
+    "parallel_run_cap",
+    "branch_name_pattern",
+    "agent_idle_timeout_seconds",
+    "agent_hard_cap_seconds",
+    "chat_idle_timeout_seconds",
+    "backlog_promote_after_seconds",
+    "paused",
+    "agent_cli",
+}
+
+TARGET_APP_SETTING_KEYS = {
+    "target_app_start_instructions",
+    "target_app_stop_instructions",
+    "target_app_health_url",
+    "target_app_start_command",
+    "target_app_stop_command",
+    "target_app_status_command",
+    "target_app_cwd",
+    "target_app_env_json",
+    "target_app_start_timeout_seconds",
+    "target_app_stop_timeout_seconds",
+    "target_app_status_timeout_seconds",
+    "target_app_log_path",
+    "target_app_http_check_url",
+    "target_app_tcp_check_host",
+    "target_app_tcp_check_port",
+    "target_app_process_check_command",
+    "target_app_state",
+    "target_app_last_check_at",
+    "target_app_last_check_ok",
+    "target_app_last_check_message",
+    "target_app_last_health_at",
+    "target_app_last_health_ok",
+    "target_app_last_health_message",
+    "target_app_last_operation_id",
+    "target_app_last_error",
+}
+
+
+def volume_root() -> Path:
+    return config.get().volume_root
+
+
+def config_json_path(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "config.json"
+
+
+def instances_json_path(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "instances.json"
+
+
+def instances_dir(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "instances"
+
+
+def run_dir(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "run"
+
+
+def active_instance_path(root: Path | None = None) -> Path:
+    return run_dir(root) / "active-instance.json"
+
+
+def instance_dir(instance_id: str, root: Path | None = None) -> Path:
+    return instances_dir(root) / instance_id
+
+
+def schema_status(root: Path | None = None) -> dict[str, Any]:
+    """Return schema compatibility for an application's .refine directory."""
+    root = root or volume_root()
+    cfg_path = config_json_path(root)
+    if not cfg_path.exists():
+        return {
+            "compatible": False,
+            "migration_required": True,
+            "schema_version": None,
+            "current_schema_version": CURRENT_SCHEMA_VERSION,
+            "reason": "legacy_project",
+        }
+    try:
+        cfg = _read_json(cfg_path, {})
+        version = int(cfg.get("schema_version") or 0)
+    except Exception:
+        return {
+            "compatible": False,
+            "migration_required": False,
+            "schema_version": None,
+            "current_schema_version": CURRENT_SCHEMA_VERSION,
+            "reason": "invalid_config",
+        }
+    if version > CURRENT_SCHEMA_VERSION:
+        return {
+            "compatible": False,
+            "migration_required": False,
+            "schema_version": version,
+            "current_schema_version": CURRENT_SCHEMA_VERSION,
+            "reason": "newer_schema",
+        }
+    if version < MIN_SUPPORTED_SCHEMA_VERSION:
+        return {
+            "compatible": False,
+            "migration_required": True,
+            "schema_version": version,
+            "current_schema_version": CURRENT_SCHEMA_VERSION,
+            "reason": "outdated_schema",
+        }
+    return {
+        "compatible": True,
+        "migration_required": False,
+        "schema_version": version,
+        "current_schema_version": CURRENT_SCHEMA_VERSION,
+        "reason": "",
+    }
+
+
+def empty_refine_state(root: Path | None = None) -> bool:
+    root = root or volume_root()
+    gaps = root / "gaps"
+    has_gaps = gaps.exists() and any(gaps.glob("**/gap.json"))
+    return not has_gaps and not (root / "index.sqlite").exists()
+
+
+def ensure_initialized(conn: sqlite3.Connection | None = None, *,
+                       migrate: bool = True) -> dict[str, Any]:
+    """Ensure canonical JSON exists and is compatible for the active app."""
+    root = volume_root()
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "gaps").mkdir(exist_ok=True)
+    run_dir(root).mkdir(exist_ok=True)
+    instances_dir(root).mkdir(exist_ok=True)
+    status = schema_status(root)
+    if status["compatible"]:
+        ensure_default_instance(root=root)
+        ensure_active_instance(root=root)
+        return status
+    if not migrate or not status.get("migration_required"):
+        return status
+    migrate_legacy(conn, root=root)
+    return schema_status(root)
+
+
+def migrate_legacy(conn: sqlite3.Connection | None = None, *,
+                   root: Path | None = None) -> None:
+    """Create v1 JSON files from an existing SQLite-backed project."""
+    root = root or volume_root()
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "gaps").mkdir(exist_ok=True)
+    run_dir(root).mkdir(exist_ok=True)
+    instances_dir(root).mkdir(exist_ok=True)
+
+    from . import db
+
+    close_conn = False
+    if conn is None:
+        conn = db.connect(root / "index.sqlite")
+        close_conn = True
+    try:
+        legacy_settings = dict(db.DEFAULT_SETTINGS)
+        try:
+            legacy_settings.update(db.list_settings(conn))
+        except sqlite3.Error:
+            pass
+        reporters = _legacy_reporters(conn)
+        gap_rows = _legacy_gap_rows(conn)
+    finally:
+        if close_conn:
+            conn.close()
+
+    _write_json(config_json_path(root), {
+        "schema_version": CURRENT_SCHEMA_VERSION,
+        "refine": {"version": _refine_version()},
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "settings": {
+            k: v for k, v in legacy_settings.items()
+            if k in PROJECT_SETTING_KEYS
+        },
+    })
+    _write_json(instances_json_path(root), {
+        "instances": [{
+            "id": DEFAULT_INSTANCE_ID,
+            "display_name": "Default",
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+            "archived": False,
+        }],
+    })
+    _write_instance_files(
+        DEFAULT_INSTANCE_ID,
+        settings=legacy_settings,
+        reporters=reporters,
+        root=root,
+    )
+    set_active_instance(DEFAULT_INSTANCE_ID, root=root)
+    _migrate_gap_files(gap_rows, root=root)
+
+
+def _legacy_reporters(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    try:
+        return [
+            {"id": int(r["id"]), "name": r["name"], "created": r["created"]}
+            for r in conn.execute(
+                "SELECT id, name, created FROM reporters ORDER BY id"
+            )
+        ]
+    except sqlite3.Error:
+        return []
+
+
+def _legacy_gap_rows(conn: sqlite3.Connection) -> dict[str, dict[str, Any]]:
+    try:
+        return {
+            r["id"]: dict(r)
+            for r in conn.execute(
+                "SELECT id, name, status, priority, reporter, created, updated, "
+                "branch_name, json_path FROM gaps_index"
+            )
+        }
+    except sqlite3.Error:
+        return {}
+
+
+def _migrate_gap_files(rows: dict[str, dict[str, Any]], *, root: Path) -> None:
+    for path in sorted((root / "gaps").glob("**/gap.json")):
+        gap = _read_json(path, {})
+        if not isinstance(gap, dict) or not gap.get("id"):
+            continue
+        row = rows.get(str(gap["id"]))
+        changed = False
+        defaults = {
+            "status": row.get("status") if row else "backlog",
+            "priority": row.get("priority") if row else "low",
+            "branch_name": row.get("branch_name") if row else None,
+            "instance_id": DEFAULT_INSTANCE_ID,
+        }
+        for key, value in defaults.items():
+            if key not in gap:
+                gap[key] = value
+                changed = True
+        if changed:
+            gap["updated"] = gap.get("updated") or now_iso()
+            _write_json(path, gap)
+
+
+def ensure_default_instance(*, root: Path | None = None) -> dict[str, Any]:
+    root = root or volume_root()
+    registry = read_instances(root=root)
+    entries = registry.get("instances") or []
+    if not entries:
+        entries = [{
+            "id": DEFAULT_INSTANCE_ID,
+            "display_name": "Default",
+            "created_at": now_iso(),
+            "updated_at": now_iso(),
+            "archived": False,
+        }]
+        registry["instances"] = entries
+        _write_json(instances_json_path(root), registry)
+    for entry in entries:
+        if entry.get("id"):
+            _ensure_instance_files(str(entry["id"]), root=root)
+    return entries[0]
+
+
+def read_project_config(*, root: Path | None = None) -> dict[str, Any]:
+    return _read_json(config_json_path(root), {})
+
+
+def write_project_config(data: dict[str, Any], *, root: Path | None = None) -> None:
+    data["updated_at"] = now_iso()
+    _write_json(config_json_path(root), data)
+
+
+def read_instances(*, root: Path | None = None) -> dict[str, Any]:
+    root = root or volume_root()
+    data = _read_json(instances_json_path(root), {"instances": []})
+    if not isinstance(data.get("instances"), list):
+        data["instances"] = []
+    return data
+
+
+def write_instances(data: dict[str, Any], *, root: Path | None = None) -> None:
+    _write_json(instances_json_path(root), data)
+
+
+def list_instances(*, root: Path | None = None) -> list[dict[str, Any]]:
+    return list(read_instances(root=root).get("instances") or [])
+
+
+def instance_by_id(instance_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
+    for entry in list_instances(root=root):
+        if entry.get("id") == instance_id:
+            return entry
+    return None
+
+
+def ensure_active_instance(*, root: Path | None = None) -> str:
+    root = root or volume_root()
+    registry = read_instances(root=root)
+    entries = registry.get("instances") or []
+    active = _read_json(active_instance_path(root), {}).get("active_instance_id")
+    if active and any(e.get("id") == active and not e.get("archived") for e in entries):
+        _ensure_instance_files(str(active), root=root)
+        return str(active)
+    fallback = next((e for e in entries if not e.get("archived")), None)
+    if fallback is None:
+        fallback = ensure_default_instance(root=root)
+    active_id = str(fallback["id"])
+    set_active_instance(active_id, root=root)
+    return active_id
+
+
+def active_instance_id(*, root: Path | None = None) -> str:
+    return ensure_active_instance(root=root)
+
+
+def set_active_instance(instance_id: str, *, root: Path | None = None) -> None:
+    root = root or volume_root()
+    if instance_by_id(instance_id, root=root) is None:
+        raise ValueError(f"unknown instance_id: {instance_id}")
+    run_dir(root).mkdir(exist_ok=True)
+    _write_json(active_instance_path(root), {
+        "active_instance_id": instance_id,
+        "updated_at": now_iso(),
+    })
+    _ensure_instance_files(instance_id, root=root)
+
+
+def create_instance(display_name: str, *, root: Path | None = None) -> dict[str, Any]:
+    root = root or volume_root()
+    name = display_name.strip() or "New instance"
+    instance_id = _slug_instance_id(name)
+    existing = {str(e.get("id")) for e in list_instances(root=root)}
+    base = instance_id
+    i = 2
+    while instance_id in existing:
+        instance_id = f"{base}-{i}"
+        i += 1
+    entry = {
+        "id": instance_id,
+        "display_name": name,
+        "created_at": now_iso(),
+        "updated_at": now_iso(),
+        "archived": False,
+    }
+    registry = read_instances(root=root)
+    registry.setdefault("instances", []).append(entry)
+    write_instances(registry, root=root)
+    _ensure_instance_files(instance_id, root=root)
+    return entry
+
+
+def update_instance(instance_id: str, *, display_name: str | None = None,
+                    archived: bool | None = None,
+                    root: Path | None = None) -> dict[str, Any]:
+    root = root or volume_root()
+    registry = read_instances(root=root)
+    for entry in registry.get("instances") or []:
+        if entry.get("id") != instance_id:
+            continue
+        if display_name is not None:
+            name = display_name.strip()
+            if not name:
+                raise ValueError("display_name is required")
+            entry["display_name"] = name
+        if archived is not None:
+            entry["archived"] = bool(archived)
+        entry["updated_at"] = now_iso()
+        write_instances(registry, root=root)
+        if archived and active_instance_id(root=root) == instance_id:
+            ensure_active_instance(root=root)
+        return entry
+    raise ValueError(f"unknown instance_id: {instance_id}")
+
+
+def list_settings() -> dict[str, str]:
+    from . import db
+
+    root = volume_root()
+    ensure_initialized(migrate=True)
+    active = active_instance_id(root=root)
+    settings = dict(db.DEFAULT_SETTINGS)
+    cfg = read_project_config(root=root)
+    settings.update(_string_map(cfg.get("settings") or {}))
+    settings.update(_string_map(_read_json(instance_dir(active, root) / "application.json", {})))
+    settings.update(_string_map(_read_json(instance_dir(active, root) / "runtime.json", {})))
+    settings.update(_string_map(_read_json(instance_dir(active, root) / "target-app.json", {})))
+    return settings
+
+
+def set_setting(key: str, value: str) -> None:
+    root = volume_root()
+    ensure_initialized(migrate=True)
+    if key in PROJECT_SETTING_KEYS:
+        cfg = read_project_config(root=root)
+        settings = cfg.setdefault("settings", {})
+        settings[key] = value
+        write_project_config(cfg, root=root)
+    elif key in APPLICATION_SETTING_KEYS:
+        _update_instance_file("application.json", {key: value}, root=root)
+    elif key in RUNTIME_SETTING_KEYS or key.startswith("feature_"):
+        _update_instance_file("runtime.json", {key: value}, root=root)
+    elif key in TARGET_APP_SETTING_KEYS:
+        _update_instance_file("target-app.json", {key: value}, root=root)
+
+
+def list_reporters(*, root: Path | None = None) -> list[dict[str, Any]]:
+    root = root or volume_root()
+    active = active_instance_id(root=root)
+    data = _read_json(instance_dir(active, root) / "reporters.json", {"reporters": []})
+    return [r for r in data.get("reporters") or [] if isinstance(r, dict)]
+
+
+def write_reporters(reporters: list[dict[str, Any]], *,
+                    root: Path | None = None) -> None:
+    root = root or volume_root()
+    active = active_instance_id(root=root)
+    _write_json(instance_dir(active, root) / "reporters.json", {
+        "reporters": reporters,
+        "updated_at": now_iso(),
+    })
+
+
+def gap_instance_display(instance_id: str | None) -> str:
+    if not instance_id:
+        return "Unknown"
+    entry = instance_by_id(instance_id)
+    if entry is None:
+        return "Unknown"
+    return str(entry.get("display_name") or entry.get("id") or "Unknown")
+
+
+def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
+                  *, statuses: set[str] | None = None) -> dict[str, Any]:
+    if instance_by_id(target_instance_id) is None:
+        raise ValueError(f"unknown target instance: {target_instance_id}")
+    allowed = statuses or {"backlog", "todo", "failed", "review", "done", "cancelled"}
+    skipped: list[dict[str, str]] = []
+    updated: list[str] = []
+    root = volume_root()
+    for path in sorted((root / "gaps").glob("**/gap.json")):
+        gap = _read_json(path, {})
+        gid = str(gap.get("id") or "")
+        if not gid:
+            continue
+        current = str(gap.get("instance_id") or "")
+        if source_instance_id and current != source_instance_id:
+            continue
+        status = str(gap.get("status") or "backlog")
+        if status not in allowed:
+            skipped.append({"id": gid, "reason": f"status:{status}"})
+            continue
+        if current == target_instance_id:
+            skipped.append({"id": gid, "reason": "already_target"})
+            continue
+        gap["instance_id"] = target_instance_id
+        gap["updated"] = now_iso()
+        _write_json(path, gap)
+        updated.append(gid)
+    return {"updated": len(updated), "ids": updated,
+            "skipped": len(skipped), "skipped_details": skipped}
+
+
+def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
+    """Rebuild SQLite projection tables from canonical JSON."""
+    from . import db
+
+    ensure_initialized(conn, migrate=True)
+    settings = list_settings()
+    reps = list_reporters()
+    root = volume_root()
+    with db.transaction(conn):
+        conn.execute("DELETE FROM gaps_index")
+        conn.execute("DELETE FROM settings")
+        conn.execute("DELETE FROM reporters")
+        for key, value in settings.items():
+            conn.execute(
+                "INSERT INTO settings(key, value) VALUES(?, ?)",
+                (key, str(value)),
+            )
+        for rep in reps:
+            conn.execute(
+                "INSERT OR IGNORE INTO reporters(id, name, created) VALUES(?, ?, ?)",
+                (
+                    int(rep.get("id") or 0) or None,
+                    str(rep.get("name") or ""),
+                    str(rep.get("created") or now_iso()),
+                ),
+            )
+        for gap, rel_path in _iter_gap_json(root):
+            conn.execute(
+                "INSERT OR REPLACE INTO gaps_index "
+                "(id, name, status, priority, reporter, created, updated, "
+                "branch_name, instance_id, json_path) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (
+                    str(gap.get("id") or ""),
+                    str(gap.get("name") or "Untitled Gap"),
+                    str(gap.get("status") or "backlog"),
+                    str(gap.get("priority") or "low"),
+                    _latest_reporter(gap),
+                    str(gap.get("created") or now_iso()),
+                    str(gap.get("updated") or gap.get("created") or now_iso()),
+                    gap.get("branch_name"),
+                    str(gap.get("instance_id") or DEFAULT_INSTANCE_ID),
+                    rel_path,
+                ),
+            )
+
+
+def _iter_gap_json(root: Path) -> list[tuple[dict[str, Any], str]]:
+    out: list[tuple[dict[str, Any], str]] = []
+    for path in sorted((root / "gaps").glob("**/gap.json")):
+        gap = _read_json(path, {})
+        if not isinstance(gap, dict) or not gap.get("id"):
+            continue
+        rel = path.relative_to(root).as_posix()
+        out.append((gap, rel))
+    return out
+
+
+def _latest_reporter(gap: dict[str, Any]) -> str:
+    rounds = gap.get("rounds") or []
+    if rounds and isinstance(rounds[-1], dict):
+        return str(rounds[-1].get("reporter") or "")
+    return ""
+
+
+def _write_instance_files(instance_id: str, *, settings: dict[str, str],
+                          reporters: list[dict[str, Any]],
+                          root: Path) -> None:
+    d = instance_dir(instance_id, root)
+    d.mkdir(parents=True, exist_ok=True)
+    files = {
+        "application.json": APPLICATION_SETTING_KEYS,
+        "runtime.json": RUNTIME_SETTING_KEYS,
+        "target-app.json": TARGET_APP_SETTING_KEYS,
+    }
+    for name, keys in files.items():
+        _write_json(d / name, {k: v for k, v in settings.items() if k in keys})
+    _write_json(d / "reporters.json", {
+        "reporters": reporters,
+        "updated_at": now_iso(),
+    })
+
+
+def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
+    from . import db
+
+    d = instance_dir(instance_id, root)
+    d.mkdir(parents=True, exist_ok=True)
+    defaults = db.DEFAULT_SETTINGS
+    for name, keys in {
+        "application.json": APPLICATION_SETTING_KEYS,
+        "runtime.json": RUNTIME_SETTING_KEYS,
+        "target-app.json": TARGET_APP_SETTING_KEYS,
+    }.items():
+        p = d / name
+        if not p.exists():
+            _write_json(p, {k: defaults[k] for k in keys if k in defaults})
+    reps = d / "reporters.json"
+    if not reps.exists():
+        _write_json(reps, {"reporters": [], "updated_at": now_iso()})
+
+
+def _update_instance_file(filename: str, updates: dict[str, str], *,
+                          root: Path | None = None) -> None:
+    root = root or volume_root()
+    active = active_instance_id(root=root)
+    p = instance_dir(active, root) / filename
+    data = _read_json(p, {})
+    data.update({k: str(v) for k, v in updates.items()})
+    data["updated_at"] = now_iso()
+    _write_json(p, data)
+
+
+def _string_map(value: dict[str, Any]) -> dict[str, str]:
+    metadata = {"created_at", "updated_at", "schema_version", "refine"}
+    return {str(k): str(v) for k, v in value.items() if str(k) not in metadata}
+
+
+def _read_json(path: Path, default: Any) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return default
+
+
+def _write_json(path: Path, data: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    fd, tmp = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _slug_instance_id(name: str) -> str:
+    import re
+
+    slug = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-")
+    return slug[:40] or "instance"
+
+
+def _refine_version() -> str:
+    try:
+        import importlib.metadata
+        return importlib.metadata.version("refine")
+    except Exception:
+        return "unknown"

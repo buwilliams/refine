@@ -22,11 +22,34 @@ def _lock_for(gap_id: str) -> threading.Lock:
         return _locks[gap_id]
 
 
-def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any]) -> dict[str, Any]:
+def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any],
+               status: str = "backlog", priority: str = "low",
+               instance_id: str | None = None) -> dict[str, Any]:
     """Initialize gap.json with one round. Returns the new Gap record."""
     with _lock_for(gap_id):
         gap = shared_gaps.empty_gap(gap_id, name)
+        gap["status"] = status
+        gap["priority"] = priority
+        if instance_id:
+            gap["instance_id"] = instance_id
         gap["rounds"].append(initial_round)
+        gap["updated"] = now_iso()
+        shared_gaps.write_gap_json(gap)
+        return gap
+
+
+def update_fields(gap_id: str, **fields: Any) -> dict[str, Any]:
+    """Update canonical top-level gap fields and touch updated."""
+    allowed = {"name", "status", "priority", "branch_name", "instance_id"}
+    unknown = set(fields) - allowed
+    if unknown:
+        raise ValueError(f"unknown gap fields: {', '.join(sorted(unknown))}")
+    with _lock_for(gap_id):
+        gap = shared_gaps.read_gap_json(gap_id)
+        if gap is None:
+            raise FileNotFoundError(f"gap.json missing for {gap_id}")
+        for key, value in fields.items():
+            gap[key] = value
         gap["updated"] = now_iso()
         shared_gaps.write_gap_json(gap)
         return gap
@@ -200,13 +223,10 @@ def append_round_log(*, gap_id: str, round_idx: int, message: str,
 
 
 def update_name(gap_id: str, name: str) -> None:
-    with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
-        if gap is None:
-            return
-        gap["name"] = name
-        gap["updated"] = now_iso()
-        shared_gaps.write_gap_json(gap)
+    try:
+        update_fields(gap_id, name=name)
+    except FileNotFoundError:
+        return
 
 
 def delete_gap_file(gap_id: str) -> None:

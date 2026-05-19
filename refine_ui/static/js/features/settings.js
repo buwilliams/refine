@@ -13,7 +13,7 @@ async function renderSettings() {
 async function refreshSettings() {
   if (state.currentRoute !== "settings") return;
   try {
-    const [s, diag, reps, feats, project, gov, dash] = await Promise.all([
+    const [s, diag, reps, feats, project, gov, dash, instances] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
@@ -21,11 +21,12 @@ async function refreshSettings() {
       api("GET", "/api/project/status"),
       api("GET", "/api/governance"),
       api("GET", "/api/dashboard"),
+      api("GET", "/api/instances"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
     state.project = project;
-    drawSettings(s.settings || {}, diag, reps.reporters || [], feats, gov || {}, dash || {});
+    drawSettings(s.settings || {}, diag, reps.reporters || [], feats, gov || {}, dash || {}, instances || {});
   } catch (e) {
     const root = document.getElementById("settings-content");
     if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
@@ -34,14 +35,16 @@ async function refreshSettings() {
 
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
+  { slug: "project",      label: "Project" },
   { slug: "application",  label: "Application" },
+  { slug: "instances",    label: "Instances" },
   { slug: "reporters",    label: "Reporters" },
   { slug: "governance",   label: "Governance" },
   { slug: "runtime",      label: "Runtime" },
 ];
 
 function normalizeSettingsTab(slug) {
-  if (slug === "project") return "application";
+  if (slug === "system") return "project";
   return SETTINGS_TABS.some((t) => t.slug === slug) ? slug : null;
 }
 
@@ -319,11 +322,16 @@ function renderRuntimeAgentCards(dash, settings, diag) {
     </section>`;
 }
 
-function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
+function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = {}) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const projectApps = state.project?.apps || [];
   const currentProject = state.project?.client_repo || "";
   const projectRegistryEnabled = state.project?.registry_enabled !== false;
+  const instances = instanceData.instances || state.project?.instances || [];
+  const activeInstanceId = instanceData.active_instance_id || state.project?.active_instance_id || "";
+  const activeInstance = instances.find((i) => i.id === activeInstanceId) || null;
+  const activeInstanceLabel = activeInstance?.display_name || activeInstanceId || "Default";
+  const instanceCounts = instanceData.counts || {};
   const appOptions = projectApps.map((app) => `
     <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
       ${htmlEscape(app.name || app.path)}
@@ -348,9 +356,10 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     </section>`;
   $("#settings-content").innerHTML = `
     ${tabStrip}
-    ${pane("application", `
+    ${pane("project", `
     <section class="settings-section">
       <h3>Applications</h3>
+      <p class="scope-label muted small">Project-wide</p>
       <p class="muted small">
         Current app: <code>${htmlEscape(state.project?.client_repo || "Not attached")}</code>
       </p>
@@ -370,6 +379,12 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
         <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
+    </section>`)}
+
+    ${pane("application", `
+    <section class="settings-section">
+      <h3>Application</h3>
+      <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
     </section>
 
     <section class="settings-section">
@@ -485,6 +500,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
 
     <section class="settings-section">
       <h3>Runtime configuration</h3>
+      <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
       <div class="form-row"><label>Parallel-run cap</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
       <div class="form-row"><label>Branch name pattern</label>
@@ -557,6 +573,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     ${pane("governance", `
     <section class="settings-section">
       <h3>Product</h3>
+      <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
         The what and why: who the product is for, what problems it solves,
         and what success looks like.
@@ -590,9 +607,57 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
       </div>
     </section>`)}
 
+    ${pane("instances", `
+    <section class="settings-section">
+      <h3>Instances</h3>
+      <p class="scope-label muted small">Project-wide</p>
+      <table class="table">
+        <thead><tr><th>Name</th><th>ID</th><th>Gaps</th><th></th></tr></thead>
+        <tbody>
+          ${instances.map((inst) => {
+            const counts = instanceCounts[inst.id] || {};
+            const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
+            const isActive = inst.id === activeInstanceId;
+            return `<tr>
+              <td>${htmlEscape(inst.display_name || inst.id)} ${isActive ? `<span class="filter-pill">active</span>` : ""}${inst.archived ? ` <span class="muted small">archived</span>` : ""}</td>
+              <td><code>${htmlEscape(inst.id)}</code></td>
+              <td class="muted small">${total}</td>
+              <td class="actions">
+                <button class="secondary" data-instance-activate="${htmlEscape(inst.id)}" ${isActive || inst.archived ? "disabled" : ""}>Activate</button>
+                <button class="secondary" data-instance-rename="${htmlEscape(inst.id)}" data-name="${htmlEscape(inst.display_name || inst.id)}">Rename</button>
+                <button class="danger" data-instance-archive="${htmlEscape(inst.id)}" ${isActive ? "disabled" : ""}>Archive</button>
+              </td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+      <div class="actions" style="margin-top:8px">
+        <button id="instance-add">Create instance</button>
+      </div>
+    </section>
+    <section class="settings-section">
+      <h3>Transfer Gaps</h3>
+      <p class="muted small" style="margin-top:0">
+        Transfers skip in-progress and ready-merge Gaps by default.
+      </p>
+      <div class="form-grid two">
+        <div class="form-row"><label>From</label>
+          <select id="instance-transfer-source">
+            <option value="">All instances</option>
+            ${instances.map((inst) => `<option value="${htmlEscape(inst.id)}">${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
+          </select></div>
+        <div class="form-row"><label>To</label>
+          <select id="instance-transfer-target">
+            ${instances.map((inst) => `<option value="${htmlEscape(inst.id)}" ${inst.id === activeInstanceId ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
+          </select></div>
+      </div>
+      <div class="actions"><button class="warn" id="instance-transfer">Transfer matching Gaps</button></div>
+    </section>`)}
+
     ${pane("reporters", `
     <section class="settings-section">
       <h3>Reporters</h3>
+      <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
       <table class="table">
         <thead><tr><th>Name</th><th></th></tr></thead>
         <tbody>
@@ -697,7 +762,19 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
       try {
         const result = await api("POST", "/api/project/attach", { path });
         await applyProjectAttachResult(result);
-      } catch (e) { toast(e.details || e.message, "error"); }
+      } catch (e) {
+        if (e.status === 409 && /migration required/i.test(e.message || "")) {
+          const migrate = await modalConfirm(
+            "This app uses an older Refine schema. Migrate .refine state and open it?",
+            { title: "Migrate app", okLabel: "Migrate and open" },
+          );
+          if (!migrate) return;
+          const result = await api("POST", "/api/project/attach", { path, migrate: true });
+          await applyProjectAttachResult(result);
+          return;
+        }
+        toast(e.details || e.message, "error");
+      }
     });
   });
   $("#s-project-remove")?.addEventListener("click", async () => {
@@ -832,6 +909,64 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}) {
     if (!name || !name.trim()) return;
     try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
     catch (e) { toast(e.message, "error"); }
+  });
+  $("#instance-add")?.addEventListener("click", async () => {
+    const name = await modalPrompt("Instance name", "",
+                                   { title: "Create instance" });
+    if (!name || !name.trim()) return;
+    try {
+      await api("POST", "/api/instances", { display_name: name.trim() });
+      await refreshSettings();
+    } catch (e) { toast(e.message, "error"); }
+  });
+  $$("[data-instance-activate]").forEach((b) => b.addEventListener("click", async () => {
+    try {
+      await api("POST", "/api/instances/activate", { instance_id: b.dataset.instanceActivate });
+      toast("Instance activated", "info");
+      await refreshSettings();
+    } catch (e) { toast(e.message, "error"); }
+  }));
+  $$("[data-instance-rename]").forEach((b) => b.addEventListener("click", async () => {
+    const name = await modalPrompt("Instance name", b.dataset.name || "",
+                                   { title: "Rename instance" });
+    if (!name || !name.trim()) return;
+    try {
+      await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceRename), {
+        display_name: name.trim(),
+      });
+      await refreshSettings();
+    } catch (e) { toast(e.message, "error"); }
+  }));
+  $$("[data-instance-archive]").forEach((b) => b.addEventListener("click", async () => {
+    const ok = await modalConfirm(
+      "Archive this instance? Gap ownership IDs stay unchanged and can still be transferred.",
+      { title: "Archive instance", okLabel: "Archive", danger: true },
+    );
+    if (!ok) return;
+    try {
+      await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceArchive), {
+        archived: true,
+      });
+      await refreshSettings();
+    } catch (e) { toast(e.message, "error"); }
+  }));
+  $("#instance-transfer")?.addEventListener("click", async () => {
+    const source = $("#instance-transfer-source")?.value || "";
+    const target = $("#instance-transfer-target")?.value || "";
+    if (!target) return;
+    const ok = await modalConfirm(
+      "Transfer matching Gaps to the selected instance?",
+      { title: "Transfer Gaps", okLabel: "Transfer" },
+    );
+    if (!ok) return;
+    try {
+      const r = await api("POST", "/api/instances/transfer-gaps", {
+        source_instance_id: source,
+        target_instance_id: target,
+      });
+      toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
+      await refreshSettings();
+    } catch (e) { toast(e.message, "error"); }
   });
 
   // --- Target application controls on the Application tab -------------------

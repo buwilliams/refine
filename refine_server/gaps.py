@@ -57,9 +57,18 @@ def new_log_entry(
 
 def empty_gap(gap_id: str, name: str) -> dict[str, Any]:
     now = now_iso()
+    try:
+        from . import project_state
+        instance_id = project_state.active_instance_id()
+    except Exception:
+        instance_id = "default"
     return {
         "id": gap_id,
         "name": name,
+        "status": "backlog",
+        "priority": "low",
+        "branch_name": None,
+        "instance_id": instance_id,
         "created": now,
         "updated": now,
         "notes": [],
@@ -151,6 +160,10 @@ def read_gap_json(gap_id: str) -> dict[str, Any] | None:
         gap = json.loads(f.read().decode("utf-8"))
     # Transparent legacy-shape migration: notes used to be a single string.
     gap["notes"] = normalize_notes(gap.get("notes"))
+    gap.setdefault("status", "backlog")
+    gap.setdefault("priority", "low")
+    gap.setdefault("branch_name", None)
+    gap.setdefault("instance_id", "default")
     for round_obj in gap.get("rounds") or []:
         if isinstance(round_obj, dict):
             normalize_round_governance(round_obj)

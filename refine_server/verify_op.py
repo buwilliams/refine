@@ -261,6 +261,10 @@ def approve_review(conn: sqlite3.Connection, gap_id: str, *,
             "UPDATE gaps_index SET status = 'done', updated = ? WHERE id = ?",
             (now_iso(), gap_id),
         )
+    try:
+        gap_writer.update_fields(gap_id, status="done", branch_name=None)
+    except Exception:
+        pass
     _log(conn, gap_id, "Gap approved by user — transitioned to `done`",
          severity="info", category="state", actor=actor)
     return {"ok": True, "stage": "approved",
@@ -371,6 +375,10 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
             "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",
             (final_status, now_iso(), gap_id),
         )
+    try:
+        gap_writer.update_fields(gap_id, status=final_status, branch_name=None)
+    except Exception:
+        pass
     git_ops.remove_worktree(gap_id)
     git_ops.delete_branch(branch)
     pushed_part = "merged + pushed" if pushed else (

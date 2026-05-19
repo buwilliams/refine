@@ -17,10 +17,29 @@ def load_configured(
     *,
     start_poller: bool = True,
     start_runner: bool = True,
+    migrate: bool = False,
 ) -> config.Config:
     """Load config, initialize SQLite, and ensure background services run."""
     global _loaded_config_path
     requested_path = Path(path).resolve() if path is not None else config.find_config()
+    cfg_preview = config.Config.load(path)
+    from refine_server import project_state
+
+    schema = project_state.schema_status(cfg_preview.volume_root)
+    if (
+        not schema.get("compatible")
+        and schema.get("migration_required")
+        and not migrate
+        and not project_state.empty_refine_state(cfg_preview.volume_root)
+    ):
+        raise config.ConfigError(
+            "Project schema migration required. Open the app from Settings "
+            "and choose migrate to upgrade .refine state."
+        )
+    if not schema.get("compatible") and not schema.get("migration_required"):
+        raise config.ConfigError(
+            "Project schema is not supported by this Refine version."
+        )
     if (_loaded_config_path is not None and requested_path is not None
             and requested_path.resolve() != _loaded_config_path):
         stop_all()
