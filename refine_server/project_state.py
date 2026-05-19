@@ -466,7 +466,8 @@ def gap_instance_display(instance_id: str | None) -> str:
 
 
 def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
-                  *, statuses: set[str] | None = None) -> dict[str, Any]:
+                  *, statuses: set[str] | None = None,
+                  gap_ids: set[str] | None = None) -> dict[str, Any]:
     if instance_by_id(target_instance_id) is None:
         raise ValueError(f"unknown target instance: {target_instance_id}")
     allowed = statuses or {"backlog", "todo", "failed", "review", "done", "cancelled"}
@@ -477,6 +478,8 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
         gap = _read_json(path, {})
         gid = str(gap.get("id") or "")
         if not gid:
+            continue
+        if gap_ids is not None and gid not in gap_ids:
             continue
         current = str(gap.get("instance_id") or "")
         if source_instance_id and current != source_instance_id:

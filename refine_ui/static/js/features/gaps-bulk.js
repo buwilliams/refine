@@ -17,6 +17,7 @@ async function openBulkModal(field) {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
+    instance: f.instance,
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
@@ -112,6 +113,7 @@ function applyGapsFilterIndicator(f) {
     "search": !!f.q,
     "filter-status": !!f.status,
     "filter-reporter": !!f.reporter,
+    "filter-instance": !!f.instance,
     "gaps-severity": !!f.severity,
     "gaps-category": !!f.category,
     "gaps-actor": !!f.actor,
@@ -130,10 +132,84 @@ function applyGapsFilterIndicator(f) {
   if (tbl) tbl.classList.toggle("results-filtered", anyActive);
 }
 
+async function openBulkTransferInstanceModal() {
+  const f = gapsFilterFromHash();
+  const filter = {
+    status: f.status, q: f.q, reporter: f.reporter,
+    instance: f.instance,
+    severity: f.severity, category: f.category, actor: f.actor,
+  };
+  const filterDesc = describeGapsFilter(filter);
+  const excludeIds = _selectionSnapshot();
+  const matchingCount = _lastGapsRender?.gaps?.length || 0;
+  const selectedCount = matchingCount - excludeIds.filter(
+    (id) => (_lastGapsRender?.gaps || []).some((g) => g.id === id),
+  ).length;
+  const countText = excludeIds.length && _lastGapsRender
+    ? `${selectedCount} of ${matchingCount} selected`
+    : ($("#gaps-count")?.textContent || "").trim();
+
+  let instances = state.project?.instances || [];
+  try {
+    const snap = await api("GET", "/api/instances");
+    instances = snap.instances || [];
+    state.project = {
+      ...(state.project || {}),
+      instances,
+      active_instance_id: snap.active_instance_id || state.project?.active_instance_id || "",
+    };
+  } catch {
+    // Keep the project-status snapshot. The submit call will surface
+    // any real schema or registry error.
+  }
+  const choices = instances.filter((inst) => !inst.archived);
+  if (!choices.length) {
+    toast("No active instances available.", "warn");
+    return;
+  }
+  const opts = choices.map((inst) => `
+    <option value="${htmlEscape(inst.id)}">
+      ${htmlEscape(inst.display_name || inst.id)}
+    </option>`).join("");
+  const body = () => `
+    <div class="modal-title">Transfer to instance</div>
+    <div class="modal-body">
+      <div class="muted small" style="margin-bottom:8px">
+        Applies to ${htmlEscape(countText || "all matching")} —
+        ${htmlEscape(filterDesc)}.
+      </div>
+      <label for="bulk-transfer-instance-value">Target instance</label>
+      <select class="modal-input" id="bulk-transfer-instance-value" style="width:100%">
+        ${opts}
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        In-progress and ready-merge Gaps are skipped.
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>Cancel</button>
+      <button data-ok>Transfer</button>
+    </div>`;
+  const target = await _openModal(
+    body, { cancel: null, ok: choices[0].id }, ".modal-input",
+  );
+  if (target === null) return;
+  try {
+    const r = await api("POST", "/api/instances/transfer-gaps", {
+      filter, exclude_ids: excludeIds, target_instance_id: target,
+    });
+    toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
+    await renderGapsList();
+  } catch (e) {
+    toast(`Transfer failed: ${e.message}`, "error");
+  }
+}
+
 async function confirmBulkDelete() {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
+    instance: f.instance,
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
@@ -181,6 +257,7 @@ function describeGapsFilter(filter) {
   const parts = [];
   if (filter.status)   parts.push(`status=${filter.status}`);
   if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
+  if (filter.instance) parts.push(`instance=${filter.instance}`);
   if (filter.q)        parts.push(`q="${filter.q}"`);
   if (filter.severity) parts.push(`severity=${filter.severity}`);
   if (filter.category) parts.push(`category=${filter.category}`);

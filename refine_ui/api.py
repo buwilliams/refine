@@ -218,8 +218,37 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
         if not isinstance(statuses, list):
             return err(400, "statuses must be a list")
         allowed = {str(s) for s in statuses if str(s) in _VALID_STATUSES}
+    gap_ids = None
+    filt = body.get("filter")
+    if isinstance(filt, dict):
+        excluded = set(body.get("exclude_ids") or [])
+        code, listing = list_gaps(
+            status=filt.get("status") or None,
+            q=filt.get("q") or None,
+            severity=filt.get("severity") or None,
+            category=filt.get("category") or None,
+            actor=filt.get("actor") or None,
+            reporter=filt.get("reporter") or None,
+            instance=filt.get("instance") or None,
+            limit=10_000,
+        )
+        if code != 200:
+            return code, listing
+        gap_ids = {
+            g["id"] for g in (listing.get("gaps") or [])
+            if g["id"] not in excluded
+        }
+        if not gap_ids:
+            return 200, {
+                "updated": 0,
+                "ids": [],
+                "skipped": 0,
+                "skipped_details": [],
+            }
     try:
-        result = project_state.transfer_gaps(source, target, statuses=allowed)
+        result = project_state.transfer_gaps(
+            source, target, statuses=allowed, gap_ids=gap_ids,
+        )
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
@@ -858,6 +887,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
         category=filt.get("category") or None,
         actor=filt.get("actor") or None,
         reporter=filt.get("reporter") or None,
+        instance=filt.get("instance") or None,
         limit=10_000,
     )
     if code != 200:
@@ -939,6 +969,7 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
         category=filt.get("category") or None,
         actor=filt.get("actor") or None,
         reporter=filt.get("reporter") or None,
+        instance=filt.get("instance") or None,
         limit=10_000,
     )
     if code != 200:

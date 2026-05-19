@@ -87,6 +87,7 @@ async function renderGapsList() {
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
+        <button class="secondary small" id="bulk-transfer-instance">Instance…</button>
         <button class="secondary small" id="bulk-delete">Delete…</button>
       </div>
     </div>
@@ -129,6 +130,7 @@ async function renderGapsList() {
   $("#bulk-set-priority").addEventListener("click", () => openBulkModal("priority"));
   $("#bulk-set-status").addEventListener("click", () => openBulkModal("status"));
   $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
+  $("#bulk-transfer-instance").addEventListener("click", () => openBulkTransferInstanceModal());
   $("#bulk-delete").addEventListener("click", () => confirmBulkDelete());
 
   // Expanding / collapsing the filter shell shows / hides the per-row
