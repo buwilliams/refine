@@ -18,7 +18,7 @@ from refine_server import activity, db, governance, project_state
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
-from . import gap_writer, git_ops, preflight, subprocess_mgr
+from . import gap_writer, git_ops, guidance, preflight, subprocess_mgr
 from .friendly_outcome import classify_outcome
 
 
@@ -276,6 +276,38 @@ class Dispatcher:
         if self._maybe_skip_already_implemented(conn, gap_id, target):
             return
 
+        # Read the Gap and run the pre-work guidance classification before
+        # any agent subprocess begins.
+        gap = read_gap_json(gap_id)
+        if not gap or not gap.get("rounds"):
+            self._abort_to_failed(
+                conn, gap_id, "Gap has no rounds — cannot launch",
+                category="state",
+            )
+            return
+        round_idx = len(gap["rounds"]) - 1
+        latest = gap["rounds"][round_idx]
+        prompt = _format_prompt(latest)
+        try:
+            accepted_guidance, _raw = guidance.select_for_gap(conn, gap)
+        except Exception as e:
+            self._abort_to_failed(
+                conn, gap_id, "Guidance classification failed",
+                category="cli", details=repr(e)[:2000],
+            )
+            return
+        if accepted_guidance:
+            prompt = guidance.prepend_to_prompt(prompt, accepted_guidance)
+            activity.append(
+                conn,
+                message=(
+                    "Guidance accepted: "
+                    + ", ".join(item["name"] for item in accepted_guidance)
+                ),
+                severity="info", category="cli",
+                gap_id=gap_id, actor="runner",
+            )
+
         # Compute the branch name + worktree.
         pattern = db.get_setting(conn, "branch_name_pattern", "refine/{gap_id}") or "refine/{gap_id}"
         branch_name = existing_branch or pattern.format(gap_id=gap_id)
@@ -287,18 +319,6 @@ class Dispatcher:
                 category="git", details=wt.stderr[:2000],
             )
             return
-
-        # Read the Gap and compute the prompt from the latest round.
-        gap = read_gap_json(gap_id)
-        if not gap or not gap.get("rounds"):
-            self._abort_to_failed(
-                conn, gap_id, "Gap has no rounds — cannot launch",
-                category="state",
-            )
-            return
-        round_idx = len(gap["rounds"]) - 1
-        latest = gap["rounds"][round_idx]
-        prompt = _format_prompt(latest)
 
         # Capture base for "no commits produced" detection.
         rev = git_ops._run(

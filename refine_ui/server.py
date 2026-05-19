@@ -298,6 +298,16 @@ def _h_instances_transfer(_h, _m, body, _q):
     return api.transfer_instance_gaps(body or {})
 
 
+@route("GET", r"/api/guidance")
+def _h_guidance_list(_h, _m, _b, _q):
+    return api.list_guidance()
+
+
+@route("PUT", r"/api/guidance")
+def _h_guidance_update(_h, _m, body, _q):
+    return api.update_guidance(body or {})
+
+
 @route("GET", r"/api/target-app/status")
 def _h_target_app_status(_h, _m, _b, _q):
     return api.target_app_status()

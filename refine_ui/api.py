@@ -290,6 +290,29 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, result
 
 
+def list_guidance() -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    return 200, {"guidance": project_state.list_guidance()}
+
+
+def update_guidance(body: dict[str, Any]) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    items = body.get("guidance")
+    if not isinstance(items, list):
+        return err(400, "guidance must be a list")
+    normalized = []
+    for item in items:
+        if not isinstance(item, dict):
+            return err(400, "each guidance item must be an object")
+        normalized.append(project_state.normalize_guidance_item(item))
+    saved = project_state.write_guidance(normalized)
+    return 200, {"guidance": saved}
+
+
 def _cancel_active_transfer_gaps(
     source_instance_id: str | None,
     gap_ids: set[str] | None,

@@ -86,6 +86,10 @@ def instances_json_path(root: Path | None = None) -> Path:
     return (root or volume_root()) / "instances.json"
 
 
+def guidance_json_path(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "guidance.json"
+
+
 def instances_dir(root: Path | None = None) -> Path:
     return (root or volume_root()) / "instances"
 
@@ -170,6 +174,7 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
     if status["compatible"]:
         ensure_default_instance(root=root)
         ensure_active_instance(root=root)
+        ensure_guidance_file(root=root)
         return status
     if not migrate or not status.get("migration_required"):
         return status
@@ -223,6 +228,10 @@ def migrate_legacy(conn: sqlite3.Connection | None = None, *,
             "updated_at": now_iso(),
             "archived": False,
         }],
+    })
+    _write_json(guidance_json_path(root), {
+        "guidance": [],
+        "updated_at": now_iso(),
     })
     _write_instance_files(
         DEFAULT_INSTANCE_ID,
@@ -320,6 +329,15 @@ def read_instances(*, root: Path | None = None) -> dict[str, Any]:
 
 def write_instances(data: dict[str, Any], *, root: Path | None = None) -> None:
     _write_json(instances_json_path(root), data)
+
+
+def ensure_guidance_file(*, root: Path | None = None) -> None:
+    root = root or volume_root()
+    if not guidance_json_path(root).exists():
+        _write_json(guidance_json_path(root), {
+            "guidance": [],
+            "updated_at": now_iso(),
+        })
 
 
 def list_instances(*, root: Path | None = None) -> list[dict[str, Any]]:
@@ -458,6 +476,36 @@ def write_reporters(reporters: list[dict[str, Any]], *,
         "reporters": reporters,
         "updated_at": now_iso(),
     })
+
+
+def list_guidance(*, root: Path | None = None) -> list[dict[str, Any]]:
+    root = root or volume_root()
+    ensure_guidance_file(root=root)
+    data = _read_json(guidance_json_path(root), {"guidance": []})
+    items = data.get("guidance") or []
+    return [normalize_guidance_item(item) for item in items if isinstance(item, dict)]
+
+
+def write_guidance(items: list[dict[str, Any]], *,
+                   root: Path | None = None) -> list[dict[str, Any]]:
+    root = root or volume_root()
+    normalized = [
+        item for item in (normalize_guidance_item(raw) for raw in items)
+        if item["name"] or item["rule"] or item["instructions"]
+    ]
+    _write_json(guidance_json_path(root), {
+        "guidance": normalized,
+        "updated_at": now_iso(),
+    })
+    return normalized
+
+
+def normalize_guidance_item(item: dict[str, Any]) -> dict[str, str]:
+    return {
+        "name": str(item.get("name") or "").strip(),
+        "rule": str(item.get("rule") or "").strip(),
+        "instructions": str(item.get("instructions") or "").strip(),
+    }
 
 
 def gap_instance_display(instance_id: str | None) -> str:

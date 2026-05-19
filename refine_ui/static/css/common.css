@@ -96,6 +96,18 @@
   margin-bottom: 8px;
 }
 
+.settings-guidance-row {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 12px;
+}
+
+.settings-guidance-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+
 /* Feature-flag matrix on System. Inline toggle + override badge,
    rendered inside table cells; .feature-current-col highlights the
    active provider's column so the operator can spot at a glance

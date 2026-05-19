@@ -32,7 +32,7 @@ def main() -> int:
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
-        "application", "reporters", "instances", "runtime", "governance",
+        "application", "agents", "reporters", "instances", "runtime", "governance",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
@@ -48,6 +48,7 @@ def main() -> int:
     )
     assert save_button_ids == [
         "s-save-application",
+        "guidance-save",
         "s-save-runtime",
         "s-governance-save",
     ], save_button_ids
@@ -94,6 +95,11 @@ def main() -> int:
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
     assert 'id="s-target-run-rebuild"' in settings_js
+    assert 'api("GET", "/api/guidance")' in settings_js
+    assert 'id="guidance-add"' in settings_js
+    assert 'id="guidance-save"' in settings_js
+    assert 'api("PUT", "/api/guidance"' in settings_js
+    assert 'data-guidance-instructions' in settings_js
     assert 'id="s-project-sync-now"' in settings_js
     assert 'await syncProjectUpdates();' in settings_js
     assert 'id="s-target-rebuild-command"' in settings_js
@@ -109,6 +115,9 @@ def main() -> int:
     assert '@route("POST", r"/api/project/sync")' in (
         root / "refine_ui/server.py"
     ).read_text(encoding="utf-8")
+    server_js = (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    assert '@route("GET", r"/api/guidance")' in server_js
+    assert '@route("PUT", r"/api/guidance")' in server_js
 
     print("settings route tests OK")
     return 0

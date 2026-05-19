@@ -13,7 +13,7 @@ async function renderSettings() {
 async function refreshSettings() {
   if (state.currentRoute !== "settings") return;
   try {
-    const [s, diag, reps, feats, project, gov, dash, instances] = await Promise.all([
+    const [s, diag, reps, feats, project, gov, dash, instances, guidance] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
@@ -22,11 +22,15 @@ async function refreshSettings() {
       api("GET", "/api/governance"),
       api("GET", "/api/dashboard"),
       api("GET", "/api/instances"),
+      api("GET", "/api/guidance"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
     state.project = project;
-    drawSettings(s.settings || {}, diag, reps.reporters || [], feats, gov || {}, dash || {}, instances || {});
+    drawSettings(
+      s.settings || {}, diag, reps.reporters || [], feats,
+      gov || {}, dash || {}, instances || {}, guidance || {},
+    );
   } catch (e) {
     const root = document.getElementById("settings-content");
     if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
@@ -36,6 +40,7 @@ async function refreshSettings() {
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
   { slug: "application",  label: "Application" },
+  { slug: "agents",       label: "Agents" },
   { slug: "reporters",    label: "Reporters" },
   { slug: "instances",    label: "Instances" },
   { slug: "runtime",      label: "Runtime" },
@@ -181,6 +186,39 @@ function renderGovernanceRules(rules) {
     </div>`;
 }
 
+function renderGuidanceRows(items) {
+  const rows = (items || []).map((item, idx) => renderGuidanceRow(item, idx)).join("");
+  return rows || `<p class="muted" data-guidance-empty>No guidance configured.</p>`;
+}
+
+function renderGuidanceRow(item = {}, idx = 0) {
+  return `
+    <div class="settings-guidance-row" data-guidance-row>
+      <div class="form-row"><label>Name</label>
+        <input type="text" data-guidance-name
+               value="${htmlEscape(item.name || "")}"
+               placeholder="e.g. Frontend accessibility"></div>
+      <div class="form-row"><label>Rule</label>
+        <textarea data-guidance-rule rows="3"
+                  placeholder="When should this guidance apply?">${htmlEscape(item.rule || "")}</textarea></div>
+      <div class="form-row"><label>Instructions</label>
+        <textarea data-guidance-instructions rows="5"
+                  placeholder="What additional context should the agent receive?">${htmlEscape(item.instructions || "")}</textarea></div>
+      <div class="actions">
+        <button class="danger" type="button" data-guidance-remove="${idx}">Remove guidance</button>
+      </div>
+    </div>`;
+}
+
+function collectGuidanceRows() {
+  return $$("[data-guidance-row]").map((row) => ({
+    name: row.querySelector("[data-guidance-name]")?.value || "",
+    rule: row.querySelector("[data-guidance-rule]")?.value || "",
+    instructions: row.querySelector("[data-guidance-instructions]")?.value || "",
+  })).filter((item) =>
+    item.name.trim() || item.rule.trim() || item.instructions.trim());
+}
+
 function collectGovernanceRules() {
   return $$(".governance-rule-input").map((input) => ({
     id: input.dataset.ruleId || "",
@@ -321,7 +359,7 @@ function renderRuntimeAgentCards(dash, settings, diag) {
     </section>`;
 }
 
-function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = {}) {
+function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = {}, guidanceData = {}) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const projectApps = state.project?.apps || [];
   const currentProject = state.project?.client_repo || "";
@@ -331,6 +369,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   const activeInstance = instances.find((i) => i.id === activeInstanceId) || null;
   const activeInstanceLabel = activeInstance?.display_name || activeInstanceId || "Default";
   const instanceCounts = instanceData.counts || {};
+  const guidanceItems = guidanceData.guidance || [];
   const appOptions = projectApps.map((app) => `
     <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
       ${htmlEscape(app.name || app.path)}
@@ -500,6 +539,24 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
 
     <section class="settings-section settings-save-section">
       <div class="actions"><button id="s-save-application">Save application</button></div>
+    </section>`)}
+
+    ${pane("agents", `
+    <section class="settings-section">
+      <h3>Guidance</h3>
+      <p class="scope-label muted small">Project-wide</p>
+      <p class="muted small" style="margin-top:0">
+        Guidance is classified against each Gap before work starts. Accepted
+        guidance instructions are prepended to the agent's work prompt.
+      </p>
+      <div id="guidance-list">
+        ${renderGuidanceRows(guidanceItems)}
+      </div>
+      <div class="actions" style="margin-top:10px">
+        <button class="secondary" id="guidance-add">Add guidance</button>
+        <span class="spacer"></span>
+        <button id="guidance-save">Save guidance</button>
+      </div>
     </section>`)}
 
     ${pane("runtime", `
@@ -753,6 +810,30 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         $("#governance-rules-list").innerHTML = renderGovernanceRuleRows(r.rules || []);
         bindGovernanceRuleButtons();
         toast("Rules generated — review and save", "info");
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
+  $("#guidance-list")?.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-guidance-remove]");
+    if (!btn) return;
+    btn.closest("[data-guidance-row]")?.remove();
+    if (!$("[data-guidance-row]")) {
+      $("#guidance-list").innerHTML = `<p class="muted" data-guidance-empty>No guidance configured.</p>`;
+    }
+  });
+  $("#guidance-add")?.addEventListener("click", () => {
+    const list = $("#guidance-list");
+    if (!list) return;
+    list.querySelector("[data-guidance-empty]")?.remove();
+    list.insertAdjacentHTML("beforeend", renderGuidanceRow({}, Date.now()));
+    list.querySelector("[data-guidance-row]:last-child [data-guidance-name]")?.focus();
+  });
+  $("#guidance-save")?.addEventListener("click", async () => {
+    await withButtonBusy($("#guidance-save"), "Saving…", async () => {
+      try {
+        await api("PUT", "/api/guidance", { guidance: collectGuidanceRows() });
+        toast("Guidance saved", "info");
+        await refreshSettings();
       } catch (e) { toast(e.message, "error"); }
     });
   });
