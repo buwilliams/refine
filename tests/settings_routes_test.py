@@ -32,11 +32,12 @@ def main() -> int:
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
-        "application", "agents", "reporters", "instances", "runtime", "governance",
+        "application", "reporters", "instances", "runtime", "guidance", "governance",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
     assert 'if (slug === "system" || slug === "project") return "application";' in settings_js
+    assert 'if (slug === "agents") return "guidance";' in settings_js
     assert "function activeSettingsTabFromRoute()" in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
@@ -48,7 +49,6 @@ def main() -> int:
     )
     assert save_button_ids == [
         "s-save-application",
-        "guidance-save",
         "s-save-runtime",
         "s-governance-save",
     ], save_button_ids
@@ -97,9 +97,14 @@ def main() -> int:
     assert 'id="s-target-run-rebuild"' in settings_js
     assert 'api("GET", "/api/guidance")' in settings_js
     assert 'id="guidance-add"' in settings_js
-    assert 'id="guidance-save"' in settings_js
+    assert 'id="guidance-form"' in settings_js
+    assert 'data-guidance-open' in settings_js
+    assert 'data-delete>Delete guidance' in settings_js
+    assert 'data-guidance-edit' not in settings_js
+    assert 'data-guidance-remove' not in settings_js
+    assert 'id="guidance-save"' not in settings_js
     assert 'api("PUT", "/api/guidance"' in settings_js
-    assert 'data-guidance-instructions' in settings_js
+    assert 'name="instructions"' in settings_js
     assert 'id="s-project-sync-now"' in settings_js
     assert 'await syncProjectUpdates();' in settings_js
     assert 'id="s-target-rebuild-command"' in settings_js

@@ -40,15 +40,16 @@ async function refreshSettings() {
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
   { slug: "application",  label: "Application" },
-  { slug: "agents",       label: "Agents" },
   { slug: "reporters",    label: "Reporters" },
   { slug: "instances",    label: "Instances" },
   { slug: "runtime",      label: "Runtime" },
+  { slug: "guidance",     label: "Guidance" },
   { slug: "governance",   label: "Governance" },
 ];
 
 function normalizeSettingsTab(slug) {
   if (slug === "system" || slug === "project") return "application";
+  if (slug === "agents") return "guidance";
   return SETTINGS_TABS.some((t) => t.slug === slug) ? slug : null;
 }
 
@@ -193,30 +194,124 @@ function renderGuidanceRows(items) {
 
 function renderGuidanceRow(item = {}, idx = 0) {
   return `
-    <div class="settings-guidance-row" data-guidance-row>
-      <div class="form-row"><label>Name</label>
-        <input type="text" data-guidance-name
-               value="${htmlEscape(item.name || "")}"
-               placeholder="e.g. Frontend accessibility"></div>
-      <div class="form-row"><label>Rule</label>
-        <textarea data-guidance-rule rows="3"
-                  placeholder="When should this guidance apply?">${htmlEscape(item.rule || "")}</textarea></div>
-      <div class="form-row"><label>Instructions</label>
-        <textarea data-guidance-instructions rows="5"
-                  placeholder="What additional context should the agent receive?">${htmlEscape(item.instructions || "")}</textarea></div>
-      <div class="actions">
-        <button class="danger" type="button" data-guidance-remove="${idx}">Remove guidance</button>
+    <div class="settings-guidance-row" data-guidance-row data-guidance-open="${idx}"
+         role="button" tabindex="0">
+      <div>
+        <h4>${htmlEscape(item.name || "Untitled guidance")}</h4>
+        <p class="muted small">${htmlEscape(item.rule || "No rule provided.")}</p>
       </div>
     </div>`;
 }
 
-function collectGuidanceRows() {
-  return $$("[data-guidance-row]").map((row) => ({
-    name: row.querySelector("[data-guidance-name]")?.value || "",
-    rule: row.querySelector("[data-guidance-rule]")?.value || "",
-    instructions: row.querySelector("[data-guidance-instructions]")?.value || "",
-  })).filter((item) =>
-    item.name.trim() || item.rule.trim() || item.instructions.trim());
+let _guidanceModalOpen = false;
+
+function openGuidanceModal(items, index = null) {
+  if (_guidanceModalOpen) return;
+  _guidanceModalOpen = true;
+  const editing = Number.isInteger(index);
+  const current = editing ? (items[index] || {}) : {};
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true"
+         aria-labelledby="guidance-modal-title" style="max-width:680px">
+      <div class="modal-title" id="guidance-modal-title">${editing ? "Edit guidance" : "New guidance"}</div>
+      <div class="modal-body" style="max-height:70vh;overflow:auto">
+        <form id="guidance-form">
+          <div class="form-row">
+            <label>Name</label>
+            <input type="text" name="name"
+                   value="${htmlEscape(current.name || "")}"
+                   placeholder="e.g. Frontend accessibility">
+          </div>
+          <div class="form-row">
+            <label>Rule</label>
+            <textarea name="rule" rows="4"
+                      placeholder="When should this guidance apply?">${htmlEscape(current.rule || "")}</textarea>
+          </div>
+          <div class="form-row">
+            <label>Instructions</label>
+            <textarea name="instructions" rows="8"
+                      placeholder="What additional context should the agent receive?">${htmlEscape(current.instructions || "")}</textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-actions">
+        ${editing ? '<button class="danger" type="button" data-delete>Delete guidance</button><span class="spacer"></span>' : ""}
+        <button class="secondary" type="button" data-cancel>Cancel</button>
+        <button type="button" data-ok>${editing ? "Save guidance" : "Create guidance"}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+
+  let closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    _guidanceModalOpen = false;
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+  }
+  function onKey(e) {
+    if (!root.contains(e.target)) return;
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    } else if (e.key === "Enter" && e.target?.tagName !== "TEXTAREA") {
+      e.preventDefault();
+      submit();
+    }
+  }
+  async function submit() {
+    const form = root.querySelector("#guidance-form");
+    const fd = new FormData(form);
+    const item = {
+      name: (fd.get("name") || "").toString().trim(),
+      rule: (fd.get("rule") || "").toString().trim(),
+      instructions: (fd.get("instructions") || "").toString().trim(),
+    };
+    if (!item.name || !item.rule || !item.instructions) {
+      toast("Name, rule, and instructions are required", "error");
+      return;
+    }
+    const next = [...items];
+    if (editing) next[index] = item;
+    else next.push(item);
+    await withButtonBusy(root.querySelector("[data-ok]"), "Saving…", async () => {
+      try {
+        await api("PUT", "/api/guidance", { guidance: next });
+        toast(editing ? "Guidance saved" : "Guidance created", "info");
+        close();
+        await refreshSettings();
+      } catch (e) { toast(e.message, "error"); }
+    });
+  }
+  async function remove() {
+    if (!editing) return;
+    const ok = await modalConfirm(
+      `Delete guidance "${current.name || "Untitled guidance"}"?`,
+      { title: "Delete guidance", okLabel: "Delete", danger: true },
+    );
+    if (!ok) return;
+    const next = items.filter((_item, idx) => idx !== index);
+    await withButtonBusy(root.querySelector("[data-delete]"), "Deleting…", async () => {
+      try {
+        await api("PUT", "/api/guidance", { guidance: next });
+        toast("Guidance deleted", "info");
+        close();
+        await refreshSettings();
+      } catch (e) { toast(e.message, "error"); }
+    });
+  }
+
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close();
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", close);
+  root.querySelector("[data-ok]").addEventListener("click", submit);
+  root.querySelector("[data-delete]")?.addEventListener("click", remove);
+  root.querySelector("[name='name']")?.focus();
 }
 
 function collectGovernanceRules() {
@@ -541,7 +636,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       <div class="actions"><button id="s-save-application">Save application</button></div>
     </section>`)}
 
-    ${pane("agents", `
+    ${pane("guidance", `
     <section class="settings-section">
       <h3>Guidance</h3>
       <p class="scope-label muted small">Project-wide</p>
@@ -554,8 +649,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       </div>
       <div class="actions" style="margin-top:10px">
         <button class="secondary" id="guidance-add">Add guidance</button>
-        <span class="spacer"></span>
-        <button id="guidance-save">Save guidance</button>
       </div>
     </section>`)}
 
@@ -814,28 +907,18 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     });
   });
   $("#guidance-list")?.addEventListener("click", (e) => {
-    const btn = e.target.closest("[data-guidance-remove]");
-    if (!btn) return;
-    btn.closest("[data-guidance-row]")?.remove();
-    if (!$("[data-guidance-row]")) {
-      $("#guidance-list").innerHTML = `<p class="muted" data-guidance-empty>No guidance configured.</p>`;
-    }
+    const row = e.target.closest("[data-guidance-open]");
+    if (row) openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen));
+  });
+  $("#guidance-list")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const row = e.target.closest("[data-guidance-open]");
+    if (!row) return;
+    e.preventDefault();
+    openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen));
   });
   $("#guidance-add")?.addEventListener("click", () => {
-    const list = $("#guidance-list");
-    if (!list) return;
-    list.querySelector("[data-guidance-empty]")?.remove();
-    list.insertAdjacentHTML("beforeend", renderGuidanceRow({}, Date.now()));
-    list.querySelector("[data-guidance-row]:last-child [data-guidance-name]")?.focus();
-  });
-  $("#guidance-save")?.addEventListener("click", async () => {
-    await withButtonBusy($("#guidance-save"), "Saving…", async () => {
-      try {
-        await api("PUT", "/api/guidance", { guidance: collectGuidanceRows() });
-        toast("Guidance saved", "info");
-        await refreshSettings();
-      } catch (e) { toast(e.message, "error"); }
-    });
+    openGuidanceModal(guidanceItems);
   });
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
