@@ -14,6 +14,9 @@ def main() -> int:
     router_js = (root / "refine_ui/static/js/router.js").read_text(
         encoding="utf-8",
     )
+    target_app_js = (root / "refine_ui/static/js/target-app.js").read_text(
+        encoding="utf-8",
+    )
     index_html = (root / "refine_ui/static/index.html").read_text(
         encoding="utf-8",
     )
@@ -29,11 +32,11 @@ def main() -> int:
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
-        "project", "application", "instances", "reporters", "governance", "runtime",
+        "application", "instances", "reporters", "governance", "runtime",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
-    assert 'if (slug === "system") return "project";' in settings_js
+    assert 'if (slug === "system" || slug === "project") return "application";' in settings_js
     assert "function activeSettingsTabFromRoute()" in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
@@ -82,6 +85,7 @@ def main() -> int:
 
     for slug in slugs:
         assert settings_js.count(f'pane("{slug}",') == 1
+    assert 'pane("project",' not in settings_js
 
     assert 'href="#/system/application"' in index_html
     assert 'slug: "instances"' in settings_js
@@ -93,6 +97,13 @@ def main() -> int:
     assert 'id="s-target-rebuild-command"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
+    assert '<span class="target-app-label">Application</span>' in index_html
+    assert "function targetAppProjectLabel()" in target_app_js
+    assert 'const app = apps.find((candidate) => candidate.path === current);' in target_app_js
+    assert "if (lbl) lbl.textContent = projectLabel;" in target_app_js
+    assert 'running: "running"' in target_app_js
+    assert '"App: running"' not in target_app_js
+    assert "label.replace(/^App: /, \"\")" not in target_app_js
 
     print("settings route tests OK")
     return 0

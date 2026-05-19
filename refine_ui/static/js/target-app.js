@@ -4,10 +4,22 @@
 // one-click toggle, so typical users can't take the app down by
 // accident). It links to System, where the actual Start / Stop
 // button lives. The dot's colour reflects the current state
-// (green=running, red=stopped, amber=in-flight, grey=unknown) and is
-// refreshed via SSE plus a 30s safety poll in case SSE is wedged.
+// (green=running, red=stopped, amber=in-flight, grey=unknown), while
+// the visible label names the active project.
 
 let _targetAppSnapshot = null;
+
+function targetAppProjectLabel() {
+  const project = state.project || {};
+  const current = project.client_repo || "";
+  const apps = Array.isArray(project.apps) ? project.apps : [];
+  const app = apps.find((candidate) => candidate.path === current);
+  if (app?.name) return app.name;
+  if (current) {
+    return current.split(/[\\/]+/).filter(Boolean).pop() || current;
+  }
+  return "Project";
+}
 
 function initTargetAppToggle() {
   const indicator = document.getElementById("target-app-indicator");
@@ -34,26 +46,27 @@ function applyTargetAppSnapshot(snap) {
   if (!indicator) return;
   const appState = snap.state || "unknown";
   indicator.dataset.state = appState;
-  const label = {
-    running:  "App: running",
-    degraded: "App: degraded",
-    stopped:  "App: stopped",
-    starting: "App: starting…",
-    rebuilding: "App: rebuilding…",
-    stopping: "App: stopping…",
-    failed:   "App: failed",
-    unknown:  "App: unknown",
-  }[appState] || "App";
+  const projectLabel = targetAppProjectLabel();
+  const stateLabel = {
+    running: "running",
+    degraded: "degraded",
+    stopped: "stopped",
+    starting: "starting…",
+    rebuilding: "rebuilding…",
+    stopping: "stopping…",
+    failed: "failed",
+    unknown: "unknown",
+  }[appState] || "unknown";
   const checkAt = snap.last_check_at || snap.last_health_at || "";
   const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
-  indicator.title = label
+  indicator.title = `${projectLabel}: ${stateLabel}`
     + (checkAt
         ? ` · last check ${checkOk ? "OK" : "FAIL"} at ${fmtTime(checkAt)}`
         : "")
     + (snap.last_error ? ` · ${snap.last_error}` : "")
     + " — click to manage in System";
   const lbl = indicator.querySelector(".target-app-label");
-  if (lbl) lbl.textContent = label.replace(/^App: /, "");
+  if (lbl) lbl.textContent = projectLabel;
   // Repaint the System status block (and the start/stop button)
   // whenever the System screen is visible.
   if (state.currentRoute === "settings") {

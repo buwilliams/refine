@@ -41,7 +41,7 @@ def test_client_switch_path(root: Path) -> None:
         "await refreshFeatures()",
         "await refreshReporters({ selectFallback: true })",
         "await refreshTargetAppToggle()",
-        'location.hash = "#/system/project"',
+        'location.hash = "#/system/application"',
     ):
         assert expected in switch_body, expected
 

@@ -35,7 +35,6 @@ async function refreshSettings() {
 
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
-  { slug: "project",      label: "Project" },
   { slug: "application",  label: "Application" },
   { slug: "instances",    label: "Instances" },
   { slug: "reporters",    label: "Reporters" },
@@ -44,7 +43,7 @@ const SETTINGS_TABS = [
 ];
 
 function normalizeSettingsTab(slug) {
-  if (slug === "system") return "project";
+  if (slug === "system" || slug === "project") return "application";
   return SETTINGS_TABS.some((t) => t.slug === slug) ? slug : null;
 }
 
@@ -356,7 +355,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     </section>`;
   $("#settings-content").innerHTML = `
     ${tabStrip}
-    ${pane("project", `
+    ${pane("application", `
     <section class="settings-section">
       <h3>Applications</h3>
       <p class="scope-label muted small">Project-wide</p>
@@ -379,9 +378,8 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
-    </section>`)}
+    </section>
 
-    ${pane("application", `
     <section class="settings-section">
       <h3>Application</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>

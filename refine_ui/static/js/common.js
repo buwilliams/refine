@@ -269,7 +269,7 @@ async function applyProjectAttachResult(result) {
   state.project = result;
   state.dashboard = null;
   state.currentGap = null;
-  state.underlayHash = "#/system/project";
+  state.underlayHash = "#/system/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
   showProjectAttachToast(result);
   resetChatForProjectSwitch();
@@ -277,8 +277,8 @@ async function applyProjectAttachResult(result) {
   await refreshFeatures();
   await refreshReporters({ selectFallback: true });
   await refreshTargetAppToggle();
-  if (location.hash !== "#/system/project") {
-    location.hash = "#/system/project";
+  if (location.hash !== "#/system/application") {
+    location.hash = "#/system/application";
   } else if (state.currentRoute === "settings") {
     await refreshSettings();
   } else {
