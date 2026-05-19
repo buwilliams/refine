@@ -36,10 +36,10 @@ async function refreshSettings() {
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
   { slug: "application",  label: "Application" },
-  { slug: "instances",    label: "Instances" },
   { slug: "reporters",    label: "Reporters" },
-  { slug: "governance",   label: "Governance" },
+  { slug: "instances",    label: "Instances" },
   { slug: "runtime",      label: "Runtime" },
+  { slug: "governance",   label: "Governance" },
 ];
 
 function normalizeSettingsTab(slug) {
