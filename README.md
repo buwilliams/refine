@@ -7,6 +7,7 @@ customers — anyone who can articulate *what the app does today* vs
 
 - **Dashboard** - consolidated space for run status, reporter stats, and work needing attention.
 - **Gaps** - searchable, filterable backlog with sorting and bulk updates.
+- **Changes** - searchable history of merged Gap work with undo controls.
 - **Instances** - separate work contexts with their own Gap queues.
 - **Chat** - persistent dock for standalone questions and Gap-specific follow-up.
 - **Workflow** - move Gaps from report to agent work to human review.
