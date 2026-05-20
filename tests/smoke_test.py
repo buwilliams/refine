@@ -418,17 +418,28 @@ def main() -> int:
     (setup_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
     (setup_clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
     old_cwd = Path.cwd()
+    old_start_background = refine_cli._start_background_ui
     old_stop_background = refine_cli._stop_background_ui
     old_print_setup_status = refine_cli._print_setup_status_block
+    old_port_open = refine_cli._port_open
+    old_wait_for_port = refine_cli._wait_for_port
     setup_calls: list[tuple] = []
     try:
         os.chdir(setup_clone)
+        refine_cli._start_background_ui = lambda clone_arg, cfg_arg, *, host, port: (
+            setup_calls.append(("start", clone_arg, cfg_arg, host, port)) or 555
+        )
         refine_cli._stop_background_ui = lambda clone_arg, cfg_arg, port_arg: (
             setup_calls.append(("stop", clone_arg, cfg_arg, port_arg)) or True
         )
         refine_cli._print_setup_status_block = lambda clone_arg, *, port: (
             setup_calls.append(("status", clone_arg, port))
         )
+        refine_cli._port_open = lambda host, port: False
+        refine_cli._wait_for_port = lambda host, port, timeout: (
+            setup_calls.append(("wait", host, port)) or True
+        )
+        assert refine_cli.cmd_start(type("Args", (), {"port": 19000})()) == 0
         assert refine_cli.cmd_stop(type("Args", (), {"port": 19001})()) == 0
         assert refine_cli.cmd_status(type("Args", (), {"config": None, "port": 19002})()) == 0
         (setup_clone / "run").mkdir(exist_ok=True)
@@ -437,15 +448,20 @@ def main() -> int:
         assert refine_cli.cmd_status(type("Args", (), {"config": None, "port": None})()) == 0
     finally:
         os.chdir(old_cwd)
+        refine_cli._start_background_ui = old_start_background
         refine_cli._stop_background_ui = old_stop_background
         refine_cli._print_setup_status_block = old_print_setup_status
+        refine_cli._port_open = old_port_open
+        refine_cli._wait_for_port = old_wait_for_port
     assert setup_calls == [
+        ("start", setup_clone.resolve(), None, "0.0.0.0", 19000),
+        ("wait", "0.0.0.0", 19000),
         ("stop", setup_clone.resolve(), None, 19001),
         ("status", setup_clone.resolve(), 19002),
         ("status", setup_clone.resolve(), 19003),
         ("status", setup_clone.resolve(), 19004),
     ]
-    print("[ok] setup-mode stop/status honor supplied ports before project attach")
+    print("[ok] setup-mode start/stop/status honor supplied ports before project attach")
 
     old_clone = tmp / "old-refine-clone"
     (old_clone / "refine_cli").mkdir(parents=True)

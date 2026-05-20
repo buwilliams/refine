@@ -35,6 +35,7 @@ from refine_server import config, project_registry
 
 
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
+SETUP_UI_HOST = "0.0.0.0"
 _LOGIN_PATH_CACHE: str | None = None
 _LOGIN_PATH_RESOLVED = False
 
@@ -510,20 +511,23 @@ def cmd_start(args: argparse.Namespace) -> int:
     if setup_clone is not None:
         port = _effective_port(args, None)
         print("No refine project is attached yet.")
-        print(f"Starting the host-native setup UI at http://127.0.0.1:{port}")
+        print(
+            "Starting the host-native setup UI at "
+            f"http://{_displayable_host(SETUP_UI_HOST)}:{port}"
+        )
         print("Use the browser to create or attach a target app path.")
-        if _port_open("127.0.0.1", port):
+        if _port_open(SETUP_UI_HOST, port):
             print("Setup UI is already reachable.")
             return 0
         try:
-            pid = _start_background_ui(setup_clone, None, host="127.0.0.1", port=port)
+            pid = _start_background_ui(setup_clone, None, host=SETUP_UI_HOST, port=port)
         except _InitError as e:
             print(f"refine start: {e}", file=sys.stderr)
             return 1
-        if not _wait_for_port("127.0.0.1", port, timeout=20.0):
+        if not _wait_for_port(SETUP_UI_HOST, port, timeout=20.0):
             print(
                 f"refine start: setup UI did not start listening on "
-                f"127.0.0.1:{port} within 20s.",
+                f"{SETUP_UI_HOST}:{port} within 20s.",
                 file=sys.stderr,
             )
             return 1
@@ -756,7 +760,7 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
 
 
 def _print_setup_status_block(clone: Path, *, port: int) -> None:
-    web_up = _port_open("127.0.0.1", port)
+    web_up = _port_open(SETUP_UI_HOST, port)
     process_pid = _running_pid(clone, None, port)
     print()
     print(_bold("refine"))
@@ -764,7 +768,7 @@ def _print_setup_status_block(clone: Path, *, port: int) -> None:
     print("  app:      setup mode")
     print(f"  ui:       {_dot(process_pid is not None and web_up)} "
           f"http {'reachable' if web_up else 'unreachable'} at "
-          f"http://127.0.0.1:{port}")
+          f"http://{_displayable_host(SETUP_UI_HOST)}:{port}")
     print(f"  process:  {_dot(process_pid is not None)} "
           f"{'pid ' + str(process_pid) if process_pid is not None else 'not running'}")
     print(f"  logs:     {_runtime_log_path(clone, None, port)}")
@@ -1024,7 +1028,7 @@ def _running_pid(clone: Path, cfg: "config.Config | None", port: int) -> int | N
     if pid is not None:
         _unlink_quietly(pid_path)
 
-    host = cfg.web_host if cfg is not None else "127.0.0.1"
+    host = cfg.web_host if cfg is not None else SETUP_UI_HOST
     listener = _refine_ui_listener_pid(clone, host, port)
     if listener is not None and _pid_alive(listener):
         return listener

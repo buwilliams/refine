@@ -34,7 +34,7 @@ def main() -> int:
             host = os.environ.get("REFINE_UI_HOST", cfg.web_host)
             port = int(os.environ.get("REFINE_UI_PORT", str(cfg.web_port)))
         except config.ConfigError:
-            host = os.environ.get("REFINE_UI_HOST", "127.0.0.1")
+            host = os.environ.get("REFINE_UI_HOST", "0.0.0.0")
             port = int(os.environ.get("REFINE_UI_PORT", "8080"))
         sys.stderr.write(f"[refine-ui] setup mode: {e}\n")
     try:
