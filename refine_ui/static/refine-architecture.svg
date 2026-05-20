@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="680" viewBox="0 0 1120 680" role="img" aria-labelledby="title desc">
+  <title id="title">Refine multi-process and git sync architecture</title>
+  <desc id="desc">Multiple Refine checkouts can run on one or more machines, target one or more application repositories, and synchronize durable Refine state through Git.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#334155"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .machine { fill: #eef6ff; stroke: #2563eb; stroke-width: 2; rx: 10; }
+      .repo { fill: #f7fee7; stroke: #65a30d; stroke-width: 2; rx: 8; }
+      .remote { fill: #fff7ed; stroke: #ea580c; stroke-width: 2; rx: 8; }
+      .process { fill: #ffffff; stroke: #64748b; stroke-width: 1.5; rx: 6; }
+      .local { fill: #f1f5f9; stroke: #94a3b8; stroke-width: 1.5; rx: 6; }
+      .title { font: 700 18px Arial, sans-serif; fill: #0f172a; }
+      .label { font: 600 14px Arial, sans-serif; fill: #0f172a; }
+      .small { font: 12px Arial, sans-serif; fill: #334155; }
+      .tiny { font: 11px Arial, sans-serif; fill: #475569; }
+      .line { stroke: #334155; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .sync { stroke: #ea580c; stroke-width: 2.5; fill: none; marker-end: url(#arrow); stroke-dasharray: 7 5; }
+      .local-line { stroke: #64748b; stroke-width: 1.5; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1120" height="680"/>
+  <text class="title" x="40" y="38">Refine architecture: local processes, target repos, and Git sync</text>
+
+  <rect class="machine" x="40" y="70" width="470" height="390"/>
+  <text class="label" x="60" y="100">Machine A</text>
+  <text class="small" x="60" y="120">One host can run multiple Refine UI processes.</text>
+
+  <rect class="process" x="70" y="145" width="180" height="72"/>
+  <text class="label" x="88" y="172">refine checkout</text>
+  <text class="small" x="88" y="193">UI port 8080</text>
+  <text class="tiny" x="88" y="207">local run/ui-8080.*</text>
+
+  <rect class="process" x="280" y="145" width="180" height="72"/>
+  <text class="label" x="298" y="172">refine checkout 2</text>
+  <text class="small" x="298" y="193">UI port 8081</text>
+  <text class="tiny" x="298" y="207">local run/ui-8081.*</text>
+
+  <rect class="local" x="70" y="245" width="390" height="62"/>
+  <text class="label" x="88" y="272">checkout-local state</text>
+  <text class="small" x="88" y="294">active app binding, active instance selection, pid/log files</text>
+
+  <rect class="repo" x="70" y="340" width="180" height="76"/>
+  <text class="label" x="88" y="366">target repo A</text>
+  <text class="small" x="88" y="387">.refine/config.json</text>
+  <text class="small" x="88" y="403">instances, gaps, guidance</text>
+
+  <rect class="repo" x="280" y="340" width="180" height="76"/>
+  <text class="label" x="298" y="366">target repo B</text>
+  <text class="small" x="298" y="387">separate .refine state</text>
+  <text class="small" x="298" y="403">separate Git history</text>
+
+  <rect class="machine" x="610" y="70" width="470" height="390"/>
+  <text class="label" x="630" y="100">Machine B</text>
+  <text class="small" x="630" y="120">Another Refine installation can target the same repo.</text>
+
+  <rect class="process" x="650" y="145" width="180" height="72"/>
+  <text class="label" x="668" y="172">refine checkout</text>
+  <text class="small" x="668" y="193">UI port 8080</text>
+  <text class="tiny" x="668" y="207">local run/ui-8080.*</text>
+
+  <rect class="local" x="860" y="145" width="180" height="72"/>
+  <text class="label" x="878" y="172">local state</text>
+  <text class="small" x="878" y="193">own active instance</text>
+  <text class="tiny" x="878" y="207">not committed</text>
+
+  <rect class="repo" x="650" y="340" width="390" height="76"/>
+  <text class="label" x="668" y="366">target repo A clone</text>
+  <text class="small" x="668" y="387">same durable .refine JSON model</text>
+  <text class="small" x="668" y="403">SQLite is rebuildable cache, not authority</text>
+
+  <rect class="remote" x="340" y="535" width="440" height="92"/>
+  <text class="label" x="360" y="564">Git remote</text>
+  <text class="small" x="360" y="586">Branches, source code, and committed .refine JSON sync between machines.</text>
+  <text class="small" x="360" y="606">Each checkout pulls/pushes, then rebuilds local SQLite cache.</text>
+
+  <path class="local-line" d="M160 217 L210 245"/>
+  <path class="local-line" d="M370 217 L320 245"/>
+  <path class="line" d="M160 307 L160 340"/>
+  <path class="line" d="M370 307 L370 340"/>
+  <path class="local-line" d="M740 217 L910 217 L910 340"/>
+  <path class="line" d="M740 217 L740 340"/>
+
+  <path class="sync" d="M160 416 C180 500, 300 520, 410 535"/>
+  <path class="sync" d="M845 416 C825 500, 760 520, 710 535"/>
+  <path class="sync" d="M560 535 C560 500, 560 500, 560 535"/>
+  <path class="sync" d="M430 535 C330 515, 250 492, 160 416"/>
+  <path class="sync" d="M690 535 C790 515, 850 492, 845 416"/>
+
+  <text class="tiny" x="82" y="438">target repo A can be shared by local ports 8080/8081</text>
+  <text class="tiny" x="648" y="438">same app state arrives through Git sync</text>
+  <text class="tiny" x="68" y="325">process/session state stays local to each Refine checkout</text>
+  <text class="tiny" x="650" y="325">durable app state stays in the target repo</text>
+</svg>
