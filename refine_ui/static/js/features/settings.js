@@ -27,6 +27,7 @@ async function refreshSettings() {
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
     state.project = project;
+    updateActiveInstanceLabel();
     drawSettings(
       s.settings || {}, diag, reps.reporters || [], feats,
       gov || {}, dash || {}, instances || {}, guidance || {},
@@ -1133,7 +1134,14 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   });
   $$("[data-instance-activate]").forEach((b) => b.addEventListener("click", async () => {
     try {
-      await api("POST", "/api/instances/activate", { instance_id: b.dataset.instanceActivate });
+      const result = await api("POST", "/api/instances/activate", { instance_id: b.dataset.instanceActivate });
+      state.project = {
+        ...(state.project || {}),
+        instances: result.instances || state.project?.instances || [],
+        active_instance_id: result.active_instance_id || "",
+        active_instance: result.active_instance || null,
+      };
+      updateActiveInstanceLabel();
       await refreshInstanceScopedState();
       toast("Instance activated", "info");
       await refreshSettings();

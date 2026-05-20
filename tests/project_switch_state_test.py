@@ -12,9 +12,16 @@ from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo
 
 
 def test_client_switch_path(root: Path) -> None:
+    index_html = (root / "refine_ui/static/index.html").read_text(encoding="utf-8")
+    base_css = (root / "refine_ui/static/css/base.css").read_text(encoding="utf-8")
     common_js = (root / "refine_ui/static/js/common.js").read_text(encoding="utf-8")
     settings_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
     chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
+
+    assert 'id="active-instance-label"' in index_html
+    assert ".brand-instance" in base_css
+    assert "function updateActiveInstanceLabel()" in common_js
+    assert "updateActiveInstanceLabel()" in common_js
 
     assert "function openAddAppModal(options = {})" in common_js
     add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
@@ -60,6 +67,8 @@ def test_client_switch_path(root: Path) -> None:
     assert "await openAddAppModal()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
     assert "await refreshInstanceScopedState()" in settings_js
+    assert "active_instance_id: result.active_instance_id" in settings_js
+    assert "updateActiveInstanceLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
 
 

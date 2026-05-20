@@ -22,6 +22,17 @@ const state = {
   features: null,
 };
 
+function updateActiveInstanceLabel() {
+  const el = document.getElementById("active-instance-label");
+  if (!el) return;
+  const project = state.project || {};
+  const active = project.active_instance || null;
+  const activeId = project.active_instance_id || "";
+  const label = active?.display_name || active?.name || activeId || "none";
+  el.textContent = project.attached === false ? "none" : label;
+  el.title = el.textContent;
+}
+
 async function refreshFeatures() {
   try {
     state.features = await api("GET", "/api/features");
@@ -151,6 +162,7 @@ async function refreshProjectStatus() {
     return null;
   }
   state.project = snap;
+  updateActiveInstanceLabel();
   return snap;
 }
 
@@ -284,6 +296,7 @@ function showProjectAttachToast(result) {
 
 async function applyProjectAttachResult(result) {
   state.project = result;
+  updateActiveInstanceLabel();
   state.dashboard = null;
   state.currentGap = null;
   state.underlayHash = "#/system/application";
