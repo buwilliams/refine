@@ -367,6 +367,7 @@ def ensure_active_instance(*, root: Path | None = None) -> str:
         _ensure_instance_files(str(active), root=root)
         if legacy:
             _write_active_instance_selection(root, str(active))
+        _cleanup_legacy_run_state(root)
         return str(active)
     fallback = next((e for e in entries if not e.get("archived")), None)
     if fallback is None:
@@ -762,6 +763,21 @@ def _write_json(path: Path, data: Any) -> None:
         except FileNotFoundError:
             pass
         raise
+
+
+def _unlink_quietly(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def _cleanup_legacy_run_state(root: Path) -> None:
+    _unlink_quietly(active_instance_path(root))
+    try:
+        legacy_run_dir(root).rmdir()
+    except OSError:
+        pass
 
 
 def _slug_instance_id(name: str) -> str:

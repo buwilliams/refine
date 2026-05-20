@@ -492,6 +492,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
         _systemctl("daemon-reload")
     else:
         print(f"No unit file found at {unit_path}")
+    _remove_legacy_runtime_units(unit)
     return 0
 
 
@@ -554,7 +555,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
-    port = _effective_port(args, cfg)
+    port = _runtime_action_port(args, clone, cfg)
     stopped = _stop_background_ui(clone, cfg, port)
     if stopped:
         print(f"Stopped UI backend on port {port}.")
@@ -567,11 +568,17 @@ def cmd_restart(args: argparse.Namespace) -> int:
     """`refine stop && refine start` — picks up source changes the
     running host processes haven't loaded yet without forcing the operator
     to run two commands."""
-    rc = cmd_stop(args)
+    clone, _unit = _resolve_clone_and_unit_or_exit()
+    _load_config_or_exit(args)
+    cfg = config.get()
+    port = _runtime_action_port(args, clone, cfg)
+    restart_args = argparse.Namespace(**vars(args))
+    restart_args.port = port
+    rc = cmd_stop(restart_args)
     if rc != 0:
         return rc
     print()
-    return cmd_start(args)
+    return cmd_start(restart_args)
 
 
 def cmd_reset(args: argparse.Namespace) -> int:
@@ -883,7 +890,7 @@ def _running_pid(clone: Path, cfg: "config.Config | None", port: int) -> int | N
         _unlink_quietly(pid_path)
 
     host = cfg.web_host if cfg is not None else "127.0.0.1"
-    listener = _refine_ui_listener_pid(host, port)
+    listener = _refine_ui_listener_pid(clone, host, port)
     if listener is not None and _pid_alive(listener):
         return listener
     return None
@@ -918,9 +925,9 @@ def _pid_alive(pid: int) -> bool:
         return True
 
 
-def _refine_ui_listener_pid(host: str, port: int) -> int | None:
+def _refine_ui_listener_pid(clone: Path, host: str, port: int) -> int | None:
     for pid in _listener_pids(port):
-        if _pid_matches_refine_ui(pid):
+        if _pid_matches_refine_ui(pid, clone):
             return pid
     return None
 
@@ -961,11 +968,87 @@ def _listener_pids(port: int) -> list[int]:
     return [int(m.group(1)) for m in re.finditer(r"pid=(\d+)", out)]
 
 
-def _pid_matches_refine_ui(pid: int) -> bool:
+def _pid_matches_refine_ui(pid: int, clone: Path) -> bool:
     cmdline = _pid_cmdline(pid)
     if not cmdline:
         return False
-    return "refine" in cmdline and re.search(r"(?:^|\s)ui(?:\s|$)", cmdline) is not None
+    if "refine" not in cmdline or re.search(r"(?:^|\s)ui(?:\s|$)", cmdline) is None:
+        return False
+    cwd = _pid_cwd(pid)
+    return cwd is not None and cwd == clone.resolve()
+
+
+def _owned_refine_ui_ports(clone: Path) -> list[int]:
+    ports: set[int] = set()
+    for pid, listen_port in _listener_port_pids():
+        if not _pid_matches_refine_ui(pid, clone):
+            continue
+        env_port = _pid_env_value(pid, "REFINE_UI_PORT")
+        if env_port and env_port.isdigit():
+            ports.add(int(env_port))
+        else:
+            ports.add(listen_port)
+    return sorted(ports)
+
+
+def _listener_port_pids() -> list[tuple[int, int]]:
+    pairs: list[tuple[int, int]] = []
+    lsof = shutil.which("lsof")
+    if lsof:
+        try:
+            out = subprocess.run(
+                [lsof, "-nP", "-iTCP", "-sTCP:LISTEN", "-Fp", "-Fn"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            ).stdout
+        except (OSError, subprocess.TimeoutExpired):
+            out = ""
+        pid: int | None = None
+        for line in out.splitlines():
+            if line.startswith("p") and line[1:].isdigit():
+                pid = int(line[1:])
+                continue
+            if pid is None or not line.startswith("n"):
+                continue
+            m = re.search(r":(\d+)(?:\s|$)", line)
+            if m:
+                pairs.append((pid, int(m.group(1))))
+        if pairs:
+            return pairs
+
+    ss = shutil.which("ss")
+    if not ss:
+        return []
+    try:
+        out = subprocess.run(
+            [ss, "-ltnp"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    for line in out.splitlines():
+        pid_match = re.search(r"pid=(\d+)", line)
+        port_match = re.search(r":(\d+)\s+", line)
+        if pid_match and port_match:
+            pairs.append((int(pid_match.group(1)), int(port_match.group(1))))
+    return pairs
+
+
+def _runtime_action_port(args: argparse.Namespace, clone: Path, cfg: "config.Config") -> int:
+    configured = _effective_port(args, cfg)
+    if getattr(args, "port", None) is not None:
+        return configured
+    if _running_pid(clone, cfg, configured) is not None:
+        return configured
+    live_ports = [p for p in _owned_refine_ui_ports(clone) if p != configured]
+    if len(live_ports) == 1:
+        return live_ports[0]
+    return configured
 
 
 def _pid_cmdline(pid: int) -> str:
@@ -987,6 +1070,25 @@ def _pid_cmdline(pid: int) -> str:
     except (OSError, subprocess.TimeoutExpired):
         return ""
     return out.strip()
+
+
+def _pid_cwd(pid: int) -> Path | None:
+    try:
+        return Path(f"/proc/{pid}/cwd").resolve(strict=True)
+    except OSError:
+        return None
+
+
+def _pid_env_value(pid: int, key: str) -> str | None:
+    try:
+        raw = (Path("/proc") / str(pid) / "environ").read_bytes()
+    except OSError:
+        return None
+    prefix = f"{key}=".encode("utf-8")
+    for item in raw.split(b"\0"):
+        if item.startswith(prefix):
+            return item[len(prefix):].decode("utf-8", "replace")
+    return None
 
 
 def _unlink_quietly(path: Path) -> None:

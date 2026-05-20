@@ -299,7 +299,10 @@ def main() -> int:
     print("[ok] refine start launches a detached per-port UI backend process")
 
     old_listener_pids = refine_cli._listener_pids
+    old_listener_port_pids = refine_cli._listener_port_pids
     old_pid_cmdline = refine_cli._pid_cmdline
+    old_pid_cwd = refine_cli._pid_cwd
+    old_pid_env_value = refine_cli._pid_env_value
     old_pid_alive = refine_cli._pid_alive
     old_getpgid = refine_cli.os.getpgid
     old_killpg = refine_cli.os.killpg
@@ -307,7 +310,10 @@ def main() -> int:
     killed: list[tuple[int, int]] = []
     try:
         refine_cli._listener_pids = lambda port: [24680] if port == 18112 else []
+        refine_cli._listener_port_pids = lambda: [(24680, 18112)]
         refine_cli._pid_cmdline = lambda pid: "/tmp/refine2/.venv/bin/refine ui" if pid == 24680 else ""
+        refine_cli._pid_cwd = lambda pid: clone if pid == 24680 else None
+        refine_cli._pid_env_value = lambda pid, key: "18112" if pid == 24680 and key == "REFINE_UI_PORT" else None
         refine_cli._pid_alive = lambda pid: listener_alive["value"] if pid == 24680 else False
         refine_cli.os.getpgid = lambda pid: 24000 if pid == 24680 else pid
 
@@ -317,10 +323,18 @@ def main() -> int:
 
         refine_cli.os.killpg = fake_killpg
         assert refine_cli._running_pid(clone, bg_cfg, 18112) == 24680
+        other_clone = tmp / "other-refine-clone"
+        other_clone.mkdir()
+        assert refine_cli._running_pid(other_clone, bg_cfg, 18112) is None
+        no_port_args = type("Args", (), {"port": None})()
+        assert refine_cli._runtime_action_port(no_port_args, clone, bg_cfg) == 18112
         assert refine_cli._stop_background_ui(clone, bg_cfg, 18112) is True
     finally:
         refine_cli._listener_pids = old_listener_pids
+        refine_cli._listener_port_pids = old_listener_port_pids
         refine_cli._pid_cmdline = old_pid_cmdline
+        refine_cli._pid_cwd = old_pid_cwd
+        refine_cli._pid_env_value = old_pid_env_value
         refine_cli._pid_alive = old_pid_alive
         refine_cli.os.getpgid = old_getpgid
         refine_cli.os.killpg = old_killpg

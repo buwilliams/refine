@@ -318,11 +318,17 @@ def test_active_instance_is_checkout_local_for_same_application() -> None:
         clone2.mkdir()
         config.write_binding(clone1, client)
         config.write_binding(clone2, client)
+        legacy_active = client / ".refine" / "run" / "active-instance.json"
+        legacy_active.parent.mkdir(parents=True, exist_ok=True)
+        legacy_active.write_text(
+            json.dumps({"active_instance_id": laptop["id"]}),
+            encoding="utf-8",
+        )
 
         os.chdir(clone1)
         config.get(reload=True)
-        project_state.set_active_instance(laptop["id"])
         assert project_state.active_instance_id() == laptop["id"]
+        assert not legacy_active.exists()
 
         os.chdir(clone2)
         config.get(reload=True)
