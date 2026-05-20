@@ -2145,12 +2145,25 @@ def import_persist(body: dict) -> tuple[int, dict]:
         return err(400, "reporter is required")
     if not isinstance(drafts, list) or not drafts:
         return err(400, "drafts must be a non-empty list")
-    created = []
-    for d in drafts:
+    created: list[str] = []
+    failures: list[dict[str, Any]] = []
+    for idx, d in enumerate(drafts, start=1):
+        if not isinstance(d, dict):
+            failures.append({
+                "index": idx,
+                "error": "draft must be an object",
+                "draft": {},
+            })
+            continue
         actual = (d.get("actual") or "").strip()
         target = (d.get("target") or "").strip()
         name = (d.get("name") or "").strip() or _autoname(actual, target)
         if not actual and not target:
+            failures.append({
+                "index": idx,
+                "error": "actual or target must be non-empty",
+                "draft": {"name": name, "actual": actual, "target": target},
+            })
             continue
         gap_id = new_ulid()
         try:
@@ -2160,8 +2173,19 @@ def import_persist(body: dict) -> tuple[int, dict]:
             })
             created.append(gap_id)
         except BackendError as e:
-            return _backend_err(e)
-    return 201, {"created": created, "count": len(created)}
+            failures.append({
+                "index": idx,
+                "error": e.message,
+                "code": e.code,
+                "draft": {"name": name, "actual": actual, "target": target},
+            })
+    status = 201 if created and not failures else 200
+    return status, {
+        "created": created,
+        "count": len(created),
+        "failures": failures,
+        "failed": len(failures),
+    }
 
 
 # --- Chat ---------------------------------------------------------------------

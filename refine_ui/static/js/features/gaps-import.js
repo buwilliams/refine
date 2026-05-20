@@ -152,7 +152,15 @@ async function extractImportDrafts(text, draftsRoot) {
         draftCount: drafts.length,
       });
     }
-    const r = await api("POST", "/api/import/extract", { text: chunk.text });
+    let r = null;
+    try {
+      r = await api("POST", "/api/import/extract", { text: chunk.text });
+    } catch (e) {
+      const range = `lines ${chunk.startLine}-${chunk.endLine}`;
+      throw new Error(
+        `AI request ${i + 1} of ${chunks.length} failed (${range}): ${e.message}`,
+      );
+    }
     drafts.push(...(r.drafts || []));
     if (draftsRoot) {
       drawImportProgress(draftsRoot, {
@@ -193,16 +201,20 @@ function drawImportProgress(root, state) {
   `;
 }
 
-function drawImportDrafts(root, drafts, close) {
+function drawImportDrafts(root, drafts, close, options = {}) {
   const drafts_root = root.querySelector("#import-drafts");
   if (!drafts.length) {
     drafts_root.innerHTML = `<p class="muted">No drafts extracted.</p>`;
     return;
   }
+  const title = options.retry
+    ? `Failed drafts (${drafts.length}) — correct &amp; retry`
+    : `Extracted drafts (${drafts.length}) — review &amp; confirm`;
   drafts_root.innerHTML = `
-    <h3 style="margin-top:0">Extracted drafts (${drafts.length}) — review &amp; confirm</h3>
+    <h3 style="margin-top:0">${title}</h3>
     ${drafts.map((d, i) => `
       <div class="draft" data-idx="${i}">
+        ${d.error ? `<p class="small" style="margin-top:0;color:#b42318">${htmlEscape(d.error)}</p>` : ""}
         <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
         <div class="form-row" style="margin-top:6px">
           <label class="small muted">Actual</label>
@@ -222,6 +234,8 @@ function drawImportDrafts(root, drafts, close) {
   `;
   actions.querySelector("[data-cancel]").addEventListener("click", () => close(true));
   actions.querySelector("#btn-persist").addEventListener("click", async () => {
+    const btn = actions.querySelector("#btn-persist");
+    if (btn.disabled) return;
     const reporter = state.lastReporter || "";
     if (!reporter) return toast("Pick a reporter in the top-right selector", "error");
     const payload = $$(".draft", drafts_root).map((row) => ({
@@ -229,13 +243,33 @@ function drawImportDrafts(root, drafts, close) {
       actual: row.querySelector(".d-actual").value.trim(),
       target: row.querySelector(".d-target").value.trim(),
     }));
-    try {
-      const r = await api("POST", "/api/import/persist", { reporter, drafts: payload });
-      toast(`Created ${r.count} gap(s)`, "info");
-      // Stay on the underlying screen — same behavior as the New Gap
-      // modal. `close(true)` only redirects when the user came in via
-      // the `#/gaps/import` deep link.
-      close(true);
-    } catch (e) { toast(e.message, "error"); }
+    await withButtonBusy(btn, "Saving…", async () => {
+      try {
+        const r = await api("POST", "/api/import/persist", { reporter, drafts: payload });
+        const failures = r.failures || [];
+        const createdCount = r.count || 0;
+        if (failures.length) {
+          const failedDrafts = failures.map((failure) => {
+            const original = payload[(failure.index || 1) - 1] || {};
+            return {
+              ...original,
+              ...(failure.draft || {}),
+              error: failure.error || "Could not save this Gap.",
+            };
+          });
+          toast(
+            `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`,
+            "error",
+          );
+          drawImportDrafts(root, failedDrafts, close, { retry: true });
+        } else {
+          toast(`Created ${createdCount} gap(s)`, "info");
+          // Stay on the underlying screen — same behavior as the New Gap
+          // modal. `close(true)` only redirects when the user came in via
+          // the `#/gaps/import` deep link.
+          close(true);
+        }
+      } catch (e) { toast(e.message, "error"); }
+    });
   });
 }

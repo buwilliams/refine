@@ -20,6 +20,11 @@ def main() -> int:
     assert 'api("POST", "/api/import/extract", { text });' not in import_js
     assert "Processing AI request ${state.current} of ${state.total}" in import_js
     assert "chunks of ${state.chunkSize}" in import_js
+    assert "AI request ${i + 1} of ${chunks.length} failed" in import_js
+    assert "lines ${chunk.startLine}-${chunk.endLine}" in import_js
+    assert 'withButtonBusy(btn, "Saving…"' in import_js
+    assert "Failed drafts (${drafts.length})" in import_js
+    assert "drawImportDrafts(root, failedDrafts, close, { retry: true })" in import_js
 
     print("import chunking tests OK")
     return 0
