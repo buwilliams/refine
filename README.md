@@ -37,7 +37,8 @@ Use `uv run refine install [port]` for a persistent service; `start [port]` runs
 
 - refine is a development tool installed on a dev or QA machine.
 - Use it as a solo contributor or open it up to a group.
-- Each machine has its own instance, set up manually.
+- Each machine has its own instance, configured manually.
+- refine supports multiple layers: processes on one host at different ports, targeted applications as data boundaries, and device instances on the same targeted application.
 - All data is owned by an instance and synced through git.
 - Governance and Guidance are global across all instances.
 
