@@ -353,4 +353,9 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
 
 
 def list_settings(conn: sqlite3.Connection) -> dict[str, str]:
-    return {r["key"]: r["value"] for r in conn.execute("SELECT key, value FROM settings")}
+    return {
+        r["key"]: r["value"]
+        for r in conn.execute(
+            "SELECT key, value FROM settings WHERE key NOT LIKE '__refine_%'"
+        )
+    }

@@ -37,8 +37,11 @@ def err(code: int, message: str, details: str | None = None) -> tuple[int, dict]
     return code, body
 
 
-def _conn() -> sqlite3.Connection:
-    return db.connect()
+def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
+    conn = db.connect()
+    if ensure_cache:
+        project_state.ensure_sqlite_cache_current(conn)
+    return conn
 
 
 def _schema_block_response() -> tuple[int, dict] | None:
@@ -367,7 +370,7 @@ def _cancel_active_transfer_gaps(
 
 
 def _rebuild_cache() -> None:
-    conn = _conn()
+    conn = _conn(ensure_cache=False)
     try:
         project_state.rebuild_sqlite_cache(conn)
     finally:

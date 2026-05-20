@@ -71,12 +71,14 @@ class Runner:
         self._recent_errors: list[str] = []
 
     def _get_conn(self) -> sqlite3.Connection:
+        project_state.ensure_sqlite_cache_current(self._conn)
         return self._conn
 
     # ---- lifecycle -----------------------------------------------------------
 
     def start(self) -> None:
         db.init_db()
+        project_state.ensure_sqlite_cache_current(self._conn)
         recovery.reconcile_on_start(self._conn)
         preflight.check(self._conn)
         self.governance_agent.start()
@@ -110,6 +112,7 @@ class Runner:
         with self._diag_lock:
             self._last_call_at = now_iso()
         try:
+            project_state.ensure_sqlite_cache_current(self._conn)
             return self._dispatch_method(method, params or {})
         except Exception as e:
             with self._diag_lock:

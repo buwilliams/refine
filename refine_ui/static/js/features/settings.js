@@ -1134,6 +1134,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   $$("[data-instance-activate]").forEach((b) => b.addEventListener("click", async () => {
     try {
       await api("POST", "/api/instances/activate", { instance_id: b.dataset.instanceActivate });
+      await refreshInstanceScopedState();
       toast("Instance activated", "info");
       await refreshSettings();
     } catch (e) { toast(e.message, "error"); }

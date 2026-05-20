@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import time
 
-from refine_server import activity, db
+from refine_server import activity, db, project_state
 
 from . import sse
 
@@ -45,7 +45,9 @@ class SqlitePoller:
         self._stop.set()
 
     def _conn(self) -> sqlite3.Connection:
-        return db.connect()
+        conn = db.connect()
+        project_state.ensure_sqlite_cache_current(conn)
+        return conn
 
     def _loop(self) -> None:
         # Initialize cursor at the latest existing activity id (don't replay history).

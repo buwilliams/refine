@@ -293,7 +293,7 @@ async function applyProjectAttachResult(result) {
   initSSE();
   await syncProjectUpdates({ silent: true });
   await refreshFeatures();
-  await refreshReporters({ selectFallback: true });
+  await refreshInstanceScopedState({ selectReporterFallback: true });
   await refreshTargetAppToggle();
   if (location.hash !== "#/system/application") {
     location.hash = "#/system/application";
@@ -576,6 +576,15 @@ async function refreshReporters({ selectFallback = false } = {}) {
   state.reporters = data.reporters || [];
   reconcileLastReporter({ selectFallback });
   populateAllReporterDropdowns();
+}
+
+async function refreshInstanceScopedState({ selectReporterFallback = false } = {}) {
+  state.reporters = [];
+  state.dashboard = null;
+  state.currentGap = null;
+  setLastReporter("");
+  populateAllReporterDropdowns();
+  await refreshReporters({ selectFallback: selectReporterFallback });
 }
 
 function reconcileLastReporter({ selectFallback = false } = {}) {

@@ -41,13 +41,14 @@ def test_client_switch_path(root: Path) -> None:
         "initSSE()",
         "await syncProjectUpdates({ silent: true })",
         "await refreshFeatures()",
-        "await refreshReporters({ selectFallback: true })",
+        "await refreshInstanceScopedState({ selectReporterFallback: true })",
         "await refreshTargetAppToggle()",
         'location.hash = "#/system/application"',
     ):
         assert expected in switch_body, expected
 
     assert "function reconcileLastReporter" in common_js
+    assert "async function refreshInstanceScopedState" in common_js
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
     assert "Migrate and open" in common_js
     assert 'api("POST", "/api/project/attach", {' in common_js
@@ -55,6 +56,7 @@ def test_client_switch_path(root: Path) -> None:
     assert "function resetChatForProjectSwitch()" in chat_js
     assert "await openAddAppModal()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
+    assert "await refreshInstanceScopedState()" in settings_js
     assert "window.location.reload()" not in settings_js
 
 
@@ -300,12 +302,48 @@ def test_active_instance_is_per_application() -> None:
         cleanup_tmp(tmp)
 
 
+def test_instance_switch_refreshes_reporter_cache() -> None:
+    tmp, client = make_client_repo("refine-instance-reporters-")
+    conn = init_refine(client)
+    try:
+        from refine_server import project_state, reporters
+        from refine_ui import api
+
+        reporters.add(conn, "Alice")
+        other = project_state.create_instance("refine2")
+
+        # Simulate another Refine process changing the shared active-instance
+        # marker without touching this process's SQLite connection.
+        project_state.set_active_instance(other["id"])
+        status, body = api.list_reporters()
+        assert status == 200, body
+        assert body["reporters"] == []
+
+        status, body = api.create_reporter({"name": "Bob"})
+        assert status == 201, body
+        assert body["reporter"]["name"] == "Bob"
+
+        project_state.set_active_instance(project_state.DEFAULT_INSTANCE_ID)
+        status, body = api.list_reporters()
+        assert status == 200, body
+        names = [r["name"] for r in body["reporters"]]
+        assert names == ["Alice"]
+
+        status, body = api.list_settings()
+        assert status == 200, body
+        assert project_state.CACHE_ACTIVE_INSTANCE_KEY not in body["settings"]
+    finally:
+        conn.close()
+        cleanup_tmp(tmp)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     test_client_switch_path(root)
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
     test_active_instance_is_per_application()
+    test_instance_switch_refreshes_reporter_cache()
     print("project switch state tests OK")
     return 0
 

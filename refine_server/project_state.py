@@ -20,6 +20,7 @@ from .gaps import now_iso
 CURRENT_SCHEMA_VERSION = 1
 MIN_SUPPORTED_SCHEMA_VERSION = 1
 DEFAULT_INSTANCE_ID = "default"
+CACHE_ACTIVE_INSTANCE_KEY = "__refine_cache_active_instance_id"
 
 PROJECT_SETTING_KEYS = {
     "governance_product",
@@ -570,6 +571,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     from . import db
 
     ensure_initialized(conn, migrate=True)
+    active = active_instance_id()
     settings = list_settings()
     reps = list_reporters()
     root = volume_root()
@@ -582,6 +584,10 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
                 "INSERT INTO settings(key, value) VALUES(?, ?)",
                 (key, str(value)),
             )
+        conn.execute(
+            "INSERT INTO settings(key, value) VALUES(?, ?)",
+            (CACHE_ACTIVE_INSTANCE_KEY, active),
+        )
         for rep in reps:
             conn.execute(
                 "INSERT OR IGNORE INTO reporters(id, name, created) VALUES(?, ?, ?)",
@@ -610,6 +616,22 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
                     rel_path,
                 ),
             )
+
+
+def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
+    """Ensure SQLite projections match the active instance on disk."""
+    active = active_instance_id()
+    try:
+        row = conn.execute(
+            "SELECT value FROM settings WHERE key = ?",
+            (CACHE_ACTIVE_INSTANCE_KEY,),
+        ).fetchone()
+        cached = str(row["value"]) if row is not None else ""
+    except sqlite3.Error:
+        cached = ""
+    if cached != active:
+        rebuild_sqlite_cache(conn)
+    return active
 
 
 def _iter_gap_json(root: Path) -> list[tuple[dict[str, Any], str]]:
