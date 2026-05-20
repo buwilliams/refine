@@ -96,32 +96,17 @@
   margin-bottom: 8px;
 }
 
-.settings-guidance-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: center;
-  border-top: 1px solid var(--border);
-  padding-top: 12px;
-  margin-top: 12px;
-  cursor: pointer;
-}
-
-.settings-guidance-row:first-child {
-  border-top: 0;
-  padding-top: 0;
-  margin-top: 0;
-}
-
-.settings-guidance-row:hover {
-  background: var(--code-bg);
-}
-
 .guidance-status-control {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.guidance-table-row td:first-child {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Feature-flag matrix on System. Inline toggle + override badge,

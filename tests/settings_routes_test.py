@@ -98,6 +98,10 @@ def main() -> int:
     assert 'api("GET", "/api/guidance")' in settings_js
     assert 'id="guidance-add"' in settings_js
     assert 'id="guidance-form"' in settings_js
+    assert '<table class="table guidance-table">' in settings_js
+    assert '<thead><tr><th>Name</th><th>Status</th><th>Rule</th></tr></thead>' in settings_js
+    assert ".guidance-table-row td:first-child" in common_css
+    assert "text-decoration: underline;" in common_css
     assert 'data-guidance-open' in settings_js
     assert 'data-toggle-enabled' in settings_js
     assert 'status-pill ${statusClass}' in settings_js
@@ -126,6 +130,8 @@ def main() -> int:
     server_js = (root / "refine_ui/server.py").read_text(encoding="utf-8")
     assert '@route("GET", r"/api/guidance")' in server_js
     assert '@route("PUT", r"/api/guidance")' in server_js
+    assert "def do_PUT" in server_js
+    assert '"GET, POST, PATCH, PUT, DELETE, OPTIONS"' in server_js
 
     print("settings route tests OK")
     return 0

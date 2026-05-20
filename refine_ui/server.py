@@ -379,12 +379,15 @@ class RefineHandler(BaseHTTPRequestHandler):
     def do_PATCH(self) -> None:  # noqa: N802
         self._dispatch("PATCH")
 
+    def do_PUT(self) -> None:  # noqa: N802
+        self._dispatch("PUT")
+
     def do_DELETE(self) -> None:  # noqa: N802
         self._dispatch("DELETE")
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         self.send_response(204)
-        self.send_header("Allow", "GET, POST, PATCH, DELETE, OPTIONS")
+        self.send_header("Allow", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
         self.end_headers()
 
     def _dispatch(self, method: str) -> None:

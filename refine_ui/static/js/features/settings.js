@@ -189,7 +189,12 @@ function renderGovernanceRules(rules) {
 
 function renderGuidanceRows(items) {
   const rows = (items || []).map((item, idx) => renderGuidanceRow(item, idx)).join("");
-  return rows || `<p class="muted" data-guidance-empty>No guidance configured.</p>`;
+  if (!rows) return `<p class="muted" data-guidance-empty>No guidance configured.</p>`;
+  return `
+    <table class="table guidance-table">
+      <thead><tr><th>Name</th><th>Status</th><th>Rule</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderGuidanceRow(item = {}, idx = 0) {
@@ -197,14 +202,12 @@ function renderGuidanceRow(item = {}, idx = 0) {
   const statusClass = enabled ? "guidance-enabled" : "guidance-disabled";
   const statusText = enabled ? "Enabled" : "Disabled";
   return `
-    <div class="settings-guidance-row" data-guidance-row data-guidance-open="${idx}"
-         role="button" tabindex="0">
-      <div>
-        <h4>${htmlEscape(item.name || "Untitled guidance")}</h4>
-        <p class="muted small">${htmlEscape(item.rule || "No rule provided.")}</p>
-      </div>
-      <span class="status-pill ${statusClass}">${statusText}</span>
-    </div>`;
+    <tr class="guidance-table-row" data-guidance-row data-guidance-open="${idx}"
+        role="button" tabindex="0">
+      <td>${htmlEscape(item.name || "Untitled guidance")}</td>
+      <td><span class="status-pill ${statusClass}">${statusText}</span></td>
+      <td class="muted small">${htmlEscape(item.rule || "No rule provided.")}</td>
+    </tr>`;
 }
 
 let _guidanceModalOpen = false;
