@@ -34,6 +34,14 @@ Use `uv run refine install [port]` for a persistent service; `start [port]` runs
 5. People review the result; if it misses the target, they submit another Round.
 6. Approval closes the Gap.
 
+## Mental Model
+
+- refine is a development tool installed on a dev or QA machine.
+- Use it as a solo contributor or open it up to a group.
+- Each machine has its own instance, set up manually.
+- All data is owned by an instance and synced through git.
+- Governance and Guidance are global across all instances.
+
 ## License
 
 [MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No
