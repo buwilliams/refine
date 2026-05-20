@@ -324,7 +324,16 @@ class Runner:
             self._conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, instance_id, json_path) "
-                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?) "
+                "ON CONFLICT(id) DO UPDATE SET "
+                "name = excluded.name, "
+                "status = excluded.status, "
+                "priority = excluded.priority, "
+                "reporter = excluded.reporter, "
+                "created = excluded.created, "
+                "updated = excluded.updated, "
+                "instance_id = excluded.instance_id, "
+                "json_path = excluded.json_path",
                 (gap_id, name, priority, params["reporter"],
                  gap["created"], gap["updated"], instance_id, relative_gap_path(gap_id)),
             )
