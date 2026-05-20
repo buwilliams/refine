@@ -54,6 +54,22 @@ class TargetAppRebuilder:
             return False
         return self.queue_rebuild(f"worktree merge for Gap {gap_id}")
 
+    def queue_pending_awaiting_rebuild(self) -> bool:
+        if self._mode() != "on_worktree_merge":
+            return False
+        with self._state_lock:
+            if self._queued or self._running:
+                return False
+        row = self._get_conn().execute(
+            "SELECT COUNT(*) AS n FROM gaps_index WHERE status = 'awaiting-rebuild'"
+        ).fetchone()
+        n = int(row["n"] if row else 0)
+        if n <= 0:
+            return False
+        return self.queue_rebuild(
+            f"{n} Gap{'' if n == 1 else 's'} awaiting target-app rebuild"
+        )
+
     def snapshot(self) -> dict:
         with self._state_lock:
             return {
@@ -89,6 +105,9 @@ class TargetAppRebuilder:
 
     def _queue_scheduled_rebuild_if_due(self) -> None:
         mode = self._mode()
+        if mode == "on_worktree_merge":
+            self.queue_pending_awaiting_rebuild()
+            return
         if mode not in ("hourly", "nightly"):
             return
         now = datetime.now().astimezone()

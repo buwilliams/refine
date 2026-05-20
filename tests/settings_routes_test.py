@@ -184,9 +184,19 @@ def main() -> int:
     assert '"awaiting-rebuild",' in common_js
     assert "const orderedStatuses = WORKFLOW_STATUSES;" in dashboard_js
     assert "dashboard-status-grid" in dashboard_js
+    assert "const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([" in dashboard_js
+    assert '"todo",' in dashboard_js
+    assert '"in-progress",' in dashboard_js
+    assert '"ready-merge",' in dashboard_js
+    assert '"awaiting-rebuild",' in dashboard_js
+    assert "dashboard-status-card-agent" in dashboard_js
+    assert "dashboard-agent-indicator" in dashboard_js
+    assert "Agent-managed automation" in dashboard_js
     assert "repeat(9, minmax(0, 1fr))" in dashboard_css
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
     assert "dashboard-status-label" in dashboard_css
+    assert ".dashboard-status-card-agent" in dashboard_css
+    assert ".dashboard-agent-indicator" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
     assert '<table class="table gaps-table">' in gaps_list_js
     assert '<col class="gaps-col-name">' in gaps_list_js

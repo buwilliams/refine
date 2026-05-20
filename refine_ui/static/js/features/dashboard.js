@@ -3,6 +3,12 @@
 const dashboardReviewSelectedIds = new Set();
 let dashboardReviewSelectedReporter = "";
 let dashboardRefreshSeq = 0;
+const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
+  "todo",
+  "in-progress",
+  "ready-merge",
+  "awaiting-rebuild",
+]);
 
 async function renderDashboard() {
   // First paint only: lay out the outer chrome and a `Loading…`
@@ -89,12 +95,16 @@ function drawDashboard(d, opts = {}) {
       </section>` : ""}
 
     <section class="card-grid dashboard-status-grid">
-      ${orderedStatuses.map((s) => `
-        <a class="card dashboard-status-card" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit"
-           title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}">
+      ${orderedStatuses.map((s) => {
+        const agentManaged = AGENT_MANAGED_DASHBOARD_STATUSES.has(s);
+        return `
+        <a class="card dashboard-status-card${agentManaged ? " dashboard-status-card-agent" : ""}" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit"
+           title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
+          ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="Agent-managed automation">Auto</span>` : ""}
           <div class="muted small dashboard-status-label">${s}</div>
           <div class="dashboard-status-count">${fmtCount(counts[s] || 0)}</div>
-        </a>`).join("")}
+        </a>`;
+      }).join("")}
     </section>
 
     <section class="card">

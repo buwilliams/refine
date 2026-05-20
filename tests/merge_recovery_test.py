@@ -55,7 +55,7 @@ def main() -> int:
     conn.close()
     try:
         from refine_server import (
-            conflict_resolver, db, git_ops, recovery,
+            conflict_resolver, db, gap_writer, git_ops, recovery,
             target_app_rebuilder, verify_op,
         )
         from refine_server.gaps import now_iso
@@ -106,6 +106,44 @@ def main() -> int:
             "transitioned to `awaiting-rebuild`" in msg
             for msg in success_messages
         ), success_messages
+
+        # On-worktree-merge rebuild mode gates the host-worktree merge queue
+        # while already-merged work is waiting to be rebuilt. Agent work can
+        # still finish into ready-merge, but the merger must not land more
+        # branches on the clean host branch until rebuild promotion clears
+        # awaiting-rebuild.
+        gid_blocked = "01MERGEBLOCKEDREBUILDAAA"
+        branch_blocked = "refine/merge-blocked-rebuild"
+        make_ready_branch(
+            conn, gid_blocked, branch_blocked, "blocked-rebuild.txt", "wait\n",
+        )
+        queued_rebuilds: list[str] = []
+        db.set_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
+        gated_merger = Merger(
+            get_conn=lambda: conn,
+            sub_mgr=FakeSubprocessManager(),
+            queue_rebuild_for_pending=(
+                lambda: queued_rebuilds.append("queued") or True
+            ),
+        )
+        gated_merger._tick()  # noqa: SLF001
+        assert queued_rebuilds == ["queued"], queued_rebuilds
+        assert db_status(conn, gid_blocked) == "ready-merge"
+        assert git_ops.local_branch_exists(branch_blocked)
+        assert "blocked-rebuild.txt" not in git(
+            client, "ls-tree", "-r", "--name-only", "origin/main",
+        ).stdout
+        conn.execute(
+            "UPDATE gaps_index SET status = 'review' WHERE id = ?",
+            (gid_success,),
+        )
+        gap_writer.update_fields(gid_success, status="review")
+        gated_merger._tick()  # noqa: SLF001
+        assert db_status(conn, gid_blocked) == "awaiting-rebuild"
+        assert "blocked-rebuild.txt" in git(
+            client, "ls-tree", "-r", "--name-only", "origin/main",
+        ).stdout
+        db.set_setting(conn, "target_app_auto_rebuild", "never")
 
         # Safety default: a direct merge operation also parks at
         # awaiting-rebuild when the caller omits final_status.

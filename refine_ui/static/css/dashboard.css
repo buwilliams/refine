@@ -21,11 +21,33 @@
 #dash > .dashboard-status-grid > .dashboard-status-card {
   min-width: 0;
   padding: 8px 6px;
+  position: relative;
+}
+#dash > .dashboard-status-grid > .dashboard-status-card-agent {
+  border-color: #b9d4ff;
+}
+#dash > .dashboard-status-grid .dashboard-agent-indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  padding: 2px 4px;
+  border: 1px solid #b9d4ff;
+  border-radius: 999px;
+  background: #e8f2ff;
+  color: #24528f;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  pointer-events: none;
 }
 #dash > .dashboard-status-grid .dashboard-status-label {
   font-size: 11px;
   overflow-wrap: anywhere;
   line-height: 1.1;
+}
+#dash > .dashboard-status-grid .dashboard-status-card-agent .dashboard-status-label {
+  padding-right: 28px;
 }
 #dash > .dashboard-status-grid .dashboard-status-count {
   font-size: 22px;

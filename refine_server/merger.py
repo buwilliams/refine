@@ -60,10 +60,12 @@ class Merger:
         get_conn,
         sub_mgr: subprocess_mgr.SubprocessManager,
         on_worktree_merged: Callable[[str], None] | None = None,
+        queue_rebuild_for_pending: Callable[[], bool] | None = None,
     ) -> None:
         self._get_conn = get_conn
         self._sub_mgr = sub_mgr
         self._on_worktree_merged = on_worktree_merged
+        self._queue_rebuild_for_pending = queue_rebuild_for_pending
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -188,6 +190,8 @@ class Merger:
             return
         with self._host_lock:
             self._cleanup_worktree(reason="pre-tick cleanup")
+            if self._defer_for_pending_rebuild():
+                return
             gap_id = self._find_one_ready()
             if not gap_id:
                 return
@@ -203,6 +207,28 @@ class Merger:
             "ORDER BY updated ASC LIMIT 1"
         ).fetchone()
         return row["id"] if row else None
+
+    def _defer_for_pending_rebuild(self) -> bool:
+        """When on-worktree-merge rebuilds are enabled, do not merge more
+        work onto the host branch while already-merged work is waiting to be
+        rebuilt. Agents may keep working in their own worktrees; only the
+        host-worktree merge queue is gated.
+        """
+        conn = self._get_conn()
+        mode = (
+            db.get_setting(conn, "target_app_auto_rebuild", "never") or "never"
+        ).strip()
+        if mode != "on_worktree_merge":
+            return False
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM gaps_index WHERE status = 'awaiting-rebuild'"
+        ).fetchone()
+        pending = int(row["n"] if row else 0)
+        if pending <= 0:
+            return False
+        if self._queue_rebuild_for_pending is not None:
+            self._queue_rebuild_for_pending()
+        return True
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()

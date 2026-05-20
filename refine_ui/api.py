@@ -20,7 +20,7 @@ from refine_server.backend_protocol import (
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
-    M_TARGET_APP_HEALTH, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
+    M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
 
@@ -1758,6 +1758,14 @@ def update_settings(body: dict) -> tuple[int, dict]:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError as e:
             return _backend_err(e)
+    if (
+        normalized.get("target_app_auto_rebuild") == "on_worktree_merge"
+        or "target_app_rebuild_command" in normalized
+    ):
+        try:
+            get_client().call(M_TARGET_APP_REBUILD_PENDING, {}, timeout=10.0)
+        except BackendError:
+            pass
     return 200, {"ok": True}
 
 

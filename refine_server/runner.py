@@ -19,7 +19,7 @@ from refine_server.backend_protocol import (
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
     M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
-    M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
+    M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 
 from . import dispatcher as _dispatcher
@@ -54,6 +54,9 @@ class Runner:
         self.merger = _merger.Merger(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
             on_worktree_merged=self.target_app_rebuilder.queue_for_worktree_merge,
+            queue_rebuild_for_pending=(
+                self.target_app_rebuilder.queue_pending_awaiting_rebuild
+            ),
         )
         self.dispatcher = _dispatcher.Dispatcher(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
@@ -158,6 +161,7 @@ class Runner:
             M_GOVERNANCE_GENERATE_RULES: self._h_governance_generate_rules,
             M_GOVERNANCE_WAKE: self._h_governance_wake,
             M_TARGET_APP_RUN: self._h_target_app_run,
+            M_TARGET_APP_REBUILD_PENDING: self._h_target_app_rebuild_pending,
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
             M_TARGET_APP_HEALTH: self._h_target_app_health,
             M_PROJECT_SYNC: self._h_project_sync,
@@ -978,6 +982,10 @@ class Runner:
         finally:
             self._target_app_lock.release()
 
+    def _h_target_app_rebuild_pending(self, params: dict) -> dict:
+        queued = self.target_app_rebuilder.queue_pending_awaiting_rebuild()
+        return {"queued": queued}
+
     def _run_automatic_target_app_rebuild(self, reason: str) -> dict:
         """Run one queued automatic rebuild and promote rebuilt Gaps to review."""
         with self._target_app_lock:
@@ -1037,6 +1045,8 @@ class Runner:
                 category="target_app", actor="runner",
                 details=err_msg or None,
             )
+            if ok:
+                self.merger.wake()
             return result
 
     def _promote_rebuilt_gaps(self, conn: sqlite3.Connection) -> int:

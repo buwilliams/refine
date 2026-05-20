@@ -14,7 +14,8 @@ def main() -> int:
     tmp, client = make_client_repo("refine-target-app-rebuild-")
     conn = init_refine(client)
     try:
-        from refine_server import db, gaps, target_app_rebuilder
+        from refine_server import db, gap_writer, gaps, target_app_rebuilder
+        from refine_server.backend_protocol import M_TARGET_APP_REBUILD_PENDING
         from refine_ui import api
 
         runs: list[str] = []
@@ -40,11 +41,40 @@ def main() -> int:
         assert rebuilder.queue_for_worktree_merge("01GAP") is True
         rebuilder._drain_queue()  # noqa: SLF001
         assert len(runs) == 3, runs
+        gid_pending = "01TARGETAPPPENDINGREBUILDA"
+        create_indexed_gap(conn, gid_pending, status="awaiting-rebuild", branch=None)
+        assert rebuilder.queue_pending_awaiting_rebuild() is True
+        assert rebuilder.queue_pending_awaiting_rebuild() is False
+        rebuilder._drain_queue()  # noqa: SLF001
+        assert runs[-1] == "1 Gap awaiting target-app rebuild", runs
+        calls: list[str] = []
+
+        class FakeClient:
+            def call(self, method: str, params: dict | None = None, *, timeout: float = 30.0) -> dict:  # noqa: ARG002
+                calls.append(method)
+                return {"queued": True}
+
+        old_get_client = api.get_client
+        try:
+            api.get_client = lambda: FakeClient()  # type: ignore[assignment]
+            status, body = api.update_settings({
+                "target_app_auto_rebuild": "on_worktree_merge",
+            })
+            assert status == 200, body
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+        assert M_TARGET_APP_REBUILD_PENDING in calls, calls
+        conn.execute(
+            "UPDATE gaps_index SET status = 'review' WHERE id = ?",
+            (gid_pending,),
+        )
+        gap_writer.update_fields(gid_pending, status="review")
         db.set_setting(conn, "target_app_auto_rebuild", "hourly")
         db.set_setting(conn, "target_app_auto_rebuild_last_started_at", "")
         rebuilder._queue_scheduled_rebuild_if_due()  # noqa: SLF001
         rebuilder._drain_queue()  # noqa: SLF001
-        assert len(runs) == 4, runs
+        assert len(runs) == 5, runs
+        assert runs[-1] == "hourly automatic rebuild", runs
         target_settings = json.loads(
             (client / ".refine" / "instances" / "default" / "target-app.json")
             .read_text(encoding="utf-8")
