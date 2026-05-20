@@ -16,13 +16,12 @@ from . import conflict_resolver, gap_writer, git_ops
 
 def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
                    actor: str = "refine",
-                   final_status: str = "review") -> dict:
+                   final_status: str = "awaiting-rebuild") -> dict:
     """Run the merge+push sequence for a `ready-merge` Gap, then transition it.
 
-    `final_status` is the status the Gap moves to on a clean run:
-      - The Merger calls with `final_status="awaiting-rebuild"` — auto-merge
-        completes the merge, then target-app rebuild promotes the Gap to
-        `review` so review means merged + rebuilt/live.
+    `final_status` is the status the Gap moves to on a clean run. The safe
+    default is `awaiting-rebuild`: target-app rebuild promotes the Gap to
+    `review` so review means merged + rebuilt/live.
 
     Returns a dict with keys: ok, stage, message, details.
     """
@@ -273,7 +272,7 @@ def approve_review(conn: sqlite3.Connection, gap_id: str, *,
 
 def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
                  branch: str, *, has_upstream: bool, actor: str,
-                 final_status: str = "review") -> dict:
+                 final_status: str = "awaiting-rebuild") -> dict:
     # 1. fetch (only if there's a remote-tracking upstream).
     if has_upstream:
         r = git_ops.fetch()

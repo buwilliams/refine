@@ -21,6 +21,7 @@ CURRENT_SCHEMA_VERSION = 1
 MIN_SUPPORTED_SCHEMA_VERSION = 1
 DEFAULT_INSTANCE_ID = "default"
 CACHE_ACTIVE_INSTANCE_KEY = "__refine_cache_active_instance_id"
+CACHE_STATE_FINGERPRINT_KEY = "__refine_cache_state_fingerprint"
 
 PROJECT_SETTING_KEYS = {
     "governance_product",
@@ -430,8 +431,11 @@ def _write_active_instance_selection(root: Path, instance_id: str) -> None:
 
 def set_active_instance(instance_id: str, *, root: Path | None = None) -> None:
     root = root or volume_root()
-    if instance_by_id(instance_id, root=root) is None:
+    entry = instance_by_id(instance_id, root=root)
+    if entry is None:
         raise ValueError(f"unknown instance_id: {instance_id}")
+    if entry.get("archived"):
+        raise ValueError(f"archived instance cannot be activated: {instance_id}")
     _write_active_instance_selection(root, instance_id)
     _ensure_instance_files(instance_id, root=root)
 
@@ -587,8 +591,11 @@ def gap_instance_display(instance_id: str | None) -> str:
 def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
                   *, statuses: set[str] | None = None,
                   gap_ids: set[str] | None = None) -> dict[str, Any]:
-    if instance_by_id(target_instance_id) is None:
+    target = instance_by_id(target_instance_id)
+    if target is None:
         raise ValueError(f"unknown target instance: {target_instance_id}")
+    if target.get("archived"):
+        raise ValueError(f"archived target instance: {target_instance_id}")
     allowed = statuses or {
         "backlog", "todo", "failed", "awaiting-rebuild",
         "review", "done", "cancelled",
@@ -630,6 +637,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     settings = list_settings()
     reps = list_reporters()
     root = volume_root()
+    fingerprint = state_fingerprint(root=root)
     with db.transaction(conn):
         conn.execute("DELETE FROM gaps_index")
         conn.execute("DELETE FROM settings")
@@ -642,6 +650,10 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         conn.execute(
             "INSERT INTO settings(key, value) VALUES(?, ?)",
             (CACHE_ACTIVE_INSTANCE_KEY, active),
+        )
+        conn.execute(
+            "INSERT INTO settings(key, value) VALUES(?, ?)",
+            (CACHE_STATE_FINGERPRINT_KEY, fingerprint),
         )
         for rep in reps:
             conn.execute(
@@ -676,17 +688,45 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
 def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
     """Ensure SQLite projections match the active instance on disk."""
     active = active_instance_id()
+    fingerprint = state_fingerprint()
     try:
         row = conn.execute(
             "SELECT value FROM settings WHERE key = ?",
             (CACHE_ACTIVE_INSTANCE_KEY,),
         ).fetchone()
         cached = str(row["value"]) if row is not None else ""
+        fp_row = conn.execute(
+            "SELECT value FROM settings WHERE key = ?",
+            (CACHE_STATE_FINGERPRINT_KEY,),
+        ).fetchone()
+        cached_fingerprint = str(fp_row["value"]) if fp_row is not None else ""
     except sqlite3.Error:
         cached = ""
-    if cached != active:
+        cached_fingerprint = ""
+    if cached != active or cached_fingerprint != fingerprint:
         rebuild_sqlite_cache(conn)
     return active
+
+
+def state_fingerprint(*, root: Path | None = None) -> str:
+    """Cheap fingerprint for canonical JSON state projected into SQLite."""
+    root = root or volume_root()
+    paths: list[Path] = [
+        config_json_path(root),
+        instances_json_path(root),
+        guidance_json_path(root),
+    ]
+    paths.extend(sorted(instances_dir(root).glob("**/*.json")))
+    paths.extend(sorted((root / "gaps").glob("**/gap.json")))
+    parts: list[str] = []
+    for path in paths:
+        try:
+            st = path.stat()
+        except OSError:
+            continue
+        rel = path.relative_to(root).as_posix()
+        parts.append(f"{rel}:{st.st_mtime_ns}:{st.st_size}")
+    return "|".join(parts)
 
 
 def _iter_gap_json(root: Path) -> list[tuple[dict[str, Any], str]]:

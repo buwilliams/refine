@@ -505,6 +505,108 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
         cleanup_tmp(tmp)
 
 
+def test_settings_are_scoped_to_active_instance_files() -> None:
+    tmp, client = make_client_repo("refine-instance-settings-")
+    conn = init_refine(client)
+    try:
+        from refine_server import db, project_state
+        from refine_ui import api
+
+        default = project_state.active_instance_id()
+        other = project_state.create_instance("refine2")
+        db.set_setting(conn, "governance_product", "Shared product")
+
+        status, body = api.update_settings({
+            "agent_subpath": "frontend",
+            "project_update_pulse_interval_seconds": "300",
+            "target_app_auto_rebuild": "hourly",
+        })
+        assert status == 200, body
+
+        project_state.set_active_instance(other["id"])
+        status, body = api.list_settings()
+        assert status == 200, body
+        settings = body["settings"]
+        assert settings["governance_product"] == "Shared product"
+        assert settings["agent_subpath"] != "frontend"
+        assert settings["project_update_pulse_interval_seconds"] != "300"
+        assert settings["target_app_auto_rebuild"] != "hourly"
+
+        status, body = api.update_settings({
+            "agent_subpath": "backend",
+            "project_update_pulse_interval_seconds": "900",
+            "target_app_auto_rebuild": "nightly",
+            "target_app_start_command": "npm run dev",
+            "target_app_stop_command": "pkill -f 'npm run dev' || true",
+            "target_app_rebuild_command": "npm run build",
+            "target_app_status_command": "pgrep -f 'npm run dev'",
+            "target_app_cwd": "apps/web",
+            "target_app_env_json": '{"PORT":"3001"}',
+            "target_app_process_check_command": "pgrep -f node",
+        })
+        assert status == 200, body
+        status, body = api.list_settings()
+        assert status == 200, body
+        settings = body["settings"]
+        assert settings["target_app_start_command"] == "npm run dev"
+        assert settings["target_app_stop_command"] == "pkill -f 'npm run dev' || true"
+        assert settings["target_app_rebuild_command"] == "npm run build"
+        assert settings["target_app_status_command"] == "pgrep -f 'npm run dev'"
+        assert settings["target_app_cwd"] == "apps/web"
+        assert settings["target_app_env_json"] == '{"PORT": "3001"}'
+        assert settings["target_app_process_check_command"] == "pgrep -f node"
+
+        project_state.set_active_instance(default)
+        status, body = api.list_settings()
+        assert status == 200, body
+        settings = body["settings"]
+        assert settings["governance_product"] == "Shared product"
+        assert settings["agent_subpath"] == "frontend"
+        assert settings["project_update_pulse_interval_seconds"] == "300"
+        assert settings["target_app_auto_rebuild"] == "hourly"
+        assert settings["target_app_start_command"] != "npm run dev"
+        assert settings["target_app_rebuild_command"] != "npm run build"
+
+        root = client / ".refine"
+        project_config = json.loads((root / "config.json").read_text(encoding="utf-8"))
+        default_app = json.loads(
+            (root / "instances" / default / "application.json").read_text(encoding="utf-8")
+        )
+        default_runtime = json.loads(
+            (root / "instances" / default / "runtime.json").read_text(encoding="utf-8")
+        )
+        default_target = json.loads(
+            (root / "instances" / default / "target-app.json").read_text(encoding="utf-8")
+        )
+        other_app = json.loads(
+            (root / "instances" / other["id"] / "application.json").read_text(encoding="utf-8")
+        )
+        other_runtime = json.loads(
+            (root / "instances" / other["id"] / "runtime.json").read_text(encoding="utf-8")
+        )
+        other_target = json.loads(
+            (root / "instances" / other["id"] / "target-app.json").read_text(encoding="utf-8")
+        )
+
+        assert project_config["settings"]["governance_product"] == "Shared product"
+        assert default_app["agent_subpath"] == "frontend"
+        assert default_runtime["project_update_pulse_interval_seconds"] == "300"
+        assert default_target["target_app_auto_rebuild"] == "hourly"
+        assert other_app["agent_subpath"] == "backend"
+        assert other_runtime["project_update_pulse_interval_seconds"] == "900"
+        assert other_target["target_app_auto_rebuild"] == "nightly"
+        assert other_target["target_app_start_command"] == "npm run dev"
+        assert other_target["target_app_stop_command"] == "pkill -f 'npm run dev' || true"
+        assert other_target["target_app_rebuild_command"] == "npm run build"
+        assert other_target["target_app_status_command"] == "pgrep -f 'npm run dev'"
+        assert other_target["target_app_cwd"] == "apps/web"
+        assert other_target["target_app_env_json"] == '{"PORT": "3001"}'
+        assert other_target["target_app_process_check_command"] == "pgrep -f node"
+    finally:
+        conn.close()
+        cleanup_tmp(tmp)
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     test_client_switch_path(root)
@@ -515,6 +617,7 @@ def main() -> int:
     test_active_instance_is_port_scoped_for_same_checkout()
     test_process_config_path_is_not_shared_through_binding()
     test_instance_switch_refreshes_reporter_cache()
+    test_settings_are_scoped_to_active_instance_files()
     print("project switch state tests OK")
     return 0
 

@@ -35,6 +35,43 @@ def main() -> int:
             encoding="utf-8",
         ) == "from peer\n"
 
+        from refine_server import config, gap_writer, gaps, project_state
+
+        config.get(path=peer / ".refine" / "refine.toml", reload=True)
+        peer_instance = project_state.create_instance("Peer Machine")
+        peer_gap = "01PROJECTSYNCPEERGAPAAAAA"
+        gap_writer.create_gap(
+            gap_id=peer_gap,
+            name="Peer-created gap",
+            initial_round=gaps.new_round("Peer", "Actual", "Target"),
+            status="todo",
+            priority="high",
+            instance_id=peer_instance["id"],
+        )
+        git(peer, "add", ".refine")
+        git(peer, "commit", "-m", "peer instance state update")
+        git(peer, "push")
+
+        config.get(path=client / ".refine" / "refine.toml", reload=True)
+        os.chdir(client)
+        result = project_sync.sync_latest(conn)
+        assert result["ok"], result
+        assert result["pulled"] is True, result
+        assert any(
+            inst["id"] == peer_instance["id"]
+            for inst in project_state.list_instances()
+        )
+        assert project_state.active_instance_id() == "default"
+        row = conn.execute(
+            "SELECT status, priority, reporter, instance_id "
+            "FROM gaps_index WHERE id = ?",
+            (peer_gap,),
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+        assert row["priority"] == "high", dict(row)
+        assert row["reporter"] == "Peer", dict(row)
+        assert row["instance_id"] == peer_instance["id"], dict(row)
+
         marker2 = peer / ".refine" / "pulse-marker.txt"
         marker2.write_text("from pulse\n", encoding="utf-8")
         git(peer, "add", ".refine/pulse-marker.txt")

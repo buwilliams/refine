@@ -73,6 +73,29 @@ def main() -> int:
         }
         assert rows == {default_gap: "backlog", refine2_gap: "backlog"}, rows
 
+        def assert_ownership_blocked(result: tuple[int, dict]) -> None:
+            status_code, payload = result
+            assert status_code == 409, payload
+            assert payload["error"]["code"] == "instance_ownership", payload
+
+        assert_ownership_blocked(api.delete_gap(default_gap))
+        assert_ownership_blocked(api.bulk_delete_gaps({
+            "filter": {"status": "backlog", "instance": "all"},
+        }))
+        assert_ownership_blocked(api.append_round(default_gap, {
+            "reporter": "Jane",
+            "actual": "Actual",
+            "target": "Target",
+        }))
+        assert_ownership_blocked(api.edit_latest_round(default_gap, {
+            "reporter": "Jane",
+            "actual": "Actual",
+            "target": "Target",
+        }))
+        assert_ownership_blocked(api.verify(default_gap))
+        assert_ownership_blocked(api.retry(default_gap))
+        assert_ownership_blocked(api.cancel(default_gap))
+
         status, body = api.transfer_instance_gaps({
             "target_instance_id": refine2["id"],
             "filter": {"instance": default},

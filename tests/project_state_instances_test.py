@@ -22,6 +22,7 @@ def main() -> int:
     conn = init_refine(client)
     try:
         from refine_server import db, gap_writer, gaps, project_state, reporters
+        from refine_ui import api
 
         root = client / ".refine"
         assert (root / "config.json").is_file()
@@ -81,6 +82,60 @@ def main() -> int:
         assert result["updated"] == 1, result
         assert result["skipped"] == 1, result
         assert result["skipped_details"][0]["reason"] == "status:in-progress"
+
+        stale_gap = "01PROJECTSTATESTALECACHEAA"
+        gap_writer.create_gap(
+            gap_id=stale_gap,
+            name="Stale projection",
+            initial_round=gaps.new_round("Jane", "Actual", "Target"),
+            status="todo",
+            priority="medium",
+            instance_id=active,
+        )
+        project_state.rebuild_sqlite_cache(conn)
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+        # Simulate another Refine process writing canonical JSON while this
+        # process's SQLite projection still has the old status.
+        gap_writer.update_fields(stale_gap, status="failed")
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+        status, body = api.get_gap(stale_gap)
+        assert status == 200, body
+        assert body["gap"]["status"] == "failed", body
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
+        ).fetchone()
+        assert row["status"] == "failed", dict(row)
+
+        archived = project_state.create_instance("Archived")
+        project_state.update_instance(archived["id"], archived=True)
+        try:
+            project_state.set_active_instance(archived["id"])
+            raise AssertionError("archived instance should not activate")
+        except ValueError as e:
+            assert "archived instance" in str(e)
+        assert project_state.active_instance_id() == active
+
+        try:
+            project_state.transfer_gaps(None, archived["id"])
+            raise AssertionError("archived instance should not receive transfers")
+        except ValueError as e:
+            assert "archived target" in str(e)
+
+        status, body = api.activate_instance({"instance_id": archived["id"]})
+        assert status == 400, body
+        assert "archived instance" in body["error"]["message"]
+        status, body = api.transfer_instance_gaps({
+            "target_instance_id": archived["id"],
+            "filter": {"instance": active},
+        })
+        assert status == 400, body
+        assert "archived target" in body["error"]["message"]
 
         sqlite_paths = [
             ".refine/index.sqlite",

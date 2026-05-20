@@ -60,6 +60,10 @@ def main() -> int:
     assert 'if (slug === "system" || slug === "project") return "application";' in settings_js
     assert 'if (slug === "agents") return "guidance";' in settings_js
     assert "function activeSettingsTabFromRoute()" in settings_js
+    assert "let _targetAppDraftDirty = false;" in settings_js
+    assert "async function refreshSettings(options = {})" in settings_js
+    assert "_targetAppDraftDirty &&" in settings_js
+    assert 'document.querySelector(\'[data-tab-pane="application"].active\')' in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
     assert '<div class="card settings-tab-card">${body}</div>' in settings_js
@@ -81,10 +85,15 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     runtime_save_body = settings_js.split('$("#s-save-runtime")?.addEventListener', 1)[1]
     runtime_save_body = runtime_save_body.split("\n  });", 1)[0]
+    application_save_body = settings_js.split('$("#s-save-application")?.addEventListener', 1)[1]
+    application_save_body = application_save_body.split("\n  });", 1)[0]
     feature_toggle_body = settings_js.split('$$("[data-feature-cell]").forEach', 1)[1]
     feature_toggle_body = feature_toggle_body.split('$$("[data-feature-clear]").forEach', 1)[0]
     assert 'api("POST", "/api/features/override"' in runtime_save_body
     assert 'api("POST", "/api/features/override"' not in feature_toggle_body
+    assert 'await api("PATCH", "/api/settings", {' in application_save_body
+    assert "_targetAppDraftDirty = false;" in application_save_body
+    assert "await refreshSettings({ force: true });" in application_save_body
     for old_save_id in (
         'id="s-save"',
         'id="s-save-cli"',
@@ -117,6 +126,7 @@ def main() -> int:
     assert 'href="#/system/application"' in index_html
     assert 'slug: "instances"' in settings_js
     assert 'api("GET", "/api/instances")' in settings_js
+    assert "const transferTargetInstances = instances.filter((inst) => !inst.archived);" in settings_js
     assert "Pause, cancel, and transfer" in settings_js
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
@@ -154,6 +164,19 @@ def main() -> int:
     assert '"on_worktree_merge", "On worktree merge"' in settings_js
     assert "target_app_auto_rebuild" in (root / "refine_ui/api.py").read_text(encoding="utf-8")
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
+    assert "function applyGeneratedTargetAppConfig(cfg)" in settings_js
+    generated_body = settings_js.split("function applyGeneratedTargetAppConfig(cfg)", 1)[1]
+    generated_body = generated_body.split("\n}", 1)[0]
+    assert "_targetAppDraftDirty = true;" in generated_body
+    for expected in (
+        'set("#s-target-start-command", cfg.start_command || "")',
+        'set("#s-target-stop-command", cfg.stop_command || "")',
+        'set("#s-target-status-command", cfg.status_command || "")',
+        'set("#s-target-cwd", cfg.cwd || "")',
+        'set("#s-target-env", JSON.stringify(cfg.env || {}, null, 2))',
+        'set("#s-target-process-command", cfg.process_check_command || "")',
+    ):
+        assert expected in settings_js
     assert "const WORKFLOW_STATUSES = [" in common_js
     assert '"awaiting-rebuild",' in common_js
     assert "const orderedStatuses = WORKFLOW_STATUSES;" in dashboard_js

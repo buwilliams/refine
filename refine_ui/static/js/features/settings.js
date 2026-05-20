@@ -1,5 +1,7 @@
 // ---- System -----------------------------------------------------------------
 
+let _targetAppDraftDirty = false;
+
 async function renderSettings() {
   renderBanners([]);
   // First-paint scaffold only; subsequent refreshes route through
@@ -10,8 +12,15 @@ async function renderSettings() {
   await refreshSettings();
 }
 
-async function refreshSettings() {
+async function refreshSettings(options = {}) {
   if (state.currentRoute !== "settings") return;
+  if (
+    _targetAppDraftDirty &&
+    !options.force &&
+    document.querySelector('[data-tab-pane="application"].active')
+  ) {
+    return;
+  }
   try {
     const [s, diag, reps, feats, project, gov, dash, instances, guidance] = await Promise.all([
       api("GET", "/api/settings"),
@@ -503,6 +512,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   const activeInstanceId = instanceData.active_instance_id || state.project?.active_instance_id || "";
   const activeInstance = instances.find((i) => i.id === activeInstanceId) || null;
   const activeInstanceLabel = activeInstance?.display_name || activeInstanceId || "Default";
+  const transferTargetInstances = instances.filter((inst) => !inst.archived);
   const instanceCounts = instanceData.counts || {};
   const guidanceItems = guidanceData.guidance || [];
   const appOptions = projectApps.map((app) => `
@@ -870,7 +880,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           </select></div>
         <div class="form-row"><label>To</label>
           <select id="instance-transfer-target">
-            ${instances.map((inst) => `<option value="${htmlEscape(inst.id)}" ${inst.id === activeInstanceId ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
+            ${transferTargetInstances.map((inst) => `<option value="${htmlEscape(inst.id)}" ${inst.id === activeInstanceId ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
           </select></div>
       </div>
       <div class="actions"><button class="warn" id="instance-transfer">Transfer matching Gaps</button></div>
@@ -1250,7 +1260,9 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           target_app_tcp_check_port: $("#s-target-tcp-port").value,
           target_app_process_check_command: $("#s-target-process-command").value,
         });
+        _targetAppDraftDirty = false;
         toast("Saved", "info");
+        await refreshSettings({ force: true });
         refreshTargetAppStatus();
       } catch (e) { toast(e.message, "error"); }
     });
@@ -1322,6 +1334,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
 }
 
 function applyGeneratedTargetAppConfig(cfg) {
+  _targetAppDraftDirty = true;
   const set = (id, value) => {
     const el = $(id);
     if (el) el.value = value == null ? "" : String(value);

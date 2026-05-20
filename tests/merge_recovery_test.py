@@ -54,7 +54,10 @@ def main() -> int:
     conn = init_refine(client)
     conn.close()
     try:
-        from refine_server import conflict_resolver, db, git_ops, recovery
+        from refine_server import (
+            conflict_resolver, db, git_ops, recovery,
+            target_app_rebuilder, verify_op,
+        )
         from refine_server.gaps import now_iso
         from refine_server.merger import Merger
         from refine_server.paths import sqlite_path
@@ -70,15 +73,21 @@ def main() -> int:
         conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")
 
-        rebuild_queue: list[str] = []
+        rebuild_runs: list[str] = []
+        rebuilder = target_app_rebuilder.TargetAppRebuilder(
+            get_conn=lambda: conn,
+            run_rebuild=lambda reason: rebuild_runs.append(reason) or {"ok": True},
+        )
+        db.set_setting(conn, "target_app_auto_rebuild", "never")
         merger = Merger(
             get_conn=lambda: conn,
             sub_mgr=FakeSubprocessManager(),
-            on_worktree_merged=rebuild_queue.append,
+            on_worktree_merged=rebuilder.queue_for_worktree_merge,
         )
 
         # Successful Merge-agent path: ready-merge -> awaiting-rebuild,
         # branch/worktree cleanup, merge commit pushed to the bare remote.
+        # Automatic rebuild mode `never` must not bypass the rebuild gate.
         gid_success = "01MERGESUCCESSAAAAAAAAAAA"
         branch_success = "refine/merge-success"
         make_ready_branch(
@@ -86,10 +95,23 @@ def main() -> int:
         )
         merger._merge_one(gid_success)
         assert db_status(conn, gid_success) == "awaiting-rebuild"
-        assert rebuild_queue == [gid_success]
+        assert rebuilder.snapshot()["queued"] is False
+        assert rebuild_runs == []
         assert not git_ops.local_branch_exists(branch_success)
         assert not git_ops.worktree_exists(gid_success)
         assert "feature-success.txt" in git(client, "ls-tree", "-r", "--name-only", "origin/main").stdout
+
+        # Safety default: a direct merge operation also parks at
+        # awaiting-rebuild when the caller omits final_status.
+        gid_default = "01MERGEDEFAULTSTATUSAAAAA"
+        branch_default = "refine/merge-default-status"
+        make_ready_branch(
+            conn, gid_default, branch_default, "feature-default.txt", "ok\n",
+        )
+        result = verify_op.perform_verify(conn, gid_default, actor="test")
+        assert result["ok"], result
+        assert result["final_status"] == "awaiting-rebuild", result
+        assert db_status(conn, gid_default) == "awaiting-rebuild"
 
         # Merge conflict path: unresolved conflict is recoverable user work, so
         # the Gap fails instead of becoming review-ready or blocking queue.

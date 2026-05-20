@@ -318,6 +318,11 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     source = (body.get("source_instance_id") or "").strip() or None
     if not target:
         return err(400, "target_instance_id is required")
+    target_instance = project_state.instance_by_id(target)
+    if target_instance is None:
+        return err(400, f"unknown target instance: {target}")
+    if target_instance.get("archived"):
+        return err(400, f"archived target instance: {target}")
     statuses = body.get("statuses")
     allowed = None
     if statuses is not None:
