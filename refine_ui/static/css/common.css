@@ -97,6 +97,10 @@
 }
 
 .settings-guidance-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
   border-top: 1px solid var(--border);
   padding-top: 12px;
   margin-top: 12px;
@@ -111,6 +115,13 @@
 
 .settings-guidance-row:hover {
   background: var(--code-bg);
+}
+
+.guidance-status-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
 }
 
 /* Feature-flag matrix on System. Inline toggle + override badge,
@@ -137,6 +148,8 @@
 .status-pill.done        { background: #e7f5ec; color: #1f6b3a; }
 .status-pill.failed      { background: #fdecea; color: #b3261e; }
 .status-pill.cancelled   { background: #eef0f4; color: #6a7280; }
+.status-pill.guidance-enabled { background: var(--success-bg); color: var(--success); }
+.status-pill.guidance-disabled { background: var(--code-bg); color: var(--muted); }
 
 .priority-pill {
   display: inline-block;

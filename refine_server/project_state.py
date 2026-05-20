@@ -500,12 +500,26 @@ def write_guidance(items: list[dict[str, Any]], *,
     return normalized
 
 
-def normalize_guidance_item(item: dict[str, Any]) -> dict[str, str]:
+def normalize_guidance_item(item: dict[str, Any]) -> dict[str, Any]:
     return {
         "name": str(item.get("name") or "").strip(),
         "rule": str(item.get("rule") or "").strip(),
         "instructions": str(item.get("instructions") or "").strip(),
+        "enabled": _coerce_guidance_enabled(item.get("enabled", True)),
     }
+
+
+def _coerce_guidance_enabled(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return True
+    if isinstance(value, (int, float)):
+        return value != 0
+    text = str(value).strip().lower()
+    if text in {"0", "false", "no", "off", "disabled"}:
+        return False
+    return True
 
 
 def gap_instance_display(instance_id: str | None) -> str:

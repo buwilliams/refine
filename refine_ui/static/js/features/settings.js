@@ -193,6 +193,9 @@ function renderGuidanceRows(items) {
 }
 
 function renderGuidanceRow(item = {}, idx = 0) {
+  const enabled = item.enabled !== false;
+  const statusClass = enabled ? "guidance-enabled" : "guidance-disabled";
+  const statusText = enabled ? "Enabled" : "Disabled";
   return `
     <div class="settings-guidance-row" data-guidance-row data-guidance-open="${idx}"
          role="button" tabindex="0">
@@ -200,6 +203,7 @@ function renderGuidanceRow(item = {}, idx = 0) {
         <h4>${htmlEscape(item.name || "Untitled guidance")}</h4>
         <p class="muted small">${htmlEscape(item.rule || "No rule provided.")}</p>
       </div>
+      <span class="status-pill ${statusClass}">${statusText}</span>
     </div>`;
 }
 
@@ -210,6 +214,7 @@ function openGuidanceModal(items, index = null) {
   _guidanceModalOpen = true;
   const editing = Number.isInteger(index);
   const current = editing ? (items[index] || {}) : {};
+  let guidanceEnabled = current.enabled !== false;
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
@@ -234,6 +239,17 @@ function openGuidanceModal(items, index = null) {
             <textarea name="instructions" rows="8"
                       placeholder="What additional context should the agent receive?">${htmlEscape(current.instructions || "")}</textarea>
           </div>
+          <div class="form-row guidance-status-row">
+            <label>Status</label>
+            <div class="guidance-status-control">
+              <span class="status-pill ${guidanceEnabled ? "guidance-enabled" : "guidance-disabled"}" data-enabled-status>
+                ${guidanceEnabled ? "Enabled" : "Disabled"}
+              </span>
+              <button class="secondary" type="button" data-toggle-enabled>
+                ${guidanceEnabled ? "Disable guidance" : "Enable guidance"}
+              </button>
+            </div>
+          </div>
         </form>
       </div>
       <div class="modal-actions">
@@ -257,7 +273,11 @@ function openGuidanceModal(items, index = null) {
     if (e.key === "Escape") {
       e.preventDefault();
       close();
-    } else if (e.key === "Enter" && e.target?.tagName !== "TEXTAREA") {
+    } else if (
+      e.key === "Enter"
+      && e.target?.tagName !== "TEXTAREA"
+      && !e.target?.closest("button")
+    ) {
       e.preventDefault();
       submit();
     }
@@ -269,6 +289,7 @@ function openGuidanceModal(items, index = null) {
       name: (fd.get("name") || "").toString().trim(),
       rule: (fd.get("rule") || "").toString().trim(),
       instructions: (fd.get("instructions") || "").toString().trim(),
+      enabled: guidanceEnabled,
     };
     if (!item.name || !item.rule || !item.instructions) {
       toast("Name, rule, and instructions are required", "error");
@@ -305,12 +326,27 @@ function openGuidanceModal(items, index = null) {
   }
 
   document.addEventListener("keydown", onKey, true);
+  function updateGuidanceEnabled() {
+    const status = root.querySelector("[data-enabled-status]");
+    const toggle = root.querySelector("[data-toggle-enabled]");
+    if (status) {
+      status.textContent = guidanceEnabled ? "Enabled" : "Disabled";
+      status.className = `status-pill ${guidanceEnabled ? "guidance-enabled" : "guidance-disabled"}`;
+    }
+    if (toggle) {
+      toggle.textContent = guidanceEnabled ? "Disable guidance" : "Enable guidance";
+    }
+  }
   root.addEventListener("click", (e) => {
     if (e.target === root) close();
   });
   root.querySelector("[data-cancel]").addEventListener("click", close);
   root.querySelector("[data-ok]").addEventListener("click", submit);
   root.querySelector("[data-delete]")?.addEventListener("click", remove);
+  root.querySelector("[data-toggle-enabled]")?.addEventListener("click", () => {
+    guidanceEnabled = !guidanceEnabled;
+    updateGuidanceEnabled();
+  });
   root.querySelector("[name='name']")?.focus();
 }
 

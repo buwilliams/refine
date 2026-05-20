@@ -99,6 +99,9 @@ def main() -> int:
     assert 'id="guidance-add"' in settings_js
     assert 'id="guidance-form"' in settings_js
     assert 'data-guidance-open' in settings_js
+    assert 'data-toggle-enabled' in settings_js
+    assert 'status-pill ${statusClass}' in settings_js
+    assert 'enabled: guidanceEnabled' in settings_js
     assert 'data-delete>Delete guidance' in settings_js
     assert 'data-guidance-edit' not in settings_js
     assert 'data-guidance-remove' not in settings_js

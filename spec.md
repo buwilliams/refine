@@ -167,6 +167,7 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 ```
 <volume-root>/
   config.json                  # schema version, project-wide settings, governance
+  guidance.json                # project-wide guidance rules and enabled state
   instances.json               # canonical instance registry
   index.sqlite                 # disposable cache + runtime history
   gaps/
@@ -184,7 +185,7 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 - **One JSON file per Gap.** All round content and logs live in `gap.json`.
 - **`gap.json` holds** identity, workflow ownership, and content: `id`, `name`, `status`, `priority`, `branch_name`, `instance_id`, `created`, `updated`, and the `rounds` array (each round with `reporter`, `actual`, `target`, timestamps, and `logs[]`).
 - **Instance JSON holds** active-instance scoped application/runtime/target-app settings and reporter dropdown entries. `instances.json` is the source of truth for instance IDs and display names.
-- **Project JSON holds** schema version and project-wide Governance settings.
+- **Project JSON holds** schema version and project-wide Governance settings. `guidance.json` holds project-wide Guidance entries with `name`, `rule`, `instructions`, and `enabled`.
 - **SQLite holds rebuildable projections** for Gap lists, filters, counts, settings, and reporter dropdown reads. It also stores disposable runtime history and observability tables: `activity`, `runs`, `preflight`, and `target_app_operations`. Deleting `index.sqlite` loses that runtime history but not canonical project, instance, reporter, settings, or Gap state.
 - The volume root lives inside the client repo and is committed there.
 

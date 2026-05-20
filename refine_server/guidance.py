@@ -42,12 +42,15 @@ def select_for_gap(
     gap: dict[str, Any],
     *,
     run_one_shot: Callable[[str], str] | None = None,
-) -> tuple[list[dict[str, str]], str]:
+) -> tuple[list[dict[str, Any]], str]:
     """Return guidance items accepted for this Gap.
 
     If no guidance exists, this intentionally skips the AI round trip.
     """
-    items = project_state.list_guidance()
+    items = [
+        item for item in project_state.list_guidance()
+        if item.get("enabled", True)
+    ]
     if not items:
         return [], ""
     latest = (gap.get("rounds") or [{}])[-1]
@@ -76,7 +79,7 @@ def select_for_gap(
     return accepted, raw
 
 
-def normalize_decisions(obj: dict[str, Any], items: list[dict[str, str]]) -> list[dict[str, str]]:
+def normalize_decisions(obj: dict[str, Any], items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     decisions = obj.get("decisions") or obj.get("guidance") or []
     accepted_indexes: set[int] = set()
     name_to_index = {item["name"].strip().lower(): idx for idx, item in enumerate(items)}
@@ -100,7 +103,7 @@ def normalize_decisions(obj: dict[str, Any], items: list[dict[str, str]]) -> lis
     return [items[idx] for idx in range(len(items)) if idx in accepted_indexes]
 
 
-def prepend_to_prompt(prompt: str, accepted: list[dict[str, str]]) -> str:
+def prepend_to_prompt(prompt: str, accepted: list[dict[str, Any]]) -> str:
     if not accepted:
         return prompt
     sections = ["Additional guidance for this Gap:"]
