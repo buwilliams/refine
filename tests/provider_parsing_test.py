@@ -133,33 +133,6 @@ def main() -> int:
         "target": "Add keyboard shortcuts.",
         "preview": "Add keyboard shortcuts.",
     }]
-    line_list = "\n".join(f"{i}. Add import item {i}" for i in range(1, 61))
-    line_drafts = llm._extract_line_list_drafts(line_list)
-    assert line_drafts is not None
-    assert len(line_drafts) == 60
-    assert line_drafts[0] == {
-        "name": "Add import item 1",
-        "actual": "",
-        "target": "Add import item 1",
-        "preview": "Add import item 1",
-    }
-    plain_list = "\n".join(f"Add plain import item {i}" for i in range(1, 101))
-    assert len(llm._extract_line_list_drafts(plain_list) or []) == 100
-    assert len(llm.extract_gaps(plain_list, provider="missing-cli")) == 100
-    transcript = "\n".join(
-        f"Alex: Discussed import behavior {i}." for i in range(1, 101)
-    )
-    assert llm._extract_line_list_drafts(transcript) is None
-    mapped_list = "\n".join(
-        f"Actual: Current issue {i}. Target: Desired behavior {i}."
-        for i in range(1, 51)
-    )
-    mapped_drafts = llm._extract_line_list_drafts(mapped_list)
-    assert mapped_drafts is not None
-    assert mapped_drafts[-1]["actual"] == "Current issue 50."
-    assert mapped_drafts[-1]["target"] == "Desired behavior 50."
-    assert llm._extract_line_list_drafts("one\nshort\nlist") is None
-
     jsonl = "\n".join([
         "this is not json",
         json.dumps({

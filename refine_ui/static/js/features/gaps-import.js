@@ -1,5 +1,7 @@
 // ---- Gaps: import -----------------------------------------------------------
 
+const IMPORT_CHUNK_LINE_COUNT = 20;
+
 async function renderGapImport() {
   // Import is a modal layered over the gaps list, mirroring New Gap.
   await renderGapsList();
@@ -74,21 +76,20 @@ function openImportModal() {
     if (btn.disabled) return;
     const text = root.querySelector("#import-text").value.trim();
     if (!text) return toast("Paste some text first", "error");
-    // Show an explicit loading indicator in the drafts area — the LLM
-    // call typically takes 20-90s and the busy button alone isn't enough
-    // signal that something's happening.
     const draftsRoot = root.querySelector("#import-drafts");
     if (draftsRoot) {
-      draftsRoot.innerHTML = `
-        <div class="loading-row">
-          <span class="loading-spinner"></span>
-          <span>Loading… asking the selected AI provider to extract Gaps from your text. This may take up to a minute.</span>
-        </div>`;
+      drawImportProgress(draftsRoot, {
+        current: 0,
+        total: 1,
+        chunkSize: IMPORT_CHUNK_LINE_COUNT,
+        lineCount: countImportLines(text),
+        draftCount: 0,
+      });
     }
     await withButtonBusy(btn, "Extracting…", async () => {
       try {
-        const r = await api("POST", "/api/import/extract", { text });
-        drawImportDrafts(root, r.drafts || [], close);
+        const drafts = await extractImportDrafts(text, draftsRoot);
+        drawImportDrafts(root, drafts, close);
       } catch (e) {
         if (draftsRoot) draftsRoot.innerHTML = "";
         toast(e.message, "error");
@@ -97,6 +98,99 @@ function openImportModal() {
   });
 
   root.querySelector("#import-text").focus();
+}
+
+function countImportLines(text) {
+  return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
+}
+
+function importTextChunks(text) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length <= IMPORT_CHUNK_LINE_COUNT) {
+    return [{
+      text: text.trim(),
+      startLine: lines.length ? 1 : 0,
+      endLine: lines.length,
+      lineCount: lines.length,
+    }];
+  }
+  const chunks = [];
+  for (let i = 0; i < lines.length; i += IMPORT_CHUNK_LINE_COUNT) {
+    const chunkLines = lines.slice(i, i + IMPORT_CHUNK_LINE_COUNT);
+    chunks.push({
+      text: chunkLines.join("\n"),
+      startLine: i + 1,
+      endLine: i + chunkLines.length,
+      lineCount: chunkLines.length,
+    });
+  }
+  return chunks;
+}
+
+async function extractImportDrafts(text, draftsRoot) {
+  const chunks = importTextChunks(text);
+  const lineCount = countImportLines(text);
+  const drafts = [];
+  if (draftsRoot) {
+    drawImportProgress(draftsRoot, {
+      current: 0,
+      total: chunks.length,
+      chunkSize: IMPORT_CHUNK_LINE_COUNT,
+      lineCount,
+      draftCount: 0,
+    });
+  }
+  for (let i = 0; i < chunks.length; i += 1) {
+    const chunk = chunks[i];
+    if (draftsRoot) {
+      drawImportProgress(draftsRoot, {
+        current: i + 1,
+        total: chunks.length,
+        chunk,
+        chunkSize: IMPORT_CHUNK_LINE_COUNT,
+        lineCount,
+        draftCount: drafts.length,
+      });
+    }
+    const r = await api("POST", "/api/import/extract", { text: chunk.text });
+    drafts.push(...(r.drafts || []));
+    if (draftsRoot) {
+      drawImportProgress(draftsRoot, {
+        current: i + 1,
+        total: chunks.length,
+        chunk,
+        chunkSize: IMPORT_CHUNK_LINE_COUNT,
+        lineCount,
+        draftCount: drafts.length,
+        completed: i + 1 === chunks.length,
+      });
+    }
+  }
+  return drafts;
+}
+
+function drawImportProgress(root, state) {
+  const chunked = state.total > 1;
+  const chunkLabel = state.chunk
+    ? ` lines ${state.chunk.startLine}-${state.chunk.endLine}`
+    : "";
+  const status = state.completed
+    ? `Processed ${state.total} AI request${state.total === 1 ? "" : "s"}.`
+    : state.current
+      ? `Processing AI request ${state.current} of ${state.total}${chunkLabel}.`
+      : chunked
+        ? `Preparing ${state.total} AI requests of up to ${state.chunkSize} lines each.`
+        : "Asking the selected AI provider to extract Gaps.";
+  const detail = chunked
+    ? `${state.lineCount} lines will be processed in chunks of ${state.chunkSize}; ${state.draftCount} draft${state.draftCount === 1 ? "" : "s"} extracted so far.`
+    : "This may take up to a minute.";
+  root.innerHTML = `
+    <div class="loading-row">
+      <span class="loading-spinner"></span>
+      <span>${htmlEscape(status)}</span>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${htmlEscape(detail)}</p>
+  `;
 }
 
 function drawImportDrafts(root, drafts, close) {
