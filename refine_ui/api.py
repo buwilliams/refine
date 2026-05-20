@@ -709,6 +709,16 @@ _VALID_STATUSES = (
     "backlog", "todo", "in-progress", "ready-merge", "awaiting-rebuild",
     "review", "done", "failed", "cancelled",
 )
+_USER_STATUS_TRANSITIONS = {
+    "backlog": {"todo"},
+    "todo": {"backlog"},
+    "review": {"todo"},
+    "done": {"review"},
+    "failed": {"todo"},
+    "cancelled": {"todo"},
+}
+_BULK_STATUS_VALUES = {"backlog", "todo", "failed"}
+_BULK_STATUS_SOURCE_VALUES = {"backlog", "todo", "failed"}
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
 # injection from the query string. `id` doubles as a chronological sort
@@ -748,6 +758,22 @@ def _gaps_order_clause(sort: str | None, direction: str | None) -> str:
     # key is equal across rows.
     tiebreaker = "" if key == "updated" else ", updated DESC"
     return f"{expr} {d}{tiebreaker}"
+
+
+def _validate_user_status_transition(previous: str | None,
+                                     next_status: str) -> tuple[int, dict] | None:
+    if previous == next_status:
+        return None
+    allowed = _USER_STATUS_TRANSITIONS.get(previous or "", set())
+    if next_status in allowed:
+        return None
+    return err(
+        409,
+        (
+            f"Invalid workflow transition: {previous or 'unknown'} → {next_status}. "
+            "Use the dedicated workflow action for system-owned states."
+        ),
+    )
 
 
 def _page_bounds(limit: int, offset: int = 0) -> tuple[int, int]:
@@ -1024,6 +1050,14 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     if ownership_err is not None:
         return ownership_err
     previous_status = row["status"] if row is not None else None
+    next_status = sql_fields.get("status")
+    if next_status is not None:
+        transition_err = _validate_user_status_transition(
+            previous_status,
+            next_status,
+        )
+        if transition_err is not None:
+            return transition_err
     if sql_fields:
         active = project_state.active_instance_id()
         updated_at = now_iso()
@@ -1125,6 +1159,15 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
         value = value.lower()
         if value not in _VALID_STATUSES:
             return err(400, "invalid status")
+        if value not in _BULK_STATUS_VALUES:
+            return err(
+                409,
+                (
+                    "Bulk status updates may only set backlog, todo, or failed. "
+                    "Use per-Gap workflow actions for review, done, cancelled, "
+                    "and system-owned states."
+                ),
+            )
     else:  # reporter
         if not value or not _VALID_REPORTER.match(value):
             return err(400, "invalid reporter name")
@@ -1150,6 +1193,24 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     ok, ownership_err = _require_active_gap_ids(gap_ids)
     if not ok and ownership_err is not None:
         return ownership_err
+
+    if field == "status":
+        invalid_sources = sorted({
+            str(g.get("status") or "")
+            for g in (listing.get("gaps") or [])
+            if g["id"] in gap_ids
+            and str(g.get("status") or "") not in _BULK_STATUS_SOURCE_VALUES
+        })
+        if invalid_sources:
+            return err(
+                409,
+                (
+                    "Bulk status updates only support backlog, todo, and failed "
+                    "Gaps. Use per-Gap workflow actions for "
+                    + ", ".join(invalid_sources)
+                    + "."
+                ),
+            )
 
     updated_ids: list[str] = []
 

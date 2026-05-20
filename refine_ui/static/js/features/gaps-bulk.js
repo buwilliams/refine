@@ -7,7 +7,7 @@
 // is changed per call so the confirmation reads cleanly.
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
-const BULK_STATUS_OPTIONS = WORKFLOW_STATUSES;
+const BULK_STATUS_OPTIONS = ["backlog", "todo", "failed"];
 
 async function openBulkModal(field) {
   // Snapshot the current filter so the modal + the server-side bulk
@@ -44,8 +44,9 @@ async function openBulkModal(field) {
         ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s}">${s}</option>`).join("")}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Bookkeeping-only — won't kill a running subprocess or clean up a
-        worktree. Use the per-Gap actions for full state transitions.
+        Bulk status updates are limited to backlog, todo, and failed Gaps.
+        Use per-Gap workflow actions for review, approval, cancellation, and
+        system-owned states.
       </p>`;
   } else if (field === "reporter") {
     const opts = (state.reporters || [])
