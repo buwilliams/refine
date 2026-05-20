@@ -1,7 +1,7 @@
 # refine
 
-Turn software gaps (features and bugs) into verified software
-through ordinary people enhanced by agents. QA, Product, support,
+Turn software gaps, features and bugs, into verified software writen by
+orchestrated AI agents and verified by ordinary people. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap.
 
