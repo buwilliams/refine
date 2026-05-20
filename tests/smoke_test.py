@@ -259,10 +259,38 @@ def main() -> int:
     assert ui_unit.is_file()
     assert unit_boot.get("unit_path") is None
     unit_text = ui_unit.read_text(encoding="utf-8")
+    assert ui_unit.name == "refine-unit-clone-8080-ui.service"
+    assert "Environment=REFINE_UI_PORT=8080" in unit_text
     assert f"ExecStart={fake_uv} run refine ui" in unit_text
+    assert "Restart=on-failure" in unit_text
     assert "docker" not in unit_text.lower()
-    assert ("enable", "refine-unit-clone-ui") in systemctl_calls
-    print("[ok] refine init writes host-native UI backend systemd unit")
+    assert ("enable", "refine-unit-clone-8080-ui") in systemctl_calls
+    print("[ok] refine install writes per-port host-native UI backend systemd unit")
+
+    bg_cfg = config.Config.load(ui_client / ".refine" / "refine.toml")
+    old_find_host_command = refine_cli._find_host_command
+    old_popen = refine_cli.subprocess.Popen
+    popen_calls: list[dict] = []
+
+    class FakePopen:
+        pid = 43210
+
+        def __init__(self, cmd, **kwargs):  # noqa: ANN001
+            popen_calls.append({"cmd": cmd, **kwargs})
+
+    try:
+        refine_cli._find_host_command = lambda name: str(fake_uv) if name == "uv" else None
+        refine_cli.subprocess.Popen = FakePopen
+        pid = refine_cli._start_background_ui(clone, bg_cfg, host=bg_cfg.web_host, port=18111)
+    finally:
+        refine_cli._find_host_command = old_find_host_command
+        refine_cli.subprocess.Popen = old_popen
+    assert pid == 43210
+    assert (bg_cfg.volume_root / "run" / "ui-18111.pid").read_text(encoding="utf-8").strip() == "43210"
+    assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "ui"]
+    assert popen_calls[0]["cwd"] == str(clone)
+    assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
+    print("[ok] refine start launches a detached per-port UI backend process")
 
     old_clone = tmp / "old-refine-clone"
     (old_clone / "refine_cli").mkdir(parents=True)

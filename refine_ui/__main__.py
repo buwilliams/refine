@@ -26,13 +26,13 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _shutdown)
     try:
         cfg = runtime.load_configured()
-        host = cfg.web_host
-        port = cfg.web_port
+        host = os.environ.get("REFINE_UI_HOST", cfg.web_host)
+        port = int(os.environ.get("REFINE_UI_PORT", str(cfg.web_port)))
     except config.ConfigError as e:
         try:
             cfg = config.get(reload=True)
-            host = cfg.web_host
-            port = cfg.web_port
+            host = os.environ.get("REFINE_UI_HOST", cfg.web_host)
+            port = int(os.environ.get("REFINE_UI_PORT", str(cfg.web_port)))
         except config.ConfigError:
             host = os.environ.get("REFINE_UI_HOST", "127.0.0.1")
             port = int(os.environ.get("REFINE_UI_PORT", "8080"))

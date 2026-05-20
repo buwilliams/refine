@@ -404,7 +404,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         _validate_target_schema_before_switch(client_repo.resolve(), body)
         prep = _prepare_current_project_for_switch(clone_dir) if switching else {"warnings": []}
 
-        install_unit = body.get("install_unit") is not False
+        install_unit = body.get("install_unit") is True
         result = bootstrap_client_repo(
             client_repo,
             clone_dir=clone_dir,

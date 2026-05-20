@@ -10,7 +10,7 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 
 ## Architecture
 
-- **Runtime split:** The UI backend runs natively on the host as a systemd --user service and owns the runner in-process. Agent CLI subprocesses, git operations, web requests, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
+- **Runtime split:** The UI backend runs natively on the host, either as a detached background process from `refine start` or as a persistent systemd --user service from `refine install`, and owns the runner in-process. Agent CLI subprocesses, git operations, web requests, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
 - **Storage:** Canonical project state lives in JSON under the client repo's `.refine/` directory. SQLite is a disposable per-application cache rebuilt from JSON on startup and app switch.
@@ -414,10 +414,11 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 
 **Reporters list:** the set of known reporter names that backs the round-submission dropdown. Managed from the System → Reporters page. See **Reporters** for the full semantics.
 
-**Deploy-time configuration** (set by `refine init` / systemd unit startup, not in SQLite):
+**Deploy-time configuration** (set by `refine init`, `refine start <port>`, and `refine install <port>`, not in SQLite):
 
 - Active app binding — checkout-local `.refine-binding` points to the active target app.
-- UI backend unit — checkout-local systemd unit that starts `uv run refine ui`.
+- Background UI process — `refine start <port>` launches a detached `uv run refine ui` process and records its PID/log under `.refine/run/`.
+- UI backend unit — `refine install <port>` writes a checkout-local, per-port systemd user unit that starts `uv run refine ui`, restarts on failure, and survives terminal close. `refine uninstall <port>` stops and removes it.
 
 ## Out of scope (initial version)
 

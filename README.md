@@ -1,6 +1,6 @@
 # refine
 
-Turn software gaps: new apps, features, and bugs into verified software writen by
+Turn software gaps: new apps, features, and bugs into verified software written by
 orchestrated AI agents and verified by ordinary people. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap.
@@ -22,6 +22,8 @@ customers — anyone who can articulate *what the app does today* vs
 ```bash
 git clone https://github.com/buwilliams/refine.git <refine-checkout> && cd <refine-checkout> && uv run refine start
 ```
+
+Use `uv run refine install [port]` for a persistent service; `start [port]` runs a non-installed background process.
 
 ## Workflow
 
