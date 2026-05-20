@@ -177,6 +177,25 @@ def find_binding(start: Path | None = None) -> Path | None:
     return None
 
 
+def local_run_dir(start: Path | None = None) -> Path:
+    """Checkout-local runtime directory for process/session state.
+
+    Bound Refine checkouts keep local state next to `.refine-binding`, so it
+    survives target-app switching without writing host state into the target
+    app's `.refine/` directory. If no binding is in scope, fall back to cwd/run
+    for setup/debug flows that do not have a target app attached yet.
+    """
+    binding = find_binding(start)
+    if binding is not None:
+        return binding.parent.resolve() / "run"
+    if start is not None:
+        return start.resolve() / "run"
+    cached = globals().get("_cached")
+    if cached is not None:
+        return cached.client_repo / "run"
+    return Path.cwd().resolve() / "run"
+
+
 def read_binding(binding_path: Path) -> Path:
     """Read `.refine-binding` and return the active target app path.
 
@@ -233,7 +252,6 @@ REFINE_GITIGNORE_LINES = [
     "index.sqlite",
     "index.sqlite-shm",
     "index.sqlite-wal",
-    "run/",
 ]
 
 
@@ -255,9 +273,9 @@ def ensure_refine_gitignore(volume_root: Path) -> Path:
 def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     """Write a default refine.toml to `volume_root` (creating the directory).
 
-    Also creates runtime directories. Adds a `.gitignore` next to the config
-    that excludes SQLite and run state (the gap JSON files and refine.toml
-    itself stay committed).
+    Also creates the gaps directory. Adds a `.gitignore` next to the config
+    that excludes SQLite state (the gap JSON files and refine.toml itself stay
+    committed).
 
     Returns the absolute path to the new config file.
     """
@@ -267,7 +285,6 @@ def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     if cfg.exists() and not force:
         raise ConfigError(f"{cfg} already exists. Use --force to overwrite.")
     cfg.write_text(DEFAULT_TOML, encoding="utf-8")
-    (volume_root / "run").mkdir(exist_ok=True)
     (volume_root / "gaps").mkdir(exist_ok=True)
 
     ensure_refine_gitignore(volume_root)

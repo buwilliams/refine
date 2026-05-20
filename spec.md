@@ -417,7 +417,8 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 **Deploy-time configuration** (set by `refine init`, `refine start <port>`, and `refine install <port>`, not in SQLite):
 
 - Active app binding — checkout-local `.refine-binding` points to the active target app.
-- Background UI process — `refine start <port>` launches a detached `uv run refine ui` process and records its PID/log under `.refine/run/`.
+- Active instance selection — checkout-local `run/active-instances.json` records each target app's selected instance for this Refine checkout.
+- Background UI process — `refine start <port>` launches a detached `uv run refine ui` process and records its PID/log under checkout-local `run/`.
 - UI backend unit — `refine install <port>` writes a checkout-local, per-port systemd user unit that starts `uv run refine ui`, restarts on failure, and survives terminal close. `refine uninstall <port>` stops and removes it.
 
 ## Out of scope (initial version)

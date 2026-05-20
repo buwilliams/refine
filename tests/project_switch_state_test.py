@@ -302,6 +302,49 @@ def test_active_instance_is_per_application() -> None:
         cleanup_tmp(tmp)
 
 
+def test_active_instance_is_checkout_local_for_same_application() -> None:
+    tmp, client = make_client_repo("refine-active-instance-local-")
+    conn = init_refine(client)
+    conn.close()
+    original_cwd = Path.cwd()
+    try:
+        from refine_server import config, project_state
+
+        laptop = project_state.create_instance("Laptop")
+        desktop = project_state.create_instance("Desktop")
+        clone1 = tmp / "refine-one"
+        clone2 = tmp / "refine-two"
+        clone1.mkdir()
+        clone2.mkdir()
+        config.write_binding(clone1, client)
+        config.write_binding(clone2, client)
+
+        os.chdir(clone1)
+        config.get(reload=True)
+        project_state.set_active_instance(laptop["id"])
+        assert project_state.active_instance_id() == laptop["id"]
+
+        os.chdir(clone2)
+        config.get(reload=True)
+        project_state.set_active_instance(desktop["id"])
+        assert project_state.active_instance_id() == desktop["id"]
+
+        os.chdir(clone1)
+        config.get(reload=True)
+        assert project_state.active_instance_id() == laptop["id"]
+
+        os.chdir(clone2)
+        config.get(reload=True)
+        assert project_state.active_instance_id() == desktop["id"]
+
+        assert (clone1 / "run" / "active-instances.json").is_file()
+        assert (clone2 / "run" / "active-instances.json").is_file()
+        assert not (client / ".refine" / "run" / "active-instance.json").exists()
+    finally:
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
 def test_instance_switch_refreshes_reporter_cache() -> None:
     tmp, client = make_client_repo("refine-instance-reporters-")
     conn = init_refine(client)
@@ -312,8 +355,8 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
         reporters.add(conn, "Alice")
         other = project_state.create_instance("refine2")
 
-        # Simulate another Refine process changing the shared active-instance
-        # marker without touching this process's SQLite connection.
+        # Simulate another Refine process changing the checkout-local active
+        # instance marker without touching this process's SQLite connection.
         project_state.set_active_instance(other["id"])
         status, body = api.list_reporters()
         assert status == 200, body
@@ -343,6 +386,7 @@ def main() -> int:
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
     test_active_instance_is_per_application()
+    test_active_instance_is_checkout_local_for_same_application()
     test_instance_switch_refreshes_reporter_cache()
     print("project switch state tests OK")
     return 0

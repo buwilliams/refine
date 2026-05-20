@@ -1,7 +1,7 @@
 """argparse-based CLI for refine.
 
 Subcommands:
-- init    — write refine.toml + run/ + gaps/ in a chosen volume root,
+- init    — write refine.toml + gaps/ in a chosen volume root,
             then write the active-app binding for this checkout.
 - install — install + start a persistent systemd --user UI backend.
 - uninstall — stop + remove a persistent systemd --user UI backend.
@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import signal
 import shutil
 import subprocess
@@ -55,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Initialize/add a target app and make it active.",
         description=(
             "Bootstraps a target app: creates <app>/.refine/refine.toml + "
-            "run/ + gaps/, writes the active-app binding, records the app in "
+            "gaps/, writes the active-app binding, records the app in "
             "the known-apps list, and prepares the checkout for `refine start` "
             "or `refine install`."
         ),
@@ -106,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
     p_reset.add_argument(
         "--purge", action="store_true",
         help="Also delete the active target app's .refine/ directory "
-             "(gap.json files, sqlite index, run/, .gitignore). DATA LOSS.",
+             "(gap.json files, sqlite index, .gitignore). DATA LOSS.",
     )
     p_reset.add_argument(
         "-y", "--yes", action="store_true",
@@ -323,7 +324,6 @@ def bootstrap_client_repo(
     cfg_path = target / config.CONFIG_FILENAME
     config_created = False
     if cfg_path.exists() and reuse_existing_config:
-        (target / "run").mkdir(parents=True, exist_ok=True)
         (target / "gaps").mkdir(parents=True, exist_ok=True)
         config.ensure_refine_gitignore(target)
     else:
@@ -838,14 +838,16 @@ def _start_background_ui(
 
 def _stop_background_ui(clone: Path, cfg: "config.Config", port: int) -> bool:
     pid_path = _runtime_pid_path(clone, cfg, port)
-    pid = _read_pid(pid_path)
+    pid = _running_pid(clone, cfg, port)
     if pid is None:
         return False
-    if not _pid_alive(pid):
+    try:
+        pgid = os.getpgid(pid)
+    except ProcessLookupError:
         _unlink_quietly(pid_path)
         return False
     try:
-        os.killpg(pid, signal.SIGTERM)
+        os.killpg(pgid, signal.SIGTERM)
     except ProcessLookupError:
         _unlink_quietly(pid_path)
         return False
@@ -862,7 +864,7 @@ def _stop_background_ui(clone: Path, cfg: "config.Config", port: int) -> bool:
             return True
         time.sleep(0.2)
     try:
-        os.killpg(pid, signal.SIGKILL)
+        os.killpg(pgid, signal.SIGKILL)
     except OSError:
         try:
             os.kill(pid, signal.SIGKILL)
@@ -875,11 +877,15 @@ def _stop_background_ui(clone: Path, cfg: "config.Config", port: int) -> bool:
 def _running_pid(clone: Path, cfg: "config.Config | None", port: int) -> int | None:
     pid_path = _runtime_pid_path(clone, cfg, port)
     pid = _read_pid(pid_path)
-    if pid is None:
-        return None
-    if _pid_alive(pid):
+    if pid is not None and _pid_alive(pid):
         return pid
-    _unlink_quietly(pid_path)
+    if pid is not None:
+        _unlink_quietly(pid_path)
+
+    host = cfg.web_host if cfg is not None else "127.0.0.1"
+    listener = _refine_ui_listener_pid(host, port)
+    if listener is not None and _pid_alive(listener):
+        return listener
     return None
 
 
@@ -892,10 +898,7 @@ def _runtime_log_path(clone: Path, cfg: "config.Config | None", port: int) -> Pa
 
 
 def _runtime_dir(clone: Path, cfg: "config.Config | None") -> Path:
-    if cfg is not None:
-        return cfg.volume_root / "run"
-    base = Path(os.environ.get("XDG_RUNTIME_DIR") or "/tmp")
-    return base / "refine" / config.unit_name_for(clone)
+    return config.local_run_dir(clone)
 
 
 def _read_pid(path: Path) -> int | None:
@@ -913,6 +916,77 @@ def _pid_alive(pid: int) -> bool:
         return False
     except PermissionError:
         return True
+
+
+def _refine_ui_listener_pid(host: str, port: int) -> int | None:
+    for pid in _listener_pids(port):
+        if _pid_matches_refine_ui(pid):
+            return pid
+    return None
+
+
+def _listener_pids(port: int) -> list[int]:
+    pids: list[int] = []
+    lsof = shutil.which("lsof")
+    if lsof:
+        try:
+            out = subprocess.run(
+                [lsof, "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-Fp"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=2,
+            ).stdout
+            for line in out.splitlines():
+                if line.startswith("p") and line[1:].isdigit():
+                    pids.append(int(line[1:]))
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    if pids:
+        return pids
+
+    ss = shutil.which("ss")
+    if not ss:
+        return []
+    try:
+        out = subprocess.run(
+            [ss, "-ltnp", f"sport = :{port}"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    return [int(m.group(1)) for m in re.finditer(r"pid=(\d+)", out)]
+
+
+def _pid_matches_refine_ui(pid: int) -> bool:
+    cmdline = _pid_cmdline(pid)
+    if not cmdline:
+        return False
+    return "refine" in cmdline and re.search(r"(?:^|\s)ui(?:\s|$)", cmdline) is not None
+
+
+def _pid_cmdline(pid: int) -> str:
+    proc_path = Path("/proc") / str(pid) / "cmdline"
+    try:
+        raw = proc_path.read_bytes()
+    except OSError:
+        raw = b""
+    if raw:
+        return raw.replace(b"\0", b" ").decode("utf-8", "replace").strip()
+    try:
+        out = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "command="],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        ).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return out.strip()
 
 
 def _unlink_quietly(path: Path) -> None:

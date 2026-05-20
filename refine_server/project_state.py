@@ -96,11 +96,19 @@ def instances_dir(root: Path | None = None) -> Path:
 
 
 def run_dir(root: Path | None = None) -> Path:
+    return config.local_run_dir()
+
+
+def legacy_run_dir(root: Path | None = None) -> Path:
     return (root or volume_root()) / "run"
 
 
+def active_instances_path() -> Path:
+    return run_dir() / "active-instances.json"
+
+
 def active_instance_path(root: Path | None = None) -> Path:
-    return run_dir(root) / "active-instance.json"
+    return legacy_run_dir(root) / "active-instance.json"
 
 
 def instance_dir(instance_id: str, root: Path | None = None) -> Path:
@@ -168,7 +176,6 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
     root = volume_root()
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
-    run_dir(root).mkdir(exist_ok=True)
     instances_dir(root).mkdir(exist_ok=True)
     config.ensure_refine_gitignore(root)
     status = schema_status(root)
@@ -189,7 +196,6 @@ def migrate_legacy(conn: sqlite3.Connection | None = None, *,
     root = root or volume_root()
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
-    run_dir(root).mkdir(exist_ok=True)
     instances_dir(root).mkdir(exist_ok=True)
     config.ensure_refine_gitignore(root)
 
@@ -356,9 +362,11 @@ def ensure_active_instance(*, root: Path | None = None) -> str:
     root = root or volume_root()
     registry = read_instances(root=root)
     entries = registry.get("instances") or []
-    active = _read_json(active_instance_path(root), {}).get("active_instance_id")
+    active, legacy = _read_active_instance_selection(root)
     if active and any(e.get("id") == active and not e.get("archived") for e in entries):
         _ensure_instance_files(str(active), root=root)
+        if legacy:
+            _write_active_instance_selection(root, str(active))
         return str(active)
     fallback = next((e for e in entries if not e.get("archived")), None)
     if fallback is None:
@@ -372,15 +380,41 @@ def active_instance_id(*, root: Path | None = None) -> str:
     return ensure_active_instance(root=root)
 
 
+def _active_instance_selection_key(root: Path) -> str:
+    return str(root.resolve())
+
+
+def _read_active_instance_selection(root: Path) -> tuple[str | None, bool]:
+    key = _active_instance_selection_key(root)
+    data = _read_json(active_instances_path(), {"selections": {}})
+    selection = (data.get("selections") or {}).get(key) or {}
+    active = selection.get("active_instance_id")
+    if active:
+        return str(active), False
+    legacy = _read_json(active_instance_path(root), {}).get("active_instance_id")
+    if legacy:
+        return str(legacy), True
+    return None, False
+
+
+def _write_active_instance_selection(root: Path, instance_id: str) -> None:
+    path = active_instances_path()
+    data = _read_json(path, {"selections": {}})
+    selections = data.setdefault("selections", {})
+    selections[_active_instance_selection_key(root)] = {
+        "active_instance_id": instance_id,
+        "volume_root": str(root.resolve()),
+        "updated_at": now_iso(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    _write_json(path, data)
+
+
 def set_active_instance(instance_id: str, *, root: Path | None = None) -> None:
     root = root or volume_root()
     if instance_by_id(instance_id, root=root) is None:
         raise ValueError(f"unknown instance_id: {instance_id}")
-    run_dir(root).mkdir(exist_ok=True)
-    _write_json(active_instance_path(root), {
-        "active_instance_id": instance_id,
-        "updated_at": now_iso(),
-    })
+    _write_active_instance_selection(root, instance_id)
     _ensure_instance_files(instance_id, root=root)
 
 

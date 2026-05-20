@@ -14,6 +14,7 @@ def assert_refine_gitignore(root: Path) -> None:
     lines = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
     for expected in ("index.sqlite", "index.sqlite-shm", "index.sqlite-wal"):
         assert expected in lines, lines
+    assert "run/" not in lines, lines
 
 
 def main() -> int:

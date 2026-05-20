@@ -585,7 +585,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <button class="secondary" id="s-target-run-rebuild">Rebuild application</button>
         <button class="danger" id="s-target-run-stop">Stop application</button>
         <span class="spacer"></span>
-        <button class="secondary" id="s-project-sync-now">Sync latest updates</button>
         <button class="secondary" id="s-target-health-now">Check status now</button>
       </div>
       <p class="muted small" style="margin-top:6px">
@@ -828,6 +827,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         </tbody>
       </table>
       <div class="actions" style="margin-top:8px">
+        <button class="secondary" id="s-project-sync-now">Trigger sync repo</button>
         <button id="instance-add">Create instance</button>
       </div>
     </section>

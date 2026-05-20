@@ -199,10 +199,12 @@ def main() -> int:
     assert ui_client.is_dir()
     assert (ui_client / ".git").exists()
     assert (ui_client / ".refine" / "refine.toml").is_file()
-    assert (ui_client / ".refine" / "run").is_dir()
+    assert not (ui_client / ".refine" / "run").exists()
     assert (ui_client / ".refine" / "gaps").is_dir()
     assert (clone / ".refine-binding").read_text(encoding="utf-8").strip().endswith(str(ui_client))
     assert str(ui_client) in (clone / ".refine-apps.json").read_text(encoding="utf-8")
+    assert "/run/" in (Path(__file__).resolve().parents[1] / ".gitignore").read_text(encoding="utf-8")
+    assert "run/" not in (ui_client / ".refine" / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert not (clone / ".env").exists()
     assert not (clone / ".refine-current").exists()
     assert boot["git_initialized"] is True
@@ -270,6 +272,7 @@ def main() -> int:
     bg_cfg = config.Config.load(ui_client / ".refine" / "refine.toml")
     old_find_host_command = refine_cli._find_host_command
     old_popen = refine_cli.subprocess.Popen
+    old_listener_pids = refine_cli._listener_pids
     popen_calls: list[dict] = []
 
     class FakePopen:
@@ -280,17 +283,49 @@ def main() -> int:
 
     try:
         refine_cli._find_host_command = lambda name: str(fake_uv) if name == "uv" else None
+        refine_cli._listener_pids = lambda port: []
         refine_cli.subprocess.Popen = FakePopen
         pid = refine_cli._start_background_ui(clone, bg_cfg, host=bg_cfg.web_host, port=18111)
     finally:
         refine_cli._find_host_command = old_find_host_command
+        refine_cli._listener_pids = old_listener_pids
         refine_cli.subprocess.Popen = old_popen
     assert pid == 43210
-    assert (bg_cfg.volume_root / "run" / "ui-18111.pid").read_text(encoding="utf-8").strip() == "43210"
+    assert (clone / "run" / "ui-18111.pid").read_text(encoding="utf-8").strip() == "43210"
+    assert not (bg_cfg.volume_root / "run" / "ui-18111.pid").exists()
     assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "ui"]
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
     print("[ok] refine start launches a detached per-port UI backend process")
+
+    old_listener_pids = refine_cli._listener_pids
+    old_pid_cmdline = refine_cli._pid_cmdline
+    old_pid_alive = refine_cli._pid_alive
+    old_getpgid = refine_cli.os.getpgid
+    old_killpg = refine_cli.os.killpg
+    listener_alive = {"value": True}
+    killed: list[tuple[int, int]] = []
+    try:
+        refine_cli._listener_pids = lambda port: [24680] if port == 18112 else []
+        refine_cli._pid_cmdline = lambda pid: "/tmp/refine2/.venv/bin/refine ui" if pid == 24680 else ""
+        refine_cli._pid_alive = lambda pid: listener_alive["value"] if pid == 24680 else False
+        refine_cli.os.getpgid = lambda pid: 24000 if pid == 24680 else pid
+
+        def fake_killpg(pgid: int, sig: int) -> None:
+            killed.append((pgid, sig))
+            listener_alive["value"] = False
+
+        refine_cli.os.killpg = fake_killpg
+        assert refine_cli._running_pid(clone, bg_cfg, 18112) == 24680
+        assert refine_cli._stop_background_ui(clone, bg_cfg, 18112) is True
+    finally:
+        refine_cli._listener_pids = old_listener_pids
+        refine_cli._pid_cmdline = old_pid_cmdline
+        refine_cli._pid_alive = old_pid_alive
+        refine_cli.os.getpgid = old_getpgid
+        refine_cli.os.killpg = old_killpg
+    assert killed == [(24000, refine_cli.signal.SIGTERM)]
+    print("[ok] refine stop recovers a missing pid file from the listening UI backend")
 
     old_clone = tmp / "old-refine-clone"
     (old_clone / "refine_cli").mkdir(parents=True)

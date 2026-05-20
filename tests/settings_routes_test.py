@@ -95,6 +95,11 @@ def main() -> int:
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
     assert 'id="s-target-run-rebuild"' in settings_js
+    current_status_body = settings_js.split("<h3>Current status</h3>", 1)[1].split("<h3>Target application</h3>", 1)[0]
+    assert 'id="s-project-sync-now"' not in current_status_body
+    instances_body = settings_js.split('${pane("instances", `', 1)[1].split('<h3>Transfer Gaps</h3>', 1)[0]
+    assert '<button class="secondary" id="s-project-sync-now">Trigger sync repo</button>' in instances_body
+    assert instances_body.index('id="s-project-sync-now"') < instances_body.index('id="instance-add"')
     assert 'api("GET", "/api/guidance")' in settings_js
     assert 'id="guidance-add"' in settings_js
     assert 'id="guidance-form"' in settings_js
@@ -112,7 +117,6 @@ def main() -> int:
     assert 'id="guidance-save"' not in settings_js
     assert 'api("PUT", "/api/guidance"' in settings_js
     assert 'name="instructions"' in settings_js
-    assert 'id="s-project-sync-now"' in settings_js
     assert 'await syncProjectUpdates();' in settings_js
     assert 'id="s-target-rebuild-command"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
