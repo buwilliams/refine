@@ -85,9 +85,13 @@ async function openBulkModal(field) {
   if (next === null) return;
   if (!next) return;          // user opened the picker but didn't choose
   try {
-    const r = await api("POST", "/api/gaps/bulk", {
+    let r = await api("POST", "/api/gaps/bulk", {
       filter, exclude_ids: excludeIds, update: { [field]: next },
     });
+    r = await resolveBackgroundJobResponse(
+      r,
+      `Bulk ${label.toLowerCase()} update is running in the background`,
+    );
     toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
     // Preserve the user's unchecked rows across the refresh — they
     // explicitly opted those out of the operation that just ran and

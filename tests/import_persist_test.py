@@ -12,6 +12,7 @@ def main() -> int:
 
         status, body = api.import_persist({
             "reporter": "Reporter",
+            "background": False,
             "drafts": [
                 {
                     "name": f"Bulk import {i}",
@@ -23,6 +24,27 @@ def main() -> int:
         })
         assert status == 201, body
         assert body["count"] == 260, body
+
+        original_import_threshold = api.IMPORT_BACKGROUND_THRESHOLD
+        api.IMPORT_BACKGROUND_THRESHOLD = 3
+        try:
+            status, body = api.import_persist({
+                "reporter": "Reporter",
+                "drafts": [
+                    {
+                        "name": f"Async import {i}",
+                        "actual": f"Async actual {i}",
+                        "target": f"Async target {i}",
+                    }
+                    for i in range(1, 4)
+                ],
+            })
+            assert status == 202, body
+            result = wait_job(body["job"]["id"])
+            assert result["http_status"] == 201, result
+            assert result["count"] == 3, result
+        finally:
+            api.IMPORT_BACKGROUND_THRESHOLD = original_import_threshold
 
         status, body = api.import_persist({
             "reporter": "Reporter",
@@ -157,6 +179,21 @@ def main() -> int:
 
     print("import persist tests OK")
     return 0
+
+
+def wait_job(job_id: str) -> dict:
+    import time
+    from refine_ui import background_jobs
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        job = background_jobs.snapshot(job_id)
+        if job and job["status"] == "complete":
+            return job["result"]
+        if job and job["status"] == "failed":
+            raise AssertionError(job["error"])
+        time.sleep(0.05)
+    raise AssertionError(f"job did not finish: {job_id}")
 
 
 if __name__ == "__main__":

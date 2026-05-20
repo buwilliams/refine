@@ -113,6 +113,39 @@ async function api(method, path, body) {
   return data;
 }
 
+async function waitForBackgroundJob(jobOrId, {
+  intervalMs = 750,
+  timeoutMs = 10 * 60 * 1000,
+} = {}) {
+  const jobId = typeof jobOrId === "string" ? jobOrId : jobOrId?.id;
+  if (!jobId) throw new Error("Background job id missing");
+  const started = Date.now();
+  while (true) {
+    const snap = await api("GET", `/api/jobs/${jobId}`);
+    const job = snap.job || {};
+    if (job.status === "complete") return job.result || {};
+    if (job.status === "failed") {
+      const err = new Error(job.error?.message || "Background job failed");
+      err.details = job.error?.details;
+      throw err;
+    }
+    if (Date.now() - started > timeoutMs) {
+      throw new Error("Background job timed out");
+    }
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+}
+
+async function resolveBackgroundJobResponse(response, message = "") {
+  if (!response?.job) return response;
+  if (message) toast(message, "info");
+  const result = await waitForBackgroundJob(response.job);
+  if (result.http_status && result.http_status >= 400) {
+    throw new Error(result.error?.message || "Background job failed");
+  }
+  return result;
+}
+
 function toast(message, kind = "info") {
   const el = document.createElement("div");
   el.className = `toast ${kind}`;

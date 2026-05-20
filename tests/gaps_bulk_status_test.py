@@ -82,6 +82,30 @@ def main() -> int:
         assert rows[gap_ids["in-progress"]] != "review", rows
         assert rows[gap_ids["ready-merge"]] != "review", rows
 
+        original_bulk_threshold = api.BULK_UPDATE_BACKGROUND_THRESHOLD
+        api.BULK_UPDATE_BACKGROUND_THRESHOLD = 2
+        try:
+            code, body = api.bulk_update_gaps({
+                "filter": {"reporter": "Reporter", "status": "review"},
+                "update": {"status": "done"},
+            })
+            assert code == 202, body
+            result = wait_job(body["job"]["id"])
+            assert result["http_status"] == 200, result
+            assert result["updated"] == 7, result
+            assert result["skipped"] == 0, result
+        finally:
+            api.BULK_UPDATE_BACKGROUND_THRESHOLD = original_bulk_threshold
+
+        rows = {
+            row["id"]: row["status"]
+            for row in conn.execute(
+                "SELECT id, status FROM gaps_index",
+            )
+        }
+        for status in _bulk_status_options():
+            assert rows[gap_ids[status]] == "done", (status, rows)
+
         for target in ("in-progress", "ready-merge"):
             code, body = api.bulk_update_gaps({
                 "filter": {"reporter": "Reporter"},
@@ -100,6 +124,7 @@ def main() -> int:
         )
         assert expected_options in gaps_bulk
         assert "skip in-progress and ready-merge" in gaps_bulk
+        assert "resolveBackgroundJobResponse" in gaps_bulk
     finally:
         try:
             conn.close()
@@ -121,6 +146,21 @@ def _bulk_status_options() -> tuple[str, ...]:
         "failed",
         "cancelled",
     )
+
+
+def wait_job(job_id: str) -> dict:
+    import time
+    from refine_ui import background_jobs
+
+    deadline = time.time() + 10
+    while time.time() < deadline:
+        job = background_jobs.snapshot(job_id)
+        if job and job["status"] == "complete":
+            return job["result"]
+        if job and job["status"] == "failed":
+            raise AssertionError(job["error"])
+        time.sleep(0.05)
+    raise AssertionError(f"job did not finish: {job_id}")
 
 
 if __name__ == "__main__":

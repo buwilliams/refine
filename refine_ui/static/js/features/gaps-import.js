@@ -245,7 +245,11 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     }));
     await withButtonBusy(btn, "Saving…", async () => {
       try {
-        const r = await api("POST", "/api/import/persist", { reporter, drafts: payload });
+        let r = await api("POST", "/api/import/persist", { reporter, drafts: payload });
+        r = await resolveBackgroundJobResponse(
+          r,
+          `Saving ${payload.length} gaps in the background`,
+        );
         const failures = r.failures || [];
         const createdCount = r.count || 0;
         if (failures.length) {

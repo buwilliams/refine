@@ -25,7 +25,7 @@ from refine_server.backend_protocol import (
 from refine_server.ulid import new_ulid
 
 from .backend_client import BackendError, get_client
-from . import runtime
+from . import background_jobs, runtime
 
 
 # --- error helpers ------------------------------------------------------------
@@ -43,6 +43,10 @@ def err(
     if error_code is not None:
         body["error"]["code"] = error_code
     return code, body
+
+
+IMPORT_BACKGROUND_THRESHOLD = 100
+BULK_UPDATE_BACKGROUND_THRESHOLD = 100
 
 
 def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
@@ -517,6 +521,13 @@ def _sqlite_cache_counts(conn: sqlite3.Connection) -> dict[str, int]:
             conn.execute("SELECT COUNT(*) AS n FROM reporters").fetchone()["n"] or 0,
         ),
     }
+
+
+def background_job(job_id: str) -> tuple[int, dict]:
+    job = background_jobs.snapshot(job_id)
+    if job is None:
+        return err(404, "Background job not found")
+    return 200, {"job": job}
 
 
 def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
@@ -1307,13 +1318,64 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     if not ok and ownership_err is not None:
         return ownership_err
 
+    selected_gaps = [
+        g for g in (listing.get("gaps") or [])
+        if g["id"] in gap_ids
+    ]
+    if (
+        len(gap_ids) >= BULK_UPDATE_BACKGROUND_THRESHOLD
+        and body.get("background") is not False
+    ):
+        job_data = json.loads(json.dumps({
+            "field": field,
+            "value": value,
+            "gaps": selected_gaps,
+            "skipped_details": skipped_status_ids,
+        }))
+
+        def run_job() -> dict[str, Any]:
+            result = _bulk_update_selected_gaps(
+                job_data["field"],
+                job_data["value"],
+                job_data["gaps"],
+                job_data["skipped_details"],
+            )
+            return {"http_status": 200, **result}
+
+        job = background_jobs.start(
+            "bulk_update_gaps",
+            f"Bulk update {len(gap_ids)} Gaps",
+            run_job,
+        )
+        return 202, {
+            "queued": True,
+            "job": job,
+            "matched": len(gap_ids),
+            "skipped": len(skipped_status_ids),
+            "skipped_details": skipped_status_ids,
+        }
+
+    return 200, _bulk_update_selected_gaps(
+        field,
+        value,
+        selected_gaps,
+        skipped_status_ids,
+    )
+
+
+def _bulk_update_selected_gaps(
+    field: str,
+    value: str,
+    selected_gaps: list[dict[str, Any]],
+    skipped_status_ids: list[dict[str, str]],
+) -> dict:
+    gap_ids = [g["id"] for g in selected_gaps]
     updated_ids: list[str] = []
 
     if field in ("priority", "status"):
         previous_status_by_id = {
             g["id"]: g.get("status")
-            for g in (listing.get("gaps") or [])
-            if g["id"] in gap_ids
+            for g in selected_gaps
         }
         conn = _conn()
         active = project_state.active_instance_id()
@@ -1375,7 +1437,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                 # keep going. The response count reflects what stuck.
                 continue
 
-    return 200, {
+    return {
         "updated": len(updated_ids), "ids": updated_ids,
         "field": field, "value": value,
         "skipped": len(skipped_status_ids),
@@ -2234,6 +2296,36 @@ def import_extract(body: dict) -> tuple[int, dict]:
 
 def import_persist(body: dict) -> tuple[int, dict]:
     """Persist user-confirmed extracted Gaps."""
+    drafts = body.get("drafts") or []
+    if (
+        isinstance(drafts, list)
+        and len(drafts) >= IMPORT_BACKGROUND_THRESHOLD
+        and body.get("background") is not False
+    ):
+        reporter = (body.get("reporter") or "").strip()
+        if not reporter:
+            return err(400, "reporter is required")
+        job_body = json.loads(json.dumps({
+            "reporter": reporter,
+            "drafts": drafts,
+            "background": False,
+        }))
+
+        def run_job() -> dict[str, Any]:
+            status, result = _import_persist_sync(job_body)
+            return {"http_status": status, **result}
+
+        job = background_jobs.start(
+            "import_persist",
+            f"Import {len(drafts)} Gaps",
+            run_job,
+        )
+        return 202, {"queued": True, "job": job, "drafts": len(drafts)}
+    return _import_persist_sync(body)
+
+
+def _import_persist_sync(body: dict) -> tuple[int, dict]:
+    """Persist user-confirmed extracted Gaps synchronously."""
     reporter = (body.get("reporter") or "").strip()
     drafts = body.get("drafts") or []
     if not reporter:

@@ -25,6 +25,7 @@ def main() -> int:
     assert 'withButtonBusy(btn, "Saving…"' in import_js
     assert "Failed drafts (${drafts.length})" in import_js
     assert "drawImportDrafts(root, failedDrafts, close, { retry: true })" in import_js
+    assert "resolveBackgroundJobResponse" in import_js
 
     print("import chunking tests OK")
     return 0
