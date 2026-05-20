@@ -150,6 +150,8 @@ def main() -> int:
     assert llm._extract_final_text(jsonl) == (
         "[{\"name\":\"N\",\"actual\":\"A\",\"target\":\"T\"}]"
     )
+    raw_array = "[{\"name\":\"N\",\"actual\":\"A\",\"target\":\"T\"}]"
+    assert llm._extract_final_text(raw_array) == raw_array
     assert llm._extract_final_text("plain response") == "plain response"
 
     # --- Target-app generated-config parsing -------------------------------

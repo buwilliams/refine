@@ -163,6 +163,8 @@ def _extract_final_text(stdout: str) -> str:
             evt = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if not isinstance(evt, dict):
+            continue
         item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
         text = item.get("text") or evt.get("text")
         item_type = item.get("type")
