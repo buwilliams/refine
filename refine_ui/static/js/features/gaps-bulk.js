@@ -95,7 +95,7 @@ async function openBulkModal(field) {
     // they're just ignored at the next selection-state pass.
     await renderGapsList();
   } catch (e) {
-    toast(`Bulk update failed: ${e.message}`, "error");
+    await showActionError(e, "Bulk update failed");
   }
 }
 
@@ -249,7 +249,7 @@ async function confirmBulkDelete() {
     // fetch naturally — they remain in the set but are inert.
     await renderGapsList();
   } catch (e) {
-    toast(`Bulk delete failed: ${e.message}`, "error");
+    await showActionError(e, "Bulk delete failed");
   }
 }
 

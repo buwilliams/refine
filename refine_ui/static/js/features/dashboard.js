@@ -229,7 +229,7 @@ function wireReviewsForReporter(reviews) {
           if (r.ok) toast(r.message || "Verified", "info");
           else toast(r.message || "Verify did not complete", "error");
           if (r.ok) dashboardReviewSelectedIds.delete(id);
-        } catch (e) { toast(e.message, "error"); }
+        } catch (e) { await showActionError(e); }
         await refreshDashboard();
       });
     });
@@ -255,15 +255,20 @@ function wireReviewsForReporter(reviews) {
     const btn = $("#rev-bulk-verify", card);
     await withButtonBusy(btn, `Verifying 0/${ids.length}…`, async () => {
       let done = 0, failed = 0;
+      let ownershipError = null;
       for (const id of ids) {
         btn.textContent = `Verifying ${done + 1}/${ids.length}…`;
         try {
           const r = await api("POST", `/api/gaps/${id}/verify`);
           if (!r.ok) failed++;
           else dashboardReviewSelectedIds.delete(id);
-        } catch (_e) { failed++; }
+        } catch (e) {
+          failed++;
+          if (isInstanceOwnershipError(e) && !ownershipError) ownershipError = e;
+        }
         done++;
       }
+      if (ownershipError) await showActionError(ownershipError);
       const msg = failed
         ? `Verified ${done - failed} of ${ids.length} — ${failed} did not complete`
         : `Verified ${done} gap${done === 1 ? "" : "s"}`;
@@ -336,7 +341,7 @@ function openAddRoundModal({ gapId, gapName }) {
         toast("New round submitted", "info");
         close();
         await refreshDashboard();
-      } catch (err) { toast(err.message, "error"); }
+      } catch (err) { await showActionError(err); }
     });
   };
   root.querySelector("[data-ok]").addEventListener("click", submit);

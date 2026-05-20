@@ -190,6 +190,29 @@ class Runner:
                 "recent_errors": list(self._recent_errors[-10:]),
             }
 
+    def _require_active_gap(
+        self,
+        gap_id: str,
+        *,
+        columns: str = "status, branch_name, instance_id",
+    ) -> sqlite3.Row:
+        row = self._conn.execute(
+            f"SELECT {columns} FROM gaps_index WHERE id = ?",
+            (gap_id,),
+        ).fetchone()
+        if not row:
+            raise ValueError("Gap not found")
+        active = project_state.active_instance_id()
+        owner = str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+        if owner != active:
+            owner_name = project_state.gap_instance_display(owner)
+            active_name = project_state.gap_instance_display(active)
+            raise ValueError(
+                "Action not allowed: Gap is owned by another instance "
+                f"({owner_name}). Transfer to {active_name} before making changes."
+            )
+        return row
+
     def _h_launch(self, params: dict) -> dict:
         # The dispatcher launches automatically; this method exists mostly so
         # the webapp can nudge scheduling after a status change.
@@ -204,11 +227,9 @@ class Runner:
 
     def _h_cancel(self, params: dict) -> dict:
         gap_id = params["gap_id"]
+        row = self._require_active_gap(gap_id)
         killed = self.sub_mgr.cancel(gap_id)
         # Move to cancelled (terminal). Clean up worktree + branch.
-        row = self._conn.execute(
-            "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gap_id,),
-        ).fetchone()
         if row:
             with db.transaction(self._conn):
                 self._conn.execute(
@@ -238,6 +259,7 @@ class Runner:
         # Verify is user approval for a Gap already parked in `review`.
         # The Merge agent owns all git merge work while Gaps are in
         # `ready-merge`.
+        self._require_active_gap(params["gap_id"])
         return verify_op.approve_review(self._conn, params["gap_id"])
 
     def _h_create_gap(self, params: dict) -> dict:
@@ -279,6 +301,7 @@ class Runner:
 
     def _h_append_round(self, params: dict) -> dict:
         gap_id = params["gap_id"]
+        self._require_active_gap(gap_id, columns="status, instance_id")
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -312,6 +335,7 @@ class Runner:
         return {"gap": gap}
 
     def _h_edit_round(self, params: dict) -> dict:
+        self._require_active_gap(params["gap_id"], columns="status, instance_id")
         gap = gap_writer.edit_latest_round(
             params["gap_id"],
             actual=params.get("actual"),
@@ -330,6 +354,7 @@ class Runner:
         return {"gap": gap}
 
     def _h_log_append(self, params: dict) -> dict:
+        self._require_active_gap(params["gap_id"], columns="status, instance_id")
         gap_writer.append_round_log(
             gap_id=params["gap_id"],
             round_idx=int(params["round_idx"]),
@@ -344,14 +369,10 @@ class Runner:
 
     def _h_delete_gap(self, params: dict) -> dict:
         gap_id = params["gap_id"]
+        row = self._require_active_gap(gap_id)
         # If running, cancel first.
         if self.sub_mgr.is_running(gap_id):
             self.sub_mgr.cancel(gap_id)
-        row = self._conn.execute(
-            "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gap_id,),
-        ).fetchone()
-        if not row:
-            return {"deleted": False}
         # Clean up worktree + branch for non-done statuses; for done, the merged
         # commits stay in the client repo and only the Gap record is removed.
         if row["status"] != "done":
@@ -373,6 +394,7 @@ class Runner:
 
     def _h_set_notes(self, params: dict) -> dict:
         gap_id = params["gap_id"]
+        self._require_active_gap(gap_id, columns="status, instance_id")
         notes = params.get("notes")
         if not isinstance(notes, list):
             raise ValueError("notes must be a list of {id, author, body, ...} objects")
@@ -435,7 +457,10 @@ class Runner:
         if old_name != new_name:
             reporters.rename(self._conn, rid, new_name)
         touched = gap_writer.rename_reporter_in_rounds(
-            self._conn, old_name, new_name,
+            self._conn,
+            old_name,
+            new_name,
+            instance_id=project_state.active_instance_id(),
         )
         activity.append(
             self._conn,
@@ -453,7 +478,12 @@ class Runner:
         new = (params.get("new") or "").strip()
         if not old or not new:
             raise ValueError("both `old` and `new` are required")
-        touched = gap_writer.rename_reporter_in_rounds(self._conn, old, new)
+        touched = gap_writer.rename_reporter_in_rounds(
+            self._conn,
+            old,
+            new,
+            instance_id=project_state.active_instance_id(),
+        )
         activity.append(
             self._conn,
             message=(f"Reporter strings rewritten: {old!r} → {new!r} "
@@ -646,8 +676,24 @@ class Runner:
         # against a stale UI where the button was visible/clickable
         # after a concurrent undo from another tab.
         row = self._conn.execute(
-            "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
+            "SELECT status, instance_id FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
+        if row:
+            active = project_state.active_instance_id()
+            owner = str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+            if owner != active:
+                owner_name = project_state.gap_instance_display(owner)
+                active_name = project_state.gap_instance_display(active)
+                return {
+                    "ok": False,
+                    "stage": "instance",
+                    "code": "instance_ownership",
+                    "message": (
+                        "Action not allowed: Gap is owned by another instance "
+                        f"({owner_name}). Transfer to {active_name} before "
+                        "making changes."
+                    ),
+                }
         if row and row["status"] == "cancelled":
             return {"ok": False, "stage": "state",
                     "message": "Gap is already cancelled — nothing to undo"}

@@ -148,7 +148,13 @@ def set_latest_round_governance(gap_id: str, fields: dict[str, Any]) -> dict[str
         return gap
 
 
-def rename_reporter_in_rounds(conn, old_name: str, new_name: str) -> int:
+def rename_reporter_in_rounds(
+    conn,
+    old_name: str,
+    new_name: str,
+    *,
+    instance_id: str | None = None,
+) -> int:
     """Rewrite every round whose `reporter == old_name` to `new_name`.
 
     Walks all Gaps in `gaps_index`, takes the same per-Gap write lock the
@@ -164,7 +170,13 @@ def rename_reporter_in_rounds(conn, old_name: str, new_name: str) -> int:
     """
     if not old_name or not new_name or old_name == new_name:
         return 0
-    rows = conn.execute("SELECT id FROM gaps_index").fetchall()
+    if instance_id is None:
+        rows = conn.execute("SELECT id FROM gaps_index").fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE instance_id = ?",
+            (instance_id,),
+        ).fetchall()
     touched = 0
     for row in rows:
         gap_id = row["id"]

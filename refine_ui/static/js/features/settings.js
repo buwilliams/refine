@@ -909,7 +909,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         try {
           await api("POST", `/api/gaps/${id}/cancel`);
           await refreshSettings();
-        } catch (e) { toast(e.message, "error"); }
+        } catch (e) { await showActionError(e); }
       });
     });
   });

@@ -232,7 +232,7 @@ function drawChanges(data, f) {
           } else {
             toast(r.message || "Undo failed", "error");
           }
-        } catch (e) { toast(e.message, "error"); }
+        } catch (e) { await showActionError(e); }
       });
     });
   });

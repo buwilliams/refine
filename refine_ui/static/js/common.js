@@ -357,7 +357,7 @@ function _openModal(buildBody, onResolveDefault, focusSel) {
       if (e.target === root) close(onResolveDefault.cancel);
     });
 
-    root.querySelector("[data-cancel]").addEventListener("click", () =>
+    root.querySelector("[data-cancel]")?.addEventListener("click", () =>
       close(onResolveDefault.cancel));
     root.querySelector("[data-ok]").addEventListener("click", () => {
       const input = root.querySelector(".modal-input");
@@ -399,6 +399,32 @@ function modalConfirm(message, {
       <button ${danger ? 'class="danger"' : ""} data-ok>${htmlEscape(okLabel)}</button>
     </div>`;
   return _openModal(body, { cancel: false, ok: true }, "[data-ok]");
+}
+
+function modalAlert(message, {
+  title = "Action not allowed", okLabel = "OK",
+} = {}) {
+  const body = () => `
+    ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
+    <div class="modal-body">${htmlEscape(message)}</div>
+    <div class="modal-actions">
+      <button data-ok>${htmlEscape(okLabel)}</button>
+    </div>`;
+  return _openModal(body, { cancel: null, ok: true }, "[data-ok]");
+}
+
+function isInstanceOwnershipError(err) {
+  return err?.code === "instance_ownership"
+    || (err?.status === 409 && /owned by another instance/i.test(err?.message || ""));
+}
+
+async function showActionError(err, fallbackPrefix = "") {
+  if (isInstanceOwnershipError(err)) {
+    await modalAlert(err.message || "This action is not allowed because the Gap is owned by another instance.");
+    return;
+  }
+  const message = err?.message || "Request failed";
+  toast(fallbackPrefix ? `${fallbackPrefix}: ${message}` : message, "error");
 }
 
 function fmtTime(iso) {

@@ -30,10 +30,18 @@ from . import runtime
 
 # --- error helpers ------------------------------------------------------------
 
-def err(code: int, message: str, details: str | None = None) -> tuple[int, dict]:
+def err(
+    code: int,
+    message: str,
+    details: str | None = None,
+    *,
+    error_code: str | None = None,
+) -> tuple[int, dict]:
     body: dict[str, Any] = {"error": {"message": message}}
     if details is not None:
         body["error"]["details"] = details
+    if error_code is not None:
+        body["error"]["code"] = error_code
     return code, body
 
 
@@ -63,6 +71,76 @@ def _schema_block_response() -> tuple[int, dict] | None:
         "Project schema is not supported by this Refine version.",
         schema.get("reason") or "",
     )
+
+
+def _instance_owner(instance_id: str | None) -> str:
+    return str(instance_id or project_state.DEFAULT_INSTANCE_ID)
+
+
+def _ownership_error(
+    owner_id: str | None,
+    *,
+    active_id: str | None = None,
+    count: int = 1,
+) -> tuple[int, dict]:
+    owner = _instance_owner(owner_id)
+    active = active_id or project_state.active_instance_id()
+    owner_name = project_state.gap_instance_display(owner)
+    active_name = project_state.gap_instance_display(active)
+    subject = "Gap is" if count == 1 else f"{count} Gaps are"
+    return err(
+        409,
+        (
+            f"Action not allowed: {subject} owned by another instance "
+            f"({owner_name}). Transfer to {active_name} before making changes."
+        ),
+        error_code="instance_ownership",
+    )
+
+
+def _require_active_gap(
+    conn: sqlite3.Connection,
+    gap_id: str,
+    *,
+    columns: str = "status, branch_name, instance_id",
+) -> tuple[sqlite3.Row | None, tuple[int, dict] | None]:
+    row = conn.execute(
+        f"SELECT {columns} FROM gaps_index WHERE id = ?",
+        (gap_id,),
+    ).fetchone()
+    if not row:
+        return None, err(404, "Gap not found")
+    active = project_state.active_instance_id()
+    if _instance_owner(row["instance_id"]) != active:
+        return None, _ownership_error(row["instance_id"], active_id=active)
+    return row, None
+
+
+def _require_active_gap_ids(gap_ids: list[str]) -> tuple[bool, tuple[int, dict] | None]:
+    if not gap_ids:
+        return True, None
+    conn = _conn()
+    try:
+        active = project_state.active_instance_id()
+        placeholders = ",".join("?" * len(gap_ids))
+        rows = conn.execute(
+            f"SELECT id, instance_id FROM gaps_index WHERE id IN ({placeholders})",
+            gap_ids,
+        ).fetchall()
+    finally:
+        conn.close()
+    violations = [
+        _instance_owner(row["instance_id"])
+        for row in rows
+        if _instance_owner(row["instance_id"]) != active
+    ]
+    if violations:
+        return False, _ownership_error(
+            sorted(set(violations))[0],
+            active_id=active,
+            count=len(violations),
+        )
+    return True, None
 
 
 # --- Project attach/setup -----------------------------------------------------
@@ -912,18 +990,30 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     notes_change = "notes" in body
     if not sql_fields and not notes_change:
         return err(400, "expected `name`, `priority`, `status`, and/or `notes`")
+    conn = _conn()
+    try:
+        _, ownership_err = _require_active_gap(conn, gap_id)
+    finally:
+        conn.close()
+    if ownership_err is not None:
+        return ownership_err
     if sql_fields:
+        active = project_state.active_instance_id()
         updated_at = now_iso()
         set_clause = ", ".join(f"{k} = ?" for k in sql_fields) + ", updated = ?"
-        args = list(sql_fields.values()) + [updated_at, gap_id]
+        args = list(sql_fields.values()) + [updated_at, gap_id, active]
         conn = _conn()
         try:
             with db.transaction(conn):
-                conn.execute(
-                    f"UPDATE gaps_index SET {set_clause} WHERE id = ?", args,
+                cur = conn.execute(
+                    f"UPDATE gaps_index SET {set_clause} "
+                    "WHERE id = ? AND instance_id = ?",
+                    args,
                 )
         finally:
             conn.close()
+        if not cur.rowcount:
+            return _ownership_error(None, active_id=active)
         try:
             from refine_server import gap_writer
 
@@ -955,6 +1045,13 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
 
 
 def delete_gap(gap_id: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        _, ownership_err = _require_active_gap(conn, gap_id)
+    finally:
+        conn.close()
+    if ownership_err is not None:
+        return ownership_err
     try:
         result = get_client().call(M_DELETE_GAP, {"gap_id": gap_id})
     except BackendError as e:
@@ -1017,21 +1114,27 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                if g["id"] not in excluded]
     if not gap_ids:
         return 200, {"updated": 0, "ids": []}
+    ok, ownership_err = _require_active_gap_ids(gap_ids)
+    if not ok and ownership_err is not None:
+        return ownership_err
 
     updated_ids: list[str] = []
 
     if field in ("priority", "status"):
         conn = _conn()
+        active = project_state.active_instance_id()
         try:
             with db.transaction(conn):
                 placeholders = ",".join("?" * len(gap_ids))
-                conn.execute(
+                cur = conn.execute(
                     f"UPDATE gaps_index SET {field} = ?, updated = ? "
-                    f"WHERE id IN ({placeholders})",
-                    [value, now_iso(), *gap_ids],
+                    f"WHERE id IN ({placeholders}) AND instance_id = ?",
+                    [value, now_iso(), *gap_ids, active],
                 )
         finally:
             conn.close()
+        if cur.rowcount != len(gap_ids):
+            return _ownership_error(None, active_id=active)
         try:
             from refine_server import gap_writer
 
@@ -1099,6 +1202,9 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
                if g["id"] not in excluded]
     if not gap_ids:
         return 200, {"deleted": 0, "ids": [], "failures": []}
+    ok, ownership_err = _require_active_gap_ids(gap_ids)
+    if not ok and ownership_err is not None:
+        return ownership_err
 
     deleted_ids: list[str] = []
     failures: list[dict] = []
@@ -1129,13 +1235,13 @@ def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     # Guard: only allowed from review or failed (or todo, treated as edit of latest).
     conn = _conn()
     try:
-        row = conn.execute(
-            "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
-        ).fetchone()
+        row, ownership_err = _require_active_gap(
+            conn, gap_id, columns="status, instance_id",
+        )
     finally:
         conn.close()
-    if not row:
-        return err(404, "Gap not found")
+    if ownership_err is not None:
+        return ownership_err
     if row["status"] != "review":
         return err(
             409,
@@ -1156,13 +1262,13 @@ def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
 def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
     conn = _conn()
     try:
-        row = conn.execute(
-            "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
-        ).fetchone()
+        row, ownership_err = _require_active_gap(
+            conn, gap_id, columns="status, instance_id",
+        )
     finally:
         conn.close()
-    if not row:
-        return err(404, "Gap not found")
+    if ownership_err is not None:
+        return ownership_err
     if row["status"] not in ("backlog", "todo", "failed"):
         return err(409, "Only the latest unaddressed round can be edited "
                         f"(status={row['status']})")
@@ -1179,6 +1285,13 @@ def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
 
 
 def verify(gap_id: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        _, ownership_err = _require_active_gap(conn, gap_id)
+    finally:
+        conn.close()
+    if ownership_err is not None:
+        return ownership_err
     try:
         result = get_client().call(M_VERIFY, {"gap_id": gap_id}, timeout=120.0)
     except BackendError as e:
@@ -1217,6 +1330,17 @@ def undo_change(body: dict) -> tuple[int, dict]:
     commit = (body.get("commit") or "").strip()
     if not commit:
         return err(400, "commit is required")
+    from refine_server import git_ops
+
+    gap_id = git_ops.gap_id_from_commit(commit)
+    if gap_id:
+        conn = _conn()
+        try:
+            _, ownership_err = _require_active_gap(conn, gap_id)
+        finally:
+            conn.close()
+        if ownership_err is not None:
+            return ownership_err
     try:
         result = get_client().call(
             M_UNDO_GAP, {"commit": commit}, timeout=120.0,
@@ -1235,11 +1359,11 @@ def retry(gap_id: str) -> tuple[int, dict]:
     """
     conn = _conn()
     try:
-        row = conn.execute(
-            "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
-        ).fetchone()
-        if not row:
-            return err(404, "Gap not found")
+        row, ownership_err = _require_active_gap(
+            conn, gap_id, columns="status, instance_id",
+        )
+        if ownership_err is not None:
+            return ownership_err
         prev_status = row["status"]
         if prev_status not in ("failed", "done", "cancelled"):
             return err(
@@ -1261,10 +1385,13 @@ def retry(gap_id: str) -> tuple[int, dict]:
             except BackendError as e:
                 return _backend_err(e)
         with db.transaction(conn):
-            conn.execute(
-                "UPDATE gaps_index SET status = 'todo', updated = ? WHERE id = ?",
-                (now_iso(), gap_id),
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = 'todo', updated = ? "
+                "WHERE id = ? AND instance_id = ?",
+                (now_iso(), gap_id, project_state.active_instance_id()),
             )
+        if not cur.rowcount:
+            return _ownership_error(None)
         try:
             from refine_server import gap_writer
 
@@ -1288,13 +1415,13 @@ def retry(gap_id: str) -> tuple[int, dict]:
 def cancel(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
-        row = conn.execute(
-            "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
-        ).fetchone()
+        row, ownership_err = _require_active_gap(
+            conn, gap_id, columns="status, instance_id",
+        )
     finally:
         conn.close()
-    if not row:
-        return err(404, "Gap not found")
+    if ownership_err is not None:
+        return ownership_err
     if row["status"] in ("done", "cancelled"):
         return err(409, f"Already terminal (status={row['status']})")
     try:
@@ -2189,6 +2316,13 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
 # --- helpers ------------------------------------------------------------------
 
 def _backend_err(e: BackendError) -> tuple[int, dict]:
-    code = 502 if e.code == "backend_unavailable" else 500
+    if e.code == "backend_unavailable":
+        code = 502
+    elif e.code == "instance_ownership":
+        code = 409
+    elif e.code == "bad_request":
+        code = 400
+    else:
+        code = 500
     return code, {"error": {"code": e.code, "message": e.message,
                             "details": e.details}}

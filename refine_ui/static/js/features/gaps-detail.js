@@ -279,7 +279,7 @@ function drawGapDetail(gap) {
             toast(`Moved to ${target.next}`, "info");
           }
           await loadGapDetail(gap.id);
-        } catch (e) { toast(e.message, "error"); }
+        } catch (e) { await showActionError(e); }
       });
     });
   };
@@ -292,7 +292,7 @@ function drawGapDetail(gap) {
     try {
       await api("PATCH", "/api/gaps/" + gap.id, { name: name.trim() });
       await loadGapDetail(gap.id);
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   });
   $(".note-composer")?.addEventListener("toggle", (e) => {
     if (e.target.open) $("#new-note-body")?.focus();
@@ -310,7 +310,7 @@ function drawGapDetail(gap) {
         await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
         toast("Note added", "info");
         await loadGapDetail(gap.id);
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $$("[data-note-edit]").forEach((el) => el.addEventListener("click", async (e) => {
@@ -332,7 +332,7 @@ function drawGapDetail(gap) {
       await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
       toast("Note updated", "info");
       await loadGapDetail(gap.id);
-    } catch (err) { toast(err.message, "error"); }
+    } catch (err) { await showActionError(err); }
   }));
   $$("[data-note-delete]").forEach((el) => el.addEventListener("click", async (e) => {
     e.preventDefault();
@@ -347,7 +347,7 @@ function drawGapDetail(gap) {
       await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
       toast("Note deleted", "info");
       await loadGapDetail(gap.id);
-    } catch (err) { toast(err.message, "error"); }
+    } catch (err) { await showActionError(err); }
   }));
   $("#btn-priority")?.addEventListener("click", async () => {
     const current = gap.priority || "low";
@@ -374,7 +374,7 @@ function drawGapDetail(gap) {
       toast(`Priority set to ${next}`, "info");
       await loadGapDetail(gap.id);
     } catch (err) {
-      toast(err.message, "error");
+      await showActionError(err);
     }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {
@@ -391,7 +391,7 @@ function drawGapDetail(gap) {
         await api("POST", `/api/gaps/${gap.id}/cancel`);
         toast("Cancelled", "info");
         await loadGapDetail(gap.id);
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#btn-delete")?.addEventListener("click", async () => {
@@ -403,7 +403,7 @@ function drawGapDetail(gap) {
     try {
       await api("DELETE", "/api/gaps/" + gap.id);
       location.hash = "#/gaps";
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   });
 
   bindFailureBannerActions(gap);
@@ -583,7 +583,7 @@ function bindRoundFormSubmit(gap) {
       }
       await loadGapDetail(gap.id);
     } catch (err) {
-      toast(err.message, "error");
+      await showActionError(err);
     }
   });
 }

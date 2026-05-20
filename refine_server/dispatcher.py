@@ -154,10 +154,11 @@ class Dispatcher:
         n = db.get_setting_int(conn, "backlog_promote_after_seconds", 3600)
         if n < 0:
             return
+        active_instance = project_state.active_instance_id()
         if n == 0:
             rows = conn.execute(
                 "SELECT id FROM gaps_index WHERE status = 'backlog' AND instance_id = ?",
-                (project_state.active_instance_id(),),
+                (active_instance,),
             ).fetchall()
         else:
             cutoff = (datetime.now(timezone.utc) - timedelta(seconds=n)).strftime(
@@ -166,7 +167,7 @@ class Dispatcher:
             rows = conn.execute(
                 "SELECT id FROM gaps_index "
                 "WHERE status = 'backlog' AND instance_id = ? AND updated <= ?",
-                (project_state.active_instance_id(), cutoff),
+                (active_instance, cutoff),
             ).fetchall()
         if not rows:
             return
@@ -180,8 +181,8 @@ class Dispatcher:
             with db.transaction(conn):
                 cur = conn.execute(
                     "UPDATE gaps_index SET status = 'todo', updated = ? "
-                    "WHERE id = ? AND status = 'backlog'",
-                    (ts, gid),
+                    "WHERE id = ? AND status = 'backlog' AND instance_id = ?",
+                    (ts, gid, active_instance),
                 )
             if cur.rowcount:
                 try:
@@ -326,13 +327,19 @@ class Dispatcher:
         )
         base_commit = rev.stdout.strip() if rev.ok else base_ref
 
+        active_instance = project_state.active_instance_id()
         # Transition: todo → in-progress
         with db.transaction(conn):
-            conn.execute(
+            cur = conn.execute(
                 "UPDATE gaps_index SET status = 'in-progress', updated = ?, branch_name = ? "
-                "WHERE id = ? AND status = 'todo'",
-                (now_iso(), branch_name, gap_id),
+                "WHERE id = ? AND status = 'todo' AND instance_id = ?",
+                (now_iso(), branch_name, gap_id, active_instance),
             )
+        if not cur.rowcount:
+            git_ops.remove_worktree(gap_id)
+            if not existing_branch:
+                git_ops.delete_branch(branch_name)
+            return
         try:
             gap_writer.update_fields(
                 gap_id, status="in-progress", branch_name=branch_name,
@@ -542,18 +549,21 @@ class Dispatcher:
     def _reset_stopped_run_to_todo(self, conn: sqlite3.Connection, gap_id: str,
                                    round_idx: int, reason: str) -> None:
         row = conn.execute(
-            "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gap_id,),
+            "SELECT status, branch_name, instance_id FROM gaps_index WHERE id = ?",
+            (gap_id,),
         ).fetchone()
         if not row:
             return
 
         branch_name = row["branch_name"]
-        if row["status"] == "in-progress":
+        active_instance = project_state.active_instance_id()
+        if row["status"] == "in-progress" and row["instance_id"] == active_instance:
             with db.transaction(conn):
                 conn.execute(
                     "UPDATE gaps_index SET status = 'todo', branch_name = NULL, "
-                    "updated = ? WHERE id = ? AND status = 'in-progress'",
-                    (now_iso(), gap_id),
+                    "updated = ? WHERE id = ? AND status = 'in-progress' "
+                    "AND instance_id = ?",
+                    (now_iso(), gap_id, active_instance),
                 )
             try:
                 gap_writer.update_fields(gap_id, status="todo", branch_name=None)
