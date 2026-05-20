@@ -11,6 +11,7 @@ the user's interactive CLI does.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -54,6 +55,20 @@ Source text:
 >>>
 """
 
+_LINE_LIST_MIN_ITEMS = 50
+_LINE_LIST_MIN_PLAIN_ITEMS = 100
+_LINE_LIST_MAX_ITEM_CHARS = 500
+_LINE_LIST_MAX_LONG_RATIO = 0.10
+_LIST_MARKER_RE = re.compile(
+    r"^\s*(?:[-*]|\d+[.)\]]|[A-Za-z][.)\]]|\[[ xX]\])\s+"
+)
+_SPEAKER_RE = re.compile(r"^[A-Z][A-Za-z0-9 ._-]{0,30}:\s+\S")
+_ACTUAL_TARGET_RE = re.compile(
+    r"^\s*actual\s*:\s*(?P<actual>.*?)\s+target\s*:\s*(?P<target>.+)\s*$",
+    re.IGNORECASE,
+)
+_ARROW_RE = re.compile(r"\s+(?:-{1,2}>|=>|\u2192)\s+")
+
 
 def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
     """Call the configured agent CLI with a structured extraction prompt and parse
@@ -66,6 +81,9 @@ def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
     text = (text or "").strip()
     if not text:
         return []
+    line_drafts = _extract_line_list_drafts(text)
+    if line_drafts is not None:
+        return line_drafts
     env = _chat_env()
     spec = get_spec(provider)
     binary = resolve_binary(spec, env)
@@ -110,6 +128,79 @@ def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
     if tmp is not None:
         tmp.cleanup()
     return _normalize_drafts(_parse_json_array(raw))
+
+
+def _extract_line_list_drafts(text: str) -> list[dict] | None:
+    """Return drafts for large newline-delimited gap lists.
+
+    Imports commonly come from spreadsheets or issue trackers where each
+    non-empty line is already one requested change. Sending hundreds of
+    those through a one-shot model call is slow and can hit provider
+    timeouts, so this keeps obviously line-oriented input local while
+    leaving transcripts and prose dumps on the LLM path.
+    """
+    raw_items = [line.strip() for line in text.splitlines() if line.strip()]
+    marked_items = sum(1 for line in raw_items if _LIST_MARKER_RE.match(line))
+    structured_items = sum(
+        1 for line in raw_items if _ACTUAL_TARGET_RE.match(line)
+    )
+    speaker_items = sum(
+        1 for line in raw_items
+        if _SPEAKER_RE.match(line)
+        and not line.lower().startswith(("actual:", "target:", "name:"))
+    )
+    lines = [_clean_line_item(line) for line in raw_items]
+    items = [line for line in lines if line]
+    if len(items) < _LINE_LIST_MIN_ITEMS:
+        return None
+    if (
+        marked_items == 0
+        and structured_items == 0
+        and len(items) < _LINE_LIST_MIN_PLAIN_ITEMS
+    ):
+        return None
+    if speaker_items / len(items) > 0.25:
+        return None
+    long_items = sum(1 for item in items if len(item) > _LINE_LIST_MAX_ITEM_CHARS)
+    if long_items / len(items) > _LINE_LIST_MAX_LONG_RATIO:
+        return None
+    return _normalize_drafts([_line_item_to_draft(item) for item in items])
+
+
+def _clean_line_item(line: str) -> str:
+    line = line.strip()
+    if not line:
+        return ""
+    line = _LIST_MARKER_RE.sub("", line).strip()
+    return line
+
+
+def _line_item_to_draft(line: str) -> dict[str, str]:
+    actual = ""
+    target = line
+    m = _ACTUAL_TARGET_RE.match(line)
+    if m:
+        actual = m.group("actual").strip()
+        target = m.group("target").strip()
+    else:
+        parts = _ARROW_RE.split(line, maxsplit=1)
+        if len(parts) == 2:
+            actual, target = parts[0].strip(), parts[1].strip()
+    source = target or actual or line
+    return {
+        "name": _draft_name(source),
+        "actual": actual,
+        "target": target,
+    }
+
+
+def _draft_name(text: str) -> str:
+    first_line = (text or "Untitled Gap").strip().split("\n", 1)[0]
+    first_sentence = re.split(r"[.!?]", first_line, maxsplit=1)[0].strip()
+    name = first_sentence or first_line or "Untitled Gap"
+    if len(name) > 80:
+        name = name[:77].rstrip() + "..."
+    return name
 
 
 def _parse_json_array(text: str) -> list[Any]:
