@@ -94,6 +94,8 @@ def main() -> int:
     old_codex_ci = os.environ.get("CODEX_CI")
     old_codex_thread = os.environ.get("CODEX_THREAD_ID")
     old_bedrock = os.environ.get("CLAUDE_CODE_USE_BEDROCK")
+    old_foundry = os.environ.get("CLAUDE_CODE_USE_FOUNDRY")
+    old_foundry_resource = os.environ.get("ANTHROPIC_FOUNDRY_RESOURCE")
     old_path = os.environ.get("PATH")
     old_login_path_cache = chat_mgr._login_path_cache
     old_login_path_resolved = chat_mgr._login_path_resolved
@@ -101,6 +103,8 @@ def main() -> int:
         os.environ["OPENAI_API_KEY"] = "sk-test-should-not-leak"
         os.environ["OPENAI_BASE_URL"] = "https://example.invalid/v1"
         os.environ["CLAUDE_CODE_USE_BEDROCK"] = "1"
+        os.environ["CLAUDE_CODE_USE_FOUNDRY"] = "1"
+        os.environ["ANTHROPIC_FOUNDRY_RESOURCE"] = "refine-foundry"
         os.environ["CODEX_CI"] = "1"
         os.environ["CODEX_THREAD_ID"] = "test-thread"
         os.environ["PATH"] = "/install/bin:/shared/bin"
@@ -110,6 +114,8 @@ def main() -> int:
         assert chat_env["OPENAI_API_KEY"] == "sk-test-should-not-leak"
         assert chat_env["OPENAI_BASE_URL"] == "https://example.invalid/v1"
         assert chat_env["CLAUDE_CODE_USE_BEDROCK"] == "1"
+        assert chat_env["CLAUDE_CODE_USE_FOUNDRY"] == "1"
+        assert chat_env["ANTHROPIC_FOUNDRY_RESOURCE"] == "refine-foundry"
         assert "CODEX_CI" not in chat_env
         assert "CODEX_THREAD_ID" not in chat_env
         assert chat_env["PATH"] == "/login/bin:/shared/bin:/install/bin"
@@ -134,6 +140,14 @@ def main() -> int:
             os.environ.pop("CLAUDE_CODE_USE_BEDROCK", None)
         else:
             os.environ["CLAUDE_CODE_USE_BEDROCK"] = old_bedrock
+        if old_foundry is None:
+            os.environ.pop("CLAUDE_CODE_USE_FOUNDRY", None)
+        else:
+            os.environ["CLAUDE_CODE_USE_FOUNDRY"] = old_foundry
+        if old_foundry_resource is None:
+            os.environ.pop("ANTHROPIC_FOUNDRY_RESOURCE", None)
+        else:
+            os.environ["ANTHROPIC_FOUNDRY_RESOURCE"] = old_foundry_resource
         if old_path is None:
             os.environ.pop("PATH", None)
         else:
@@ -249,6 +263,8 @@ def main() -> int:
     old_env_path = os.environ.get("PATH")
     old_azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
     old_bedrock_unit = os.environ.get("CLAUDE_CODE_USE_BEDROCK")
+    old_foundry_unit = os.environ.get("CLAUDE_CODE_USE_FOUNDRY")
+    old_foundry_resource_unit = os.environ.get("ANTHROPIC_FOUNDRY_RESOURCE")
     git_bin = Path(old_which("git") or "/usr/bin/git").parent
     systemctl_calls: list[tuple[str, ...]] = []
 
@@ -274,6 +290,8 @@ def main() -> int:
         )
         os.environ["AZURE_OPENAI_ENDPOINT"] = "https://foundry.example.invalid"
         os.environ["CLAUDE_CODE_USE_BEDROCK"] = "1"
+        os.environ["CLAUDE_CODE_USE_FOUNDRY"] = "1"
+        os.environ["ANTHROPIC_FOUNDRY_RESOURCE"] = "refine-foundry"
         unit_boot = bootstrap_client_repo(
             unit_client,
             clone_dir=unit_clone,
@@ -300,6 +318,14 @@ def main() -> int:
             os.environ.pop("CLAUDE_CODE_USE_BEDROCK", None)
         else:
             os.environ["CLAUDE_CODE_USE_BEDROCK"] = old_bedrock_unit
+        if old_foundry_unit is None:
+            os.environ.pop("CLAUDE_CODE_USE_FOUNDRY", None)
+        else:
+            os.environ["CLAUDE_CODE_USE_FOUNDRY"] = old_foundry_unit
+        if old_foundry_resource_unit is None:
+            os.environ.pop("ANTHROPIC_FOUNDRY_RESOURCE", None)
+        else:
+            os.environ["ANTHROPIC_FOUNDRY_RESOURCE"] = old_foundry_resource_unit
     ui_unit = Path(unit_boot["ui_unit_path"])
     assert ui_unit.is_file()
     assert unit_boot.get("unit_path") is None
@@ -311,6 +337,8 @@ def main() -> int:
     ) in unit_text
     assert 'Environment="AZURE_OPENAI_ENDPOINT=https://foundry.example.invalid"' in unit_text
     assert 'Environment="CLAUDE_CODE_USE_BEDROCK=1"' in unit_text
+    assert 'Environment="CLAUDE_CODE_USE_FOUNDRY=1"' in unit_text
+    assert 'Environment="ANTHROPIC_FOUNDRY_RESOURCE=refine-foundry"' in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
     assert f"ExecStart={fake_uv} run refine ui" in unit_text
     assert "Restart=on-failure" in unit_text
