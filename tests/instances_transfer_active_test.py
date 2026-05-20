@@ -17,7 +17,9 @@ class FakeBackend:
         params = params or {}
         self.calls.append((method, dict(params)))
         from refine_server import db, gap_writer
-        from refine_server.backend_protocol import M_CANCEL, M_CANCEL_ALL, M_ENFORCE_SCHEDULING
+        from refine_server.backend_protocol import (
+            M_CANCEL, M_CANCEL_ALL, M_CHAT_RESET_ALL, M_ENFORCE_SCHEDULING,
+        )
         from refine_server.gaps import now_iso
 
         if method == M_CANCEL_ALL:
@@ -37,6 +39,9 @@ class FakeBackend:
             return {"killed_subprocess": True}
         if method == M_ENFORCE_SCHEDULING:
             return {"ok": True}
+        if method == M_CHAT_RESET_ALL:
+            assert params.get("reason") == "instance activated", params
+            return {"stopped": 2}
         raise AssertionError(f"unexpected backend call: {method}")
 
 
@@ -46,7 +51,7 @@ def main() -> int:
     original_get_client = None
     try:
         from refine_server import db, gap_writer, gaps, project_state
-        from refine_server.backend_protocol import M_CANCEL, M_CANCEL_ALL
+        from refine_server.backend_protocol import M_CANCEL, M_CANCEL_ALL, M_CHAT_RESET_ALL
         from refine_ui import api
 
         original_get_client = api.get_client
@@ -106,6 +111,14 @@ def main() -> int:
         assert rows[running] == ("cancelled", target["id"]), rows
         assert rows[ready] == ("cancelled", target["id"]), rows
         assert rows[unrelated] == ("in-progress", other["id"]), rows
+
+        fake.calls.clear()
+        status, body = api.activate_instance({"instance_id": target["id"]})
+        assert status == 200, body
+        assert body["active_instance_id"] == target["id"], body
+        methods = [m for m, _ in fake.calls]
+        assert M_CHAT_RESET_ALL in methods, methods
+        assert M_CANCEL_ALL not in methods, methods
     finally:
         if original_get_client is not None:
             from refine_ui import api

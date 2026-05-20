@@ -579,6 +579,7 @@ async function refreshReporters({ selectFallback = false } = {}) {
 }
 
 async function refreshInstanceScopedState({ selectReporterFallback = false } = {}) {
+  if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
   state.reporters = [];
   state.dashboard = null;
   state.currentGap = null;

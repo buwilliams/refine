@@ -16,7 +16,7 @@ from refine_server import activity, config, db, gaps as shared_gaps, governance,
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
-    M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
+    M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
@@ -220,6 +220,14 @@ def activate_instance(body: dict[str, Any]) -> tuple[int, dict]:
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
+    try:
+        get_client().call(
+            M_CHAT_RESET_ALL,
+            {"reason": "instance activated"},
+            timeout=10.0,
+        )
+    except BackendError:
+        pass
     try:
         get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
     except BackendError:

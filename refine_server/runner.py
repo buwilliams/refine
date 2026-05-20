@@ -14,7 +14,7 @@ from refine_server import activity, db, features, gaps as shared_gaps, governanc
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
-    M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
+    M_CHAT_RESET_ALL, M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
@@ -140,6 +140,7 @@ class Runner:
             M_CHAT_INPUT: self._h_chat_input,
             M_CHAT_READ: self._h_chat_read,
             M_CHAT_STOP: self._h_chat_stop,
+            M_CHAT_RESET_ALL: self._h_chat_reset_all,
             M_EXTRACT_GAPS: self._h_extract_gaps,
             M_RENAME_REPORTER: self._h_rename_reporter,
             M_RENAME_REPORTER_STRINGS: self._h_rename_reporter_strings,
@@ -857,6 +858,10 @@ class Runner:
     def _h_chat_stop(self, params: dict) -> dict:
         ok = self.chat.stop(params["session_id"])
         return {"stopped": ok}
+
+    def _h_chat_reset_all(self, params: dict) -> dict:
+        reason = params.get("reason") or "state reset"
+        return {"stopped": self.chat.stop_all(reason=reason)}
 
     # ---- target-app ----------------------------------------------------------
 

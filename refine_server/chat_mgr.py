@@ -204,11 +204,16 @@ class ChatManager:
 
     def shutdown(self) -> None:
         self._supervisor_stop.set()
+        self.stop_all(reason="shutdown")
+
+    def stop_all(self, *, reason: str | None = None) -> int:
+        """Close every active chat session and return how many were closed."""
         with self._lock:
             sessions = list(self._sessions.values())
             self._sessions.clear()
         for session in sessions:
-            self._terminate(session, reason="shutdown")
+            self._terminate(session, reason=reason)
+        return len(sessions)
 
     def start(self, cwd: Path, *, is_standalone: bool = True,
               provider: str | None = None,

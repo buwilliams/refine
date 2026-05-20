@@ -49,6 +49,9 @@ def test_client_switch_path(root: Path) -> None:
 
     assert "function reconcileLastReporter" in common_js
     assert "async function refreshInstanceScopedState" in common_js
+    instance_state_body = common_js.split("async function refreshInstanceScopedState", 1)[1]
+    instance_state_body = instance_state_body.split("\n}", 1)[0]
+    assert "resetChatForProjectSwitch()" in instance_state_body
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
     assert "Migrate and open" in common_js
     assert 'api("POST", "/api/project/attach", {' in common_js
