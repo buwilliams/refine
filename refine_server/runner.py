@@ -28,6 +28,29 @@ from .chat_mgr import ChatManager
 from .governance_agent import GovernanceAgent
 
 
+def _combine_step_tail(steps: list[dict[str, Any]], key: str) -> str:
+    parts = []
+    for step in steps:
+        text = (step.get(key) or "").strip()
+        if text:
+            parts.append(f"{step.get('kind') or 'step'}:\n{text}")
+    return "\n\n".join(parts)
+
+
+def _automatic_rebuild_details(result: dict[str, Any]) -> str | None:
+    parts = []
+    steps = result.get("steps") or []
+    if steps:
+        parts.append("steps:\n" + json.dumps(steps, indent=2))
+    if result.get("stdout_tail"):
+        parts.append("stdout:\n" + str(result["stdout_tail"]))
+    if result.get("stderr_tail"):
+        parts.append("stderr:\n" + str(result["stderr_tail"]))
+    if result.get("checks"):
+        parts.append("checks:\n" + json.dumps(result["checks"], indent=2))
+    return "\n\n".join(parts) if parts else None
+
+
 class Runner:
     def __init__(self) -> None:
         self._conn_lock = threading.Lock()
@@ -987,13 +1010,19 @@ class Runner:
         return {"queued": queued}
 
     def _run_automatic_target_app_rebuild(self, reason: str) -> dict:
-        """Run one queued automatic rebuild and promote rebuilt Gaps to review."""
+        """Run one queued automatic stop/rebuild/start cycle.
+
+        Automatic rebuilds need the clean host worktree, so they run after
+        merges park Gaps in `awaiting-rebuild`. The target application itself
+        is cycled around the rebuild so users review the freshly rebuilt app:
+        stop, rebuild if configured, then start.
+        """
         with self._target_app_lock:
             conn = self._get_conn()
             settings = db.list_settings(conn)
             cfg = target_app.config_from_settings(settings)
-            if not (cfg.get("rebuild_command") or "").strip():
-                msg = "No rebuild command configured for automatic target-app rebuild."
+            if not (cfg.get("stop_command") or "").strip():
+                msg = "No stop command configured for automatic target-app rebuild."
                 now = now_iso()
                 db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now)
                 db.set_setting(conn, "target_app_auto_rebuild_last_finished_at", now)
@@ -1002,6 +1031,24 @@ class Runner:
                 activity.append(
                     conn, message=msg, severity="warn",
                     category="target_app", actor="runner",
+                )
+                self._log_automatic_rebuild_failure_to_pending_gaps(
+                    conn, msg, details=None,
+                )
+                return {"ok": False, "state": "failed", "message": msg}
+            if not (cfg.get("start_command") or "").strip():
+                msg = "No start command configured for automatic target-app rebuild."
+                now = now_iso()
+                db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now)
+                db.set_setting(conn, "target_app_auto_rebuild_last_finished_at", now)
+                db.set_setting(conn, "target_app_auto_rebuild_last_ok", "0")
+                db.set_setting(conn, "target_app_auto_rebuild_last_message", msg)
+                activity.append(
+                    conn, message=msg, severity="warn",
+                    category="target_app", actor="runner",
+                )
+                self._log_automatic_rebuild_failure_to_pending_gaps(
+                    conn, msg, details=None,
                 )
                 return {"ok": False, "state": "failed", "message": msg}
             db.set_setting(conn, "target_app_state", "rebuilding")
@@ -1012,7 +1059,7 @@ class Runner:
                 message=f"target-app: automatic rebuild started ({reason})",
                 severity="info", category="target_app", actor="runner",
             )
-            result = target_app.run_operation("rebuild", cfg)
+            result = self._run_target_app_rebuild_sequence(cfg)
             ok = bool(result.get("ok"))
             final_state = result.get("state") if result.get("state") in {
                 "unknown", "running", "degraded", "stopped", "failed",
@@ -1033,6 +1080,11 @@ class Runner:
                     conn, result.get("checks") or [], result.get("message") or "",
                 )
             promoted = self._promote_rebuilt_gaps(conn) if ok else 0
+            details = _automatic_rebuild_details(result) if not ok else None
+            if not ok:
+                self._log_automatic_rebuild_failure_to_pending_gaps(
+                    conn, err_msg, details=details,
+                )
             activity.append(
                 conn,
                 message=(
@@ -1043,11 +1095,118 @@ class Runner:
                 ),
                 severity="info" if ok else "error",
                 category="target_app", actor="runner",
-                details=err_msg or None,
+                details=details or err_msg or None,
             )
             if ok:
                 self.merger.wake()
             return result
+
+    def _run_target_app_rebuild_sequence(self, cfg: dict[str, Any]) -> dict:
+        steps: list[dict[str, Any]] = []
+
+        def run_step(kind: str) -> dict[str, Any]:
+            result = target_app.run_operation(kind, cfg)
+            steps.append(result)
+            return result
+
+        stop_result = run_step("stop")
+        if not stop_result.get("ok"):
+            return self._automatic_rebuild_sequence_result(steps, failed_step="stop")
+
+        if (cfg.get("rebuild_command") or "").strip():
+            rebuild_result = run_step("rebuild")
+        else:
+            rebuild_result = {
+                "ok": True,
+                "kind": "rebuild",
+                "state": "stopped",
+                "command": "",
+                "cwd": "",
+                "exit_code": 0,
+                "stdout_tail": "",
+                "stderr_tail": "",
+                "message": "No rebuild command configured; rebuild treated as a no-op.",
+                "started_at": now_iso(),
+                "finished_at": now_iso(),
+                "checks_configured": False,
+                "checks": [],
+            }
+            steps.append(rebuild_result)
+        if not rebuild_result.get("ok"):
+            return self._automatic_rebuild_sequence_result(steps, failed_step="rebuild")
+
+        start_result = run_step("start")
+        if not start_result.get("ok"):
+            return self._automatic_rebuild_sequence_result(steps, failed_step="start")
+        return self._automatic_rebuild_sequence_result(steps)
+
+    def _automatic_rebuild_sequence_result(
+        self,
+        steps: list[dict[str, Any]],
+        *,
+        failed_step: str | None = None,
+    ) -> dict[str, Any]:
+        last = steps[-1] if steps else {}
+        ok = failed_step is None
+        if ok:
+            message = "Automatic rebuild completed: stopped app, rebuilt app, started app."
+        else:
+            message = (
+                f"Automatic rebuild failed during {failed_step}: "
+                f"{last.get('message') or 'operation failed'}"
+            )
+        return {
+            "ok": ok,
+            "kind": "rebuild",
+            "state": last.get("state") or ("running" if ok else "failed"),
+            "command": "\n".join(
+                f"{step.get('kind')}: {step.get('command') or '(no-op)'}"
+                for step in steps
+            ),
+            "cwd": last.get("cwd") or "",
+            "exit_code": 0 if ok else last.get("exit_code"),
+            "stdout_tail": _combine_step_tail(steps, "stdout_tail"),
+            "stderr_tail": _combine_step_tail(steps, "stderr_tail"),
+            "message": message,
+            "started_at": (steps[0].get("started_at") if steps else now_iso()),
+            "finished_at": last.get("finished_at") or now_iso(),
+            "checks_configured": bool(last.get("checks_configured")),
+            "checks": last.get("checks") or [],
+            "steps": [
+                {
+                    "kind": step.get("kind"),
+                    "ok": bool(step.get("ok")),
+                    "state": step.get("state"),
+                    "message": step.get("message") or "",
+                }
+                for step in steps
+            ],
+        }
+
+    def _log_automatic_rebuild_failure_to_pending_gaps(
+        self,
+        conn: sqlite3.Connection,
+        message: str,
+        *,
+        details: str | None,
+    ) -> None:
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
+            "ORDER BY updated ASC"
+        ).fetchall()
+        for row in rows:
+            gap_id = row["id"]
+            try:
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="error",
+                    category="target_app",
+                    actor="runner",
+                    message=f"Automatic target-app rebuild failed: {message}",
+                    details=details,
+                )
+            except Exception:
+                pass
 
     def _promote_rebuilt_gaps(self, conn: sqlite3.Connection) -> int:
         rows = conn.execute(
