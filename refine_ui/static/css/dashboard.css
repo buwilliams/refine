@@ -13,6 +13,16 @@
 #dash > section.card-grid {
   flex: 0 0 auto;   /* fixed-size sections */
 }
+#dash > .dashboard-collapsible-shell {
+  flex: 0 0 auto;
+  margin-bottom: 0;
+}
+#dash > .dashboard-collapsible-shell .filter-shell-body {
+  background: var(--card);
+}
+.dashboard-panel-actions {
+  margin-bottom: 10px;
+}
 #dash > .dashboard-status-grid {
   display: grid;
   gap: 6px;

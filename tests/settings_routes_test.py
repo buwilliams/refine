@@ -199,11 +199,16 @@ def main() -> int:
     assert "dashboard-status-card-agent" in dashboard_js
     assert "dashboard-agent-indicator" in dashboard_js
     assert "Agent-managed automation" in dashboard_js
+    assert "dashboard-collapsible-shell" in dashboard_js
+    assert 'id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}' in dashboard_js
+    assert 'id="dashboard-reporter-stats-shell"${reporterStatsShellOpen ? " open" : ""}' in dashboard_js
+    assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter stats")
     assert "repeat(9, minmax(0, 1fr))" in dashboard_css
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
     assert "dashboard-status-label" in dashboard_css
     assert ".dashboard-status-card-agent" in dashboard_css
     assert ".dashboard-agent-indicator" in dashboard_css
+    assert "#dash > .dashboard-collapsible-shell" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
     assert '<table class="table gaps-table">' in gaps_list_js
     assert '<col class="gaps-col-name">' in gaps_list_js

@@ -79,6 +79,10 @@ function drawDashboard(d, opts = {}) {
   const counts = d.counts || {};
   const orderedStatuses = WORKFLOW_STATUSES;
   const dash = $("#dash");
+  const reporterStats = d.reporter_stats || [];
+  const reviewsShell = document.getElementById("reviews-for-reporter-card");
+  const reviewsShellOpen = reviewsShell ? reviewsShell.open : true;
+  const reporterStatsShellOpen = !!document.getElementById("dashboard-reporter-stats-shell")?.open;
   // Guard against late-arriving SSE refreshes after the user navigated
   // away — the container is gone, so just bail silently.
   if (!dash) return;
@@ -107,43 +111,18 @@ function drawDashboard(d, opts = {}) {
       }).join("")}
     </section>
 
-    <section class="card">
-      <h3>Reporter stats</h3>
-      ${(d.reporter_stats || []).length === 0
-        ? `<p class="muted">No reporter activity yet.</p>`
-        : `<table class="table">
-            <thead><tr>
-              <th>Reporter</th>
-              <th>Active</th>
-              <th>Done</th>
-              <th>Reported</th>
-              <th>Done / Reported</th>
-            </tr></thead>
-            <tbody>
-              ${d.reporter_stats.map((s) => `
-                <tr class="reporter-stats-row"
-                    data-reporter="${htmlEscape(s.reporter)}"
-                    title="See Gaps reported by ${htmlEscape(s.reporter)}">
-                  <td>${htmlEscape(s.reporter)}</td>
-                  <td>${fmtCount(s.active)}</td>
-                  <td>${fmtCount(s.done)}</td>
-                  <td>${fmtCount(s.reported)}</td>
-                  <td>${s.completion_rate.toFixed(1)}%</td>
-                </tr>`).join("")}
-            </tbody>
-          </table>`}
-    </section>
-
     ${reviewReporter ? `
-    <section class="card" id="reviews-for-reporter-card">
-      <div class="card-head-row">
-        <h3>
-          Awaiting your review
-          <span class="muted small">— ${htmlEscape(reviewReporter)}</span>
-        </h3>
+    <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}>
+      <summary>
+        <span class="filter-shell-title">Awaiting your review</span>
+        <span class="muted small">${htmlEscape(reviewReporter)}</span>
+        <span class="filter-pill">${fmtCount(reviewsForReporter.length)}</span>
+      </summary>
+      <div class="filter-shell-body">
         ${reviewsForReporter.length === 0 ? "" : `
-          <button id="rev-bulk-verify" disabled>Verify selected</button>`}
-      </div>
+          <div class="actions dashboard-panel-actions">
+            <button id="rev-bulk-verify" disabled>Verify selected</button>
+          </div>`}
       ${reviewsForReporter.length === 0
         ? `<p class="muted">Nothing in <code>review</code> assigned to you right now.</p>`
         : `<table class="table">
@@ -174,7 +153,40 @@ function drawDashboard(d, opts = {}) {
                 </tr>`).join("")}
             </tbody>
           </table>`}
-    </section>` : ""}
+      </div>
+    </details>` : ""}
+
+    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-reporter-stats-shell"${reporterStatsShellOpen ? " open" : ""}>
+      <summary>
+        <span class="filter-shell-title">Reporter stats</span>
+        <span class="filter-pill">${fmtCount(reporterStats.length)}</span>
+      </summary>
+      <div class="filter-shell-body">
+        ${reporterStats.length === 0
+          ? `<p class="muted">No reporter activity yet.</p>`
+          : `<table class="table">
+              <thead><tr>
+                <th>Reporter</th>
+                <th>Active</th>
+                <th>Done</th>
+                <th>Reported</th>
+                <th>Done / Reported</th>
+              </tr></thead>
+              <tbody>
+                ${reporterStats.map((s) => `
+                  <tr class="reporter-stats-row"
+                      data-reporter="${htmlEscape(s.reporter)}"
+                      title="See Gaps reported by ${htmlEscape(s.reporter)}">
+                    <td>${htmlEscape(s.reporter)}</td>
+                    <td>${fmtCount(s.active)}</td>
+                    <td>${fmtCount(s.done)}</td>
+                    <td>${fmtCount(s.reported)}</td>
+                    <td>${s.completion_rate.toFixed(1)}%</td>
+                  </tr>`).join("")}
+              </tbody>
+            </table>`}
+      </div>
+    </details>
 
   `;
   // Click any reporter row → deep-link into the Gaps list filtered by
