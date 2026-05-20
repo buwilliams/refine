@@ -104,9 +104,45 @@ def main() -> int:
             "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
         ).fetchone()
         assert row["status"] == "todo", dict(row)
-        status, body = api.get_gap(stale_gap)
+        original_fingerprint = project_state.state_fingerprint
+
+        def fail_state_fingerprint(*, root=None):
+            raise AssertionError("routine cache checks must not scan Gap JSON")
+
+        project_state.state_fingerprint = fail_state_fingerprint
+        try:
+            assert project_state.ensure_sqlite_cache_current(conn) == active
+            status, body = api.list_settings()
+            assert status == 200, body
+            status, body = api.list_instances()
+            assert status == 200, body
+
+            original_get_client = api.get_client
+
+            class DashboardClient:
+                def call(self, method, params=None, *, timeout=30.0):
+                    return {"running": [], "merger": None, "governance": None}
+
+                def is_reachable(self):
+                    return True
+
+            api.get_client = lambda: DashboardClient()
+            try:
+                status, body = api.dashboard_summary()
+                assert status == 200, body
+            finally:
+                api.get_client = original_get_client
+
+            status, body = api.get_gap(stale_gap)
+        finally:
+            project_state.state_fingerprint = original_fingerprint
         assert status == 200, body
-        assert body["gap"]["status"] == "failed", body
+        assert body["gap"]["status"] == "todo", body
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+        project_state.rebuild_sqlite_cache(conn)
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
         ).fetchone()

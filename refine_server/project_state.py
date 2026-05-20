@@ -687,24 +687,23 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
 
 
 def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
-    """Ensure SQLite projections match the active instance on disk."""
+    """Ensure SQLite projections are scoped to the active instance.
+
+    Routine reads must stay O(1) with respect to the number of Gap JSON files.
+    Normal Refine writes update SQLite and canonical JSON together; full
+    projection rebuilds are reserved for startup, project sync, app/instance
+    switches, and the explicit System > Runtime rebuild action.
+    """
     active = active_instance_id()
-    fingerprint = state_fingerprint()
     try:
         row = conn.execute(
             "SELECT value FROM settings WHERE key = ?",
             (CACHE_ACTIVE_INSTANCE_KEY,),
         ).fetchone()
         cached = str(row["value"]) if row is not None else ""
-        fp_row = conn.execute(
-            "SELECT value FROM settings WHERE key = ?",
-            (CACHE_STATE_FINGERPRINT_KEY,),
-        ).fetchone()
-        cached_fingerprint = str(fp_row["value"]) if fp_row is not None else ""
     except sqlite3.Error:
         cached = ""
-        cached_fingerprint = ""
-    if cached != active or cached_fingerprint != fingerprint:
+    if cached != active:
         rebuild_sqlite_cache(conn)
     return active
 
