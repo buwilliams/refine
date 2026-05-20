@@ -296,6 +296,11 @@ def main() -> int:
     assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "ui"]
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
+    try:
+        refine_cli._effective_port(type("Args", (), {"port": 0})(), bg_cfg)
+        raise AssertionError("port 0 should be rejected")
+    except SystemExit as e:
+        assert "invalid port 0" in str(e)
     print("[ok] refine start launches a detached per-port UI backend process")
 
     old_listener_pids = refine_cli._listener_pids
@@ -340,6 +345,34 @@ def main() -> int:
         refine_cli.os.killpg = old_killpg
     assert killed == [(24000, refine_cli.signal.SIGTERM)]
     print("[ok] refine stop recovers a missing pid file from the listening UI backend")
+
+    setup_clone = tmp / "setup-refine-clone"
+    (setup_clone / "refine_cli").mkdir(parents=True)
+    (setup_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
+    (setup_clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    old_cwd = Path.cwd()
+    old_stop_background = refine_cli._stop_background_ui
+    old_print_setup_status = refine_cli._print_setup_status_block
+    setup_calls: list[tuple] = []
+    try:
+        os.chdir(setup_clone)
+        refine_cli._stop_background_ui = lambda clone_arg, cfg_arg, port_arg: (
+            setup_calls.append(("stop", clone_arg, cfg_arg, port_arg)) or True
+        )
+        refine_cli._print_setup_status_block = lambda clone_arg, *, port: (
+            setup_calls.append(("status", clone_arg, port))
+        )
+        assert refine_cli.cmd_stop(type("Args", (), {"port": 19001})()) == 0
+        assert refine_cli.cmd_status(type("Args", (), {"config": None, "port": 19002})()) == 0
+    finally:
+        os.chdir(old_cwd)
+        refine_cli._stop_background_ui = old_stop_background
+        refine_cli._print_setup_status_block = old_print_setup_status
+    assert setup_calls == [
+        ("stop", setup_clone.resolve(), None, 19001),
+        ("status", setup_clone.resolve(), 19002),
+    ]
+    print("[ok] setup-mode stop/status honor supplied ports before project attach")
 
     old_clone = tmp / "old-refine-clone"
     (old_clone / "refine_cli").mkdir(parents=True)

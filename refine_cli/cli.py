@@ -497,9 +497,9 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
 
 
 def cmd_start(args: argparse.Namespace) -> int:
-    binding = config.find_binding()
-    if binding is None and config.find_config() is None and _is_refine_source_dir(Path.cwd()):
-        port = int(args.port or 8080)
+    setup_clone = _setup_source_dir()
+    if setup_clone is not None:
+        port = _effective_port(args, None)
         print("No refine project is attached yet.")
         print(f"Starting the host-native setup UI at http://127.0.0.1:{port}")
         print("Use the browser to create or attach a target app path.")
@@ -507,7 +507,7 @@ def cmd_start(args: argparse.Namespace) -> int:
             print("Setup UI is already reachable.")
             return 0
         try:
-            pid = _start_background_ui(Path.cwd().resolve(), None, host="127.0.0.1", port=port)
+            pid = _start_background_ui(setup_clone, None, host="127.0.0.1", port=port)
         except _InitError as e:
             print(f"refine start: {e}", file=sys.stderr)
             return 1
@@ -552,6 +552,16 @@ def cmd_start(args: argparse.Namespace) -> int:
 
 
 def cmd_stop(args: argparse.Namespace) -> int:
+    setup_clone = _setup_source_dir()
+    if setup_clone is not None:
+        port = _runtime_action_port(args, setup_clone, None)
+        stopped = _stop_background_ui(setup_clone, None, port)
+        if stopped:
+            print(f"Stopped setup UI backend on port {port}.")
+        else:
+            print(f"No background setup UI backend was running on port {port}.")
+        return 0
+
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
@@ -568,6 +578,17 @@ def cmd_restart(args: argparse.Namespace) -> int:
     """`refine stop && refine start` — picks up source changes the
     running host processes haven't loaded yet without forcing the operator
     to run two commands."""
+    setup_clone = _setup_source_dir()
+    if setup_clone is not None:
+        port = _runtime_action_port(args, setup_clone, None)
+        restart_args = argparse.Namespace(**vars(args))
+        restart_args.port = port
+        rc = cmd_stop(restart_args)
+        if rc != 0:
+            return rc
+        print()
+        return cmd_start(restart_args)
+
     clone, _unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
@@ -670,13 +691,19 @@ def cmd_reset(args: argparse.Namespace) -> int:
 
 
 def cmd_status(args: argparse.Namespace) -> int:
+    setup_clone = _setup_source_dir()
+    if setup_clone is not None:
+        port = _runtime_action_port(args, setup_clone, None)
+        _print_setup_status_block(setup_clone, port=port)
+        return 0
+
     clone, unit = _resolve_clone_and_unit_or_exit()
     try:
         cfg = config.get(path=args.config) if args.config else config.get()
     except config.ConfigError as e:
         print(f"refine status: {e}", file=sys.stderr)
         return 1
-    port = _effective_port(args, cfg)
+    port = _runtime_action_port(args, clone, cfg)
     _sync_bound_project_registry(clone, cfg)
     _print_status_block(clone, unit, cfg, port=port)
     return 0
@@ -706,6 +733,23 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     print(f"  logs:     {_runtime_log_path(clone, cfg, effective_port)}")
     print(f"  journal:  journalctl --user -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop {effective_port}")
+    print()
+
+
+def _print_setup_status_block(clone: Path, *, port: int) -> None:
+    web_up = _port_open("127.0.0.1", port)
+    process_pid = _running_pid(clone, None, port)
+    print()
+    print(_bold("refine"))
+    print(f"  checkout: {clone}")
+    print("  app:      setup mode")
+    print(f"  ui:       {_dot(process_pid is not None and web_up)} "
+          f"http {'reachable' if web_up else 'unreachable'} at "
+          f"http://127.0.0.1:{port}")
+    print(f"  process:  {_dot(process_pid is not None)} "
+          f"{'pid ' + str(process_pid) if process_pid is not None else 'not running'}")
+    print(f"  logs:     {_runtime_log_path(clone, None, port)}")
+    print(f"  stop:     uv run refine stop {port}")
     print()
 
 
@@ -796,8 +840,10 @@ def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
         pass
 
 
-def _effective_port(args: argparse.Namespace, cfg: "config.Config") -> int:
-    port = int(getattr(args, "port", None) or cfg.web_port)
+def _effective_port(args: argparse.Namespace, cfg: "config.Config | None") -> int:
+    default_port = cfg.web_port if cfg is not None else 8080
+    raw_port = getattr(args, "port", None)
+    port = int(raw_port if raw_port is not None else default_port)
     if port <= 0 or port > 65535:
         raise SystemExit(f"refine: invalid port {port}")
     return port
@@ -843,7 +889,7 @@ def _start_background_ui(
     return proc.pid
 
 
-def _stop_background_ui(clone: Path, cfg: "config.Config", port: int) -> bool:
+def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> bool:
     pid_path = _runtime_pid_path(clone, cfg, port)
     pid = _running_pid(clone, cfg, port)
     if pid is None:
@@ -1039,7 +1085,7 @@ def _listener_port_pids() -> list[tuple[int, int]]:
     return pairs
 
 
-def _runtime_action_port(args: argparse.Namespace, clone: Path, cfg: "config.Config") -> int:
+def _runtime_action_port(args: argparse.Namespace, clone: Path, cfg: "config.Config | None") -> int:
     configured = _effective_port(args, cfg)
     if getattr(args, "port", None) is not None:
         return configured
@@ -1088,6 +1134,17 @@ def _pid_env_value(pid: int, key: str) -> str | None:
     for item in raw.split(b"\0"):
         if item.startswith(prefix):
             return item[len(prefix):].decode("utf-8", "replace")
+    return None
+
+
+def _setup_source_dir() -> Path | None:
+    cwd = Path.cwd().resolve()
+    if (
+        config.find_binding(cwd) is None
+        and config.find_config(cwd) is None
+        and _is_refine_source_dir(cwd)
+    ):
+        return cwd
     return None
 
 
