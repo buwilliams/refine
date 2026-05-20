@@ -83,14 +83,20 @@ def main() -> int:
             "filter": {"status": "todo"},
             "update": {"status": "review"},
         })
-        assert status == 409, body
-        assert db_status(conn, gid_bulk_todo) == "todo"
+        assert status == 200, body
+        assert gid_bulk_todo in body["ids"], body
+        assert db_status(conn, gid_bulk_todo) == "review"
 
         status, body = api.bulk_update_gaps({
             "filter": {"status": "ready-merge"},
             "update": {"status": "todo"},
         })
-        assert status == 409, body
+        assert status == 200, body
+        assert body["updated"] == 0, body
+        assert body["skipped_details"] == [{
+            "id": gid_bulk_ready,
+            "reason": "status:ready-merge",
+        }], body
         assert db_status(conn, gid_bulk_ready) == "ready-merge"
     finally:
         conn.close()

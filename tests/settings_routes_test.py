@@ -221,8 +221,10 @@ def main() -> int:
     assert ".gaps-status-cell" in gaps_css
     assert "white-space: nowrap;" in gaps_css
     assert "${STATUS_FILTER_OPTIONS" in changes_js
-    assert 'const BULK_STATUS_OPTIONS = ["backlog", "todo", "failed"];' in gaps_bulk_js
-    assert "system-owned states" in gaps_bulk_js
+    assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
+    assert '"awaiting-rebuild", "review",' in gaps_bulk_js
+    assert '"done", "failed", "cancelled"' in gaps_bulk_js
+    assert "skip in-progress and ready-merge" in gaps_bulk_js
     assert 'forward: { label: "Review →"' not in gaps_detail_js
     assert 'todo:         { back:    { label: "← Backlog",  next: "backlog" } }' in gaps_detail_js
     assert '<span class="target-app-label">Application</span>' in index_html

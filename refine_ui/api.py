@@ -717,8 +717,9 @@ _USER_STATUS_TRANSITIONS = {
     "failed": {"todo"},
     "cancelled": {"todo"},
 }
-_BULK_STATUS_VALUES = {"backlog", "todo", "failed"}
-_BULK_STATUS_SOURCE_VALUES = {"backlog", "todo", "failed"}
+_BULK_STATUS_AUTOMATED_VALUES = {"in-progress", "ready-merge"}
+_BULK_STATUS_VALUES = set(_VALID_STATUSES) - _BULK_STATUS_AUTOMATED_VALUES
+_BULK_STATUS_SOURCE_VALUES = _BULK_STATUS_VALUES
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
 # injection from the query string. `id` doubles as a chronological sort
@@ -1163,9 +1164,8 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
             return err(
                 409,
                 (
-                    "Bulk status updates may only set backlog, todo, or failed. "
-                    "Use per-Gap workflow actions for review, done, cancelled, "
-                    "and system-owned states."
+                    "Bulk status updates cannot set in-progress or ready-merge. "
+                    "Use per-Gap workflow actions for automated states."
                 ),
             )
     else:  # reporter
@@ -1188,29 +1188,29 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
         return code, listing
     gap_ids = [g["id"] for g in (listing.get("gaps") or [])
                if g["id"] not in excluded]
+    skipped_status_ids: list[dict[str, str]] = []
+    if field == "status":
+        skipped_status_ids = [
+            {"id": g["id"], "reason": f"status:{g.get('status')}"}
+            for g in (listing.get("gaps") or [])
+            if g["id"] in gap_ids
+            and str(g.get("status") or "") in _BULK_STATUS_AUTOMATED_VALUES
+        ]
+        gap_ids = [
+            g["id"] for g in (listing.get("gaps") or [])
+            if g["id"] in gap_ids
+            and str(g.get("status") or "") in _BULK_STATUS_SOURCE_VALUES
+        ]
     if not gap_ids:
-        return 200, {"updated": 0, "ids": []}
+        return 200, {
+            "updated": 0,
+            "ids": [],
+            "skipped": len(skipped_status_ids),
+            "skipped_details": skipped_status_ids,
+        }
     ok, ownership_err = _require_active_gap_ids(gap_ids)
     if not ok and ownership_err is not None:
         return ownership_err
-
-    if field == "status":
-        invalid_sources = sorted({
-            str(g.get("status") or "")
-            for g in (listing.get("gaps") or [])
-            if g["id"] in gap_ids
-            and str(g.get("status") or "") not in _BULK_STATUS_SOURCE_VALUES
-        })
-        if invalid_sources:
-            return err(
-                409,
-                (
-                    "Bulk status updates only support backlog, todo, and failed "
-                    "Gaps. Use per-Gap workflow actions for "
-                    + ", ".join(invalid_sources)
-                    + "."
-                ),
-            )
 
     updated_ids: list[str] = []
 
@@ -1280,8 +1280,12 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                 # keep going. The response count reflects what stuck.
                 continue
 
-    return 200, {"updated": len(updated_ids), "ids": updated_ids,
-                 "field": field, "value": value}
+    return 200, {
+        "updated": len(updated_ids), "ids": updated_ids,
+        "field": field, "value": value,
+        "skipped": len(skipped_status_ids),
+        "skipped_details": skipped_status_ids,
+    }
 
 
 def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
