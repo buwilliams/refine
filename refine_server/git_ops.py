@@ -403,7 +403,7 @@ def commits_on_branch_since(base_ref: str, cwd: Path) -> int:
         return 0
 
 
-# ---- merge & push (ready-merge → review) -------------------------------------
+# ---- merge & push (ready-merge → awaiting-rebuild) ----------------------------
 
 def pull_ff_only(cwd: Path | None = None) -> GitResult:
     return _run(["pull", "--ff-only", "--no-rebase"], cwd=cwd or client_repo_path())

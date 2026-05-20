@@ -23,7 +23,7 @@ from refine_server.backend_protocol import (
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, merger as _merger, preflight, project_sync, recovery, state_committer, subprocess_mgr, target_app, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, preflight, project_sync, recovery, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
 from .chat_mgr import ChatManager
 from .governance_agent import GovernanceAgent
 
@@ -43,11 +43,17 @@ class Runner:
         self._conn.execute("PRAGMA foreign_keys = ON")
 
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
+        self._target_app_lock = threading.Lock()
+        self.target_app_rebuilder = target_app_rebuilder.TargetAppRebuilder(
+            get_conn=self._get_conn,
+            run_rebuild=self._run_automatic_target_app_rebuild,
+        )
         # The merger owns the host worktree — everything that merges,
         # auto-resolves conflicts, or cleans stale git op state goes
         # through it. See refine_server/merger.py for the rationale.
         self.merger = _merger.Merger(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
+            on_worktree_merged=self.target_app_rebuilder.queue_for_worktree_merge,
         )
         self.dispatcher = _dispatcher.Dispatcher(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
@@ -65,7 +71,6 @@ class Runner:
         self.state_committer = state_committer.StateCommitter(
             get_conn=self._get_conn,
         )
-        self._target_app_lock = threading.Lock()
         self._diag_lock = threading.Lock()
         self._last_call_at: str | None = None
         self._recent_errors: list[str] = []
@@ -84,6 +89,7 @@ class Runner:
         self.governance_agent.start()
         self.dispatcher.start()
         self.merger.start()
+        self.target_app_rebuilder.start()
         self.state_committer.start()
         activity.append(
             self._conn, message="refine-server started",
@@ -98,6 +104,7 @@ class Runner:
         except Exception:
             pass
         self.state_committer.stop()
+        self.target_app_rebuilder.stop()
         self.governance_agent.stop()
         self.merger.stop()
         self.dispatcher.stop()
@@ -180,6 +187,7 @@ class Runner:
             "running": self.sub_mgr.running_snapshot(),
             "merger": self.merger.snapshot(),
             "governance": self.governance_agent.snapshot(),
+            "target_app_rebuild": self.target_app_rebuilder.snapshot(),
         }
 
     def _h_diagnostics(self, _: dict) -> dict:
@@ -955,6 +963,127 @@ class Runner:
             return result
         finally:
             self._target_app_lock.release()
+
+    def _run_automatic_target_app_rebuild(self, reason: str) -> dict:
+        """Run one queued automatic rebuild and promote rebuilt Gaps to review."""
+        with self._target_app_lock:
+            conn = self._get_conn()
+            settings = db.list_settings(conn)
+            cfg = target_app.config_from_settings(settings)
+            if not (cfg.get("rebuild_command") or "").strip():
+                msg = "No rebuild command configured for automatic target-app rebuild."
+                now = now_iso()
+                db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now)
+                db.set_setting(conn, "target_app_auto_rebuild_last_finished_at", now)
+                db.set_setting(conn, "target_app_auto_rebuild_last_ok", "0")
+                db.set_setting(conn, "target_app_auto_rebuild_last_message", msg)
+                activity.append(
+                    conn, message=msg, severity="warn",
+                    category="target_app", actor="runner",
+                )
+                return {"ok": False, "state": "failed", "message": msg}
+            db.set_setting(conn, "target_app_state", "rebuilding")
+            db.set_setting(conn, "target_app_last_error", "")
+            db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now_iso())
+            activity.append(
+                conn,
+                message=f"target-app: automatic rebuild started ({reason})",
+                severity="info", category="target_app", actor="runner",
+            )
+            result = target_app.run_operation("rebuild", cfg)
+            ok = bool(result.get("ok"))
+            final_state = result.get("state") if result.get("state") in {
+                "unknown", "running", "degraded", "stopped", "failed",
+            } else ("unknown" if ok else "failed")
+            err_msg = "" if ok else (result.get("message") or "target-app rebuild failed")
+            db.set_setting(conn, "target_app_state", final_state)
+            db.set_setting(conn, "target_app_last_error", err_msg)
+            db.set_setting(conn, "target_app_auto_rebuild_last_finished_at", now_iso())
+            db.set_setting(conn, "target_app_auto_rebuild_last_ok", "1" if ok else "0")
+            db.set_setting(
+                conn, "target_app_auto_rebuild_last_message",
+                result.get("message") or "",
+            )
+            op_id = self._record_target_app_operation(conn, "rebuild", result, final_state)
+            db.set_setting(conn, "target_app_last_operation_id", str(op_id))
+            if result.get("checks_configured"):
+                self._persist_target_app_checks(
+                    conn, result.get("checks") or [], result.get("message") or "",
+                )
+            promoted = self._promote_rebuilt_gaps(conn) if ok else 0
+            activity.append(
+                conn,
+                message=(
+                    f"target-app: automatic rebuild "
+                    f"{'completed' if ok else 'failed'}"
+                    + (f"; {promoted} Gap{'s' if promoted != 1 else ''} ready for review"
+                       if ok else "")
+                ),
+                severity="info" if ok else "error",
+                category="target_app", actor="runner",
+                details=err_msg or None,
+            )
+            return result
+
+    def _promote_rebuilt_gaps(self, conn: sqlite3.Connection) -> int:
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
+            "ORDER BY updated ASC"
+        ).fetchall()
+        if not rows:
+            return 0
+        updated = now_iso()
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'review', updated = ? "
+                "WHERE status = 'awaiting-rebuild'",
+                (updated,),
+            )
+        for row in rows:
+            gid = row["id"]
+            try:
+                gap_writer.update_fields(gid, status="review", branch_name=None)
+            except Exception:
+                pass
+            activity.append(
+                conn,
+                message="Target application rebuilt; Gap is ready for review",
+                severity="info", category="state", gap_id=gid, actor="runner",
+            )
+        return len(rows)
+
+    def _record_target_app_operation(self, conn: sqlite3.Connection, kind: str,
+                                     result: dict, state: str) -> int:
+        cur = conn.execute(
+            "INSERT INTO target_app_operations "
+            "(kind, state, started_at, finished_at, command, cwd, exit_code, "
+            "message, stdout_tail, stderr_tail, checks_json) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                kind, state,
+                result.get("started_at") or now_iso(),
+                result.get("finished_at") or now_iso(),
+                result.get("command") or "",
+                result.get("cwd") or "",
+                result.get("exit_code"),
+                result.get("message") or "",
+                result.get("stdout_tail") or "",
+                result.get("stderr_tail") or "",
+                json.dumps(result.get("checks") or []),
+            ),
+        )
+        return int(cur.lastrowid)
+
+    def _persist_target_app_checks(self, conn: sqlite3.Connection, checks: list[dict],
+                                   message: str) -> None:
+        ok = bool(checks) and all(bool(c.get("ok")) for c in checks)
+        db.set_setting(conn, "target_app_last_check_at", now_iso())
+        db.set_setting(conn, "target_app_last_check_ok", "1" if ok else "0")
+        db.set_setting(conn, "target_app_last_check_message", message or "")
+        db.set_setting(conn, "target_app_last_health_at",
+                       db.get_setting(conn, "target_app_last_check_at") or "")
+        db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0")
+        db.set_setting(conn, "target_app_last_health_message", message or "")
 
     def _h_target_app_health(self, params: dict) -> dict:
         """Probe the configured health URL from the host.

@@ -71,7 +71,7 @@ function drawDashboard(d, opts = {}) {
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
-  const orderedStatuses = ["backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled"];
+  const orderedStatuses = WORKFLOW_STATUSES;
   const dash = $("#dash");
   // Guard against late-arriving SSE refreshes after the user navigated
   // away — the container is gone, so just bail silently.
@@ -88,12 +88,12 @@ function drawDashboard(d, opts = {}) {
         </div>
       </section>` : ""}
 
-    <section class="card-grid">
+    <section class="card-grid dashboard-status-grid">
       ${orderedStatuses.map((s) => `
-        <a class="card" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit"
+        <a class="card dashboard-status-card" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit"
            title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}">
-          <div class="muted small">${s}</div>
-          <div style="font-size:28px;font-weight:600;margin-top:4px">${fmtCount(counts[s] || 0)}</div>
+          <div class="muted small dashboard-status-label">${s}</div>
+          <div class="dashboard-status-count">${fmtCount(counts[s] || 0)}</div>
         </a>`).join("")}
     </section>
 

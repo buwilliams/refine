@@ -22,6 +22,19 @@ const state = {
   features: null,
 };
 
+const WORKFLOW_STATUSES = [
+  "backlog",
+  "todo",
+  "in-progress",
+  "ready-merge",
+  "awaiting-rebuild",
+  "review",
+  "done",
+  "failed",
+  "cancelled",
+];
+const STATUS_FILTER_OPTIONS = ["", ...WORKFLOW_STATUSES];
+
 function updateActiveInstanceLabel() {
   const el = document.getElementById("active-instance-label");
   if (!el) return;

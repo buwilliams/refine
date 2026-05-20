@@ -421,7 +421,7 @@ class Dispatcher:
         msg = (f"Skipped agent run — this round's work is already on "
                f"`{target}` ({n_merges} merge commit"
                f"{'' if n_merges == 1 else 's'} for this Gap). "
-               f"Moved straight to review for human approval.")
+               f"Waiting for target-app rebuild before review.")
         # Log to the latest round's logs[] so the audit trail shows
         # why we bypassed the agent for this specific round.
         try:
@@ -434,12 +434,12 @@ class Dispatcher:
             pass
         with db.transaction(conn):
             conn.execute(
-                "UPDATE gaps_index SET status = 'review', updated = ? "
+                "UPDATE gaps_index SET status = 'awaiting-rebuild', updated = ? "
                 "WHERE id = ? AND status = 'todo'",
                 (now_iso(), gap_id),
             )
         try:
-            gap_writer.update_fields(gap_id, status="review")
+            gap_writer.update_fields(gap_id, status="awaiting-rebuild")
         except Exception:
             pass
         activity.append(
@@ -497,7 +497,7 @@ class Dispatcher:
         # system-owned status — picked up by the Merger, never set or
         # cleared by the user. The dispatcher owns the
         # `in-progress -> ready-merge` flip; the merger owns the
-        # `ready-merge -> review` merge step.
+        # `ready-merge -> awaiting-rebuild` merge step.
         next_status = "ready-merge" if success else "failed"
         with db.transaction(conn):
             cur = conn.execute(
@@ -544,7 +544,7 @@ class Dispatcher:
         # The dispatcher just flipped the Gap to `ready-merge`; tell
         # the merger to scan promptly instead of waiting on its
         # periodic tick. The Gap stays in `ready-merge` until the
-        # merger parks it in `review`.
+        # merger parks it in `awaiting-rebuild`.
 
     def _reset_stopped_run_to_todo(self, conn: sqlite3.Connection, gap_id: str,
                                    round_idx: int, reason: str) -> None:

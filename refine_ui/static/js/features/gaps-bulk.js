@@ -7,9 +7,7 @@
 // is changed per call so the confirmation reads cleanly.
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
-const BULK_STATUS_OPTIONS = [
-  "backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled",
-];
+const BULK_STATUS_OPTIONS = WORKFLOW_STATUSES;
 
 async function openBulkModal(field) {
   // Snapshot the current filter so the modal + the server-side bulk
@@ -183,7 +181,7 @@ async function openBulkTransferInstanceModal() {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        In-progress and ready-merge Gaps are skipped.
+        In-progress, ready-merge, and awaiting-rebuild Gaps are skipped.
       </p>
     </div>
     <div class="modal-actions">

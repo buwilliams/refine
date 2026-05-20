@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, config, db, gaps as shared_gaps, governance, project_registry, project_state, reporters
+from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
@@ -410,7 +410,7 @@ def _cancel_active_transfer_gaps(
     try:
         project_state.set_setting("paused", "1")
         db.set_setting(conn, "paused", "1")
-        where = ["status IN ('in-progress', 'ready-merge')"]
+        where = ["status IN ('in-progress', 'ready-merge', 'awaiting-rebuild')"]
         args: list[Any] = []
         if source_instance_id:
             where.append("instance_id = ?")
@@ -680,7 +680,7 @@ def _git_checked(repo: Path, args: list[str]) -> None:
 
 _VALID_PRIORITIES = ("low", "medium", "high")
 _VALID_STATUSES = (
-    "backlog", "todo", "in-progress", "ready-merge",
+    "backlog", "todo", "in-progress", "ready-merge", "awaiting-rebuild",
     "review", "done", "failed", "cancelled",
 )
 
@@ -1567,6 +1567,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "target_app_tcp_check_host",
         "target_app_tcp_check_port",
         "target_app_process_check_command",
+        "target_app_auto_rebuild",
     }
     valid_agent_clis = ("claude", "codex", "gemini")
     normalized: dict[str, str] = {}
@@ -1637,6 +1638,16 @@ def update_settings(body: dict) -> tuple[int, dict]:
             if n < 1 or n > 3600:
                 return err(400, f"{k} must be between 1 and 3600")
             normalized[k] = str(n)
+        elif k == "target_app_auto_rebuild":
+            choice = str(v or "").strip()
+            allowed_modes = {"never", "on_worktree_merge", "hourly", "nightly"}
+            if choice not in allowed_modes:
+                return err(
+                    400,
+                    "target_app_auto_rebuild must be one of never, "
+                    "on_worktree_merge, hourly, nightly",
+                )
+            normalized[k] = choice
         elif k == "target_app_tcp_check_port":
             port = str(v or "").strip()
             if port:
@@ -1906,7 +1917,7 @@ def dashboard_summary() -> tuple[int, dict]:
     }
 
 
-_ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "review")
+_ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "awaiting-rebuild", "review")
 
 
 def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]:
@@ -2105,6 +2116,11 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
         "last_error": settings.get("target_app_last_error") or "",
         "last_operation_id": settings.get("target_app_last_operation_id") or "",
         "last_operation": dict(last_op) if last_op else None,
+        "auto_rebuild": settings.get("target_app_auto_rebuild") or "never",
+        "auto_rebuild_last_started_at": settings.get("target_app_auto_rebuild_last_started_at") or "",
+        "auto_rebuild_last_finished_at": settings.get("target_app_auto_rebuild_last_finished_at") or "",
+        "auto_rebuild_last_ok": (settings.get("target_app_auto_rebuild_last_ok") or "0") == "1",
+        "auto_rebuild_last_message": settings.get("target_app_auto_rebuild_last_message") or "",
         "legacy_config_present": bool(legacy_start or legacy_stop or (settings.get("target_app_health_url") or "").strip()),
     }
 
@@ -2188,6 +2204,7 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
         db.set_setting(conn, "target_app_last_operation_id", str(op_id))
         if result.get("checks_configured"):
             _persist_check_settings(conn, result.get("checks") or [], result.get("message") or "")
+        promoted = _promote_rebuilt_gaps(conn) if kind == "rebuild" and ok else 0
         snap = _target_app_snapshot(conn)
     finally:
         conn.close()
@@ -2202,6 +2219,7 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
             or result.get("stdout_tail")
             or json.dumps(result.get("checks") or [])
         )[:8000],
+        "promoted_gaps": promoted,
     })
     return status, snap
 
@@ -2227,6 +2245,33 @@ def _record_target_app_operation(conn: sqlite3.Connection, kind: str,
         ),
     )
     return int(cur.lastrowid)
+
+
+def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
+    rows = conn.execute(
+        "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
+        "ORDER BY updated ASC"
+    ).fetchall()
+    if not rows:
+        return 0
+    with db.transaction(conn):
+        conn.execute(
+            "UPDATE gaps_index SET status = 'review', updated = ? "
+            "WHERE status = 'awaiting-rebuild'",
+            (now_iso(),),
+        )
+    for row in rows:
+        gid = row["id"]
+        try:
+            gap_writer.update_fields(gid, status="review", branch_name=None)
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message="Target application rebuilt; Gap is ready for review",
+            severity="info", category="state", gap_id=gid, actor="refine",
+        )
+    return len(rows)
 
 
 def _persist_check_settings(conn: sqlite3.Connection, checks: list[dict],

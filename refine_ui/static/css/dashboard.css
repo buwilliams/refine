@@ -13,6 +13,31 @@
 #dash > section.card-grid {
   flex: 0 0 auto;   /* fixed-size sections */
 }
+#dash > .dashboard-status-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(9, minmax(0, 1fr));
+}
+#dash > .dashboard-status-grid > .dashboard-status-card {
+  min-width: 0;
+  padding: 8px 6px;
+}
+#dash > .dashboard-status-grid .dashboard-status-label {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  line-height: 1.1;
+}
+#dash > .dashboard-status-grid .dashboard-status-count {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.1;
+  margin-top: 2px;
+}
+@media (max-width: 900px) {
+  #dash > .dashboard-status-grid {
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  }
+}
 #dash > section.row {
   flex: 1 1 auto;   /* claims the remaining vertical space */
   min-height: 280px;

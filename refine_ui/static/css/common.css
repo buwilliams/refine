@@ -22,6 +22,7 @@
 .status-pill.todo        { background: #eef0f4; color: #4a5060; }
 .status-pill.in-progress { background: #fff4d0; color: #875e00; }
 .status-pill.ready-merge { background: #ffeac2; color: #7a4500; }
+.status-pill.awaiting-rebuild { background: #fff0e0; color: #8a4b00; }
 
 /* System screen tab strip. Mirrors the Chat dock tabs so Settings
    sections read as tabs instead of plain text links. */

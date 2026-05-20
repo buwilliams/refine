@@ -17,10 +17,31 @@ def main() -> int:
     target_app_js = (root / "refine_ui/static/js/target-app.js").read_text(
         encoding="utf-8",
     )
+    common_js = (root / "refine_ui/static/js/common.js").read_text(
+        encoding="utf-8",
+    )
+    dashboard_js = (root / "refine_ui/static/js/features/dashboard.js").read_text(
+        encoding="utf-8",
+    )
+    gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(
+        encoding="utf-8",
+    )
+    gaps_bulk_js = (root / "refine_ui/static/js/features/gaps-bulk.js").read_text(
+        encoding="utf-8",
+    )
+    gaps_detail_js = (root / "refine_ui/static/js/features/gaps-detail.js").read_text(
+        encoding="utf-8",
+    )
+    changes_js = (root / "refine_ui/static/js/features/changes.js").read_text(
+        encoding="utf-8",
+    )
     index_html = (root / "refine_ui/static/index.html").read_text(
         encoding="utf-8",
     )
     common_css = (root / "refine_ui/static/css/common.css").read_text(
+        encoding="utf-8",
+    )
+    dashboard_css = (root / "refine_ui/static/css/dashboard.css").read_text(
         encoding="utf-8",
     )
 
@@ -127,8 +148,24 @@ def main() -> int:
         root / "refine_ui/static/js/common.js"
     ).read_text(encoding="utf-8")
     assert 'id="s-target-rebuild-command"' in settings_js
+    assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
+    assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
+    assert '"on_worktree_merge", "On worktree merge"' in settings_js
+    assert "target_app_auto_rebuild" in (root / "refine_ui/api.py").read_text(encoding="utf-8")
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
+    assert "const WORKFLOW_STATUSES = [" in common_js
+    assert '"awaiting-rebuild",' in common_js
+    assert "const orderedStatuses = WORKFLOW_STATUSES;" in dashboard_js
+    assert "dashboard-status-grid" in dashboard_js
+    assert "repeat(9, minmax(0, 1fr))" in dashboard_css
+    assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
+    assert "dashboard-status-label" in dashboard_css
+    assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
+    assert "${STATUS_FILTER_OPTIONS" in changes_js
+    assert "const BULK_STATUS_OPTIONS = WORKFLOW_STATUSES;" in gaps_bulk_js
+    assert 'forward: { label: "Review →"' not in gaps_detail_js
+    assert 'todo:         { back:    { label: "← Backlog",  next: "backlog" } }' in gaps_detail_js
     assert '<span class="target-app-label">Application</span>' in index_html
     assert "function targetAppProjectLabel()" in target_app_js
     assert 'const app = apps.find((candidate) => candidate.path === current);' in target_app_js

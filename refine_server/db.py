@@ -160,6 +160,11 @@ DEFAULT_SETTINGS = {
     "target_app_tcp_check_host": "",
     "target_app_tcp_check_port": "",
     "target_app_process_check_command": "",
+    "target_app_auto_rebuild": "never",
+    "target_app_auto_rebuild_last_started_at": "",
+    "target_app_auto_rebuild_last_finished_at": "",
+    "target_app_auto_rebuild_last_ok": "0",
+    "target_app_auto_rebuild_last_message": "",
     # Latest known status. "unknown" | "starting" | "running" |
     # "degraded" | "stopping" | "stopped" | "failed".
     "target_app_state": "unknown",

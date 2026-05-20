@@ -56,7 +56,7 @@ async function renderChanges() {
           </div>
           <div class="filter-row filter-row-filters">
             <select id="changes-status">
-              ${["", "backlog", "todo", "in-progress", "ready-merge", "review", "done", "failed", "cancelled"]
+              ${STATUS_FILTER_OPTIONS
                 .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
             </select>
             <select id="changes-priority">

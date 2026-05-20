@@ -97,23 +97,23 @@ async function loadGapDetail(gapId) {
 }
 
 // User-driven workflow transitions for a Gap. Each state declares its
-// `back` and `forward` neighbors. Two states have no user buttons —
-// `in-progress` (dispatcher owns) and `ready-merge` (merger owns) —
+// `back` and `forward` neighbors. System-owned states have no user buttons —
+// `in-progress` (dispatcher owns), `ready-merge` (merger owns), and
+// `awaiting-rebuild` (target-app rebuild owns) have no user buttons
 // because they're system-driven phases the agent passes through
-// automatically (todo → in-progress → ready-merge → review).
-// Forward from `review` goes through the dedicated /verify endpoint
-// for approval; every other transition is a status PATCH with no
-// workflow side effects.
+// automatically (todo → in-progress → ready-merge → awaiting-rebuild → review).
+// Forward from `review` goes through the dedicated /verify endpoint for
+// approval. No user action moves a Gap into `review`; successful rebuild does.
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
 // from done). Use back to send the Gap back to todo and rerun.
 const GAP_WORKFLOW = {
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
-  todo:         { back:    { label: "← Backlog",  next: "backlog" },
-                  forward: { label: "Review →",   next: "review" } },
+  todo:         { back:    { label: "← Backlog",  next: "backlog" } },
   // in-progress: no user buttons — dispatcher owns.
   // ready-merge: no user buttons — merger owns.
+  // awaiting-rebuild: no user buttons — target-app rebuild owns.
   review:       { back:    { label: "← Todo",     next: "todo"   },
                   forward: { label: "Verify →",   next: "done", verify: true } },
   done:         { back:    { label: "← Review",   next: "review" } },
@@ -160,9 +160,9 @@ function drawGapDetail(gap) {
 
   // Dynamic workflow buttons: each state shows the previous/next state
   // it can move to as back / forward buttons. The user-driven workflow
-  // skips `in-progress` (the dispatcher owns that). Forward from review
-  // goes through the existing `verify` endpoint for approval; everything
-  // else is a bookkeeping status update via PATCH /api/gaps/<id>.
+  // skips system-owned statuses. Forward from review goes through the existing
+  // `verify` endpoint for approval; everything else is a bookkeeping status
+  // update via PATCH /api/gaps/<id>.
   const workflow = GAP_WORKFLOW[gap.status] || {};
   const backBtn = workflow.back ? `
     <button id="btn-state-back">${htmlEscape(workflow.back.label)}</button>

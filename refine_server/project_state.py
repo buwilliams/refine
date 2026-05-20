@@ -64,6 +64,11 @@ TARGET_APP_SETTING_KEYS = {
     "target_app_tcp_check_host",
     "target_app_tcp_check_port",
     "target_app_process_check_command",
+    "target_app_auto_rebuild",
+    "target_app_auto_rebuild_last_started_at",
+    "target_app_auto_rebuild_last_finished_at",
+    "target_app_auto_rebuild_last_ok",
+    "target_app_auto_rebuild_last_message",
     "target_app_state",
     "target_app_last_check_at",
     "target_app_last_check_ok",
@@ -584,7 +589,10 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
                   gap_ids: set[str] | None = None) -> dict[str, Any]:
     if instance_by_id(target_instance_id) is None:
         raise ValueError(f"unknown target instance: {target_instance_id}")
-    allowed = statuses or {"backlog", "todo", "failed", "review", "done", "cancelled"}
+    allowed = statuses or {
+        "backlog", "todo", "failed", "awaiting-rebuild",
+        "review", "done", "cancelled",
+    }
     skipped: list[dict[str, str]] = []
     updated: list[str] = []
     root = volume_root()

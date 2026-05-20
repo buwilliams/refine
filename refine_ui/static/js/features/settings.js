@@ -626,6 +626,16 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <input type="text" id="s-target-rebuild-command"
                placeholder="npm run build"
                value="${htmlEscape(s.target_app_rebuild_command || "")}"></div>
+      <div class="form-row"><label>Automatic application rebuild
+        <span class="muted small">— controls when Refine rebuilds merged work before it becomes ready for review.</span></label>
+        <select id="s-target-auto-rebuild">
+          ${[
+            ["never", "Never"],
+            ["on_worktree_merge", "On worktree merge"],
+            ["hourly", "Hourly"],
+            ["nightly", "Nightly (12 PM)"],
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.target_app_auto_rebuild || "never") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
       <div class="form-row"><label>Status command
         <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>
         <input type="text" id="s-target-status-command"
@@ -850,7 +860,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       <p class="muted small" style="margin-top:0">
         Transfers matching Gaps to another instance. If active work is present,
         Refine pauses agents, stops agent processes, cancels in-progress and
-        ready-merge Gaps, then transfers them.
+        ready-merge and awaiting-rebuild Gaps, then transfers them.
       </p>
       <div class="form-grid two">
         <div class="form-row"><label>From</label>
@@ -1191,7 +1201,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     if (!target) return;
     const ok = await modalConfirm(
       "Refine will pause agents, stop all running agent processes, mark matching " +
-      "in-progress and ready-merge Gaps as cancelled, then transfer all matching " +
+      "in-progress, ready-merge, and awaiting-rebuild Gaps as cancelled, then transfer all matching " +
       "Gaps to the selected instance.",
       {
         title: "Transfer Gaps",
@@ -1226,6 +1236,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           target_app_start_command: $("#s-target-start-command").value,
           target_app_stop_command: $("#s-target-stop-command").value,
           target_app_rebuild_command: $("#s-target-rebuild-command").value,
+          target_app_auto_rebuild: $("#s-target-auto-rebuild").value,
           target_app_status_command: $("#s-target-status-command").value,
           target_app_cwd: $("#s-target-cwd").value,
           target_app_env_json: $("#s-target-env").value,
@@ -1376,6 +1387,17 @@ function drawTargetAppStatusBlock(snap) {
   const op = snap.last_operation
     ? `<p class="muted small" style="margin-top:6px">Last operation: ${htmlEscape(snap.last_operation.kind)} → ${htmlEscape(snap.last_operation.state)} · ${fmtTime(snap.last_operation.finished_at)}</p>`
     : "";
+  const autoRebuildLabel = {
+    never: "Never",
+    on_worktree_merge: "On worktree merge",
+    hourly: "Hourly",
+    nightly: "Nightly (12 PM)",
+  }[snap.auto_rebuild || "never"] || "Never";
+  const autoRebuild = `<p class="muted small" style="margin-top:6px">Automatic rebuild: ${htmlEscape(autoRebuildLabel)}${
+    snap.auto_rebuild_last_finished_at
+      ? ` · last ${snap.auto_rebuild_last_ok ? "OK" : "failed"} at ${fmtTime(snap.auto_rebuild_last_finished_at)}`
+      : ""
+  }</p>`;
   block.innerHTML = `
     <div style="display:flex;align-items:center;gap:10px">
       <span class="target-app-dot" data-status-dot></span>
@@ -1385,6 +1407,7 @@ function drawTargetAppStatusBlock(snap) {
     <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
     ${healthDetail}
     ${op}
+    ${autoRebuild}
     ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
     ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
   `;

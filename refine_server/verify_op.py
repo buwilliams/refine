@@ -20,9 +20,9 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
     """Run the merge+push sequence for a `ready-merge` Gap, then transition it.
 
     `final_status` is the status the Gap moves to on a clean run:
-      - The Merger calls with `final_status="review"` — auto-merge
-        completes the merge but parks the Gap in `review` so a human
-        approves it before it lands in `done`.
+      - The Merger calls with `final_status="awaiting-rebuild"` — auto-merge
+        completes the merge, then target-app rebuild promotes the Gap to
+        `review` so review means merged + rebuilt/live.
 
     Returns a dict with keys: ok, stage, message, details.
     """
@@ -361,15 +361,15 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
                 r = git_ops.push_current()
         if not r.ok:
             _log(conn, gap_id,
-                 "Push failed — environment issue; Gap stays in `review`",
+                 "Push failed — environment issue; Gap is not ready for review",
                  details=r.stderr, severity="error", category="git", actor=actor)
-            # Per spec: gap STAYS IN REVIEW.
             return {"ok": False, "stage": "push",
                     "message": "Push failed", "details": r.stderr}
         pushed = True
 
-    # Merge landed; clean up branch + worktree and park the Gap in
-    # `review` so a human can approve it.
+    # Merge landed; clean up branch + worktree and park the Gap in the requested
+    # final status. The Merger uses `awaiting-rebuild`; successful target-app
+    # rebuilds promote those Gaps to `review`.
     with db.transaction(conn):
         conn.execute(
             "UPDATE gaps_index SET status = ?, updated = ? WHERE id = ?",

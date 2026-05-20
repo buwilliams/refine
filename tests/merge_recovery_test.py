@@ -70,23 +70,29 @@ def main() -> int:
         conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")
 
-        merger = Merger(get_conn=lambda: conn, sub_mgr=FakeSubprocessManager())
+        rebuild_queue: list[str] = []
+        merger = Merger(
+            get_conn=lambda: conn,
+            sub_mgr=FakeSubprocessManager(),
+            on_worktree_merged=rebuild_queue.append,
+        )
 
-        # Successful Merge-agent path: ready-merge -> review, branch/worktree
-        # cleanup, merge commit pushed to the bare remote.
+        # Successful Merge-agent path: ready-merge -> awaiting-rebuild,
+        # branch/worktree cleanup, merge commit pushed to the bare remote.
         gid_success = "01MERGESUCCESSAAAAAAAAAAA"
         branch_success = "refine/merge-success"
         make_ready_branch(
             conn, gid_success, branch_success, "feature-success.txt", "ok\n",
         )
         merger._merge_one(gid_success)
-        assert db_status(conn, gid_success) == "review"
+        assert db_status(conn, gid_success) == "awaiting-rebuild"
+        assert rebuild_queue == [gid_success]
         assert not git_ops.local_branch_exists(branch_success)
         assert not git_ops.worktree_exists(gid_success)
         assert "feature-success.txt" in git(client, "ls-tree", "-r", "--name-only", "origin/main").stdout
 
         # Merge conflict path: unresolved conflict is recoverable user work, so
-        # the Gap parks in review instead of becoming done or blocking queue.
+        # the Gap fails instead of becoming review-ready or blocking queue.
         gid_conflict = "01MERGECONFLICTAAAAAAAAAA"
         branch_conflict = "refine/merge-conflict"
         make_ready_branch(
@@ -106,11 +112,11 @@ def main() -> int:
             merger._merge_one(gid_conflict)
         finally:
             conflict_resolver.attempt_auto_resolve = old_resolver
-        assert db_status(conn, gid_conflict) == "review"
+        assert db_status(conn, gid_conflict) == "failed"
         assert any("Merge conflict" in msg for msg in latest_messages(gid_conflict))
 
         # Push failure path: the merge may have landed locally, but the Gap
-        # stays in review for operator recovery and is not marked done.
+        # is not considered review-ready because it was not deployed remotely.
         gid_push = "01MERGEPUSHFAILAAAAAAAAAA"
         branch_push = "refine/merge-push-fail"
         make_ready_branch(conn, gid_push, branch_push, "push-fail.txt", "push\n")
@@ -118,7 +124,7 @@ def main() -> int:
         hook.write_text("#!/bin/sh\necho rejected by test >&2\nexit 1\n", encoding="utf-8")
         hook.chmod(0o755)
         merger._merge_one(gid_push)
-        assert db_status(conn, gid_push) == "review"
+        assert db_status(conn, gid_push) == "failed"
         assert any("Push failed" in msg for msg in latest_messages(gid_push))
 
         # Recovery: finished in-progress run is promoted to ready-merge; orphan

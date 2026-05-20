@@ -25,8 +25,8 @@ Status semantics:
   user never sets or clears it. The merger's `_find_one_ready()`
   query picks up any `ready-merge` Gap, oldest-finished first.
 - The merger calls `verify_op.perform_verify`. On success, it parks
-  the Gap in `review` for human approval. On failure, the merger also
-  transitions the Gap to `review` so the operator has a recovery path,
+  the Gap in `awaiting-rebuild`; a target-app rebuild promotes it to
+  `review`. On failure, the merger transitions the Gap to `failed`
   and cleans the host worktree so the next ready Gap can proceed.
 
 On runner restart, `recovery.reconcile_on_start` distinguishes "agent
@@ -40,6 +40,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 import time
+from collections.abc import Callable
 
 from refine_server import activity, db
 from refine_server.gaps import now_iso
@@ -58,9 +59,11 @@ class Merger:
         *,
         get_conn,
         sub_mgr: subprocess_mgr.SubprocessManager,
+        on_worktree_merged: Callable[[str], None] | None = None,
     ) -> None:
         self._get_conn = get_conn
         self._sub_mgr = sub_mgr
+        self._on_worktree_merged = on_worktree_merged
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -210,12 +213,12 @@ class Merger:
             self._current_started = time.monotonic()
         try:
             try:
-                # Auto-merge lands the branch but parks the Gap in
-                # `review` — a human approves before it moves to
-                # `done`.
+                # Auto-merge lands the branch, then parks the Gap in
+                # `awaiting-rebuild`. A target-app rebuild promotes it to
+                # `review`, so review always means merged + deployed/live.
                 result = verify_op.perform_verify(
                     conn, gap_id, actor="runner",
-                    final_status="review",
+                    final_status="awaiting-rebuild",
                 )
             except Exception as e:
                 activity.append(
@@ -230,22 +233,18 @@ class Merger:
             with self._snap_lock:
                 self._current_gap_id = None
                 self._current_started = None
-                # Both the happy path (auto-merge succeeded → review)
-                # and the failure path (auto-merge couldn't complete
-                # → review) land the Gap in `review`. So the
-                # snapshot's `last_outcome` is always `review` from
-                # the Merge agent's perspective.
-                self._last_outcome = "review"
+                self._last_outcome = (
+                    result.get("final_status") if result.get("ok") else "failed"
+                )
 
         if result.get("ok"):
-            # verify_op already parked the Gap in `review`. Nothing
-            # else to do.
+            if self._on_worktree_merged is not None:
+                self._on_worktree_merged(gap_id)
             return
 
         # Merge failed somewhere recoverable. Clean up any new stuck
         # state left behind by this attempt, then move the Gap to
-        # `review` so the operator can investigate without blocking
-        # the rest of the queue.
+        # `failed` so review remains reserved for rebuilt/live work.
         self._cleanup_worktree(reason="post-failure cleanup")
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = ?", (gap_id,),
@@ -253,18 +252,18 @@ class Merger:
         if row and row["status"] == "ready-merge":
             with db.transaction(conn):
                 conn.execute(
-                    "UPDATE gaps_index SET status = 'review', updated = ? "
+                    "UPDATE gaps_index SET status = 'failed', updated = ? "
                     "WHERE id = ?",
                     (now_iso(), gap_id),
                 )
             try:
-                gap_writer.update_fields(gap_id, status="review")
+                gap_writer.update_fields(gap_id, status="failed")
             except Exception:
                 pass
             activity.append(
                 conn,
                 message=(result.get("message")
-                         or "Merge failed — moved Gap to review"),
+                         or "Merge failed — moved Gap to failed"),
                 severity="warn", category="state",
                 gap_id=gap_id, actor="runner",
                 details=result.get("details"),
