@@ -119,10 +119,11 @@ def main(argv: list[str] | None = None) -> int:
         "start",
         help="Start the UI backend.",
         description=(
-            "Starts the host-native UI backend as a detached background "
-            "process, then prints a status block. The backend owns the runner "
-            "in-process. Pass a port to run multiple Refine instances on one "
-            "host."
+            "Starts the host-native UI backend, then prints a status block. "
+            "If this checkout has an installed systemd user unit, the command "
+            "starts that service; otherwise it starts a detached background "
+            "process. The backend owns the runner in-process. Pass a port to "
+            "run multiple Refine instances on one host."
         ),
     )
     p_start.add_argument(
@@ -532,8 +533,11 @@ def cmd_start(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
-    port = _effective_port(args, cfg)
+    port = _runtime_action_port(args, clone, cfg, unit)
     _sync_bound_project_registry(clone, cfg)
+    ui_unit = _installed_ui_unit(unit, port)
+    if ui_unit is not None:
+        return _start_systemd_ui(clone, unit, cfg, port)
     if _port_open(cfg.web_host, port):
         print(f"UI backend is already reachable on port {port}.")
         _print_status_block(clone, unit, cfg, port=port)
@@ -573,7 +577,10 @@ def cmd_stop(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
-    port = _runtime_action_port(args, clone, cfg)
+    port = _runtime_action_port(args, clone, cfg, unit)
+    ui_unit = _installed_ui_unit(unit, port)
+    if ui_unit is not None:
+        return _stop_systemd_ui(clone, unit, cfg, port)
     stopped = _stop_background_ui(clone, cfg, port)
     if stopped:
         print(f"Stopped UI backend on port {port}.")
@@ -597,10 +604,13 @@ def cmd_restart(args: argparse.Namespace) -> int:
         print()
         return cmd_start(restart_args)
 
-    clone, _unit = _resolve_clone_and_unit_or_exit()
+    clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
-    port = _runtime_action_port(args, clone, cfg)
+    port = _runtime_action_port(args, clone, cfg, unit)
+    ui_unit = _installed_ui_unit(unit, port)
+    if ui_unit is not None:
+        return _restart_systemd_ui(clone, unit, cfg, port)
     restart_args = argparse.Namespace(**vars(args))
     restart_args.port = port
     rc = cmd_stop(restart_args)
@@ -712,7 +722,7 @@ def cmd_status(args: argparse.Namespace) -> int:
         print(f"refine status: {e}", file=sys.stderr)
         return 1
     _sync_bound_project_registry(clone, cfg)
-    for port in _status_ports(args, clone, cfg):
+    for port in _status_ports(args, clone, cfg, unit):
         _print_status_block(clone, unit, cfg, port=port)
     return 0
 
@@ -951,6 +961,61 @@ def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> 
     return True
 
 
+def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
+    ui_unit = _ui_unit_name(unit, port)
+    print(f"Starting persistent UI backend (systemctl --user start {ui_unit})...")
+    rc, out = _systemctl("start", ui_unit)
+    if rc != 0:
+        print(f"refine start: systemctl --user start {ui_unit} failed: {out.strip()}",
+              file=sys.stderr)
+        return 1
+    _unlink_quietly(_runtime_pid_path(clone, cfg, port))
+    if not _wait_for_port(cfg.web_host, port, timeout=20.0):
+        print(
+            f"refine start: systemd unit {ui_unit} did not start listening on "
+            f"{cfg.web_host}:{port} within 20s.",
+            file=sys.stderr,
+        )
+        return 1
+    _print_status_block(clone, unit, cfg, port=port)
+    return 0
+
+
+def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
+    ui_unit = _ui_unit_name(unit, port)
+    print(f"Stopping persistent UI backend (systemctl --user stop {ui_unit})...")
+    rc, out = _systemctl("stop", ui_unit)
+    if rc != 0:
+        print(f"refine stop: systemctl --user stop {ui_unit} failed: {out.strip()}",
+              file=sys.stderr)
+        return 1
+    _unlink_quietly(_runtime_pid_path(clone, cfg, port))
+    print(f"Stopped persistent UI backend on port {port}.")
+    return 0
+
+
+def _restart_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
+    ui_unit = _ui_unit_name(unit, port)
+    print(f"Restarting persistent UI backend (systemctl --user restart {ui_unit})...")
+    rc, out = _systemctl("restart", ui_unit)
+    if rc != 0:
+        print(
+            f"refine restart: systemctl --user restart {ui_unit} failed: {out.strip()}",
+            file=sys.stderr,
+        )
+        return 1
+    _unlink_quietly(_runtime_pid_path(clone, cfg, port))
+    if not _wait_for_port(cfg.web_host, port, timeout=20.0):
+        print(
+            f"refine restart: systemd unit {ui_unit} did not start listening on "
+            f"{cfg.web_host}:{port} within 20s.",
+            file=sys.stderr,
+        )
+        return 1
+    _print_status_block(clone, unit, cfg, port=port)
+    return 0
+
+
 def _running_pid(clone: Path, cfg: "config.Config | None", port: int) -> int | None:
     pid_path = _runtime_pid_path(clone, cfg, port)
     pid = _read_pid(pid_path)
@@ -1062,11 +1127,14 @@ def _owned_refine_ui_ports(clone: Path) -> list[int]:
 
 
 def _status_ports(args: argparse.Namespace, clone: Path,
-                  cfg: "config.Config | None") -> list[int]:
+                  cfg: "config.Config | None",
+                  unit: str | None = None) -> list[int]:
     if getattr(args, "port", None) is not None:
         return [_effective_port(args, cfg)]
     ports = set(_runtime_pid_ports(clone, cfg))
     ports.update(_owned_refine_ui_ports(clone))
+    if unit is not None:
+        ports.update(_installed_ui_unit_ports(unit))
     if not ports:
         ports.add(_effective_port(args, cfg))
     return sorted(ports)
@@ -1137,15 +1205,23 @@ def _listener_port_pids() -> list[tuple[int, int]]:
     return pairs
 
 
-def _runtime_action_port(args: argparse.Namespace, clone: Path, cfg: "config.Config | None") -> int:
+def _runtime_action_port(args: argparse.Namespace, clone: Path,
+                         cfg: "config.Config | None",
+                         unit: str | None = None) -> int:
     configured = _effective_port(args, cfg)
     if getattr(args, "port", None) is not None:
         return configured
     if _running_pid(clone, cfg, configured) is not None:
         return configured
+    if unit is not None and _installed_ui_unit(unit, configured) is not None:
+        return configured
     live_ports = [p for p in _owned_refine_ui_ports(clone) if p != configured]
     if len(live_ports) == 1:
         return live_ports[0]
+    if unit is not None:
+        installed_ports = [p for p in _installed_ui_unit_ports(unit) if p != configured]
+        if len(installed_ports) == 1:
+            return installed_ports[0]
     return configured
 
 
@@ -1218,6 +1294,27 @@ def _unit_names_for_reset(unit: str) -> list[str]:
         if name not in out:
             out.append(name)
     return out
+
+
+def _installed_ui_unit(unit: str, port: int) -> str | None:
+    ui_unit = _ui_unit_name(unit, port)
+    if (SYSTEMD_USER_DIR / f"{ui_unit}.service").exists():
+        return ui_unit
+    return None
+
+
+def _installed_ui_unit_ports(unit: str) -> list[int]:
+    ports: set[int] = set()
+    pattern = re.compile(rf"^{re.escape(unit)}-(\d+)-ui\.service$")
+    try:
+        paths = list(SYSTEMD_USER_DIR.glob(f"{unit}-*-ui.service"))
+    except OSError:
+        return []
+    for path in paths:
+        m = pattern.fullmatch(path.name)
+        if m:
+            ports.add(int(m.group(1)))
+    return sorted(ports)
 
 
 def _ui_unit_name(runner_unit: str, port: int) -> str:

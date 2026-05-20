@@ -269,6 +269,57 @@ def main() -> int:
     assert ("enable", "refine-unit-clone-8080-ui") in systemctl_calls
     print("[ok] refine install writes per-port host-native UI backend systemd unit")
 
+    unit_name = "refine-unit-clone"
+    unit_cfg_path = unit_client / ".refine" / "refine.toml"
+    unit_cfg = config.Config.load(unit_cfg_path)
+    nondefault_unit = ui_unit.with_name("refine-unit-clone-18124-ui.service")
+    ui_unit.rename(nondefault_unit)
+    nondefault_unit.write_text(unit_text.replace("8080", "18124"), encoding="utf-8")
+    old_systemd_dir = refine_cli.SYSTEMD_USER_DIR
+    old_systemctl = refine_cli._systemctl
+    old_wait_for_port = refine_cli._wait_for_port
+    old_print_status_block = refine_cli._print_status_block
+    old_start_background = refine_cli._start_background_ui
+    old_stop_background = refine_cli._stop_background_ui
+    old_cwd = Path.cwd()
+    lifecycle_calls: list[tuple[str, ...]] = []
+
+    def fail_start_background(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("installed systemd unit should handle refine start")
+
+    def fail_stop_background(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise AssertionError("installed systemd unit should handle refine stop")
+
+    try:
+        os.chdir(unit_clone)
+        refine_cli.SYSTEMD_USER_DIR = tmp / "systemd-user"
+        refine_cli._systemctl = fake_systemctl
+        refine_cli._wait_for_port = lambda host, port, timeout: True
+        refine_cli._print_status_block = lambda clone_arg, unit_arg, cfg_arg, *, port: (
+            lifecycle_calls.append(("status", unit_arg, str(port)))
+        )
+        refine_cli._start_background_ui = fail_start_background
+        refine_cli._stop_background_ui = fail_stop_background
+        no_port_args = type("Args", (), {"port": None, "config": str(unit_cfg_path)})()
+
+        assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 18124
+        assert refine_cli.cmd_start(no_port_args) == 0
+        assert refine_cli.cmd_stop(no_port_args) == 0
+        assert refine_cli.cmd_restart(no_port_args) == 0
+    finally:
+        os.chdir(old_cwd)
+        refine_cli.SYSTEMD_USER_DIR = old_systemd_dir
+        refine_cli._systemctl = old_systemctl
+        refine_cli._wait_for_port = old_wait_for_port
+        refine_cli._print_status_block = old_print_status_block
+        refine_cli._start_background_ui = old_start_background
+        refine_cli._stop_background_ui = old_stop_background
+    assert ("start", "refine-unit-clone-18124-ui") in systemctl_calls
+    assert ("stop", "refine-unit-clone-18124-ui") in systemctl_calls
+    assert ("restart", "refine-unit-clone-18124-ui") in systemctl_calls
+    assert ("status", "refine-unit-clone", "18124") in lifecycle_calls
+    print("[ok] refine start/stop/restart route installed UI units through systemd")
+
     bg_cfg = config.Config.load(ui_client / ".refine" / "refine.toml")
     old_find_host_command = refine_cli._find_host_command
     old_popen = refine_cli.subprocess.Popen
