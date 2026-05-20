@@ -144,6 +144,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    old_cfg = os.environ.get("REFINE_CONFIG_PATH")
     try:
         conn = init_refine(client1)
         conn.close()
@@ -196,6 +197,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         assert fake_poller.stopped is False
         assert config.get(reload=True).client_repo == client1
 
+        os.environ.pop("REFINE_CONFIG_PATH", None)
         config.write_binding(root, client2)
         config.get(reload=True)
         status, body = api.dashboard_summary()
@@ -255,6 +257,10 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        if old_cfg is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
@@ -363,6 +369,107 @@ def test_active_instance_is_checkout_local_for_same_application() -> None:
         cleanup_tmp(tmp)
 
 
+def test_active_instance_is_port_scoped_for_same_checkout() -> None:
+    tmp, client = make_client_repo("refine-active-instance-port-")
+    conn = init_refine(client)
+    conn.close()
+    original_cwd = Path.cwd()
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    old_cfg = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        from refine_server import config, project_state
+
+        laptop = project_state.create_instance("Laptop")
+        desktop = project_state.create_instance("Desktop")
+        clone = tmp / "refine-one"
+        clone.mkdir()
+        config.write_binding(clone, client)
+
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        os.environ.pop("REFINE_UI_PORT", None)
+        os.chdir(clone)
+
+        os.environ["REFINE_UI_SCOPE"] = "8080"
+        cfg8080 = config.get(reload=True)
+        project_state.set_active_instance(laptop["id"])
+        assert project_state.active_instance_id() == laptop["id"]
+        sqlite8080 = cfg8080.sqlite_path
+
+        os.environ["REFINE_UI_SCOPE"] = "8081"
+        cfg8081 = config.get(reload=True)
+        project_state.set_active_instance(desktop["id"])
+        assert project_state.active_instance_id() == desktop["id"]
+        sqlite8081 = cfg8081.sqlite_path
+
+        os.environ["REFINE_UI_SCOPE"] = "8080"
+        config.get(reload=True)
+        assert project_state.active_instance_id() == laptop["id"]
+
+        os.environ["REFINE_UI_SCOPE"] = "8081"
+        config.get(reload=True)
+        assert project_state.active_instance_id() == desktop["id"]
+
+        assert sqlite8080 != sqlite8081
+        assert sqlite8080.parent == clone / "run" / "cache"
+        assert sqlite8081.parent == clone / "run" / "cache"
+    finally:
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        if old_cfg is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_process_config_path_is_not_shared_through_binding() -> None:
+    tmp, client1 = make_client_repo("refine-config-scope-")
+    conn = init_refine(client1)
+    conn.close()
+    original_cwd = Path.cwd()
+    old_cfg = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        from refine_server import config
+
+        client2 = tmp / "client-two"
+        client2.mkdir()
+        git(client2, "init", "-q")
+        git(client2, "config", "user.email", "t@x")
+        git(client2, "config", "user.name", "t")
+        (client2 / "app.txt").write_text("base\n", encoding="utf-8")
+        git(client2, "add", "app.txt")
+        git(client2, "commit", "-m", "init")
+        conn2 = init_refine(client2)
+        conn2.close()
+
+        clone = tmp / "refine-one"
+        clone.mkdir()
+        config.write_binding(clone, client2)
+        os.chdir(clone)
+
+        os.environ["REFINE_CONFIG_PATH"] = str(client1 / ".refine" / "refine.toml")
+        assert config.get(reload=True).client_repo == client1
+        assert config.find_config() == client1 / ".refine" / "refine.toml"
+
+        os.environ["REFINE_CONFIG_PATH"] = str(client2 / ".refine" / "refine.toml")
+        assert config.get(reload=True).client_repo == client2
+    finally:
+        if old_cfg is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
 def test_instance_switch_refreshes_reporter_cache() -> None:
     tmp, client = make_client_repo("refine-instance-reporters-")
     conn = init_refine(client)
@@ -405,6 +512,8 @@ def main() -> int:
     test_blocked_switch_does_not_stop_current_app(root)
     test_active_instance_is_per_application()
     test_active_instance_is_checkout_local_for_same_application()
+    test_active_instance_is_port_scoped_for_same_checkout()
+    test_process_config_path_is_not_shared_through_binding()
     test_instance_switch_refreshes_reporter_cache()
     print("project switch state tests OK")
     return 0

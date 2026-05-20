@@ -251,11 +251,17 @@ def cmd_test(_args: argparse.Namespace) -> int:
         return 1
 
     failures: list[Path] = []
+    env = os.environ.copy()
+    root_path = str(root)
+    env["PYTHONPATH"] = (
+        root_path if not env.get("PYTHONPATH")
+        else f"{root_path}{os.pathsep}{env['PYTHONPATH']}"
+    )
     print(f"Running {len(tests)} test scripts")
     for test in tests:
         rel = test.relative_to(root)
         print(f"\n=== {rel} ===", flush=True)
-        result = subprocess.run([sys.executable, str(test)], cwd=str(root))
+        result = subprocess.run([sys.executable, str(test)], cwd=str(root), env=env)
         if result.returncode != 0:
             failures.append(rel)
 
@@ -406,6 +412,8 @@ def _write_and_enable_ui_unit(
         f"WorkingDirectory={clone_dir}\n"
         f"Environment=REFINE_UI_HOST={host}\n"
         f"Environment=REFINE_UI_PORT={port}\n"
+        f"Environment=REFINE_UI_SCOPE={port}\n"
+        f"Environment=REFINE_CONFIG_PATH={client_repo / '.refine' / config.CONFIG_FILENAME}\n"
         f"ExecStart={uv} run refine ui\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
@@ -715,12 +723,13 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     ui_unit = _ui_unit_name(unit, effective_port)
     web_up = _port_open(cfg.web_host, effective_port)
     process_pid = _running_pid(clone, cfg, effective_port)
+    display_cfg = _running_config(process_pid) or cfg
     service_active = _systemctl_is_active(ui_unit)
 
     print()
     print(_bold("refine"))
     print(f"  checkout: {clone}")
-    print(f"  app:      {cfg.client_repo}")
+    print(f"  app:      {display_cfg.client_repo}")
     print(f"  ui:       {_dot((process_pid is not None or service_active) and web_up)} "
           f"http {'reachable' if web_up else 'unreachable'} at "
           f"http://{_displayable_host(cfg.web_host)}:{effective_port}")
@@ -730,7 +739,7 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
           f"({'active' if service_active else 'inactive'})")
     print(f"  server:   {_dot((process_pid is not None or service_active) and web_up)} "
           "in-process with UI backend")
-    print(f"  logs:     {_runtime_log_path(clone, cfg, effective_port)}")
+    print(f"  logs:     {_runtime_log_path(clone, display_cfg, effective_port)}")
     print(f"  journal:  journalctl --user -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop {effective_port}")
     print()
@@ -751,6 +760,18 @@ def _print_setup_status_block(clone: Path, *, port: int) -> None:
     print(f"  logs:     {_runtime_log_path(clone, None, port)}")
     print(f"  stop:     uv run refine stop {port}")
     print()
+
+
+def _running_config(pid: int | None) -> "config.Config | None":
+    if pid is None:
+        return None
+    cfg_path = _pid_env_value(pid, config.ENV_CONFIG_PATH)
+    if not cfg_path:
+        return None
+    try:
+        return config.Config.load(cfg_path)
+    except config.ConfigError:
+        return None
 
 
 # ----- server / ui ------------------------------------------------------------
@@ -874,6 +895,9 @@ def _start_background_ui(
     env = os.environ.copy()
     env["REFINE_UI_HOST"] = host
     env["REFINE_UI_PORT"] = str(port)
+    env["REFINE_UI_SCOPE"] = str(port)
+    if cfg is not None:
+        env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
     env.setdefault("PYTHONUNBUFFERED", "1")
     with log_path.open("ab") as log:
         proc = subprocess.Popen(

@@ -382,14 +382,25 @@ def active_instance_id(*, root: Path | None = None) -> str:
 
 
 def _active_instance_selection_key(root: Path) -> str:
+    base = str(root.resolve())
+    scope = config.runtime_scope()
+    return f"{base}#scope={scope}" if scope else base
+
+
+def _legacy_active_instance_selection_key(root: Path) -> str:
     return str(root.resolve())
 
 
 def _read_active_instance_selection(root: Path) -> tuple[str | None, bool]:
     key = _active_instance_selection_key(root)
     data = _read_json(active_instances_path(), {"selections": {}})
-    selection = (data.get("selections") or {}).get(key) or {}
+    selections = data.get("selections") or {}
+    selection = selections.get(key) or {}
     active = selection.get("active_instance_id")
+    if active:
+        return str(active), False
+    legacy_selection = selections.get(_legacy_active_instance_selection_key(root)) or {}
+    active = legacy_selection.get("active_instance_id")
     if active:
         return str(active), False
     legacy = _read_json(active_instance_path(root), {}).get("active_instance_id")

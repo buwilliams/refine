@@ -1,6 +1,7 @@
 """Web process runtime state shared by the entry point and project API."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from refine_server import config, db
@@ -44,6 +45,7 @@ def load_configured(
             and requested_path.resolve() != _loaded_config_path):
         stop_all()
     cfg = config.get(path=path, reload=True)
+    os.environ[config.ENV_CONFIG_PATH] = str(cfg.config_path)
     _loaded_config_path = cfg.config_path
     db.init_db()
     if start_poller:

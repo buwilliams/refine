@@ -17,6 +17,7 @@ Schema (TOML):
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 from dataclasses import dataclass, field
@@ -30,6 +31,9 @@ except ModuleNotFoundError:
 
 CONFIG_FILENAME = "refine.toml"
 BINDING_FILENAME = ".refine-binding"
+ENV_CONFIG_PATH = "REFINE_CONFIG_PATH"
+ENV_UI_SCOPE = "REFINE_UI_SCOPE"
+ENV_UI_PORT = "REFINE_UI_PORT"
 
 # Marker line in the binding file recording the systemd --user service base name
 # associated with this refine checkout, so `refine start/stop/status` don't
@@ -83,7 +87,7 @@ class Config:
 
     @property
     def sqlite_path(self) -> Path:
-        return self.volume_root / "index.sqlite"
+        return sqlite_path_for(self.volume_root)
 
     @property
     def gaps_dir(self) -> Path:
@@ -136,6 +140,14 @@ def find_config(start: Path | None = None) -> Path | None:
        This is the "run from inside the target app repo" workflow.
     """
     start = (start or Path.cwd()).resolve()
+
+    env_path = os.environ.get(ENV_CONFIG_PATH)
+    if env_path:
+        cfg = Path(env_path).expanduser()
+        if not cfg.is_absolute():
+            cfg = (start / cfg).resolve()
+        if cfg.is_file():
+            return cfg
 
     # 1. Binding file
     binding = find_binding(start)
@@ -194,6 +206,25 @@ def local_run_dir(start: Path | None = None) -> Path:
     if cached is not None:
         return cached.client_repo / "run"
     return Path.cwd().resolve() / "run"
+
+
+def runtime_scope() -> str:
+    """Stable local scope for one UI backend process.
+
+    Detached UI backends set this from the port they serve. Without a scope,
+    CLI/test/foreground paths keep the historical shared cache behavior.
+    """
+    raw = os.environ.get(ENV_UI_SCOPE) or os.environ.get(ENV_UI_PORT) or ""
+    return "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in raw.strip())
+
+
+def sqlite_path_for(volume_root: Path) -> Path:
+    scope = runtime_scope()
+    if not scope:
+        return volume_root / "index.sqlite"
+    digest = hashlib.sha1(str(volume_root.resolve()).encode("utf-8")).hexdigest()[:12]
+    cache_dir = local_run_dir() / "cache"
+    return cache_dir / f"index-{scope}-{digest}.sqlite"
 
 
 def read_binding(binding_path: Path) -> Path:
