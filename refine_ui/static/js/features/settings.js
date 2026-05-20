@@ -43,7 +43,7 @@ async function refreshSettings(options = {}) {
     );
   } catch (e) {
     const root = document.getElementById("settings-content");
-    if (root) root.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
+    if (root) drawRuntimeRecovery(e);
   }
 }
 
@@ -175,6 +175,74 @@ function updateFeatureToggleLabel(box) {
   label.classList.toggle("on", box.checked);
   label.classList.toggle("off", !box.checked);
   text.textContent = box.checked ? "on" : "off";
+}
+
+function renderSettingsTabStrip(activeSlug) {
+  return `
+    <nav class="settings-tabs" id="settings-tabs">
+      ${SETTINGS_TABS.map((t) => `
+        <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
+           href="#/system/${t.slug}"
+           data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
+    </nav>`;
+}
+
+function renderSettingsPane(slug, body, activeSlug) {
+  return `
+    <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
+             data-tab-pane="${slug}">
+      <div class="card settings-tab-card">${body}</div>
+    </section>`;
+}
+
+function bindSettingsTabHandlers() {
+  $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setSettingsTab(btn.dataset.tabTarget);
+    });
+  });
+}
+
+function renderSqliteCacheSection(error = null) {
+  return `
+    <section class="settings-section">
+      <h3>SQLite cache</h3>
+      ${error ? `<p class="muted small" style="color:var(--error);margin-top:0">${htmlEscape(error.message || String(error))}</p>` : ""}
+      <p class="muted small" style="margin-top:0">
+        Rebuilds <code>index.sqlite</code> from canonical <code>.refine</code> JSON.
+      </p>
+      <div class="actions">
+        <button class="secondary" id="s-rebuild-cache">Rebuild SQLite cache</button>
+      </div>
+    </section>`;
+}
+
+function drawRuntimeRecovery(error) {
+  const activeSlug = "runtime";
+  $("#settings-content").innerHTML = `
+    ${renderSettingsTabStrip(activeSlug)}
+    ${renderSettingsPane("runtime", renderSqliteCacheSection(error), activeSlug)}
+  `;
+  bindSettingsTabHandlers();
+  bindRebuildCacheHandler();
+}
+
+function bindRebuildCacheHandler() {
+  $("#s-rebuild-cache")?.addEventListener("click", async () => {
+    const ok = await modalConfirm(
+      "Rebuild the SQLite cache from canonical .refine JSON? If the existing database is corrupted, Refine will replace it and SQLite-only runtime history may be lost.",
+      { title: "Rebuild SQLite cache", okLabel: "Rebuild" },
+    );
+    if (!ok) return;
+    await withButtonBusy($("#s-rebuild-cache"), "Rebuilding…", async () => {
+      try {
+        const result = await api("POST", "/api/cache/rebuild", {});
+        const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
+        toast(`SQLite cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
+        await refreshSettings({ force: true });
+      } catch (e) { toast(e.message, "error"); }
+    });
+  });
 }
 
 function renderGovernanceRuleRows(rules) {
@@ -525,18 +593,8 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   // localStorage key, route segment, and DOM hook.
   const tabs = SETTINGS_TABS;
   const activeSlug = readSettingsTab(tabs);
-  const tabStrip = `
-    <nav class="settings-tabs" id="settings-tabs">
-      ${tabs.map((t) => `
-        <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
-           href="#/system/${t.slug}"
-           data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
-    </nav>`;
-  const pane = (slug, body) => `
-    <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
-             data-tab-pane="${slug}">
-      <div class="card settings-tab-card">${body}</div>
-    </section>`;
+  const tabStrip = renderSettingsTabStrip(activeSlug);
+  const pane = (slug, body) => renderSettingsPane(slug, body, activeSlug);
   $("#settings-content").innerHTML = `
     ${tabStrip}
     ${pane("application", `
@@ -789,6 +847,8 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     ${renderFeatureFlagsCard(feats)
       || `<section class="settings-section"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></section>`}
 
+    ${renderSqliteCacheSection()}
+
     <section class="settings-section">
       <h3>Logs retention</h3>
       <p class="muted small">
@@ -925,11 +985,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
 
   `;
   // Tab click handlers — purely DOM-local, no re-fetch.
-  $$(".settings-tab", $("#settings-tabs")).forEach((btn) => {
-    btn.addEventListener("click", () => {
-      setSettingsTab(btn.dataset.tabTarget);
-    });
-  });
+  bindSettingsTabHandlers();
   $("#btn-pause")?.addEventListener("click", async () => {
     const paused = s.paused === "1";
     await withButtonBusy($("#btn-pause"), paused ? "Resuming…" : "Pausing…", async () => {
@@ -1139,6 +1195,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       } catch (e) { toast(e.message, "error"); }
     });
   });
+  bindRebuildCacheHandler();
   $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(
       "Remove this reporter from the dropdown? Historical rounds keep their original reporter string.",

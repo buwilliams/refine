@@ -112,6 +112,23 @@ def main() -> int:
         ).fetchone()
         assert row["status"] == "failed", dict(row)
 
+        conn.close()
+        (root / "index.sqlite").write_bytes(b"not a sqlite database")
+        for suffix in ("-wal", "-shm"):
+            try:
+                (root / f"index.sqlite{suffix}").unlink()
+            except FileNotFoundError:
+                pass
+        status, body = api.rebuild_sqlite_cache({"restart_services": False})
+        assert status == 200, body
+        assert body["mode"] == "recreated", body
+        assert body["gaps"] >= 3, body
+        conn = db.connect()
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (stale_gap,),
+        ).fetchone()
+        assert row["status"] == "failed", dict(row)
+
         archived = project_state.create_instance("Archived")
         project_state.update_instance(archived["id"], archived=True)
         try:

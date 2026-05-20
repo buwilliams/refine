@@ -44,6 +44,8 @@ def main() -> int:
     common_css = (root / "refine_ui/static/css/common.css").read_text(
         encoding="utf-8",
     )
+    api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
+    server_py = (root / "refine_ui/server.py").read_text(encoding="utf-8")
     dashboard_css = (root / "refine_ui/static/css/dashboard.css").read_text(
         encoding="utf-8",
     )
@@ -83,15 +85,19 @@ def main() -> int:
     assert "Feature flag changes are saved with Save runtime." in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
+    assert 'id="s-rebuild-cache"' in settings_js
+    assert 'api("POST", "/api/cache/rebuild", {})' in settings_js
+    assert 'withButtonBusy($("#s-rebuild-cache"), "Rebuilding…"' in settings_js
+    assert "function drawRuntimeRecovery(error)" in settings_js
+    assert '@route("POST", r"/api/cache/rebuild")' in server_py
+    assert "def rebuild_sqlite_cache" in api_py
     assert 'id="s-agent-limit-pause"' in settings_js
     assert "agent_limit_pause_seconds" in settings_js
     assert '"30",    "30 seconds"' in settings_js
     assert '"60",    "1 minute"' in settings_js
     assert '"3600",  "1 hour"' in settings_js
     assert '"10800", "3 hours"' in settings_js
-    assert "project_update_pulse_interval_seconds" in (
-        root / "refine_ui/api.py"
-    ).read_text(encoding="utf-8")
+    assert "project_update_pulse_interval_seconds" in api_py
     runtime_save_body = settings_js.split('$("#s-save-runtime")?.addEventListener', 1)[1]
     runtime_save_body = runtime_save_body.split("\n  });", 1)[0]
     application_save_body = settings_js.split('$("#s-save-application")?.addEventListener', 1)[1]

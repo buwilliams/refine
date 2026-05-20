@@ -177,6 +177,11 @@ def _h_recheck(_h, _m, _b, _q):
     return api.recheck_auth()
 
 
+@route("POST", r"/api/cache/rebuild")
+def _h_rebuild_cache(_h, _m, body, _q):
+    return api.rebuild_sqlite_cache(body or {})
+
+
 @route("GET", r"/api/features")
 def _h_get_features(_h, _m, _b, _q):
     return api.list_features()

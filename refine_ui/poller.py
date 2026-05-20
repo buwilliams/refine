@@ -44,6 +44,13 @@ class SqlitePoller:
 
     def stop(self) -> None:
         self._stop.set()
+        if (
+            self._thread is not None
+            and self._thread.is_alive()
+            and self._thread is not threading.current_thread()
+        ):
+            self._thread.join(timeout=2.0)
+        self._thread = None
 
     def _conn(self) -> sqlite3.Connection:
         conn = db.connect()

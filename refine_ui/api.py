@@ -489,6 +489,101 @@ def _rebuild_cache() -> None:
         conn.close()
 
 
+def _sqlite_cache_files(sqlite_file: Path) -> list[Path]:
+    return [
+        sqlite_file,
+        Path(f"{sqlite_file}-wal"),
+        Path(f"{sqlite_file}-shm"),
+    ]
+
+
+def _unlink_sqlite_cache_files(sqlite_file: Path) -> list[str]:
+    removed: list[str] = []
+    for path in _sqlite_cache_files(sqlite_file):
+        try:
+            path.unlink()
+            removed.append(path.name)
+        except FileNotFoundError:
+            continue
+    return removed
+
+
+def _sqlite_cache_counts(conn: sqlite3.Connection) -> dict[str, int]:
+    return {
+        "gaps": int(
+            conn.execute("SELECT COUNT(*) AS n FROM gaps_index").fetchone()["n"] or 0,
+        ),
+        "reporters": int(
+            conn.execute("SELECT COUNT(*) AS n FROM reporters").fetchone()["n"] or 0,
+        ),
+    }
+
+
+def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
+    """Operator recovery path for a stale or corrupted SQLite cache."""
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+
+    body = body or {}
+    restart_services = body.get("restart_services") is not False
+    cfg = config.get(reload=True)
+    sqlite_file = cfg.sqlite_path
+    mode = "rebuilt"
+    details = ""
+    removed: list[str] = []
+
+    if restart_services:
+        runtime.stop_all()
+    try:
+        try:
+            conn = db.connect(sqlite_file)
+            try:
+                integrity = conn.execute("PRAGMA integrity_check").fetchone()
+                if integrity is None or str(integrity[0]).lower() != "ok":
+                    detail = str(integrity[0]) if integrity is not None else "no integrity result"
+                    raise sqlite3.DatabaseError(f"integrity_check failed: {detail}")
+                project_state.rebuild_sqlite_cache(conn)
+            finally:
+                conn.close()
+        except sqlite3.Error as e:
+            mode = "recreated"
+            details = str(e)
+            removed = _unlink_sqlite_cache_files(sqlite_file)
+            db.init_db()
+
+        conn = db.connect(sqlite_file)
+        try:
+            project_state.ensure_sqlite_cache_current(conn)
+            counts = _sqlite_cache_counts(conn)
+            activity.append(
+                conn,
+                message=(
+                    "SQLite cache recreated from canonical JSON"
+                    if mode == "recreated"
+                    else "SQLite cache rebuilt from canonical JSON"
+                ),
+                severity="info",
+                category="state",
+                actor="refine",
+                details=details or None,
+            )
+        finally:
+            conn.close()
+    finally:
+        if restart_services:
+            runtime.ensure_poller()
+            runtime.ensure_runner()
+
+    return 200, {
+        "ok": True,
+        "mode": mode,
+        "path": str(sqlite_file),
+        "removed": removed,
+        **counts,
+    }
+
+
 def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     """Create or attach a target app path and make it active."""
     raw_path = (body.get("path") or "").strip()
