@@ -342,12 +342,18 @@ class Runner:
             reporters.add(self._conn, params["reporter"])
         except Exception:
             pass
-        activity.append(
-            self._conn, message=f"Gap created: {name}",
-            severity="info", category="state",
-            gap_id=gap_id, actor=params["reporter"],
-        )
-        self.governance_agent.wake()
+        try:
+            activity.append(
+                self._conn, message=f"Gap created: {name}",
+                severity="info", category="state",
+                gap_id=gap_id, actor=params["reporter"],
+            )
+        except Exception:
+            pass
+        try:
+            self.governance_agent.wake()
+        except Exception:
+            pass
         return {"gap": gap}
 
     def _h_append_round(self, params: dict) -> dict:

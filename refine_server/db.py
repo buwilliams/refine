@@ -305,8 +305,13 @@ def transaction(conn: sqlite3.Connection) -> Iterator[None]:
                 conn.execute(f"RELEASE SAVEPOINT {savepoint}")
                 return
             except Exception:
-                conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
-                conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+                try:
+                    conn.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+                finally:
+                    try:
+                        conn.execute(f"RELEASE SAVEPOINT {savepoint}")
+                    except sqlite3.Error:
+                        pass
                 raise
 
         delays = [0.01, 0.05, 0.25, 0.5]
@@ -316,18 +321,30 @@ def transaction(conn: sqlite3.Connection) -> Iterator[None]:
                 time.sleep(delay * (0.5 + random.random()))
             try:
                 conn.execute("BEGIN IMMEDIATE")
-                try:
-                    yield
-                    conn.execute("COMMIT")
-                    return
-                except Exception:
-                    conn.execute("ROLLBACK")
-                    raise
             except sqlite3.OperationalError as e:
                 if "locked" in str(e) or "busy" in str(e):
                     last_err = e
                     continue
                 raise
+            try:
+                yield
+            except Exception:
+                try:
+                    if conn.in_transaction:
+                        conn.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+                raise
+            try:
+                conn.execute("COMMIT")
+            except Exception:
+                try:
+                    if conn.in_transaction:
+                        conn.execute("ROLLBACK")
+                except sqlite3.Error:
+                    pass
+                raise
+            return
         raise last_err or sqlite3.OperationalError("transaction busy-retry exhausted")
 
 

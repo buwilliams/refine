@@ -70,6 +70,14 @@ def main() -> int:
         ).fetchall()
         assert [r["message"] for r in rows] == ["outer", "inner", "kept"]
 
+        try:
+            with db.transaction(conn):
+                conn.execute("ROLLBACK")
+                raise IndexError("tuple index out of range")
+            raise AssertionError("transaction should have raised the original error")
+        except IndexError as e:
+            assert "tuple index out of range" in str(e)
+
         # Runner background services share one check_same_thread=False
         # connection. Concurrent writers should serialize instead of racing
         # into "cannot start a transaction within a transaction".

@@ -63,10 +63,33 @@ def main() -> int:
             },
         }, body
 
-        from refine_server import project_state
         from refine_server.paths import relative_gap_path
         from refine_server.runner import Runner
         import refine_server.runner as runner_mod
+
+        original_activity_append = runner_mod.activity.append
+
+        def fail_activity_append(*args, **kwargs):
+            raise IndexError("tuple index out of range")
+
+        runner_mod.activity.append = fail_activity_append
+        try:
+            status, body = api.import_persist({
+                "reporter": "Reporter",
+                "drafts": [{
+                    "name": "Activity side effect should not fail import",
+                    "actual": "Current",
+                    "target": "Target",
+                }],
+            })
+        finally:
+            runner_mod.activity.append = original_activity_append
+
+        assert status == 201, body
+        assert body["count"] == 1, body
+        assert body["failed"] == 0, body
+
+        from refine_server import project_state
 
         runner = Runner()
         original_create_gap = runner_mod.gap_writer.create_gap
