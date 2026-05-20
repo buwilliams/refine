@@ -113,6 +113,9 @@ DEFAULT_SETTINGS = {
     # it to 'todo'. 3600 = 1 h default. Sentinel -1 = never (disabled).
     # 0 = instant (promote on next tick).
     "backlog_promote_after_seconds": "3600",
+    # How often this instance checks the target repo for local HEAD changes or
+    # upstream commits and refreshes projected state. -1 = never.
+    "project_update_pulse_interval_seconds": "60",
     "paused": "0",
     # Which agent CLI refine drives for Gap runs, conflict resolution,
     # chat, import extraction, target-app actions, and pre-flight.

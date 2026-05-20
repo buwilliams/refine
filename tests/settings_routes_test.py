@@ -53,6 +53,11 @@ def main() -> int:
         "s-governance-save",
     ], save_button_ids
     assert "Feature flag changes are saved with Save runtime." in settings_js
+    assert 'id="s-project-update-pulse"' in settings_js
+    assert "project_update_pulse_interval_seconds" in settings_js
+    assert "project_update_pulse_interval_seconds" in (
+        root / "refine_ui/api.py"
+    ).read_text(encoding="utf-8")
     runtime_save_body = settings_js.split('$("#s-save-runtime")?.addEventListener', 1)[1]
     runtime_save_body = runtime_save_body.split("\n  });", 1)[0]
     feature_toggle_body = settings_js.split('$$("[data-feature-cell]").forEach', 1)[1]
@@ -118,6 +123,9 @@ def main() -> int:
     assert 'api("PUT", "/api/guidance"' in settings_js
     assert 'name="instructions"' in settings_js
     assert 'await syncProjectUpdates();' in settings_js
+    assert 'sseSource.addEventListener("project_updated"' in (
+        root / "refine_ui/static/js/common.js"
+    ).read_text(encoding="utf-8")
     assert 'id="s-target-rebuild-command"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js

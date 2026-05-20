@@ -40,6 +40,7 @@ RUNTIME_SETTING_KEYS = {
     "agent_hard_cap_seconds",
     "chat_idle_timeout_seconds",
     "backlog_promote_after_seconds",
+    "project_update_pulse_interval_seconds",
     "paused",
     "agent_cli",
 }

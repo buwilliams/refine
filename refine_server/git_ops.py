@@ -99,6 +99,27 @@ def fetch(cwd: Path | None = None) -> GitResult:
     return _run(["fetch", "--prune"], cwd=cwd or client_repo_path(), timeout=300.0)
 
 
+def rev_parse(ref: str = "HEAD", cwd: Path | None = None) -> str | None:
+    r = _run(["rev-parse", "--verify", ref], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return None
+    return r.stdout.strip()
+
+
+def rev_list_count(base_ref: str, tip_ref: str,
+                   cwd: Path | None = None) -> int:
+    r = _run(
+        ["rev-list", "--count", f"{base_ref}..{tip_ref}"],
+        cwd=cwd or client_repo_path(),
+    )
+    if not r.ok:
+        return 0
+    try:
+        return int(r.stdout.strip())
+    except ValueError:
+        return 0
+
+
 def stash_push(message: str, *, cwd: Path | None = None) -> GitResult:
     """Stash all uncommitted changes (incl. untracked) so we can run a clean
     git operation. Returns a result whose stdout we don't really care about;

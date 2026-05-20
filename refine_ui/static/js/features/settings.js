@@ -722,6 +722,19 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
             ["86400", "24 hours"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
+      <div class="form-row"><label>Target repo update pulse
+        <span class="muted small">— checks for local commits or upstream commits and refreshes this instance's projected state.</span></label>
+        <select id="s-project-update-pulse">
+          ${[
+            ["-1",   "Never"],
+            ["30",   "30 seconds"],
+            ["60",   "1 minute"],
+            ["300",  "5 minutes"],
+            ["900",  "15 minutes"],
+            ["1800", "30 minutes"],
+            ["3600", "1 hour"],
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.project_update_pulse_interval_seconds ?? "60") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
     </section>
 
     <section class="settings-section">
@@ -1018,6 +1031,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           agent_hard_cap_seconds: $("#s-hard").value,
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
           backlog_promote_after_seconds: $("#s-backlog-promote").value,
+          project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
           agent_cli: chosen,
         });
         for (const box of $$("[data-feature-cell]")) {

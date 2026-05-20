@@ -795,6 +795,19 @@ function initSSE() {
   sseSource.addEventListener("target_app_health", () => {
     refreshTargetAppToggle();
   });
+  sseSource.addEventListener("project_updated", async () => {
+    await refreshProjectStatus();
+    await refreshFeatures();
+    await refreshReporters();
+    if (state.currentRoute === "dashboard") refreshDashboard();
+    if (state.currentRoute === "gaps") refreshGapsTable();
+    if (state.currentRoute === "logs") loadLogs();
+    if (state.currentRoute === "settings") refreshSettings();
+    if (state.currentRoute === "changes") loadChanges();
+    if (state.currentRoute === "gaps_detail" && state.currentGap) {
+      loadGapDetail(state.currentGap);
+    }
+  });
   sseSource.addEventListener("round_log_added", (e) => {
     // Subprocess flushed new stdout to the active round's logs[]. If the user
     // is viewing that gap's detail, refresh so the new lines appear live.

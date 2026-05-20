@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import time
 
-from refine_server import activity, db, project_state
+from refine_server import activity, db, project_state, project_sync
 
 from . import sse
 
@@ -35,6 +35,7 @@ class SqlitePoller:
         # Previously-observed target-app state — emit an SSE event when
         # it transitions so the nav button updates without a poll.
         self._last_target_app_state: str | None = None
+        self._last_project_update_pulse_at: float = 0.0
 
     def start(self) -> None:
         self._thread = threading.Thread(target=self._loop, name="refine-poller",
@@ -135,6 +136,10 @@ class SqlitePoller:
                 self._run_target_app_health_check()
             except Exception:
                 pass
+        try:
+            self._run_project_update_pulse(now)
+        except Exception:
+            pass
 
     def _run_target_app_health_check(self) -> None:
         """Probe configured target-app status checks and persist the result.
@@ -164,3 +169,30 @@ class SqlitePoller:
             "at": snap.get("last_check_at", snap.get("last_health_at")),
             "state": snap.get("state"),
         })
+
+    def _run_project_update_pulse(self, now: float) -> None:
+        """Check for target-repo updates at the instance-configured cadence."""
+        conn = self._conn()
+        try:
+            interval = db.get_setting_int(
+                conn, "project_update_pulse_interval_seconds", 60,
+            )
+        finally:
+            conn.close()
+        if interval <= 0:
+            return
+        if now - self._last_project_update_pulse_at < interval:
+            return
+        self._last_project_update_pulse_at = now
+        conn = self._conn()
+        try:
+            result = project_sync.pulse(conn, actor="runner")
+        finally:
+            conn.close()
+        if result.get("ok") and result.get("changed"):
+            sse.publish("project_updated", {
+                "stage": result.get("stage"),
+                "branch": result.get("branch"),
+                "upstream": result.get("upstream"),
+                "message": result.get("message"),
+            })
