@@ -29,11 +29,11 @@ from typing import Callable, Deque
 from . import agent_cli
 
 
-# Env vars that, if set, would make provider CLIs use API-key auth, inherit
-# another agent's session context, or otherwise diverge from the host CLI's
-# login session. Strip them before spawn so agent subprocesses behave like
-# the user's interactive CLI in a clean terminal — e.g. `claude login` /
-# `codex login`.
+# Env vars from an outer agent/session context that would make provider CLIs
+# treat refine's subprocess as part of some other in-flight session. Do not
+# strip provider auth/config vars here: deploy installs intentionally capture
+# them into the systemd unit so Claude/Codex can use Bedrock, Azure Foundry,
+# custom endpoints, API keys, etc.
 # How long to wait for the provider CLI to actually exit after it emits its
 # terminal `result` event. Past this point, something is almost
 # certainly holding the stdio pipes open — typically a backgrounded
@@ -54,26 +54,7 @@ _RESULT_EXIT_GRACE_SECONDS = 10.0
 _TURN_STDOUT_IDLE_SECONDS = 60.0
 
 
-_AUTH_OVERRIDE_VARS = (
-    # API-key family
-    "ANTHROPIC_API_KEY",
-    "CLAUDE_API_KEY",
-    "ANTHROPIC_AUTH_TOKEN",
-    "OPENAI_API_KEY",
-    "OPENAI_ORG_ID",
-    "OPENAI_ORGANIZATION",
-    "OPENAI_PROJECT",
-    # Endpoint redirects that would aim a valid key at the wrong service
-    "ANTHROPIC_BASE_URL",
-    "ANTHROPIC_VERSION",
-    "OPENAI_BASE_URL",
-    "OPENAI_API_BASE",
-    "OPENAI_API_HOST",
-    # Alternate cloud providers — force the user's Anthropic OAuth login
-    "CLAUDE_CODE_USE_BEDROCK",
-    "CLAUDE_CODE_USE_VERTEX",
-    # Inherited Claude-Code-agent context that would make claude treat the
-    # subprocess as part of *another* session's auth context
+_INHERITED_AGENT_CONTEXT_VARS = (
     "CLAUDECODE",
     "CLAUDE_CODE_ENTRYPOINT",
     "CLAUDE_CODE_SESSION_ID",
@@ -147,14 +128,14 @@ def _merge_paths(*paths: str | None) -> str | None:
 def _chat_env() -> dict[str, str]:
     """Build the environment agent subprocesses run with.
 
-    Strip API-key and inherited agent vars so provider CLIs use the
-    user's normal login session. For all providers, merge the user's
-    interactive-login-shell PATH with the process PATH captured by the
-    installed unit, so `claude`, `codex`, or `gemini` resolve the same
-    way they do in the terminal used to install/run Refine.
+    Strip inherited agent/session vars while preserving provider auth and
+    endpoint configuration. Merge the user's interactive-login-shell PATH
+    with the process PATH captured by the installed unit, so `claude`,
+    `codex`, or `gemini` resolve the same way they do in the terminal used
+    to install/run Refine.
     """
     env = os.environ.copy()
-    for key in _AUTH_OVERRIDE_VARS:
+    for key in _INHERITED_AGENT_CONTEXT_VARS:
         env.pop(key, None)
     login_path = _user_login_path()
     path = _merge_paths(login_path, env.get("PATH"))

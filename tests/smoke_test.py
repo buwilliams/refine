@@ -93,20 +93,23 @@ def main() -> int:
     old_openai_base = os.environ.get("OPENAI_BASE_URL")
     old_codex_ci = os.environ.get("CODEX_CI")
     old_codex_thread = os.environ.get("CODEX_THREAD_ID")
+    old_bedrock = os.environ.get("CLAUDE_CODE_USE_BEDROCK")
     old_path = os.environ.get("PATH")
     old_login_path_cache = chat_mgr._login_path_cache
     old_login_path_resolved = chat_mgr._login_path_resolved
     try:
         os.environ["OPENAI_API_KEY"] = "sk-test-should-not-leak"
         os.environ["OPENAI_BASE_URL"] = "https://example.invalid/v1"
+        os.environ["CLAUDE_CODE_USE_BEDROCK"] = "1"
         os.environ["CODEX_CI"] = "1"
         os.environ["CODEX_THREAD_ID"] = "test-thread"
         os.environ["PATH"] = "/install/bin:/shared/bin"
         chat_mgr._login_path_cache = "/login/bin:/shared/bin"
         chat_mgr._login_path_resolved = True
         chat_env = chat_mgr._chat_env()
-        assert "OPENAI_API_KEY" not in chat_env
-        assert "OPENAI_BASE_URL" not in chat_env
+        assert chat_env["OPENAI_API_KEY"] == "sk-test-should-not-leak"
+        assert chat_env["OPENAI_BASE_URL"] == "https://example.invalid/v1"
+        assert chat_env["CLAUDE_CODE_USE_BEDROCK"] == "1"
         assert "CODEX_CI" not in chat_env
         assert "CODEX_THREAD_ID" not in chat_env
         assert chat_env["PATH"] == "/login/bin:/shared/bin:/install/bin"
@@ -127,6 +130,10 @@ def main() -> int:
             os.environ.pop("CODEX_THREAD_ID", None)
         else:
             os.environ["CODEX_THREAD_ID"] = old_codex_thread
+        if old_bedrock is None:
+            os.environ.pop("CLAUDE_CODE_USE_BEDROCK", None)
+        else:
+            os.environ["CLAUDE_CODE_USE_BEDROCK"] = old_bedrock
         if old_path is None:
             os.environ.pop("PATH", None)
         else:
@@ -240,6 +247,8 @@ def main() -> int:
     old_which = refine_cli.shutil.which
     old_login_path = refine_cli._user_login_path
     old_env_path = os.environ.get("PATH")
+    old_azure_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
+    old_bedrock_unit = os.environ.get("CLAUDE_CODE_USE_BEDROCK")
     git_bin = Path(old_which("git") or "/usr/bin/git").parent
     systemctl_calls: list[tuple[str, ...]] = []
 
@@ -263,6 +272,8 @@ def main() -> int:
             f"{fake_uv_bin}{os.pathsep}/custom/claude/bin"
             f"{os.pathsep}/literal%bin{os.pathsep}{git_bin}"
         )
+        os.environ["AZURE_OPENAI_ENDPOINT"] = "https://foundry.example.invalid"
+        os.environ["CLAUDE_CODE_USE_BEDROCK"] = "1"
         unit_boot = bootstrap_client_repo(
             unit_client,
             clone_dir=unit_clone,
@@ -281,6 +292,14 @@ def main() -> int:
             os.environ.pop("PATH", None)
         else:
             os.environ["PATH"] = old_env_path
+        if old_azure_endpoint is None:
+            os.environ.pop("AZURE_OPENAI_ENDPOINT", None)
+        else:
+            os.environ["AZURE_OPENAI_ENDPOINT"] = old_azure_endpoint
+        if old_bedrock_unit is None:
+            os.environ.pop("CLAUDE_CODE_USE_BEDROCK", None)
+        else:
+            os.environ["CLAUDE_CODE_USE_BEDROCK"] = old_bedrock_unit
     ui_unit = Path(unit_boot["ui_unit_path"])
     assert ui_unit.is_file()
     assert unit_boot.get("unit_path") is None
@@ -290,10 +309,11 @@ def main() -> int:
         f'Environment="PATH={fake_uv_bin}{os.pathsep}/custom/claude/bin'
         f'{os.pathsep}/literal%%bin'
     ) in unit_text
+    assert 'Environment="AZURE_OPENAI_ENDPOINT=https://foundry.example.invalid"' in unit_text
+    assert 'Environment="CLAUDE_CODE_USE_BEDROCK=1"' in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
     assert f"ExecStart={fake_uv} run refine ui" in unit_text
     assert "Restart=on-failure" in unit_text
-    assert "docker" not in unit_text.lower()
     assert ("enable", "refine-unit-clone-8080-ui") in systemctl_calls
     print("[ok] refine install writes per-port host-native UI backend systemd unit")
 
@@ -619,8 +639,31 @@ def main() -> int:
 
     # --- Pre-flight ---------------------------------------------------------
     from refine_server import preflight
-    ok, msg = preflight.check(conn)
-    print(f"[ok] preflight ran (ok={ok}, msg={'set' if msg else 'none'})")
+    old_preflight_run = preflight.subprocess.run
+    preflight_calls = []
+
+    def fake_preflight_run(args, **kwargs):
+        preflight_calls.append((args, kwargs))
+
+        class Result:
+            returncode = 0
+            stdout = "hello\n"
+            stderr = ""
+
+        return Result()
+
+    try:
+        preflight.subprocess.run = fake_preflight_run
+        ok, msg = preflight.check(conn)
+    finally:
+        preflight.subprocess.run = old_preflight_run
+    assert ok and msg is None
+    assert preflight_calls
+    args, kwargs = preflight_calls[0]
+    assert "--version" not in args
+    assert any("hello" in str(part).lower() for part in args)
+    assert kwargs.get("timeout") == preflight._AUTH_TIMEOUT_SECONDS
+    print("[ok] preflight auth prompt ran")
 
     # --- Runner instantiation -----------------------------------------------
     from refine_server.runner import Runner

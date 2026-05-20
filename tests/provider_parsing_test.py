@@ -14,7 +14,7 @@ from pathlib import Path
 def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-    from refine_server import agent_cli, llm, target_app
+    from refine_server import agent_cli, llm, preflight, target_app
     from refine_server.chat_mgr import ChatManager, ChatSession
     from refine_server.subprocess_mgr import _summarize_codex_event
 
@@ -59,6 +59,24 @@ def main() -> int:
     assert one_shot[one_shot.index("--output-last-message") + 1] == "/tmp/last.txt"
     assert one_shot[one_shot.index("--output-schema") + 1] == "/tmp/schema.json"
     assert one_shot[-1] == "extract"
+
+    auth_check = codex.auth_check_args(
+        "/bin/codex", "Say exactly hello",
+        cwd=cwd,
+        output_last_message=Path("/tmp/auth.txt"),
+    )
+    assert auth_check[:2] == ["/bin/codex", "exec"]
+    assert "--json" in auth_check
+    assert auth_check[auth_check.index("--output-last-message") + 1] == "/tmp/auth.txt"
+    assert auth_check[-1] == "Say exactly hello"
+
+    assert preflight._is_hello_response("hello\n")
+    assert preflight._is_hello_response('"hello"')
+    assert not preflight._is_hello_response("hello world")
+    assert preflight._extract_response_text(json.dumps({
+        "type": "item.completed",
+        "item": {"type": "agent_message", "text": "hello"},
+    })) == "hello"
 
     # --- Codex JSONL summarization -----------------------------------------
     assert _summarize_codex_event({

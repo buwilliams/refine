@@ -9,7 +9,7 @@ The abstraction covers provider-specific subprocess construction for:
 
   - `subprocess_mgr.SubprocessManager.launch` — Gap agent runs.
   - `conflict_resolver.attempt_auto_resolve` — merger conflict fixer.
-  - `preflight.check` — startup "is the CLI installed + authed?" test.
+  - `preflight.check` — startup "can the CLI answer a prompt?" auth test.
   - `chat_mgr`, `llm`, and `target_app` — Chat, Import extraction, and
     target-app one-shot prompts.
 
@@ -46,9 +46,6 @@ class CliSpec:
                    cwd: Path | None = None) -> list[str]:
         raise NotImplementedError
 
-    def preflight_args(self, binary_path: str) -> list[str]:
-        return [binary_path, "--version"]
-
     def chat_args(self, binary_path: str, prompt: str, *,
                   session_id: str | None = None,
                   cwd: Path | None = None) -> list[str]:
@@ -60,6 +57,17 @@ class CliSpec:
                       output_schema: Path | None = None,
                       json_output: bool = False) -> list[str]:
         return self.agent_args(binary_path, prompt, cwd=cwd)
+
+    def auth_check_args(self, binary_path: str, prompt: str, *,
+                        cwd: Path | None = None,
+                        output_last_message: Path | None = None) -> list[str]:
+        return self.one_shot_args(
+            binary_path,
+            prompt,
+            cwd=cwd,
+            output_last_message=output_last_message,
+            json_output=self.output_format == "codex_json",
+        )
 
 
 class _ClaudeSpec(CliSpec):
