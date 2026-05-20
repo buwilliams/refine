@@ -20,7 +20,7 @@ from typing import Any
 
 from . import git_ops
 from .agent_cli import get_spec, resolve_binary
-from .chat_mgr import _chat_env, _user_login_path
+from .chat_mgr import _chat_env, _merge_paths, _user_login_path
 
 
 _TAIL_LIMIT = 8000
@@ -320,8 +320,9 @@ def resolve_cwd(cwd_setting: str) -> Path:
 def _command_env(overrides: dict[str, str]) -> dict[str, str]:
     env = os.environ.copy()
     login_path = _user_login_path()
-    if login_path:
-        env["PATH"] = login_path
+    path = _merge_paths(login_path, env.get("PATH"))
+    if path:
+        env["PATH"] = path
     for k, v in overrides.items():
         if k:
             env[str(k)] = str(v)

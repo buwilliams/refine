@@ -130,21 +130,36 @@ def _user_login_path() -> str | None:
     return _login_path_cache
 
 
+def _merge_paths(*paths: str | None) -> str | None:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for path in paths:
+        if not path:
+            continue
+        for part in path.split(os.pathsep):
+            if not part or part in seen:
+                continue
+            merged.append(part)
+            seen.add(part)
+    return os.pathsep.join(merged) if merged else None
+
+
 def _chat_env() -> dict[str, str]:
     """Build the environment agent subprocesses run with.
 
     Strip API-key and inherited agent vars so provider CLIs use the
-    user's normal login session. For all providers, override PATH with
-    the user's interactive-login-shell PATH (cached after the first
-    call) so `claude`, `codex`, or `gemini` resolve the same way they
-    do in the user's terminal.
+    user's normal login session. For all providers, merge the user's
+    interactive-login-shell PATH with the process PATH captured by the
+    installed unit, so `claude`, `codex`, or `gemini` resolve the same
+    way they do in the terminal used to install/run Refine.
     """
     env = os.environ.copy()
     for key in _AUTH_OVERRIDE_VARS:
         env.pop(key, None)
     login_path = _user_login_path()
-    if login_path:
-        env["PATH"] = login_path
+    path = _merge_paths(login_path, env.get("PATH"))
+    if path:
+        env["PATH"] = path
     return env
 
 

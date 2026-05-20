@@ -88,21 +88,28 @@ def main() -> int:
         "type": "item.completed",
         "item": {"type": "agent_message", "text": "done"},
     }) == ["done"]
-    from refine_server.chat_mgr import _chat_env
+    from refine_server import chat_mgr
     old_openai_key = os.environ.get("OPENAI_API_KEY")
     old_openai_base = os.environ.get("OPENAI_BASE_URL")
     old_codex_ci = os.environ.get("CODEX_CI")
     old_codex_thread = os.environ.get("CODEX_THREAD_ID")
+    old_path = os.environ.get("PATH")
+    old_login_path_cache = chat_mgr._login_path_cache
+    old_login_path_resolved = chat_mgr._login_path_resolved
     try:
         os.environ["OPENAI_API_KEY"] = "sk-test-should-not-leak"
         os.environ["OPENAI_BASE_URL"] = "https://example.invalid/v1"
         os.environ["CODEX_CI"] = "1"
         os.environ["CODEX_THREAD_ID"] = "test-thread"
-        chat_env = _chat_env()
+        os.environ["PATH"] = "/install/bin:/shared/bin"
+        chat_mgr._login_path_cache = "/login/bin:/shared/bin"
+        chat_mgr._login_path_resolved = True
+        chat_env = chat_mgr._chat_env()
         assert "OPENAI_API_KEY" not in chat_env
         assert "OPENAI_BASE_URL" not in chat_env
         assert "CODEX_CI" not in chat_env
         assert "CODEX_THREAD_ID" not in chat_env
+        assert chat_env["PATH"] == "/login/bin:/shared/bin:/install/bin"
     finally:
         if old_openai_key is None:
             os.environ.pop("OPENAI_API_KEY", None)
@@ -120,6 +127,12 @@ def main() -> int:
             os.environ.pop("CODEX_THREAD_ID", None)
         else:
             os.environ["CODEX_THREAD_ID"] = old_codex_thread
+        if old_path is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = old_path
+        chat_mgr._login_path_cache = old_login_path_cache
+        chat_mgr._login_path_resolved = old_login_path_resolved
     print("[ok] codex CLI args + JSONL parsing")
 
     # --- Target-app command/check runtime -----------------------------------
@@ -226,6 +239,8 @@ def main() -> int:
     old_systemctl = refine_cli._systemctl
     old_which = refine_cli.shutil.which
     old_login_path = refine_cli._user_login_path
+    old_env_path = os.environ.get("PATH")
+    git_bin = Path(old_which("git") or "/usr/bin/git").parent
     systemctl_calls: list[tuple[str, ...]] = []
 
     def fake_systemctl(*args: str) -> tuple[int, str]:
@@ -244,6 +259,10 @@ def main() -> int:
         refine_cli._systemctl = fake_systemctl
         refine_cli.shutil.which = fake_which
         refine_cli._user_login_path = lambda: str(fake_uv_bin)
+        os.environ["PATH"] = (
+            f"{fake_uv_bin}{os.pathsep}/custom/claude/bin"
+            f"{os.pathsep}/literal%bin{os.pathsep}{git_bin}"
+        )
         unit_boot = bootstrap_client_repo(
             unit_client,
             clone_dir=unit_clone,
@@ -258,11 +277,19 @@ def main() -> int:
         refine_cli._systemctl = old_systemctl
         refine_cli.shutil.which = old_which
         refine_cli._user_login_path = old_login_path
+        if old_env_path is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = old_env_path
     ui_unit = Path(unit_boot["ui_unit_path"])
     assert ui_unit.is_file()
     assert unit_boot.get("unit_path") is None
     unit_text = ui_unit.read_text(encoding="utf-8")
     assert ui_unit.name == "refine-unit-clone-8080-ui.service"
+    assert (
+        f'Environment="PATH={fake_uv_bin}{os.pathsep}/custom/claude/bin'
+        f'{os.pathsep}/literal%%bin'
+    ) in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
     assert f"ExecStart={fake_uv} run refine ui" in unit_text
     assert "Restart=on-failure" in unit_text
