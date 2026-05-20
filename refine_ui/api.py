@@ -1592,6 +1592,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
     allowed = {
         "parallel_run_cap", "branch_name_pattern",
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
+        "agent_limit_pause_seconds",
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
         "project_update_pulse_interval_seconds",
@@ -1739,6 +1740,18 @@ def update_settings(body: dict) -> tuple[int, dict]:
                     400,
                     "project_update_pulse_interval_seconds must be one of "
                     "-1 (never), 30, 60, 300, 900, 1800, 3600",
+                )
+            normalized[k] = str(n)
+        elif k == "agent_limit_pause_seconds":
+            try:
+                n = int(v)
+            except (TypeError, ValueError):
+                return err(400, "agent_limit_pause_seconds must be an integer")
+            allowed_intervals = {30, 60, 3600, 10800}
+            if n not in allowed_intervals:
+                return err(
+                    400,
+                    "agent_limit_pause_seconds must be one of 30, 60, 3600, 10800",
                 )
             normalized[k] = str(n)
         else:

@@ -83,6 +83,12 @@ def main() -> int:
     assert "Feature flag changes are saved with Save runtime." in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
+    assert 'id="s-agent-limit-pause"' in settings_js
+    assert "agent_limit_pause_seconds" in settings_js
+    assert '"30",    "30 seconds"' in settings_js
+    assert '"60",    "1 minute"' in settings_js
+    assert '"3600",  "1 hour"' in settings_js
+    assert '"10800", "3 hours"' in settings_js
     assert "project_update_pulse_interval_seconds" in (
         root / "refine_ui/api.py"
     ).read_text(encoding="utf-8")
@@ -93,6 +99,7 @@ def main() -> int:
     feature_toggle_body = settings_js.split('$$("[data-feature-cell]").forEach', 1)[1]
     feature_toggle_body = feature_toggle_body.split('$$("[data-feature-clear]").forEach', 1)[0]
     assert 'api("POST", "/api/features/override"' in runtime_save_body
+    assert 'agent_limit_pause_seconds: $("#s-agent-limit-pause").value' in runtime_save_body
     assert 'api("POST", "/api/features/override"' not in feature_toggle_body
     assert 'await api("PATCH", "/api/settings", {' in application_save_body
     assert "_targetAppDraftDirty = false;" in application_save_body

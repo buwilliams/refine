@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -106,6 +107,23 @@ def main() -> int:
         insert_gap("low-todo", "todo", "low")
         dispatcher._tick()
         assert launched == ["high-todo"], launched
+
+        reset()
+        insert_gap("paused-high-todo", "todo", "high")
+        db.set_setting(
+            conn,
+            "__refine_agent_limit_pause_until",
+            f"{time.time() + 60:.3f}",
+        )
+        dispatcher._tick()
+        assert launched == [], launched
+        db.set_setting(
+            conn,
+            "__refine_agent_limit_pause_until",
+            f"{time.time() - 1:.3f}",
+        )
+        dispatcher._tick()
+        assert launched == ["paused-high-todo"], launched
 
         reset()
         insert_gap("high-running", "in-progress", "high")

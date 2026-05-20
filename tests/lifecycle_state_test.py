@@ -129,6 +129,27 @@ def main() -> int:
             latest_logs = gap["rounds"][-1]["logs"]
             assert any(expected_fragment in log["message"] for log in latest_logs)
 
+        gid_limit = "01LIFECYCLELIMITAAAAAAA"
+        branch_limit = "refine/lifecycle-limit"
+        create_indexed_gap(conn, gid_limit, status="in-progress", branch=branch_limit)
+        _wt_limit, base_limit = launchable_worktree(gid_limit, branch_limit)
+        dispatcher._on_finished(
+            gid_limit,
+            0,
+            1,
+            None,
+            base_limit,
+            failure_text="provider returned 429 rate limit exceeded",
+        )
+        assert status(conn, gid_limit) == "failed"
+        until = db.get_setting(conn, "__refine_agent_limit_pause_until", "")
+        assert until and float(until) > 0, until
+        assert db.get_setting(conn, "__refine_agent_limit_pause_reason") == "rate_limit"
+        limit_gap = gap_writer.shared_gaps.read_gap_json(gid_limit)
+        assert any(
+            "rate limit" in log["message"] for log in limit_gap["rounds"][-1]["logs"]
+        )
+
         # Preemption/paused cancellation resets in-progress work to todo and
         # removes partial branch/worktree state.
         gid_preempt = "01LIFECYCLEPREEMPTAAAAAA"

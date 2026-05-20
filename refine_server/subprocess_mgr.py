@@ -16,6 +16,7 @@ import sqlite3
 import subprocess
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -240,10 +241,13 @@ class RunHandle:
     # agent's own success signal doesn't get demoted to `failed`
     # solely because nothing changed in the worktree.
     agent_reported_success: bool | None = None
+    recent_output: deque[str] | None = None
 
     def __post_init__(self) -> None:
         if self.finished is None:
             self.finished = threading.Event()
+        if self.recent_output is None:
+            self.recent_output = deque(maxlen=40)
 
 
 class SubprocessManager:
@@ -270,8 +274,9 @@ class SubprocessManager:
     ) -> int:
         """Spawn an agent CLI subprocess in the Gap's worktree.
 
-        Returns the PID. on_finished(gap_id, exit_code, killed_reason) is invoked
-        from the supervisor thread when the subprocess exits.
+        Returns the PID. on_finished(gap_id, exit_code, killed_reason,
+        agent_reported_success, failure_text) is invoked from the supervisor
+        thread when the subprocess exits.
         """
         # Reuse the same env + PATH plumbing the chat subprocess uses:
         # strip provider API-key override vars for CLI login auth, and
@@ -437,7 +442,7 @@ class SubprocessManager:
         if on_finished is not None:
             try:
                 on_finished(h.gap_id, exit_code, h.killed_reason,
-                            h.agent_reported_success)
+                            h.agent_reported_success, self._failure_text(h))
             except Exception as e:  # pragma: no cover — defensive
                 activity.append(
                     self._get_conn(),
@@ -518,6 +523,7 @@ class SubprocessManager:
 
     def _write_log_entry(self, h: RunHandle, message: str) -> None:
         """One round-log entry per call + a `last_output_at` bump."""
+        self._remember_output(h, message)
         try:
             gap_writer.append_round_log(
                 gap_id=h.gap_id,
@@ -538,6 +544,16 @@ class SubprocessManager:
                 )
         except Exception:
             pass
+
+    def _remember_output(self, h: RunHandle, message: str) -> None:
+        text = (message or "").strip()
+        if text and h.recent_output is not None:
+            h.recent_output.append(text[:1000])
+
+    def _failure_text(self, h: RunHandle) -> str:
+        if not h.recent_output:
+            return ""
+        return "\n".join(h.recent_output)
 
     def _kill(self, h: RunHandle, reason: str) -> None:
         h.killed_reason = reason

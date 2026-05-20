@@ -23,6 +23,8 @@ from .friendly_outcome import classify_outcome
 
 
 _RESET_TO_TODO_REASONS = {"priority_preempted", "paused"}
+_LIMIT_PAUSE_UNTIL_KEY = "__refine_agent_limit_pause_until"
+_LIMIT_PAUSE_REASON_KEY = "__refine_agent_limit_pause_reason"
 
 
 @dataclass
@@ -80,6 +82,8 @@ class Dispatcher:
             self._stop_running_agents(reason="paused")
             return
         self._promote_backlog(conn)
+        if self._agent_limit_pause_active(conn):
+            return
 
         active_rank = self._highest_blocking_priority_rank(conn)
         if active_rank is None:
@@ -398,9 +402,12 @@ class Dispatcher:
             base_ref=base_commit,
             idle_window=idle,
             hard_cap=cap,
-            on_finished=lambda gid, code, reason, agent_ok: self._on_finished(
-                gid, round_idx, code, reason, base_commit,
-                agent_reported_success=agent_ok,
+            on_finished=(
+                lambda gid, code, reason, agent_ok, failure_text="": self._on_finished(
+                    gid, round_idx, code, reason, base_commit,
+                    agent_reported_success=agent_ok,
+                    failure_text=failure_text,
+                )
             ),
         )
 
@@ -501,7 +508,8 @@ class Dispatcher:
 
     def _on_finished(self, gap_id: str, round_idx: int, exit_code: int,
                      killed_reason: str | None, base_commit: str,
-                     *, agent_reported_success: bool | None = None) -> None:
+                     *, agent_reported_success: bool | None = None,
+                     failure_text: str | None = None) -> None:
         conn = self.get_conn()
         if killed_reason in _RESET_TO_TODO_REASONS:
             self._reset_stopped_run_to_todo(conn, gap_id, round_idx, killed_reason)
@@ -516,6 +524,7 @@ class Dispatcher:
             killed_reason=killed_reason,
             no_new_commits=no_new_commits,
             agent_reported_success=agent_reported_success,
+            failure_text=failure_text,
         )
 
         success = outcome.kind == "success"
@@ -573,6 +582,8 @@ class Dispatcher:
             gap_id=gap_id, actor="runner",
             details=outcome.details,
         )
+        if outcome.limit_kind:
+            self._pause_after_limit_failure(conn, outcome.limit_kind, gap_id=gap_id)
 
         # Merging is owned by the Merger now — a single-threaded worker
         # that serializes every operation on the host worktree.
@@ -580,6 +591,41 @@ class Dispatcher:
         # the merger to scan promptly instead of waiting on its
         # periodic tick. The Gap stays in `ready-merge` until the
         # merger parks it in `awaiting-rebuild`.
+
+    def _agent_limit_pause_active(self, conn: sqlite3.Connection) -> bool:
+        raw = db.get_setting(conn, _LIMIT_PAUSE_UNTIL_KEY, "") or ""
+        try:
+            until = float(raw)
+        except ValueError:
+            return False
+        if until <= time.time():
+            db.set_setting(conn, _LIMIT_PAUSE_UNTIL_KEY, "")
+            db.set_setting(conn, _LIMIT_PAUSE_REASON_KEY, "")
+            return False
+        return True
+
+    def _pause_after_limit_failure(
+        self,
+        conn: sqlite3.Connection,
+        limit_kind: str,
+        *,
+        gap_id: str,
+    ) -> None:
+        seconds = db.get_setting_int(conn, "agent_limit_pause_seconds", 60)
+        if seconds <= 0:
+            return
+        until = time.time() + seconds
+        db.set_setting(conn, _LIMIT_PAUSE_UNTIL_KEY, f"{until:.3f}")
+        db.set_setting(conn, _LIMIT_PAUSE_REASON_KEY, limit_kind)
+        label = "rate limit" if limit_kind == "rate_limit" else "token limit"
+        activity.append(
+            conn,
+            message=f"Agent scheduling paused for {seconds} seconds after {label}",
+            severity="warn",
+            category="cli",
+            gap_id=gap_id,
+            actor="runner",
+        )
 
     def _reset_stopped_run_to_todo(self, conn: sqlite3.Connection, gap_id: str,
                                    round_idx: int, reason: str) -> None:

@@ -61,6 +61,7 @@ def main() -> int:
     assert settings["parallel_run_cap"] == "3"
     assert settings["agent_idle_timeout_seconds"] == "900"
     assert settings["agent_hard_cap_seconds"] == "86400"
+    assert settings["agent_limit_pause_seconds"] == "60"
     print("[ok] DB init + defaults seeded")
 
     # --- Agent CLI abstraction ---------------------------------------------
@@ -541,6 +542,20 @@ def main() -> int:
     assert classify_outcome(exit_code=0, killed_reason="idle", no_new_commits=False).kind == "failure"
     assert classify_outcome(exit_code=0, killed_reason="hard_cap", no_new_commits=False).kind == "failure"
     assert classify_outcome(exit_code=2, killed_reason=None, no_new_commits=False).kind == "failure"
+    rate_limited = classify_outcome(
+        exit_code=1,
+        killed_reason=None,
+        no_new_commits=True,
+        failure_text="provider returned 429 rate limit exceeded",
+    )
+    assert rate_limited.limit_kind == "rate_limit", rate_limited
+    token_limited = classify_outcome(
+        exit_code=1,
+        killed_reason=None,
+        no_new_commits=True,
+        failure_text="prompt exceeds maximum context length",
+    )
+    assert token_limited.limit_kind == "token_limit", token_limited
     # No commits but the agent's `result` event reported success
     # ("target already met") — trust the agent over the no-commits heuristic.
     target_met = classify_outcome(exit_code=0, killed_reason=None,

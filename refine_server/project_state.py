@@ -39,6 +39,7 @@ RUNTIME_SETTING_KEYS = {
     "branch_name_pattern",
     "agent_idle_timeout_seconds",
     "agent_hard_cap_seconds",
+    "agent_limit_pause_seconds",
     "chat_idle_timeout_seconds",
     "backlog_promote_after_seconds",
     "project_update_pulse_interval_seconds",

@@ -1,6 +1,7 @@
 """Classify the outcome of a finished subprocess into a friendly summary."""
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 
@@ -11,17 +12,34 @@ class Outcome:
     severity: str      # info | warn | error
     message: str
     details: str | None = None
+    limit_kind: str | None = None  # rate_limit | token_limit
 
 
 def classify_outcome(*, exit_code: int, killed_reason: str | None,
                      no_new_commits: bool,
-                     agent_reported_success: bool | None = None) -> Outcome:
+                     agent_reported_success: bool | None = None,
+                     failure_text: str | None = None) -> Outcome:
     if killed_reason == "idle":
         return Outcome("failure", "cli", "error", "Agent appears stuck — no output during the idle window")
     if killed_reason == "hard_cap":
         return Outcome("failure", "cli", "error", "Agent exceeded the hard wall-clock cap")
     if killed_reason == "cancel":
         return Outcome("failure", "state", "info", "Agent run cancelled")
+    limit_kind = None
+    if exit_code != 0 or agent_reported_success is False:
+        limit_kind = _classify_limit_failure(failure_text)
+    if limit_kind == "rate_limit":
+        return Outcome(
+            "failure", "cli", "warn",
+            "Agent hit a rate limit — pausing agents before continuing",
+            _trim_details(failure_text), "rate_limit",
+        )
+    if limit_kind == "token_limit":
+        return Outcome(
+            "failure", "cli", "warn",
+            "Agent hit a token limit — pausing agents before continuing",
+            _trim_details(failure_text), "token_limit",
+        )
     if killed_reason == "result_grace":
         # Agent emitted its terminal `result` event but didn't actually
         # exit (almost always: it kicked off a backgrounded subprocess
@@ -61,3 +79,43 @@ def classify_outcome(*, exit_code: int, killed_reason: str | None,
             "Agent exited without producing changes — try refining the round",
         )
     return Outcome("success", "cli", "info", "Agent run completed")
+
+
+def _classify_limit_failure(text: str | None) -> str | None:
+    if not text:
+        return None
+    lowered = text.lower()
+    rate_patterns = (
+        r"\brate[-_ ]?limit(?:ed|ing)?\b",
+        r"\b429\b",
+        r"too many requests",
+        r"quota exceeded",
+        r"exceeded your current quota",
+        r"temporarily unavailable due to capacity",
+    )
+    for pattern in rate_patterns:
+        if re.search(pattern, lowered):
+            return "rate_limit"
+    token_patterns = (
+        r"\btoken[-_ ]?limit\b",
+        r"\btoo many tokens\b",
+        r"\bmax(?:imum)? tokens?\b",
+        r"\bcontext length\b",
+        r"\bcontext window\b",
+        r"\bmaximum context\b",
+        r"\bcontext_limit\b",
+        r"\bprompt too long\b",
+        r"\binput is too long\b",
+        r"exceeds? (?:the )?(?:model'?s? )?(?:maximum )?(?:context|token)",
+    )
+    for pattern in token_patterns:
+        if re.search(pattern, lowered):
+            return "token_limit"
+    return None
+
+
+def _trim_details(text: str | None) -> str | None:
+    if not text:
+        return None
+    stripped = text.strip()
+    return stripped[:2000] if stripped else None

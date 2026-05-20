@@ -725,6 +725,16 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
       <div class="form-row"><label>Agent hard cap (seconds)</label>
         <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
+      <div class="form-row"><label>Rate/token limit pause
+        <span class="muted small">— how long agents wait before continuing after provider rate-limit or token-limit errors.</span></label>
+        <select id="s-agent-limit-pause">
+          ${[
+            ["30",    "30 seconds"],
+            ["60",    "1 minute"],
+            ["3600",  "1 hour"],
+            ["10800", "3 hours"],
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.agent_limit_pause_seconds ?? "60") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
       <div class="form-row"><label>Standalone chat idle timeout (seconds)
         <span class="muted small">— set to 0 to disable auto-close</span></label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
@@ -1049,6 +1059,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           branch_name_pattern: $("#s-pattern").value,
           agent_idle_timeout_seconds: $("#s-idle").value,
           agent_hard_cap_seconds: $("#s-hard").value,
+          agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
           chat_idle_timeout_seconds: $("#s-chat-idle").value,
           backlog_promote_after_seconds: $("#s-backlog-promote").value,
           project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
