@@ -701,8 +701,8 @@ def cmd_reset(args: argparse.Namespace) -> int:
 def cmd_status(args: argparse.Namespace) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
-        port = _runtime_action_port(args, setup_clone, None)
-        _print_setup_status_block(setup_clone, port=port)
+        for port in _status_ports(args, setup_clone, None):
+            _print_setup_status_block(setup_clone, port=port)
         return 0
 
     clone, unit = _resolve_clone_and_unit_or_exit()
@@ -711,9 +711,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     except config.ConfigError as e:
         print(f"refine status: {e}", file=sys.stderr)
         return 1
-    port = _runtime_action_port(args, clone, cfg)
     _sync_bound_project_registry(clone, cfg)
-    _print_status_block(clone, unit, cfg, port=port)
+    for port in _status_ports(args, clone, cfg):
+        _print_status_block(clone, unit, cfg, port=port)
     return 0
 
 
@@ -1058,6 +1058,34 @@ def _owned_refine_ui_ports(clone: Path) -> list[int]:
             ports.add(int(env_port))
         else:
             ports.add(listen_port)
+    return sorted(ports)
+
+
+def _status_ports(args: argparse.Namespace, clone: Path,
+                  cfg: "config.Config | None") -> list[int]:
+    if getattr(args, "port", None) is not None:
+        return [_effective_port(args, cfg)]
+    ports = set(_runtime_pid_ports(clone, cfg))
+    ports.update(_owned_refine_ui_ports(clone))
+    if not ports:
+        ports.add(_effective_port(args, cfg))
+    return sorted(ports)
+
+
+def _runtime_pid_ports(clone: Path, cfg: "config.Config | None") -> list[int]:
+    run_dir = _runtime_dir(clone, cfg)
+    ports: set[int] = set()
+    try:
+        entries = list(run_dir.glob("ui-*.pid"))
+    except OSError:
+        return []
+    for path in entries:
+        m = re.fullmatch(r"ui-(\d+)\.pid", path.name)
+        if not m:
+            continue
+        port = int(m.group(1))
+        if 0 < port <= 65535:
+            ports.add(port)
     return sorted(ports)
 
 
