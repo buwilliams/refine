@@ -1,14 +1,14 @@
 """Guidance storage, classification normalization, and prompt composition."""
 from __future__ import annotations
 
-from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+from tests.helpers import cleanup_tmp, create_indexed_gap, init_refine, make_client_repo
 
 
 def main() -> int:
     tmp, client = make_client_repo("refine-guidance-")
     conn = init_refine(client)
     try:
-        from refine_server import guidance, project_state
+        from refine_server import gaps, guidance, project_state
 
         gap = {
             "name": "Improve button contrast",
@@ -67,6 +67,29 @@ def main() -> int:
         assert prompt.startswith("Additional guidance for this Gap:"), prompt
         assert "Preserve keyboard access and color contrast." in prompt
         assert prompt.endswith("Gap instructions"), prompt
+
+        gid = "01GUIDANCELOGAAAAAAAAAAAAAA"
+        create_indexed_gap(conn, gid)
+        logged_gap = gaps.read_gap_json(gid)
+        guidance.log_selection(conn, logged_gap, selected, raw)
+        logged_gap = gaps.read_gap_json(gid)
+        messages = [log["message"] for log in logged_gap["rounds"][-1]["logs"]]
+        assert "Guidance accepted: Accessibility" in messages, messages
+
+        gid_reject = "01GUIDANCEREJECTAAAAAAAAAA"
+        create_indexed_gap(conn, gid_reject)
+        rejected_gap = gaps.read_gap_json(gid_reject)
+        guidance.log_selection(
+            conn,
+            rejected_gap,
+            [],
+            '{"decisions":[{"index":0,"decision":"reject"}]}',
+        )
+        rejected_gap = gaps.read_gap_json(gid_reject)
+        messages = [
+            log["message"] for log in rejected_gap["rounds"][-1]["logs"]
+        ]
+        assert "Guidance reviewed; no guidance matched this Gap" in messages, messages
 
         saved = project_state.write_guidance([{
             "name": "Paused",

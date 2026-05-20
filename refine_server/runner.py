@@ -249,6 +249,13 @@ class Runner:
                 git_ops.delete_branch(row["branch_name"])
             try:
                 gap_writer.update_fields(gap_id, status="cancelled")
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="info",
+                    category="state",
+                    actor="refine",
+                    message=f"Workflow status changed: {row['status']} → cancelled",
+                )
             except Exception:
                 pass
             activity.append(
@@ -309,7 +316,7 @@ class Runner:
 
     def _h_append_round(self, params: dict) -> dict:
         gap_id = params["gap_id"]
-        self._require_active_gap(gap_id, columns="status, instance_id")
+        row = self._require_active_gap(gap_id, columns="status, instance_id")
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -327,6 +334,13 @@ class Runner:
             )
         try:
             gap_writer.update_fields(gap_id, status="todo")
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="state",
+                actor=params["reporter"],
+                message=f"Workflow status changed: {row['status']} → todo; new round submitted",
+            )
         except Exception:
             pass
         try:
@@ -1043,6 +1057,13 @@ class Runner:
             gid = row["id"]
             try:
                 gap_writer.update_fields(gid, status="review", branch_name=None)
+                gap_writer.append_latest_round_log(
+                    gap_id=gid,
+                    severity="info",
+                    category="state",
+                    actor="runner",
+                    message="Target application rebuilt; Gap is ready for review",
+                )
             except Exception:
                 pass
             activity.append(

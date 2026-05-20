@@ -141,6 +141,14 @@ def main() -> int:
             "SELECT status FROM gaps_index WHERE id = '01CCCCCCCCCCCCCCCCCCCCCCCC'"
         ).fetchone()
         assert row["status"] == "backlog", dict(row)
+        failed_gap = gaps.read_gap_json("01CCCCCCCCCCCCCCCCCCCCCCCC")
+        assert failed_gap["status"] == "backlog", failed_gap
+        failed_messages = [
+            log["message"] for log in failed_gap["rounds"][-1]["logs"]
+        ]
+        assert "Governance review started" in failed_messages, failed_messages
+        assert "Does not fit product direction." in failed_messages, failed_messages
+        assert any("todo → backlog" in msg for msg in failed_messages), failed_messages
         db.set_setting(conn, "backlog_promote_after_seconds", "0")
         dispatcher._promote_backlog(conn)
         row = conn.execute(
@@ -168,6 +176,13 @@ def main() -> int:
             governance.classify_gap = old_classify
         settings = governance.load_settings(conn)
         assert [r["text"] for r in settings["rules"]] == ["New rule"], settings
+        passed_gap = gaps.read_gap_json("01DDDDDDDDDDDDDDDDDDDDDDDD")
+        passed_messages = [
+            log["message"] for log in passed_gap["rounds"][-1]["logs"]
+        ]
+        assert "Governance review started" in passed_messages, passed_messages
+        assert "Governance auto-applied 1 rule change" in passed_messages, passed_messages
+        assert "Governance passed." in passed_messages, passed_messages
     finally:
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)

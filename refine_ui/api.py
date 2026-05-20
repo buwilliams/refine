@@ -143,6 +143,27 @@ def _require_active_gap_ids(gap_ids: list[str]) -> tuple[bool, tuple[int, dict] 
     return True, None
 
 
+def _append_gap_workflow_log(
+    gap_id: str,
+    message: str,
+    *,
+    severity: str = "info",
+    actor: str = "refine",
+    details: str | None = None,
+) -> None:
+    try:
+        gap_writer.append_latest_round_log(
+            gap_id=gap_id,
+            severity=severity,
+            category="state",
+            actor=actor,
+            message=message,
+            details=details,
+        )
+    except Exception:
+        pass
+
+
 # --- Project attach/setup -----------------------------------------------------
 
 def project_status() -> tuple[int, dict]:
@@ -997,11 +1018,12 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
         return err(400, "expected `name`, `priority`, `status`, and/or `notes`")
     conn = _conn()
     try:
-        _, ownership_err = _require_active_gap(conn, gap_id)
+        row, ownership_err = _require_active_gap(conn, gap_id)
     finally:
         conn.close()
     if ownership_err is not None:
         return ownership_err
+    previous_status = row["status"] if row is not None else None
     if sql_fields:
         active = project_state.active_instance_id()
         updated_at = now_iso()
@@ -1023,6 +1045,12 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             from refine_server import gap_writer
 
             gap_writer.update_fields(gap_id, **sql_fields)
+            next_status = sql_fields.get("status")
+            if next_status is not None and previous_status != next_status:
+                _append_gap_workflow_log(
+                    gap_id,
+                    f"Workflow status changed: {previous_status} → {next_status}",
+                )
         except Exception:
             pass
     if notes_change:
@@ -1126,6 +1154,11 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     updated_ids: list[str] = []
 
     if field in ("priority", "status"):
+        previous_status_by_id = {
+            g["id"]: g.get("status")
+            for g in (listing.get("gaps") or [])
+            if g["id"] in gap_ids
+        }
         conn = _conn()
         active = project_state.active_instance_id()
         try:
@@ -1145,6 +1178,16 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
 
             for gid in gap_ids:
                 gap_writer.update_fields(gid, **{field: value})
+                if field == "status":
+                    previous = previous_status_by_id.get(gid)
+                    if previous != value:
+                        _append_gap_workflow_log(
+                            gid,
+                            (
+                                "Workflow status changed by bulk update: "
+                                f"{previous} → {value}"
+                            ),
+                        )
         except Exception:
             pass
         # Nudge each gap.json's mtime via the runner so listings sort
@@ -1401,6 +1444,10 @@ def retry(gap_id: str) -> tuple[int, dict]:
             from refine_server import gap_writer
 
             gap_writer.update_fields(gap_id, status="todo")
+            _append_gap_workflow_log(
+                gap_id,
+                f"Workflow status changed: {prev_status} → todo; reopened",
+            )
         except Exception:
             pass
         activity.append(
@@ -2269,6 +2316,11 @@ def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
         gid = row["id"]
         try:
             gap_writer.update_fields(gid, status="review", branch_name=None)
+            _append_gap_workflow_log(
+                gid,
+                "Target application rebuilt; Gap is ready for review",
+                actor="refine",
+            )
         except Exception:
             pass
         activity.append(

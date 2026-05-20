@@ -187,6 +187,13 @@ class Dispatcher:
             if cur.rowcount:
                 try:
                     gap_writer.update_fields(gid, status="todo")
+                    gap_writer.append_latest_round_log(
+                        gap_id=gid,
+                        severity="info",
+                        category="state",
+                        actor="runner",
+                        message="Auto-promoted from backlog to todo",
+                    )
                 except Exception:
                     pass
                 activity.append(
@@ -209,6 +216,17 @@ class Dispatcher:
         if last and last["failure_category"] == "auth":
             ok, msg = preflight.check(conn)
             if not ok:
+                try:
+                    gap_writer.append_latest_round_log(
+                        gap_id=gap_id,
+                        severity="warn",
+                        category="auth",
+                        actor="runner",
+                        message="Retry blocked — auth pre-flight still failing",
+                        details=msg or "",
+                    )
+                except Exception:
+                    pass
                 activity.append(
                     conn,
                     message="Retry blocked — auth pre-flight still failing",
@@ -290,24 +308,16 @@ class Dispatcher:
         latest = gap["rounds"][round_idx]
         prompt = _format_prompt(latest)
         try:
-            accepted_guidance, _raw = guidance.select_for_gap(conn, gap)
+            accepted_guidance, raw_guidance = guidance.select_for_gap(conn, gap)
         except Exception as e:
             self._abort_to_failed(
                 conn, gap_id, "Guidance classification failed",
                 category="cli", details=repr(e)[:2000],
             )
             return
+        guidance.log_selection(conn, gap, accepted_guidance, raw_guidance)
         if accepted_guidance:
             prompt = guidance.prepend_to_prompt(prompt, accepted_guidance)
-            activity.append(
-                conn,
-                message=(
-                    "Guidance accepted: "
-                    + ", ".join(item["name"] for item in accepted_guidance)
-                ),
-                severity="info", category="cli",
-                gap_id=gap_id, actor="runner",
-            )
 
         # Compute the branch name + worktree.
         pattern = db.get_setting(conn, "branch_name_pattern", "refine/{gap_id}") or "refine/{gap_id}"
@@ -343,6 +353,16 @@ class Dispatcher:
         try:
             gap_writer.update_fields(
                 gap_id, status="in-progress", branch_name=branch_name,
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="state",
+                actor="runner",
+                message=(
+                    "Workflow status changed: todo → in-progress; "
+                    f"agent work started on `{branch_name}`"
+                ),
             )
         except Exception:
             pass
@@ -468,6 +488,14 @@ class Dispatcher:
             )
         try:
             gap_writer.update_fields(gap_id, status="failed")
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="error",
+                category=category,
+                actor="runner",
+                message=f"Workflow status changed: todo → failed; {message}",
+                details=details or None,
+            )
         except Exception:
             pass
 
@@ -514,6 +542,13 @@ class Dispatcher:
                 pass
         try:
             gap_writer.update_fields(gap_id, status=next_status)
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info" if success else outcome.severity,
+                category="state",
+                actor="runner",
+                message=f"Workflow status changed: in-progress → {next_status}",
+            )
         except Exception:
             pass
 

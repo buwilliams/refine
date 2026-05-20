@@ -66,6 +66,16 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
                 )
             try:
                 gap_writer.update_fields(gid, status="ready-merge")
+                gap_writer.append_latest_round_log(
+                    gap_id=gid,
+                    severity="info",
+                    category="state",
+                    actor="runner",
+                    message=(
+                        "Workflow status changed: in-progress → ready-merge; "
+                        "runner restarted after agent completion"
+                    ),
+                )
             except Exception:
                 pass
             activity.append(

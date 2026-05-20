@@ -131,6 +131,16 @@ class GovernanceAgent:
             self._current_gap_id = gap_id
             self._current_started = time.monotonic()
         try:
+            try:
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="info",
+                    category="governance",
+                    actor="runner",
+                    message="Governance review started",
+                )
+            except Exception:
+                pass
             provider = db.get_setting(conn, "agent_cli")
             try:
                 result = governance.classify_gap(conn, gap_id, provider=provider)
@@ -155,6 +165,22 @@ class GovernanceAgent:
                     conn, result["governance_rule_actions"],
                 )
                 if applied_actions:
+                    details = json.dumps(applied_actions, indent=2)
+                    try:
+                        gap_writer.append_latest_round_log(
+                            gap_id=gap_id,
+                            severity="info",
+                            category="governance",
+                            actor="runner",
+                            message=(
+                                "Governance auto-applied "
+                                f"{len(applied_actions)} rule change"
+                                f"{'' if len(applied_actions) == 1 else 's'}"
+                            ),
+                            details=details,
+                        )
+                    except Exception:
+                        pass
                     activity.append(
                         conn,
                         message=(
@@ -164,7 +190,7 @@ class GovernanceAgent:
                         ),
                         severity="info", category="governance",
                         gap_id=gap_id, actor="runner",
-                        details=json.dumps(applied_actions, indent=2),
+                        details=details,
                     )
             fields = {
                 "rule_state": result["rule_state"],
@@ -194,6 +220,20 @@ class GovernanceAgent:
                         "WHERE id = ? AND status = 'todo'",
                         (now_iso(), gap_id),
                     )
+                try:
+                    gap_writer.update_fields(gap_id, status="backlog")
+                    gap_writer.append_latest_round_log(
+                        gap_id=gap_id,
+                        severity="warn",
+                        category="state",
+                        actor="runner",
+                        message=(
+                            "Workflow status changed: todo → backlog; "
+                            "governance review did not pass"
+                        ),
+                    )
+                except Exception:
+                    pass
                 self._log_result(conn, gap_id, round_idx, fields, severity="warn")
                 with self._snap_lock:
                     self._last_outcome = result["rule_state"]

@@ -83,3 +83,34 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+.gaps-table {
+  table-layout: fixed;
+}
+.gaps-col-name {
+  width: auto;
+}
+.gaps-col-status {
+  width: 140px;
+}
+.gaps-col-priority {
+  width: 92px;
+}
+.gaps-col-reporter {
+  width: 15%;
+}
+.gaps-col-instance {
+  width: 13%;
+}
+.gaps-col-updated {
+  width: 120px;
+}
+.gaps-col-select {
+  width: 32px;
+}
+.gaps-name-cell {
+  overflow-wrap: anywhere;
+}
+.gaps-status-cell {
+  white-space: nowrap;
+}

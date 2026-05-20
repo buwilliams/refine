@@ -116,6 +116,9 @@ def main() -> int:
             (default_gap,),
         ).fetchone()
         assert row["status"] == "todo", dict(row)
+        updated_gap = gaps.read_gap_json(default_gap)
+        messages = [log["message"] for log in updated_gap["rounds"][-1]["logs"]]
+        assert "Workflow status changed: backlog → todo" in messages, messages
 
         automation_default = "01OWNERSHIPAUTODEFAULTAAAA"
         automation_refine2 = "01OWNERSHIPAUTOREFINE2AAAA"
@@ -136,6 +139,9 @@ def main() -> int:
             automation_default: "backlog",
             automation_refine2: "todo",
         }, rows
+        auto_gap = gaps.read_gap_json(automation_refine2)
+        auto_messages = [log["message"] for log in auto_gap["rounds"][-1]["logs"]]
+        assert "Auto-promoted from backlog to todo" in auto_messages, auto_messages
 
         root = Path(__file__).resolve().parents[1]
         common_js = (root / "refine_ui/static/js/common.js").read_text(

@@ -26,6 +26,9 @@ def main() -> int:
     gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(
         encoding="utf-8",
     )
+    gaps_css = (root / "refine_ui/static/css/gaps.css").read_text(
+        encoding="utf-8",
+    )
     gaps_bulk_js = (root / "refine_ui/static/js/features/gaps-bulk.js").read_text(
         encoding="utf-8",
     )
@@ -185,6 +188,16 @@ def main() -> int:
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
     assert "dashboard-status-label" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
+    assert '<table class="table gaps-table">' in gaps_list_js
+    assert '<col class="gaps-col-name">' in gaps_list_js
+    assert '<col class="gaps-col-status">' in gaps_list_js
+    assert 'class="gaps-status-cell"' in gaps_list_js
+    assert ".gaps-table" in gaps_css
+    assert "table-layout: fixed;" in gaps_css
+    assert ".gaps-col-status" in gaps_css
+    assert "width: 140px;" in gaps_css
+    assert ".gaps-status-cell" in gaps_css
+    assert "white-space: nowrap;" in gaps_css
     assert "${STATUS_FILTER_OPTIONS" in changes_js
     assert "const BULK_STATUS_OPTIONS = WORKFLOW_STATUSES;" in gaps_bulk_js
     assert 'forward: { label: "Review →"' not in gaps_detail_js

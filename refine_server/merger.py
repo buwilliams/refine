@@ -258,6 +258,18 @@ class Merger:
                 )
             try:
                 gap_writer.update_fields(gap_id, status="failed")
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="warn",
+                    category="state",
+                    actor="runner",
+                    message=(
+                        "Workflow status changed: ready-merge → failed; "
+                        + (result.get("message")
+                           or "merge failed")
+                    ),
+                    details=result.get("details"),
+                )
             except Exception:
                 pass
             activity.append(

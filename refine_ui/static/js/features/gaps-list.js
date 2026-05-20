@@ -300,7 +300,16 @@ function drawGapsTable(gaps, state) {
        </th>`
     : "";
   root.innerHTML = `
-    <table class="table">
+    <table class="table gaps-table">
+      <colgroup>
+        ${showSelection ? '<col class="gaps-col-select">' : ""}
+        <col class="gaps-col-name">
+        <col class="gaps-col-status">
+        <col class="gaps-col-priority">
+        <col class="gaps-col-reporter">
+        <col class="gaps-col-instance">
+        <col class="gaps-col-updated">
+      </colgroup>
       <thead><tr>${selectionHead}${sortHeads}</tr></thead>
       <tbody>
         ${gaps.map((g) => {
@@ -315,8 +324,8 @@ function drawGapsTable(gaps, state) {
             : "";
           return `<tr data-id="${g.id}">
             ${cell}
-            <td>${htmlEscape(g.name)}</td>
-            <td><span class="status-pill ${g.status}">${g.status}</span></td>
+            <td class="gaps-name-cell">${htmlEscape(g.name)}</td>
+            <td class="gaps-status-cell"><span class="status-pill ${g.status}">${g.status}</span></td>
             <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
             <td class="muted small">${htmlEscape(g.instance_display_name || g.instance_id || "Unknown")}</td>

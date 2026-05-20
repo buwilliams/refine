@@ -70,6 +70,14 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
              f"Branch `{target}` has no upstream — Merge agent will merge "
              f"locally and skip the push.",
              severity="info", category="git", actor=actor)
+    _log(
+        conn,
+        gap_id,
+        f"Merge started for `{branch}` into `{target}`",
+        severity="info",
+        category="git",
+        actor=actor,
+    )
 
     # If the host's working tree is in an unfinished git operation —
     # typically a prior merge that hit code-level conflicts and was
@@ -384,10 +392,13 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
         "merged locally (no upstream — push skipped)"
     )
     done_msg = (f"Gap {pushed_part}; transitioned to `{final_status}`")
-    activity.append(
+    _log(
         conn,
+        gap_id,
         message=done_msg,
-        severity="info", category="state", gap_id=gap_id, actor=actor,
+        severity="info",
+        category="state",
+        actor=actor,
     )
     return {"ok": True, "stage": "done",
             "message": "Merged and pushed" if pushed

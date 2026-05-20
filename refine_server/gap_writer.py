@@ -234,6 +234,29 @@ def append_round_log(*, gap_id: str, round_idx: int, message: str,
         shared_gaps.write_gap_json(gap)
 
 
+def append_latest_round_log(*, gap_id: str, message: str,
+                            severity: str = "info", category: str = "cli",
+                            details: str | None = None,
+                            actor: str | None = None,
+                            actions: list[dict] | None = None) -> None:
+    gap = shared_gaps.read_gap_json(gap_id)
+    if gap is None:
+        return
+    rounds = gap.get("rounds") or []
+    if not rounds:
+        return
+    append_round_log(
+        gap_id=gap_id,
+        round_idx=len(rounds) - 1,
+        message=message,
+        severity=severity,
+        category=category,
+        details=details,
+        actor=actor,
+        actions=actions,
+    )
+
+
 def update_name(gap_id: str, name: str) -> None:
     try:
         update_fields(gap_id, name=name)

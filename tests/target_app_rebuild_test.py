@@ -61,6 +61,8 @@ def main() -> int:
         gap = gaps.read_gap_json(gid)
         assert gap["status"] == "review"
         assert gap.get("branch_name") is None
+        messages = [log["message"] for log in gap["rounds"][-1]["logs"]]
+        assert "Target application rebuilt; Gap is ready for review" in messages, messages
     finally:
         conn.close()
         cleanup_tmp(tmp)

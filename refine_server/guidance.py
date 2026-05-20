@@ -5,9 +5,9 @@ import json
 import sqlite3
 from typing import Any, Callable
 
-from refine_server import db, project_state
+from refine_server import activity, db, project_state
 
-from . import governance
+from . import gap_writer, governance
 
 
 _CLASSIFY_PROMPT = """You are selecting operator guidance for one software Gap.
@@ -116,6 +116,54 @@ def prepend_to_prompt(prompt: str, accepted: list[dict[str, Any]]) -> str:
     if len(sections) == 1:
         return prompt
     return "\n\n".join(sections) + "\n\n" + prompt
+
+
+def log_selection(
+    conn: sqlite3.Connection,
+    gap: dict[str, Any],
+    accepted: list[dict[str, Any]],
+    raw: str,
+    *,
+    actor: str = "runner",
+) -> None:
+    if not raw:
+        return
+    gap_id = str(gap.get("id") or "")
+    if not gap_id:
+        return
+    accepted_names = [str(item.get("name") or "Guidance") for item in accepted]
+    if accepted_names:
+        message = "Guidance accepted: " + ", ".join(accepted_names)
+    else:
+        message = "Guidance reviewed; no guidance matched this Gap"
+    details = json.dumps(
+        {
+            "accepted": accepted_names,
+            "classifier_response": raw[:4000],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+    try:
+        gap_writer.append_latest_round_log(
+            gap_id=gap_id,
+            severity="info",
+            category="guidance",
+            actor=actor,
+            message=message,
+            details=details,
+        )
+    except Exception:
+        pass
+    activity.append(
+        conn,
+        message=message,
+        severity="info",
+        category="guidance",
+        gap_id=gap_id,
+        actor=actor,
+        details=details,
+    )
 
 
 def _coerce_index(value: Any) -> int | None:

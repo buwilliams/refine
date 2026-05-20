@@ -100,6 +100,12 @@ def main() -> int:
         assert not git_ops.local_branch_exists(branch_success)
         assert not git_ops.worktree_exists(gid_success)
         assert "feature-success.txt" in git(client, "ls-tree", "-r", "--name-only", "origin/main").stdout
+        success_messages = latest_messages(gid_success)
+        assert any("Merge started" in msg for msg in success_messages), success_messages
+        assert any(
+            "transitioned to `awaiting-rebuild`" in msg
+            for msg in success_messages
+        ), success_messages
 
         # Safety default: a direct merge operation also parks at
         # awaiting-rebuild when the caller omits final_status.
@@ -171,6 +177,10 @@ def main() -> int:
         assert moved == 1
         assert db_status(conn, gid_finished) == "ready-merge"
         assert db_status(conn, gid_orphan) == "failed"
+        assert any(
+            "in-progress → ready-merge" in msg
+            for msg in latest_messages(gid_finished)
+        ), latest_messages(gid_finished)
         run = conn.execute(
             "SELECT status, failure_category, finished_at FROM runs "
             "WHERE gap_id = ? ORDER BY id DESC LIMIT 1",
