@@ -8,6 +8,7 @@ import json
 import sqlite3
 from typing import Any
 
+from . import search_index
 from .db import transaction
 from .gaps import now_iso
 
@@ -76,9 +77,14 @@ def recent(
         where.append("actor = ?")
         args.append(actor)
     if q:
-        where.append("(message LIKE ? OR details LIKE ?)")
-        like = f"%{q}%"
-        args.extend([like, like])
+        match = search_index.fts_query(q)
+        if match is None:
+            return []
+        where.append(
+            "id IN (SELECT rowid FROM activity_search_fts "
+            "WHERE activity_search_fts MATCH ?)"
+        )
+        args.append(match)
     if where:
         sql.append("WHERE " + " AND ".join(where))
     sql.append("ORDER BY id DESC LIMIT ? OFFSET ?")

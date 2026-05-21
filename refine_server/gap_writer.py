@@ -208,6 +208,12 @@ def rename_reporter_in_rounds(
                         "UPDATE gaps_index SET reporter = ? WHERE id = ?",
                         (new_name, gap_id),
                     )
+                try:
+                    from refine_server import search_index
+
+                    search_index.upsert_gap(conn, gap)
+                except Exception:
+                    pass
     return touched
 
 

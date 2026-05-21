@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters
+from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters, search_index
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -949,9 +949,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         return blocked
     metric_start = perf_metrics.now()
     page_limit, page_offset = _page_bounds(limit, offset)
-    needs_round_search = bool(
-        q and not (severity or category or actor or reporter)
-    )
+    fts_match = search_index.fts_query(q)
     sql = [
         "SELECT id, name, status, priority, reporter, "
         "created, updated, branch_name, instance_id "
@@ -963,9 +961,24 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         where.append("status = ?")
         args.append(status)
     if q:
-        where.append("(name LIKE ? OR id LIKE ?)")
-        like = f"%{q}%"
-        args.extend([like, like])
+        if fts_match is None:
+            return 200, {
+                "gaps": [],
+                "page": {
+                    "limit": page_limit,
+                    "offset": page_offset,
+                    "has_more": False,
+                },
+            }
+        where.append(
+            "id IN ("
+            "SELECT gap_id FROM gap_search_docs "
+            "WHERE rowid IN ("
+            "SELECT rowid FROM gap_search_fts "
+            "WHERE gap_search_fts MATCH ?"
+            "))"
+        )
+        args.append(fts_match)
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
@@ -1007,12 +1020,8 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     if where:
         sql.append("WHERE " + " AND ".join(where))
     sql.append("ORDER BY " + _gaps_order_clause(sort, direction))
-    if needs_round_search:
-        sql.append("LIMIT ?")
-        args.append(page_limit + page_offset + 1)
-    else:
-        sql.append("LIMIT ? OFFSET ?")
-        args.extend([page_limit + 1, page_offset])
+    sql.append("LIMIT ? OFFSET ?")
+    args.extend([page_limit + 1, page_offset])
     conn = _conn()
     try:
         rows = [_enrich_gap_row(dict(r)) for r in conn.execute(" ".join(sql), args)]
@@ -1024,18 +1033,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
             }
     finally:
         conn.close()
-    # Round-content search only kicks in when the only non-q filters are
-    # the existing ones — the activity-side subquery already constrains
-    # the candidate id set.
     rows_scanned = len(rows)
-    round_rows_scanned = 0
-    if needs_round_search and len(rows) < page_limit + page_offset + 1:
-        rows, round_rows_scanned = _augment_with_round_search(
-            rows, q, page_limit + page_offset + 1,
-        )
-        rows_scanned += round_rows_scanned
-    if needs_round_search:
-        rows = rows[page_offset:]
     has_more = len(rows) > page_limit
     rows = rows[:page_limit]
     body: dict = {
@@ -1051,7 +1049,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     perf_metrics.record(
         "api.list_gaps",
         elapsed_ms=perf_metrics.elapsed_ms(metric_start),
-        query_mode="round_search" if needs_round_search else "indexed",
+        query_mode="search_index" if q else "indexed",
         rows_scanned=rows_scanned,
         rows_returned=len(rows),
         details={
@@ -1066,45 +1064,9 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
             "offset": page_offset,
             "sort": sort or "",
             "direction": direction or "",
-            "round_rows_scanned": round_rows_scanned,
         },
     )
     return 200, body
-
-
-def _augment_with_round_search(initial: list[dict], q: str,
-                                limit: int) -> tuple[list[dict], int]:
-    seen = {r["id"] for r in initial}
-    needle = q.lower()
-    conn = _conn()
-    try:
-        rows = conn.execute(
-            "SELECT id, name, status, priority, reporter, created, updated, branch_name, instance_id "
-            "FROM gaps_index ORDER BY updated DESC LIMIT 1000"
-        ).fetchall()
-    finally:
-        conn.close()
-    extras: list[dict] = []
-    scanned = 0
-    for r in rows:
-        scanned += 1
-        if r["id"] in seen:
-            continue
-        gap = shared_gaps.read_gap_json(r["id"])
-        if not gap:
-            continue
-        for round_obj in gap.get("rounds", []):
-            blob = " ".join([
-                round_obj.get("reporter", "") or "",
-                round_obj.get("actual", "") or "",
-                round_obj.get("target", "") or "",
-            ]).lower()
-            if needle in blob:
-                extras.append(_enrich_gap_row(dict(r)))
-                break
-        if len(initial) + len(extras) >= limit:
-            break
-    return initial + extras, scanned
 
 
 def get_gap(gap_id: str) -> tuple[int, dict]:
@@ -1271,7 +1233,13 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
         try:
             from refine_server import gap_writer
 
-            gap_writer.update_fields(gap_id, **sql_fields)
+            gap = gap_writer.update_fields(gap_id, **sql_fields)
+            conn = _conn()
+            try:
+                with db.transaction(conn):
+                    search_index.upsert_gap(conn, gap)
+            finally:
+                conn.close()
             next_status = sql_fields.get("status")
             if next_status is not None and previous_status != next_status:
                 _append_gap_workflow_log(
@@ -1481,7 +1449,13 @@ def _bulk_update_selected_gaps(
             from refine_server import gap_writer
 
             for gid in gap_ids:
-                gap_writer.update_fields(gid, **{field: value})
+                gap = gap_writer.update_fields(gid, **{field: value})
+                conn = _conn()
+                try:
+                    with db.transaction(conn):
+                        search_index.upsert_gap(conn, gap)
+                finally:
+                    conn.close()
                 if field == "status":
                     previous = previous_status_by_id.get(gid)
                     if previous != value:

@@ -633,6 +633,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     """Rebuild SQLite projection tables from canonical JSON."""
     from . import db
     from . import perf_metrics
+    from . import search_index
 
     total_start = perf_metrics.now()
     phase_ms: dict[str, float] = {}
@@ -649,6 +650,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     phase_ms["fingerprint_ms"] = perf_metrics.elapsed_ms(phase_start)
     phase_start = perf_metrics.now()
     gap_rows, iter_stats = _iter_gap_json_with_stats(root)
+    gap_rows = list(gap_rows)
     phase_ms["parse_ms"] = perf_metrics.elapsed_ms(phase_start)
     files_scanned = iter_stats["files_scanned"]
     bytes_parsed = iter_stats["bytes_parsed"]
@@ -682,6 +684,9 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
                 ),
             )
         phase_ms["settings_reporters_ms"] = perf_metrics.elapsed_ms(phase_start)
+        phase_start = perf_metrics.now()
+        search_index.rebuild_gap_docs(conn, gap_rows)
+        phase_ms["gap_search_insert_ms"] = perf_metrics.elapsed_ms(phase_start)
         phase_start = perf_metrics.now()
         for gap, rel_path in gap_rows:
             conn.execute(
