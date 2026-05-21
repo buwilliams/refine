@@ -154,6 +154,31 @@ def main() -> int:
 
         try:
             target_app.run_operation = fake_run_operation  # type: ignore[assignment]
+            for kind in ("start", "stop", "rebuild"):
+                result = auto_runner._h_target_app_run({  # noqa: SLF001
+                    "kind": kind,
+                    "config": {},
+                })
+                assert result["ok"], result
+            manual_activity = [
+                r["message"]
+                for r in conn.execute(
+                    "SELECT message FROM activity "
+                    "WHERE category = 'target_app' AND actor = 'refine' "
+                    "AND gap_id IS NULL ORDER BY id"
+                )
+            ]
+            for kind in ("start", "stop", "rebuild"):
+                assert any(
+                    f"target-app: {kind} requested" in msg
+                    for msg in manual_activity
+                ), manual_activity
+                assert any(
+                    f"target-app: {kind} completed" in msg
+                    for msg in manual_activity
+                ), manual_activity
+            operations.clear()
+
             gid_auto = "01TARGETAPPAUTOREBUILDAAA"
             create_indexed_gap(conn, gid_auto, status="awaiting-rebuild", branch=None)
             gap_writer.update_fields(gid_auto, status="awaiting-rebuild")
@@ -168,6 +193,26 @@ def main() -> int:
             ).fetchone()
             assert row["status"] == "review", dict(row)
             assert db.get_setting(conn, "target_app_auto_rebuild_last_ok") == "1"
+            target_activity = [
+                r["message"]
+                for r in conn.execute(
+                    "SELECT message FROM activity "
+                    "WHERE category = 'target_app' AND actor = 'runner' "
+                    "ORDER BY id"
+                )
+            ]
+            assert any(
+                "target-app: automatic stop completed" in msg
+                for msg in target_activity
+            ), target_activity
+            assert any(
+                "target-app: automatic rebuild completed" in msg
+                for msg in target_activity
+            ), target_activity
+            assert any(
+                "target-app: automatic start completed" in msg
+                for msg in target_activity
+            ), target_activity
 
             operations.clear()
             db.set_setting(conn, "target_app_rebuild_command", "")
@@ -181,6 +226,15 @@ def main() -> int:
                 "stop", "rebuild", "start",
             ], result
             assert "no-op" in result["steps"][1]["message"], result
+            noop_activity = conn.execute(
+                "SELECT message FROM activity "
+                "WHERE category = 'target_app' "
+                "AND message LIKE 'target-app: automatic rebuild completed%' "
+                "AND message LIKE '%no-op%' "
+                "ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            assert noop_activity is not None
+            assert "no-op" in noop_activity["message"], dict(noop_activity)
 
             operations.clear()
             fail_rebuild = True

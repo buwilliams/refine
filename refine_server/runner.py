@@ -1303,7 +1303,7 @@ class Runner:
                 message=f"target-app: automatic rebuild started ({reason})",
                 severity="info", category="target_app", actor="runner",
             )
-            result = self._run_target_app_rebuild_sequence(cfg)
+            result = self._run_target_app_rebuild_sequence(conn, cfg)
             ok = bool(result.get("ok"))
             final_state = result.get("state") if result.get("state") in {
                 "unknown", "running", "degraded", "stopped", "failed",
@@ -1345,12 +1345,17 @@ class Runner:
                 self.merger.wake()
             return result
 
-    def _run_target_app_rebuild_sequence(self, cfg: dict[str, Any]) -> dict:
+    def _run_target_app_rebuild_sequence(
+        self,
+        conn: sqlite3.Connection,
+        cfg: dict[str, Any],
+    ) -> dict:
         steps: list[dict[str, Any]] = []
 
         def run_step(kind: str) -> dict[str, Any]:
             result = target_app.run_operation(kind, cfg)
             steps.append(result)
+            self._log_target_app_rebuild_step(conn, result)
             return result
 
         stop_result = run_step("stop")
@@ -1376,6 +1381,7 @@ class Runner:
                 "checks": [],
             }
             steps.append(rebuild_result)
+            self._log_target_app_rebuild_step(conn, rebuild_result)
         if not rebuild_result.get("ok"):
             return self._automatic_rebuild_sequence_result(steps, failed_step="rebuild")
 
@@ -1383,6 +1389,38 @@ class Runner:
         if not start_result.get("ok"):
             return self._automatic_rebuild_sequence_result(steps, failed_step="start")
         return self._automatic_rebuild_sequence_result(steps)
+
+    def _log_target_app_rebuild_step(
+        self,
+        conn: sqlite3.Connection,
+        result: dict[str, Any],
+    ) -> None:
+        kind = str(result.get("kind") or "operation")
+        ok = bool(result.get("ok"))
+        details_parts = []
+        if result.get("stdout_tail"):
+            details_parts.append("stdout:\n" + str(result["stdout_tail"]))
+        if result.get("stderr_tail"):
+            details_parts.append("stderr:\n" + str(result["stderr_tail"]))
+        if result.get("checks"):
+            details_parts.append(
+                "checks:\n" + json.dumps(result["checks"], indent=2)
+            )
+        details = "\n\n".join(details_parts) if details_parts else None
+        message = (
+            f"target-app: automatic {kind} "
+            f"{'completed' if ok else 'failed'}"
+        )
+        if result.get("message"):
+            message += f" — {result['message']}"
+        activity.append(
+            conn,
+            message=message,
+            severity="info" if ok else "error",
+            category="target_app",
+            actor="runner",
+            details=details,
+        )
 
     def _automatic_rebuild_sequence_result(
         self,
