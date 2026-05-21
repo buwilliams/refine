@@ -89,6 +89,65 @@ CREATE TABLE IF NOT EXISTS activity (
 CREATE INDEX IF NOT EXISTS idx_activity_datetime ON activity(datetime DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_gap      ON activity(gap_id);
 
+CREATE TABLE IF NOT EXISTS gap_search_docs (
+    rowid         INTEGER PRIMARY KEY AUTOINCREMENT,
+    gap_id        TEXT NOT NULL UNIQUE,
+    name          TEXT NOT NULL,
+    reporter      TEXT NOT NULL DEFAULT '',
+    round_content TEXT NOT NULL DEFAULT '',
+    notes_content TEXT NOT NULL DEFAULT '',
+    updated       TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_gap_search_docs_gap
+    ON gap_search_docs(gap_id);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS gap_search_fts USING fts5(
+    gap_id,
+    name,
+    reporter,
+    round_content,
+    notes_content,
+    content='gap_search_docs',
+    content_rowid='rowid'
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS activity_search_fts USING fts5(
+    message,
+    details,
+    content='activity',
+    content_rowid='id'
+);
+
+CREATE TRIGGER IF NOT EXISTS gap_search_docs_ai AFTER INSERT ON gap_search_docs BEGIN
+    INSERT INTO gap_search_fts(rowid, gap_id, name, reporter, round_content, notes_content)
+    VALUES (new.rowid, new.gap_id, new.name, new.reporter, new.round_content, new.notes_content);
+END;
+CREATE TRIGGER IF NOT EXISTS gap_search_docs_ad AFTER DELETE ON gap_search_docs BEGIN
+    INSERT INTO gap_search_fts(gap_search_fts, rowid, gap_id, name, reporter, round_content, notes_content)
+    VALUES ('delete', old.rowid, old.gap_id, old.name, old.reporter, old.round_content, old.notes_content);
+END;
+CREATE TRIGGER IF NOT EXISTS gap_search_docs_au AFTER UPDATE ON gap_search_docs BEGIN
+    INSERT INTO gap_search_fts(gap_search_fts, rowid, gap_id, name, reporter, round_content, notes_content)
+    VALUES ('delete', old.rowid, old.gap_id, old.name, old.reporter, old.round_content, old.notes_content);
+    INSERT INTO gap_search_fts(rowid, gap_id, name, reporter, round_content, notes_content)
+    VALUES (new.rowid, new.gap_id, new.name, new.reporter, new.round_content, new.notes_content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS activity_search_ai AFTER INSERT ON activity BEGIN
+    INSERT INTO activity_search_fts(rowid, message, details)
+    VALUES (new.id, new.message, new.details);
+END;
+CREATE TRIGGER IF NOT EXISTS activity_search_ad AFTER DELETE ON activity BEGIN
+    INSERT INTO activity_search_fts(activity_search_fts, rowid, message, details)
+    VALUES ('delete', old.id, old.message, old.details);
+END;
+CREATE TRIGGER IF NOT EXISTS activity_search_au AFTER UPDATE ON activity BEGIN
+    INSERT INTO activity_search_fts(activity_search_fts, rowid, message, details)
+    VALUES ('delete', old.id, old.message, old.details);
+    INSERT INTO activity_search_fts(rowid, message, details)
+    VALUES (new.id, new.message, new.details);
+END;
+
 CREATE TABLE IF NOT EXISTS performance_events (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     occurred_at   TEXT NOT NULL,
@@ -302,6 +361,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_instance ON gaps_index(instance_id)"
     )
+    _ensure_search_schema(conn)
+    _rebuild_activity_search(conn)
     conn.execute(
         "CREATE TABLE IF NOT EXISTS gap_cache_meta ("
         "json_path TEXT PRIMARY KEY, "
@@ -353,6 +414,75 @@ def _migrate(conn: sqlite3.Connection) -> None:
         perf_metrics.prune(conn)
     except Exception:
         pass
+
+
+def _ensure_search_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS gap_search_docs (
+            rowid         INTEGER PRIMARY KEY AUTOINCREMENT,
+            gap_id        TEXT NOT NULL UNIQUE,
+            name          TEXT NOT NULL,
+            reporter      TEXT NOT NULL DEFAULT '',
+            round_content TEXT NOT NULL DEFAULT '',
+            notes_content TEXT NOT NULL DEFAULT '',
+            updated       TEXT NOT NULL DEFAULT ''
+        );
+        CREATE INDEX IF NOT EXISTS idx_gap_search_docs_gap
+            ON gap_search_docs(gap_id);
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS gap_search_fts USING fts5(
+            gap_id,
+            name,
+            reporter,
+            round_content,
+            notes_content,
+            content='gap_search_docs',
+            content_rowid='rowid'
+        );
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS activity_search_fts USING fts5(
+            message,
+            details,
+            content='activity',
+            content_rowid='id'
+        );
+
+        CREATE TRIGGER IF NOT EXISTS gap_search_docs_ai AFTER INSERT ON gap_search_docs BEGIN
+            INSERT INTO gap_search_fts(rowid, gap_id, name, reporter, round_content, notes_content)
+            VALUES (new.rowid, new.gap_id, new.name, new.reporter, new.round_content, new.notes_content);
+        END;
+        CREATE TRIGGER IF NOT EXISTS gap_search_docs_ad AFTER DELETE ON gap_search_docs BEGIN
+            INSERT INTO gap_search_fts(gap_search_fts, rowid, gap_id, name, reporter, round_content, notes_content)
+            VALUES ('delete', old.rowid, old.gap_id, old.name, old.reporter, old.round_content, old.notes_content);
+        END;
+        CREATE TRIGGER IF NOT EXISTS gap_search_docs_au AFTER UPDATE ON gap_search_docs BEGIN
+            INSERT INTO gap_search_fts(gap_search_fts, rowid, gap_id, name, reporter, round_content, notes_content)
+            VALUES ('delete', old.rowid, old.gap_id, old.name, old.reporter, old.round_content, old.notes_content);
+            INSERT INTO gap_search_fts(rowid, gap_id, name, reporter, round_content, notes_content)
+            VALUES (new.rowid, new.gap_id, new.name, new.reporter, new.round_content, new.notes_content);
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS activity_search_ai AFTER INSERT ON activity BEGIN
+            INSERT INTO activity_search_fts(rowid, message, details)
+            VALUES (new.id, new.message, new.details);
+        END;
+        CREATE TRIGGER IF NOT EXISTS activity_search_ad AFTER DELETE ON activity BEGIN
+            INSERT INTO activity_search_fts(activity_search_fts, rowid, message, details)
+            VALUES ('delete', old.id, old.message, old.details);
+        END;
+        CREATE TRIGGER IF NOT EXISTS activity_search_au AFTER UPDATE ON activity BEGIN
+            INSERT INTO activity_search_fts(activity_search_fts, rowid, message, details)
+            VALUES ('delete', old.id, old.message, old.details);
+            INSERT INTO activity_search_fts(rowid, message, details)
+            VALUES (new.id, new.message, new.details);
+        END;
+        """
+    )
+
+
+def _rebuild_activity_search(conn: sqlite3.Connection) -> None:
+    conn.execute("INSERT INTO activity_search_fts(activity_search_fts) VALUES('rebuild')")
 
 
 def _backfill_reporter(conn: sqlite3.Connection) -> None:

@@ -638,7 +638,6 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     """
     from . import db
     from . import perf_metrics
-
     total_start = perf_metrics.now()
     phase_ms: dict[str, float] = {}
     rows_updated = 0
@@ -751,6 +750,10 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
         str(r["json_path"]): str(r["id"] or "")
         for r in conn.execute("SELECT id, json_path FROM gaps_index")
     }
+    indexed_search_docs = {
+        str(r["gap_id"] or "")
+        for r in conn.execute("SELECT gap_id FROM gap_search_docs")
+    }
     seen: set[str] = set()
     upserts: list[dict[str, Any]] = []
     deletes: list[dict[str, str]] = []
@@ -774,7 +777,13 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
         stats["files_seen"] += 1
         prior = existing.get(rel)
         prior_gap_id = str(prior.get("gap_id") or "") if prior is not None else ""
-        index_has_prior = not prior_gap_id or indexed.get(rel) == prior_gap_id
+        index_has_prior = (
+            not prior_gap_id
+            or (
+                indexed.get(rel) == prior_gap_id
+                and prior_gap_id in indexed_search_docs
+            )
+        )
         mtime_ns = int(st.st_mtime_ns)
         size = int(st.st_size)
         if (
@@ -848,6 +857,8 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
 
 def _apply_gap_cache_refresh(conn: sqlite3.Connection,
                              refresh: dict[str, Any]) -> int:
+    from . import search_index
+
     changed_rows = 0
     now = now_iso()
     for item in refresh["deletes"]:
@@ -858,6 +869,7 @@ def _apply_gap_cache_refresh(conn: sqlite3.Connection,
                 "DELETE FROM gaps_index WHERE id = ? AND json_path = ?",
                 (gap_id, rel),
             )
+            search_index.delete_gap(conn, gap_id)
         conn.execute("DELETE FROM gap_cache_meta WHERE json_path = ?", (rel,))
         changed_rows += 1
     for item in refresh["upserts"]:
@@ -870,7 +882,9 @@ def _apply_gap_cache_refresh(conn: sqlite3.Connection,
                 "DELETE FROM gaps_index WHERE id = ? AND json_path = ?",
                 (old_gap_id, rel),
             )
+            search_index.delete_gap(conn, old_gap_id)
         _upsert_gap_index_row(conn, gap, rel)
+        search_index.upsert_gap(conn, gap)
         _upsert_gap_cache_meta(conn, item, gap_id=gap_id, now=now)
         changed_rows += 1
     for item in refresh["meta_only"]:

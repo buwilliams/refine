@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters
+from refine_server import activity, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
@@ -337,6 +337,7 @@ class Runner:
                 (gap_id, name, priority, params["reporter"],
                  gap["created"], gap["updated"], instance_id, relative_gap_path(gap_id)),
             )
+            search_index.upsert_gap(self._conn, gap)
         # ensure reporter exists in dropdown list
         try:
             reporters.add(self._conn, params["reporter"])
@@ -374,6 +375,7 @@ class Runner:
                 "WHERE id = ?",
                 (params["reporter"], now_iso(), gap_id),
             )
+            search_index.upsert_gap(self._conn, gap)
         try:
             gap_writer.update_fields(gap_id, status="todo")
             gap_writer.append_latest_round_log(
@@ -415,6 +417,10 @@ class Runner:
                     "UPDATE gaps_index SET reporter = ? WHERE id = ?",
                     (params["reporter"], params["gap_id"]),
                 )
+                search_index.upsert_gap(self._conn, gap)
+        else:
+            with db.transaction(self._conn):
+                search_index.upsert_gap(self._conn, gap)
         return {"gap": gap}
 
     def _h_log_append(self, params: dict) -> dict:
@@ -448,6 +454,7 @@ class Runner:
             gap_writer.delete_gap_file(gap_id)
         with db.transaction(self._conn):
             self._conn.execute("DELETE FROM gaps_index WHERE id = ?", (gap_id,))
+            search_index.delete_gap(self._conn, gap_id)
             self._conn.execute("DELETE FROM runs WHERE gap_id = ?", (gap_id,))
         activity.append(
             self._conn, message="Gap deleted",
@@ -469,6 +476,7 @@ class Runner:
                 "UPDATE gaps_index SET updated = ? WHERE id = ?",
                 (gap["updated"], gap_id),
             )
+            search_index.upsert_gap(self._conn, gap)
         activity.append(
             self._conn,
             message=f"Notes updated ({len(gap['notes'])} note{'' if len(gap['notes']) == 1 else 's'})",
