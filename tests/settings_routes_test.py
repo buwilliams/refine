@@ -86,7 +86,7 @@ def main() -> int:
     assert "Feature flag changes are saved with Save runtime." in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
-    assert 'id="s-rebuild-cache"' in settings_js
+    assert 'class="danger" id="s-rebuild-cache"' in settings_js
     assert 'api("POST", "/api/cache/rebuild", { background: true })' in settings_js
     assert "function drawSqliteCacheProgress" in settings_js
     assert "onProgress: drawSqliteCacheProgress" in settings_js

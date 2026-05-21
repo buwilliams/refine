@@ -214,7 +214,7 @@ function renderSqliteCacheSection(error = null) {
         Rebuilds <code>index.sqlite</code> from canonical <code>.refine</code> JSON.
       </p>
       <div class="actions">
-        <button class="secondary" id="s-rebuild-cache">Rebuild SQLite cache</button>
+        <button class="danger" id="s-rebuild-cache">Rebuild SQLite cache</button>
       </div>
       <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
     </section>`;
