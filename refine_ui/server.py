@@ -76,6 +76,16 @@ def _h_get_gap(_h, m, _b, _q):
     return api.get_gap(m.group(1).upper())
 
 
+@route("GET", r"/api/gaps/([0-9A-Za-z]{26})/rounds/(\d+)/logs")
+def _h_get_gap_round_logs(_h, m, _b, q):
+    return api.get_gap_round_logs(
+        m.group(1).upper(),
+        int(m.group(2)),
+        limit=int(_get_one(q, "limit", "100")),
+        offset=int(_get_one(q, "offset", "0")),
+    )
+
+
 @route("PATCH", r"/api/gaps/([0-9A-Za-z]{26})")
 def _h_update_gap(_h, m, body, _q):
     return api.update_gap_name(m.group(1).upper(), body or {})

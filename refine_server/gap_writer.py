@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from refine_server import gaps as shared_gaps
+from refine_server import round_logs
 from refine_server.gaps import now_iso
 
 _locks: dict[str, threading.Lock] = defaultdict(threading.Lock)
@@ -45,7 +46,7 @@ def update_fields(gap_id: str, **fields: Any) -> dict[str, Any]:
     if unknown:
         raise ValueError(f"unknown gap fields: {', '.join(sorted(unknown))}")
     with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if gap is None:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
         for key, value in fields.items():
@@ -80,7 +81,7 @@ def set_notes(gap_id: str, notes: list[dict[str, Any]]) -> dict[str, Any]:
             "updated": str(n.get("updated") or now),
         })
     with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if gap is None:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
         gap["notes"] = cleaned
@@ -96,7 +97,7 @@ def _new_note_id() -> str:
 
 def append_round(gap_id: str, round_obj: dict[str, Any]) -> dict[str, Any]:
     with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if gap is None:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
         gap["rounds"].append(round_obj)
@@ -108,7 +109,7 @@ def append_round(gap_id: str, round_obj: dict[str, Any]) -> dict[str, Any]:
 def edit_latest_round(gap_id: str, *, actual: str | None = None,
                       target: str | None = None, reporter: str | None = None) -> dict[str, Any]:
     with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if gap is None:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
         if not gap["rounds"]:
@@ -130,7 +131,7 @@ def edit_latest_round(gap_id: str, *, actual: str | None = None,
 
 def set_latest_round_governance(gap_id: str, fields: dict[str, Any]) -> dict[str, Any]:
     with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if gap is None:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
         if not gap["rounds"]:
@@ -181,7 +182,7 @@ def rename_reporter_in_rounds(
     for row in rows:
         gap_id = row["id"]
         with _lock_for(gap_id):
-            gap = shared_gaps.read_gap_json(gap_id)
+            gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
             if gap is None:
                 continue
             changed = False
@@ -217,7 +218,7 @@ def append_round_log(*, gap_id: str, round_idx: int, message: str,
                      actor: str | None = None,
                      actions: list[dict] | None = None) -> None:
     with _lock_for(gap_id):
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if gap is None:
             return
         rounds = gap.get("rounds", [])
@@ -228,10 +229,7 @@ def append_round_log(*, gap_id: str, round_idx: int, message: str,
             severity=severity, category=category,
             details=details, actions=actions, actor=actor,
         )
-        rounds[round_idx].setdefault("logs", []).append(entry)
-        rounds[round_idx]["updated"] = entry["datetime"]
-        gap["updated"] = entry["datetime"]
-        shared_gaps.write_gap_json(gap)
+        round_logs.append_log(gap_id, round_idx, entry)
 
 
 def append_latest_round_log(*, gap_id: str, message: str,
@@ -239,7 +237,7 @@ def append_latest_round_log(*, gap_id: str, message: str,
                             details: str | None = None,
                             actor: str | None = None,
                             actions: list[dict] | None = None) -> None:
-    gap = shared_gaps.read_gap_json(gap_id)
+    gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
     if gap is None:
         return
     rounds = gap.get("rounds") or []

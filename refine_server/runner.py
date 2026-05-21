@@ -923,7 +923,7 @@ class Runner:
                 f"`{target}` (no upstream — push skipped)"
             )
         try:
-            gap = shared_gaps.read_gap_json(gap_id) or {}
+            gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
             rounds = gap.get("rounds") or []
             if rounds:
                 gap_writer.append_round_log(
@@ -1405,7 +1405,7 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     ).fetchone()
     if not row:
         return None, None
-    gap_json = shared_gaps.read_gap_json(gap_id) or {}
+    gap_json = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
     rounds = gap_json.get("rounds") or []
     latest = rounds[-1] if rounds else {}
     recent_activity = activity.recent(conn, limit=10, gap_id=gap_id)

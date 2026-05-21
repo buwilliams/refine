@@ -105,7 +105,7 @@ class SqlitePoller:
                         })
 
             # Active-run streaming output: when a runner flushes lines to a
-            # round's logs[], it bumps runs.last_output_at. We can't watch the
+            # round's log file, it bumps runs.last_output_at. We can't watch the
             # gap.json file from here, but this column lets us nudge clients
             # to refresh the round view.
             for r in conn.execute(

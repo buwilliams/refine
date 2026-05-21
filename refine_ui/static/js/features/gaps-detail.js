@@ -11,6 +11,8 @@ async function renderGapDetail(r) {
 }
 
 let _gapModalRoot = null;
+const GAP_ROUND_LOG_LIMIT = 100;
+const _gapRoundLogCache = new Map();
 
 function gapDetailContainer() {
   return _gapModalRoot?.querySelector(".gap-detail-modal-body") || null;
@@ -65,6 +67,7 @@ function closeGapDetailModal({ navigateAway = false } = {}) {
   _gapModalRoot.remove();
   _gapModalRoot = null;
   state.currentGap = null;
+  state.currentGapData = null;
   if (navigateAway) {
     // Restore the URL to whatever was underneath. If we're already there
     // somehow (shouldn't happen), no-op so we don't trigger a redundant
@@ -96,6 +99,54 @@ async function loadGapDetail(gapId) {
   }
 }
 
+function roundLogCacheKey(gapId, roundIdx) {
+  return `${gapId}:${roundIdx}`;
+}
+
+function roundLogPageState(gapId, roundIdx) {
+  return _gapRoundLogCache.get(roundLogCacheKey(gapId, roundIdx)) || null;
+}
+
+function invalidateGapRoundLogCache(gapId) {
+  for (const key of Array.from(_gapRoundLogCache.keys())) {
+    if (key.startsWith(`${gapId}:`)) _gapRoundLogCache.delete(key);
+  }
+}
+
+async function loadRoundLogsPage(gapId, roundIdx, page = 1) {
+  const offset = (Math.max(1, page) - 1) * GAP_ROUND_LOG_LIMIT;
+  const key = roundLogCacheKey(gapId, roundIdx);
+  _gapRoundLogCache.set(key, {
+    ...(roundLogPageState(gapId, roundIdx) || {}),
+    loading: true,
+    error: "",
+    page: { limit: GAP_ROUND_LOG_LIMIT, offset, has_more: false },
+  });
+  drawGapDetail(state.currentGapData);
+  try {
+    const data = await api(
+      "GET",
+      `/api/gaps/${gapId}/rounds/${roundIdx}/logs?limit=${GAP_ROUND_LOG_LIMIT}&offset=${offset}`,
+    );
+    _gapRoundLogCache.set(key, {
+      logs: data.logs || [],
+      page: data.page || { limit: GAP_ROUND_LOG_LIMIT, offset, has_more: false },
+      loading: false,
+      error: "",
+    });
+  } catch (e) {
+    _gapRoundLogCache.set(key, {
+      logs: [],
+      page: { limit: GAP_ROUND_LOG_LIMIT, offset, has_more: false },
+      loading: false,
+      error: e.message || "Could not load logs",
+    });
+  }
+  if (state.currentRoute === "gaps_detail" && state.currentGap === gapId) {
+    await loadGapDetail(gapId);
+  }
+}
+
 // User-driven workflow transitions for a Gap. Each state declares its
 // `back` and `forward` neighbors. System-owned states have no user buttons —
 // `in-progress` (dispatcher owns), `ready-merge` (merger owns), and
@@ -122,6 +173,8 @@ const GAP_WORKFLOW = {
 };
 
 function drawGapDetail(gap) {
+  if (!gap) return;
+  state.currentGapData = gap;
   renderBanners([]);
   // Preserve the notes-card open state across re-renders of the same gap so
   // saving a note (or an SSE-driven refresh) doesn't snap it shut.
@@ -142,10 +195,10 @@ function drawGapDetail(gap) {
   });
   const rounds = gap.rounds || [];
   // Merge gap-scoped activity into each round so users see lifecycle events
-  // and runner errors alongside the round's own logs[]. Each activity entry
+  // and runner errors alongside the round's own paged logs. Each activity entry
   // goes into the latest round whose `created` is at or before the entry's
   // datetime.
-  attachActivityToRounds(rounds, gap.activity || []);
+  attachActivityToRounds(rounds, gap.activity || [], gap.id);
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
   const governanceBanner = computeGovernanceBanner(gap, latest);
@@ -212,7 +265,7 @@ function drawGapDetail(gap) {
           rnd, idx,
           idx === rounds.length - 1,
           isLatestEditable && idx === rounds.length - 1,
-          prevRoundOpen, prevLogsOpen,
+          prevRoundOpen, prevLogsOpen, gap.id,
         )).join("")}
 
       ${(gap.status === "backlog" || gap.status === "todo" || gap.status === "failed") ? `
@@ -408,11 +461,36 @@ function drawGapDetail(gap) {
 
   bindFailureBannerActions(gap);
   bindRoundFormSubmit(gap);
+  bindRoundLogControls(gap);
 }
 
-function attachActivityToRounds(rounds, activity) {
-  // Reset any prior merge — we always recompute from gap.activity + rnd.logs.
-  for (const r of rounds) r._mergedLogs = (r.logs || []).slice();
+function bindRoundLogControls(gap) {
+  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
+    const roundIdx = parseInt(el.dataset.roundIdx, 10);
+    if (!Number.isFinite(roundIdx)) return;
+    el.addEventListener("toggle", () => {
+      if (!el.open) return;
+      if (roundLogPageState(gap.id, roundIdx)) return;
+      loadRoundLogsPage(gap.id, roundIdx, 1);
+    });
+    bindPaginationControls(el, `round-${roundIdx}-logs`, (page) => {
+      loadRoundLogsPage(gap.id, roundIdx, page);
+    });
+    if (el.open && !roundLogPageState(gap.id, roundIdx)) {
+      loadRoundLogsPage(gap.id, roundIdx, 1);
+    }
+  });
+}
+
+function attachActivityToRounds(rounds, activity, gapId = "") {
+  // Reset any prior merge — we always recompute from cached round logs plus
+  // gap activity.
+  rounds.forEach((r, idx) => {
+    const cached = roundLogPageState(gapId, idx);
+    r._roundLogsPage = cached;
+    r._mergedLogs = (cached?.logs || r.logs || []).slice();
+    r._activityLogCount = 0;
+  });
   if (!rounds.length) return;
   // Sort rounds ascending by `created`; bucket each activity entry into the
   // last round whose `created` ≤ entry.datetime.
@@ -427,6 +505,7 @@ function attachActivityToRounds(rounds, activity) {
   for (const a of activity) {
     const idx = bucket(a.datetime || "");
     rounds[idx]._mergedLogs.push(a);
+    rounds[idx]._activityLogCount = (rounds[idx]._activityLogCount || 0) + 1;
   }
   // Sort each round's merged logs by datetime ascending.
   for (const r of rounds) {
@@ -435,8 +514,12 @@ function attachActivityToRounds(rounds, activity) {
 }
 
 function renderRound(rnd, idx, isLatest, editable,
-                     prevRoundOpen = {}, prevLogsOpen = {}) {
+                     prevRoundOpen = {}, prevLogsOpen = {}, gapId = "") {
   const logs = rnd._mergedLogs || rnd.logs || [];
+  const pageState = rnd._roundLogsPage || null;
+  const roundLogCount = parseInt(rnd.log_count || 0, 10) || 0;
+  const activityCount = parseInt(rnd._activityLogCount || 0, 10) || 0;
+  const displayLogCount = roundLogCount + activityCount;
   // Preserve the user's open/closed choice across re-renders. New rounds
   // (no prior entry in the snapshot) default to "open on latest" — the
   // historical behavior — and Logs default closed.
@@ -459,14 +542,36 @@ function renderRound(rnd, idx, isLatest, editable,
           <dt>actual</dt><dd>${htmlEscape(rnd.actual || "").replace(/\n/g, "<br>")}</dd>
           <dt>target</dt><dd>${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
         </dl>
-        ${logs.length ? `
-          <details data-role="round-logs" data-round-idx="${idx}" ${logsOpen ? "open" : ""}>
-            <summary>Logs (${logs.length})</summary>
-            ${logs.map((l) => renderLogEntry(l)).join("")}
+        ${displayLogCount || logs.length ? `
+          <details data-role="round-logs" data-gap-id="${htmlEscape(gapId)}"
+                   data-round-idx="${idx}" ${logsOpen ? "open" : ""}>
+            <summary>Logs (${displayLogCount || logs.length})</summary>
+            ${renderRoundLogsBody(logs, pageState, idx)}
           </details>` : `<p class="muted small">No logs.</p>`}
       </div>
     </details>
   `;
+}
+
+function renderRoundLogsBody(logs, pageState, roundIdx) {
+  if (pageState?.loading) {
+    return `<p class="muted small">Loading…</p>`;
+  }
+  if (pageState?.error) {
+    return `<p class="muted small">${htmlEscape(pageState.error)}</p>`;
+  }
+  const pageControls = pageState?.page
+    ? renderPaginationControls(
+      `round-${roundIdx}-logs`,
+      pageState.page,
+      pageState.logs?.length || 0,
+      "entry",
+    )
+    : "";
+  if (!logs.length) {
+    return `<p class="muted small">Open to load logs.</p>${pageControls}`;
+  }
+  return `${logs.map((l) => renderLogEntry(l)).join("")}${pageControls}`;
 }
 
 function renderGovernanceSummary(round) {
@@ -590,7 +695,7 @@ function bindRoundFormSubmit(gap) {
 
 function computeFailureBanner(gap, latest) {
   if (gap.status === "failed") {
-    const lastLog = (latest?.logs || []).slice(-1)[0];
+    const lastLog = latest?.latest_log || (latest?.logs || []).slice(-1)[0];
     return {
       severity: "error",
       message: lastLog?.message || "Agent run failed",
@@ -599,7 +704,8 @@ function computeFailureBanner(gap, latest) {
   }
   if (gap.status === "review") {
     // Was the last log an error? Then we treat it as a stuck-review state.
-    const errLog = (latest?.logs || []).slice().reverse().find((l) => l.severity === "error");
+    const errLog = latest?.latest_error_log
+      || (latest?.logs || []).slice().reverse().find((l) => l.severity === "error");
     if (errLog) {
       return {
         severity: "error",
