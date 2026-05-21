@@ -15,6 +15,8 @@ refine puts automation at the forefront, reduces feedback loops by orders of mag
 
 ## Features
 
+- **Decentralized** - each instance owns its work locally and syncs through git.
+- **Existing Infrastructure** - works inside existing applications, repositories, branches, and development practices.
 - **Dashboard** - consolidated space for run status, reporter stats, and work needing attention.
 - **Gaps** - searchable, filterable backlog with sorting and bulk updates.
 - **Changes** - searchable history of merged Gap work with undo controls.
