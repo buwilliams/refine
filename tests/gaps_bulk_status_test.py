@@ -304,14 +304,18 @@ def main() -> int:
         assert expected_options in gaps_bulk
         assert "skip in-progress and ready-merge" in gaps_bulk
         assert "resolveBackgroundJobResponse" in gaps_bulk
-        assert "selected_ids: selectedIds" in gaps_bulk
-        assert "Unseen rows are" in gaps_bulk
+        assert "filter, ...selectionFields" in gaps_bulk
+        assert "exclude_ids: Array.from(gapsExcludedIds)" in gaps_bulk
+        assert "selected_ids: Array.from(gapsIncludedIds)" in gaps_bulk
+        assert "all matching Gaps selected" in gaps_bulk
         assert 'toast("No Gaps selected.", "warn");' in gaps_bulk
         gaps_list = (
             root / "refine_ui/static/js/features/gaps-list.js"
         ).read_text(encoding="utf-8")
         assert "Bulk update selected:" in gaps_list
-        assert "unseen" in gaps_list.lower()
+        assert "Select all matching Gaps" in gaps_list
+        assert "let gapsSelectAllMatching = true" in gaps_list
+        assert "const gapsIncludedIds = new Set()" in gaps_list
     finally:
         try:
             conn.close()

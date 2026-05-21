@@ -245,16 +245,29 @@ async function refreshGapsTable() {
   }
 }
 
-// IDs the user has explicitly DESELECTED from bulk operations on loaded
-// pages. Bulk endpoints receive the visible checked row IDs, so unseen
-// pages are never selected behind the scenes. Persisted only in-memory;
-// the excluded set survives filter tweaks and re-expanding the filter
-// shell but resets on a hard navigation away from the Gaps screen.
+// Bulk selection is filter-scoped. By default, bulk actions target every
+// matching Gap across pagination, with checked row changes stored as explicit
+// include/exclude exceptions. State survives filter tweaks and re-expanding
+// the filter shell but resets on a hard navigation away from the Gaps screen.
+let gapsSelectAllMatching = true;
 const gapsExcludedIds = new Set();
+const gapsIncludedIds = new Set();
 
 // Cached snapshot of the last refresh, so toggling the filter shell open
 // or closed can redraw the table without re-fetching.
 let _lastGapsRender = null;
+
+function resetGapsSelection() {
+  gapsSelectAllMatching = true;
+  gapsExcludedIds.clear();
+  gapsIncludedIds.clear();
+}
+
+function _isGapSelected(id) {
+  return gapsSelectAllMatching
+    ? !gapsExcludedIds.has(id)
+    : gapsIncludedIds.has(id);
+}
 
 function drawGapsTable(gaps, state) {
   const root = $("#gaps-table");
@@ -296,7 +309,7 @@ function drawGapsTable(gaps, state) {
   const selectionHead = showSelection
     ? `<th class="gap-select-col">
          <input type="checkbox" id="gap-select-all"
-                aria-label="Select all on this page">
+                aria-label="Select all matching Gaps">
        </th>`
     : "";
   root.innerHTML = `
@@ -313,7 +326,7 @@ function drawGapsTable(gaps, state) {
       <thead><tr>${selectionHead}${sortHeads}</tr></thead>
       <tbody>
         ${gaps.map((g) => {
-          const selected = !gapsExcludedIds.has(g.id);
+          const selected = _isGapSelected(g.id);
           const cell = showSelection
             ? `<td class="gap-select-col">
                  <input type="checkbox" class="gap-select"
@@ -350,8 +363,14 @@ function drawGapsTable(gaps, state) {
     cb.addEventListener("click", (e) => e.stopPropagation());
     cb.addEventListener("change", (e) => {
       const id = e.target.dataset.id;
-      if (e.target.checked) gapsExcludedIds.delete(id);
-      else gapsExcludedIds.add(id);
+      if (gapsSelectAllMatching) {
+        if (e.target.checked) gapsExcludedIds.delete(id);
+        else gapsExcludedIds.add(id);
+      } else if (e.target.checked) {
+        gapsIncludedIds.add(id);
+      } else {
+        gapsIncludedIds.delete(id);
+      }
       _updateSelectAllState(gaps);
     });
   });
@@ -361,13 +380,12 @@ function drawGapsTable(gaps, state) {
     selectAll.addEventListener("click", (e) => {
       e.stopPropagation();
       const shouldCheck = selectAll.checked;
-      for (const g of gaps) {
-        if (shouldCheck) gapsExcludedIds.delete(g.id);
-        else gapsExcludedIds.add(g.id);
-      }
-      // Re-sync the row checkboxes without a full redraw.
+      gapsSelectAllMatching = shouldCheck;
+      gapsExcludedIds.clear();
+      gapsIncludedIds.clear();
+      // Re-sync the current page checkboxes without a full redraw.
       $$(".gap-select", root).forEach((cb) => {
-        cb.checked = !gapsExcludedIds.has(cb.dataset.id);
+        cb.checked = shouldCheck;
       });
       selectAll.indeterminate = false;
     });
@@ -388,19 +406,20 @@ function drawGapsTable(gaps, state) {
   });
 }
 
-// Sync the header checkbox's checked / indeterminate state to the page
-// selection: all checked → checked, none checked → unchecked, mix →
-// indeterminate. Called after every selection change.
+// Sync the header checkbox to the global filter-scoped selection:
+// all matching selected -> checked, none selected -> unchecked, per-row
+// exceptions -> indeterminate.
 function _updateSelectAllState(gaps) {
   const master = document.getElementById("gap-select-all");
   if (!master) return;
-  let selected = 0;
-  for (const g of gaps) if (!gapsExcludedIds.has(g.id)) selected++;
-  if (selected === 0) {
+  if (!gaps.length && !gapsIncludedIds.size) {
     master.checked = false;
     master.indeterminate = false;
-  } else if (selected === gaps.length) {
+  } else if (gapsSelectAllMatching && gapsExcludedIds.size === 0) {
     master.checked = true;
+    master.indeterminate = false;
+  } else if (!gapsSelectAllMatching && gapsIncludedIds.size === 0) {
+    master.checked = false;
     master.indeterminate = false;
   } else {
     master.checked = false;

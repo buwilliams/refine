@@ -1,7 +1,7 @@
 // ---- Gaps: bulk-update modal ------------------------------------------------
 //
 // Each bulk action prompts for a new value and confirms the change against
-// the currently loaded checked rows. Exactly one field is changed per call
+// the current filter-scoped selection. Exactly one field is changed per call
 // so the confirmation reads cleanly.
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
@@ -12,7 +12,8 @@ const BULK_STATUS_OPTIONS = [
 
 async function openBulkModal(field) {
   // Snapshot the current filter for display context; the mutation itself
-  // uses explicit checked row IDs from the current page.
+  // targets all matching Gaps unless the user has switched to an explicit
+  // picked-ID selection by clearing the header checkbox.
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
@@ -20,8 +21,8 @@ async function openBulkModal(field) {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const selectedIds = _selectionSnapshot();
-  if (!selectedIds.length) {
+  const selectionFields = _selectionRequestFields();
+  if (!_hasAnyGapSelection()) {
     toast("No Gaps selected.", "warn");
     return;
   }
@@ -79,7 +80,7 @@ async function openBulkModal(field) {
   if (!next) return;          // user opened the picker but didn't choose
   try {
     let r = await api("POST", "/api/gaps/bulk", {
-      filter, selected_ids: selectedIds, update: { [field]: next },
+      filter, ...selectionFields, update: { [field]: next },
     });
     r = await resolveBackgroundJobResponse(
       r,
@@ -92,18 +93,26 @@ async function openBulkModal(field) {
   }
 }
 
-// Frozen-at-call-time copy of checked visible row IDs. Unseen rows are
-// deliberately absent, even if they match the current filters.
-function _selectionSnapshot() {
-  return (_lastGapsRender?.gaps || [])
-    .filter((g) => !gapsExcludedIds.has(g.id))
-    .map((g) => g.id);
+function _selectionRequestFields() {
+  if (gapsSelectAllMatching) {
+    return { exclude_ids: Array.from(gapsExcludedIds) };
+  }
+  return { selected_ids: Array.from(gapsIncludedIds) };
+}
+
+function _hasAnyGapSelection() {
+  return gapsSelectAllMatching || gapsIncludedIds.size > 0;
 }
 
 function _selectionCountText(noun = "selected") {
-  const visibleCount = _lastGapsRender?.gaps?.length || 0;
-  const selectedCount = _selectionSnapshot().length;
-  return `${selectedCount} of ${visibleCount} ${noun}`;
+  if (gapsSelectAllMatching) {
+    if (gapsExcludedIds.size) {
+      return `all matching Gaps except ${gapsExcludedIds.size} excluded`;
+    }
+    return "all matching Gaps selected";
+  }
+  const selectedCount = gapsIncludedIds.size;
+  return `${selectedCount} explicitly ${noun}`;
 }
 
 // Highlight each non-default Gaps filter control with the accent
@@ -141,8 +150,8 @@ async function openBulkTransferInstanceModal() {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const selectedIds = _selectionSnapshot();
-  if (!selectedIds.length) {
+  const selectionFields = _selectionRequestFields();
+  if (!_hasAnyGapSelection()) {
     toast("No Gaps selected.", "warn");
     return;
   }
@@ -195,7 +204,7 @@ async function openBulkTransferInstanceModal() {
   if (target === null) return;
   try {
     const r = await api("POST", "/api/instances/transfer-gaps", {
-      filter, selected_ids: selectedIds, target_instance_id: target,
+      filter, ...selectionFields, target_instance_id: target,
     });
     toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
     await renderGapsList();
@@ -212,8 +221,8 @@ async function confirmBulkDelete() {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const selectedIds = _selectionSnapshot();
-  if (!selectedIds.length) {
+  const selectionFields = _selectionRequestFields();
+  if (!_hasAnyGapSelection()) {
     toast("No Gaps selected.", "warn");
     return;
   }
@@ -232,7 +241,7 @@ async function confirmBulkDelete() {
   if (!ok) return;
   try {
     const r = await api("POST", "/api/gaps/bulk/delete", {
-      filter, selected_ids: selectedIds,
+      filter, ...selectionFields,
     });
     const failedN = (r.failures || []).length;
     if (failedN) {

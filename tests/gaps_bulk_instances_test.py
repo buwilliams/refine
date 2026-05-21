@@ -106,7 +106,9 @@ def main() -> int:
         assert 'id="bulk-transfer-instance"' in gaps_list
         assert "openBulkTransferInstanceModal" in gaps_bulk
         assert 'api("POST", "/api/instances/transfer-gaps"' in gaps_bulk
-        assert "selected_ids: selectedIds" in gaps_bulk
+        assert "filter, ...selectionFields" in gaps_bulk
+        assert "exclude_ids: Array.from(gapsExcludedIds)" in gaps_bulk
+        assert "selected_ids: Array.from(gapsIncludedIds)" in gaps_bulk
         assert "instance: f.instance" in gaps_bulk
         assert '"filter-instance": !!f.instance' in gaps_bulk
     finally:

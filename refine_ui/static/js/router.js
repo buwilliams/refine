@@ -46,11 +46,11 @@ function navigate() {
     location.hash = "#/";
     return;
   }
-  // Leaving the Gaps list forgets per-row bulk deselections on purpose —
-  // a fresh visit starts with everything selected again.
+  // Leaving the Gaps list forgets in-memory bulk-selection exceptions on
+  // purpose — a fresh visit starts with all matching Gaps selected again.
   const prevRoute = state.currentRoute;
   if (prevRoute === "gaps" && r.route !== "gaps") {
-    gapsExcludedIds.clear();
+    resetGapsSelection();
   }
   if (r.route === "gaps_detail") {
     // Gap detail is now a modal layered on top of the current screen, so
