@@ -814,7 +814,10 @@ function initSSE() {
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       try {
         const data = JSON.parse(e.data);
-        if (!data.gap_id || data.gap_id === state.currentGap) loadGapDetail(state.currentGap);
+        if (!data.gap_id || data.gap_id === state.currentGap) {
+          if (typeof invalidateGapRoundLogs === "function") invalidateGapRoundLogs(state.currentGap);
+          loadGapDetail(state.currentGap);
+        }
       } catch {}
     }
   });
@@ -860,7 +863,10 @@ function initSSE() {
     if (state.currentRoute !== "gaps_detail" || !state.currentGap) return;
     try {
       const data = JSON.parse(e.data);
-      if (data.gap_id === state.currentGap) loadGapDetail(state.currentGap);
+      if (data.gap_id === state.currentGap) {
+        if (typeof invalidateGapRoundLogs === "function") invalidateGapRoundLogs(state.currentGap);
+        loadGapDetail(state.currentGap);
+      }
     } catch {}
   });
   sseSource.onerror = () => {

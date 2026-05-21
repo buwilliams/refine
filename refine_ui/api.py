@@ -1120,10 +1120,6 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
         ).fetchone()
         if not row:
             return err(404, "Gap not found")
-        # Gap-scoped activity entries (lifecycle events, dispatcher errors,
-        # subprocess flush nudges). These are merged into the round view so
-        # users see real progress even when the round's logs[] is empty.
-        gap_activity = activity.recent(conn, limit=500, gap_id=gap_id)
     finally:
         conn.close()
     gap = shared_gaps.read_gap_json(gap_id) or {
@@ -1138,11 +1134,9 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     gap["branch_name"] = row["branch_name"]
     gap["instance_id"] = row["instance_id"]
     gap["instance_display_name"] = project_state.gap_instance_display(row["instance_id"])
-    gap["activity"] = gap_activity
-    rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
-    log_count = sum(
-        len(r.get("logs") or []) for r in rounds if isinstance(r.get("logs") or [], list)
-    )
+    rounds = [_round_metadata(r) for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+    gap["rounds"] = rounds
+    log_count = sum(int(r.get("log_count") or 0) for r in rounds)
     perf_metrics.record(
         "api.get_gap",
         elapsed_ms=perf_metrics.elapsed_ms(metric_start),
@@ -1151,10 +1145,143 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
         details={
             "round_count": len(rounds),
             "log_count": log_count,
-            "activity_count": len(gap_activity),
         },
     )
     return 200, {"gap": gap}
+
+
+def _compact_log(log: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(log, dict):
+        return None
+    out: dict[str, Any] = {}
+    for key in ("id", "datetime", "severity", "category", "message", "actor", "gap_id"):
+        if key in log and log[key] is not None:
+            out[key] = log[key]
+    return out
+
+
+def _round_metadata(round_obj: dict[str, Any]) -> dict[str, Any]:
+    meta = dict(round_obj)
+    logs = meta.pop("logs", [])
+    if not isinstance(logs, list):
+        logs = []
+    meta["log_count"] = len(logs)
+    if logs:
+        meta["latest_log"] = _compact_log(logs[-1])
+        for log in reversed(logs):
+            if isinstance(log, dict) and log.get("severity") == "error":
+                meta["latest_error_log"] = _compact_log(log)
+                break
+    return meta
+
+
+def get_gap_logs(
+    gap_id: str,
+    *,
+    round_idx: int,
+    limit: int = 100,
+    offset: int = 0,
+) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    limit = max(1, min(int(limit), 200))
+    offset = max(0, int(offset))
+    metric_start = perf_metrics.now()
+    conn = _conn()
+    try:
+        row = conn.execute(
+            "SELECT id FROM gaps_index WHERE id = ?", (gap_id,),
+        ).fetchone()
+        if not row:
+            return err(404, "Gap not found")
+        gap = shared_gaps.read_gap_json(gap_id)
+        if gap is None:
+            return err(404, "Gap not found")
+        rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+        if round_idx < 0 or round_idx >= len(rounds):
+            return err(404, "Round not found")
+        round_obj = rounds[round_idx]
+        round_logs = [
+            dict(log)
+            for log in (round_obj.get("logs") or [])
+            if isinstance(log, dict)
+        ]
+        activity_logs = _activity_for_round(conn, gap_id, rounds, round_idx)
+    finally:
+        conn.close()
+
+    merged = [
+        *_mark_log_source(round_logs, "round"),
+        *_mark_log_source(activity_logs, "activity"),
+    ]
+    merged.sort(key=lambda log: (str(log.get("datetime") or ""), int(log.get("id") or 0)))
+    total = len(merged)
+    page = merged[offset:offset + limit]
+    perf_metrics.record(
+        "api.get_gap_logs",
+        elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+        gap_id=gap_id,
+        rows_returned=len(page),
+        details={
+            "round_idx": round_idx,
+            "limit": limit,
+            "offset": offset,
+            "total": total,
+            "round_log_count": len(round_logs),
+            "activity_count": len(activity_logs),
+        },
+    )
+    return 200, {
+        "gap_id": gap_id,
+        "round_idx": round_idx,
+        "logs": page,
+        "pagination": {
+            "limit": limit,
+            "offset": offset,
+            "total": total,
+            "has_more": offset + len(page) < total,
+        },
+        "round_log_count": len(round_logs),
+        "activity_count": len(activity_logs),
+    }
+
+
+def _mark_log_source(logs: list[dict[str, Any]], source: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for log in logs:
+        item = dict(log)
+        item.setdefault("source", source)
+        out.append(item)
+    return out
+
+
+def _activity_for_round(
+    conn: sqlite3.Connection,
+    gap_id: str,
+    rounds: list[dict[str, Any]],
+    round_idx: int,
+) -> list[dict[str, Any]]:
+    current = rounds[round_idx]
+    lower = str(current.get("created") or "")
+    upper = ""
+    for later in rounds[round_idx + 1:]:
+        upper = str(later.get("created") or "")
+        if upper:
+            break
+    sql = [
+        "SELECT id, datetime, severity, category, gap_id, actor, message, "
+        "       details, actions_json FROM activity WHERE gap_id = ?"
+    ]
+    args: list[Any] = [gap_id]
+    if lower:
+        sql.append("AND datetime >= ?")
+        args.append(lower)
+    if upper:
+        sql.append("AND datetime < ?")
+        args.append(upper)
+    sql.append("ORDER BY datetime ASC, id ASC")
+    return [activity._row_to_entry(row) for row in conn.execute(" ".join(sql), args)]
 
 
 def _enrich_gap_row(row: dict[str, Any]) -> dict[str, Any]:
