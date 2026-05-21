@@ -13,7 +13,7 @@ def main() -> int:
     tmp, client = make_client_repo("refine-project-update-pulse-")
     conn = init_refine(client)
     try:
-        from refine_server import db
+        from refine_server import db, mutation_guard
         from refine_ui import poller as poller_mod, sse
         from refine_ui.poller import SqlitePoller
 
@@ -59,6 +59,13 @@ def main() -> int:
             db.set_setting(conn, "project_update_pulse_interval_seconds", "-1")
             p._run_project_update_pulse(200.0)  # noqa: SLF001
             assert calls == ["runner"], calls
+
+            db.set_setting(conn, "project_update_pulse_interval_seconds", "30")
+            with mutation_guard.exclusive("Test mutation", kind="test"):
+                p._run_project_update_pulse(200.0)  # noqa: SLF001
+            assert calls == ["runner"], calls
+            p._run_project_update_pulse(200.0)  # noqa: SLF001
+            assert calls == ["runner", "runner"], calls
         finally:
             poller_mod.project_sync.pulse = original_pulse
             sse.publish = original_publish

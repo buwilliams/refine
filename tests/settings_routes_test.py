@@ -100,6 +100,8 @@ def main() -> int:
     assert "function drawRuntimeRecovery(error)" in settings_js
     assert '@route("POST", r"/api/cache/rebuild")' in server_py
     assert "def rebuild_sqlite_cache" in api_py
+    assert 'await showActionError(e, "SQLite cache rebuild failed");' in settings_js
+    assert 'await showActionError(e, "Target app action failed");' in target_app_js
     assert 'id="s-agent-limit-pause"' in settings_js
     assert "agent_limit_pause_seconds" in settings_js
     assert '"30",    "30 seconds"' in settings_js

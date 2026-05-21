@@ -273,7 +273,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
           // the `#/gaps/import` deep link.
           close(true);
         }
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e, "Import failed"); }
     });
   });
 }

@@ -21,8 +21,15 @@ from . import git_ops
 
 
 class StateCommitter:
-    def __init__(self, get_conn: Callable, interval: float = 30.0) -> None:
+    def __init__(
+        self,
+        get_conn: Callable,
+        *,
+        mutation_blocked: Callable[[], bool] | None = None,
+        interval: float = 30.0,
+    ) -> None:
         self.get_conn = get_conn
+        self.mutation_blocked = mutation_blocked
         self.interval = interval
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -55,6 +62,8 @@ class StateCommitter:
             self._stop.wait(self.interval)
 
     def _tick(self) -> bool:
+        if self.mutation_blocked is not None and self.mutation_blocked():
+            return False
         paths = git_ops.dirty_paths_under(".refine")
         if not paths:
             return False

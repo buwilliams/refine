@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import inspect
 import json
+from contextlib import contextmanager
 import threading
 import traceback
 import uuid
@@ -15,16 +16,36 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from refine_server import db
+from refine_server import db, mutation_guard
 
 
 _JOBS: dict[str, dict[str, Any]] = {}
 _LOCK = threading.Lock()
 _KIND_LOCKS: dict[str, threading.Lock] = {}
+_EXCLUSIVE_OWNER: dict[str, Any] | None = None
+_LOCAL = threading.local()
 _MAX_JOBS = 100
+EXCLUSIVE_KINDS = {
+    "bulk_delete_gaps",
+    "bulk_update_gaps",
+    "import_persist",
+    "sqlite_cache_rebuild",
+}
+
+
+class BackgroundJobConflict(RuntimeError):
+    def __init__(self, job: dict[str, Any]) -> None:
+        self.job = job
+        super().__init__(
+            f"Background job already running: {job.get('label') or job.get('kind')}",
+        )
 
 
 def start(kind: str, label: str, fn: Callable[..., dict[str, Any]]) -> dict[str, Any]:
+    if kind in EXCLUSIVE_KINDS:
+        conflict = active_exclusive_job()
+        if conflict is not None:
+            raise BackgroundJobConflict(conflict)
     job_id = uuid.uuid4().hex
     job = {
         "id": job_id,
@@ -37,7 +58,12 @@ def start(kind: str, label: str, fn: Callable[..., dict[str, Any]]) -> dict[str,
         "error": None,
         "progress": {"completed": 0, "total": 0, "message": "Queued"},
     }
+    ignore_owner_id = getattr(_LOCAL, "exclusive_owner_id", None)
     with _LOCK:
+        if kind in EXCLUSIVE_KINDS:
+            conflict = _active_exclusive_job_locked(ignore_owner_id=ignore_owner_id)
+            if conflict is not None:
+                raise BackgroundJobConflict(conflict)
         _JOBS[job_id] = job
         _trim_locked()
     _persist(job)
@@ -49,6 +75,61 @@ def start(kind: str, label: str, fn: Callable[..., dict[str, Any]]) -> dict[str,
     )
     thread.start()
     return snapshot(job_id) or job
+
+
+def active_exclusive_job() -> dict[str, Any] | None:
+    ignore_owner_id = getattr(_LOCAL, "exclusive_owner_id", None)
+    with _LOCK:
+        job = _active_exclusive_job_locked(ignore_owner_id=ignore_owner_id)
+        if job is not None:
+            return job
+    for job_id in _active_exclusive_job_ids_from_store():
+        snap = snapshot(job_id)
+        if (
+            snap
+            and snap.get("kind") in EXCLUSIVE_KINDS
+            and snap.get("status") in {"queued", "running"}
+        ):
+            return snap
+    owner = mutation_guard.active()
+    if owner is not None:
+        if owner.get("id") == ignore_owner_id:
+            return None
+        return owner
+    return None
+
+
+@contextmanager
+def exclusive_operation(label: str, *, kind: str = "api_operation"):
+    global _EXCLUSIVE_OWNER
+    with _LOCK:
+        conflict = _active_exclusive_job_locked()
+        if conflict is not None:
+            raise BackgroundJobConflict(conflict)
+    try:
+        with mutation_guard.exclusive(label, kind=kind) as owner:
+            with _LOCK:
+                _EXCLUSIVE_OWNER = owner
+            previous_owner = getattr(_LOCAL, "exclusive_owner_id", None)
+            _LOCAL.exclusive_owner_id = owner["id"]
+            try:
+                yield
+            finally:
+                if previous_owner is None:
+                    try:
+                        delattr(_LOCAL, "exclusive_owner_id")
+                    except AttributeError:
+                        pass
+                else:
+                    _LOCAL.exclusive_owner_id = previous_owner
+                with _LOCK:
+                    if (
+                        _EXCLUSIVE_OWNER is not None
+                        and _EXCLUSIVE_OWNER.get("id") == owner["id"]
+                    ):
+                        _EXCLUSIVE_OWNER = None
+    except mutation_guard.MutationBusy as e:
+        raise BackgroundJobConflict(e.owner) from e
 
 
 def snapshot(job_id: str) -> dict[str, Any] | None:
@@ -93,7 +174,14 @@ def _run(job_id: str, fn: Callable[..., dict[str, Any]]) -> None:
         _mark_running(job_id)
         callback = lambda **kwargs: progress(job_id, **kwargs)
         try:
-            if _accepts_progress(fn):
+            if kind in EXCLUSIVE_KINDS:
+                label = str((job or {}).get("label") or kind)
+                with mutation_guard.exclusive(label, kind=kind, blocking=True):
+                    if _accepts_progress(fn):
+                        result = fn(callback)
+                    else:
+                        result = fn()
+            elif _accepts_progress(fn):
                 result = fn(callback)
             else:
                 result = fn()
@@ -155,6 +243,44 @@ def _lock_for_kind(kind: str) -> threading.Lock:
             lock = threading.Lock()
             _KIND_LOCKS[kind] = lock
         return lock
+
+
+def _active_exclusive_job_locked(
+    *,
+    ignore_owner_id: str | None = None,
+) -> dict[str, Any] | None:
+    if (
+        _EXCLUSIVE_OWNER is not None
+        and _EXCLUSIVE_OWNER.get("id") != ignore_owner_id
+    ):
+        return dict(_EXCLUSIVE_OWNER)
+    active = [
+        job for job in _JOBS.values()
+        if job.get("kind") in EXCLUSIVE_KINDS
+        and job.get("status") in {"queued", "running"}
+    ]
+    if not active:
+        return None
+    active.sort(key=lambda job: str(job.get("started_at") or ""))
+    return dict(active[0])
+
+
+def _active_exclusive_job_ids_from_store() -> list[str]:
+    try:
+        conn = db.connect()
+        try:
+            rows = conn.execute(
+                "SELECT id FROM background_jobs "
+                "WHERE status IN ('queued', 'running') "
+                f"AND kind IN ({','.join('?' * len(EXCLUSIVE_KINDS))}) "
+                "ORDER BY started_at LIMIT 10",
+                tuple(sorted(EXCLUSIVE_KINDS)),
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return []
+    return [str(row["id"]) for row in rows]
 
 
 def _trim_locked() -> None:

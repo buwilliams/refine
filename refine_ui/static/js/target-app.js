@@ -116,7 +116,7 @@ async function runTargetAppAction(action) {
       last_error: r.ok ? "" : (r.message || ""),
     });
   } catch (e) {
-    toast(e.message, "error");
+    await showActionError(e, "Target app action failed");
     // Reset to whatever the server thinks.
     refreshTargetAppToggle();
   }

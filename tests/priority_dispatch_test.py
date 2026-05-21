@@ -183,6 +183,21 @@ def main() -> int:
             "SELECT message FROM activity WHERE gap_id = 'low-running'"
         ).fetchone()
         assert "higher-priority" in activity_row["message"], activity_row["message"]
+
+        reset()
+        blocked = True
+        blocked_dispatcher = Dispatcher(
+            get_conn=lambda: conn,
+            sub_mgr=fake,
+            launch_blocked=lambda: blocked,
+        )
+        blocked_dispatcher._launch_one = launch_one  # type: ignore[method-assign]
+        insert_gap("blocked-todo", "todo", "high")
+        blocked_dispatcher._tick()
+        assert launched == [], launched
+        blocked = False
+        blocked_dispatcher._tick()
+        assert launched == ["blocked-todo"], launched
     finally:
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)

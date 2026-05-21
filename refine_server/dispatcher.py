@@ -38,6 +38,7 @@ class Dispatcher:
     # Gap rather than waiting on its 10s poll. Optional so tests can
     # instantiate a Dispatcher without one.
     on_run_finished: callable | None = None  # type: ignore[type-arg]
+    launch_blocked: callable | None = None  # type: ignore[type-arg]
     poll_interval: float = 2.0
 
     _stop: threading.Event = None  # type: ignore[assignment]
@@ -80,6 +81,8 @@ class Dispatcher:
         paused = db.get_setting_int(conn, "paused", 0)
         if paused:
             self._stop_running_agents(reason="paused")
+            return
+        if self.launch_blocked is not None and self.launch_blocked():
             return
         self._promote_backlog(conn)
         if self._agent_limit_pause_active(conn):

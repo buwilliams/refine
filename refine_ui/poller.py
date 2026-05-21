@@ -9,7 +9,7 @@ import sqlite3
 import threading
 import time
 
-from refine_server import activity, db, project_state, project_sync
+from refine_server import activity, db, mutation_guard, project_state, project_sync
 
 from . import sse
 
@@ -189,6 +189,8 @@ class SqlitePoller:
         if interval <= 0:
             return
         if now - self._last_project_update_pulse_at < interval:
+            return
+        if mutation_guard.active() is not None:
             return
         self._last_project_update_pulse_at = now
         conn = self._conn()

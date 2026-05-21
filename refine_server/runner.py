@@ -23,7 +23,7 @@ from refine_server.backend_protocol import (
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, merger as _merger, preflight, project_sync, recovery, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, mutation_guard, preflight, project_sync, recovery, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
 from .chat_mgr import ChatManager
 from .governance_agent import GovernanceAgent
 
@@ -88,6 +88,7 @@ class Runner:
         self.dispatcher = _dispatcher.Dispatcher(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
             on_run_finished=lambda _gid: self.merger.wake(),
+            launch_blocked=self._automation_blocked,
         )
         self.governance_agent = GovernanceAgent(
             get_conn=self._get_governance_conn,
@@ -100,6 +101,7 @@ class Runner:
         )
         self.state_committer = state_committer.StateCommitter(
             get_conn=self._get_conn,
+            mutation_blocked=self._automation_blocked,
         )
         self._diag_lock = threading.Lock()
         self._last_call_at: str | None = None
@@ -129,6 +131,9 @@ class Runner:
                 self._governance_conns.append(conn)
         project_state.ensure_sqlite_cache_current(conn)
         return conn
+
+    def _automation_blocked(self) -> bool:
+        return self._bulk_update_lock.locked() or mutation_guard.active() is not None
 
     # ---- lifecycle -----------------------------------------------------------
 
@@ -499,7 +504,11 @@ class Runner:
                 "progress": {"completed": 0, "total": 0},
             }
         with self._bulk_update_lock:
-            return self._bulk_update_gaps_locked(field, value, gap_ids)
+            result = self._bulk_update_gaps_locked(field, value, gap_ids)
+        if field in {"priority", "status"}:
+            self.dispatcher.enforce_now()
+            self.governance_agent.wake()
+        return result
 
     def _bulk_update_gaps_locked(
         self,
@@ -579,9 +588,6 @@ class Runner:
                 except Exception as e:
                     failures.append({"id": gap_id, "error": str(e) or repr(e)})
                 self._record_bulk_progress(field, idx, len(gap_ids))
-            if field in {"priority", "status"}:
-                self.dispatcher.enforce_now()
-                self.governance_agent.wake()
         else:
             for idx, gap_id in enumerate(gap_ids, start=1):
                 try:
@@ -1261,6 +1267,14 @@ class Runner:
         is cycled around the rebuild so users review the freshly rebuilt app:
         stop, rebuild if configured, then start.
         """
+        with mutation_guard.exclusive(
+            "Automatic target-app rebuild",
+            kind="target_app_rebuild",
+            blocking=True,
+        ):
+            return self._run_automatic_target_app_rebuild_locked(reason)
+
+    def _run_automatic_target_app_rebuild_locked(self, reason: str) -> dict:
         with self._target_app_lock:
             conn = self._get_conn()
             settings = db.list_settings(conn)

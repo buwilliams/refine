@@ -45,7 +45,7 @@ from collections.abc import Callable
 from refine_server import activity, db
 from refine_server.gaps import now_iso
 
-from . import gap_writer, git_ops, subprocess_mgr, verify_op
+from . import gap_writer, git_ops, mutation_guard, subprocess_mgr, verify_op
 
 
 # How long the merger sleeps between scans when there's no signal. A
@@ -188,16 +188,20 @@ class Merger:
         # work; pause only gates this Merge-agent loop.
         if db.get_setting_int(self._get_conn(), "paused", 0):
             return
-        with self._host_lock:
-            self._cleanup_worktree(reason="pre-tick cleanup")
-            if self._defer_for_pending_rebuild():
-                return
-            gap_id = self._find_one_ready()
-            if not gap_id:
-                return
-            self._merge_one(gap_id)
-            # If there were more queued, run the next one promptly.
-            self._wake.set()
+        try:
+            with mutation_guard.exclusive("Merge agent", kind="merge_agent"):
+                with self._host_lock:
+                    self._cleanup_worktree(reason="pre-tick cleanup")
+                    if self._defer_for_pending_rebuild():
+                        return
+                    gap_id = self._find_one_ready()
+                    if not gap_id:
+                        return
+                    self._merge_one(gap_id)
+                    # If there were more queued, run the next one promptly.
+                    self._wake.set()
+        except mutation_guard.MutationBusy:
+            return
 
     def _find_one_ready(self) -> str | None:
         """`ready-merge` Gaps are waiting on the merger. Process

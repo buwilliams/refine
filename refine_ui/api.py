@@ -9,8 +9,9 @@ import re
 import sqlite3
 import subprocess
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters, round_logs, search_index
 from refine_server import perf_metrics
@@ -77,6 +78,31 @@ def _schema_block_response() -> tuple[int, dict] | None:
         "Project schema is not supported by this Refine version.",
         schema.get("reason") or "",
     )
+
+
+def _background_job_conflict_response(
+    conflict: background_jobs.BackgroundJobConflict,
+) -> tuple[int, dict]:
+    job = conflict.job
+    return err(
+        409,
+        "A background job is already running.",
+        details=f"{job.get('label') or job.get('kind')} ({job.get('status')})",
+        error_code="background_job_active",
+    )
+
+
+def _exclusive_mutation(label: str) -> Callable:
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            try:
+                with background_jobs.exclusive_operation(label):
+                    return fn(*args, **kwargs)
+            except background_jobs.BackgroundJobConflict as e:
+                return _background_job_conflict_response(e)
+        return wrapped
+    return decorator
 
 
 def _instance_owner(instance_id: str | None) -> str:
@@ -256,6 +282,7 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, {"apps": apps}
 
 
+@_exclusive_mutation("Sync project")
 def project_sync(_: dict[str, Any] | None = None) -> tuple[int, dict]:
     block = _schema_block_response()
     if block:
@@ -300,6 +327,7 @@ def list_instances() -> tuple[int, dict]:
     }
 
 
+@_exclusive_mutation("Create instance")
 def create_instance(body: dict[str, Any]) -> tuple[int, dict]:
     name = (body.get("display_name") or body.get("name") or "").strip()
     if not name:
@@ -309,6 +337,7 @@ def create_instance(body: dict[str, Any]) -> tuple[int, dict]:
     return 201, {"instance": entry, **_instance_summary()}
 
 
+@_exclusive_mutation("Update instance")
 def update_instance(instance_id: str, body: dict[str, Any]) -> tuple[int, dict]:
     try:
         entry = project_state.update_instance(
@@ -322,6 +351,7 @@ def update_instance(instance_id: str, body: dict[str, Any]) -> tuple[int, dict]:
     return 200, {"instance": entry, **_instance_summary()}
 
 
+@_exclusive_mutation("Activate instance")
 def activate_instance(body: dict[str, Any]) -> tuple[int, dict]:
     instance_id = (body.get("instance_id") or body.get("id") or "").strip()
     if not instance_id:
@@ -346,6 +376,7 @@ def activate_instance(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, {"ok": True, **_instance_summary()}
 
 
+@_exclusive_mutation("Transfer Gaps between instances")
 def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     target = (body.get("target_instance_id") or "").strip()
     source = (body.get("source_instance_id") or "").strip() or None
@@ -599,6 +630,7 @@ def performance_cleanup(body: dict | None = None) -> tuple[int, dict]:
         conn.close()
 
 
+@_exclusive_mutation("Rebuild SQLite cache")
 def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
     """Operator recovery path for a stale or corrupted SQLite cache."""
     blocked = _schema_block_response()
@@ -620,11 +652,14 @@ def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
             )
             return {"http_status": status, **result}
 
-        job = background_jobs.start(
-            "sqlite_cache_rebuild",
-            "Rebuild SQLite cache",
-            run_job,
-        )
+        try:
+            job = background_jobs.start(
+                "sqlite_cache_rebuild",
+                "Rebuild SQLite cache",
+                run_job,
+            )
+        except background_jobs.BackgroundJobConflict as e:
+            return _background_job_conflict_response(e)
         return 202, {"queued": True, "job": job}
 
     return _rebuild_sqlite_cache_sync(body)
@@ -1427,6 +1462,7 @@ def _enrich_gap_row(row: dict[str, Any]) -> dict[str, Any]:
 _VALID_REPORTER = re.compile(r"^[^\x00-\x1f]{1,80}$")
 
 
+@_exclusive_mutation("Create Gap")
 def create_gap(body: dict) -> tuple[int, dict]:
     reporter = (body.get("reporter") or "").strip()
     actual = (body.get("actual") or "").strip()
@@ -1464,6 +1500,7 @@ def _autoname(actual: str, target: str) -> str:
     return short or "Untitled Gap"
 
 
+@_exclusive_mutation("Update Gap")
 def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     """PATCH handler: accepts `name`, `priority`, and/or `notes`.
 
@@ -1577,6 +1614,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     return 200, {"ok": True}
 
 
+@_exclusive_mutation("Delete Gap")
 def delete_gap(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
@@ -1592,6 +1630,7 @@ def delete_gap(gap_id: str) -> tuple[int, dict]:
     return 200, result
 
 
+@_exclusive_mutation("Bulk update Gaps")
 def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     """Apply a single field update to every Gap matching the supplied filter.
 
@@ -1693,11 +1732,14 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                 )
             return {"http_status": 200, **result}
 
-        job = background_jobs.start(
-            "bulk_update_gaps",
-            f"Bulk update {len(gap_ids)} Gaps",
-            run_job,
-        )
+        try:
+            job = background_jobs.start(
+                "bulk_update_gaps",
+                f"Bulk update {len(gap_ids)} Gaps",
+                run_job,
+            )
+        except background_jobs.BackgroundJobConflict as e:
+            return _background_job_conflict_response(e)
         return 202, {
             "queued": True,
             "job": job,
@@ -1759,6 +1801,7 @@ def _bulk_update_selected_gaps(
     }
 
 
+@_exclusive_mutation("Bulk delete Gaps")
 def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     """Delete every Gap matching the supplied filter.
 
@@ -1809,6 +1852,7 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     }
 
 
+@_exclusive_mutation("Append Gap round")
 def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     reporter = (body.get("reporter") or "").strip()
     actual = (body.get("actual") or "").strip()
@@ -1844,6 +1888,7 @@ def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     return 201, result
 
 
+@_exclusive_mutation("Edit Gap round")
 def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
     conn = _conn()
     try:
@@ -1869,6 +1914,7 @@ def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
     return 200, result
 
 
+@_exclusive_mutation("Verify Gap")
 def verify(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
@@ -2123,6 +2169,7 @@ def set_feature_override(body: dict) -> tuple[int, dict]:
     return 200, {"ok": True}
 
 
+@_exclusive_mutation("Update settings")
 def update_settings(body: dict) -> tuple[int, dict]:
     if not isinstance(body, dict) or not body:
         return err(400, "expected an object of {key: value}")
@@ -2647,6 +2694,7 @@ def _import_extract_chunks(text: str) -> list[dict[str, Any]]:
     return chunks
 
 
+@_exclusive_mutation("Import Gaps")
 def import_persist(body: dict) -> tuple[int, dict]:
     """Persist user-confirmed extracted Gaps."""
     drafts = body.get("drafts") or []
@@ -2841,16 +2889,19 @@ def _has_status_checks(cfg: dict[str, Any]) -> bool:
     ))
 
 
+@_exclusive_mutation("Start target app")
 def target_app_start(_body: dict | None = None) -> tuple[int, dict]:
     """Run the configured start command via the host runner."""
     return _target_app_run("start")
 
 
+@_exclusive_mutation("Stop target app")
 def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
     """Run the configured stop command via the host runner."""
     return _target_app_run("stop")
 
 
+@_exclusive_mutation("Rebuild target app")
 def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
     """Run the configured rebuild command via the host runner."""
     return _target_app_run("rebuild")

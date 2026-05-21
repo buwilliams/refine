@@ -155,6 +155,10 @@ def main() -> int:
         ).read_text(encoding="utf-8")
         assert "function modalAlert" in common_js
         assert "instance_ownership" in common_js
+        assert "function isBackgroundJobActiveError" in common_js
+        assert "background_job_active" in common_js
+        assert 'title: "Refine is busy"' in common_js
+        assert "err.code = raw.code" in common_js
         assert "await showActionError(e);" in gaps_detail_js
         assert 'await showActionError(e, "Bulk update failed");' in gaps_bulk_js
     finally:

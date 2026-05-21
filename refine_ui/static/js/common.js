@@ -103,11 +103,16 @@ async function api(method, path, body) {
   let data = null;
   try { data = await res.json(); } catch {}
   if (!res.ok) {
-    const msg = data?.error?.message || res.statusText || "Request failed";
+    let msg = data?.error?.message || res.statusText || "Request failed";
+    const details = data?.error?.details;
+    const code = data?.error?.code;
+    if (code === "background_job_active" && details) {
+      msg = `${msg} Active operation: ${details}.`;
+    }
     const err = new Error(msg);
     err.status = res.status;
-    err.details = data?.error?.details;
-    err.code = data?.error?.code;
+    err.details = details;
+    err.code = code;
     throw err;
   }
   return data;
@@ -134,6 +139,7 @@ async function waitForBackgroundJob(jobOrId, {
     if (job.status === "failed") {
       const err = new Error(job.error?.message || "Background job failed");
       err.details = job.error?.details;
+      err.code = job.error?.code;
       throw err;
     }
     if (Date.now() - started > timeoutMs) {
@@ -148,7 +154,11 @@ async function resolveBackgroundJobResponse(response, message = "") {
   if (message) toast(message, "info");
   const result = await waitForBackgroundJob(response.job);
   if (result.http_status && result.http_status >= 400) {
-    throw new Error(result.error?.message || "Background job failed");
+    const raw = result.error || {};
+    const err = new Error(raw.message || "Background job failed");
+    err.details = raw.details;
+    err.code = raw.code;
+    throw err;
   }
   return result;
 }
@@ -226,8 +236,12 @@ async function syncProjectUpdates({ silent = false } = {}) {
     if (!silent) toast(result.message || "Project updates synced", "info");
     return result;
   } catch (e) {
-    const message = e.details || e.message || "Could not sync latest project updates";
-    toast(message, silent ? "warn" : "error");
+    if (!silent) {
+      await showActionError(e, "Could not sync latest project updates");
+    } else {
+      const message = e.details || e.message || "Could not sync latest project updates";
+      toast(message, "warn");
+    }
     if (!silent) throw e;
     return null;
   }
@@ -471,9 +485,27 @@ function isInstanceOwnershipError(err) {
     || (err?.status === 409 && /owned by another instance/i.test(err?.message || ""));
 }
 
+function isBackgroundJobActiveError(err) {
+  return err?.code === "background_job_active";
+}
+
+function backgroundJobActiveMessage(err) {
+  const base = err?.message || "Refine is already applying changes.";
+  const hasDetails = err?.details && base.includes(err.details);
+  const details = err?.details && !hasDetails ? `\n\nActive operation: ${err.details}` : "";
+  return `${base}${details}\n\nWait for the current operation to finish, then try again.`;
+}
+
 async function showActionError(err, fallbackPrefix = "") {
   if (isInstanceOwnershipError(err)) {
     await modalAlert(err.message || "This action is not allowed because the Gap is owned by another instance.");
+    return;
+  }
+  if (isBackgroundJobActiveError(err)) {
+    await modalAlert(backgroundJobActiveMessage(err), {
+      title: "Refine is busy",
+      okLabel: "OK",
+    });
     return;
   }
   const message = err?.message || "Request failed";

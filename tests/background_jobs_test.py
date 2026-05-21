@@ -56,6 +56,62 @@ def main() -> int:
         wait_job(first_job["id"])
         wait_job(second_job["id"])
         assert events == ["first-start", "first-end", "second-start"], events
+
+        release = threading.Event()
+        exclusive_started = threading.Event()
+
+        def exclusive(progress):  # noqa: ANN001, ANN202
+            progress(completed=0, total=1, message="exclusive")
+            exclusive_started.set()
+            assert release.wait(timeout=2), "exclusive job was not released"
+            return {"updated": 1}
+
+        exclusive_job = background_jobs.start(
+            "sqlite_cache_rebuild",
+            "Exclusive rebuild",
+            exclusive,
+        )
+        assert exclusive_started.wait(timeout=2), "exclusive job did not start"
+        try:
+            background_jobs.start("import_persist", "Import", quick)
+        except background_jobs.BackgroundJobConflict as e:
+            assert e.job["id"] == exclusive_job["id"], e.job
+        else:
+            raise AssertionError("exclusive background jobs should not overlap")
+
+        from refine_ui import api
+
+        status, body = api.create_gap({
+            "reporter": "Reporter",
+            "actual": "Current",
+            "target": "Target",
+        })
+        assert status == 409, body
+        assert body["error"]["code"] == "background_job_active", body
+        release.set()
+        wait_job(exclusive_job["id"])
+
+        sync_started = threading.Event()
+        sync_release = threading.Event()
+
+        def sync_mutation() -> None:
+            with background_jobs.exclusive_operation("Synchronous mutation"):
+                sync_started.set()
+                assert sync_release.wait(timeout=2), "sync mutation was not released"
+
+        sync_thread = threading.Thread(target=sync_mutation)
+        sync_thread.start()
+        assert sync_started.wait(timeout=2), "sync mutation did not start"
+        try:
+            background_jobs.start("bulk_update_gaps", "Bulk", quick)
+        except background_jobs.BackgroundJobConflict as e:
+            assert e.job["label"] == "Synchronous mutation", e.job
+        else:
+            raise AssertionError("background job should wait for sync mutation")
+        sync_release.set()
+        sync_thread.join(timeout=2)
+        assert not sync_thread.is_alive(), "sync mutation did not finish"
+
     finally:
         try:
             conn.close()

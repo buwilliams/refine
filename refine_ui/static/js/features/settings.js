@@ -267,13 +267,17 @@ function bindRebuildCacheHandler() {
             onProgress: drawSqliteCacheProgress,
           });
           if (result.http_status && result.http_status >= 400) {
-            throw new Error(result.error?.message || "SQLite cache rebuild failed");
+            const raw = result.error || {};
+            const err = new Error(raw.message || "SQLite cache rebuild failed");
+            err.details = raw.details;
+            err.code = raw.code;
+            throw err;
           }
         }
         const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
         toast(`SQLite cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
         await refreshSettings({ force: true });
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e, "SQLite cache rebuild failed"); }
     });
   });
 }
@@ -418,7 +422,7 @@ function openGuidanceModal(items, index = null) {
         toast(editing ? "Guidance saved" : "Guidance created", "info");
         close();
         await refreshSettings();
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   }
   async function remove() {
@@ -435,7 +439,7 @@ function openGuidanceModal(items, index = null) {
         toast("Guidance deleted", "info");
         close();
         await refreshSettings();
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   }
 
@@ -1122,7 +1126,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       try {
         await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
         await refreshSettings();
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $$("[data-cancel-agent]").forEach((b) => {
@@ -1154,7 +1158,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         });
         toast("Governance saved", "info");
         await refreshSettings();
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#s-governance-generate")?.addEventListener("click", async () => {
@@ -1172,7 +1176,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         $("#governance-rules-list").innerHTML = renderGovernanceRuleRows(r.rules || []);
         bindGovernanceRuleButtons();
         toast("Rules generated — review and save", "info");
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#guidance-list")?.addEventListener("click", (e) => {
@@ -1200,7 +1204,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         const r = await api("POST", "/api/performance/cleanup", {});
         toast(`Deleted ${r.deleted} old metric event${r.deleted === 1 ? "" : "s"}.`, "info");
         await refreshSettings({ force: true });
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#performance-clear")?.addEventListener("click", async () => {
@@ -1214,7 +1218,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         const r = await api("POST", "/api/performance/cleanup", { clear: true });
         toast(`Deleted ${r.deleted} metric event${r.deleted === 1 ? "" : "s"}.`, "info");
         await refreshSettings({ force: true });
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#performance-filter-apply")?.addEventListener("click", async () => {
@@ -1230,7 +1234,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       const successSel = $("#performance-success-filter");
       if (opSel) opSel.value = op;
       if (successSel) successSel.value = outcome;
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   });
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
@@ -1321,7 +1325,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         } else {
           toast("Saved — re-check auth to confirm the new CLI is reachable", "info");
         }
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   // Feature flag toggles.
@@ -1347,7 +1351,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       try {
         const r = await api("POST", "/api/settings/recheck-auth");
         toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#logs-cleanup").addEventListener("click", async () => {
@@ -1365,7 +1369,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       try {
         const r = await api("POST", "/api/activity/cleanup", { days });
         toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   bindRebuildCacheHandler();
@@ -1376,7 +1380,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     );
     if (!ok) return;
     try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await renderSettings(); }
-    catch (e) { toast(e.message, "error"); }
+    catch (e) { await showActionError(e); }
   }));
   $$("[data-rename]").forEach((b) => b.addEventListener("click", async () => {
     const oldName = b.dataset.name;
@@ -1389,14 +1393,14 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       if (state.lastReporter === oldName) setLastReporter(newName);
       await refreshReporters();
       await renderSettings();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   }));
   $("#r-add").addEventListener("click", async () => {
     const name = await modalPrompt("Reporter name", "",
                                    { title: "Add reporter" });
     if (!name || !name.trim()) return;
     try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
-    catch (e) { toast(e.message, "error"); }
+    catch (e) { await showActionError(e); }
   });
   $("#instance-add")?.addEventListener("click", async () => {
     const name = await modalPrompt("Instance name", "",
@@ -1405,7 +1409,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     try {
       await api("POST", "/api/instances", { display_name: name.trim() });
       await refreshSettings();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   });
   $$("[data-instance-activate]").forEach((b) => b.addEventListener("click", async () => {
     try {
@@ -1420,7 +1424,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       await refreshInstanceScopedState();
       toast("Instance activated", "info");
       await refreshSettings();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   }));
   $$("[data-instance-rename]").forEach((b) => b.addEventListener("click", async () => {
     const name = await modalPrompt("Instance name", b.dataset.name || "",
@@ -1431,7 +1435,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         display_name: name.trim(),
       });
       await refreshSettings();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   }));
   $$("[data-instance-archive]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(
@@ -1444,7 +1448,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         archived: true,
       });
       await refreshSettings();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   }));
   $("#instance-transfer")?.addEventListener("click", async () => {
     const source = $("#instance-transfer-source")?.value || "";
@@ -1474,7 +1478,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         "info",
       );
       await refreshSettings();
-    } catch (e) { toast(e.message, "error"); }
+    } catch (e) { await showActionError(e); }
   });
 
   // --- Target application controls on the Application tab -------------------
@@ -1505,7 +1509,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         toast("Saved", "info");
         await refreshSettings({ force: true });
         refreshTargetAppStatus();
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#s-target-generate")?.addEventListener("click", async () => {
@@ -1525,7 +1529,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         } else {
           toast("Generation produced no configuration", "error");
         }
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   $("#s-target-run-start")?.addEventListener("click", async () => {
@@ -1567,7 +1571,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"),
               ok ? "info" : "error");
         drawTargetAppStatusBlock(r);
-      } catch (e) { toast(e.message, "error"); }
+      } catch (e) { await showActionError(e); }
     });
   });
   // Kick off the initial status load (and let SSE refresh later).
