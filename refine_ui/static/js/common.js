@@ -116,13 +116,20 @@ async function api(method, path, body) {
 async function waitForBackgroundJob(jobOrId, {
   intervalMs = 750,
   timeoutMs = 10 * 60 * 1000,
+  onProgress = null,
 } = {}) {
   const jobId = typeof jobOrId === "string" ? jobOrId : jobOrId?.id;
   if (!jobId) throw new Error("Background job id missing");
   const started = Date.now();
+  let lastProgress = "";
   while (true) {
     const snap = await api("GET", `/api/jobs/${jobId}`);
     const job = snap.job || {};
+    const progressKey = JSON.stringify(job.progress || {});
+    if (onProgress && progressKey !== lastProgress) {
+      lastProgress = progressKey;
+      onProgress(job.progress || {}, job);
+    }
     if (job.status === "complete") return job.result || {};
     if (job.status === "failed") {
       const err = new Error(job.error?.message || "Background job failed");

@@ -409,12 +409,33 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
-    try:
-        get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
-    except BackendError:
-        pass
+    if _should_enforce_after_instance_transfer(result.get("ids") or []):
+        try:
+            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+        except BackendError:
+            pass
     result.update(cancelled)
     return 200, result
+
+
+def _should_enforce_after_instance_transfer(gap_ids: list[str]) -> bool:
+    if not gap_ids:
+        return False
+    active = project_state.active_instance_id()
+    placeholders = ",".join("?" * len(gap_ids))
+    conn = _conn()
+    try:
+        if (db.get_setting(conn, "paused") or "0") == "1":
+            return False
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM gaps_index "
+            f"WHERE id IN ({placeholders}) "
+            "AND instance_id = ? AND status = 'todo'",
+            [*gap_ids, active],
+        ).fetchone()
+        return bool(row and int(row["n"] or 0) > 0)
+    finally:
+        conn.close()
 
 
 def list_guidance() -> tuple[int, dict]:
@@ -585,6 +606,36 @@ def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
         return blocked
 
     body = body or {}
+    if body.get("background"):
+        restart_services = body.get("restart_services") is not False
+
+        def run_job(progress=None) -> dict[str, Any]:
+            def report(completed: int, total: int, message: str) -> None:
+                if progress is not None:
+                    progress(completed=completed, total=total, message=message)
+
+            status, result = _rebuild_sqlite_cache_sync(
+                {"restart_services": restart_services},
+                progress=report,
+            )
+            return {"http_status": status, **result}
+
+        job = background_jobs.start(
+            "sqlite_cache_rebuild",
+            "Rebuild SQLite cache",
+            run_job,
+        )
+        return 202, {"queued": True, "job": job}
+
+    return _rebuild_sqlite_cache_sync(body)
+
+
+def _rebuild_sqlite_cache_sync(
+    body: dict,
+    *,
+    progress: project_state.ProgressCallback | None = None,
+) -> tuple[int, dict]:
+    """Force-rebuild SQLite projections from canonical .refine JSON."""
     restart_services = body.get("restart_services") is not False
     cfg = config.get(reload=True)
     sqlite_file = cfg.sqlite_path
@@ -602,12 +653,14 @@ def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
                 if integrity is None or str(integrity[0]).lower() != "ok":
                     detail = str(integrity[0]) if integrity is not None else "no integrity result"
                     raise sqlite3.DatabaseError(f"integrity_check failed: {detail}")
-                project_state.rebuild_sqlite_cache(conn)
+                project_state.rebuild_sqlite_cache(conn, force=True, progress=progress)
             finally:
                 conn.close()
         except sqlite3.Error as e:
             mode = "recreated"
             details = str(e)
+            if progress is not None:
+                progress(0, 0, "Recreating corrupted SQLite cache")
             removed = _unlink_sqlite_cache_files(sqlite_file)
             db.init_db()
 
@@ -1457,6 +1510,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
         )
         if transition_err is not None:
             return transition_err
+    paused_after_update = False
     if sql_fields:
         active = project_state.active_instance_id()
         updated_at = now_iso()
@@ -1470,6 +1524,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
                     "WHERE id = ? AND instance_id = ?",
                     args,
                 )
+                paused_after_update = (db.get_setting(conn, "paused") or "0") == "1"
         finally:
             conn.close()
         if not cur.rowcount:
@@ -1513,7 +1568,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             })
         except BackendError:
             pass
-    if "priority" in sql_fields or "status" in sql_fields:
+    if ("priority" in sql_fields or "status" in sql_fields) and not paused_after_update:
         try:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:

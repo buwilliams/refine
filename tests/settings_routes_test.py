@@ -87,7 +87,9 @@ def main() -> int:
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
     assert 'id="s-rebuild-cache"' in settings_js
-    assert 'api("POST", "/api/cache/rebuild", {})' in settings_js
+    assert 'api("POST", "/api/cache/rebuild", { background: true })' in settings_js
+    assert "function drawSqliteCacheProgress" in settings_js
+    assert "onProgress: drawSqliteCacheProgress" in settings_js
     assert 'slug: "performance"' in settings_js
     assert 'api("GET", "/api/performance")' in settings_js
     assert 'api("POST", "/api/performance/cleanup"' in settings_js

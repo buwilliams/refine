@@ -216,7 +216,29 @@ function renderSqliteCacheSection(error = null) {
       <div class="actions">
         <button class="secondary" id="s-rebuild-cache">Rebuild SQLite cache</button>
       </div>
+      <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
     </section>`;
+}
+
+function drawSqliteCacheProgress(progress = {}) {
+  const root = $("#sqlite-cache-progress");
+  if (!root) return;
+  const total = Number(progress.total || 0);
+  const completed = Number(progress.completed || 0);
+  const message = progress.message || (
+    total ? `Processing ${completed} of ${total} Gaps` : "Rebuilding SQLite cache"
+  );
+  const detail = total
+    ? `${Math.min(completed, total)} / ${total} Gap${total === 1 ? "" : "s"} processed`
+    : "Preparing rebuild";
+  root.style.display = "";
+  root.innerHTML = `
+    <div class="loading-row" style="padding:0">
+      <span class="loading-spinner"></span>
+      <span>${htmlEscape(message)}</span>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${htmlEscape(detail)}</p>
+  `;
 }
 
 function drawRuntimeRecovery(error) {
@@ -238,7 +260,16 @@ function bindRebuildCacheHandler() {
     if (!ok) return;
     await withButtonBusy($("#s-rebuild-cache"), "Rebuilding…", async () => {
       try {
-        const result = await api("POST", "/api/cache/rebuild", {});
+        let result = await api("POST", "/api/cache/rebuild", { background: true });
+        if (result.job) {
+          drawSqliteCacheProgress(result.job.progress || {});
+          result = await waitForBackgroundJob(result.job, {
+            onProgress: drawSqliteCacheProgress,
+          });
+          if (result.http_status && result.http_status >= 400) {
+            throw new Error(result.error?.message || "SQLite cache rebuild failed");
+          }
+        }
         const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
         toast(`SQLite cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
         await refreshSettings({ force: true });

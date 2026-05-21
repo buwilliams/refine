@@ -12,7 +12,7 @@ import os
 import sqlite3
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from . import config
 from .gaps import now_iso
@@ -630,11 +630,21 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
             "skipped": len(skipped), "skipped_details": skipped}
 
 
-def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
+ProgressCallback = Callable[[int, int, str], None]
+
+
+def rebuild_sqlite_cache(
+    conn: sqlite3.Connection,
+    *,
+    force: bool = False,
+    progress: ProgressCallback | None = None,
+) -> None:
     """Refresh SQLite projection tables from canonical JSON.
 
-    Gap projection is incremental: unchanged gap.json files are identified by
-    cached mtime/size metadata and are not read or parsed.
+    By default, Gap projection is incremental: unchanged gap.json files are
+    identified by cached mtime/size metadata and are not read or parsed. A
+    forced rebuild reparses every Gap file and replaces rebuildable projection
+    tables from canonical .refine JSON.
     """
     from . import changes_index
     from . import db
@@ -651,12 +661,22 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     fingerprint = state_fingerprint(root=root)
     phase_ms["fingerprint_ms"] = perf_metrics.elapsed_ms(phase_start)
     phase_start = perf_metrics.now()
-    gap_refresh = _plan_gap_cache_refresh(conn, root)
+    gap_refresh = _plan_gap_cache_refresh(
+        conn,
+        root,
+        force=force,
+        progress=progress,
+    )
     phase_ms["gap_scan_ms"] = perf_metrics.elapsed_ms(phase_start)
     with db.transaction(conn):
         phase_start = perf_metrics.now()
         conn.execute("DELETE FROM settings")
         conn.execute("DELETE FROM reporters")
+        if force:
+            conn.execute("DELETE FROM guidance_decisions")
+            conn.execute("DELETE FROM gap_search_docs")
+            conn.execute("DELETE FROM gaps_index")
+            conn.execute("DELETE FROM gap_cache_meta")
         phase_ms["delete_ms"] = perf_metrics.elapsed_ms(phase_start)
         phase_start = perf_metrics.now()
         for key, value in settings.items():
@@ -685,6 +705,10 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         phase_start = perf_metrics.now()
         rows_updated = _apply_gap_cache_refresh(conn, gap_refresh)
         phase_ms["gap_index_refresh_ms"] = perf_metrics.elapsed_ms(phase_start)
+    if force:
+        from . import search_index
+
+        search_index.rebuild_fts(conn, "gap_search_fts")
     phase_start = perf_metrics.now()
     indexed_branch = changes_index.rebuild_target_branch(conn)
     phase_ms["changes_index_ms"] = perf_metrics.elapsed_ms(phase_start)
@@ -699,6 +723,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         details={
             **phase_ms,
             "changes_index_branch": indexed_branch,
+            "force": force,
             **gap_refresh["stats"],
         },
     )
@@ -709,8 +734,9 @@ def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
 
     Routine reads must stay O(1) with respect to the number of Gap JSON files.
     Normal Refine writes update SQLite and canonical JSON together; incremental
-    projection refreshes are reserved for startup, project sync, app/instance
-    switches, and the explicit System > Runtime rebuild action.
+    projection refreshes are reserved for startup, project sync, and
+    app/instance switches. The explicit System > Runtime rebuild action uses
+    a forced rebuild instead.
     """
     active = active_instance_id()
     try:
@@ -718,7 +744,13 @@ def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
             "SELECT value FROM settings WHERE key = ?",
             (CACHE_ACTIVE_INSTANCE_KEY,),
         ).fetchone()
-        cached = str(row["value"]) if row is not None else ""
+        if row is None:
+            cached = ""
+        else:
+            try:
+                cached = str(row["value"])
+            except (IndexError, TypeError):
+                cached = str(row[0])
     except sqlite3.Error:
         cached = ""
     if cached != active:
@@ -746,8 +778,13 @@ def state_fingerprint(*, root: Path | None = None) -> str:
     return "|".join(parts)
 
 
-def _plan_gap_cache_refresh(conn: sqlite3.Connection,
-                            root: Path) -> dict[str, Any]:
+def _plan_gap_cache_refresh(
+    conn: sqlite3.Connection,
+    root: Path,
+    *,
+    force: bool = False,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
     existing = {
         str(r["json_path"]): dict(r)
         for r in conn.execute(
@@ -775,7 +812,11 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
         "files_invalid": 0,
         "bytes_read": 0,
     }
-    for path in sorted((root / "gaps").glob("**/gap.json")):
+    gap_paths = sorted((root / "gaps").glob("**/gap.json"))
+    total = len(gap_paths)
+    if progress is not None:
+        progress(0, total, f"Processing 0 of {total} Gaps")
+    for path in gap_paths:
         try:
             st = path.stat()
         except OSError:
@@ -795,19 +836,24 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
         mtime_ns = int(st.st_mtime_ns)
         size = int(st.st_size)
         if (
-            prior is not None
+            not force
+            and prior is not None
             and index_has_prior
             and int(prior.get("mtime_ns") or -1) == mtime_ns
             and int(prior.get("size") or -1) == size
         ):
             stats["files_unchanged"] += 1
+            if progress is not None:
+                progress(stats["files_seen"], total,
+                         f"Processing {stats['files_seen']} of {total} Gaps")
             continue
         raw = _read_gap_cache_bytes(path)
         stats["bytes_read"] += len(raw)
         stats["files_hashed"] += 1
         digest = hashlib.sha256(raw).hexdigest()
         if (
-            prior is not None
+            not force
+            and prior is not None
             and index_has_prior
             and str(prior.get("sha256") or "") == digest
         ):
@@ -818,6 +864,9 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
                 "size": size,
                 "sha256": digest,
             })
+            if progress is not None:
+                progress(stats["files_seen"], total,
+                         f"Processing {stats['files_seen']} of {total} Gaps")
             continue
         old_gap_id = prior_gap_id
         gap = _decode_gap_cache_json(raw)
@@ -833,6 +882,9 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
                 "sha256": digest,
             })
             stats["files_invalid"] += 1
+            if progress is not None:
+                progress(stats["files_seen"], total,
+                         f"Processing {stats['files_seen']} of {total} Gaps")
             continue
         upserts.append({
             "json_path": rel,
@@ -842,6 +894,18 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
             "size": size,
             "sha256": digest,
         })
+        if progress is not None:
+            progress(stats["files_seen"], total,
+                     f"Processing {stats['files_seen']} of {total} Gaps")
+    if force:
+        return {
+            "upserts": upserts,
+            "deletes": [],
+            "meta_only": meta_only,
+            "files_seen": stats["files_seen"],
+            "bytes_read": stats["bytes_read"],
+            "stats": stats,
+        }
     for rel, prior in existing.items():
         if rel in seen:
             continue
