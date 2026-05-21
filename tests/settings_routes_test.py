@@ -185,6 +185,8 @@ def main() -> int:
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
     assert '"on_worktree_merge", "On worktree merge"' in settings_js
+    assert '"nightly", "Nightly (midnight)"' in settings_js
+    assert "Nightly (12 PM)" not in settings_js
     assert "target_app_auto_rebuild" in (root / "refine_ui/api.py").read_text(encoding="utf-8")
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
     assert "function applyGeneratedTargetAppConfig(cfg)" in settings_js

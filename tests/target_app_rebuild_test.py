@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -84,6 +85,30 @@ def main() -> int:
             .read_text(encoding="utf-8")
         )
         assert target_settings["target_app_auto_rebuild"] == "hourly"
+
+        db.set_setting(conn, "target_app_auto_rebuild", "nightly")
+        midnight = datetime.now().astimezone().replace(
+            hour=0, minute=0, second=0, microsecond=0,
+        )
+        db.set_setting(
+            conn,
+            "target_app_auto_rebuild_last_started_at",
+            (midnight - timedelta(days=1)).isoformat(),
+        )
+        rebuilder._queue_scheduled_rebuild_if_due(midnight)  # noqa: SLF001
+        rebuilder._drain_queue()  # noqa: SLF001
+        assert runs[-1] == "nightly automatic rebuild", runs
+        nightly_count = len(runs)
+        db.set_setting(
+            conn,
+            "target_app_auto_rebuild_last_started_at",
+            midnight.isoformat(),
+        )
+        rebuilder._queue_scheduled_rebuild_if_due(  # noqa: SLF001
+            midnight.replace(hour=12),
+        )
+        rebuilder._drain_queue()  # noqa: SLF001
+        assert len(runs) == nightly_count, runs
 
         db.set_setting(conn, "target_app_stop_command", "stop-app")
         db.set_setting(conn, "target_app_rebuild_command", "build-app")

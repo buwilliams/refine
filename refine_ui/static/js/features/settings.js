@@ -773,7 +773,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
             ["never", "Never"],
             ["on_worktree_merge", "On worktree merge"],
             ["hourly", "Hourly"],
-            ["nightly", "Nightly (12 PM)"],
+            ["nightly", "Nightly (midnight)"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.target_app_auto_rebuild || "never") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
       <div class="form-row"><label>Status command
@@ -1614,7 +1614,7 @@ function drawTargetAppStatusBlock(snap) {
     never: "Never",
     on_worktree_merge: "On worktree merge",
     hourly: "Hourly",
-    nightly: "Nightly (12 PM)",
+    nightly: "Nightly (midnight)",
   }[snap.auto_rebuild || "never"] || "Never";
   const autoRebuild = `<p class="muted small" style="margin-top:6px">Automatic rebuild: ${htmlEscape(autoRebuildLabel)}${
     snap.auto_rebuild_last_finished_at

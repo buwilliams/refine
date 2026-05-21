@@ -103,14 +103,14 @@ class TargetAppRebuilder:
                 with self._state_lock:
                     self._running = False
 
-    def _queue_scheduled_rebuild_if_due(self) -> None:
+    def _queue_scheduled_rebuild_if_due(self, now: datetime | None = None) -> None:
         mode = self._mode()
         if mode == "on_worktree_merge":
             self.queue_pending_awaiting_rebuild()
             return
         if mode not in ("hourly", "nightly"):
             return
-        now = datetime.now().astimezone()
+        now = now or datetime.now().astimezone()
         last = _parse_iso(db.get_setting(
             self._get_conn(), "target_app_auto_rebuild_last_started_at", "",
         ) or "")
@@ -122,9 +122,8 @@ class TargetAppRebuilder:
             if elapsed is None or elapsed >= 3600:
                 self.queue_rebuild("hourly automatic rebuild")
             return
-        # The UI label is "Nightly (12 PM)"; run once per local day after noon.
-        if now.hour < 12:
-            return
+        # Run once per local day as soon as the scheduler sees the local date
+        # roll over after midnight.
         if last is not None and last.astimezone().date() == now.date():
             return
         self.queue_rebuild("nightly automatic rebuild")
