@@ -671,14 +671,20 @@ def get_setting_int(conn: sqlite3.Connection, key: str, default: int = 0) -> int
         return default
 
 
-def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
+def set_setting(
+    conn: sqlite3.Connection,
+    key: str,
+    value: str,
+    *,
+    persist: bool = True,
+) -> None:
     with transaction(conn):
         conn.execute(
             "INSERT INTO settings(key, value) VALUES(?, ?) "
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, value),
         )
-    if not _REBUILDING_CACHE:
+    if persist and not _REBUILDING_CACHE:
         try:
             from . import project_state
 

@@ -1011,7 +1011,10 @@ def _update_instance_file(filename: str, updates: dict[str, str], *,
     active = active_instance_id(root=root)
     p = instance_dir(active, root) / filename
     data = _read_json(p, {})
-    data.update({k: str(v) for k, v in updates.items()})
+    normalized = {k: str(v) for k, v in updates.items()}
+    if all(data.get(k) == v for k, v in normalized.items()):
+        return
+    data.update(normalized)
     data["updated_at"] = now_iso()
     _write_json(p, data)
 

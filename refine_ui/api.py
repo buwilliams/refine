@@ -2926,15 +2926,16 @@ def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
 
 
 def _persist_check_settings(conn: sqlite3.Connection, checks: list[dict],
-                            message: str) -> None:
+                            message: str, *, persist: bool = True) -> None:
     ok = bool(checks) and all(bool(c.get("ok")) for c in checks)
-    db.set_setting(conn, "target_app_last_check_at", now_iso())
-    db.set_setting(conn, "target_app_last_check_ok", "1" if ok else "0")
-    db.set_setting(conn, "target_app_last_check_message", message or "")
+    checked_at = now_iso()
+    db.set_setting(conn, "target_app_last_check_at", checked_at, persist=persist)
+    db.set_setting(conn, "target_app_last_check_ok", "1" if ok else "0", persist=persist)
+    db.set_setting(conn, "target_app_last_check_message", message or "", persist=persist)
     # Back-compat mirrors.
-    db.set_setting(conn, "target_app_last_health_at", db.get_setting(conn, "target_app_last_check_at") or "")
-    db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0")
-    db.set_setting(conn, "target_app_last_health_message", message or "")
+    db.set_setting(conn, "target_app_last_health_at", checked_at, persist=persist)
+    db.set_setting(conn, "target_app_last_health_ok", "1" if ok else "0", persist=persist)
+    db.set_setting(conn, "target_app_last_health_message", message or "", persist=persist)
 
 
 def target_app_check(_body: dict | None = None) -> tuple[int, dict]:
@@ -2964,12 +2965,23 @@ def target_app_check(_body: dict | None = None) -> tuple[int, dict]:
     final_state = result.get("state") if result.get("state") in _TARGET_APP_STATES else "unknown"
     conn = _conn()
     try:
-        db.set_setting(conn, "target_app_state", final_state)
-        db.set_setting(conn, "target_app_last_error", "" if result.get("ok") else (result.get("message") or "status check failed"))
+        persist_status = not quiet
+        db.set_setting(conn, "target_app_state", final_state, persist=persist_status)
+        db.set_setting(
+            conn,
+            "target_app_last_error",
+            "" if result.get("ok") else (result.get("message") or "status check failed"),
+            persist=persist_status,
+        )
         if not quiet:
             op_id = _record_target_app_operation(conn, "status", result, final_state)
             db.set_setting(conn, "target_app_last_operation_id", str(op_id))
-        _persist_check_settings(conn, result.get("checks") or [], result.get("message") or "")
+        _persist_check_settings(
+            conn,
+            result.get("checks") or [],
+            result.get("message") or "",
+            persist=persist_status,
+        )
         snap = _target_app_snapshot(conn)
     finally:
         conn.close()
