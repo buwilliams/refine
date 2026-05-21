@@ -27,8 +27,8 @@
   margin-bottom: 16px;
   line-height: 1.45;
   color: var(--fg);
-  white-space: pre-wrap;
 }
+.modal-message-body { white-space: pre-wrap; }
 .modal-body input[type="text"] { margin-top: 8px; }
 .project-setup-backdrop {
   background: rgba(17, 24, 39, 0.62);

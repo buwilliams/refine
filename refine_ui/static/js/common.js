@@ -460,7 +460,7 @@ function modalConfirm(message, {
 } = {}) {
   const body = () => `
     ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
-    <div class="modal-body">${htmlEscape(message)}</div>
+    <div class="modal-body modal-message-body">${htmlEscape(message)}</div>
     <div class="modal-actions">
       <button class="secondary" data-cancel>${htmlEscape(cancelLabel)}</button>
       <button ${danger ? 'class="danger"' : ""} data-ok>${htmlEscape(okLabel)}</button>
@@ -473,7 +473,7 @@ function modalAlert(message, {
 } = {}) {
   const body = () => `
     ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
-    <div class="modal-body">${htmlEscape(message)}</div>
+    <div class="modal-body modal-message-body">${htmlEscape(message)}</div>
     <div class="modal-actions">
       <button data-ok>${htmlEscape(okLabel)}</button>
     </div>`;
