@@ -70,15 +70,15 @@ def main() -> int:
         assert round_obj["latest_log"]["message"] == "third line"
         assert round_obj["latest_error_log"]["message"] == "third line"
 
-        status, page1 = api.get_gap_round_logs(gid, 0, limit=2, offset=0)
+        status, page1 = api.get_gap_logs(gid, round_idx=0, limit=2, offset=0)
         assert status == 200, page1
         assert [log["message"] for log in page1["logs"]] == ["first line", "second line"]
-        assert page1["page"]["has_more"] is True
+        assert page1["pagination"]["has_more"] is True
 
-        status, page2 = api.get_gap_round_logs(gid, 0, limit=2, offset=2)
+        status, page2 = api.get_gap_logs(gid, round_idx=0, limit=2, offset=2)
         assert status == 200, page2
         assert [log["message"] for log in page2["logs"]] == ["third line"]
-        assert page2["page"]["has_more"] is False
+        assert page2["pagination"]["has_more"] is False
 
         legacy = "01ROUNDLOGSLEGACYAAAAAAA"
         create_indexed_gap(conn, legacy)

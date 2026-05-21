@@ -11,8 +11,8 @@ async function renderGapDetail(r) {
 }
 
 let _gapModalRoot = null;
-const GAP_ROUND_LOG_LIMIT = 100;
-const _gapRoundLogCache = new Map();
+const GAP_LOG_PAGE_SIZE = 100;
+const gapRoundLogState = new Map();
 
 function gapDetailContainer() {
   return _gapModalRoot?.querySelector(".gap-detail-modal-body") || null;
@@ -68,6 +68,7 @@ function closeGapDetailModal({ navigateAway = false } = {}) {
   _gapModalRoot = null;
   state.currentGap = null;
   state.currentGapData = null;
+  gapRoundLogState.clear();
   if (navigateAway) {
     // Restore the URL to whatever was underneath. If we're already there
     // somehow (shouldn't happen), no-op so we don't trigger a redundant
@@ -96,54 +97,6 @@ async function loadGapDetail(gapId) {
     if (container) {
       container.innerHTML = `<p class="muted">Could not load gap: ${htmlEscape(e.message)}</p>`;
     }
-  }
-}
-
-function roundLogCacheKey(gapId, roundIdx) {
-  return `${gapId}:${roundIdx}`;
-}
-
-function roundLogPageState(gapId, roundIdx) {
-  return _gapRoundLogCache.get(roundLogCacheKey(gapId, roundIdx)) || null;
-}
-
-function invalidateGapRoundLogCache(gapId) {
-  for (const key of Array.from(_gapRoundLogCache.keys())) {
-    if (key.startsWith(`${gapId}:`)) _gapRoundLogCache.delete(key);
-  }
-}
-
-async function loadRoundLogsPage(gapId, roundIdx, page = 1) {
-  const offset = (Math.max(1, page) - 1) * GAP_ROUND_LOG_LIMIT;
-  const key = roundLogCacheKey(gapId, roundIdx);
-  _gapRoundLogCache.set(key, {
-    ...(roundLogPageState(gapId, roundIdx) || {}),
-    loading: true,
-    error: "",
-    page: { limit: GAP_ROUND_LOG_LIMIT, offset, has_more: false },
-  });
-  drawGapDetail(state.currentGapData);
-  try {
-    const data = await api(
-      "GET",
-      `/api/gaps/${gapId}/rounds/${roundIdx}/logs?limit=${GAP_ROUND_LOG_LIMIT}&offset=${offset}`,
-    );
-    _gapRoundLogCache.set(key, {
-      logs: data.logs || [],
-      page: data.page || { limit: GAP_ROUND_LOG_LIMIT, offset, has_more: false },
-      loading: false,
-      error: "",
-    });
-  } catch (e) {
-    _gapRoundLogCache.set(key, {
-      logs: [],
-      page: { limit: GAP_ROUND_LOG_LIMIT, offset, has_more: false },
-      loading: false,
-      error: e.message || "Could not load logs",
-    });
-  }
-  if (state.currentRoute === "gaps_detail" && state.currentGap === gapId) {
-    await loadGapDetail(gapId);
   }
 }
 
@@ -176,6 +129,9 @@ function drawGapDetail(gap) {
   if (!gap) return;
   state.currentGapData = gap;
   renderBanners([]);
+  for (const key of gapRoundLogState.keys()) {
+    if (!key.startsWith(`${gap.id}:`)) gapRoundLogState.delete(key);
+  }
   // Preserve the notes-card open state across re-renders of the same gap so
   // saving a note (or an SSE-driven refresh) doesn't snap it shut.
   const notesOpen = document.querySelector(
@@ -194,11 +150,6 @@ function drawGapDetail(gap) {
     prevLogsOpen[el.dataset.roundIdx] = el.open;
   });
   const rounds = gap.rounds || [];
-  // Merge gap-scoped activity into each round so users see lifecycle events
-  // and runner errors alongside the round's own paged logs. Each activity entry
-  // goes into the latest round whose `created` is at or before the entry's
-  // datetime.
-  attachActivityToRounds(rounds, gap.activity || [], gap.id);
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
   const governanceBanner = computeGovernanceBanner(gap, latest);
@@ -262,6 +213,7 @@ function drawGapDetail(gap) {
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
         rounds.map((rnd, idx) => renderRound(
+          gap.id,
           rnd, idx,
           idx === rounds.length - 1,
           isLatestEditable && idx === rounds.length - 1,
@@ -460,72 +412,21 @@ function drawGapDetail(gap) {
   });
 
   bindFailureBannerActions(gap);
+  bindRoundLogLoading(gap);
   bindRoundFormSubmit(gap);
-  bindRoundLogControls(gap);
 }
 
-function bindRoundLogControls(gap) {
-  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
-    const roundIdx = parseInt(el.dataset.roundIdx, 10);
-    if (!Number.isFinite(roundIdx)) return;
-    el.addEventListener("toggle", () => {
-      if (!el.open) return;
-      if (roundLogPageState(gap.id, roundIdx)) return;
-      loadRoundLogsPage(gap.id, roundIdx, 1);
-    });
-    bindPaginationControls(el, `round-${roundIdx}-logs`, (page) => {
-      loadRoundLogsPage(gap.id, roundIdx, page);
-    });
-    if (el.open && !roundLogPageState(gap.id, roundIdx)) {
-      loadRoundLogsPage(gap.id, roundIdx, 1);
-    }
-  });
-}
-
-function attachActivityToRounds(rounds, activity, gapId = "") {
-  // Reset any prior merge — we always recompute from cached round logs plus
-  // gap activity.
-  rounds.forEach((r, idx) => {
-    const cached = roundLogPageState(gapId, idx);
-    r._roundLogsPage = cached;
-    r._mergedLogs = (cached?.logs || r.logs || []).slice();
-    r._activityLogCount = 0;
-  });
-  if (!rounds.length) return;
-  // Sort rounds ascending by `created`; bucket each activity entry into the
-  // last round whose `created` ≤ entry.datetime.
-  const bucket = (ts) => {
-    let idx = 0;
-    for (let i = 0; i < rounds.length; i++) {
-      if ((rounds[i].created || "") <= ts) idx = i;
-      else break;
-    }
-    return idx;
-  };
-  for (const a of activity) {
-    const idx = bucket(a.datetime || "");
-    rounds[idx]._mergedLogs.push(a);
-    rounds[idx]._activityLogCount = (rounds[idx]._activityLogCount || 0) + 1;
-  }
-  // Sort each round's merged logs by datetime ascending.
-  for (const r of rounds) {
-    r._mergedLogs.sort((x, y) => (x.datetime || "").localeCompare(y.datetime || ""));
-  }
-}
-
-function renderRound(rnd, idx, isLatest, editable,
-                     prevRoundOpen = {}, prevLogsOpen = {}, gapId = "") {
-  const logs = rnd._mergedLogs || rnd.logs || [];
-  const pageState = rnd._roundLogsPage || null;
-  const roundLogCount = parseInt(rnd.log_count || 0, 10) || 0;
-  const activityCount = parseInt(rnd._activityLogCount || 0, 10) || 0;
-  const displayLogCount = roundLogCount + activityCount;
+function renderRound(gapId, rnd, idx, isLatest, editable,
+                     prevRoundOpen = {}, prevLogsOpen = {}) {
   // Preserve the user's open/closed choice across re-renders. New rounds
   // (no prior entry in the snapshot) default to "open on latest" — the
   // historical behavior — and Logs default closed.
   const key = String(idx);
   const roundOpen = key in prevRoundOpen ? prevRoundOpen[key] : isLatest;
   const logsOpen = key in prevLogsOpen ? prevLogsOpen[key] : false;
+  const logLabel = typeof rnd.log_count === "number"
+    ? `Logs (${rnd.log_count})`
+    : "Logs";
   return `
     <details class="round" data-round-idx="${idx}" ${roundOpen ? "open" : ""}>
       <summary class="round-head">
@@ -542,36 +443,123 @@ function renderRound(rnd, idx, isLatest, editable,
           <dt>actual</dt><dd>${htmlEscape(rnd.actual || "").replace(/\n/g, "<br>")}</dd>
           <dt>target</dt><dd>${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
         </dl>
-        ${displayLogCount || logs.length ? `
-          <details data-role="round-logs" data-gap-id="${htmlEscape(gapId)}"
-                   data-round-idx="${idx}" ${logsOpen ? "open" : ""}>
-            <summary>Logs (${displayLogCount || logs.length})</summary>
-            ${renderRoundLogsBody(logs, pageState, idx)}
-          </details>` : `<p class="muted small">No logs.</p>`}
+        <details data-role="round-logs" data-round-idx="${idx}" ${logsOpen ? "open" : ""}>
+          <summary>${logLabel}</summary>
+          <div data-role="round-logs-body" data-round-idx="${idx}">
+            ${renderRoundLogsBody(gapId, idx)}
+          </div>
+        </details>
       </div>
     </details>
   `;
 }
 
-function renderRoundLogsBody(logs, pageState, roundIdx) {
-  if (pageState?.loading) {
-    return `<p class="muted small">Loading…</p>`;
+function roundLogKey(gapId, roundIdx) {
+  return `${gapId}:${roundIdx}`;
+}
+
+function invalidateGapRoundLogs(gapId) {
+  for (const key of gapRoundLogState.keys()) {
+    if (key.startsWith(`${gapId}:`)) gapRoundLogState.delete(key);
   }
-  if (pageState?.error) {
-    return `<p class="muted small">${htmlEscape(pageState.error)}</p>`;
+}
+
+function renderRoundLogsBody(gapId, roundIdx) {
+  const logState = gapRoundLogState.get(roundLogKey(gapId, roundIdx));
+  if (!logState || (!logState.loaded && !logState.loading && !logState.error)) {
+    return `<p class="muted small">Open to load logs.</p>`;
   }
-  const pageControls = pageState?.page
-    ? renderPaginationControls(
-      `round-${roundIdx}-logs`,
-      pageState.page,
-      pageState.logs?.length || 0,
-      "entry",
-    )
-    : "";
-  if (!logs.length) {
-    return `<p class="muted small">Open to load logs.</p>${pageControls}`;
+  if (logState.loading && !logState.loaded) {
+    return `<p class="muted small">Loading logs…</p>`;
   }
-  return `${logs.map((l) => renderLogEntry(l)).join("")}${pageControls}`;
+  if (logState.error) {
+    return `<p class="muted small">Could not load logs: ${htmlEscape(logState.error)}</p>`;
+  }
+  const logs = logState.logs || [];
+  const body = logs.length
+    ? logs.map((l) => renderLogEntry(l)).join("")
+    : `<p class="muted small">No logs.</p>`;
+  const more = logState.hasMore ? `
+    <div class="actions" style="margin-top:8px">
+      <button class="secondary" data-round-logs-more="${roundIdx}" ${logState.loading ? "disabled" : ""}>
+        ${logState.loading ? "Loading…" : "Load more"}
+      </button>
+    </div>` : "";
+  return `${body}${more}`;
+}
+
+function updateRoundLogsPanel(gapId, roundIdx) {
+  const body = document.querySelector(
+    `[data-role="round-logs-body"][data-round-idx="${roundIdx}"]`,
+  );
+  if (!body) return;
+  body.innerHTML = renderRoundLogsBody(gapId, roundIdx);
+  const logState = gapRoundLogState.get(roundLogKey(gapId, roundIdx));
+  const details = body.closest('details[data-role="round-logs"]');
+  const summary = details?.querySelector("summary");
+  if (summary && logState?.loaded && typeof logState.total === "number") {
+    summary.textContent = `Logs (${logState.total})`;
+  }
+  body.querySelector("[data-round-logs-more]")?.addEventListener("click", async (e) => {
+    e.preventDefault();
+    await loadRoundLogs(gapId, roundIdx, { append: true });
+  });
+}
+
+function bindRoundLogLoading(gap) {
+  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
+    const roundIdx = Number(el.dataset.roundIdx);
+    const loadIfOpen = () => {
+      if (!el.open) return;
+      const existing = gapRoundLogState.get(roundLogKey(gap.id, roundIdx));
+      if (!existing?.loaded && !existing?.loading) {
+        loadRoundLogs(gap.id, roundIdx);
+      }
+    };
+    el.addEventListener("toggle", loadIfOpen);
+    updateRoundLogsPanel(gap.id, roundIdx);
+    loadIfOpen();
+  });
+}
+
+async function loadRoundLogs(gapId, roundIdx, { append = false } = {}) {
+  const key = roundLogKey(gapId, roundIdx);
+  const current = gapRoundLogState.get(key) || {
+    logs: [],
+    loaded: false,
+    loading: false,
+    hasMore: true,
+    total: null,
+  };
+  if (current.loading) return;
+  const offset = append ? current.logs.length : 0;
+  const nextState = { ...current, loading: true, error: "" };
+  gapRoundLogState.set(key, nextState);
+  updateRoundLogsPanel(gapId, roundIdx);
+  try {
+    const data = await api(
+      "GET",
+      `/api/gaps/${gapId}/logs?round_idx=${roundIdx}&limit=${GAP_LOG_PAGE_SIZE}&offset=${offset}`,
+    );
+    const logs = append ? [...(current.logs || []), ...(data.logs || [])] : (data.logs || []);
+    const pagination = data.pagination || {};
+    gapRoundLogState.set(key, {
+      logs,
+      loaded: true,
+      loading: false,
+      hasMore: !!pagination.has_more,
+      total: typeof pagination.total === "number" ? pagination.total : logs.length,
+      error: "",
+    });
+  } catch (e) {
+    gapRoundLogState.set(key, {
+      ...current,
+      loading: false,
+      loaded: current.loaded || false,
+      error: e.message || "Request failed",
+    });
+  }
+  updateRoundLogsPanel(gapId, roundIdx);
 }
 
 function renderGovernanceSummary(round) {
@@ -695,7 +683,7 @@ function bindRoundFormSubmit(gap) {
 
 function computeFailureBanner(gap, latest) {
   if (gap.status === "failed") {
-    const lastLog = latest?.latest_log || (latest?.logs || []).slice(-1)[0];
+    const lastLog = latest?.latest_log;
     return {
       severity: "error",
       message: lastLog?.message || "Agent run failed",
@@ -703,9 +691,8 @@ function computeFailureBanner(gap, latest) {
     };
   }
   if (gap.status === "review") {
-    // Was the last log an error? Then we treat it as a stuck-review state.
-    const errLog = latest?.latest_error_log
-      || (latest?.logs || []).slice().reverse().find((l) => l.severity === "error");
+    // Was there a recent error? Then we treat it as a stuck-review state.
+    const errLog = latest?.latest_error_log;
     if (errLog) {
       return {
         severity: "error",
