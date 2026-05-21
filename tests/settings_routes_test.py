@@ -229,6 +229,8 @@ def main() -> int:
     assert ".dashboard-agent-indicator" in dashboard_css
     assert "#dash > .dashboard-collapsible-shell" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
+    assert 'renderPaginationControls("gaps"' in gaps_list_js
+    assert 'bindPaginationControls(root, "gaps"' in gaps_list_js
     assert '<table class="table gaps-table">' in gaps_list_js
     assert '<col class="gaps-col-name">' in gaps_list_js
     assert '<col class="gaps-col-status">' in gaps_list_js
@@ -242,6 +244,8 @@ def main() -> int:
     assert "${STATUS_FILTER_OPTIONS" in changes_js
     assert "const CHANGES_DEFAULT_LIMIT = 100;" in changes_js
     assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
+    assert 'renderPaginationControls("changes"' in changes_js
+    assert 'bindPaginationControls(root, "changes"' in changes_js
     assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
     assert '"awaiting-rebuild", "review",' in gaps_bulk_js
     assert '"done", "failed", "cancelled"' in gaps_bulk_js

@@ -94,12 +94,14 @@ def main() -> int:
                 "status": "done",
                 "priority": "high",
             })
+            default_page = runner._h_list_changes({})
         finally:
             runner._conn.close()
             git_ops.list_all_refine_merges = original_list_all
             git_ops.list_refine_merges = original_list_page
         assert [row["gap_id"] for row in result["changes"]] == [gid_done]
         assert result["page"]["has_more"] is False
+        assert default_page["page"]["limit"] == 100, default_page["page"]
     finally:
         try:
             conn.close()

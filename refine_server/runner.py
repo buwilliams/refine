@@ -819,7 +819,7 @@ class Runner:
         """
         metric_start = perf_metrics.now()
         target = self._effective_target_branch()
-        limit = max(1, int(params.get("limit") or 50))
+        limit = max(1, int(params.get("limit") or 100))
         offset = max(0, int(params.get("offset") or 0))
         q = str(params.get("q") or "").strip().lower()
         status = str(params.get("status") or "").strip()
