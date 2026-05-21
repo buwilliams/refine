@@ -249,13 +249,22 @@ class Runner:
             label="project sync",
         )
 
-    def _h_running(self, _: dict) -> dict:
+    def status_snapshot(self) -> dict:
+        """Return live runner state without routing through `call()`.
+
+        Dashboard/status views use this as best-effort runtime context. It must
+        stay cheap and avoid cache checks or SQLite reads so UI refreshes do not
+        queue behind writer-heavy agent work.
+        """
         return {
             "running": self.sub_mgr.running_snapshot(),
             "merger": self.merger.snapshot(),
             "governance": self.governance_agent.snapshot(),
             "target_app_rebuild": self.target_app_rebuilder.snapshot(),
         }
+
+    def _h_running(self, _: dict) -> dict:
+        return self.status_snapshot()
 
     def _h_diagnostics(self, _: dict) -> dict:
         with self._diag_lock:

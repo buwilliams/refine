@@ -93,8 +93,9 @@ function applyFeatureGates() {
 
 // ---- API helpers ------------------------------------------------------------
 
-async function api(method, path, body) {
+async function api(method, path, body, options = {}) {
   const opts = { method, headers: {} };
+  if (options.signal) opts.signal = options.signal;
   if (body !== undefined) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);

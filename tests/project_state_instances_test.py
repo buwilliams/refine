@@ -119,14 +119,10 @@ def main() -> int:
 
             original_get_client = api.get_client
 
-            class DashboardClient:
-                def call(self, method, params=None, *, timeout=30.0):
-                    return {"running": [], "merger": None, "governance": None}
+            def fail_get_client():
+                raise AssertionError("dashboard should not block on backend client")
 
-                def is_reachable(self):
-                    return True
-
-            api.get_client = lambda: DashboardClient()
+            api.get_client = fail_get_client
             try:
                 status, body = api.dashboard_summary()
                 assert status == 200, body

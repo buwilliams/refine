@@ -219,6 +219,12 @@ def main() -> int:
     assert "dashboard-agent-indicator" in dashboard_js
     assert "Agent-managed automation" in dashboard_js
     assert "dashboard-collapsible-shell" in dashboard_js
+    assert "dashboardRefreshInFlight" in dashboard_js
+    assert "dashboardRefreshQueued" in dashboard_js
+    assert "DASHBOARD_REFRESH_TIMEOUT_MS" in dashboard_js
+    assert "state.dashboardReviewSnapshot" in dashboard_js
+    assert "scheduleDashboardRetry()" in dashboard_js
+    assert "options.signal" in common_js
     assert 'id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}' in dashboard_js
     assert 'id="dashboard-reporter-stats-shell"${reporterStatsShellOpen ? " open" : ""}' in dashboard_js
     assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter stats")

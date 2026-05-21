@@ -3,6 +3,10 @@
 const dashboardReviewSelectedIds = new Set();
 let dashboardReviewSelectedReporter = "";
 let dashboardRefreshSeq = 0;
+let dashboardRefreshInFlight = false;
+let dashboardRefreshQueued = false;
+let dashboardRetryTimer = null;
+const DASHBOARD_REFRESH_TIMEOUT_MS = 6000;
 const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
   "todo",
   "in-progress",
@@ -18,7 +22,12 @@ async function renderDashboard() {
   // was re-invoked by hashchange while the screen is already up), skip
   // the wipe — drawing the new data over the old DOM is silent.
   if (!document.getElementById("dash")) {
-    $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"><p class="muted">Loading…</p></div>`;
+    $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"></div>`;
+    if (state.dashboard) {
+      drawDashboard(state.dashboard, state.dashboardReviewSnapshot || {});
+    } else {
+      $("#dash").innerHTML = `<p class="muted">Loading…</p>`;
+    }
   }
   await refreshDashboard();
 }
@@ -28,23 +37,64 @@ async function refreshDashboard() {
   // by both the route handler (after the first-paint scaffold above) and
   // every SSE handler that wants the dashboard to track live state.
   if (state.currentRoute !== "dashboard") return;
+  if (dashboardRefreshInFlight) {
+    dashboardRefreshQueued = true;
+    return;
+  }
+  dashboardRefreshInFlight = true;
+  dashboardRefreshQueued = false;
+  if (dashboardRetryTimer) {
+    clearTimeout(dashboardRetryTimer);
+    dashboardRetryTimer = null;
+  }
   const refreshSeq = ++dashboardRefreshSeq;
   try {
     const reporter = state.lastReporter || "";
     const [d, reviews] = await Promise.all([
-      api("GET", "/api/dashboard"),
+      dashboardApi("GET", "/api/dashboard"),
       reporter
-        ? api("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + "&limit=200")
+        ? dashboardApi("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + "&limit=200")
         : Promise.resolve({ gaps: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
     state.dashboard = d;
-    drawDashboard(d, { reviewsForReporter: reviews.gaps || [], reporter });
+    state.dashboardReviewSnapshot = { reviewsForReporter: reviews.gaps || [], reporter };
+    drawDashboard(d, state.dashboardReviewSnapshot);
   } catch (e) {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
     const dash = document.getElementById("dash");
-    if (dash) dash.innerHTML = `<p class="muted">Failed to load: ${htmlEscape(e.message)}</p>`;
+    if (dash && !state.dashboard) {
+      const waiting = e.name === "AbortError"
+        ? "Dashboard is still waiting for the backend. Retrying…"
+        : `Failed to load: ${htmlEscape(e.message)}`;
+      dash.innerHTML = `<p class="muted">${waiting}</p>`;
+    }
+    scheduleDashboardRetry();
+  } finally {
+    dashboardRefreshInFlight = false;
+    if (dashboardRefreshQueued && state.currentRoute === "dashboard") {
+      dashboardRefreshQueued = false;
+      refreshDashboard();
+    }
   }
+}
+
+async function dashboardApi(method, path) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DASHBOARD_REFRESH_TIMEOUT_MS);
+  try {
+    return await api(method, path, undefined, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function scheduleDashboardRetry() {
+  if (dashboardRetryTimer || state.currentRoute !== "dashboard") return;
+  dashboardRetryTimer = setTimeout(() => {
+    dashboardRetryTimer = null;
+    if (state.currentRoute === "dashboard") refreshDashboard();
+  }, 2000);
 }
 
 function drawDashboard(d, opts = {}) {

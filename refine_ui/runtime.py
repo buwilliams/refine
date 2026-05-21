@@ -94,6 +94,35 @@ def runner_call(method: str, params: dict | None = None) -> dict:
     return ensure_runner().call(method, params or {})
 
 
+def runner_status_snapshot() -> dict:
+    """Best-effort live runner state for read-only UI summaries.
+
+    Unlike `runner_call()`, this does not start the runner and does not route
+    through the backend dispatcher/cache check. The dashboard can still render
+    cached SQLite data quickly when the runner is busy or unavailable.
+    """
+    runner = _runner
+    if runner is None:
+        return {
+            "runner_reachable": False,
+            "running": [],
+            "merger": None,
+            "governance": None,
+            "target_app_rebuild": None,
+        }
+    try:
+        snap = runner.status_snapshot()
+    except Exception:
+        return {
+            "runner_reachable": False,
+            "running": [],
+            "merger": None,
+            "governance": None,
+            "target_app_rebuild": None,
+        }
+    return {"runner_reachable": True, **snap}
+
+
 def stop_all() -> None:
     stop_runner()
     stop_poller()

@@ -21,7 +21,7 @@ from refine_server.backend_protocol import (
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
-    M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
+    M_RENAME_REPORTER, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
@@ -2600,6 +2600,7 @@ def dashboard_summary() -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
+    runner_snap = runtime.runner_status_snapshot()
     conn = _conn()
     try:
         counts = {}
@@ -2607,15 +2608,6 @@ def dashboard_summary() -> tuple[int, dict]:
             "SELECT status, COUNT(*) AS n FROM gaps_index GROUP BY status"
         ):
             counts[row["status"]] = row["n"]
-        merger_snap: dict | None = None
-        try:
-            r = get_client().call(M_RUNNING, {}, timeout=5.0)
-            running = r.get("running", [])
-            merger_snap = r.get("merger")
-            governance_snap = r.get("governance")
-        except BackendError:
-            running = []
-            governance_snap = None
         pf = conn.execute(
             "SELECT ok, checked_at, message FROM preflight WHERE id = 1"
         ).fetchone()
@@ -2639,12 +2631,12 @@ def dashboard_summary() -> tuple[int, dict]:
     finally:
         conn.close()
     reporter_stats = _compute_reporter_stats(stat_rows, known_reporters)
-    runner_reachable = get_client().is_reachable()
+    runner_reachable = bool(runner_snap.get("runner_reachable"))
     return 200, {
         "counts": counts,
-        "running": running,
-        "merger": merger_snap,
-        "governance": governance_snap,
+        "running": runner_snap.get("running") or [],
+        "merger": runner_snap.get("merger"),
+        "governance": runner_snap.get("governance"),
         "preflight": preflight,
         "activity": feed,
         "runner_reachable": runner_reachable,
