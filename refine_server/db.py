@@ -125,6 +125,22 @@ CREATE TABLE IF NOT EXISTS target_app_operations (
 );
 CREATE INDEX IF NOT EXISTS idx_target_app_operations_started
     ON target_app_operations(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS background_jobs (
+    id            TEXT PRIMARY KEY,
+    kind          TEXT NOT NULL,
+    label         TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    started_at    TEXT NOT NULL,
+    finished_at   TEXT NOT NULL DEFAULT '',
+    result_json   TEXT,
+    error_json    TEXT,
+    progress_json TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_background_jobs_kind_status
+    ON background_jobs(kind, status);
+CREATE INDEX IF NOT EXISTS idx_background_jobs_started
+    ON background_jobs(started_at DESC);
 """
 
 DEFAULT_SETTINGS = {
@@ -329,6 +345,26 @@ def _migrate(conn: sqlite3.Connection) -> None:
         perf_metrics.prune(conn)
     except Exception:
         pass
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS background_jobs ("
+        "id TEXT PRIMARY KEY, "
+        "kind TEXT NOT NULL, "
+        "label TEXT NOT NULL, "
+        "status TEXT NOT NULL, "
+        "started_at TEXT NOT NULL, "
+        "finished_at TEXT NOT NULL DEFAULT '', "
+        "result_json TEXT, "
+        "error_json TEXT, "
+        "progress_json TEXT)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_background_jobs_kind_status "
+        "ON background_jobs(kind, status)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_background_jobs_started "
+        "ON background_jobs(started_at DESC)"
+    )
 
 
 def _backfill_reporter(conn: sqlite3.Connection) -> None:

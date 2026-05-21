@@ -15,7 +15,7 @@ from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
     M_CHAT_RESET_ALL, M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
+    M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
     M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
@@ -67,6 +67,7 @@ class Runner:
 
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
         self._target_app_lock = threading.Lock()
+        self._bulk_update_lock = threading.Lock()
         self.target_app_rebuilder = target_app_rebuilder.TargetAppRebuilder(
             get_conn=self._get_conn,
             run_rebuild=self._run_automatic_target_app_rebuild,
@@ -166,8 +167,10 @@ class Runner:
             M_CREATE_GAP: self._h_create_gap,
             M_APPEND_ROUND: self._h_append_round,
             M_EDIT_ROUND: self._h_edit_round,
+            M_BULK_UPDATE_GAPS: self._h_bulk_update_gaps,
             M_LOG_APPEND: self._h_log_append,
             M_DELETE_GAP: self._h_delete_gap,
+            M_BULK_DELETE_GAPS: self._h_bulk_delete_gaps,
             M_SET_NOTES: self._h_set_notes,
             M_CHAT_START: self._h_chat_start,
             M_CHAT_INPUT: self._h_chat_input,
@@ -417,6 +420,168 @@ class Runner:
                 )
         return {"gap": gap}
 
+    def _h_bulk_update_gaps(self, params: dict) -> dict:
+        """Apply one bulk metadata update in runner-owned order.
+
+        The UI sends an ordered id list after filter validation. The runner
+        owns the SQLite write, gap.json mutation, round touch/reporter edit,
+        and scheduling wake-up behind a single bulk lock so overlapping bulk
+        requests do not interleave per-Gap file writes.
+        """
+        field = str(params.get("field") or "").strip().lower()
+        value = str(params.get("value") or "").strip()
+        raw_ids = params.get("gap_ids") or []
+        if field not in {"priority", "status", "reporter"}:
+            raise ValueError("field must be one of priority, status, or reporter")
+        if field == "priority":
+            value = _normalize_priority_required(value)
+        elif field == "status":
+            value = _normalize_status_required(value)
+        elif not value:
+            raise ValueError("reporter is required")
+        if not isinstance(raw_ids, list):
+            raise ValueError("gap_ids must be a list")
+        gap_ids = _unique_strings(raw_ids)
+        if not gap_ids:
+            return {
+                "updated": 0,
+                "ids": [],
+                "field": field,
+                "value": value,
+                "failed": 0,
+                "failures": [],
+                "progress": {"completed": 0, "total": 0},
+            }
+        with self._bulk_update_lock:
+            return self._bulk_update_gaps_locked(field, value, gap_ids)
+
+    def _bulk_update_gaps_locked(
+        self,
+        field: str,
+        value: str,
+        gap_ids: list[str],
+    ) -> dict:
+        active = project_state.active_instance_id()
+        rows: list[sqlite3.Row] = []
+        for chunk in _chunks(gap_ids):
+            placeholders = ",".join("?" * len(chunk))
+            rows.extend(self._conn.execute(
+                "SELECT id, status, instance_id FROM gaps_index "
+                f"WHERE id IN ({placeholders})",
+                chunk,
+            ).fetchall())
+        by_id = {row["id"]: row for row in rows}
+        missing = [gid for gid in gap_ids if gid not in by_id]
+        if missing:
+            raise ValueError(f"Gap not found: {missing[0]}")
+        owners = {
+            str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+            for row in rows
+        }
+        if owners != {active}:
+            owner = sorted(owners - {active})[0]
+            owner_name = project_state.gap_instance_display(owner)
+            active_name = project_state.gap_instance_display(active)
+            raise ValueError(
+                "Action not allowed: Gap is owned by another instance "
+                f"({owner_name}). Transfer to {active_name} before making changes."
+            )
+
+        updated_ids: list[str] = []
+        failures: list[dict[str, str]] = []
+        previous_status_by_id = {
+            gid: str(by_id[gid]["status"] or "")
+            for gid in gap_ids
+        }
+        now = now_iso()
+
+        if field in {"priority", "status"}:
+            with db.transaction(self._conn):
+                for chunk in _chunks(gap_ids):
+                    placeholders = ",".join("?" * len(chunk))
+                    self._conn.execute(
+                        f"UPDATE gaps_index SET {field} = ?, updated = ? "
+                        f"WHERE id IN ({placeholders}) AND instance_id = ?",
+                        [value, now, *chunk, active],
+                    )
+            for idx, gap_id in enumerate(gap_ids, start=1):
+                try:
+                    gap_writer.update_fields(gap_id, **{field: value})
+                    if field == "status":
+                        previous = previous_status_by_id.get(gap_id)
+                        if previous != value:
+                            gap_writer.append_latest_round_log(
+                                gap_id=gap_id,
+                                severity="info",
+                                category="state",
+                                actor="refine",
+                                message=(
+                                    "Workflow status changed by bulk update: "
+                                    f"{previous} → {value}"
+                                ),
+                            )
+                    try:
+                        gap_writer.edit_latest_round(
+                            gap_id,
+                            actual=None,
+                            target=None,
+                            reporter=None,
+                        )
+                    except Exception:
+                        pass
+                    updated_ids.append(gap_id)
+                except Exception as e:
+                    failures.append({"id": gap_id, "error": str(e) or repr(e)})
+                self._record_bulk_progress(field, idx, len(gap_ids))
+            if field in {"priority", "status"}:
+                self.dispatcher.enforce_now()
+                self.governance_agent.wake()
+        else:
+            for idx, gap_id in enumerate(gap_ids, start=1):
+                try:
+                    gap_writer.edit_latest_round(
+                        gap_id,
+                        actual=None,
+                        target=None,
+                        reporter=value,
+                    )
+                    with db.transaction(self._conn):
+                        self._conn.execute(
+                            "UPDATE gaps_index SET reporter = ?, updated = ? "
+                            "WHERE id = ? AND instance_id = ?",
+                            (value, now_iso(), gap_id, active),
+                        )
+                    updated_ids.append(gap_id)
+                except Exception as e:
+                    failures.append({"id": gap_id, "error": str(e) or repr(e)})
+                self._record_bulk_progress(field, idx, len(gap_ids))
+
+        return {
+            "updated": len(updated_ids),
+            "ids": updated_ids,
+            "field": field,
+            "value": value,
+            "failed": len(failures),
+            "failures": failures,
+            "progress": {
+                "completed": len(updated_ids) + len(failures),
+                "total": len(gap_ids),
+            },
+        }
+
+    def _record_bulk_progress(self, field: str, completed: int, total: int) -> None:
+        if completed == total or completed == 1 or completed % 25 == 0:
+            try:
+                activity.append(
+                    self._conn,
+                    message=f"Bulk {field} update progress: {completed}/{total}",
+                    severity="info",
+                    category="state",
+                    actor="refine",
+                )
+            except Exception:
+                pass
+
     def _h_log_append(self, params: dict) -> dict:
         self._require_active_gap(params["gap_id"], columns="status, instance_id")
         gap_writer.append_round_log(
@@ -455,6 +620,33 @@ class Runner:
             gap_id=gap_id, actor="refine",
         )
         return {"deleted": True}
+
+    def _h_bulk_delete_gaps(self, params: dict) -> dict:
+        raw_ids = params.get("gap_ids") or []
+        if not isinstance(raw_ids, list):
+            raise ValueError("gap_ids must be a list")
+        gap_ids = _unique_strings(raw_ids)
+        deleted_ids: list[str] = []
+        failures: list[dict[str, str]] = []
+        with self._bulk_update_lock:
+            for idx, gap_id in enumerate(gap_ids, start=1):
+                try:
+                    result = self._h_delete_gap({"gap_id": gap_id})
+                    if result.get("deleted"):
+                        deleted_ids.append(gap_id)
+                except Exception as e:
+                    failures.append({"id": gap_id, "error": str(e) or repr(e)})
+                self._record_bulk_progress("delete", idx, len(gap_ids))
+        return {
+            "deleted": len(deleted_ids),
+            "ids": deleted_ids,
+            "failed": len(failures),
+            "failures": failures,
+            "progress": {
+                "completed": len(deleted_ids) + len(failures),
+                "total": len(gap_ids),
+            },
+        }
 
     def _h_set_notes(self, params: dict) -> dict:
         gap_id = params["gap_id"]
@@ -1371,6 +1563,10 @@ class Runner:
 
 
 _VALID_PRIORITIES = ("low", "medium", "high")
+_VALID_STATUSES = (
+    "backlog", "todo", "in-progress", "ready-merge", "awaiting-rebuild",
+    "review", "done", "failed", "cancelled",
+)
 
 
 def _normalize_priority(value: Any) -> str:
@@ -1379,6 +1575,40 @@ def _normalize_priority(value: Any) -> str:
         if v in _VALID_PRIORITIES:
             return v
     return "low"
+
+
+def _normalize_priority_required(value: Any) -> str:
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in _VALID_PRIORITIES:
+            return v
+    raise ValueError("priority must be one of low/medium/high")
+
+
+def _normalize_status_required(value: Any) -> str:
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in _VALID_STATUSES:
+            return v
+    raise ValueError("invalid status")
+
+
+def _unique_strings(values: list[Any]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        text = value.strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append(text)
+    return out
+
+
+def _chunks(values: list[str], size: int = 500) -> list[list[str]]:
+    return [values[idx:idx + size] for idx in range(0, len(values), size)]
 
 
 # ---- chat priming -----------------------------------------------------------
