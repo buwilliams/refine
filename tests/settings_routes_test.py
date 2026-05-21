@@ -240,6 +240,8 @@ def main() -> int:
     assert ".gaps-status-cell" in gaps_css
     assert "white-space: nowrap;" in gaps_css
     assert "${STATUS_FILTER_OPTIONS" in changes_js
+    assert "const CHANGES_DEFAULT_LIMIT = 100;" in changes_js
+    assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
     assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
     assert '"awaiting-rebuild", "review",' in gaps_bulk_js
     assert '"done", "failed", "cancelled"' in gaps_bulk_js

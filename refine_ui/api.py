@@ -181,6 +181,25 @@ def _id_chunks(values: list[str], size: int = 500) -> list[list[str]]:
     return [values[idx:idx + size] for idx in range(0, len(values), size)]
 
 
+def _selected_gap_ids(body: dict[str, Any]) -> list[str] | None:
+    raw = body.get("selected_ids")
+    if raw is None:
+        raw = body.get("gap_ids")
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        return []
+    ids: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        gap_id = str(item or "").strip()
+        if not gap_id or gap_id in seen:
+            continue
+        ids.append(gap_id)
+        seen.add(gap_id)
+    return ids
+
+
 def _append_gap_workflow_log(
     gap_id: str,
     message: str,
@@ -393,9 +412,17 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
         if not isinstance(statuses, list):
             return err(400, "statuses must be a list")
         allowed = {str(s) for s in statuses if str(s) in _VALID_STATUSES}
-    gap_ids = None
+    selected_ids = _selected_gap_ids(body)
+    gap_ids = set(selected_ids) if selected_ids is not None else None
+    if selected_ids == []:
+        return 200, {
+            "updated": 0,
+            "ids": [],
+            "skipped": 0,
+            "skipped_details": [],
+        }
     filt = body.get("filter")
-    if isinstance(filt, dict):
+    if gap_ids is None and isinstance(filt, dict):
         excluded = set(body.get("exclude_ids") or [])
         code, listing = list_gaps(
             status=filt.get("status") or None,
@@ -1170,10 +1197,34 @@ def _select_bulk_update_candidates(
     excluded: set[str],
     *,
     skip_automated: bool,
+    selected_ids: list[str] | None = None,
 ) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
+    conn = _conn()
+    try:
+        if selected_ids is not None:
+            if not selected_ids:
+                return 200, {"gaps": [], "skipped_details": []}
+            found: dict[str, dict[str, Any]] = {}
+            for chunk in _id_chunks(selected_ids):
+                placeholders = ",".join("?" * len(chunk))
+                rows = conn.execute(
+                    "SELECT id, name, status, priority, reporter, "
+                    "created, updated, branch_name, instance_id "
+                    f"FROM gaps_index WHERE id IN ({placeholders})",
+                    chunk,
+                ).fetchall()
+                for row in rows:
+                    found[row["id"]] = dict(row)
+            rows = [found[gap_id] for gap_id in selected_ids if gap_id in found]
+            return _filter_bulk_candidate_rows(
+                rows,
+                skip_automated=skip_automated,
+            )
+    finally:
+        conn.close()
     q = str(filt.get("q") or "").strip()
     fts_match = search_index.fts_query(q)
     severity = filt.get("severity") or None
@@ -1250,6 +1301,14 @@ def _select_bulk_update_candidates(
     finally:
         conn.close()
     rows = [r for r in rows if r["id"] not in excluded]
+    return _filter_bulk_candidate_rows(rows, skip_automated=skip_automated)
+
+
+def _filter_bulk_candidate_rows(
+    rows: list[dict[str, Any]],
+    *,
+    skip_automated: bool,
+) -> tuple[int, dict]:
     skipped: list[dict[str, str]] = []
     if skip_automated:
         skipped = [
@@ -1678,10 +1737,12 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
 
     filt = body.get("filter") or {}
     excluded = set(body.get("exclude_ids") or [])
+    selected_ids = _selected_gap_ids(body)
     code, selected = _select_bulk_update_candidates(
         filt,
         excluded,
         skip_automated=(field == "status"),
+        selected_ids=selected_ids,
     )
     if code != 200:
         return code, selected
@@ -1812,10 +1873,12 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     """
     filt = body.get("filter") or {}
     excluded = set(body.get("exclude_ids") or [])
+    selected_ids = _selected_gap_ids(body)
     code, selected = _select_bulk_update_candidates(
         filt,
         excluded,
         skip_automated=False,
+        selected_ids=selected_ids,
     )
     if code != 200:
         return code, selected
@@ -1930,7 +1993,7 @@ def verify(gap_id: str) -> tuple[int, dict]:
     return 200, result
 
 
-def list_changes(*, limit: int = 50, offset: int = 0,
+def list_changes(*, limit: int = 100, offset: int = 0,
                  q: str | None = None, status: str | None = None,
                  priority: str | None = None) -> tuple[int, dict]:
     """List refine merge commits on the target branch (plus the Gap

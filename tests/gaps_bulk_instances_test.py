@@ -73,6 +73,29 @@ def main() -> int:
         assert rows[blocked_status] == active, rows
         assert rows[wrong_instance] == other["id"], rows
 
+        selected_transfer = "01GAPSBULKSELECTEDAAAAA"
+        visible_but_unchecked = "01GAPSBULKUNCHECKEDAAAA"
+        create(selected_transfer, "Selected Jane", "todo")
+        create(visible_but_unchecked, "Selected Jane", "todo")
+        project_state.rebuild_sqlite_cache(conn)
+        status, body = api.transfer_instance_gaps({
+            "target_instance_id": target["id"],
+            "filter": {"reporter": "Selected Jane", "instance": active},
+            "selected_ids": [selected_transfer],
+        })
+        assert status == 200, body
+        assert body["updated"] == 1, body
+        assert body["ids"] == [selected_transfer], body
+        rows = {
+            row["id"]: row["instance_id"]
+            for row in conn.execute(
+                "SELECT id, instance_id FROM gaps_index WHERE id IN (?, ?)",
+                (selected_transfer, visible_but_unchecked),
+            )
+        }
+        assert rows[selected_transfer] == target["id"], rows
+        assert rows[visible_but_unchecked] == active, rows
+
         root = Path(__file__).resolve().parents[1]
         gaps_list = (root / "refine_ui/static/js/features/gaps-list.js").read_text(
             encoding="utf-8",
@@ -83,6 +106,7 @@ def main() -> int:
         assert 'id="bulk-transfer-instance"' in gaps_list
         assert "openBulkTransferInstanceModal" in gaps_bulk
         assert 'api("POST", "/api/instances/transfer-gaps"' in gaps_bulk
+        assert "selected_ids: selectedIds" in gaps_bulk
         assert "instance: f.instance" in gaps_bulk
         assert '"filter-instance": !!f.instance' in gaps_bulk
     finally:

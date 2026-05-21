@@ -83,7 +83,7 @@ async function renderGapsList() {
         <button class="secondary" id="gaps-clear">Clear filters</button>
       </div>
       <div class="filter-row filter-row-bulk">
-        <span class="muted small">Bulk update matching:</span>
+        <span class="muted small">Bulk update selected:</span>
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
@@ -245,11 +245,11 @@ async function refreshGapsTable() {
   }
 }
 
-// IDs the user has explicitly DESELECTED from bulk operations. Every Gap
-// starts selected by default — the bulk endpoints apply to "every Gap
-// matching the filter, minus this set". Persisted only in-memory; the
-// excluded set survives filter tweaks and re-expanding the filter shell
-// but resets on a hard navigation away from the Gaps screen.
+// IDs the user has explicitly DESELECTED from bulk operations on loaded
+// pages. Bulk endpoints receive the visible checked row IDs, so unseen
+// pages are never selected behind the scenes. Persisted only in-memory;
+// the excluded set survives filter tweaks and re-expanding the filter
+// shell but resets on a hard navigation away from the Gaps screen.
 const gapsExcludedIds = new Set();
 
 // Cached snapshot of the last refresh, so toggling the filter shell open

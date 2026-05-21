@@ -1,10 +1,8 @@
 // ---- Gaps: bulk-update modal ------------------------------------------------
 //
 // Each bulk action prompts for a new value and confirms the change against
-// the *current* filter (read from the URL hash at click time). The server
-// re-runs the filter query, so what the user sees in the table is what gets
-// updated — no client-side ID list to drift out of sync. Exactly one field
-// is changed per call so the confirmation reads cleanly.
+// the currently loaded checked rows. Exactly one field is changed per call
+// so the confirmation reads cleanly.
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
 const BULK_STATUS_OPTIONS = [
@@ -13,8 +11,8 @@ const BULK_STATUS_OPTIONS = [
 ];
 
 async function openBulkModal(field) {
-  // Snapshot the current filter so the modal + the server-side bulk
-  // operation see exactly what the user sees in the table.
+  // Snapshot the current filter for display context; the mutation itself
+  // uses explicit checked row IDs from the current page.
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
@@ -22,17 +20,12 @@ async function openBulkModal(field) {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  // When the filter shell is open, the user may have unchecked some of
-  // the rows. Translate that into an explicit exclude list and a
-  // selected-count for the modal text.
-  const excludeIds = _selectionSnapshot();
-  const matchingCount = _lastGapsRender?.gaps?.length || 0;
-  const selectedCount = matchingCount - excludeIds.filter(
-    (id) => (_lastGapsRender?.gaps || []).some((g) => g.id === id),
-  ).length;
-  const countText = excludeIds.length && _lastGapsRender
-    ? `${selectedCount} of ${matchingCount} selected`
-    : ($("#gaps-count")?.textContent || "").trim();
+  const selectedIds = _selectionSnapshot();
+  if (!selectedIds.length) {
+    toast("No Gaps selected.", "warn");
+    return;
+  }
+  const countText = _selectionCountText("selected");
   const label = { priority: "Priority", status: "Status", reporter: "Reporter" }[field];
 
   let valueControlHtml = "";
@@ -86,28 +79,31 @@ async function openBulkModal(field) {
   if (!next) return;          // user opened the picker but didn't choose
   try {
     let r = await api("POST", "/api/gaps/bulk", {
-      filter, exclude_ids: excludeIds, update: { [field]: next },
+      filter, selected_ids: selectedIds, update: { [field]: next },
     });
     r = await resolveBackgroundJobResponse(
       r,
       `Bulk ${label.toLowerCase()} update is running in the background`,
     );
     toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
-    // Preserve the user's unchecked rows across the refresh — they
-    // explicitly opted those out of the operation that just ran and
-    // will likely want them excluded from follow-up actions too.
-    // Stale IDs (rows that no longer match the filter) are harmless;
-    // they're just ignored at the next selection-state pass.
     await renderGapsList();
   } catch (e) {
     await showActionError(e, "Bulk update failed");
   }
 }
 
-// Frozen-at-call-time copy of the user's deselected IDs (so a slow
-// network request doesn't see live edits).
+// Frozen-at-call-time copy of checked visible row IDs. Unseen rows are
+// deliberately absent, even if they match the current filters.
 function _selectionSnapshot() {
-  return Array.from(gapsExcludedIds);
+  return (_lastGapsRender?.gaps || [])
+    .filter((g) => !gapsExcludedIds.has(g.id))
+    .map((g) => g.id);
+}
+
+function _selectionCountText(noun = "selected") {
+  const visibleCount = _lastGapsRender?.gaps?.length || 0;
+  const selectedCount = _selectionSnapshot().length;
+  return `${selectedCount} of ${visibleCount} ${noun}`;
 }
 
 // Highlight each non-default Gaps filter control with the accent
@@ -145,14 +141,12 @@ async function openBulkTransferInstanceModal() {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const excludeIds = _selectionSnapshot();
-  const matchingCount = _lastGapsRender?.gaps?.length || 0;
-  const selectedCount = matchingCount - excludeIds.filter(
-    (id) => (_lastGapsRender?.gaps || []).some((g) => g.id === id),
-  ).length;
-  const countText = excludeIds.length && _lastGapsRender
-    ? `${selectedCount} of ${matchingCount} selected`
-    : ($("#gaps-count")?.textContent || "").trim();
+  const selectedIds = _selectionSnapshot();
+  if (!selectedIds.length) {
+    toast("No Gaps selected.", "warn");
+    return;
+  }
+  const countText = _selectionCountText("selected");
 
   let instances = state.project?.instances || [];
   try {
@@ -201,7 +195,7 @@ async function openBulkTransferInstanceModal() {
   if (target === null) return;
   try {
     const r = await api("POST", "/api/instances/transfer-gaps", {
-      filter, exclude_ids: excludeIds, target_instance_id: target,
+      filter, selected_ids: selectedIds, target_instance_id: target,
     });
     toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
     await renderGapsList();
@@ -218,14 +212,12 @@ async function confirmBulkDelete() {
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
-  const excludeIds = _selectionSnapshot();
-  const matchingCount = _lastGapsRender?.gaps?.length || 0;
-  const selectedCount = matchingCount - excludeIds.filter(
-    (id) => (_lastGapsRender?.gaps || []).some((g) => g.id === id),
-  ).length;
-  const countText = excludeIds.length && _lastGapsRender
-    ? `${selectedCount} of ${matchingCount} selected gaps`
-    : (($("#gaps-count")?.textContent || "matching gaps").trim());
+  const selectedIds = _selectionSnapshot();
+  if (!selectedIds.length) {
+    toast("No Gaps selected.", "warn");
+    return;
+  }
+  const countText = _selectionCountText("selected gaps");
   const ok = await modalConfirm(
     `Permanently delete ${countText} (${filterDesc})? This cancels any ` +
     "running subprocesses, removes worktrees and branches for non-done " +
@@ -240,7 +232,7 @@ async function confirmBulkDelete() {
   if (!ok) return;
   try {
     const r = await api("POST", "/api/gaps/bulk/delete", {
-      filter, exclude_ids: excludeIds,
+      filter, selected_ids: selectedIds,
     });
     const failedN = (r.failures || []).length;
     if (failedN) {
@@ -249,9 +241,6 @@ async function confirmBulkDelete() {
     } else {
       toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}.`, "info");
     }
-    // Preserve the user's unchecked rows so follow-up bulk actions
-    // continue to skip them. IDs of deleted gaps drop out of the next
-    // fetch naturally — they remain in the set but are inert.
     await renderGapsList();
   } catch (e) {
     await showActionError(e, "Bulk delete failed");

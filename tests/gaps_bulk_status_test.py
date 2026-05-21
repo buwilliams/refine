@@ -106,6 +106,51 @@ def main() -> int:
         for status in _bulk_status_options():
             assert rows[gap_ids[status]] == "done", (status, rows)
 
+        selected_a = "01BULKSELECTEDAAAAAAAAAA"
+        selected_b = "01BULKSELECTEDBBBBBBBBBB"
+        unselected = "01BULKSELECTEDCCCCCCCCCC"
+        for gid in (selected_a, selected_b, unselected):
+            gap = gap_writer.create_gap(
+                gap_id=gid,
+                name=gid,
+                initial_round=gaps.new_round("Selected Reporter", "Actual", "Target"),
+                status="backlog",
+                priority="low",
+            )
+            conn.execute(
+                "INSERT INTO gaps_index "
+                "(id, name, status, priority, reporter, created, updated, json_path) "
+                "VALUES (?, ?, 'backlog', 'low', 'Selected Reporter', ?, ?, ?)",
+                (
+                    gid,
+                    gid,
+                    gap["created"],
+                    gap["updated"],
+                    relative_gap_path(gid),
+                ),
+            )
+        code, body = api.bulk_update_gaps({
+            "filter": {"reporter": "Selected Reporter"},
+            "selected_ids": [selected_a, selected_b],
+            "update": {"priority": "high"},
+            "background": False,
+        })
+        assert code == 200, body
+        assert body["updated"] == 2, body
+        assert body["ids"] == [selected_a, selected_b], body
+        selected_rows = {
+            row["id"]: row["priority"]
+            for row in conn.execute(
+                "SELECT id, priority FROM gaps_index WHERE id IN (?, ?, ?)",
+                (selected_a, selected_b, unselected),
+            )
+        }
+        assert selected_rows == {
+            selected_a: "high",
+            selected_b: "high",
+            unselected: "low",
+        }, selected_rows
+
         from refine_server.backend_protocol import (
             M_BULK_DELETE_GAPS,
             M_BULK_UPDATE_GAPS,
@@ -201,6 +246,42 @@ def main() -> int:
             assert body["deleted"] == 2, body
             assert [c[0] for c in tracking.calls] == [M_BULK_DELETE_GAPS], tracking.calls
             assert M_DELETE_GAP not in [c[0] for c in tracking.calls], tracking.calls
+
+            tracking.calls.clear()
+            delete_selected = "01BULKDELETESELECTEDAAA"
+            delete_unselected = "01BULKDELETEUNSELECTEDAA"
+            for gid in (delete_selected, delete_unselected):
+                gap = gap_writer.create_gap(
+                    gap_id=gid,
+                    name=gid,
+                    initial_round=gaps.new_round("Delete Selected", "Actual", "Target"),
+                    status="backlog",
+                    priority="low",
+                )
+                conn.execute(
+                    "INSERT INTO gaps_index "
+                    "(id, name, status, priority, reporter, created, updated, json_path) "
+                    "VALUES (?, ?, 'backlog', 'low', 'Delete Selected', ?, ?, ?)",
+                    (
+                        gid,
+                        gid,
+                        gap["created"],
+                        gap["updated"],
+                        relative_gap_path(gid),
+                    ),
+                )
+            code, body = api.bulk_delete_gaps({
+                "filter": {"reporter": "Delete Selected"},
+                "selected_ids": [delete_selected],
+            })
+            assert code == 200, body
+            assert body["deleted"] == 1, body
+            assert body["ids"] == [delete_selected], body
+            remaining = conn.execute(
+                "SELECT id FROM gaps_index WHERE id = ?",
+                (delete_unselected,),
+            ).fetchone()
+            assert remaining is not None, body
         finally:
             api.get_client = original_get_client
 
@@ -223,6 +304,14 @@ def main() -> int:
         assert expected_options in gaps_bulk
         assert "skip in-progress and ready-merge" in gaps_bulk
         assert "resolveBackgroundJobResponse" in gaps_bulk
+        assert "selected_ids: selectedIds" in gaps_bulk
+        assert "Unseen rows are" in gaps_bulk
+        assert 'toast("No Gaps selected.", "warn");' in gaps_bulk
+        gaps_list = (
+            root / "refine_ui/static/js/features/gaps-list.js"
+        ).read_text(encoding="utf-8")
+        assert "Bulk update selected:" in gaps_list
+        assert "unseen" in gaps_list.lower()
     finally:
         try:
             conn.close()

@@ -6,8 +6,8 @@
 // the merge commit, pushes if there's an upstream, and moves the Gap to
 // `cancelled` with a log entry.
 
-const CHANGES_LIMIT_OPTIONS = [25, 50, 100, 250];
-const CHANGES_DEFAULT_LIMIT = 50;
+const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+const CHANGES_DEFAULT_LIMIT = 100;
 
 function changesFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
