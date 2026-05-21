@@ -48,7 +48,7 @@ RUNTIME_SETTING_KEYS = {
     "agent_cli",
 }
 
-TARGET_APP_SETTING_KEYS = {
+TARGET_APP_CONFIG_SETTING_KEYS = {
     "target_app_start_instructions",
     "target_app_stop_instructions",
     "target_app_health_url",
@@ -68,6 +68,9 @@ TARGET_APP_SETTING_KEYS = {
     "target_app_tcp_check_port",
     "target_app_process_check_command",
     "target_app_auto_rebuild",
+}
+
+TARGET_APP_RUNTIME_SETTING_KEYS = {
     "target_app_auto_rebuild_last_started_at",
     "target_app_auto_rebuild_last_finished_at",
     "target_app_auto_rebuild_last_ok",
@@ -82,6 +85,8 @@ TARGET_APP_SETTING_KEYS = {
     "target_app_last_operation_id",
     "target_app_last_error",
 }
+
+TARGET_APP_SETTING_KEYS = TARGET_APP_CONFIG_SETTING_KEYS | TARGET_APP_RUNTIME_SETTING_KEYS
 
 
 def volume_root() -> Path:
@@ -500,11 +505,22 @@ def list_settings() -> dict[str, str]:
     settings.update(_string_map(cfg.get("settings") or {}))
     settings.update(_string_map(_read_json(instance_dir(active, root) / "application.json", {})))
     settings.update(_string_map(_read_json(instance_dir(active, root) / "runtime.json", {})))
-    settings.update(_string_map(_read_json(instance_dir(active, root) / "target-app.json", {})))
+    settings.update(_string_map(
+        _read_json(instance_dir(active, root) / "target-app.json", {}),
+        allowed=TARGET_APP_CONFIG_SETTING_KEYS,
+    ))
     return settings
 
 
 def set_setting(key: str, value: str) -> None:
+    if not (
+        key in PROJECT_SETTING_KEYS
+        or key in APPLICATION_SETTING_KEYS
+        or key in RUNTIME_SETTING_KEYS
+        or key.startswith("feature_")
+        or key in TARGET_APP_CONFIG_SETTING_KEYS
+    ):
+        return
     root = volume_root()
     ensure_initialized(migrate=True)
     if key in PROJECT_SETTING_KEYS:
@@ -516,7 +532,7 @@ def set_setting(key: str, value: str) -> None:
         _update_instance_file("application.json", {key: value}, root=root)
     elif key in RUNTIME_SETTING_KEYS or key.startswith("feature_"):
         _update_instance_file("runtime.json", {key: value}, root=root)
-    elif key in TARGET_APP_SETTING_KEYS:
+    elif key in TARGET_APP_CONFIG_SETTING_KEYS:
         _update_instance_file("target-app.json", {key: value}, root=root)
 
 
@@ -1040,7 +1056,7 @@ def _write_instance_files(instance_id: str, *, settings: dict[str, str],
     files = {
         "application.json": APPLICATION_SETTING_KEYS,
         "runtime.json": RUNTIME_SETTING_KEYS,
-        "target-app.json": TARGET_APP_SETTING_KEYS,
+        "target-app.json": TARGET_APP_CONFIG_SETTING_KEYS,
     }
     for name, keys in files.items():
         _write_json(d / name, {k: v for k, v in settings.items() if k in keys})
@@ -1059,11 +1075,13 @@ def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
     for name, keys in {
         "application.json": APPLICATION_SETTING_KEYS,
         "runtime.json": RUNTIME_SETTING_KEYS,
-        "target-app.json": TARGET_APP_SETTING_KEYS,
+        "target-app.json": TARGET_APP_CONFIG_SETTING_KEYS,
     }.items():
         p = d / name
         if not p.exists():
             _write_json(p, {k: defaults[k] for k in keys if k in defaults})
+        elif name == "target-app.json":
+            _prune_instance_file(p, keys)
     reps = d / "reporters.json"
     if not reps.exists():
         _write_json(reps, {"reporters": [], "updated_at": now_iso()})
@@ -1083,9 +1101,34 @@ def _update_instance_file(filename: str, updates: dict[str, str], *,
     _write_json(p, data)
 
 
-def _string_map(value: dict[str, Any]) -> dict[str, str]:
+def _prune_instance_file(path: Path, allowed_keys: set[str]) -> None:
+    data = _read_json(path, {})
+    if not isinstance(data, dict):
+        return
     metadata = {"created_at", "updated_at", "schema_version", "refine"}
-    return {str(k): str(v) for k, v in value.items() if str(k) not in metadata}
+    pruned = {
+        str(k): v
+        for k, v in data.items()
+        if str(k) in metadata or str(k) in allowed_keys
+    }
+    if pruned == data:
+        return
+    pruned["updated_at"] = now_iso()
+    _write_json(path, pruned)
+
+
+def _string_map(value: dict[str, Any], *,
+                allowed: set[str] | None = None) -> dict[str, str]:
+    metadata = {"created_at", "updated_at", "schema_version", "refine"}
+    out: dict[str, str] = {}
+    for k, v in value.items():
+        key = str(k)
+        if key in metadata:
+            continue
+        if allowed is not None and key not in allowed:
+            continue
+        out[key] = str(v)
+    return out
 
 
 def _read_json(path: Path, default: Any) -> Any:

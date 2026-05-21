@@ -1,6 +1,7 @@
 """Target-app status persistence tests."""
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -57,7 +58,7 @@ def main() -> int:
             api.get_client = old_get_client  # type: ignore[assignment]
         assert explicit_status == 200, explicit_body
         assert calls[-1].get("quiet") is False, calls
-        assert target_app_path.read_bytes() != before
+        assert target_app_path.read_bytes() == before
 
         conn = db.connect()
         try:
@@ -66,6 +67,21 @@ def main() -> int:
             assert db.get_setting(conn, "target_app_last_check_message") == "ok"
         finally:
             conn.close()
+
+        target_settings = json.loads(target_app_path.read_text(encoding="utf-8"))
+        target_settings["target_app_state"] = "failed"
+        target_settings["target_app_last_check_at"] = "1999-01-01T00:00:00+00:00"
+        target_settings["target_app_auto_rebuild_last_message"] = "stale"
+        target_app_path.write_text(json.dumps(target_settings, indent=2), encoding="utf-8")
+
+        from refine_server import project_state
+
+        listed = project_state.list_settings()
+        assert listed["target_app_state"] != "failed"
+        pruned = json.loads(target_app_path.read_text(encoding="utf-8"))
+        assert "target_app_state" not in pruned
+        assert "target_app_last_check_at" not in pruned
+        assert "target_app_auto_rebuild_last_message" not in pruned
     finally:
         cleanup_tmp(tmp)
 
