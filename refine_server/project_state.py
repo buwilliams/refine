@@ -865,6 +865,7 @@ def _plan_gap_cache_refresh(conn: sqlite3.Connection,
 
 def _apply_gap_cache_refresh(conn: sqlite3.Connection,
                              refresh: dict[str, Any]) -> int:
+    from . import guidance
     from . import search_index
 
     changed_rows = 0
@@ -878,6 +879,7 @@ def _apply_gap_cache_refresh(conn: sqlite3.Connection,
                 (gap_id, rel),
             )
             search_index.delete_gap(conn, gap_id)
+            guidance.delete_gap_guidance_decisions(conn, gap_id)
         conn.execute("DELETE FROM gap_cache_meta WHERE json_path = ?", (rel,))
         changed_rows += 1
     for item in refresh["upserts"]:
@@ -891,8 +893,11 @@ def _apply_gap_cache_refresh(conn: sqlite3.Connection,
                 (old_gap_id, rel),
             )
             search_index.delete_gap(conn, old_gap_id)
+            guidance.delete_gap_guidance_decisions(conn, old_gap_id)
         _upsert_gap_index_row(conn, gap, rel)
         search_index.upsert_gap(conn, gap)
+        guidance.delete_gap_guidance_decisions(conn, gap_id)
+        guidance.project_gap_guidance_decisions(conn, gap, use_transaction=False)
         _upsert_gap_cache_meta(conn, item, gap_id=gap_id, now=now)
         changed_rows += 1
     for item in refresh["meta_only"]:

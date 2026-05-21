@@ -71,6 +71,39 @@ def main() -> int:
         gid = "01GUIDANCELOGAAAAAAAAAAAAAA"
         create_indexed_gap(conn, gid)
         logged_gap = gaps.read_gap_json(gid)
+        logged_selected, logged_raw = guidance.select_for_gap(
+            conn, logged_gap, run_one_shot=fake_classifier,
+        )
+        assert [item["name"] for item in logged_selected] == ["Accessibility"]
+        assert logged_raw.startswith("{"), logged_raw
+        logged_gap = gaps.read_gap_json(gid)
+        decision = logged_gap["rounds"][-1].get("guidance_decision")
+        assert decision, logged_gap["rounds"][-1]
+        assert decision["accepted_names"] == ["Accessibility"], decision
+        row = conn.execute(
+            "SELECT accepted_json, details_json FROM guidance_decisions "
+            "WHERE gap_id = ? AND round_idx = 0",
+            (gid,),
+        ).fetchone()
+        assert row is not None
+        assert "Accessibility" in row["accepted_json"], row["accepted_json"]
+        assert "classifier_response" in row["details_json"], row["details_json"]
+        cached_selected, cached_raw = guidance.select_for_gap(
+            conn, logged_gap,
+            run_one_shot=lambda _prompt: (_ for _ in ()).throw(
+                AssertionError("cached decision should skip classifier"),
+            ),
+        )
+        assert [item["name"] for item in cached_selected] == ["Accessibility"]
+        assert cached_raw == "", cached_raw
+        conn.execute("DELETE FROM guidance_decisions WHERE gap_id = ?", (gid,))
+        project_state.rebuild_sqlite_cache(conn)
+        rebuilt = conn.execute(
+            "SELECT accepted_json FROM guidance_decisions WHERE gap_id = ?",
+            (gid,),
+        ).fetchone()
+        assert rebuilt is not None
+
         guidance.log_selection(conn, logged_gap, selected, raw)
         logged_gap = gaps.read_gap_json(gid)
         messages = [log["message"] for log in logged_gap["rounds"][-1]["logs"]]

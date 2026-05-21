@@ -51,6 +51,8 @@ def update_fields(gap_id: str, **fields: Any) -> dict[str, Any]:
             raise FileNotFoundError(f"gap.json missing for {gap_id}")
         for key, value in fields.items():
             gap[key] = value
+        if "name" in fields and gap.get("rounds"):
+            gap["rounds"][-1].pop("guidance_decision", None)
         gap["updated"] = now_iso()
         shared_gaps.write_gap_json(gap)
         return gap
@@ -123,8 +125,29 @@ def edit_latest_round(gap_id: str, *, actual: str | None = None,
             r["reporter"] = reporter
         if actual is not None or target is not None or reporter is not None:
             shared_gaps.reset_round_governance(r)
+        if actual is not None or target is not None:
+            r.pop("guidance_decision", None)
         r["updated"] = now_iso()
         gap["updated"] = r["updated"]
+        shared_gaps.write_gap_json(gap)
+        return gap
+
+
+def set_round_guidance_decision(
+    gap_id: str,
+    round_idx: int,
+    decision: dict[str, Any],
+) -> dict[str, Any]:
+    with _lock_for(gap_id):
+        gap = shared_gaps.read_gap_json(gap_id)
+        if gap is None:
+            raise FileNotFoundError(f"gap.json missing for {gap_id}")
+        rounds = gap.get("rounds") or []
+        if round_idx < 0 or round_idx >= len(rounds):
+            raise ValueError("round_idx out of range")
+        rounds[round_idx]["guidance_decision"] = decision
+        rounds[round_idx]["updated"] = str(decision.get("decided_at") or now_iso())
+        gap["updated"] = rounds[round_idx]["updated"]
         shared_gaps.write_gap_json(gap)
         return gap
 
