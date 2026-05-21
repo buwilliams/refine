@@ -95,6 +95,14 @@ def main() -> int:
                 (gid, gid, status, priority, ts, ts, branch, f"gaps/{gid}.json"),
             )
 
+        def insert_running_run(gid: str) -> None:
+            conn.execute(
+                "INSERT INTO runs "
+                "(gap_id, round_idx, started_at, pid, status, failure_category) "
+                "VALUES (?, 0, ?, ?, 'running', NULL)",
+                (gid, now_iso(), os.getpid()),
+            )
+
         reset()
         insert_gap("high-backlog", "backlog", "high")
         insert_gap("low-todo", "todo", "low")
@@ -136,7 +144,9 @@ def main() -> int:
         reset()
         db.set_setting(conn, "parallel_run_cap", "3")
         for idx in range(3):
-            insert_gap(f"running-{idx}", "in-progress", "high")
+            gid = f"running-{idx}"
+            insert_gap(gid, "in-progress", "high")
+            insert_running_run(gid)
         insert_gap("blocked-by-index-cap", "todo", "high")
         assert dispatcher._active_run_count(conn) == 3  # noqa: SLF001
         dispatcher._tick()
@@ -147,6 +157,18 @@ def main() -> int:
         assert row["status"] == "todo", dict(row)
 
         reset()
+        db.set_setting(conn, "parallel_run_cap", "1")
+        insert_gap("stale-in-progress", "in-progress", "high")
+        insert_gap("launch-after-stale", "todo", "high")
+        dispatcher._tick()
+        assert launched == ["launch-after-stale"], launched
+        stale = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'stale-in-progress'",
+        ).fetchone()
+        assert stale["status"] == "failed", dict(stale)
+
+        reset()
+        db.set_setting(conn, "parallel_run_cap", "3")
         for idx in range(3):
             insert_gap(f"reserved-{idx}", "in-progress", "high")
         insert_gap("race-todo", "todo", "high")

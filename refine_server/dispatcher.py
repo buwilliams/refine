@@ -18,7 +18,7 @@ from refine_server import activity, changes_index, db, governance, project_state
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
-from . import gap_writer, git_ops, guidance, preflight, subprocess_mgr
+from . import gap_writer, git_ops, guidance, preflight, recovery, subprocess_mgr
 from .friendly_outcome import classify_outcome
 
 
@@ -84,6 +84,11 @@ class Dispatcher:
             return
         if self.launch_blocked is not None and self.launch_blocked():
             return
+        running_snapshot = self.sub_mgr.running_snapshot()
+        recovery.reconcile_runtime_in_progress(
+            conn,
+            live_gap_ids={r["gap_id"] for r in running_snapshot if r.get("gap_id")},
+        )
         self._promote_backlog(conn)
         if self._agent_limit_pause_active(conn):
             return
@@ -95,7 +100,7 @@ class Dispatcher:
             return
 
         cap = self._parallel_run_cap(conn)
-        running = self._active_run_count(conn)
+        running = self._active_run_count(conn, running_snapshot=running_snapshot)
         if running >= cap:
             return
         rows = conn.execute(
@@ -121,7 +126,12 @@ class Dispatcher:
     def _parallel_run_cap(self, conn: sqlite3.Connection) -> int:
         return max(1, db.get_setting_int(conn, "parallel_run_cap", 10))
 
-    def _active_run_count(self, conn: sqlite3.Connection) -> int:
+    def _active_run_count(
+        self,
+        conn: sqlite3.Connection,
+        *,
+        running_snapshot: list[dict] | None = None,
+    ) -> int:
         active_instance = project_state.active_instance_id()
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
@@ -132,7 +142,11 @@ class Dispatcher:
         # The SQLite state is the shared cross-runner reservation source. Keep
         # the local process snapshot in the count as a defensive fallback for
         # any launch window before the index is updated.
-        local = len(self.sub_mgr.running_snapshot())
+        local = len(
+            running_snapshot
+            if running_snapshot is not None
+            else self.sub_mgr.running_snapshot()
+        )
         return max(indexed, local)
 
     def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
@@ -409,22 +423,30 @@ class Dispatcher:
             ),
         )
 
-        self.sub_mgr.launch(
-            gap_id=gap_id,
-            round_idx=round_idx,
-            prompt=prompt,
-            cwd=agent_cwd,
-            base_ref=base_commit,
-            idle_window=idle,
-            hard_cap=hard_cap,
-            on_finished=(
-                lambda gid, code, reason, agent_ok, failure_text="": self._on_finished(
-                    gid, round_idx, code, reason, base_commit,
-                    agent_reported_success=agent_ok,
-                    failure_text=failure_text,
-                )
-            ),
-        )
+        try:
+            self.sub_mgr.launch(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                prompt=prompt,
+                cwd=agent_cwd,
+                base_ref=base_commit,
+                idle_window=idle,
+                hard_cap=hard_cap,
+                on_finished=(
+                    lambda gid, code, reason, agent_ok, failure_text="": self._on_finished(
+                        gid, round_idx, code, reason, base_commit,
+                        agent_reported_success=agent_ok,
+                        failure_text=failure_text,
+                    )
+                ),
+            )
+        except Exception as e:
+            self._fail_reserved_launch(
+                conn,
+                gap_id,
+                round_idx,
+                f"Agent subprocess failed to start: {e!r}",
+            )
 
     def _reserve_in_progress_slot(
         self,
@@ -448,6 +470,38 @@ class Dispatcher:
                 ),
             )
         return bool(cur.rowcount)
+
+    def _fail_reserved_launch(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+        round_idx: int,
+        message: str,
+    ) -> None:
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'failed', updated = ? "
+                "WHERE id = ? AND status = 'in-progress'",
+                (now_iso(), gap_id),
+            )
+        try:
+            gap_writer.update_fields(gap_id, status="failed")
+            gap_writer.append_round_log(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                severity="error",
+                category="cli",
+                actor="runner",
+                message=message,
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message=message,
+            severity="error", category="cli",
+            gap_id=gap_id, actor="runner",
+        )
 
     def _maybe_skip_already_implemented(self, conn: sqlite3.Connection,
                                           gap_id: str, target: str) -> bool:

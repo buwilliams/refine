@@ -10,6 +10,7 @@ far it got.
 """
 from __future__ import annotations
 
+import os
 import sqlite3
 
 from refine_server import activity, db
@@ -40,14 +41,47 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
 
     Returns count moved to `failed`.
     """
+    return _reconcile_in_progress(
+        conn,
+        live_gap_ids=set(),
+        startup=True,
+    )
+
+
+def reconcile_runtime_in_progress(
+    conn: sqlite3.Connection,
+    *,
+    live_gap_ids: set[str],
+) -> int:
+    """Clean up in-progress rows that no live tracked agent owns anymore.
+
+    This runs during dispatcher ticks. It is intentionally more conservative
+    than startup reconciliation: an unfinished run with a still-live PID is
+    left alone because it may belong to another still-running process.
+    """
+    return _reconcile_in_progress(
+        conn,
+        live_gap_ids=live_gap_ids,
+        startup=False,
+    )
+
+
+def _reconcile_in_progress(
+    conn: sqlite3.Connection,
+    *,
+    live_gap_ids: set[str],
+    startup: bool,
+) -> int:
     rows = conn.execute(
         "SELECT id FROM gaps_index WHERE status = 'in-progress'"
     ).fetchall()
     moved = 0
     for row in rows:
         gid = row["id"]
+        if gid in live_gap_ids:
+            continue
         rrow = conn.execute(
-            "SELECT round_idx, finished_at, status, failure_category "
+            "SELECT round_idx, finished_at, status, failure_category, pid "
             "FROM runs WHERE gap_id = ? ORDER BY id DESC LIMIT 1",
             (gid,),
         ).fetchone()
@@ -87,7 +121,26 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
             )
             continue
 
+        if (
+            not startup
+            and rrow
+            and not rrow["finished_at"]
+            and _pid_may_be_alive(rrow["pid"])
+        ):
+            continue
+
         # Orphan agent case — kill the run record + flip to failed.
+        failure_category = "runner_restart" if startup else "agent_orphaned"
+        detail_message = (
+            "Runner restarted while this Gap was in-progress — marked failed"
+            if startup
+            else "No live agent subprocess is tracking this in-progress Gap — marked failed"
+        )
+        activity_message = (
+            "Runner restarted; marked Gap as failed"
+            if startup
+            else "In-progress Gap had no live agent subprocess; marked failed"
+        )
         with db.transaction(conn):
             conn.execute(
                 "UPDATE gaps_index SET status = 'failed', updated = ? WHERE id = ?",
@@ -95,9 +148,9 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
             )
             conn.execute(
                 "UPDATE runs SET finished_at = ?, status = 'killed', "
-                "  failure_category = 'runner_restart' "
+                "  failure_category = ? "
                 "WHERE gap_id = ? AND finished_at IS NULL",
-                (now_iso(), gid),
+                (now_iso(), failure_category, gid),
             )
         try:
             gap_writer.update_fields(gid, status="failed")
@@ -110,16 +163,32 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
                 round_idx=round_idx,
                 severity="error", category="state",
                 actor="runner",
-                message="Runner restarted while this Gap was in-progress — marked failed",
+                message=detail_message,
             )
         except Exception:
             pass
 
         activity.append(
             conn,
-            message="Runner restarted; marked Gap as failed",
+            message=activity_message,
             severity="warn", category="state",
             gap_id=gid, actor="runner",
         )
         moved += 1
     return moved
+
+
+def _pid_may_be_alive(pid: object) -> bool:
+    try:
+        pid_int = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid_int <= 0:
+        return False
+    try:
+        os.kill(pid_int, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
