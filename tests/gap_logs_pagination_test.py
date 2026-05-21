@@ -1,6 +1,8 @@
 """Gap detail log pagination checks."""
 from __future__ import annotations
 
+from pathlib import Path
+
 from tests.helpers import cleanup_tmp, init_refine, make_client_repo
 
 
@@ -122,6 +124,15 @@ def main() -> int:
             "round-1",
             "activity-mid",
         ]
+
+        root = Path(__file__).resolve().parents[1]
+        gaps_detail_js = (
+            root / "refine_ui/static/js/features/gaps-detail.js"
+        ).read_text(encoding="utf-8")
+        assert "renderPaginationControls(" in gaps_detail_js
+        assert "bindPaginationControls(body, pagerId" in gaps_detail_js
+        assert "data-round-logs-more" not in gaps_detail_js
+        assert "Load more" not in gaps_detail_js
     finally:
         try:
             conn.close()

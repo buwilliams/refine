@@ -479,13 +479,21 @@ function renderRoundLogsBody(gapId, roundIdx) {
   const body = logs.length
     ? logs.map((l) => renderLogEntry(l)).join("")
     : `<p class="muted small">No logs.</p>`;
-  const more = logState.hasMore ? `
-    <div class="actions" style="margin-top:8px">
-      <button class="secondary" data-round-logs-more="${roundIdx}" ${logState.loading ? "disabled" : ""}>
-        ${logState.loading ? "Loading…" : "Load more"}
-      </button>
-    </div>` : "";
-  return `${body}${more}`;
+  const loading = logState.loading && logState.loaded
+    ? `<p class="muted small">Loading page…</p>`
+    : "";
+  const pageMeta = {
+    limit: logState.limit || GAP_LOG_PAGE_SIZE,
+    offset: logState.offset || 0,
+    has_more: !!logState.hasMore,
+  };
+  const pager = renderPaginationControls(
+    `gap-round-${roundIdx}-logs`,
+    pageMeta,
+    logs.length,
+    "log",
+  );
+  return `${body}${loading}${pager}`;
 }
 
 function updateRoundLogsPanel(gapId, roundIdx) {
@@ -500,10 +508,14 @@ function updateRoundLogsPanel(gapId, roundIdx) {
   if (summary && logState?.loaded && typeof logState.total === "number") {
     summary.textContent = `Logs (${logState.total})`;
   }
-  body.querySelector("[data-round-logs-more]")?.addEventListener("click", async (e) => {
-    e.preventDefault();
-    await loadRoundLogs(gapId, roundIdx, { append: true });
-  });
+  const pagerId = `gap-round-${roundIdx}-logs`;
+  bindPaginationControls(body, pagerId, (page) =>
+    loadRoundLogs(gapId, roundIdx, { page }));
+  if (logState?.loading) {
+    $$(`#${pagerId}-pagination [data-page]`, body).forEach((btn) => {
+      btn.disabled = true;
+    });
+  }
 }
 
 function bindRoundLogLoading(gap) {
@@ -522,7 +534,7 @@ function bindRoundLogLoading(gap) {
   });
 }
 
-async function loadRoundLogs(gapId, roundIdx, { append = false } = {}) {
+async function loadRoundLogs(gapId, roundIdx, { page = 1 } = {}) {
   const key = roundLogKey(gapId, roundIdx);
   const current = gapRoundLogState.get(key) || {
     logs: [],
@@ -530,18 +542,22 @@ async function loadRoundLogs(gapId, roundIdx, { append = false } = {}) {
     loading: false,
     hasMore: true,
     total: null,
+    limit: GAP_LOG_PAGE_SIZE,
+    offset: 0,
   };
   if (current.loading) return;
-  const offset = append ? current.logs.length : 0;
+  const limit = current.limit || GAP_LOG_PAGE_SIZE;
+  const targetPage = Math.max(1, parseInt(page, 10) || 1);
+  const offset = (targetPage - 1) * limit;
   const nextState = { ...current, loading: true, error: "" };
   gapRoundLogState.set(key, nextState);
   updateRoundLogsPanel(gapId, roundIdx);
   try {
     const data = await api(
       "GET",
-      `/api/gaps/${gapId}/logs?round_idx=${roundIdx}&limit=${GAP_LOG_PAGE_SIZE}&offset=${offset}`,
+      `/api/gaps/${gapId}/logs?round_idx=${roundIdx}&limit=${limit}&offset=${offset}`,
     );
-    const logs = append ? [...(current.logs || []), ...(data.logs || [])] : (data.logs || []);
+    const logs = data.logs || [];
     const pagination = data.pagination || {};
     gapRoundLogState.set(key, {
       logs,
@@ -549,6 +565,8 @@ async function loadRoundLogs(gapId, roundIdx, { append = false } = {}) {
       loading: false,
       hasMore: !!pagination.has_more,
       total: typeof pagination.total === "number" ? pagination.total : logs.length,
+      limit: typeof pagination.limit === "number" ? pagination.limit : limit,
+      offset: typeof pagination.offset === "number" ? pagination.offset : offset,
       error: "",
     });
   } catch (e) {

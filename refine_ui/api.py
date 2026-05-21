@@ -1313,9 +1313,9 @@ def get_gap_logs(
     )
     return 200, {
         "gap_id": gap_id,
-            "round_idx": round_idx,
-            "logs": page,
-            "pagination": {
+        "round_idx": round_idx,
+        "logs": page,
+        "pagination": {
             "limit": page_limit,
             "offset": page_offset,
             "total": total,
