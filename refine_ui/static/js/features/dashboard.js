@@ -17,17 +17,11 @@ const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
 async function renderDashboard() {
   // First paint only: lay out the outer chrome and a `Loading…`
   // placeholder. SSE-triggered refreshes route through `refreshDashboard`
-  // below so the screen doesn't flicker back to `Loading…` between
-  // events. If `#dash` is already in the DOM (e.g. the route handler
-  // was re-invoked by hashchange while the screen is already up), skip
-  // the wipe — drawing the new data over the old DOM is silent.
+  // below so the screen doesn't flicker back to `Loading…` between events.
+  // Fresh navigation should not paint cached counts as current; once the
+  // dashboard is already visible, refreshes redraw over the existing DOM.
   if (!document.getElementById("dash")) {
-    $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"></div>`;
-    if (state.dashboard) {
-      drawDashboard(state.dashboard, state.dashboardReviewSnapshot || {});
-    } else {
-      $("#dash").innerHTML = `<p class="muted">Loading…</p>`;
-    }
+    $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"><p class="muted">Loading…</p></div>`;
   }
   await refreshDashboard();
 }
@@ -63,7 +57,8 @@ async function refreshDashboard() {
   } catch (e) {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
     const dash = document.getElementById("dash");
-    if (dash && !state.dashboard) {
+    const hasRenderedDashboard = !!dash?.querySelector(".dashboard-status-grid");
+    if (dash && !hasRenderedDashboard) {
       const waiting = e.name === "AbortError"
         ? "Dashboard is still waiting for the backend. Retrying…"
         : `Failed to load: ${htmlEscape(e.message)}`;
