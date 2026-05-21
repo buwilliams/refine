@@ -134,6 +134,31 @@ def main() -> int:
         assert fake.cancel_calls == [], fake.cancel_calls
 
         reset()
+        db.set_setting(conn, "parallel_run_cap", "3")
+        for idx in range(3):
+            insert_gap(f"running-{idx}", "in-progress", "high")
+        insert_gap("blocked-by-index-cap", "todo", "high")
+        assert dispatcher._active_run_count(conn) == 3  # noqa: SLF001
+        dispatcher._tick()
+        assert launched == [], launched
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'blocked-by-index-cap'",
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+
+        reset()
+        for idx in range(3):
+            insert_gap(f"reserved-{idx}", "in-progress", "high")
+        insert_gap("race-todo", "todo", "high")
+        assert not dispatcher._reserve_in_progress_slot(  # noqa: SLF001
+            conn, "race-todo", "refine/race-todo",
+        )
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'race-todo'",
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+
+        reset()
         insert_gap("high-ready", "ready-merge", "high")
         insert_gap("low-todo", "todo", "low")
         dispatcher._tick()

@@ -94,8 +94,8 @@ class Dispatcher:
         if self._preempt_lower_priority_runs(conn, active_rank):
             return
 
-        cap = db.get_setting_int(conn, "parallel_run_cap", 10)
-        running = len(self.sub_mgr.running_snapshot())
+        cap = self._parallel_run_cap(conn)
+        running = self._active_run_count(conn)
         if running >= cap:
             return
         rows = conn.execute(
@@ -114,7 +114,26 @@ class Dispatcher:
                 latest = (gap.get("rounds") or [])[-1] if gap and gap.get("rounds") else None
                 if not latest or not governance.has_passed(latest):
                     continue
+            if self._active_run_count(conn) >= cap:
+                return
             self._launch_one(conn, gid, row["branch_name"])
+
+    def _parallel_run_cap(self, conn: sqlite3.Connection) -> int:
+        return max(1, db.get_setting_int(conn, "parallel_run_cap", 10))
+
+    def _active_run_count(self, conn: sqlite3.Connection) -> int:
+        active_instance = project_state.active_instance_id()
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM gaps_index "
+            "WHERE status = 'in-progress' AND instance_id = ?",
+            (active_instance,),
+        ).fetchone()
+        indexed = int(row["n"] if row else 0)
+        # The SQLite state is the shared cross-runner reservation source. Keep
+        # the local process snapshot in the count as a defensive fallback for
+        # any launch window before the index is updated.
+        local = len(self.sub_mgr.running_snapshot())
+        return max(indexed, local)
 
     def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
         placeholders = ",".join("?" * len(BLOCKING_STATUSES))
@@ -344,15 +363,8 @@ class Dispatcher:
         )
         base_commit = rev.stdout.strip() if rev.ok else base_ref
 
-        active_instance = project_state.active_instance_id()
         # Transition: todo → in-progress
-        with db.transaction(conn):
-            cur = conn.execute(
-                "UPDATE gaps_index SET status = 'in-progress', updated = ?, branch_name = ? "
-                "WHERE id = ? AND status = 'todo' AND instance_id = ?",
-                (now_iso(), branch_name, gap_id, active_instance),
-            )
-        if not cur.rowcount:
+        if not self._reserve_in_progress_slot(conn, gap_id, branch_name):
             git_ops.remove_worktree(gap_id)
             if not existing_branch:
                 git_ops.delete_branch(branch_name)
@@ -381,7 +393,7 @@ class Dispatcher:
         )
 
         idle = db.get_setting_int(conn, "agent_idle_timeout_seconds", 900)
-        cap = db.get_setting_int(conn, "agent_hard_cap_seconds", 86400)
+        hard_cap = db.get_setting_int(conn, "agent_hard_cap_seconds", 86400)
         # The agent runs inside the operator-configured sub-project when set
         # (e.g. a monorepo's `apps/web`). Worktree creation + base_ref + on-
         # finished git plumbing all stay at the worktree root above; only
@@ -404,7 +416,7 @@ class Dispatcher:
             cwd=agent_cwd,
             base_ref=base_commit,
             idle_window=idle,
-            hard_cap=cap,
+            hard_cap=hard_cap,
             on_finished=(
                 lambda gid, code, reason, agent_ok, failure_text="": self._on_finished(
                     gid, round_idx, code, reason, base_commit,
@@ -413,6 +425,29 @@ class Dispatcher:
                 )
             ),
         )
+
+    def _reserve_in_progress_slot(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+        branch_name: str,
+    ) -> bool:
+        active_instance = project_state.active_instance_id()
+        parallel_cap = self._parallel_run_cap(conn)
+        with db.transaction(conn):
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = 'in-progress', updated = ?, branch_name = ? "
+                "WHERE id = ? AND status = 'todo' AND instance_id = ? "
+                "AND ("
+                "  SELECT COUNT(*) FROM gaps_index "
+                "  WHERE status = 'in-progress' AND instance_id = ?"
+                ") < ?",
+                (
+                    now_iso(), branch_name, gap_id, active_instance,
+                    active_instance, parallel_cap,
+                ),
+            )
+        return bool(cur.rowcount)
 
     def _maybe_skip_already_implemented(self, conn: sqlite3.Connection,
                                           gap_id: str, target: str) -> bool:

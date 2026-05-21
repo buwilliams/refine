@@ -2304,6 +2304,14 @@ def update_settings(body: dict) -> tuple[int, dict]:
                 return err(400,
                     f"agent_cli must be one of {', '.join(valid_agent_clis)}")
             normalized[k] = choice
+        elif k == "parallel_run_cap":
+            try:
+                n = int(v)
+            except (TypeError, ValueError):
+                return err(400, "parallel_run_cap must be an integer")
+            if n < 1 or n > 100:
+                return err(400, "parallel_run_cap must be between 1 and 100")
+            normalized[k] = str(n)
         elif k == "target_app_cwd":
             cwd = str(v or "").strip()
             if cwd and "\0" in cwd:
