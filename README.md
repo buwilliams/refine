@@ -9,12 +9,9 @@ customers — anyone who can articulate *what the app does today* vs
 
 refine is a decentralized, agents-first software delivery application that works within your existing applications and infrastructure by leveraging existing development practices. It creates economic advantage by shrinking the time and coordination cost between identifying a problem and shipping a verified change.
 
-- Full-control engineering is expensive: reading every line, modeling every dependency, and organizing code as if the system can be made "perfect" still does not prevent outages or security breaches.
-- Reliability often increases the cost of change, and many engineering cultures optimize for correctness at the expense of the businesses they serve.
-- refine puts automation at the forefront, reduces feedback loops by orders of magnitude, and lets companies onboard without new infrastructure or new processes.
-- The architecture is economics first and technical accuracy second: the same principles of high-quality software and rapid development, reordered so businesses can stay competitive.
+Full-control engineering is expensive: reading every line, modeling every dependency, and organizing code as if the system can be made "perfect" still does not prevent outages or security breaches. Reliability often increases the cost of change, and many engineering cultures optimize for correctness at the expense of the businesses they serve.
 
-Instead of trying to make every decision correct up front, refine makes feedback cheap enough that software can become accurate over time as the business learns and changes.
+refine puts automation at the forefront, reduces feedback loops by orders of magnitude, and lets companies onboard without new infrastructure or new processes. The architecture is economics first and technical accuracy second: the same principles of high-quality software and rapid development, reordered so businesses can stay competitive. Instead of trying to make every decision correct up front, refine makes feedback cheap enough that software can become accurate over time as the business learns and changes.
 
 ## Features
 
