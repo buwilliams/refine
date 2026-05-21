@@ -39,6 +39,17 @@ CREATE INDEX IF NOT EXISTS idx_gaps_updated  ON gaps_index(updated);
 -- idx_gaps_priority + idx_gaps_reporter are created in _migrate() after
 -- their respective ALTER TABLE steps so older databases pick them up.
 
+CREATE TABLE IF NOT EXISTS gap_cache_meta (
+    json_path TEXT PRIMARY KEY,
+    gap_id    TEXT NOT NULL DEFAULT '',
+    mtime_ns  INTEGER NOT NULL,
+    size      INTEGER NOT NULL,
+    sha256    TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gap_cache_meta_gap_id
+    ON gap_cache_meta(gap_id);
+
 CREATE TABLE IF NOT EXISTS runs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
     gap_id          TEXT NOT NULL,
@@ -290,6 +301,19 @@ def _migrate(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_instance ON gaps_index(instance_id)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS gap_cache_meta ("
+        "json_path TEXT PRIMARY KEY, "
+        "gap_id TEXT NOT NULL DEFAULT '', "
+        "mtime_ns INTEGER NOT NULL, "
+        "size INTEGER NOT NULL, "
+        "sha256 TEXT NOT NULL DEFAULT '', "
+        "updated_at TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gap_cache_meta_gap_id "
+        "ON gap_cache_meta(gap_id)"
     )
     conn.execute(
         "CREATE TABLE IF NOT EXISTS performance_events ("
