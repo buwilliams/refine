@@ -104,6 +104,8 @@ def main() -> int:
             encoding="utf-8",
         )
         assert 'id="bulk-transfer-instance"' in gaps_list
+        assert 'id="gap-select-page"' in gaps_list
+        assert "selectCurrentGapsPage" in gaps_list
         assert "openBulkTransferInstanceModal" in gaps_bulk
         assert 'api("POST", "/api/instances/transfer-gaps"' in gaps_bulk
         assert "filter, ...selectionFields" in gaps_bulk

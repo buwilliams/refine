@@ -112,6 +112,13 @@ function _selectionCountText(noun = "selected") {
     return "all matching Gaps selected";
   }
   const selectedCount = gapsIncludedIds.size;
+  const visibleIds = (_lastGapsRender?.gaps || []).map((g) => g.id);
+  const currentPageOnly = visibleIds.length > 0
+    && visibleIds.length === selectedCount
+    && visibleIds.every((id) => gapsIncludedIds.has(id));
+  if (currentPageOnly) {
+    return `${selectedCount} Gaps on this page ${noun}`;
+  }
   return `${selectedCount} explicitly ${noun}`;
 }
 

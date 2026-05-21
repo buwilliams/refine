@@ -313,9 +313,13 @@ def main() -> int:
             root / "refine_ui/static/js/features/gaps-list.js"
         ).read_text(encoding="utf-8")
         assert "Bulk update selected:" in gaps_list
+        assert 'id="gap-select-page"' in gaps_list
+        assert "selectCurrentGapsPage" in gaps_list
         assert "Select all matching Gaps" in gaps_list
         assert "let gapsSelectAllMatching = true" in gaps_list
         assert "const gapsIncludedIds = new Set()" in gaps_list
+        assert "for (const gap of gaps) gapsIncludedIds.add(gap.id)" in gaps_list
+        assert "Gaps on this page" in gaps_bulk
     finally:
         try:
             conn.close()

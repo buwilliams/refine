@@ -84,6 +84,7 @@ async function renderGapsList() {
       </div>
       <div class="filter-row filter-row-bulk">
         <span class="muted small">Bulk update selected:</span>
+        <button class="secondary small" id="gap-select-page">Select page</button>
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
@@ -132,6 +133,7 @@ async function renderGapsList() {
   $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
   $("#bulk-transfer-instance").addEventListener("click", () => openBulkTransferInstanceModal());
   $("#bulk-delete").addEventListener("click", () => confirmBulkDelete());
+  $("#gap-select-page").addEventListener("click", selectCurrentGapsPage);
 
   // Expanding / collapsing the filter shell shows / hides the per-row
   // checkbox column. Redraw from the cached results so we don't re-fetch.
@@ -261,6 +263,19 @@ function resetGapsSelection() {
   gapsSelectAllMatching = true;
   gapsExcludedIds.clear();
   gapsIncludedIds.clear();
+}
+
+function selectCurrentGapsPage() {
+  const gaps = _lastGapsRender?.gaps || [];
+  if (!gaps.length) {
+    toast("No Gaps on this page.", "warn");
+    return;
+  }
+  gapsSelectAllMatching = false;
+  gapsExcludedIds.clear();
+  gapsIncludedIds.clear();
+  for (const gap of gaps) gapsIncludedIds.add(gap.id);
+  drawGapsTable(gaps, _lastGapsRender.state);
 }
 
 function _isGapSelected(id) {
