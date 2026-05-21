@@ -197,6 +197,20 @@ def _h_diag(_h, _m, _b, _q):
     return api.backend_diagnostics()
 
 
+@route("GET", r"/api/performance")
+def _h_performance(_h, _m, _b, q):
+    return api.performance_summary(
+        operation=_get_one(q, "operation"),
+        success=_get_one(q, "success"),
+        limit=int(_get_one(q, "limit", "100")),
+    )
+
+
+@route("POST", r"/api/performance/cleanup")
+def _h_performance_cleanup(_h, _m, body, _q):
+    return api.performance_cleanup(body or {})
+
+
 @route("GET", r"/api/jobs/([0-9a-fA-F]+)")
 def _h_job(_h, m, _b, _q):
     return api.background_job(m.group(1))

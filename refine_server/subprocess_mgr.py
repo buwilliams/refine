@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from refine_server import activity, db
+from refine_server import activity, db, perf_metrics
 from refine_server.gaps import now_iso
 
 from . import gap_writer  # local module; sole owner of gap.json writes
@@ -224,6 +224,7 @@ class RunHandle:
     cwd: Path              # worktree path
     base_ref: str          # commit before the run, for "no commits produced" detection
     output_format: str = "plain"
+    provider: str = ""
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
     # Set to time.monotonic() when stream-json emits a `result` event.
@@ -242,6 +243,10 @@ class RunHandle:
     # solely because nothing changed in the worktree.
     agent_reported_success: bool | None = None
     recent_output: deque[str] | None = None
+    log_entries: int = 0
+    truncated_bytes: int = 0
+    skipped_bytes: int = 0
+    last_log_metric_at: float = 0.0
 
     def __post_init__(self) -> None:
         if self.finished is None:
@@ -317,6 +322,7 @@ class SubprocessManager:
             cwd=cwd,
             base_ref=base_ref,
             output_format=spec.output_format,
+            provider=spec.name,
         )
         with self._lock:
             self._runs[gap_id] = handle
@@ -450,6 +456,39 @@ class SubprocessManager:
                     severity="error", category="cli",
                     gap_id=h.gap_id, actor="runner",
                 )
+        elapsed = max(0.001, time.monotonic() - h.started_at)
+        perf_metrics.record(
+            "agent_log_append",
+            conn=self._get_conn(),
+            elapsed_ms=elapsed * 1000.0,
+            success=h.killed_reason is None,
+            gap_id=h.gap_id,
+            provider=h.provider,
+            rows_returned=h.log_entries,
+            bytes_out=h.truncated_bytes,
+            details={
+                "round_idx": h.round_idx,
+                "entries_per_sec": round(h.log_entries / elapsed, 3),
+                "total_entries": h.log_entries,
+                "truncated_bytes": h.truncated_bytes,
+                "skipped_bytes": h.skipped_bytes,
+                "killed_reason": h.killed_reason or "",
+            },
+        )
+        perf_metrics.record(
+            "ai.agent_run",
+            conn=self._get_conn(),
+            elapsed_ms=elapsed * 1000.0,
+            success=(h.killed_reason is None and exit_code == 0),
+            gap_id=h.gap_id,
+            provider=h.provider,
+            details={
+                "round_idx": h.round_idx,
+                "exit_code": exit_code,
+                "killed_reason": h.killed_reason or "",
+                "agent_reported_success": h.agent_reported_success,
+            },
+        )
 
     def _drain_stdout(self, h: RunHandle) -> None:
         """Translate structured events from the agent into round-log lines.
@@ -504,6 +543,8 @@ class SubprocessManager:
                 for s in summaries:
                     if s:
                         self._write_log_entry(h, s)
+                if h.output_format != "plain" and not summaries:
+                    h.skipped_bytes += len(line.encode("utf-8", errors="replace"))
                 if (h.output_format == "claude_json"
                         and isinstance(evt, dict)
                         and evt.get("type") == "result"):
@@ -524,17 +565,46 @@ class SubprocessManager:
     def _write_log_entry(self, h: RunHandle, message: str) -> None:
         """One round-log entry per call + a `last_output_at` bump."""
         self._remember_output(h, message)
+        raw_bytes = len(message.encode("utf-8", errors="replace"))
+        stored = message[:200]
+        stored_bytes = len(stored.encode("utf-8", errors="replace"))
+        if raw_bytes > stored_bytes:
+            h.truncated_bytes += raw_bytes - stored_bytes
+        h.log_entries += 1
         try:
             gap_writer.append_round_log(
                 gap_id=h.gap_id,
                 round_idx=h.round_idx,
                 severity="info",
                 category="cli",
-                message=message[:200],
+                message=stored,
                 details=message if len(message) > 200 else None,
             )
         except Exception:
             pass
+        now = time.monotonic()
+        if h.last_log_metric_at == 0.0:
+            h.last_log_metric_at = now
+        elif h.log_entries % 50 == 0 or (now - h.last_log_metric_at) >= 30.0:
+            elapsed = max(0.001, now - h.started_at)
+            perf_metrics.record(
+                "agent_log_append",
+                conn=self._get_conn(),
+                elapsed_ms=elapsed * 1000.0,
+                gap_id=h.gap_id,
+                provider=h.provider,
+                rows_returned=h.log_entries,
+                bytes_out=h.truncated_bytes,
+                details={
+                    "round_idx": h.round_idx,
+                    "entries_per_sec": round(h.log_entries / elapsed, 3),
+                    "total_entries": h.log_entries,
+                    "truncated_bytes": h.truncated_bytes,
+                    "skipped_bytes": h.skipped_bytes,
+                    "partial": True,
+                },
+            )
+            h.last_log_metric_at = now
         try:
             conn = self._get_conn()
             with db.transaction(conn):

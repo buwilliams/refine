@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters
+from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
@@ -530,6 +531,46 @@ def background_job(job_id: str) -> tuple[int, dict]:
     return 200, {"job": job}
 
 
+def performance_summary(*, operation: str | None = None,
+                        success: str | None = None,
+                        limit: int = 100) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        success_filter: bool | None = None
+        if success in ("1", "true", "ok", "success"):
+            success_filter = True
+        elif success in ("0", "false", "failed", "failure"):
+            success_filter = False
+        return 200, perf_metrics.snapshot(
+            conn,
+            days=perf_metrics.RETENTION_DAYS,
+            limit=limit,
+            operation=operation or None,
+            success=success_filter,
+        )
+    finally:
+        conn.close()
+
+
+def performance_cleanup(body: dict | None = None) -> tuple[int, dict]:
+    body = body or {}
+    conn = _conn()
+    try:
+        if body.get("clear"):
+            deleted = perf_metrics.clear(conn)
+            return 200, {
+                "deleted": deleted,
+                "retention_days": perf_metrics.RETENTION_DAYS,
+            }
+        deleted = perf_metrics.prune(conn, days=perf_metrics.RETENTION_DAYS)
+        return 200, {
+            "deleted": deleted,
+            "retention_days": perf_metrics.RETENTION_DAYS,
+        }
+    finally:
+        conn.close()
+
+
 def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
     """Operator recovery path for a stale or corrupted SQLite cache."""
     blocked = _schema_block_response()
@@ -906,6 +947,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
+    metric_start = perf_metrics.now()
     page_limit, page_offset = _page_bounds(limit, offset)
     needs_round_search = bool(
         q and not (severity or category or actor or reporter)
@@ -985,8 +1027,13 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     # Round-content search only kicks in when the only non-q filters are
     # the existing ones — the activity-side subquery already constrains
     # the candidate id set.
+    rows_scanned = len(rows)
+    round_rows_scanned = 0
     if needs_round_search and len(rows) < page_limit + page_offset + 1:
-        rows = _augment_with_round_search(rows, q, page_limit + page_offset + 1)
+        rows, round_rows_scanned = _augment_with_round_search(
+            rows, q, page_limit + page_offset + 1,
+        )
+        rows_scanned += round_rows_scanned
     if needs_round_search:
         rows = rows[page_offset:]
     has_more = len(rows) > page_limit
@@ -1001,11 +1048,32 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     }
     if facets is not None:
         body["facets"] = facets
+    perf_metrics.record(
+        "api.list_gaps",
+        elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+        query_mode="round_search" if needs_round_search else "indexed",
+        rows_scanned=rows_scanned,
+        rows_returned=len(rows),
+        details={
+            "status": status or "",
+            "q": bool(q),
+            "severity": severity or "",
+            "category": category or "",
+            "actor": actor or "",
+            "reporter": reporter or "",
+            "instance": instance or "",
+            "limit": page_limit,
+            "offset": page_offset,
+            "sort": sort or "",
+            "direction": direction or "",
+            "round_rows_scanned": round_rows_scanned,
+        },
+    )
     return 200, body
 
 
 def _augment_with_round_search(initial: list[dict], q: str,
-                                limit: int) -> list[dict]:
+                                limit: int) -> tuple[list[dict], int]:
     seen = {r["id"] for r in initial}
     needle = q.lower()
     conn = _conn()
@@ -1017,7 +1085,9 @@ def _augment_with_round_search(initial: list[dict], q: str,
     finally:
         conn.close()
     extras: list[dict] = []
+    scanned = 0
     for r in rows:
+        scanned += 1
         if r["id"] in seen:
             continue
         gap = shared_gaps.read_gap_json(r["id"])
@@ -1034,13 +1104,14 @@ def _augment_with_round_search(initial: list[dict], q: str,
                 break
         if len(initial) + len(extras) >= limit:
             break
-    return initial + extras
+    return initial + extras, scanned
 
 
 def get_gap(gap_id: str) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
+    metric_start = perf_metrics.now()
     conn = _conn()
     try:
         row = conn.execute(
@@ -1068,6 +1139,21 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     gap["instance_id"] = row["instance_id"]
     gap["instance_display_name"] = project_state.gap_instance_display(row["instance_id"])
     gap["activity"] = gap_activity
+    rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+    log_count = sum(
+        len(r.get("logs") or []) for r in rounds if isinstance(r.get("logs") or [], list)
+    )
+    perf_metrics.record(
+        "api.get_gap",
+        elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+        gap_id=gap_id,
+        rows_returned=1,
+        details={
+            "round_count": len(rounds),
+            "log_count": log_count,
+            "activity_count": len(gap_activity),
+        },
+    )
     return 200, {"gap": gap}
 
 
@@ -2087,6 +2173,7 @@ def list_activity(*, limit: int = 100, gap_id: str | None = None,
                   q: str | None = None,
                   offset: int = 0,
                   include_facets: bool = False) -> tuple[int, dict]:
+    metric_start = perf_metrics.now()
     page_limit, page_offset = _page_bounds(limit, offset)
     conn = _conn()
     try:
@@ -2110,6 +2197,23 @@ def list_activity(*, limit: int = 100, gap_id: str | None = None,
                 "actors": activity.distinct_actors(conn),
                 "severities": ["info", "warn", "error"],
             }
+        perf_metrics.record(
+            "api.list_activity",
+            conn=conn,
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            gap_id=gap_id,
+            query_mode="filtered" if any([gap_id, since_id, severity, category, actor, q]) else "recent",
+            rows_returned=len(body["activity"]),
+            details={
+                "limit": page_limit,
+                "offset": page_offset,
+                "since_id": since_id,
+                "severity": severity or "",
+                "category": category or "",
+                "actor": actor or "",
+                "q": bool(q),
+            },
+        )
     finally:
         conn.close()
     return 200, body

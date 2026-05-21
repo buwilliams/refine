@@ -58,7 +58,8 @@ def main() -> int:
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
-        "application", "reporters", "instances", "runtime", "guidance", "governance",
+        "application", "reporters", "instances", "runtime", "performance",
+        "guidance", "governance",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
@@ -87,6 +88,12 @@ def main() -> int:
     assert "project_update_pulse_interval_seconds" in settings_js
     assert 'id="s-rebuild-cache"' in settings_js
     assert 'api("POST", "/api/cache/rebuild", {})' in settings_js
+    assert 'slug: "performance"' in settings_js
+    assert 'api("GET", "/api/performance")' in settings_js
+    assert 'api("POST", "/api/performance/cleanup"' in settings_js
+    assert '@route("GET", r"/api/performance")' in server_py
+    assert '@route("POST", r"/api/performance/cleanup")' in server_py
+    assert "def performance_summary" in api_py
     assert 'withButtonBusy($("#s-rebuild-cache"), "Rebuilding…"' in settings_js
     assert "function drawRuntimeRecovery(error)" in settings_js
     assert '@route("POST", r"/api/cache/rebuild")' in server_py

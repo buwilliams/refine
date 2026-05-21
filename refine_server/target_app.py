@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from . import git_ops
+from . import git_ops, perf_metrics
 from .agent_cli import get_spec, resolve_binary
 from .chat_mgr import _chat_env, _merge_paths, _user_login_path
 
@@ -340,6 +340,7 @@ def _now_iso() -> str:
 def generate_config(provider: str | None = None,
                     timeout: float = 300.0) -> dict[str, Any]:
     """Ask the selected AI agent to produce structured target-app config."""
+    metric_start = perf_metrics.now()
     env = _chat_env()
     spec = get_spec(provider)
     binary = resolve_binary(spec, env)
@@ -354,12 +355,38 @@ def generate_config(provider: str | None = None,
             env=env, cwd=str(cwd),
         )
     except subprocess.TimeoutExpired as e:
+        perf_metrics.record(
+            "ai.target_app_generate",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=len(_GENERATE_PROMPT.encode("utf-8", errors="replace")),
+            bytes_out=len(str(e.stdout or "").encode("utf-8", errors="replace")),
+            details={"error": "timeout", "timeout": timeout},
+        )
         return {"ok": False, "config": {}, "message": f"agent timed out after {int(timeout)}s",
                 "raw": (e.stdout or "")}
     except (OSError, FileNotFoundError) as e:
+        perf_metrics.record(
+            "ai.target_app_generate",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=len(_GENERATE_PROMPT.encode("utf-8", errors="replace")),
+            details={"error": repr(e)[:1000]},
+        )
         return {"ok": False, "config": {}, "message": f"could not launch agent: {e}",
                 "raw": ""}
     if out.returncode != 0:
+        perf_metrics.record(
+            "ai.target_app_generate",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=len(_GENERATE_PROMPT.encode("utf-8", errors="replace")),
+            bytes_out=len(((out.stdout or "") + (out.stderr or "")).encode("utf-8", errors="replace")),
+            details={"returncode": out.returncode},
+        )
         return {"ok": False, "config": {}, "message": (
             (out.stderr or "").strip().splitlines()[-1]
             if (out.stderr or "").strip() else f"agent exited {out.returncode}"
@@ -367,9 +394,25 @@ def generate_config(provider: str | None = None,
     raw = _last_agent_text(out.stdout or "").strip()
     parsed = _parse_json_object(raw)
     if parsed is None:
+        perf_metrics.record(
+            "ai.target_app_generate",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=len(_GENERATE_PROMPT.encode("utf-8", errors="replace")),
+            bytes_out=len(raw.encode("utf-8", errors="replace")),
+            details={"error": "invalid_json"},
+        )
         return {"ok": False, "config": {}, "message": "agent did not return a JSON object",
                 "raw": raw}
     config = normalize_generated_config(parsed)
+    perf_metrics.record(
+        "ai.target_app_generate",
+        elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+        provider=spec.name,
+        bytes_in=len(_GENERATE_PROMPT.encode("utf-8", errors="replace")),
+        bytes_out=len(raw.encode("utf-8", errors="replace")),
+    )
     return {"ok": True, "config": config, "message": "generated", "raw": raw}
 
 

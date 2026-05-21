@@ -78,6 +78,30 @@ CREATE TABLE IF NOT EXISTS activity (
 CREATE INDEX IF NOT EXISTS idx_activity_datetime ON activity(datetime DESC);
 CREATE INDEX IF NOT EXISTS idx_activity_gap      ON activity(gap_id);
 
+CREATE TABLE IF NOT EXISTS performance_events (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    occurred_at   TEXT NOT NULL,
+    operation     TEXT NOT NULL,
+    elapsed_ms    REAL NOT NULL DEFAULT 0,
+    success       INTEGER NOT NULL DEFAULT 1,
+    gap_id        TEXT,
+    provider      TEXT,
+    query_mode    TEXT,
+    rows_scanned  INTEGER,
+    rows_returned INTEGER,
+    bytes_in      INTEGER,
+    bytes_out     INTEGER,
+    details_json  TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_performance_operation
+    ON performance_events(operation, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_performance_occurred
+    ON performance_events(occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_performance_gap
+    ON performance_events(gap_id);
+CREATE INDEX IF NOT EXISTS idx_performance_success
+    ON performance_events(success);
+
 CREATE TABLE IF NOT EXISTS preflight (
     id           INTEGER PRIMARY KEY CHECK (id = 1),
     ok           INTEGER NOT NULL,
@@ -267,6 +291,44 @@ def _migrate(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_instance ON gaps_index(instance_id)"
     )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS performance_events ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "occurred_at TEXT NOT NULL, "
+        "operation TEXT NOT NULL, "
+        "elapsed_ms REAL NOT NULL DEFAULT 0, "
+        "success INTEGER NOT NULL DEFAULT 1, "
+        "gap_id TEXT, "
+        "provider TEXT, "
+        "query_mode TEXT, "
+        "rows_scanned INTEGER, "
+        "rows_returned INTEGER, "
+        "bytes_in INTEGER, "
+        "bytes_out INTEGER, "
+        "details_json TEXT)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_performance_operation "
+        "ON performance_events(operation, occurred_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_performance_occurred "
+        "ON performance_events(occurred_at DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_performance_gap "
+        "ON performance_events(gap_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_performance_success "
+        "ON performance_events(success)"
+    )
+    try:
+        from . import perf_metrics
+
+        perf_metrics.prune(conn)
+    except Exception:
+        pass
 
 
 def _backfill_reporter(conn: sqlite3.Connection) -> None:

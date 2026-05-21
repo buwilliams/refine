@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import git_ops
+from . import perf_metrics
 from .agent_cli import get_spec, resolve_binary
 from .chat_mgr import _chat_env
 
@@ -66,10 +67,12 @@ def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
     text = (text or "").strip()
     if not text:
         return []
+    metric_start = perf_metrics.now()
     env = _chat_env()
     spec = get_spec(provider)
     binary = resolve_binary(spec, env)
     prompt = _EXTRACT_PROMPT_TEMPLATE.format(text=text)
+    prompt_bytes = len(prompt.encode("utf-8", errors="replace"))
     cwd = git_ops.client_repo_path()
     output_last_message: Path | None = None
     tmp: tempfile.TemporaryDirectory | None = None
@@ -89,16 +92,41 @@ def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
             cwd=str(cwd),
         )
     except subprocess.TimeoutExpired as e:
+        perf_metrics.record(
+            "ai.import_extract",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=prompt_bytes,
+            details={"error": "timeout", "timeout": 180},
+        )
         if tmp is not None:
             tmp.cleanup()
         raise RuntimeError(f"{spec.binary} timed out after 180s") from e
     except (OSError, FileNotFoundError) as e:
+        perf_metrics.record(
+            "ai.import_extract",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=prompt_bytes,
+            details={"error": repr(e)[:1000]},
+        )
         if tmp is not None:
             tmp.cleanup()
         raise RuntimeError(f"could not launch {spec.binary}: {e}") from e
     if out.returncode != 0:
         msg = (out.stdout or "").strip() or (out.stderr or "").strip() \
               or f"{spec.binary} exited {out.returncode}"
+        perf_metrics.record(
+            "ai.import_extract",
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=spec.name,
+            bytes_in=prompt_bytes,
+            bytes_out=len(((out.stdout or "") + (out.stderr or "")).encode("utf-8", errors="replace")),
+            details={"returncode": out.returncode, "message": msg[:1000]},
+        )
         if tmp is not None:
             tmp.cleanup()
         raise RuntimeError(msg)
@@ -109,7 +137,16 @@ def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
         raw = _extract_final_text(out.stdout or "")
     if tmp is not None:
         tmp.cleanup()
-    return _normalize_drafts(_parse_json_array(raw))
+    drafts = _normalize_drafts(_parse_json_array(raw))
+    perf_metrics.record(
+        "ai.import_extract",
+        elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+        provider=spec.name,
+        bytes_in=prompt_bytes,
+        bytes_out=len(raw.encode("utf-8", errors="replace")),
+        rows_returned=len(drafts),
+    )
+    return drafts
 
 
 def _parse_json_array(text: str) -> list[Any]:

@@ -72,6 +72,7 @@ def select_for_gap(
         provider = (db.get_setting(conn, "agent_cli") or "claude").strip().lower()
         run_one_shot = lambda p: governance._run_one_shot(  # noqa: SLF001
             p, provider=provider, timeout=300.0,
+            operation="ai.guidance_select",
         )
     raw = run_one_shot(prompt)
     obj = governance._parse_json_object(raw) or {}  # noqa: SLF001

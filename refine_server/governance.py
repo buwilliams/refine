@@ -8,7 +8,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from refine_server import db, gaps as shared_gaps
+from refine_server import db, gaps as shared_gaps, perf_metrics
 from refine_server.gaps import now_iso
 
 from . import git_ops
@@ -98,7 +98,10 @@ def generate_rules(product: str, constitution: str, *,
         product=product.strip(),
         constitution=constitution.strip(),
     )
-    raw = _run_one_shot(prompt, provider=provider, timeout=300.0)
+    raw = _run_one_shot(
+        prompt, provider=provider, timeout=300.0,
+        operation="ai.governance_generate_rules",
+    )
     rules = normalize_rules(_parse_json_array(raw))
     return {"ok": True, "rules": rules, "raw": raw}
 
@@ -125,7 +128,10 @@ def classify_gap(conn, gap_id: str, *, provider: str | None = None) -> dict[str,
         actual=latest.get("actual", ""),
         target=latest.get("target", ""),
     )
-    raw = _run_one_shot(prompt, provider=provider, timeout=300.0)
+    raw = _run_one_shot(
+        prompt, provider=provider, timeout=300.0,
+        operation="ai.governance_classify",
+    )
     obj = _parse_json_object(raw) or {}
     result = normalize_classification(obj)
     result["raw"] = raw
@@ -227,9 +233,13 @@ def apply_rule_actions(conn, actions: list[dict[str, Any]]) -> list[dict[str, An
 
 
 def _run_one_shot(prompt: str, *, provider: str | None,
-                  timeout: float) -> str:
+                  timeout: float, operation: str = "ai.one_shot") -> str:
+    metric_start = perf_metrics.now()
+    prompt_bytes = len(prompt.encode("utf-8", errors="replace"))
+    metric_provider = provider or ""
     env = _chat_env()
     spec = get_spec(provider)
+    metric_provider = spec.name
     binary = resolve_binary(spec, env)
     cwd = git_ops.client_repo_path()
     output_last_message: Path | None = None
@@ -248,15 +258,40 @@ def _run_one_shot(prompt: str, *, provider: str | None,
             env=env, cwd=str(cwd),
         )
     except subprocess.TimeoutExpired as e:
+        perf_metrics.record(
+            operation,
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=metric_provider,
+            bytes_in=prompt_bytes,
+            details={"error": "timeout", "timeout": timeout},
+        )
         if tmp is not None:
             tmp.cleanup()
         raise RuntimeError(f"{spec.binary} timed out after {int(timeout)}s") from e
     except (OSError, FileNotFoundError) as e:
+        perf_metrics.record(
+            operation,
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=metric_provider,
+            bytes_in=prompt_bytes,
+            details={"error": repr(e)[:1000]},
+        )
         if tmp is not None:
             tmp.cleanup()
         raise RuntimeError(f"could not launch {spec.binary}: {e}") from e
     if out.returncode != 0:
         msg = (out.stderr or out.stdout or f"{spec.binary} exited {out.returncode}").strip()
+        perf_metrics.record(
+            operation,
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            success=False,
+            provider=metric_provider,
+            bytes_in=prompt_bytes,
+            bytes_out=len(((out.stdout or "") + (out.stderr or "")).encode("utf-8", errors="replace")),
+            details={"returncode": out.returncode, "message": msg[:1000]},
+        )
         if tmp is not None:
             tmp.cleanup()
         raise RuntimeError(msg)
@@ -267,6 +302,13 @@ def _run_one_shot(prompt: str, *, provider: str | None,
         raw = _extract_final_text(out.stdout or "")
     if tmp is not None:
         tmp.cleanup()
+    perf_metrics.record(
+        operation,
+        elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+        provider=metric_provider,
+        bytes_in=prompt_bytes,
+        bytes_out=len(raw.encode("utf-8", errors="replace")),
+    )
     return raw
 
 

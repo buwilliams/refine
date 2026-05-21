@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, db, features, gaps as shared_gaps, governance, project_state, reporters
+from refine_server import activity, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
@@ -572,20 +572,33 @@ class Runner:
         Returns each commit plus the Gap metadata refine knows about
         (name + current status). Powers the Changes screen.
         """
+        metric_start = perf_metrics.now()
         target = self._effective_target_branch()
         limit = max(1, int(params.get("limit") or 50))
         offset = max(0, int(params.get("offset") or 0))
         q = str(params.get("q") or "").strip().lower()
         status = str(params.get("status") or "").strip()
         priority = str(params.get("priority") or "").strip()
+        query_mode = "filtered" if (q or status or priority) else "paged"
+        rows_scanned = 0
         if not target:
-            return {
+            result = {
                 "branch": None,
                 "changes": [],
                 "page": {"limit": limit, "offset": offset, "has_more": False},
             }
+            perf_metrics.record(
+                "runner.list_changes",
+                conn=self._conn,
+                elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+                query_mode="no_target",
+                rows_scanned=0,
+                rows_returned=0,
+                details={"limit": limit, "offset": offset},
+            )
+            return result
         if q or status or priority:
-            fetched = self._filtered_refine_merges(
+            fetched, rows_scanned = self._filtered_refine_merges(
                 target, q=q, status=status, priority=priority,
                 needed=offset + limit + 1,
             )
@@ -594,26 +607,54 @@ class Runner:
             page_rows = git_ops.list_refine_merges(
                 target, limit=limit + 1, offset=offset,
             )
+            rows_scanned = len(page_rows)
             self._enrich_refine_merges(page_rows)
         has_more = len(page_rows) > limit
         merges = page_rows[:limit]
         if not merges:
-            return {
+            result = {
                 "branch": target,
                 "changes": [],
                 "page": {"limit": limit, "offset": offset, "has_more": False},
             }
-        return {
+            perf_metrics.record(
+                "runner.list_changes",
+                conn=self._conn,
+                elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+                query_mode=query_mode,
+                rows_scanned=rows_scanned,
+                rows_returned=0,
+                details={
+                    "limit": limit, "offset": offset, "q": bool(q),
+                    "status": status, "priority": priority,
+                },
+            )
+            return result
+        result = {
             "branch": target,
             "changes": merges,
             "page": {"limit": limit, "offset": offset, "has_more": has_more},
         }
+        perf_metrics.record(
+            "runner.list_changes",
+            conn=self._conn,
+            elapsed_ms=perf_metrics.elapsed_ms(metric_start),
+            query_mode=query_mode,
+            rows_scanned=rows_scanned,
+            rows_returned=len(merges),
+            details={
+                "limit": limit, "offset": offset, "q": bool(q),
+                "status": status, "priority": priority,
+            },
+        )
+        return result
 
     def _filtered_refine_merges(self, target: str, *, q: str, status: str,
-                                priority: str, needed: int) -> list[dict]:
+                                priority: str, needed: int) -> tuple[list[dict], int]:
         matches: list[dict] = []
         scan_offset = 0
         chunk_size = 200
+        scanned = 0
         while len(matches) < needed:
             chunk = git_ops.list_refine_merges(
                 target, limit=chunk_size, offset=scan_offset,
@@ -622,6 +663,7 @@ class Runner:
                 break
             self._enrich_refine_merges(chunk)
             for row in chunk:
+                scanned += 1
                 if self._refine_merge_matches(row, q=q, status=status,
                                               priority=priority):
                     matches.append(row)
@@ -630,7 +672,7 @@ class Runner:
             scan_offset += len(chunk)
             if len(chunk) < chunk_size:
                 break
-        return matches
+        return matches, scanned
 
     def _enrich_refine_merges(self, merges: list[dict]) -> None:
         if not merges:

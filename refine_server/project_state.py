@@ -632,17 +632,33 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
 def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     """Rebuild SQLite projection tables from canonical JSON."""
     from . import db
+    from . import perf_metrics
 
+    total_start = perf_metrics.now()
+    phase_ms: dict[str, float] = {}
+    rows_inserted = 0
+    files_scanned = 0
+    bytes_parsed = 0
     ensure_initialized(conn, migrate=True)
     active = active_instance_id()
     settings = list_settings()
     reps = list_reporters()
     root = volume_root()
+    phase_start = perf_metrics.now()
     fingerprint = state_fingerprint(root=root)
+    phase_ms["fingerprint_ms"] = perf_metrics.elapsed_ms(phase_start)
+    phase_start = perf_metrics.now()
+    gap_rows, iter_stats = _iter_gap_json_with_stats(root)
+    phase_ms["parse_ms"] = perf_metrics.elapsed_ms(phase_start)
+    files_scanned = iter_stats["files_scanned"]
+    bytes_parsed = iter_stats["bytes_parsed"]
     with db.transaction(conn):
+        phase_start = perf_metrics.now()
         conn.execute("DELETE FROM gaps_index")
         conn.execute("DELETE FROM settings")
         conn.execute("DELETE FROM reporters")
+        phase_ms["delete_ms"] = perf_metrics.elapsed_ms(phase_start)
+        phase_start = perf_metrics.now()
         for key, value in settings.items():
             conn.execute(
                 "INSERT INTO settings(key, value) VALUES(?, ?)",
@@ -665,7 +681,9 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
                     str(rep.get("created") or now_iso()),
                 ),
             )
-        for gap, rel_path in _iter_gap_json(root):
+        phase_ms["settings_reporters_ms"] = perf_metrics.elapsed_ms(phase_start)
+        phase_start = perf_metrics.now()
+        for gap, rel_path in gap_rows:
             conn.execute(
                 "INSERT OR REPLACE INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, "
@@ -684,6 +702,18 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
                     rel_path,
                 ),
             )
+            rows_inserted += 1
+        phase_ms["gap_index_insert_ms"] = perf_metrics.elapsed_ms(phase_start)
+    perf_metrics.record(
+        "sqlite_cache_rebuild",
+        conn=conn,
+        elapsed_ms=perf_metrics.elapsed_ms(total_start),
+        success=True,
+        rows_scanned=files_scanned,
+        rows_returned=rows_inserted,
+        bytes_in=bytes_parsed,
+        details={**phase_ms, "files_scanned": files_scanned},
+    )
 
 
 def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
@@ -730,14 +760,26 @@ def state_fingerprint(*, root: Path | None = None) -> str:
 
 
 def _iter_gap_json(root: Path) -> list[tuple[dict[str, Any], str]]:
+    return _iter_gap_json_with_stats(root)[0]
+
+
+def _iter_gap_json_with_stats(root: Path) -> tuple[list[tuple[dict[str, Any], str]], dict[str, int]]:
     out: list[tuple[dict[str, Any], str]] = []
+    files_scanned = 0
+    bytes_parsed = 0
     for path in sorted((root / "gaps").glob("**/gap.json")):
-        gap = _read_json(path, {})
+        files_scanned += 1
+        try:
+            raw = path.read_bytes()
+            bytes_parsed += len(raw)
+            gap = json.loads(raw.decode("utf-8"))
+        except (OSError, json.JSONDecodeError):
+            gap = {}
         if not isinstance(gap, dict) or not gap.get("id"):
             continue
         rel = path.relative_to(root).as_posix()
         out.append((gap, rel))
-    return out
+    return out, {"files_scanned": files_scanned, "bytes_parsed": bytes_parsed}
 
 
 def _latest_reporter(gap: dict[str, Any]) -> str:

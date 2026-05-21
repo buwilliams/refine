@@ -153,21 +153,50 @@ def reset_round_governance(round_obj: dict[str, Any]) -> dict[str, Any]:
 
 
 def read_gap_json(gap_id: str) -> dict[str, Any] | None:
+    from . import perf_metrics
+
+    start = perf_metrics.now()
     p = gap_json_path(gap_id)
     if not p.exists():
+        perf_metrics.record(
+            "gap_json_read",
+            gap_id=gap_id,
+            elapsed_ms=perf_metrics.elapsed_ms(start),
+            success=False,
+            details={"missing": True},
+        )
         return None
-    with open(p, "rb") as f:
-        gap = json.loads(f.read().decode("utf-8"))
-    # Transparent legacy-shape migration: notes used to be a single string.
-    gap["notes"] = normalize_notes(gap.get("notes"))
-    gap.setdefault("status", "backlog")
-    gap.setdefault("priority", "low")
-    gap.setdefault("branch_name", None)
-    gap.setdefault("instance_id", "default")
-    for round_obj in gap.get("rounds") or []:
-        if isinstance(round_obj, dict):
-            normalize_round_governance(round_obj)
-    return gap
+    raw = b""
+    try:
+        with open(p, "rb") as f:
+            raw = f.read()
+        gap = json.loads(raw.decode("utf-8"))
+        # Transparent legacy-shape migration: notes used to be a single string.
+        gap["notes"] = normalize_notes(gap.get("notes"))
+        gap.setdefault("status", "backlog")
+        gap.setdefault("priority", "low")
+        gap.setdefault("branch_name", None)
+        gap.setdefault("instance_id", "default")
+        for round_obj in gap.get("rounds") or []:
+            if isinstance(round_obj, dict):
+                normalize_round_governance(round_obj)
+        perf_metrics.record(
+            "gap_json_read",
+            gap_id=gap_id,
+            elapsed_ms=perf_metrics.elapsed_ms(start),
+            bytes_in=len(raw),
+            details=_gap_metric_details(gap),
+        )
+        return gap
+    except Exception:
+        perf_metrics.record(
+            "gap_json_read",
+            gap_id=gap_id,
+            elapsed_ms=perf_metrics.elapsed_ms(start),
+            success=False,
+            bytes_in=len(raw) if raw else None,
+        )
+        raise
 
 
 def write_gap_json(gap: dict[str, Any]) -> None:
@@ -175,6 +204,10 @@ def write_gap_json(gap: dict[str, Any]) -> None:
 
     RUNNER ONLY. Web HTTP handlers must route writes through the backend runner.
     """
+    from . import perf_metrics
+
+    start = perf_metrics.now()
+    fsync_ms = 0.0
     gid = gap["id"]
     d = gap_dir(gid)
     d.mkdir(parents=True, exist_ok=True)
@@ -185,9 +218,19 @@ def write_gap_json(gap: dict[str, Any]) -> None:
         with os.fdopen(fd, "wb") as f:
             f.write(data)
             f.flush()
+            fsync_start = perf_metrics.now()
             os.fsync(f.fileno())
+            fsync_ms += perf_metrics.elapsed_ms(fsync_start)
         os.replace(tmp, p)
     except Exception:
+        perf_metrics.record(
+            "gap_json_write",
+            gap_id=gid,
+            elapsed_ms=perf_metrics.elapsed_ms(start),
+            success=False,
+            bytes_out=len(data),
+            details={**_gap_metric_details(gap), "fsync_ms": round(fsync_ms, 2)},
+        )
         try:
             os.unlink(tmp)
         except FileNotFoundError:
@@ -197,8 +240,25 @@ def write_gap_json(gap: dict[str, Any]) -> None:
     try:
         dir_fd = os.open(str(d), os.O_RDONLY)
         try:
+            fsync_start = perf_metrics.now()
             os.fsync(dir_fd)
+            fsync_ms += perf_metrics.elapsed_ms(fsync_start)
         finally:
             os.close(dir_fd)
     except OSError:
         pass  # not all filesystems support directory fsync
+    perf_metrics.record(
+        "gap_json_write",
+        gap_id=gid,
+        elapsed_ms=perf_metrics.elapsed_ms(start),
+        bytes_out=len(data),
+        details={**_gap_metric_details(gap), "fsync_ms": round(fsync_ms, 2)},
+    )
+
+
+def _gap_metric_details(gap: dict[str, Any]) -> dict[str, int]:
+    rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+    log_count = sum(
+        len(r.get("logs") or []) for r in rounds if isinstance(r.get("logs") or [], list)
+    )
+    return {"round_count": len(rounds), "log_count": log_count}
