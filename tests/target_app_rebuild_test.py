@@ -46,6 +46,11 @@ def main() -> int:
         assert rebuilder.queue_for_worktree_merge("01GAP") is True
         rebuilder._drain_queue()  # noqa: SLF001
         assert len(runs) == 3, runs
+        assert rebuilder.queue_for_worktree_merge("02GAP") is True
+        db.set_setting(conn, "target_app_auto_rebuild", "never")
+        rebuilder._drain_queue()  # noqa: SLF001
+        assert len(runs) == 3, runs
+        db.set_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
         gid_pending = "01TARGETAPPPENDINGREBUILDA"
         create_indexed_gap(conn, gid_pending, status="awaiting-rebuild", branch=None)
         assert rebuilder.queue_pending_awaiting_rebuild() is True
@@ -87,9 +92,15 @@ def main() -> int:
         assert target_settings["target_app_auto_rebuild"] == "hourly"
 
         db.set_setting(conn, "target_app_auto_rebuild", "nightly")
+        db.set_setting(conn, "target_app_auto_rebuild_last_started_at", "")
         midnight = datetime.now().astimezone().replace(
             hour=0, minute=0, second=0, microsecond=0,
         )
+        rebuilder._queue_scheduled_rebuild_if_due(  # noqa: SLF001
+            midnight.replace(hour=12),
+        )
+        rebuilder._drain_queue()  # noqa: SLF001
+        assert runs[-1] == "hourly automatic rebuild", runs
         db.set_setting(
             conn,
             "target_app_auto_rebuild_last_started_at",

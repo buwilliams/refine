@@ -10,6 +10,7 @@ from refine_server import db
 
 AUTO_REBUILD_MODES = ("never", "on_worktree_merge", "hourly", "nightly")
 DEFAULT_AUTO_REBUILD_MODE = "never"
+NIGHTLY_REBUILD_HOUR = 0
 
 
 class TargetAppRebuilder:
@@ -30,6 +31,7 @@ class TargetAppRebuilder:
         self._queued = False
         self._running = False
         self._last_reason = ""
+        self._last_mode: str | None = None
 
     def start(self) -> None:
         self._thread = threading.Thread(
@@ -41,18 +43,22 @@ class TargetAppRebuilder:
         self._stop.set()
         self._wake.set()
 
-    def queue_rebuild(self, reason: str) -> bool:
+    def queue_rebuild(self, reason: str, *, mode: str | None = None) -> bool:
         with self._state_lock:
             already_pending = self._queued
             self._queued = True
             self._last_reason = reason
+            self._last_mode = mode
         self._wake.set()
         return not already_pending
 
     def queue_for_worktree_merge(self, gap_id: str) -> bool:
         if self._mode() != "on_worktree_merge":
             return False
-        return self.queue_rebuild(f"worktree merge for Gap {gap_id}")
+        return self.queue_rebuild(
+            f"worktree merge for Gap {gap_id}",
+            mode="on_worktree_merge",
+        )
 
     def queue_pending_awaiting_rebuild(self) -> bool:
         if self._mode() != "on_worktree_merge":
@@ -67,7 +73,8 @@ class TargetAppRebuilder:
         if n <= 0:
             return False
         return self.queue_rebuild(
-            f"{n} Gap{'' if n == 1 else 's'} awaiting target-app rebuild"
+            f"{n} Gap{'' if n == 1 else 's'} awaiting target-app rebuild",
+            mode="on_worktree_merge",
         )
 
     def snapshot(self) -> dict:
@@ -97,11 +104,15 @@ class TargetAppRebuilder:
                 self._queued = False
                 self._running = True
                 reason = self._last_reason or "automatic rebuild"
+                queued_mode = self._last_mode
             try:
-                self._run_rebuild(reason)
+                if queued_mode is None or self._mode() == queued_mode:
+                    self._run_rebuild(reason)
             finally:
                 with self._state_lock:
                     self._running = False
+                    if not self._queued:
+                        self._last_mode = None
 
     def _queue_scheduled_rebuild_if_due(self, now: datetime | None = None) -> None:
         mode = self._mode()
@@ -120,13 +131,16 @@ class TargetAppRebuilder:
                 else (now.astimezone(timezone.utc) - last).total_seconds()
             )
             if elapsed is None or elapsed >= 3600:
-                self.queue_rebuild("hourly automatic rebuild")
+                self.queue_rebuild("hourly automatic rebuild", mode="hourly")
             return
         # Run once per local day as soon as the scheduler sees the local date
-        # roll over after midnight.
+        # roll over during the midnight hour. If Refine starts later in the
+        # day, wait for the next nightly window instead of rebuilding on boot.
+        if now.hour != NIGHTLY_REBUILD_HOUR:
+            return
         if last is not None and last.astimezone().date() == now.date():
             return
-        self.queue_rebuild("nightly automatic rebuild")
+        self.queue_rebuild("nightly automatic rebuild", mode="nightly")
 
     def _mode(self) -> str:
         mode = (db.get_setting(
