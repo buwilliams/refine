@@ -879,7 +879,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
       <div class="form-row"><label>Parallel-run cap</label>
-        <input type="number" id="s-cap" value="${s.parallel_run_cap || 3}"></div>
+        <input type="number" id="s-cap" value="${s.parallel_run_cap || 10}"></div>
       <div class="form-row"><label>Branch name pattern</label>
         <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
       <div class="form-row"><label>Agent idle timeout (seconds)</label>

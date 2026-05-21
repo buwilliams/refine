@@ -239,7 +239,7 @@ CREATE INDEX IF NOT EXISTS idx_guidance_decisions_gap
 """
 
 DEFAULT_SETTINGS = {
-    "parallel_run_cap": "3",
+    "parallel_run_cap": "10",
     "branch_name_pattern": "refine/{gap_id}",
     "agent_idle_timeout_seconds": "900",   # 15 min
     "agent_hard_cap_seconds": "86400",     # 24 h

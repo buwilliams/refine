@@ -91,7 +91,7 @@ class Dispatcher:
         if self._preempt_lower_priority_runs(conn, active_rank):
             return
 
-        cap = db.get_setting_int(conn, "parallel_run_cap", 3)
+        cap = db.get_setting_int(conn, "parallel_run_cap", 10)
         running = len(self.sub_mgr.running_snapshot())
         if running >= cap:
             return

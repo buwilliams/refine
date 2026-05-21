@@ -201,7 +201,7 @@ Two-character ID-prefix sharded directory layout under the volume root on the ho
 
 ### Concurrency
 
-- **Parallel-run cap** — at most N agent CLI subprocesses may run at once across all Gaps (default `3`, configurable from the System page). There is no persistent worker pool; subprocesses are spawned on demand when there is work to do, and the process exits when its round finishes.
+- **Parallel-run cap** — at most N agent CLI subprocesses may run at once across all Gaps (default `10`, configurable from the System page). There is no persistent worker pool; subprocesses are spawned on demand when there is work to do, and the process exits when its round finishes.
 - **Per-Gap lock** — a Gap may have at most one running subprocess at a time.
 - When a Gap enters `todo`, refine launches a subprocess for it immediately if a slot is available under the cap. Otherwise the Gap waits in `todo` and is picked up the moment a running subprocess finishes.
 
@@ -406,7 +406,7 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 
 | Setting               | Default                                    | Notes |
 |-----------------------|--------------------------------------------|-------|
-| Parallel-run cap      | `3`                                        | Max agent subprocesses running concurrently. |
+| Parallel-run cap      | `10`                                       | Max agent subprocesses running concurrently. |
 | Branch name pattern   | `refine/<gap-id>`                          | `<gap-id>` is substituted at branch creation. |
 | Merge target          | client repo's current branch at merge time | **Fixed policy** — not configurable. Refine always merges into whatever branch is checked out at merge time. |
 | Agent idle timeout    | `15 min`                                   | Kill the subprocess if it produces no output for this long. Primary stuck-detector. Set to `0` to disable. |

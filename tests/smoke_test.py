@@ -58,7 +58,7 @@ def main() -> int:
     db.init_db()
     conn = db.connect()
     settings = db.list_settings(conn)
-    assert settings["parallel_run_cap"] == "3"
+    assert settings["parallel_run_cap"] == "10"
     assert settings["agent_idle_timeout_seconds"] == "900"
     assert settings["agent_hard_cap_seconds"] == "86400"
     assert settings["agent_limit_pause_seconds"] == "60"
