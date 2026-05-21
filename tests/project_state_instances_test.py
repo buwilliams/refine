@@ -148,6 +148,71 @@ def main() -> int:
         ).fetchone()
         assert row["status"] == "failed", dict(row)
 
+        inc_a = "01PROJECTSTATEINCAAAAAAAA"
+        inc_b = "01PROJECTSTATEINCBBBBBBBB"
+        inc_c = "01PROJECTSTATEINCCCCCCCCC"
+        for inc_gid in (inc_a, inc_b, inc_c):
+            gap_writer.create_gap(
+                gap_id=inc_gid,
+                name=f"Incremental {inc_gid[-1]}",
+                initial_round=gaps.new_round("Jane", "Actual", "Target"),
+                status="todo",
+                priority="low",
+                instance_id=active,
+            )
+        project_state.rebuild_sqlite_cache(conn)
+        meta_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM gap_cache_meta WHERE gap_id IN (?, ?, ?)",
+            (inc_a, inc_b, inc_c),
+        ).fetchone()["n"]
+        assert meta_count == 3, meta_count
+
+        original_read_cache_bytes = project_state._read_gap_cache_bytes
+        cache_reads: list[str] = []
+
+        def counted_cache_read(path: Path) -> bytes:
+            cache_reads.append(path.relative_to(root).as_posix())
+            return original_read_cache_bytes(path)
+
+        project_state._read_gap_cache_bytes = counted_cache_read
+        try:
+            project_state.rebuild_sqlite_cache(conn)
+            assert cache_reads == [], cache_reads
+
+            gap_writer.update_fields(inc_b, status="review")
+            project_state.rebuild_sqlite_cache(conn)
+            expected_changed = f"gaps/{inc_b[:2]}/{inc_b[2:]}/gap.json"
+            assert cache_reads == [expected_changed], cache_reads
+            row = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = ?", (inc_b,),
+            ).fetchone()
+            assert row["status"] == "review", dict(row)
+
+            cache_reads.clear()
+            conn.execute("DELETE FROM gaps_index WHERE id = ?", (inc_a,))
+            project_state.rebuild_sqlite_cache(conn)
+            expected_restored = f"gaps/{inc_a[:2]}/{inc_a[2:]}/gap.json"
+            assert cache_reads == [expected_restored], cache_reads
+            row = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = ?", (inc_a,),
+            ).fetchone()
+            assert row["status"] == "todo", dict(row)
+
+            cache_reads.clear()
+            (root / f"gaps/{inc_c[:2]}/{inc_c[2:]}/gap.json").unlink()
+            project_state.rebuild_sqlite_cache(conn)
+            assert cache_reads == [], cache_reads
+            row = conn.execute(
+                "SELECT id FROM gaps_index WHERE id = ?", (inc_c,),
+            ).fetchone()
+            assert row is None
+            row = conn.execute(
+                "SELECT gap_id FROM gap_cache_meta WHERE gap_id = ?", (inc_c,),
+            ).fetchone()
+            assert row is None
+        finally:
+            project_state._read_gap_cache_bytes = original_read_cache_bytes
+
         conn.close()
         (root / "index.sqlite").write_bytes(b"not a sqlite database")
         for suffix in ("-wal", "-shm"):

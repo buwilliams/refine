@@ -6,6 +6,7 @@ and Gap ownership state.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -630,15 +631,17 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
 
 
 def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
-    """Rebuild SQLite projection tables from canonical JSON."""
+    """Refresh SQLite projection tables from canonical JSON.
+
+    Gap projection is incremental: unchanged gap.json files are identified by
+    cached mtime/size metadata and are not read or parsed.
+    """
     from . import db
     from . import perf_metrics
 
     total_start = perf_metrics.now()
     phase_ms: dict[str, float] = {}
-    rows_inserted = 0
-    files_scanned = 0
-    bytes_parsed = 0
+    rows_updated = 0
     ensure_initialized(conn, migrate=True)
     active = active_instance_id()
     settings = list_settings()
@@ -648,13 +651,10 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     fingerprint = state_fingerprint(root=root)
     phase_ms["fingerprint_ms"] = perf_metrics.elapsed_ms(phase_start)
     phase_start = perf_metrics.now()
-    gap_rows, iter_stats = _iter_gap_json_with_stats(root)
-    phase_ms["parse_ms"] = perf_metrics.elapsed_ms(phase_start)
-    files_scanned = iter_stats["files_scanned"]
-    bytes_parsed = iter_stats["bytes_parsed"]
+    gap_refresh = _plan_gap_cache_refresh(conn, root)
+    phase_ms["gap_scan_ms"] = perf_metrics.elapsed_ms(phase_start)
     with db.transaction(conn):
         phase_start = perf_metrics.now()
-        conn.execute("DELETE FROM gaps_index")
         conn.execute("DELETE FROM settings")
         conn.execute("DELETE FROM reporters")
         phase_ms["delete_ms"] = perf_metrics.elapsed_ms(phase_start)
@@ -683,36 +683,17 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
             )
         phase_ms["settings_reporters_ms"] = perf_metrics.elapsed_ms(phase_start)
         phase_start = perf_metrics.now()
-        for gap, rel_path in gap_rows:
-            conn.execute(
-                "INSERT OR REPLACE INTO gaps_index "
-                "(id, name, status, priority, reporter, created, updated, "
-                "branch_name, instance_id, json_path) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    str(gap.get("id") or ""),
-                    str(gap.get("name") or "Untitled Gap"),
-                    str(gap.get("status") or "backlog"),
-                    str(gap.get("priority") or "low"),
-                    _latest_reporter(gap),
-                    str(gap.get("created") or now_iso()),
-                    str(gap.get("updated") or gap.get("created") or now_iso()),
-                    gap.get("branch_name"),
-                    str(gap.get("instance_id") or DEFAULT_INSTANCE_ID),
-                    rel_path,
-                ),
-            )
-            rows_inserted += 1
-        phase_ms["gap_index_insert_ms"] = perf_metrics.elapsed_ms(phase_start)
+        rows_updated = _apply_gap_cache_refresh(conn, gap_refresh)
+        phase_ms["gap_index_refresh_ms"] = perf_metrics.elapsed_ms(phase_start)
     perf_metrics.record(
         "sqlite_cache_rebuild",
         conn=conn,
         elapsed_ms=perf_metrics.elapsed_ms(total_start),
         success=True,
-        rows_scanned=files_scanned,
-        rows_returned=rows_inserted,
-        bytes_in=bytes_parsed,
-        details={**phase_ms, "files_scanned": files_scanned},
+        rows_scanned=gap_refresh["files_seen"],
+        rows_returned=rows_updated,
+        bytes_in=gap_refresh["bytes_read"],
+        details={**phase_ms, **gap_refresh["stats"]},
     )
 
 
@@ -720,8 +701,8 @@ def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
     """Ensure SQLite projections are scoped to the active instance.
 
     Routine reads must stay O(1) with respect to the number of Gap JSON files.
-    Normal Refine writes update SQLite and canonical JSON together; full
-    projection rebuilds are reserved for startup, project sync, app/instance
+    Normal Refine writes update SQLite and canonical JSON together; incremental
+    projection refreshes are reserved for startup, project sync, app/instance
     switches, and the explicit System > Runtime rebuild action.
     """
     active = active_instance_id()
@@ -739,7 +720,7 @@ def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
 
 
 def state_fingerprint(*, root: Path | None = None) -> str:
-    """Cheap fingerprint for canonical JSON state projected into SQLite."""
+    """Cheap fingerprint for non-Gap project state projected into SQLite."""
     root = root or volume_root()
     paths: list[Path] = [
         config_json_path(root),
@@ -747,7 +728,6 @@ def state_fingerprint(*, root: Path | None = None) -> str:
         guidance_json_path(root),
     ]
     paths.extend(sorted(instances_dir(root).glob("**/*.json")))
-    paths.extend(sorted((root / "gaps").glob("**/gap.json")))
     parts: list[str] = []
     for path in paths:
         try:
@@ -759,27 +739,199 @@ def state_fingerprint(*, root: Path | None = None) -> str:
     return "|".join(parts)
 
 
-def _iter_gap_json(root: Path) -> list[tuple[dict[str, Any], str]]:
-    return _iter_gap_json_with_stats(root)[0]
-
-
-def _iter_gap_json_with_stats(root: Path) -> tuple[list[tuple[dict[str, Any], str]], dict[str, int]]:
-    out: list[tuple[dict[str, Any], str]] = []
-    files_scanned = 0
-    bytes_parsed = 0
+def _plan_gap_cache_refresh(conn: sqlite3.Connection,
+                            root: Path) -> dict[str, Any]:
+    existing = {
+        str(r["json_path"]): dict(r)
+        for r in conn.execute(
+            "SELECT json_path, gap_id, mtime_ns, size, sha256 FROM gap_cache_meta"
+        )
+    }
+    indexed = {
+        str(r["json_path"]): str(r["id"] or "")
+        for r in conn.execute("SELECT id, json_path FROM gaps_index")
+    }
+    seen: set[str] = set()
+    upserts: list[dict[str, Any]] = []
+    deletes: list[dict[str, str]] = []
+    meta_only: list[dict[str, Any]] = []
+    stats = {
+        "files_seen": 0,
+        "files_unchanged": 0,
+        "files_hashed": 0,
+        "files_parsed": 0,
+        "files_deleted": 0,
+        "files_invalid": 0,
+        "bytes_read": 0,
+    }
     for path in sorted((root / "gaps").glob("**/gap.json")):
-        files_scanned += 1
         try:
-            raw = path.read_bytes()
-            bytes_parsed += len(raw)
-            gap = json.loads(raw.decode("utf-8"))
-        except (OSError, json.JSONDecodeError):
-            gap = {}
-        if not isinstance(gap, dict) or not gap.get("id"):
+            st = path.stat()
+        except OSError:
             continue
         rel = path.relative_to(root).as_posix()
-        out.append((gap, rel))
-    return out, {"files_scanned": files_scanned, "bytes_parsed": bytes_parsed}
+        seen.add(rel)
+        stats["files_seen"] += 1
+        prior = existing.get(rel)
+        prior_gap_id = str(prior.get("gap_id") or "") if prior is not None else ""
+        index_has_prior = not prior_gap_id or indexed.get(rel) == prior_gap_id
+        mtime_ns = int(st.st_mtime_ns)
+        size = int(st.st_size)
+        if (
+            prior is not None
+            and index_has_prior
+            and int(prior.get("mtime_ns") or -1) == mtime_ns
+            and int(prior.get("size") or -1) == size
+        ):
+            stats["files_unchanged"] += 1
+            continue
+        raw = _read_gap_cache_bytes(path)
+        stats["bytes_read"] += len(raw)
+        stats["files_hashed"] += 1
+        digest = hashlib.sha256(raw).hexdigest()
+        if (
+            prior is not None
+            and index_has_prior
+            and str(prior.get("sha256") or "") == digest
+        ):
+            meta_only.append({
+                "json_path": rel,
+                "gap_id": prior_gap_id,
+                "mtime_ns": mtime_ns,
+                "size": size,
+                "sha256": digest,
+            })
+            continue
+        old_gap_id = prior_gap_id
+        gap = _decode_gap_cache_json(raw)
+        stats["files_parsed"] += 1
+        if not isinstance(gap, dict) or not gap.get("id"):
+            if old_gap_id:
+                deletes.append({"json_path": rel, "gap_id": old_gap_id})
+            meta_only.append({
+                "json_path": rel,
+                "gap_id": "",
+                "mtime_ns": mtime_ns,
+                "size": size,
+                "sha256": digest,
+            })
+            stats["files_invalid"] += 1
+            continue
+        upserts.append({
+            "json_path": rel,
+            "old_gap_id": old_gap_id,
+            "gap": gap,
+            "mtime_ns": mtime_ns,
+            "size": size,
+            "sha256": digest,
+        })
+    for rel, prior in existing.items():
+        if rel in seen:
+            continue
+        old_gap_id = str(prior.get("gap_id") or "")
+        deletes.append({"json_path": rel, "gap_id": old_gap_id})
+        stats["files_deleted"] += 1
+    for rel, gap_id in indexed.items():
+        if rel in seen or rel in existing:
+            continue
+        deletes.append({"json_path": rel, "gap_id": gap_id})
+        stats["files_deleted"] += 1
+    return {
+        "upserts": upserts,
+        "deletes": deletes,
+        "meta_only": meta_only,
+        "files_seen": stats["files_seen"],
+        "bytes_read": stats["bytes_read"],
+        "stats": stats,
+    }
+
+
+def _apply_gap_cache_refresh(conn: sqlite3.Connection,
+                             refresh: dict[str, Any]) -> int:
+    changed_rows = 0
+    now = now_iso()
+    for item in refresh["deletes"]:
+        gap_id = str(item.get("gap_id") or "")
+        rel = str(item.get("json_path") or "")
+        if gap_id:
+            conn.execute(
+                "DELETE FROM gaps_index WHERE id = ? AND json_path = ?",
+                (gap_id, rel),
+            )
+        conn.execute("DELETE FROM gap_cache_meta WHERE json_path = ?", (rel,))
+        changed_rows += 1
+    for item in refresh["upserts"]:
+        rel = str(item["json_path"])
+        old_gap_id = str(item.get("old_gap_id") or "")
+        gap = item["gap"]
+        gap_id = str(gap.get("id") or "")
+        if old_gap_id and old_gap_id != gap_id:
+            conn.execute(
+                "DELETE FROM gaps_index WHERE id = ? AND json_path = ?",
+                (old_gap_id, rel),
+            )
+        _upsert_gap_index_row(conn, gap, rel)
+        _upsert_gap_cache_meta(conn, item, gap_id=gap_id, now=now)
+        changed_rows += 1
+    for item in refresh["meta_only"]:
+        _upsert_gap_cache_meta(conn, item, gap_id=str(item.get("gap_id") or ""),
+                               now=now)
+    return changed_rows
+
+
+def _upsert_gap_cache_meta(conn: sqlite3.Connection, item: dict[str, Any], *,
+                           gap_id: str, now: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO gap_cache_meta "
+        "(json_path, gap_id, mtime_ns, size, sha256, updated_at) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            str(item["json_path"]),
+            gap_id,
+            int(item["mtime_ns"]),
+            int(item["size"]),
+            str(item["sha256"]),
+            now,
+        ),
+    )
+
+
+def _upsert_gap_index_row(conn: sqlite3.Connection,
+                          gap: dict[str, Any],
+                          rel_path: str) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO gaps_index "
+        "(id, name, status, priority, reporter, created, updated, "
+        "branch_name, instance_id, json_path) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            str(gap.get("id") or ""),
+            str(gap.get("name") or "Untitled Gap"),
+            str(gap.get("status") or "backlog"),
+            str(gap.get("priority") or "low"),
+            _latest_reporter(gap),
+            str(gap.get("created") or now_iso()),
+            str(gap.get("updated") or gap.get("created") or now_iso()),
+            gap.get("branch_name"),
+            str(gap.get("instance_id") or DEFAULT_INSTANCE_ID),
+            rel_path,
+        ),
+    )
+
+
+def _read_gap_cache_bytes(path: Path) -> bytes:
+    try:
+        return path.read_bytes()
+    except OSError:
+        return b""
+
+
+def _decode_gap_cache_json(raw: bytes) -> dict[str, Any]:
+    try:
+        data = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _latest_reporter(gap: dict[str, Any]) -> str:
