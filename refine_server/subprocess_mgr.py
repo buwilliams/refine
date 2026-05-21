@@ -4,7 +4,7 @@ Per spec:
 - One fresh CLI invocation per unaddressed round (no session resume).
 - Idle timeout (primary stuck-detector) — kill if no stdout/stderr for N seconds.
 - Hard wall-clock cap (ultimate stop-gap) — kill if total runtime exceeds N seconds.
-- Stream stdout/stderr → round logs[] (runner appends, via gap_writer).
+- Stream stdout/stderr → per-Gap round log file (runner appends, via gap_writer).
 """
 from __future__ import annotations
 

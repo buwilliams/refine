@@ -115,7 +115,7 @@ class GovernanceAgent:
         ).fetchall()
         out = []
         for row in rows:
-            gap = shared_gaps.read_gap_json(row["id"])
+            gap = shared_gaps.read_gap_json(row["id"], include_logs=False)
             latest = (gap.get("rounds") or [])[-1] if gap and gap.get("rounds") else None
             if not latest:
                 out.append(row)

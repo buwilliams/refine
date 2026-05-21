@@ -410,13 +410,13 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
 def _log(conn: sqlite3.Connection, gap_id: str, message: str, *,
          severity: str, category: str, actor: str,
          details: str | None = None) -> None:
-    # Append to latest round's logs[] + activity
+    # Append to latest round's log file + activity.
     row = conn.execute(
         "SELECT json_path FROM gaps_index WHERE id = ?", (gap_id,),
     ).fetchone()
     if row:
         from refine_server.gaps import read_gap_json
-        gap = read_gap_json(gap_id)
+        gap = read_gap_json(gap_id, include_logs=False)
         if gap and gap.get("rounds"):
             try:
                 gap_writer.append_round_log(
@@ -459,7 +459,7 @@ def _build_merge_message(conn: sqlite3.Connection, gap_id: str,
     # Latest round target (the asked-for behavior).
     target = ""
     try:
-        gap_json = read_gap_json(gap_id) or {}
+        gap_json = read_gap_json(gap_id, include_logs=False) or {}
         rounds = gap_json.get("rounds") or []
         if rounds:
             target = (rounds[-1].get("target") or "").strip()

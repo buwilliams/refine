@@ -108,7 +108,7 @@ def generate_rules(product: str, constitution: str, *,
 
 def classify_gap(conn, gap_id: str, *, provider: str | None = None) -> dict[str, Any]:
     settings = load_settings(conn)
-    gap = shared_gaps.read_gap_json(gap_id)
+    gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
     if not gap or not gap.get("rounds"):
         return normalize_classification({
             "rule_state": "blocked",

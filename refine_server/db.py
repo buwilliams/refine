@@ -341,7 +341,7 @@ def _backfill_reporter(conn: sqlite3.Connection) -> None:
     rows = conn.execute("SELECT id FROM gaps_index").fetchall()
     for row in rows:
         gap_id = row["id"]
-        gap = shared_gaps.read_gap_json(gap_id)
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
         if not gap:
             continue
         rounds = gap.get("rounds") or []

@@ -855,12 +855,17 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("round_log_added", (e) => {
-    // Subprocess flushed new stdout to the active round's logs[]. If the user
+    // Subprocess flushed new stdout to the active round's log file. If the user
     // is viewing that gap's detail, refresh so the new lines appear live.
     if (state.currentRoute !== "gaps_detail" || !state.currentGap) return;
     try {
       const data = JSON.parse(e.data);
-      if (data.gap_id === state.currentGap) loadGapDetail(state.currentGap);
+      if (data.gap_id === state.currentGap) {
+        if (typeof invalidateGapRoundLogCache === "function") {
+          invalidateGapRoundLogCache(state.currentGap);
+        }
+        loadGapDetail(state.currentGap);
+      }
     } catch {}
   });
   sseSource.onerror = () => {

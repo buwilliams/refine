@@ -33,6 +33,10 @@ def gap_json_path(gap_id: str) -> Path:
     return gap_dir(gap_id) / "gap.json"
 
 
+def gap_logs_path(gap_id: str) -> Path:
+    return gap_dir(gap_id) / "logs.jsonl"
+
+
 def relative_gap_path(gap_id: str) -> str:
     """Path stored in SQLite's gaps_index.json_path column (relative to volume root)."""
     gid = gap_id.upper()

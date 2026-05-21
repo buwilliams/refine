@@ -152,7 +152,7 @@ def reset_round_governance(round_obj: dict[str, Any]) -> dict[str, Any]:
     return round_obj
 
 
-def read_gap_json(gap_id: str) -> dict[str, Any] | None:
+def read_gap_json(gap_id: str, *, include_logs: bool = True) -> dict[str, Any] | None:
     from . import perf_metrics
 
     start = perf_metrics.now()
@@ -180,6 +180,14 @@ def read_gap_json(gap_id: str) -> dict[str, Any] | None:
         for round_obj in gap.get("rounds") or []:
             if isinstance(round_obj, dict):
                 normalize_round_governance(round_obj)
+        if include_logs:
+            from . import round_logs
+
+            round_logs.hydrate_round_logs(gap)
+        else:
+            from . import round_logs
+
+            round_logs.strip_embedded_logs(gap)
         perf_metrics.record(
             "gap_json_read",
             gap_id=gap_id,
@@ -212,6 +220,9 @@ def write_gap_json(gap: dict[str, Any]) -> None:
     d = gap_dir(gid)
     d.mkdir(parents=True, exist_ok=True)
     p = gap_json_path(gid)
+    from . import round_logs
+
+    externalized_logs = round_logs.externalize_embedded_logs(gap)
     data = json.dumps(gap, ensure_ascii=False, indent=2).encode("utf-8")
     fd, tmp = tempfile.mkstemp(prefix=".gap.", suffix=".tmp", dir=str(d))
     try:
@@ -229,7 +240,11 @@ def write_gap_json(gap: dict[str, Any]) -> None:
             elapsed_ms=perf_metrics.elapsed_ms(start),
             success=False,
             bytes_out=len(data),
-            details={**_gap_metric_details(gap), "fsync_ms": round(fsync_ms, 2)},
+            details={
+                **_gap_metric_details(gap),
+                "fsync_ms": round(fsync_ms, 2),
+                "externalized_logs": externalized_logs,
+            },
         )
         try:
             os.unlink(tmp)
@@ -252,7 +267,11 @@ def write_gap_json(gap: dict[str, Any]) -> None:
         gap_id=gid,
         elapsed_ms=perf_metrics.elapsed_ms(start),
         bytes_out=len(data),
-        details={**_gap_metric_details(gap), "fsync_ms": round(fsync_ms, 2)},
+        details={
+            **_gap_metric_details(gap),
+            "fsync_ms": round(fsync_ms, 2),
+            "externalized_logs": externalized_logs,
+        },
     )
 
 

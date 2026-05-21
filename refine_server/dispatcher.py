@@ -107,7 +107,7 @@ class Dispatcher:
             if self.sub_mgr.is_running(gid):
                 continue
             if governance.is_configured(conn):
-                gap = read_gap_json(gid)
+                gap = read_gap_json(gid, include_logs=False)
                 latest = (gap.get("rounds") or [])[-1] if gap and gap.get("rounds") else None
                 if not latest or not governance.has_passed(latest):
                     continue
@@ -179,7 +179,7 @@ class Dispatcher:
         for row in rows:
             gid = row["id"]
             if governance.is_configured(conn):
-                gap = read_gap_json(gid)
+                gap = read_gap_json(gid, include_logs=False)
                 if governance.latest_round_is_governance_blocked(gap):
                     continue
             with db.transaction(conn):
@@ -301,7 +301,7 @@ class Dispatcher:
 
         # Read the Gap and run the pre-work guidance classification before
         # any agent subprocess begins.
-        gap = read_gap_json(gap_id)
+        gap = read_gap_json(gap_id, include_logs=False)
         if not gap or not gap.get("rounds"):
             self._abort_to_failed(
                 conn, gap_id, "Gap has no rounds — cannot launch",
@@ -433,7 +433,7 @@ class Dispatcher:
         the human just needs to approve it. No worktree created, no
         agent spawned.
         """
-        gap = read_gap_json(gap_id)
+        gap = read_gap_json(gap_id, include_logs=False)
         if not gap:
             return False
         rounds = gap.get("rounds") or []
@@ -449,7 +449,7 @@ class Dispatcher:
                f"`{target}` ({n_merges} merge commit"
                f"{'' if n_merges == 1 else 's'} for this Gap). "
                f"Waiting for target-app rebuild before review.")
-        # Log to the latest round's logs[] so the audit trail shows
+        # Log to the latest round's log file so the audit trail shows
         # why we bypassed the agent for this specific round.
         try:
             gap_writer.append_round_log(

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters
+from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters, round_logs
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -1090,7 +1090,7 @@ def _augment_with_round_search(initial: list[dict], q: str,
         scanned += 1
         if r["id"] in seen:
             continue
-        gap = shared_gaps.read_gap_json(r["id"])
+        gap = shared_gaps.read_gap_json(r["id"], include_logs=False)
         if not gap:
             continue
         for round_obj in gap.get("rounds", []):
@@ -1122,14 +1122,15 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
             return err(404, "Gap not found")
         # Gap-scoped activity entries (lifecycle events, dispatcher errors,
         # subprocess flush nudges). These are merged into the round view so
-        # users see real progress even when the round's logs[] is empty.
+        # users see real progress even when round logs have not been loaded.
         gap_activity = activity.recent(conn, limit=500, gap_id=gap_id)
     finally:
         conn.close()
-    gap = shared_gaps.read_gap_json(gap_id) or {
+    gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {
         "id": gap_id, "name": row["name"], "rounds": [],
         "created": row["created"], "updated": row["updated"],
     }
+    gap.pop("_refine_embedded_round_logs", None)
     # SQLite is the source of truth for `status` and `priority` — overlay
     # them onto the response.
     gap = dict(gap)
@@ -1140,9 +1141,16 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     gap["instance_display_name"] = project_state.gap_instance_display(row["instance_id"])
     gap["activity"] = gap_activity
     rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
-    log_count = sum(
-        len(r.get("logs") or []) for r in rounds if isinstance(r.get("logs") or [], list)
-    )
+    log_counts = round_logs.count_by_round(gap_id, len(rounds))
+    for idx, round_obj in enumerate(rounds):
+        round_obj["log_count"] = log_counts.get(idx, 0)
+        if idx == len(rounds) - 1:
+            latest_log, latest_error_log = round_logs.latest_for_round(gap_id, idx)
+            if latest_log:
+                round_obj["latest_log"] = latest_log
+            if latest_error_log:
+                round_obj["latest_error_log"] = latest_error_log
+    log_count = sum(log_counts.values())
     perf_metrics.record(
         "api.get_gap",
         elapsed_ms=perf_metrics.elapsed_ms(metric_start),
@@ -1155,6 +1163,41 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
         },
     )
     return 200, {"gap": gap}
+
+
+def get_gap_round_logs(gap_id: str, round_idx: int, *,
+                       limit: int = 100, offset: int = 0) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    page_limit, page_offset = _page_bounds(limit, offset)
+    conn = _conn()
+    try:
+        row = conn.execute("SELECT id FROM gaps_index WHERE id = ?", (gap_id,)).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return err(404, "Gap not found")
+    gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
+    if gap is None:
+        return err(404, "Gap not found")
+    rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+    if round_idx < 0 or round_idx >= len(rounds):
+        return err(404, "Round not found")
+    entries, has_more = round_logs.page_round_logs(
+        gap_id,
+        round_idx,
+        limit=page_limit,
+        offset=page_offset,
+    )
+    return 200, {
+        "logs": entries,
+        "page": {
+            "limit": page_limit,
+            "offset": page_offset,
+            "has_more": has_more,
+        },
+    }
 
 
 def _enrich_gap_row(row: dict[str, Any]) -> dict[str, Any]:
