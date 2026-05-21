@@ -106,6 +106,104 @@ def main() -> int:
         for status in _bulk_status_options():
             assert rows[gap_ids[status]] == "done", (status, rows)
 
+        from refine_server.backend_protocol import (
+            M_BULK_DELETE_GAPS,
+            M_BULK_UPDATE_GAPS,
+            M_DELETE_GAP,
+            M_EDIT_ROUND,
+        )
+        from refine_ui import runtime
+
+        class TrackingClient:
+            def __init__(self) -> None:
+                self.calls = []
+
+            def call(self, method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+                self.calls.append((method, params or {}, timeout))
+                return runtime.runner_call(method, params or {})
+
+        tracking = TrackingClient()
+        original_get_client = api.get_client
+        api.get_client = lambda: tracking
+        try:
+            for idx in range(2):
+                gid = f"01BULKPROTO{idx}AAAAAAAAAAA"
+                gap = gap_writer.create_gap(
+                    gap_id=gid,
+                    name=gid,
+                    initial_round=gaps.new_round("Batch Reporter", "Actual", "Target"),
+                    status="backlog",
+                    priority="low",
+                )
+                conn.execute(
+                    "INSERT INTO gaps_index "
+                    "(id, name, status, priority, reporter, created, updated, json_path) "
+                    "VALUES (?, ?, 'backlog', 'low', 'Batch Reporter', ?, ?, ?)",
+                    (
+                        gid,
+                        gid,
+                        gap["created"],
+                        gap["updated"],
+                        relative_gap_path(gid),
+                    ),
+                )
+
+            code, body = api.bulk_update_gaps({
+                "filter": {"reporter": "Batch Reporter"},
+                "update": {"priority": "high"},
+                "background": False,
+            })
+            assert code == 200, body
+            assert body["updated"] == 2, body
+            assert [c[0] for c in tracking.calls] == [M_BULK_UPDATE_GAPS], tracking.calls
+            assert tracking.calls[0][1]["gap_ids"] == body["ids"], tracking.calls
+            assert M_EDIT_ROUND not in [c[0] for c in tracking.calls], tracking.calls
+
+            tracking.calls.clear()
+            code, body = api.bulk_update_gaps({
+                "filter": {"reporter": "Batch Reporter"},
+                "update": {"reporter": "Batch Renamed"},
+                "background": False,
+            })
+            assert code == 200, body
+            assert body["updated"] == 2, body
+            assert [c[0] for c in tracking.calls] == [M_BULK_UPDATE_GAPS], tracking.calls
+            for gid in body["ids"]:
+                gap = gaps.read_gap_json(gid)
+                assert gap["rounds"][-1]["reporter"] == "Batch Renamed"
+
+            tracking.calls.clear()
+            for idx in range(2):
+                gid = f"01BULKDELETE{idx}AAAAAAAAAA"
+                gap = gap_writer.create_gap(
+                    gap_id=gid,
+                    name=gid,
+                    initial_round=gaps.new_round("Delete Reporter", "Actual", "Target"),
+                    status="backlog",
+                    priority="low",
+                )
+                conn.execute(
+                    "INSERT INTO gaps_index "
+                    "(id, name, status, priority, reporter, created, updated, json_path) "
+                    "VALUES (?, ?, 'backlog', 'low', 'Delete Reporter', ?, ?, ?)",
+                    (
+                        gid,
+                        gid,
+                        gap["created"],
+                        gap["updated"],
+                        relative_gap_path(gid),
+                    ),
+                )
+            code, body = api.bulk_delete_gaps({
+                "filter": {"reporter": "Delete Reporter"},
+            })
+            assert code == 200, body
+            assert body["deleted"] == 2, body
+            assert [c[0] for c in tracking.calls] == [M_BULK_DELETE_GAPS], tracking.calls
+            assert M_DELETE_GAP not in [c[0] for c in tracking.calls], tracking.calls
+        finally:
+            api.get_client = original_get_client
+
         for target in ("in-progress", "ready-merge"):
             code, body = api.bulk_update_gaps({
                 "filter": {"reporter": "Reporter"},

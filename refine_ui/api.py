@@ -18,7 +18,7 @@ from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
+    M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
     M_RENAME_REPORTER, M_RUNNING, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
@@ -127,11 +127,13 @@ def _require_active_gap_ids(gap_ids: list[str]) -> tuple[bool, tuple[int, dict] 
     conn = _conn()
     try:
         active = project_state.active_instance_id()
-        placeholders = ",".join("?" * len(gap_ids))
-        rows = conn.execute(
-            f"SELECT id, instance_id FROM gaps_index WHERE id IN ({placeholders})",
-            gap_ids,
-        ).fetchall()
+        rows = []
+        for chunk in _id_chunks(gap_ids):
+            placeholders = ",".join("?" * len(chunk))
+            rows.extend(conn.execute(
+                f"SELECT id, instance_id FROM gaps_index WHERE id IN ({placeholders})",
+                chunk,
+            ).fetchall())
     finally:
         conn.close()
     violations = [
@@ -146,6 +148,10 @@ def _require_active_gap_ids(gap_ids: list[str]) -> tuple[bool, tuple[int, dict] 
             count=len(violations),
         )
     return True, None
+
+
+def _id_chunks(values: list[str], size: int = 500) -> list[list[str]]:
+    return [values[idx:idx + size] for idx in range(0, len(values), size)]
 
 
 def _append_gap_workflow_log(
@@ -1069,6 +1075,105 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     return 200, body
 
 
+def _select_bulk_update_candidates(
+    filt: dict[str, Any],
+    excluded: set[str],
+    *,
+    skip_automated: bool,
+) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    q = str(filt.get("q") or "").strip()
+    fts_match = search_index.fts_query(q)
+    severity = filt.get("severity") or None
+    category = filt.get("category") or None
+    actor = filt.get("actor") or None
+    reporter = filt.get("reporter") or None
+    sql = [
+        "SELECT id, name, status, priority, reporter, "
+        "created, updated, branch_name, instance_id "
+        "FROM gaps_index"
+    ]
+    args: list[Any] = []
+    where: list[str] = []
+    status = filt.get("status") or None
+    if status:
+        where.append("status = ?")
+        args.append(status)
+    if q:
+        if fts_match is None:
+            return 200, {"gaps": [], "skipped_details": []}
+        where.append(
+            "id IN ("
+            "SELECT gap_id FROM gap_search_docs "
+            "WHERE rowid IN ("
+            "SELECT rowid FROM gap_search_fts "
+            "WHERE gap_search_fts MATCH ?"
+            "))"
+        )
+        args.append(fts_match)
+    if reporter:
+        where.append("reporter = ?")
+        args.append(reporter)
+    instance = filt.get("instance") or None
+    if instance:
+        if instance == "current":
+            where.append("instance_id = ?")
+            args.append(project_state.active_instance_id())
+        elif instance == "unknown":
+            known = [i.get("id") for i in project_state.list_instances()]
+            if known:
+                where.append(
+                    "(instance_id = '' OR instance_id NOT IN ("
+                    + ",".join("?" * len(known)) + "))"
+                )
+                args.extend(known)
+            else:
+                where.append("1 = 1")
+        elif instance != "all":
+            where.append("instance_id = ?")
+            args.append(instance)
+    if severity or category or actor:
+        sub_where = ["gap_id IS NOT NULL"]
+        sub_args: list[Any] = []
+        if severity:
+            sub_where.append("severity = ?")
+            sub_args.append(severity)
+        if category:
+            sub_where.append("category = ?")
+            sub_args.append(category)
+        if actor:
+            sub_where.append("actor = ?")
+            sub_args.append(actor)
+        where.append(
+            "id IN (SELECT DISTINCT gap_id FROM activity WHERE "
+            + " AND ".join(sub_where) + ")"
+        )
+        args.extend(sub_args)
+    if where:
+        sql.append("WHERE " + " AND ".join(where))
+    sql.append("ORDER BY " + _gaps_order_clause(None, None))
+    conn = _conn()
+    try:
+        rows = [dict(r) for r in conn.execute(" ".join(sql), args)]
+    finally:
+        conn.close()
+    rows = [r for r in rows if r["id"] not in excluded]
+    skipped: list[dict[str, str]] = []
+    if skip_automated:
+        skipped = [
+            {"id": r["id"], "reason": f"status:{r.get('status')}"}
+            for r in rows
+            if str(r.get("status") or "") in _BULK_STATUS_AUTOMATED_VALUES
+        ]
+        rows = [
+            r for r in rows
+            if str(r.get("status") or "") in _BULK_STATUS_SOURCE_VALUES
+        ]
+    return 200, {"gaps": rows, "skipped_details": skipped}
+
+
 def get_gap(gap_id: str) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
@@ -1435,11 +1540,11 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
 
     Exactly one update key is honored per call so the action is unambiguous
     to confirm in the UI. `priority` and `status` are SQL-index fields and
-    are updated in a single transaction; `reporter` rewrites each Gap's
-    latest round via the runner-owned `M_EDIT_ROUND` path, one Gap at a
-    time. Status changes here are bookkeeping-only — they don't trigger
-    workflow side effects like killing a running subprocess or cleaning
-    up a worktree; for those, use the per-Gap action on the detail page.
+    are selected in the UI process, then applied by one runner protocol
+    request that carries the ordered Gap ids. Status changes here are
+    bookkeeping-only — they don't trigger workflow side effects like
+    killing a running subprocess or cleaning up a worktree; for those,
+    use the per-Gap action on the detail page.
     """
     update = body.get("update") or {}
     update = {k: v for k, v in update.items()
@@ -1472,33 +1577,16 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
 
     filt = body.get("filter") or {}
     excluded = set(body.get("exclude_ids") or [])
-    code, listing = list_gaps(
-        status=filt.get("status") or None,
-        q=filt.get("q") or None,
-        severity=filt.get("severity") or None,
-        category=filt.get("category") or None,
-        actor=filt.get("actor") or None,
-        reporter=filt.get("reporter") or None,
-        instance=filt.get("instance") or None,
-        limit=10_000,
+    code, selected = _select_bulk_update_candidates(
+        filt,
+        excluded,
+        skip_automated=(field == "status"),
     )
     if code != 200:
-        return code, listing
-    gap_ids = [g["id"] for g in (listing.get("gaps") or [])
-               if g["id"] not in excluded]
-    skipped_status_ids: list[dict[str, str]] = []
-    if field == "status":
-        skipped_status_ids = [
-            {"id": g["id"], "reason": f"status:{g.get('status')}"}
-            for g in (listing.get("gaps") or [])
-            if g["id"] in gap_ids
-            and str(g.get("status") or "") in _BULK_STATUS_AUTOMATED_VALUES
-        ]
-        gap_ids = [
-            g["id"] for g in (listing.get("gaps") or [])
-            if g["id"] in gap_ids
-            and str(g.get("status") or "") in _BULK_STATUS_SOURCE_VALUES
-        ]
+        return code, selected
+    selected_gaps = selected["gaps"]
+    skipped_status_ids = selected["skipped_details"]
+    gap_ids = [g["id"] for g in selected_gaps]
     if not gap_ids:
         return 200, {
             "updated": 0,
@@ -1510,10 +1598,6 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     if not ok and ownership_err is not None:
         return ownership_err
 
-    selected_gaps = [
-        g for g in (listing.get("gaps") or [])
-        if g["id"] in gap_ids
-    ]
     if (
         len(gap_ids) >= BULK_UPDATE_BACKGROUND_THRESHOLD
         and body.get("background") is not False
@@ -1525,13 +1609,26 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
             "skipped_details": skipped_status_ids,
         }))
 
-        def run_job() -> dict[str, Any]:
+        def run_job(progress=None) -> dict[str, Any]:
+            if progress is not None:
+                progress(
+                    completed=0,
+                    total=len(job_data["gaps"]),
+                    message="Bulk update queued",
+                )
             result = _bulk_update_selected_gaps(
                 job_data["field"],
                 job_data["value"],
                 job_data["gaps"],
                 job_data["skipped_details"],
             )
+            if progress is not None:
+                runner_progress = result.get("progress") or {}
+                progress(
+                    completed=runner_progress.get("completed", result["updated"]),
+                    total=runner_progress.get("total", len(job_data["gaps"])),
+                    message="Bulk update complete",
+                )
             return {"http_status": 200, **result}
 
         job = background_jobs.start(
@@ -1547,12 +1644,15 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
             "skipped_details": skipped_status_ids,
         }
 
-    return 200, _bulk_update_selected_gaps(
+    result = _bulk_update_selected_gaps(
         field,
         value,
         selected_gaps,
         skipped_status_ids,
     )
+    if int(result.get("http_status") or 200) >= 400:
+        return int(result["http_status"]), result
+    return 200, result
 
 
 def _bulk_update_selected_gaps(
@@ -1562,133 +1662,88 @@ def _bulk_update_selected_gaps(
     skipped_status_ids: list[dict[str, str]],
 ) -> dict:
     gap_ids = [g["id"] for g in selected_gaps]
-    updated_ids: list[str] = []
-
-    if field in ("priority", "status"):
-        previous_status_by_id = {
-            g["id"]: g.get("status")
-            for g in selected_gaps
+    try:
+        result = get_client().call(
+            M_BULK_UPDATE_GAPS,
+            {"field": field, "value": value, "gap_ids": gap_ids},
+            timeout=max(30.0, min(300.0, len(gap_ids) / 10)),
+        )
+    except BackendError as e:
+        code, body = _backend_err(e)
+        return {
+            "updated": 0,
+            "ids": [],
+            "field": field,
+            "value": value,
+            "skipped": len(skipped_status_ids),
+            "skipped_details": skipped_status_ids,
+            "failed": len(gap_ids),
+            "failures": [{"id": gid, "error": body["error"]["message"]} for gid in gap_ids],
+            "error": body["error"],
+            "http_status": code,
         }
-        conn = _conn()
-        active = project_state.active_instance_id()
-        try:
-            with db.transaction(conn):
-                placeholders = ",".join("?" * len(gap_ids))
-                cur = conn.execute(
-                    f"UPDATE gaps_index SET {field} = ?, updated = ? "
-                    f"WHERE id IN ({placeholders}) AND instance_id = ?",
-                    [value, now_iso(), *gap_ids, active],
-                )
-        finally:
-            conn.close()
-        if cur.rowcount != len(gap_ids):
-            return _ownership_error(None, active_id=active)
-        try:
-            from refine_server import gap_writer
-
-            for gid in gap_ids:
-                gap = gap_writer.update_fields(gid, **{field: value})
-                conn = _conn()
-                try:
-                    with db.transaction(conn):
-                        search_index.upsert_gap(conn, gap)
-                finally:
-                    conn.close()
-                if field == "status":
-                    previous = previous_status_by_id.get(gid)
-                    if previous != value:
-                        _append_gap_workflow_log(
-                            gid,
-                            (
-                                "Workflow status changed by bulk update: "
-                                f"{previous} → {value}"
-                            ),
-                        )
-        except Exception:
-            pass
-        # Nudge each gap.json's mtime via the runner so listings sort
-        # consistently and any file-watchers see the touch.
-        for gid in gap_ids:
-            try:
-                get_client().call(M_EDIT_ROUND, {
-                    "gap_id": gid,
-                    "actual": None, "target": None, "reporter": None,
-                })
-                updated_ids.append(gid)
-            except BackendError:
-                updated_ids.append(gid)
-        try:
-            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
-        except BackendError:
-            pass
-    else:  # reporter — rewrite the latest round's reporter on each gap
-        for gid in gap_ids:
-            try:
-                get_client().call(M_EDIT_ROUND, {
-                    "gap_id": gid,
-                    "actual": None, "target": None,
-                    "reporter": value,
-                })
-                updated_ids.append(gid)
-            except BackendError:
-                # Skip gaps the runner refused (no rounds yet, etc.) and
-                # keep going. The response count reflects what stuck.
-                continue
-
     return {
-        "updated": len(updated_ids), "ids": updated_ids,
+        "updated": int(result.get("updated") or 0),
+        "ids": result.get("ids") or [],
         "field": field, "value": value,
         "skipped": len(skipped_status_ids),
         "skipped_details": skipped_status_ids,
+        "failed": int(result.get("failed") or 0),
+        "failures": result.get("failures") or [],
+        "progress": result.get("progress") or {
+            "completed": int(result.get("updated") or 0),
+            "total": len(gap_ids),
+        },
     }
 
 
 def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     """Delete every Gap matching the supplied filter.
 
-    Each Gap is dispatched through the same `M_DELETE_GAP` path a
-    single-Gap delete uses, so the runner cancels any running
-    subprocess, tears down the worktree + branch for non-done gaps,
-    erases gap.json, and cleans the index. Per-Gap failures don't
-    abort the run — we collect them in the response.
+    One runner request carries the ordered id list. The runner then cancels
+    any running subprocess, tears down worktrees + branches for non-done
+    gaps, erases gap.json, and cleans the index in runner-owned order.
+    Per-Gap failures don't abort the run — we collect them in the response.
     """
     filt = body.get("filter") or {}
     excluded = set(body.get("exclude_ids") or [])
-    code, listing = list_gaps(
-        status=filt.get("status") or None,
-        q=filt.get("q") or None,
-        severity=filt.get("severity") or None,
-        category=filt.get("category") or None,
-        actor=filt.get("actor") or None,
-        reporter=filt.get("reporter") or None,
-        instance=filt.get("instance") or None,
-        limit=10_000,
+    code, selected = _select_bulk_update_candidates(
+        filt,
+        excluded,
+        skip_automated=False,
     )
     if code != 200:
-        return code, listing
-    gap_ids = [g["id"] for g in (listing.get("gaps") or [])
-               if g["id"] not in excluded]
+        return code, selected
+    gap_ids = [g["id"] for g in selected["gaps"]]
     if not gap_ids:
         return 200, {"deleted": 0, "ids": [], "failures": []}
     ok, ownership_err = _require_active_gap_ids(gap_ids)
     if not ok and ownership_err is not None:
         return ownership_err
 
-    deleted_ids: list[str] = []
-    failures: list[dict] = []
-    for gid in gap_ids:
-        try:
-            res = get_client().call(
-                M_DELETE_GAP, {"gap_id": gid}, timeout=60.0,
-            )
-            if res.get("deleted"):
-                deleted_ids.append(gid)
-        except BackendError as e:
-            failures.append({"id": gid, "error": str(e)})
+    try:
+        result = get_client().call(
+            M_BULK_DELETE_GAPS,
+            {"gap_ids": gap_ids},
+            timeout=max(60.0, min(300.0, len(gap_ids) / 5)),
+        )
+    except BackendError as e:
+        code, body = _backend_err(e)
+        return code, {
+            "deleted": 0,
+            "ids": [],
+            "failures": [{"id": gid, "error": body["error"]["message"]} for gid in gap_ids],
+            "error": body["error"],
+        }
     return 200, {
-        "deleted": len(deleted_ids),
-        "ids": deleted_ids,
-        "failures": failures,
+        "deleted": int(result.get("deleted") or 0),
+        "ids": result.get("ids") or [],
+        "failures": result.get("failures") or [],
+        "failed": int(result.get("failed") or 0),
+        "progress": result.get("progress") or {
+            "completed": int(result.get("deleted") or 0),
+            "total": len(gap_ids),
+        },
     }
 
 
