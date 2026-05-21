@@ -113,6 +113,32 @@ def main() -> int:
         assert job["progress"]["completed"] == job["progress"]["total"], job
         assert job["result"]["http_status"] == 200, job
         assert job["result"]["mode"] in {"rebuilt", "recreated"}, job
+
+        conn.execute("DROP INDEX IF EXISTS idx_performance_operation")
+        conn.execute("DROP INDEX IF EXISTS idx_performance_occurred")
+        conn.execute("DROP INDEX IF EXISTS idx_performance_gap")
+        conn.execute("DROP INDEX IF EXISTS idx_performance_success")
+        conn.execute("DROP TABLE performance_events")
+        missing = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'performance_events'",
+        ).fetchone()
+        assert missing is None
+
+        status, body = api.rebuild_sqlite_cache({"restart_services": False})
+        assert status == 200, body
+        assert body["mode"] == "rebuilt", body
+        migrated = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' "
+            "AND name = 'performance_events'",
+        ).fetchone()
+        assert migrated is not None
+        event = conn.execute(
+            "SELECT operation FROM performance_events "
+            "WHERE operation = 'sqlite_cache_rebuild' "
+            "ORDER BY id DESC LIMIT 1",
+        ).fetchone()
+        assert event is not None
     finally:
         conn.close()
         cleanup_tmp(tmp)

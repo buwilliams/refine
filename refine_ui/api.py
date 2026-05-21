@@ -647,6 +647,7 @@ def _rebuild_sqlite_cache_sync(
         runtime.stop_all()
     try:
         try:
+            db.init_db(sqlite_file)
             conn = db.connect(sqlite_file)
             try:
                 integrity = conn.execute("PRAGMA integrity_check").fetchone()
