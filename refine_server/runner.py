@@ -406,6 +406,14 @@ class Runner:
             target=params.get("target"),
             reporter=params.get("reporter"),
         )
+        if params.get("actual") is not None or params.get("target") is not None:
+            round_idx = max(0, len(gap.get("rounds") or []) - 1)
+            with db.transaction(self._conn):
+                self._conn.execute(
+                    "DELETE FROM guidance_decisions "
+                    "WHERE gap_id = ? AND round_idx = ?",
+                    (params["gap_id"], round_idx),
+                )
         # Keep the index reporter in sync with the latest round when the
         # reporter was actually changed by this edit. (None means "leave
         # it alone" in `edit_latest_round`.)
@@ -449,6 +457,9 @@ class Runner:
         with db.transaction(self._conn):
             self._conn.execute("DELETE FROM gaps_index WHERE id = ?", (gap_id,))
             self._conn.execute("DELETE FROM runs WHERE gap_id = ?", (gap_id,))
+            self._conn.execute(
+                "DELETE FROM guidance_decisions WHERE gap_id = ?", (gap_id,),
+            )
         activity.append(
             self._conn, message="Gap deleted",
             severity="info", category="state",

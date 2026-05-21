@@ -125,6 +125,19 @@ CREATE TABLE IF NOT EXISTS target_app_operations (
 );
 CREATE INDEX IF NOT EXISTS idx_target_app_operations_started
     ON target_app_operations(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS guidance_decisions (
+    gap_id               TEXT NOT NULL,
+    round_idx            INTEGER NOT NULL,
+    decided_at           TEXT NOT NULL,
+    round_fingerprint    TEXT NOT NULL,
+    guidance_fingerprint TEXT NOT NULL,
+    accepted_json        TEXT NOT NULL,
+    details_json         TEXT,
+    PRIMARY KEY (gap_id, round_idx)
+);
+CREATE INDEX IF NOT EXISTS idx_guidance_decisions_gap
+    ON guidance_decisions(gap_id);
 """
 
 DEFAULT_SETTINGS = {
@@ -322,6 +335,21 @@ def _migrate(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_performance_success "
         "ON performance_events(success)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS guidance_decisions ("
+        "gap_id TEXT NOT NULL, "
+        "round_idx INTEGER NOT NULL, "
+        "decided_at TEXT NOT NULL, "
+        "round_fingerprint TEXT NOT NULL, "
+        "guidance_fingerprint TEXT NOT NULL, "
+        "accepted_json TEXT NOT NULL, "
+        "details_json TEXT, "
+        "PRIMARY KEY (gap_id, round_idx))"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_guidance_decisions_gap "
+        "ON guidance_decisions(gap_id)"
     )
     try:
         from . import perf_metrics

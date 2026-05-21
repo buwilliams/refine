@@ -632,6 +632,7 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
 def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     """Rebuild SQLite projection tables from canonical JSON."""
     from . import db
+    from . import guidance
     from . import perf_metrics
 
     total_start = perf_metrics.now()
@@ -657,6 +658,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         conn.execute("DELETE FROM gaps_index")
         conn.execute("DELETE FROM settings")
         conn.execute("DELETE FROM reporters")
+        conn.execute("DELETE FROM guidance_decisions")
         phase_ms["delete_ms"] = perf_metrics.elapsed_ms(phase_start)
         phase_start = perf_metrics.now()
         for key, value in settings.items():
@@ -701,6 +703,9 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
                     str(gap.get("instance_id") or DEFAULT_INSTANCE_ID),
                     rel_path,
                 ),
+            )
+            guidance.project_gap_guidance_decisions(
+                conn, gap, use_transaction=False,
             )
             rows_inserted += 1
         phase_ms["gap_index_insert_ms"] = perf_metrics.elapsed_ms(phase_start)

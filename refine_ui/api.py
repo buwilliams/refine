@@ -46,6 +46,7 @@ def err(
     return code, body
 
 
+IMPORT_EXTRACT_CHUNK_LINE_COUNT = 20
 IMPORT_BACKGROUND_THRESHOLD = 100
 BULK_UPDATE_BACKGROUND_THRESHOLD = 100
 
@@ -1272,6 +1273,16 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             from refine_server import gap_writer
 
             gap_writer.update_fields(gap_id, **sql_fields)
+            if "name" in sql_fields:
+                cleanup_conn = _conn()
+                try:
+                    with db.transaction(cleanup_conn):
+                        cleanup_conn.execute(
+                            "DELETE FROM guidance_decisions WHERE gap_id = ?",
+                            (gap_id,),
+                        )
+                finally:
+                    cleanup_conn.close()
             next_status = sql_fields.get("status")
             if next_status is not None and previous_status != next_status:
                 _append_gap_workflow_log(
@@ -2387,15 +2398,35 @@ def import_extract(body: dict) -> tuple[int, dict]:
     raw = (body.get("text") or "").strip()
     if not raw:
         return err(400, "text is required")
+    chunks = _import_extract_chunks(raw)
+    drafts: list[dict[str, Any]] = []
+    client = get_client()
     try:
-        result = get_client().call(
-            M_EXTRACT_GAPS, {"text": raw}, timeout=200.0,
-        )
+        for chunk in chunks:
+            result = client.call(
+                M_EXTRACT_GAPS, {"text": chunk["text"]}, timeout=200.0,
+            )
+            if result.get("ok") is False and result.get("code") == "feature_disabled":
+                return 409, result
+            drafts.extend(result.get("drafts") or [])
     except BackendError as e:
         return _backend_err(e)
-    if result.get("ok") is False and result.get("code") == "feature_disabled":
-        return 409, result
-    return 200, {"drafts": result.get("drafts") or []}
+    return 200, {"drafts": drafts}
+
+
+def _import_extract_chunks(text: str) -> list[dict[str, Any]]:
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if len(lines) <= IMPORT_EXTRACT_CHUNK_LINE_COUNT:
+        return [{"text": text.strip(), "start_line": 1, "end_line": len(lines)}]
+    chunks: list[dict[str, Any]] = []
+    for idx in range(0, len(lines), IMPORT_EXTRACT_CHUNK_LINE_COUNT):
+        chunk_lines = lines[idx:idx + IMPORT_EXTRACT_CHUNK_LINE_COUNT]
+        chunks.append({
+            "text": "\n".join(chunk_lines),
+            "start_line": idx + 1,
+            "end_line": idx + len(chunk_lines),
+        })
+    return chunks
 
 
 def import_persist(body: dict) -> tuple[int, dict]:
