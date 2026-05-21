@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from refine_server import activity, db
+from refine_server import activity, changes_index, db
 from refine_server.gaps import now_iso
 
 from . import conflict_resolver, gap_writer, git_ops
@@ -386,6 +386,7 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
         gap_writer.update_fields(gap_id, status=final_status, branch_name=None)
     except Exception:
         pass
+    changes_index.upsert_head_merge(conn, current)
     git_ops.remove_worktree(gap_id)
     git_ops.delete_branch(branch)
     pushed_part = "merged + pushed" if pushed else (

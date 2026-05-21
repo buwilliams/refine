@@ -211,6 +211,18 @@ CREATE INDEX IF NOT EXISTS idx_background_jobs_kind_status
     ON background_jobs(kind, status);
 CREATE INDEX IF NOT EXISTS idx_background_jobs_started
     ON background_jobs(started_at DESC);
+
+CREATE TABLE IF NOT EXISTS refine_merges (
+    commit_sha TEXT PRIMARY KEY,
+    branch     TEXT NOT NULL,
+    committed  TEXT NOT NULL,
+    subject    TEXT NOT NULL,
+    gap_id     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_refine_merges_branch_committed
+    ON refine_merges(branch, committed DESC, commit_sha DESC);
+CREATE INDEX IF NOT EXISTS idx_refine_merges_branch_gap
+    ON refine_merges(branch, gap_id);
 """
 
 DEFAULT_SETTINGS = {
@@ -423,6 +435,22 @@ def _migrate(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_performance_success "
         "ON performance_events(success)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS refine_merges ("
+        "commit_sha TEXT PRIMARY KEY, "
+        "branch TEXT NOT NULL, "
+        "committed TEXT NOT NULL, "
+        "subject TEXT NOT NULL, "
+        "gap_id TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_refine_merges_branch_committed "
+        "ON refine_merges(branch, committed DESC, commit_sha DESC)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_refine_merges_branch_gap "
+        "ON refine_merges(branch, gap_id)"
     )
     try:
         from . import perf_metrics

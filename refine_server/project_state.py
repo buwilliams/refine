@@ -636,6 +636,7 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     Gap projection is incremental: unchanged gap.json files are identified by
     cached mtime/size metadata and are not read or parsed.
     """
+    from . import changes_index
     from . import db
     from . import perf_metrics
     total_start = perf_metrics.now()
@@ -684,6 +685,9 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         phase_start = perf_metrics.now()
         rows_updated = _apply_gap_cache_refresh(conn, gap_refresh)
         phase_ms["gap_index_refresh_ms"] = perf_metrics.elapsed_ms(phase_start)
+    phase_start = perf_metrics.now()
+    indexed_branch = changes_index.rebuild_target_branch(conn)
+    phase_ms["changes_index_ms"] = perf_metrics.elapsed_ms(phase_start)
     perf_metrics.record(
         "sqlite_cache_rebuild",
         conn=conn,
@@ -692,7 +696,11 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         rows_scanned=gap_refresh["files_seen"],
         rows_returned=rows_updated,
         bytes_in=gap_refresh["bytes_read"],
-        details={**phase_ms, **gap_refresh["stats"]},
+        details={
+            **phase_ms,
+            "changes_index_branch": indexed_branch,
+            **gap_refresh["stats"],
+        },
     )
 
 

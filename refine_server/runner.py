@@ -10,7 +10,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, search_index
+from refine_server import activity, changes_index, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
@@ -760,11 +760,7 @@ class Runner:
         """The configured merge target branch, or the host's current
         branch when nothing's set. None if neither resolves (e.g. host
         is in detached-HEAD state with no setting)."""
-        configured = (db.get_setting(self._conn, "merge_target_branch")
-                      or "").strip()
-        if configured:
-            return configured
-        return git_ops.current_branch()
+        return changes_index.effective_target_branch(self._conn)
 
     def _h_list_changes(self, params: dict) -> dict:
         """List refine merge commits on the target branch.
@@ -781,6 +777,7 @@ class Runner:
         priority = str(params.get("priority") or "").strip()
         query_mode = "filtered" if (q or status or priority) else "paged"
         rows_scanned = 0
+        rebuilt = False
         if not target:
             result = {
                 "branch": None,
@@ -797,18 +794,17 @@ class Runner:
                 details={"limit": limit, "offset": offset},
             )
             return result
-        if q or status or priority:
-            fetched, rows_scanned = self._filtered_refine_merges(
-                target, q=q, status=status, priority=priority,
-                needed=offset + limit + 1,
-            )
-            page_rows = fetched[offset:]
-        else:
-            page_rows = git_ops.list_refine_merges(
-                target, limit=limit + 1, offset=offset,
-            )
-            rows_scanned = len(page_rows)
-            self._enrich_refine_merges(page_rows)
+        rebuilt = changes_index.ensure_branch_current(self._conn, target)
+        page_rows = changes_index.list_changes(
+            self._conn,
+            target,
+            limit=limit + 1,
+            offset=offset,
+            q=q,
+            status=status,
+            priority=priority,
+        )
+        rows_scanned = len(page_rows)
         has_more = len(page_rows) > limit
         merges = page_rows[:limit]
         if not merges:
@@ -827,6 +823,7 @@ class Runner:
                 details={
                     "limit": limit, "offset": offset, "q": bool(q),
                     "status": status, "priority": priority,
+                    "rebuilt": rebuilt,
                 },
             )
             return result
@@ -844,67 +841,10 @@ class Runner:
             rows_returned=len(merges),
             details={
                 "limit": limit, "offset": offset, "q": bool(q),
-                "status": status, "priority": priority,
+                "status": status, "priority": priority, "rebuilt": rebuilt,
             },
         )
         return result
-
-    def _filtered_refine_merges(self, target: str, *, q: str, status: str,
-                                priority: str, needed: int) -> tuple[list[dict], int]:
-        matches: list[dict] = []
-        scan_offset = 0
-        chunk_size = 200
-        scanned = 0
-        while len(matches) < needed:
-            chunk = git_ops.list_refine_merges(
-                target, limit=chunk_size, offset=scan_offset,
-            )
-            if not chunk:
-                break
-            self._enrich_refine_merges(chunk)
-            for row in chunk:
-                scanned += 1
-                if self._refine_merge_matches(row, q=q, status=status,
-                                              priority=priority):
-                    matches.append(row)
-                    if len(matches) >= needed:
-                        break
-            scan_offset += len(chunk)
-            if len(chunk) < chunk_size:
-                break
-        return matches, scanned
-
-    def _enrich_refine_merges(self, merges: list[dict]) -> None:
-        if not merges:
-            return
-        ids = [m["gap_id"] for m in merges]
-        placeholders = ",".join("?" * len(ids))
-        rows = self._conn.execute(
-            f"SELECT id, name, status, priority "
-            f"FROM gaps_index WHERE id IN ({placeholders})",
-            ids,
-        ).fetchall()
-        by_id = {r["id"]: r for r in rows}
-        for m in merges:
-            row = by_id.get(m["gap_id"])
-            m["name"] = row["name"] if row else None
-            m["status"] = row["status"] if row else None
-            m["priority"] = row["priority"] if row else None
-
-    @staticmethod
-    def _refine_merge_matches(row: dict, *, q: str, status: str,
-                              priority: str) -> bool:
-        if status and row.get("status") != status:
-            return False
-        if priority and row.get("priority") != priority:
-            return False
-        if q:
-            haystack = " ".join(str(row.get(k) or "") for k in (
-                "commit", "gap_id", "subject", "name", "status", "priority",
-            )).lower()
-            if q not in haystack:
-                return False
-        return True
 
     def _h_governance_get(self, params: dict) -> dict:
         settings = governance.load_settings(self._conn)
@@ -1043,6 +983,7 @@ class Runner:
         pushed = False
         push_warning: str | None = None
         revert_message: str | None = None
+        pre_revert_head = git_ops.rev_parse(target)
         try:
             # `git revert -m 1 <merge> --no-edit`
             r = git_ops.revert_merge_commit(commit_sha)
@@ -1106,6 +1047,9 @@ class Runner:
                 "UPDATE gaps_index SET status = 'cancelled', updated = ? WHERE id = ?",
                 (now_iso(), gap_id),
             )
+        changes_index.advance_branch_head(
+            self._conn, target, previous_head=pre_revert_head,
+        )
         try:
             gap_writer.update_fields(gap_id, status="cancelled")
         except Exception:

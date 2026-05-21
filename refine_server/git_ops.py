@@ -425,6 +425,29 @@ def push_current(cwd: Path | None = None) -> GitResult:
     return _run(["push"], cwd=cwd or client_repo_path(), timeout=300.0)
 
 
+def _parse_refine_merge_log(stdout: str, branch: str) -> list[dict]:
+    out: list[dict] = []
+    for chunk in stdout.split(_LOG_RECORD_SEP):
+        chunk = chunk.strip("\x00\n ")
+        if not chunk:
+            continue
+        parts = chunk.split(_LOG_FIELD_SEP, 3)
+        if len(parts) != 4:
+            continue
+        sha, committed, subject, body = parts
+        m = _REFINE_GAP_FOOTER.search(body)
+        if not m:
+            continue
+        out.append({
+            "commit": sha,
+            "committed": committed,
+            "subject": subject,
+            "gap_id": m.group(1),
+            "branch": branch,
+        })
+    return out
+
+
 def list_refine_merges(branch: str, limit: int = 50,
                         *, offset: int = 0,
                         cwd: Path | None = None) -> list[dict]:
@@ -444,26 +467,42 @@ def list_refine_merges(branch: str, limit: int = 50,
     ], cwd=cwd or client_repo_path())
     if not r.ok:
         return []
-    out: list[dict] = []
-    for chunk in r.stdout.split(_LOG_RECORD_SEP):
-        chunk = chunk.strip("\x00\n ")
-        if not chunk:
-            continue
-        parts = chunk.split(_LOG_FIELD_SEP, 3)
-        if len(parts) != 4:
-            continue
-        sha, committed, subject, body = parts
-        m = _REFINE_GAP_FOOTER.search(body)
-        if not m:
-            continue
-        out.append({
-            "commit": sha,
-            "committed": committed,
-            "subject": subject,
-            "gap_id": m.group(1),
-            "branch": branch,
-        })
-    return out
+    return _parse_refine_merge_log(r.stdout, branch)
+
+
+def list_all_refine_merges(branch: str, *,
+                           cwd: Path | None = None) -> list[dict]:
+    """Walk all first-parent merge commits on `branch` and return refine ones."""
+    fmt = _LOG_FIELD_SEP.join(["%H", "%cI", "%s", "%B"]) + _LOG_RECORD_SEP
+    r = _run([
+        "log", "--first-parent", "--merges",
+        f"--pretty=format:{fmt}",
+        branch,
+    ], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
+    return _parse_refine_merge_log(r.stdout, branch)
+
+
+def refine_merge_for_commit(commit_sha: str, *, branch: str,
+                            cwd: Path | None = None) -> dict | None:
+    """Return refine merge metadata for one commit, or None if it is not one."""
+    fmt = _LOG_FIELD_SEP.join(["%H", "%cI", "%s", "%B"]) + _LOG_RECORD_SEP
+    r = _run([
+        "show", "-s", f"--pretty=format:{fmt}", commit_sha,
+    ], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return None
+    rows = _parse_refine_merge_log(r.stdout, branch)
+    return rows[0] if rows else None
+
+
+def rev_parse(ref: str, *, cwd: Path | None = None) -> str | None:
+    r = _run(["rev-parse", "--verify", ref],
+             cwd=cwd or client_repo_path())
+    if not r.ok:
+        return None
+    return r.stdout.strip()
 
 
 def count_refine_merges_for_gap(gap_id: str, branch: str, *,
