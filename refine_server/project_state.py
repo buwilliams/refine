@@ -631,6 +631,7 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
 
 def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
     """Rebuild SQLite projection tables from canonical JSON."""
+    from . import changes_index
     from . import db
     from . import perf_metrics
 
@@ -704,6 +705,9 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
             )
             rows_inserted += 1
         phase_ms["gap_index_insert_ms"] = perf_metrics.elapsed_ms(phase_start)
+    phase_start = perf_metrics.now()
+    indexed_branch = changes_index.rebuild_target_branch(conn)
+    phase_ms["changes_index_ms"] = perf_metrics.elapsed_ms(phase_start)
     perf_metrics.record(
         "sqlite_cache_rebuild",
         conn=conn,
@@ -712,7 +716,11 @@ def rebuild_sqlite_cache(conn: sqlite3.Connection) -> None:
         rows_scanned=files_scanned,
         rows_returned=rows_inserted,
         bytes_in=bytes_parsed,
-        details={**phase_ms, "files_scanned": files_scanned},
+        details={
+            **phase_ms,
+            "files_scanned": files_scanned,
+            "changes_index_branch": indexed_branch,
+        },
     )
 
 

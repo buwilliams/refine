@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from refine_server import activity, db, governance, project_state
+from refine_server import activity, changes_index, db, governance, project_state
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
@@ -440,7 +440,7 @@ class Dispatcher:
         n_rounds = len(rounds)
         if n_rounds == 0:
             return False
-        n_merges = git_ops.count_refine_merges_for_gap(gap_id, target)
+        n_merges = changes_index.count_for_gap(conn, gap_id, target)
         if n_merges < n_rounds:
             return False
 
