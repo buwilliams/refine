@@ -5,9 +5,9 @@ orchestrated AI agents and verified by ordinary people. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap.
 
-## Benefits
+## Why?
 
-Building decentralized, agents-first software delivery creates economic advantage by shrinking the time and coordination cost between identifying a problem and shipping a verified change.
+refine is a decentralized, agents-first software delivery application that works within your existing applications and infrastructure by leveraging existing development practices. It creates economic advantage by shrinking the time and coordination cost between identifying a problem and shipping a verified change.
 
 - Full-control engineering is expensive: reading every line, modeling every dependency, and organizing code as if the system can be made "perfect" still does not prevent outages or security breaches.
 - Reliability often increases the cost of change, and many engineering cultures optimize for correctness at the expense of the businesses they serve.
