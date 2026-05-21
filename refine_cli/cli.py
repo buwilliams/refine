@@ -543,6 +543,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
+    _ensure_sqlite_schema(cfg)
     port = _runtime_action_port(args, clone, cfg, unit)
     _sync_bound_project_registry(clone, cfg)
     ui_unit = _installed_ui_unit(unit, port)
@@ -617,6 +618,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
+    _ensure_sqlite_schema(cfg)
     port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
@@ -1455,6 +1457,19 @@ def _load_config_or_exit(args: argparse.Namespace) -> None:
     except config.ConfigError as e:
         print(f"refine: {e}", file=sys.stderr)
         sys.exit(1)
+
+
+def _ensure_sqlite_schema(cfg: "config.Config") -> None:
+    """Apply lightweight SQLite schema migrations before runtime handoff.
+
+    The UI backend initializes SQLite too, but start/restart can delegate to a
+    systemd unit that was installed from a different checkout. Running schema
+    setup from the invoking CLI makes cache-table migrations immediate after a
+    pull, before the service process starts serving requests.
+    """
+    from refine_server import db
+
+    db.init_db(cfg.sqlite_path)
 
 
 def _resolve_clone_and_unit_or_exit() -> tuple[Path, str]:

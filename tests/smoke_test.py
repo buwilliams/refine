@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -381,7 +382,25 @@ def main() -> int:
         assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 18124
         assert refine_cli.cmd_start(no_port_args) == 0
         assert refine_cli.cmd_stop(no_port_args) == 0
+        schema_conn = sqlite3.connect(str(unit_cfg.sqlite_path))
+        try:
+            schema_conn.execute("DROP TABLE IF EXISTS performance_events")
+            schema_conn.commit()
+            assert schema_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name = 'performance_events'",
+            ).fetchone() is None
+        finally:
+            schema_conn.close()
         assert refine_cli.cmd_restart(no_port_args) == 0
+        schema_conn = sqlite3.connect(str(unit_cfg.sqlite_path))
+        try:
+            assert schema_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name = 'performance_events'",
+            ).fetchone() is not None
+        finally:
+            schema_conn.close()
     finally:
         os.chdir(old_cwd)
         refine_cli.SYSTEMD_USER_DIR = old_systemd_dir
