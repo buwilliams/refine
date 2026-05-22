@@ -98,6 +98,7 @@ def main() -> int:
         assert "governance" not in kinds, kinds
         supervisor = next(p for p in body["processes"] if p["kind"] == "supervisor")
         assert supervisor["pid"] == 3030, supervisor
+        assert "Supervises the UI and runner worker processes" in supervisor["details"], supervisor
         runner = next(p for p in body["processes"] if p["kind"] == "runner")
         assert runner["pid"] == 3131, runner
         assert runner["max_memory"]["label"] == "4096 MB", runner
@@ -105,6 +106,7 @@ def main() -> int:
         ui = next(p for p in body["processes"] if p["kind"] == "ui")
         assert ui["max_memory"]["label"] == "1024 MB", ui
         assert ui["cpu_priority"]["label"] == "normal (weight 100)", ui
+        assert ui["details"] == "Serves the web UI, API routes, and SSE updates.", ui
         target = next(p for p in body["processes"] if p["kind"] == "target_app")
         assert target["status"] == "running", target
         assert target["actions"] == ["start", "rebuild", "stop", "check"], target

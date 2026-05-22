@@ -2737,6 +2737,10 @@ def process_summary() -> tuple[int, dict]:
             "label": "Supervisor",
             "status": "running" if supervisor_pid else "unknown",
             "pid": supervisor_pid,
+            "details": (
+                "Supervises the UI and runner worker processes; shuts Refine "
+                "down if either exits."
+            ),
             "actions": [],
             **no_caps,
         })
@@ -2747,6 +2751,7 @@ def process_summary() -> tuple[int, dict]:
             "label": "UI process",
             "status": "running",
             "pid": os.getpid(),
+            "details": "Serves the web UI, API routes, and SSE updates.",
             "actions": [],
             **ui_caps,
         },
