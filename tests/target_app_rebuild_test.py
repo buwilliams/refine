@@ -19,7 +19,10 @@ def main() -> int:
             db, gap_writer, gaps, runner as runner_mod,
             target_app, target_app_rebuilder,
         )
-        from refine_server.backend_protocol import M_TARGET_APP_REBUILD_PENDING
+        from refine_server.backend_protocol import (
+            M_TARGET_APP_REBUILD_PENDING,
+            M_TARGET_APP_REBUILD_QUEUE,
+        )
         from refine_server.gaps import now_iso
         from refine_ui import api
 
@@ -71,9 +74,12 @@ def main() -> int:
                 "target_app_auto_rebuild": "on_worktree_merge",
             })
             assert status == 200, body
+            status, body = api.target_app_rebuild_queue({})
+            assert status == 202, body
         finally:
             api.get_client = old_get_client  # type: ignore[assignment]
         assert M_TARGET_APP_REBUILD_PENDING in calls, calls
+        assert M_TARGET_APP_REBUILD_QUEUE in calls, calls
         conn.execute(
             "UPDATE gaps_index SET status = 'review' WHERE id = ?",
             (gid_pending,),

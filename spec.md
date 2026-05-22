@@ -374,8 +374,8 @@ Single landing view summarizing:
 ### Processes
 
 - View the managed-process table: supervisor when present, UI process, runner worker, target application, and agent scheduler.
+- View the runner-workers table for persistent runner threads: merger, governance, and target-app rebuilder. Idle workers stay visible; the target-app rebuilder row can queue a rebuild.
 - View the agents table for active agent subprocesses and chat sessions, including elapsed and idle time. Chat rows show the same worker resource limits as agent rows and include a stop action.
-- View the runner-workers table for internal runner work such as merger, governance, and target-app rebuild.
 - Managed process and agent rows show CPU priority and max-memory labels. Worker memory limits are per process, UI memory limits apply to the UI process, and target-app commands are unmanaged. CPU values are priority weights, not hard CPU quotas.
 - Start / stop / rebuild / check the target application from the process list using saved host commands and configured health checks. The target application may not have a known PID.
 - Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. The pause flag is stored in SQLite, so it survives runner restarts.
@@ -394,7 +394,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 ### System
 
-- **Processes** — default System tab with managed-process, agents, and runner-workers tables; includes target application start/stop/rebuild/status check, pause/resume agents, runner diagnostics, chat session stop, and in-flight agent cancellation.
+- **Processes** — default System tab with managed-process, runner-workers, and agents tables; includes target application start/stop/rebuild/status check, pause/resume agents, runner diagnostics, chat session stop, target-app rebuilder queueing, and in-flight agent cancellation.
 - **Instances** — active application instance selection, sync, and Gap transfer.
 - **Performance** — backend timing metrics and cache/runtime maintenance.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.

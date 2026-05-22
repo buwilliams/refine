@@ -210,12 +210,19 @@ def main() -> int:
     assert 'class="table process-table managed-process-table"' in processes_body
     assert 'class="table process-table agents-process-table"' in processes_body
     assert 'class="table process-table runner-workers-table"' in processes_body
+    assert processes_body.index("<h3>Managed processes</h3>") < processes_body.index("<h3>Runner workers</h3>") < processes_body.index("<h3>Agents</h3>")
     managed_table = processes_body.split('class="table process-table managed-process-table"', 1)[1].split("</table>", 1)[0]
+    runner_table = processes_body.split('class="table process-table runner-workers-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table"', 1)[1].split("</table>", 1)[0]
     assert "<th>CPU priority</th>" in managed_table
     assert "<th>Max memory</th>" in managed_table
     assert "<th>Elapsed</th>" not in managed_table
     assert "<th>Idle</th>" not in managed_table
+    assert "<th>Worker</th>" in runner_table
+    assert "<th>Queue</th>" in runner_table
+    assert 'data-runner-target-app-rebuild' in processes_body
+    assert 'api("POST", "/api/runner-workers/target-app-rebuilder/rebuild")' in settings_js
+    assert '@route("POST", r"/api/runner-workers/target-app-rebuilder/rebuild")' in server_py
     assert "<th>CPU priority</th>" in agents_table
     assert "<th>Max memory</th>" in agents_table
     assert "<th>Elapsed</th>" in agents_table
@@ -225,6 +232,7 @@ def main() -> int:
     assert '.filter((proc) => proc.kind === "agent" || proc.kind === "chat")' in processes_body
     assert '.filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")' in processes_body
     assert "No active agent subprocesses or chat sessions." in processes_body
+    assert "No active runner work." not in processes_body
     assert "refreshProcessesTabForChatChange" in (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
     assert 'idle: "idle"' in processes_body
     assert 'data-full-details="${htmlEscape(details)}"' in processes_body
@@ -232,6 +240,7 @@ def main() -> int:
     assert "function openProcessDetailsIfOverflowing" in processes_body
     assert 'modalAlert(details' in processes_body
     assert '<span class="role-pill ${kind === "agent"' not in processes_body
+    assert '<span class="role-pill merger"' not in processes_body
     assert 'class="process-actions"><div class="actions">' in processes_body
     assert "<h3>Managed processes</h3>" in processes_body
     assert "<h3>Agents</h3>" in processes_body
@@ -255,6 +264,7 @@ def main() -> int:
     assert ".managed-process-table .actions-col { width: 274px; }" in common_css
     assert ".agents-process-table .agent-col" in common_css
     assert ".agents-process-table .agent-actions-col" in common_css
+    assert ".runner-workers-table .worker-actions-col" in common_css
     assert ".process-table td[data-process-details]" in common_css
     assert ".process-table .process-actions .actions" in common_css
     assert ".process-table .process-details-cell.is-overflowing" in common_css

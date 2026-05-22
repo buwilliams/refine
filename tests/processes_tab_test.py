@@ -57,20 +57,21 @@ def main() -> int:
                     "idle_seconds": 3,
                 }],
                 "merger": {
-                    "state": "merging",
-                    "gap_id": "01PROCESSMERGEGAP000000001",
-                    "elapsed_seconds": 7,
-                    "queued": 2,
+                    "state": "idle",
+                    "gap_id": None,
+                    "elapsed_seconds": 0,
+                    "queued": 0,
                 },
                 "governance": {
-                    "configured": True,
+                    "configured": False,
                     "state": "idle",
-                    "queued": 1,
+                    "queued": 0,
                 },
                 "target_app_rebuild": {
+                    "mode": "on_worktree_merge",
                     "running": False,
-                    "queued": True,
-                    "last_reason": "1 Gap awaiting target-app rebuild",
+                    "queued": False,
+                    "last_reason": "",
                 },
             }
 
@@ -123,6 +124,8 @@ def main() -> int:
         assert chat["cpu_priority"]["label"] == "normal (weight 100)", chat
         work_kinds = [w["kind"] for w in body["runner_work"]]
         assert work_kinds == ["merger", "governance", "target_app_rebuilder"], work_kinds
+        assert [w["status"] for w in body["runner_work"]] == ["idle", "idle", "idle"], body["runner_work"]
+        assert body["runner_work"][2]["details"] == "Rebuilds the target application after merged work.", body["runner_work"]
     finally:
         try:
             conn.close()

@@ -23,7 +23,7 @@ from refine_server.backend_protocol import (
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
     M_RENAME_REPORTER, M_SET_NOTES, M_TARGET_APP_GENERATE,
-    M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
+    M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
 from refine_runtime import resources as runtime_resources
@@ -2847,45 +2847,53 @@ def _runner_work_summary(
     governance_state: dict | None,
     target_app_rebuild: dict | None,
 ) -> list[dict[str, Any]]:
-    work: list[dict[str, Any]] = []
-    if merger and (merger.get("state") == "merging" or merger.get("queued")):
-        work.append({
+    merger = merger or {}
+    governance_state = governance_state or {}
+    target_app_rebuild = target_app_rebuild or {}
+    target_status = "idle"
+    if target_app_rebuild.get("running"):
+        target_status = "running"
+    elif target_app_rebuild.get("queued"):
+        target_status = "queued"
+    return [
+        {
             "id": "merger",
             "kind": "merger",
             "label": "Merger",
-            "status": merger.get("state") or "idle",
+            "status": merger.get("state") or "unknown",
             "gap_id": merger.get("gap_id"),
             "elapsed_seconds": merger.get("elapsed_seconds") or 0,
             "queued": merger.get("queued") or 0,
             "last_outcome": merger.get("last_outcome") or "",
-        })
-    if governance_state and (
-        governance_state.get("state") == "reviewing"
-        or governance_state.get("queued")
-    ):
-        work.append({
+            "details": "Merges ready Gap work into the target branch.",
+        },
+        {
             "id": "governance",
             "kind": "governance",
             "label": "Governance",
-            "status": governance_state.get("state") or "idle",
+            "status": governance_state.get("state") or "unknown",
             "gap_id": governance_state.get("gap_id"),
             "elapsed_seconds": governance_state.get("elapsed_seconds") or 0,
             "queued": governance_state.get("queued") or 0,
             "last_outcome": governance_state.get("last_outcome") or "",
-        })
-    if target_app_rebuild and (
-        target_app_rebuild.get("running") or target_app_rebuild.get("queued")
-    ):
-        status = "running" if target_app_rebuild.get("running") else "queued"
-        work.append({
+            "details": (
+                "Reviews Gaps against configured governance rules."
+                if governance_state.get("configured")
+                else "Idle until governance rules are configured."
+            ),
+        },
+        {
             "id": "target-app-rebuilder",
             "kind": "target_app_rebuilder",
             "label": "Target-app rebuilder",
-            "status": status,
+            "status": target_status if target_app_rebuild else "unknown",
             "queued": 1 if target_app_rebuild.get("queued") else 0,
-            "details": target_app_rebuild.get("last_reason") or "",
-        })
-    return work
+            "details": (
+                target_app_rebuild.get("last_reason")
+                or "Rebuilds the target application after merged work."
+            ),
+        },
+    ]
 
 
 def _process_resource_caps(settings: dict[str, str]) -> dict[str, Any]:
@@ -3242,6 +3250,15 @@ def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
 def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
     """Run the configured rebuild command via the host runner."""
     return _target_app_run("rebuild")
+
+
+def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:
+    """Queue the persistent target-app rebuilder worker."""
+    try:
+        result = get_client().call(M_TARGET_APP_REBUILD_QUEUE, {}, timeout=10.0)
+    except BackendError as e:
+        return _backend_err(e)
+    return 202, result
 
 
 def _target_app_run(kind: str) -> tuple[int, dict]:

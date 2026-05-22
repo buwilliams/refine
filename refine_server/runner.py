@@ -20,7 +20,7 @@ from refine_server.backend_protocol import (
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
     M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
-    M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
+    M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 
 from . import dispatcher as _dispatcher
@@ -225,6 +225,7 @@ class Runner:
             M_GOVERNANCE_GENERATE_RULES: self._h_governance_generate_rules,
             M_GOVERNANCE_WAKE: self._h_governance_wake,
             M_TARGET_APP_RUN: self._h_target_app_run,
+            M_TARGET_APP_REBUILD_QUEUE: self._h_target_app_rebuild_queue,
             M_TARGET_APP_REBUILD_PENDING: self._h_target_app_rebuild_pending,
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
             M_TARGET_APP_HEALTH: self._h_target_app_health,
@@ -1273,6 +1274,12 @@ class Runner:
 
     def _h_target_app_rebuild_pending(self, params: dict) -> dict:
         queued = self.target_app_rebuilder.queue_pending_awaiting_rebuild()
+        return {"queued": queued}
+
+    def _h_target_app_rebuild_queue(self, params: dict) -> dict:
+        queued = self.target_app_rebuilder.queue_rebuild(
+            "manual runner-worker rebuild",
+        )
         return {"queued": queued}
 
     def _run_automatic_target_app_rebuild(self, reason: str) -> dict:

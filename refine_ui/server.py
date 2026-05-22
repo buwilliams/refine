@@ -367,6 +367,11 @@ def _h_target_app_rebuild(_h, _m, body, _q):
     return api.target_app_rebuild(body or {})
 
 
+@route("POST", r"/api/runner-workers/target-app-rebuilder/rebuild")
+def _h_target_app_rebuild_queue(_h, _m, body, _q):
+    return api.target_app_rebuild_queue(body or {})
+
+
 @route("POST", r"/api/target-app/health")
 def _h_target_app_health(_h, _m, body, _q):
     return api.target_app_health(body or {})

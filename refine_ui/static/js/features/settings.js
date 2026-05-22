@@ -563,6 +563,26 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
+      <h3>Runner workers</h3>
+      <table class="table process-table runner-workers-table">
+        <colgroup>
+          <col class="worker-col">
+          <col class="status-col">
+          <col class="gap-col">
+          <col class="elapsed-col">
+          <col class="queue-col">
+          <col class="details-col">
+          <col class="worker-actions-col">
+        </colgroup>
+        <thead><tr>
+          <th>Worker</th><th>Status</th><th>Gap</th>
+          <th>Elapsed</th><th>Queue</th><th>Details</th><th></th>
+        </tr></thead>
+        <tbody>${workRows}</tbody>
+      </table>
+    </section>
+
+    <section class="settings-section">
       <h3>Agents</h3>
       ${agentRows ? `
         <table class="table process-table agents-process-table">
@@ -583,26 +603,6 @@ function renderProcessesTab(processData, settings, diag, dash) {
           </tr></thead>
           <tbody>${agentRows}</tbody>
         </table>` : `<p class="muted">No active agent subprocesses or chat sessions.</p>`}
-    </section>
-
-    <section class="settings-section">
-      <h3>Runner workers</h3>
-      ${workRows ? `
-        <table class="table process-table runner-workers-table">
-          <colgroup>
-            <col class="worker-col">
-            <col class="status-col">
-            <col class="gap-col">
-            <col class="elapsed-col">
-            <col class="queue-col">
-            <col class="details-col">
-          </colgroup>
-          <thead><tr>
-            <th>Worker</th><th>Status</th><th>Gap</th>
-            <th>Elapsed</th><th>Queue</th><th>Details</th>
-          </tr></thead>
-          <tbody>${workRows}</tbody>
-        </table>` : `<p class="muted">No active runner work.</p>`}
     </section>`;
 }
 
@@ -826,13 +826,22 @@ function renderRunnerWorkRow(work, anchorMs) {
     : ` class="runner-work-details"`;
   return `
     <tr>
-      <td><span class="role-pill merger">${htmlEscape(runnerWorkKindLabel(work.kind))}</span></td>
+      <td>${htmlEscape(runnerWorkKindLabel(work.kind))}</td>
       <td>${htmlEscape(processStatusLabel(work.status || ""))}</td>
       <td>${gap}</td>
       <td>${elapsed}</td>
       <td>${queued ? fmtCount(queued) : `<span class="muted small">-</span>`}</td>
       <td${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td class="process-actions"><div class="actions">${renderRunnerWorkActions(work)}</div></td>
     </tr>`;
+}
+
+function renderRunnerWorkActions(work) {
+  if (work.kind !== "target_app_rebuilder") {
+    return `<span class="muted small">-</span>`;
+  }
+  const busy = ["running", "queued", "unknown"].includes(work.status);
+  return `<button class="secondary" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
 }
 
 function runnerWorkKindLabel(kind) {
@@ -1481,6 +1490,16 @@ function drawSettings(
         try {
           await api("POST", `/api/chat/${id}/stop`);
           await refreshSettings();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$("[data-runner-target-app-rebuild]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      await withButtonBusy(b, "Queueing…", async () => {
+        try {
+          await api("POST", "/api/runner-workers/target-app-rebuilder/rebuild");
+          await refreshSettings({ force: true });
         } catch (e) { await showActionError(e); }
       });
     });
