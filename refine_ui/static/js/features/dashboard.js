@@ -34,7 +34,16 @@ async function renderDashboard() {
   // Fresh navigation should not paint cached counts as current; once the
   // dashboard is already visible, refreshes redraw over the existing DOM.
   if (!document.getElementById("dash")) {
-    $("#main").innerHTML = `<h2>Dashboard</h2><div id="dash"><p class="muted">Loading…</p></div>`;
+    $("#main").innerHTML = `
+      <div class="dashboard-title-row">
+        <h2>Dashboard</h2>
+        <div class="dashboard-scope-switch" role="group" aria-label="Dashboard instance scope">
+          <button type="button" data-dashboard-scope="current">Current</button>
+          <button type="button" data-dashboard-scope="all">All</button>
+        </div>
+      </div>
+      <div id="dash"><p class="muted">Loading…</p></div>`;
+    wireDashboardScopeSwitch();
   }
   await refreshDashboard();
 }
@@ -139,46 +148,18 @@ function drawDashboard(d, opts = {}) {
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
-  const scopeLabel = scope === "all"
-    ? "All instances"
-    : (d.active_instance_display_name || "Current instance");
   const orderedStatuses = WORKFLOW_STATUSES;
   const dash = $("#dash");
   const reporterStats = d.reporter_stats || [];
   const reviewsShell = document.getElementById("reviews-for-reporter-card");
   const reviewsShellOpen = reviewsShell ? reviewsShell.open : true;
   const reporterStatsShellOpen = !!document.getElementById("dashboard-reporter-stats-shell")?.open;
+  const showReviewPanel = !!reviewReporter || needsAttention.length > 0;
+  syncDashboardScopeSwitch(scope);
   // Guard against late-arriving SSE refreshes after the user navigated
   // away — the container is gone, so just bail silently.
   if (!dash) return;
   dash.innerHTML = `
-    <div class="row" style="align-items:center;margin-bottom:12px">
-      <span class="muted small">Stats for</span>
-      <div class="actions" role="group" aria-label="Dashboard instance scope">
-        <button class="secondary small" data-dashboard-scope="current" ${scope === "current" ? "disabled" : ""}>
-          Current instance
-        </button>
-        <button class="secondary small" data-dashboard-scope="all" ${scope === "all" ? "disabled" : ""}>
-          All instances
-        </button>
-      </div>
-      <span class="filter-pill">${htmlEscape(scopeLabel)}</span>
-    </div>
-
-    ${needsAttention.length ? `
-      <section class="card">
-        <h3>Needs attention</h3>
-        <div class="actions">
-          ${needsAttention.map((x) => `
-            <a href="${gapsHash({
-              status: x.filter?.status || "",
-              instance: x.filter?.instance || scope,
-            })}" class="btn">
-              ${htmlEscape(x.message)}
-            </a>`).join("")}
-        </div>
-      </section>` : ""}
-
     <section class="card-grid dashboard-status-grid">
       ${orderedStatuses.map((s) => {
         const agentManaged = AGENT_MANAGED_DASHBOARD_STATUSES.has(s);
@@ -192,19 +173,32 @@ function drawDashboard(d, opts = {}) {
       }).join("")}
     </section>
 
-    ${reviewReporter ? `
+    ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}>
       <summary>
         <span class="filter-shell-title">Awaiting your review</span>
-        <span class="muted small">${htmlEscape(reviewReporter)}</span>
+        ${reviewReporter ? `<span class="muted small">${htmlEscape(reviewReporter)}</span>` : ""}
         <span class="filter-pill">${fmtCount(reviewsForReporter.length)}</span>
+        ${needsAttention.length ? `<span class="filter-pill">Needs attention</span>` : ""}
       </summary>
       <div class="filter-shell-body">
+        ${needsAttention.length ? `
+          <div class="actions dashboard-panel-actions">
+            ${needsAttention.map((x) => `
+              <a href="${gapsHash({
+                status: x.filter?.status || "",
+                instance: x.filter?.instance || scope,
+              })}" class="btn">
+                ${htmlEscape(x.message)}
+              </a>`).join("")}
+          </div>` : ""}
         ${reviewsForReporter.length === 0 ? "" : `
           <div class="actions dashboard-panel-actions">
             <button id="rev-bulk-verify" disabled>Verify selected</button>
           </div>`}
-      ${reviewsForReporter.length === 0
+      ${!reviewReporter
+        ? ""
+        : reviewsForReporter.length === 0
         ? `<p class="muted">Nothing in <code>review</code> assigned to you right now.</p>`
         : `<table class="table">
             <thead><tr>
@@ -270,11 +264,6 @@ function drawDashboard(d, opts = {}) {
     </details>
 
   `;
-  $$("[data-dashboard-scope]", dash).forEach((btn) => {
-    btn.addEventListener("click", () => {
-      location.hash = dashboardHash(btn.dataset.dashboardScope || "current");
-    });
-  });
   // Click any reporter row → deep-link into the Gaps list filtered by
   // that reporter. We use data-reporter + a delegated listener so the
   // name can contain spaces/quotes without HTML-escaping hazards.
@@ -285,6 +274,23 @@ function drawDashboard(d, opts = {}) {
   });
 
   wireReviewsForReporter(reviewsForReporter);
+}
+
+function wireDashboardScopeSwitch() {
+  $$(".dashboard-scope-switch [data-dashboard-scope]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      location.hash = dashboardHash(btn.dataset.dashboardScope || "current");
+    });
+  });
+  syncDashboardScopeSwitch(dashboardScopeFromHash());
+}
+
+function syncDashboardScopeSwitch(scope) {
+  $$(".dashboard-scope-switch [data-dashboard-scope]").forEach((btn) => {
+    const active = btn.dataset.dashboardScope === scope;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
 }
 
 function wireReviewsForReporter(reviews) {

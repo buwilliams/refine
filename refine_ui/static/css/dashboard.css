@@ -9,6 +9,40 @@
   flex: 1 1 auto;
   min-height: 0;
 }
+.dashboard-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.dashboard-title-row h2 {
+  margin-bottom: 0;
+}
+.dashboard-scope-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.dashboard-scope-switch button {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 12px;
+  line-height: 1;
+}
+.dashboard-scope-switch button:last-child {
+  border-right: 0;
+}
+.dashboard-scope-switch button.active {
+  background: #e2e5eb;
+  color: var(--fg);
+  font-weight: 600;
+}
 #dash > section.card,
 #dash > section.card-grid {
   flex: 0 0 auto;   /* fixed-size sections */
