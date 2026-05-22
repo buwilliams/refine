@@ -226,7 +226,7 @@ select {
 .runner-workers-table .worker-col { width: 160px; }
 .runner-workers-table .gap-col { width: 120px; }
 .runner-workers-table .queue-col { width: 72px; }
-.runner-workers-table .worker-actions-col { width: 96px; }
+.runner-workers-table .worker-actions-col { width: 188px; }
 .process-table td[data-process-details],
 .process-table .runner-work-details {
   overflow: hidden;

@@ -29,6 +29,7 @@ def main() -> int:
         conn.commit()
 
         original_snapshot = runtime.runner_status_snapshot
+        original_active_background_job = api._active_background_job  # type: ignore[attr-defined]
         original_supervisor_pid = os.environ.get("REFINE_SUPERVISOR_PID")
 
         def fake_snapshot() -> dict:
@@ -78,9 +79,19 @@ def main() -> int:
         try:
             os.environ["REFINE_SUPERVISOR_PID"] = "3030"
             runtime.runner_status_snapshot = fake_snapshot  # type: ignore[assignment]
+            api._active_background_job = (  # type: ignore[attr-defined]
+                lambda kind: {
+                    "id": "job-import",
+                    "kind": "import_persist",
+                    "status": "running",
+                    "started_at": "2000-01-01T00:00:00Z",
+                    "progress": {"message": "Persisting imports"},
+                } if kind == "import_persist" else None
+            )
             status, body = api.process_summary()
         finally:
             runtime.runner_status_snapshot = original_snapshot  # type: ignore[assignment]
+            api._active_background_job = original_active_background_job  # type: ignore[attr-defined]
             if original_supervisor_pid is None:
                 os.environ.pop("REFINE_SUPERVISOR_PID", None)
             else:
@@ -123,9 +134,24 @@ def main() -> int:
         assert chat["idle_seconds"] == 5, chat
         assert chat["cpu_priority"]["label"] == "normal (weight 100)", chat
         work_kinds = [w["kind"] for w in body["runner_work"]]
-        assert work_kinds == ["merger", "governance", "target_app_rebuilder"], work_kinds
-        assert [w["status"] for w in body["runner_work"]] == ["idle", "idle", "idle"], body["runner_work"]
+        assert work_kinds == [
+            "merger",
+            "governance",
+            "target_app_rebuilder",
+            "target_app_config_generator",
+            "sqlite_cache_rebuild",
+            "activity_log_cleanup",
+            "import_persist",
+            "bulk_update_gaps",
+            "bulk_delete_gaps",
+        ], work_kinds
+        assert [w["status"] for w in body["runner_work"]] == [
+            "idle", "idle", "idle", "idle", "idle", "idle", "running", "idle", "idle",
+        ], body["runner_work"]
         assert body["runner_work"][2]["details"] == "Rebuilds the target application after merged work.", body["runner_work"]
+        import_worker = next(w for w in body["runner_work"] if w["kind"] == "import_persist")
+        assert import_worker["details"] == "Persisting imports", import_worker
+        assert import_worker["job_id"] == "job-import", import_worker
     finally:
         try:
             conn.close()

@@ -98,7 +98,6 @@ def main() -> int:
     assert 'id="s-resource-isolation"' in settings_js
     assert '["very_low", "Very low"]' in settings_js
     assert '["best_effort", "Best effort"]' in settings_js
-    assert 'class="danger" id="s-rebuild-cache"' in settings_js
     assert 'api("POST", "/api/cache/rebuild", { background: true })' in settings_js
     assert "function drawSqliteCacheProgress" in settings_js
     assert "onProgress: drawSqliteCacheProgress" in settings_js
@@ -121,7 +120,6 @@ def main() -> int:
     assert "function performanceResourceLabel" in settings_js
     assert "<dt>Process model</dt>" in settings_js
     assert "<th>Resource</th>" in settings_js
-    assert 'withButtonBusy($("#s-rebuild-cache"), "Rebuilding…"' in settings_js
     assert "function drawRuntimeRecovery(error)" in settings_js
     assert '@route("POST", r"/api/cache/rebuild")' in server_py
     assert "def rebuild_sqlite_cache" in api_py
@@ -190,6 +188,7 @@ def main() -> int:
     processes_body = settings_js.split("function renderProcessesTab", 1)[1].split("function backendProcessLabel", 1)[0]
     application_body = settings_js.split('${pane("application", `', 1)[1].split('${pane("processes", `', 1)[0]
     runtime_body = settings_js.split('${pane("runtime", `', 1)[1].split('${pane("performance", `', 1)[0]
+    assert 'id="s-rebuild-cache"' not in runtime_body
     assert 'id="s-target-run-rebuild"' in processes_body
     assert 'id="s-target-run-start"' in processes_body
     assert 'id="s-target-run-stop"' in processes_body
@@ -221,7 +220,13 @@ def main() -> int:
     assert "<th>Worker</th>" in runner_table
     assert "<th>Queue</th>" in runner_table
     assert 'data-runner-target-app-rebuild' in processes_body
+    assert 'data-runner-target-app-generate' in processes_body
+    assert 'data-runner-cache-rebuild' in processes_body
+    assert 'data-runner-log-cleanup' in processes_body
+    assert 'data-runner-log-cleanup-days' in processes_body
     assert 'api("POST", "/api/runner-workers/target-app-rebuilder/rebuild")' in settings_js
+    assert 'api("POST", "/api/target-app/generate-instructions"' in settings_js
+    assert 'api("POST", "/api/activity/cleanup"' in settings_js
     assert '@route("POST", r"/api/runner-workers/target-app-rebuilder/rebuild")' in server_py
     assert "<th>CPU priority</th>" in agents_table
     assert "<th>Max memory</th>" in agents_table
@@ -265,6 +270,9 @@ def main() -> int:
     assert ".agents-process-table .agent-col" in common_css
     assert ".agents-process-table .agent-actions-col" in common_css
     assert ".runner-workers-table .worker-actions-col" in common_css
+    assert 'id="s-target-generate"' not in settings_js
+    assert 'id="logs-cleanup"' not in settings_js
+    assert 'id="logs-cleanup-days"' not in settings_js
     assert ".process-table td[data-process-details]" in common_css
     assert ".process-table .process-actions .actions" in common_css
     assert ".process-table .process-details-cell.is-overflowing" in common_css

@@ -2893,7 +2893,119 @@ def _runner_work_summary(
                 or "Rebuilds the target application after merged work."
             ),
         },
+        _static_worker_row(
+            "target-app-config-generator",
+            "target_app_config_generator",
+            "Target-app config generator",
+            "Uses the AI provider to draft target-app commands from the codebase.",
+        ),
+        _background_worker_row(
+            "sqlite-cache-rebuilder",
+            "sqlite_cache_rebuild",
+            "SQLite cache rebuilder",
+            "Rebuilds index.sqlite from canonical .refine JSON.",
+        ),
+        _static_worker_row(
+            "activity-log-cleanup",
+            "activity_log_cleanup",
+            "Activity log cleanup",
+            "Deletes activity log entries older than the selected retention window.",
+        ),
+        _background_worker_row(
+            "import-persister",
+            "import_persist",
+            "Import persister",
+            "Persists large imported Gap batches in the background.",
+        ),
+        _background_worker_row(
+            "bulk-gap-updater",
+            "bulk_update_gaps",
+            "Bulk Gap updater",
+            "Applies large bulk Gap updates in the background.",
+        ),
+        _background_worker_row(
+            "bulk-gap-deleter",
+            "bulk_delete_gaps",
+            "Bulk Gap deleter",
+            "Deletes large selected Gap batches in the background.",
+        ),
     ]
+
+
+def _static_worker_row(
+    worker_id: str,
+    kind: str,
+    label: str,
+    details: str,
+) -> dict[str, Any]:
+    return {
+        "id": worker_id,
+        "kind": kind,
+        "label": label,
+        "status": "idle",
+        "gap_id": None,
+        "elapsed_seconds": 0,
+        "queued": 0,
+        "details": details,
+    }
+
+
+def _background_worker_row(
+    worker_id: str,
+    job_kind: str,
+    label: str,
+    details: str,
+) -> dict[str, Any]:
+    job = _active_background_job(job_kind)
+    if not job:
+        return _static_worker_row(worker_id, job_kind, label, details)
+    progress = job.get("progress") or {}
+    message = progress.get("message") or job.get("label") or details
+    return {
+        "id": worker_id,
+        "kind": job_kind,
+        "label": label,
+        "status": job.get("status") or "idle",
+        "gap_id": None,
+        "elapsed_seconds": _elapsed_since(job.get("started_at")),
+        "queued": 1 if job.get("status") == "queued" else 0,
+        "details": message,
+        "job_id": job.get("id"),
+        "progress": progress,
+    }
+
+
+def _active_background_job(kind: str) -> dict[str, Any] | None:
+    try:
+        conn = _conn()
+        try:
+            rows = conn.execute(
+                "SELECT id FROM background_jobs "
+                "WHERE kind = ? AND status IN ('queued', 'running') "
+                "ORDER BY started_at DESC LIMIT 5",
+                (kind,),
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return None
+    for row in rows:
+        snap = background_jobs.snapshot(str(row["id"]))
+        if snap and snap.get("status") in {"queued", "running"}:
+            return snap
+    return None
+
+
+def _elapsed_since(value: Any) -> int:
+    text = str(value or "").strip()
+    if not text:
+        return 0
+    try:
+        started = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    now = datetime.now(started.tzinfo or timezone.utc)
+    return max(0, int((now - started).total_seconds()))
 
 
 def _process_resource_caps(settings: dict[str, str]) -> dict[str, Any]:

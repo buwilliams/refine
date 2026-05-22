@@ -580,6 +580,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
         </tr></thead>
         <tbody>${workRows}</tbody>
       </table>
+      <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
     </section>
 
     <section class="settings-section">
@@ -837,11 +838,27 @@ function renderRunnerWorkRow(work, anchorMs) {
 }
 
 function renderRunnerWorkActions(work) {
-  if (work.kind !== "target_app_rebuilder") {
-    return `<span class="muted small">-</span>`;
+  if (work.kind === "target_app_rebuilder") {
+    const busy = ["running", "queued", "unknown"].includes(work.status);
+    return `<button class="secondary" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
   }
-  const busy = ["running", "queued", "unknown"].includes(work.status);
-  return `<button class="secondary" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
+  if (work.kind === "target_app_config_generator") {
+    const busy = ["running", "queued", "unknown"].includes(work.status);
+    return `<button class="secondary" data-runner-target-app-generate ${busy ? "disabled" : ""}>Generate</button>`;
+  }
+  if (work.kind === "sqlite_cache_rebuild") {
+    const busy = ["running", "queued", "unknown"].includes(work.status);
+    return `<button class="danger" data-runner-cache-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
+  }
+  if (work.kind === "activity_log_cleanup") {
+    return `
+      <select data-runner-log-cleanup-days aria-label="Activity log retention">
+        ${[0, 7, 30, 60, 90, 365].map((n) =>
+          `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 days" : `${n} days`}</option>`).join("")}
+      </select>
+      <button class="danger" data-runner-log-cleanup>Clean up</button>`;
+  }
+  return `<span class="muted small">-</span>`;
 }
 
 function runnerWorkKindLabel(kind) {
@@ -849,6 +866,12 @@ function runnerWorkKindLabel(kind) {
     merger: "merger",
     governance: "governance",
     target_app_rebuilder: "target-app rebuilder",
+    target_app_config_generator: "target-app config generator",
+    sqlite_cache_rebuild: "SQLite cache rebuilder",
+    activity_log_cleanup: "activity log cleanup",
+    import_persist: "import persister",
+    bulk_update_gaps: "bulk Gap updater",
+    bulk_delete_gaps: "bulk Gap deleter",
   }[kind] || "worker";
 }
 
@@ -1079,13 +1102,10 @@ function drawSettings(
       </p>
       ${(s.target_app_start_instructions || s.target_app_stop_instructions || s.target_app_health_url) ? `
         <p class="muted small" style="color:var(--warn)">
-          Legacy prose target-app settings are present. Generate from codebase
-          to convert them into structured commands, then Save.
+          Legacy prose target-app settings are present. Use Processes → Runner
+          workers → target-app config generator to convert them into structured
+          commands, then Save.
         </p>` : ""}
-      <div class="actions" style="margin-bottom:10px">
-        <button class="secondary" id="s-target-generate">Generate from codebase</button>
-        <span class="muted small">Review generated fields before saving.</span>
-      </div>
       <div class="form-row"><label>Start command
         <span class="muted small">— one-line shell command that starts the app and returns promptly.</span></label>
         <input type="text" id="s-target-start-command"
@@ -1281,24 +1301,6 @@ function drawSettings(
 
     ${renderFeatureFlagsCard(feats)
       || `<section class="settings-section"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></section>`}
-
-    ${renderSqliteCacheSection()}
-
-    <section class="settings-section">
-      <h3>Logs retention</h3>
-      <p class="muted small">
-        Delete activity entries older than the chosen window. Newer entries
-        and gap state are untouched.
-      </p>
-      <div class="actions">
-        <label for="logs-cleanup-days" class="muted small">Keep</label>
-        <select id="logs-cleanup-days">
-          ${[0, 7, 30, 60, 90, 365].map((n) =>
-            `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 (don't keep any)" : `${n} days`}</option>`).join("")}
-        </select>
-        <button class="danger" id="logs-cleanup">Clean up old logs</button>
-      </div>
-    </section>
 
     <section class="settings-section settings-save-section">
       <div class="actions"><button id="s-save-runtime">Save runtime</button></div>
@@ -1499,6 +1501,79 @@ function drawSettings(
       await withButtonBusy(b, "Queueing…", async () => {
         try {
           await api("POST", "/api/runner-workers/target-app-rebuilder/rebuild");
+          await refreshSettings({ force: true });
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$("[data-runner-target-app-generate]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const ok = await modalConfirm(
+        "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the fields on the Application tab.",
+        { title: "Generate target-app config", okLabel: "Generate" },
+      );
+      if (!ok) return;
+      await withButtonBusy(b, "Generating…", async () => {
+        try {
+          const r = await api("POST", "/api/target-app/generate-instructions",
+                              { kind: "all" });
+          if (r.ok && r.config) {
+            setSettingsTab("application");
+            applyGeneratedTargetAppConfig(r.config);
+            toast("Generated — review and click Save application to persist", "info");
+          } else {
+            toast("Generation produced no configuration", "error");
+          }
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$("[data-runner-cache-rebuild]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const ok = await modalConfirm(
+        "Rebuild the SQLite cache from canonical .refine JSON? If the existing database is corrupted, Refine will replace it and SQLite-only runtime history may be lost.",
+        { title: "Rebuild SQLite cache", okLabel: "Rebuild" },
+      );
+      if (!ok) return;
+      await withButtonBusy(b, "Rebuilding…", async () => {
+        try {
+          let result = await api("POST", "/api/cache/rebuild", { background: true });
+          if (result.job) {
+            drawSqliteCacheProgress(result.job.progress || {});
+            result = await waitForBackgroundJob(result.job, {
+              onProgress: drawSqliteCacheProgress,
+            });
+            if (result.http_status && result.http_status >= 400) {
+              const raw = result.error || {};
+              const err = new Error(raw.message || "SQLite cache rebuild failed");
+              err.details = raw.details;
+              err.code = raw.code;
+              throw err;
+            }
+          }
+          toast("SQLite cache rebuilt", "info");
+          await refreshSettings({ force: true });
+        } catch (e) { await showActionError(e, "SQLite cache rebuild failed"); }
+      });
+    });
+  });
+  $$("[data-runner-log-cleanup]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const select = b.parentElement?.querySelector("[data-runner-log-cleanup-days]");
+      const days = parseInt(select?.value || "7", 10);
+      const human = days === 0
+        ? "Delete ALL activity log entries? This cannot be undone."
+        : `Delete activity log entries older than ${days} day${days === 1 ? "" : "s"}? This cannot be undone.`;
+      const ok = await modalConfirm(human, {
+        title: "Clean up old logs",
+        okLabel: days === 0 ? "Delete all" : "Delete",
+        danger: true,
+      });
+      if (!ok) return;
+      await withButtonBusy(b, "Cleaning…", async () => {
+        try {
+          const r = await api("POST", "/api/activity/cleanup", { days });
+          toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
           await refreshSettings({ force: true });
         } catch (e) { await showActionError(e); }
       });
@@ -1716,25 +1791,6 @@ function drawSettings(
       } catch (e) { await showActionError(e); }
     });
   });
-  $("#logs-cleanup").addEventListener("click", async () => {
-    const days = parseInt($("#logs-cleanup-days").value, 10);
-    const human = days === 0
-      ? "Delete ALL activity log entries? This cannot be undone."
-      : `Delete activity log entries older than ${days} day${days === 1 ? "" : "s"}? This cannot be undone.`;
-    const ok = await modalConfirm(human, {
-      title: "Clean up old logs",
-      okLabel: days === 0 ? "Delete all" : "Delete",
-      danger: true,
-    });
-    if (!ok) return;
-    await withButtonBusy($("#logs-cleanup"), "Cleaning…", async () => {
-      try {
-        const r = await api("POST", "/api/activity/cleanup", { days });
-        toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
-      } catch (e) { await showActionError(e); }
-    });
-  });
-  bindRebuildCacheHandler();
   $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(
       "Remove this reporter from the dropdown? Historical rounds keep their original reporter string.",
@@ -1871,26 +1927,6 @@ function drawSettings(
         toast("Saved", "info");
         await refreshSettings({ force: true });
         refreshTargetAppStatus();
-      } catch (e) { await showActionError(e); }
-    });
-  });
-  $("#s-target-generate")?.addEventListener("click", async () => {
-    const btn = $("#s-target-generate");
-    const ok = await modalConfirm(
-      "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the fields above.",
-      { title: "Generate target-app config", okLabel: "Generate" },
-    );
-    if (!ok) return;
-    await withButtonBusy(btn, "Generating…", async () => {
-      try {
-        const r = await api("POST", "/api/target-app/generate-instructions",
-                            { kind: "all" });
-        if (r.ok && r.config) {
-          applyGeneratedTargetAppConfig(r.config);
-          toast("Generated — review and click Save application to persist", "info");
-        } else {
-          toast("Generation produced no configuration", "error");
-        }
       } catch (e) { await showActionError(e); }
     });
   });
