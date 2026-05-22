@@ -12,7 +12,10 @@ from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo
 
 def assert_refine_gitignore(root: Path) -> None:
     lines = (root / ".gitignore").read_text(encoding="utf-8").splitlines()
-    for expected in ("index.sqlite", "index.sqlite-shm", "index.sqlite-wal"):
+    for expected in (
+        "index.sqlite", "index.sqlite-shm", "index.sqlite-wal",
+        "app.log", "app.pid", "logs/", "gaps/**/logs.jsonl",
+    ):
         assert expected in lines, lines
     assert "run/" not in lines, lines
 
@@ -251,19 +254,22 @@ def main() -> int:
         assert status == 400, body
         assert "archived target" in body["error"]["message"]
 
-        sqlite_paths = [
+        runtime_paths = [
             ".refine/index.sqlite",
             ".refine/index.sqlite-shm",
             ".refine/index.sqlite-wal",
+            ".refine/app.pid",
+            ".refine/app.log",
+            ".refine/gaps/01/PROJECTSTATELOGNOISE/logs.jsonl",
         ]
-        for rel in sqlite_paths:
+        for rel in runtime_paths:
             p = client / rel
             p.parent.mkdir(parents=True, exist_ok=True)
             if not p.exists():
                 p.write_text("tracked cache\n", encoding="utf-8")
-        git(client, "add", "-f", *sqlite_paths)
-        git(client, "commit", "-m", "track sqlite cache")
-        assert set(git(client, "ls-files", *sqlite_paths).stdout.splitlines()) == set(sqlite_paths)
+        git(client, "add", "-f", *runtime_paths)
+        git(client, "commit", "-m", "track runtime cache")
+        assert set(git(client, "ls-files", *runtime_paths).stdout.splitlines()) == set(runtime_paths)
 
         (root / ".gitignore").unlink()
         (root / "config.json").unlink()
@@ -274,9 +280,14 @@ def main() -> int:
         from refine_ui.api import _commit_refine_state
 
         _commit_refine_state(client)
-        assert git(client, "ls-files", *sqlite_paths).stdout.strip() == ""
-        for rel in sqlite_paths:
+        assert git(client, "ls-files", *runtime_paths).stdout.strip() == ""
+        for rel in runtime_paths:
             assert (client / rel).exists(), rel
+        head = git(client, "rev-parse", "HEAD").stdout.strip()
+        for rel in runtime_paths[3:]:
+            (client / rel).write_text("new runtime noise\n", encoding="utf-8")
+        _commit_refine_state(client)
+        assert git(client, "rev-parse", "HEAD").stdout.strip() == head
     finally:
         try:
             conn.close()

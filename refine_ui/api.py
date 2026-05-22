@@ -952,22 +952,22 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
 def _commit_refine_state(repo: Path) -> None:
     from refine_server import git_ops
 
-    git_ops.untrack_refine_sqlite(cwd=repo)
+    config.ensure_refine_gitignore(repo / ".refine")
     dirty_refine = _git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
     if not dirty_refine.strip():
         return
-    _git_checked(repo, ["add", ".refine"])
-    staged = subprocess.run(
-        ["git", "diff", "--cached", "--quiet"],
-        cwd=str(repo), capture_output=True, text=True, timeout=30,
+    paths = git_ops.dirty_paths_under(".refine")
+    result = git_ops.commit_refine_sync_state(
+        paths,
+        state_message="refine: sync project state before switch",
+        cwd=repo,
     )
-    if staged.returncode == 0:
+    if result.ok:
         return
-    _git_checked(repo, [
-        "-c", "user.email=refine@localhost",
-        "-c", "user.name=refine",
-        "commit", "-m", "refine: persist state before switch",
-    ])
+    raise _SwitchBlocked(
+        "Could not commit current app Refine state.",
+        (result.stderr or result.stdout or "git commit failed").strip(),
+    )
 
 
 def _git_stdout(repo: Path, args: list[str]) -> str:

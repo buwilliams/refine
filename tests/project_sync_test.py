@@ -17,6 +17,29 @@ def main() -> int:
         git(client, "commit", "-m", "init refine state")
         git(client, "push")
 
+        runtime_noise = [
+            ".refine/app.pid",
+            ".refine/app.log",
+            ".refine/gaps/01/PROJECTSYNCLOGNOISE/logs.jsonl",
+        ]
+        for rel in runtime_noise:
+            p = client / rel
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("tracked runtime noise\n", encoding="utf-8")
+        git(client, "add", "-f", *runtime_noise)
+        git(client, "commit", "-m", "track runtime noise")
+        git(client, "push")
+        for rel in runtime_noise:
+            (client / rel).write_text("changed runtime noise\n", encoding="utf-8")
+        result = project_sync.sync_latest(conn)
+        assert result["ok"], result
+        assert result["committed_state"] is True, result
+        assert git(client, "log", "-1", "--format=%s").stdout.strip() == (
+            "refine: stop tracking runtime state"
+        )
+        assert git(client, "ls-files", *runtime_noise).stdout.strip() == ""
+        git(client, "push")
+
         git(tmp, "clone", str(tmp / "origin.git"), "peer")
         peer = tmp / "peer"
         git(peer, "config", "user.email", "t@x")

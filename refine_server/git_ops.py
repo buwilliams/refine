@@ -28,6 +28,11 @@ REFINE_SQLITE_PATHS = (
     ".refine/index.sqlite-shm",
     ".refine/index.sqlite-wal",
 )
+REFINE_RUNTIME_EXACT_PATHS = (
+    *REFINE_SQLITE_PATHS,
+    ".refine/app.log",
+    ".refine/app.pid",
+)
 
 
 def client_repo_path() -> Path:
@@ -238,6 +243,30 @@ def is_refine_sqlite_path(path: str) -> bool:
     return path.strip().strip('"') in REFINE_SQLITE_PATHS
 
 
+def is_refine_runtime_path(path: str) -> bool:
+    clean = path.strip().strip('"')
+    return (
+        clean in REFINE_RUNTIME_EXACT_PATHS
+        or clean.startswith(".refine/logs/")
+        or clean.startswith(".refine/run/")
+        or (clean.startswith(".refine/") and clean.endswith("/logs.jsonl"))
+    )
+
+
+def syncable_refine_paths(paths: list[str]) -> list[str]:
+    """Return dirty .refine paths worth committing for cross-instance sync."""
+    out: list[str] = []
+    for path in paths:
+        clean = path.strip().strip('"')
+        if not (clean == ".refine" or clean.startswith(".refine/")):
+            continue
+        if is_refine_runtime_path(clean):
+            continue
+        if clean not in out:
+            out.append(clean)
+    return out
+
+
 def untrack_refine_sqlite(*, cwd: Path | None = None) -> GitResult:
     """Remove disposable SQLite cache files from Git while leaving them on disk."""
     return _run(
@@ -246,17 +275,105 @@ def untrack_refine_sqlite(*, cwd: Path | None = None) -> GitResult:
     )
 
 
-def staged_refine_sqlite_removals(*, cwd: Path | None = None) -> list[str]:
+def tracked_refine_runtime_paths(*, cwd: Path | None = None) -> list[str]:
+    r = _run(["ls-files", "--", ".refine"], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
+    return [
+        line.strip()
+        for line in r.stdout.splitlines()
+        if line.strip() and is_refine_runtime_path(line.strip())
+    ]
+
+
+def untrack_refine_runtime(*, cwd: Path | None = None) -> GitResult:
+    """Remove disposable Refine runtime files from Git while leaving them on disk."""
+    paths = tracked_refine_runtime_paths(cwd=cwd or client_repo_path())
+    if not paths:
+        return GitResult(ok=True, stdout="", stderr="", code=0)
+    return _run(
+        ["rm", "--cached", "-f", "--ignore-unmatch", "--", *paths],
+        cwd=cwd or client_repo_path(),
+    )
+
+
+def staged_refine_runtime_removals(*, cwd: Path | None = None) -> list[str]:
     r = _run(
         [
             "diff", "--cached", "--name-only", "--diff-filter=D",
-            "--", *REFINE_SQLITE_PATHS,
+            "--", ".refine",
         ],
         cwd=cwd or client_repo_path(),
     )
     if not r.ok:
         return []
+    return [
+        line.strip()
+        for line in r.stdout.splitlines()
+        if line.strip() and is_refine_runtime_path(line.strip())
+    ]
+
+
+def staged_paths(*, cwd: Path | None = None) -> list[str]:
+    r = _run(["diff", "--cached", "--name-only"], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
     return [line.strip() for line in r.stdout.splitlines() if line.strip()]
+
+
+def staged_refine_sqlite_removals(*, cwd: Path | None = None) -> list[str]:
+    return [
+        path for path in staged_refine_runtime_removals(cwd=cwd)
+        if is_refine_sqlite_path(path)
+    ]
+
+
+def commit_refine_sync_state(
+    paths: list[str],
+    *,
+    state_message: str = "refine: sync project state",
+    cleanup_message: str = "refine: stop tracking runtime state",
+    cwd: Path | None = None,
+) -> GitResult:
+    """Commit only cross-instance Refine state, plus one-time runtime untracking.
+
+    Per-round logs, process logs, PID files, and SQLite are high-churn local
+    runtime files. They may need to be removed from the index once, but they
+    should not be re-added or drive recurring sync commits.
+    """
+    repo = cwd or client_repo_path()
+    rm = untrack_refine_runtime(cwd=repo)
+    if not rm.ok:
+        return rm
+    state_paths = syncable_refine_paths(paths)
+    cleanup_paths = staged_refine_runtime_removals(cwd=repo)
+    commit_paths = list(dict.fromkeys([*state_paths, *cleanup_paths]))
+    if not commit_paths:
+        return GitResult(ok=True, stdout="", stderr="(nothing to commit)", code=0)
+    if state_paths:
+        add = _run(["add", "--", *state_paths], cwd=repo)
+        if not add.ok:
+            return add
+    staged_now = staged_paths(cwd=repo)
+    allowed_staged = set(syncable_refine_paths(staged_now))
+    allowed_staged.update(staged_refine_runtime_removals(cwd=repo))
+    unexpected_staged = [path for path in staged_now if path not in allowed_staged]
+    if unexpected_staged:
+        return GitResult(
+            ok=False,
+            stdout="",
+            stderr=(
+                "Refusing to commit unrelated staged paths: "
+                + ", ".join(unexpected_staged)
+            ),
+            code=1,
+        )
+    message = state_message if state_paths else cleanup_message
+    return _run([
+        "-c", "user.email=refine@localhost",
+        "-c", "user.name=refine",
+        "commit", "-m", message,
+    ], cwd=repo)
 
 
 def add_and_commit(paths: list[str], message: str,

@@ -43,18 +43,21 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
         })
 
     committed_state = False
+    config.ensure_refine_gitignore(config.get().volume_root)
     dirty_refine = git_ops.dirty_paths_under(".refine")
+    syncable_refine = git_ops.syncable_refine_paths(dirty_refine)
     metric_details["dirty_refine_count"] = len(dirty_refine)
+    metric_details["syncable_refine_count"] = len(syncable_refine)
     if dirty_refine:
-        commit = git_ops.add_and_commit(dirty_refine, "refine: persist state")
+        commit = git_ops.commit_refine_sync_state(dirty_refine)
         if not commit.ok:
             return finish({
                 "ok": False,
                 "stage": "commit",
-                "message": "Could not commit local .refine state before sync.",
+                "message": "Could not commit local Refine project state before sync.",
                 "details": commit.stderr or commit.stdout,
             })
-        committed_state = True
+        committed_state = commit.code == 0 and commit.stderr != "(nothing to commit)"
 
     upstream = git_ops.upstream_branch(branch)
     if upstream is None:

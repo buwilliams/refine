@@ -1,11 +1,10 @@
-"""Periodic auto-commit of refine's own state under `.refine/**`.
+"""Periodic auto-commit of durable Refine project state under `.refine/**`.
 
 The runner writes to `gap.json` (and friends under `.refine/`) as part of its
-normal operation. Per the spec these files are tracked content, but the
-runner doesn't commit each individual write — that would create noisy
-history. This committer wakes periodically, collects any dirty `.refine/`
-paths, and rolls them up into a single commit on the currently checked-out
-branch.
+normal operation. Per-round logs, SQLite, PID files, and process logs are local
+runtime state and are deliberately excluded. This committer wakes periodically,
+collects sync-worthy dirty `.refine/` paths, and rolls them up into a single
+commit on the currently checked-out branch.
 
 We deliberately scope to `.refine/` — user files outside that directory are
 the operator's concern and aren't auto-touched.
@@ -15,7 +14,7 @@ from __future__ import annotations
 import threading
 from typing import Callable
 
-from refine_server import activity
+from refine_server import activity, config
 
 from . import git_ops
 
@@ -64,18 +63,22 @@ class StateCommitter:
     def _tick(self) -> bool:
         if self.mutation_blocked is not None and self.mutation_blocked():
             return False
+        config.ensure_refine_gitignore(config.get().volume_root)
         paths = git_ops.dirty_paths_under(".refine")
         if not paths:
             return False
-        r = git_ops.add_and_commit(paths, "refine: persist state")
+        r = git_ops.commit_refine_sync_state(paths)
         if not r.ok:
             return False
+        if r.stderr == "(nothing to commit)":
+            return False
         try:
+            syncable_count = len(git_ops.syncable_refine_paths(paths))
             activity.append(
                 self.get_conn(),
                 message=(
-                    f"Auto-committed refine state "
-                    f"({len(paths)} path{'' if len(paths) == 1 else 's'})"
+                    f"Auto-committed Refine project state "
+                    f"({syncable_count} sync path{'' if syncable_count == 1 else 's'})"
                 ),
                 severity="info", category="git", actor="runner",
             )

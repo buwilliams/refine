@@ -279,10 +279,14 @@ port = 8080
 """
 
 REFINE_GITIGNORE_LINES = [
-    "# refine state - derived from gap.json files; not worth committing.",
+    "# refine runtime state - local, derived, or high-churn.",
     "index.sqlite",
     "index.sqlite-shm",
     "index.sqlite-wal",
+    "app.log",
+    "app.pid",
+    "logs/",
+    "gaps/**/logs.jsonl",
 ]
 
 
