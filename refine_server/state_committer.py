@@ -41,6 +41,12 @@ class StateCommitter:
 
     def stop(self) -> None:
         self._stop.set()
+        if (
+            self._thread is not None
+            and self._thread.is_alive()
+            and self._thread is not threading.current_thread()
+        ):
+            self._thread.join(timeout=5.0)
 
     def commit_now(self, *, ignore_mutation_block: bool = False) -> bool:
         """Synchronously commit any dirty .refine/** paths. Safe to call from

@@ -42,6 +42,12 @@ class TargetAppRebuilder:
     def stop(self) -> None:
         self._stop.set()
         self._wake.set()
+        if (
+            self._thread is not None
+            and self._thread.is_alive()
+            and self._thread is not threading.current_thread()
+        ):
+            self._thread.join(timeout=5.0)
 
     def queue_rebuild(self, reason: str, *, mode: str | None = None) -> bool:
         with self._state_lock:

@@ -66,6 +66,7 @@ class Runner:
         self._conn.execute("PRAGMA journal_mode = WAL")
         self._conn.execute("PRAGMA synchronous = NORMAL")
         self._conn.execute("PRAGMA foreign_keys = ON")
+        db.register_shared_connection(self._conn)
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
         self._target_app_lock = threading.Lock()
         self._bulk_update_lock = threading.Lock()
@@ -105,6 +106,7 @@ class Runner:
         self._diag_lock = threading.Lock()
         self._last_call_at: str | None = None
         self._recent_errors: list[str] = []
+        self._closed = False
 
     def _get_conn(self) -> sqlite3.Connection:
         project_state.ensure_sqlite_cache_current(self._conn)
@@ -136,6 +138,8 @@ class Runner:
         )
 
     def shutdown(self) -> None:
+        if self._closed:
+            return
         self.chat.shutdown()
         self.sub_mgr.cancel_all("shutdown")
         try:
@@ -147,10 +151,15 @@ class Runner:
         self.governance_agent.stop()
         self.merger.stop()
         self.dispatcher.stop()
-        activity.append(
-            self._conn, message="refine-server stopping",
-            severity="info", category="state", actor="runner",
-        )
+        try:
+            activity.append(
+                self._conn, message="refine-server stopping",
+                severity="info", category="state", actor="runner",
+            )
+        finally:
+            db.unregister_shared_connection(self._conn)
+            self._conn.close()
+            self._closed = True
     # ---- direct backend routing ---------------------------------------------
 
     def call(self, method: str, params: dict | None = None) -> dict:

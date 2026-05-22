@@ -18,6 +18,16 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="refine-db-tx-"))
     db_path = tmp / "refine.sqlite3"
     db.init_db(db_path)
+    assert db._shared_transaction_lock_count() == 0  # noqa: SLF001
+    for _ in range(10):
+        short_conn = db.connect(db_path)
+        try:
+            with db.transaction(short_conn):
+                short_conn.execute("SELECT 1").fetchone()
+        finally:
+            short_conn.close()
+    assert db._shared_transaction_lock_count() == 0  # noqa: SLF001
+
     conn = sqlite3.connect(
         str(db_path),
         isolation_level=None,
@@ -28,6 +38,8 @@ def main() -> int:
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = NORMAL")
     conn.execute("PRAGMA foreign_keys = ON")
+    db.register_shared_connection(conn)
+    assert db._shared_transaction_lock_count() == 1  # noqa: SLF001
 
     try:
         # Nested writes on the same shared connection should use a savepoint,
@@ -113,6 +125,8 @@ def main() -> int:
         ).fetchone()["n"]
         assert count == 6, count
     finally:
+        db.unregister_shared_connection(conn)
+        assert db._shared_transaction_lock_count() == 0  # noqa: SLF001
         conn.close()
         shutil.rmtree(tmp, ignore_errors=True)
 

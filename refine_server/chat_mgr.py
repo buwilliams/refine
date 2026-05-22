@@ -55,6 +55,7 @@ _RESULT_EXIT_GRACE_SECONDS = 10.0
 # (structured CLIs stream events as they work, including tool_use / tool_result
 # pairs) but tight enough that the chat self-heals quickly.
 _TURN_STDOUT_IDLE_SECONDS = 60.0
+_PRIMING_EXIT_TIMEOUT_SECONDS = 120.0
 
 
 _INHERITED_AGENT_CONTEXT_VARS = (
@@ -217,6 +218,11 @@ class ChatManager:
     def shutdown(self) -> None:
         self._supervisor_stop.set()
         self.stop_all(reason="shutdown")
+        if (
+            self._supervisor.is_alive()
+            and self._supervisor is not threading.current_thread()
+        ):
+            self._supervisor.join(timeout=2.0)
 
     def stop_all(self, *, reason: str | None = None) -> int:
         """Close every active chat session and return how many were closed."""
@@ -310,20 +316,39 @@ class ChatManager:
             with s.proc_lock:
                 s.proc = proc
             s.last_activity_ts = time.monotonic()
+            s.last_chunk_at = time.monotonic()
             # Use the same JSON-buffered consumer as user-facing chat, but
             # ask it to suppress assistant text so the priming reply doesn't
             # priming doesn't leak into the user-visible chat buffer.
-            if proc.stdout is not None:
-                self._consume_chat_output(
-                    s, proc.stdout, suppress_assistant=True,
-                )
+            pump = threading.Thread(
+                target=self._pump_output,
+                args=(s, proc),
+                kwargs={"suppress_assistant": True},
+                name=f"refine-chat-prime-pump-{s.session_id}",
+                daemon=True,
+            )
+            pump.start()
+            timed_out = False
             try:
-                proc.wait(timeout=120)
+                proc.wait(timeout=_PRIMING_EXIT_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                self._terminate_process_group(proc)
             except Exception:
                 pass
-            with s.proc_lock:
-                if s.proc is proc:
-                    s.proc = None
+            finally:
+                pump.join(timeout=5.0)
+                with s.proc_lock:
+                    if s.proc is proc:
+                        s.proc = None
+                    s.watchdog_armed_pids.discard(proc.pid)
+            if timed_out:
+                with s.out_lock:
+                    s.out_lines.append(
+                        "[refine] Eager context injection timed out; your "
+                        "first message will include the context inline."
+                    )
+                return
             if s.provider_session_id:
                 # Context is now resident in the provider's session; the lazy
                 # fallback in send() is no longer needed.
@@ -443,21 +468,12 @@ class ChatManager:
                 s.out_lines.append(f"[refine] session closed: {reason}")
         with s.proc_lock:
             proc = s.proc
-            if proc is not None and proc.poll() is None:
-                try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
-                    pass
-                try:
-                    proc.wait(timeout=5.0)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                    except (ProcessLookupError, PermissionError):
-                        pass
+            if proc is not None:
+                self._terminate_process_group(proc)
         return True
 
-    def _pump_output(self, s: ChatSession, proc: subprocess.Popen) -> None:
+    def _pump_output(self, s: ChatSession, proc: subprocess.Popen,
+                     *, suppress_assistant: bool = False) -> None:
         """Parse provider structured events into chat lines.
 
         Different provider versions format JSON differently — some emit
@@ -478,9 +494,18 @@ class ChatManager:
         doesn't look like JSON is passed through verbatim
         (line-by-line) so plain-text CLI errors still reach the user.
         """
-        if proc.stdout is None:
-            return
-        self._consume_chat_output(s, proc.stdout, suppress_assistant=False)
+        try:
+            if proc.stdout is not None:
+                self._consume_chat_output(
+                    s, proc.stdout, suppress_assistant=suppress_assistant,
+                )
+        finally:
+            exited = proc.poll() is not None
+            with s.proc_lock:
+                if s.proc is proc and exited:
+                    s.proc = None
+                if exited:
+                    s.watchdog_armed_pids.discard(proc.pid)
 
     def _consume_chat_output(self, s: ChatSession, stream,
                               *, suppress_assistant: bool) -> None:
@@ -681,16 +706,9 @@ class ChatManager:
             if (time.monotonic() - s.last_chunk_at
                     > _TURN_STDOUT_IDLE_SECONDS):
                 try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-                except (ProcessLookupError, PermissionError):
+                    self._terminate_process_group(proc)
+                except Exception:
                     return
-                try:
-                    proc.wait(timeout=5.0)
-                except subprocess.TimeoutExpired:
-                    try:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-                    except (ProcessLookupError, PermissionError):
-                        pass
                 with s.out_lock:
                     s.out_lines.append(
                         "[refine] Turn went idle on stdout — terminated to "
@@ -702,29 +720,48 @@ class ChatManager:
 
     def _result_watchdog(self, s: ChatSession,
                           proc: subprocess.Popen) -> None:
-        # Brief grace for the provider CLI to exit on its own.
         try:
-            proc.wait(timeout=_RESULT_EXIT_GRACE_SECONDS)
-            return  # clean exit
-        except subprocess.TimeoutExpired:
+            # Brief grace for the provider CLI to exit on its own.
+            try:
+                proc.wait(timeout=_RESULT_EXIT_GRACE_SECONDS)
+                return  # clean exit
+            except subprocess.TimeoutExpired:
+                pass
+            # Still alive after grace — SIGTERM the whole process group so
+            # backgrounded children (http.server, watchers, ...) come down too.
+            self._terminate_process_group(proc)
+            with s.out_lock:
+                s.out_lines.append(
+                    "[refine] Backgrounded subprocess terminated to free the chat.",
+                )
+        finally:
+            with s.proc_lock:
+                s.watchdog_armed_pids.discard(proc.pid)
+
+    @staticmethod
+    def _terminate_process_group(proc: subprocess.Popen) -> None:
+        def signal_group(sig: signal.Signals) -> None:
+            try:
+                os.killpg(proc.pid, sig)
+                return
+            except ProcessLookupError:
+                pass
+            try:
+                os.killpg(os.getpgid(proc.pid), sig)
+            except (ProcessLookupError, PermissionError):
+                pass
+
+        try:
+            signal_group(signal.SIGTERM)
+        except PermissionError:
             pass
-        # Still alive after grace — SIGTERM the whole process group so
-        # backgrounded children (http.server, watchers, …) come down too.
-        try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
-            return
         try:
             proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
+                signal_group(signal.SIGKILL)
+            except PermissionError:
                 pass
-        with s.out_lock:
-            s.out_lines.append(
-                "[refine] Backgrounded subprocess terminated to free the chat.",
-            )
 
     def _supervise(self) -> None:
         # Poll every 15s. Granularity beyond that is fine; users won't notice

@@ -5,6 +5,7 @@ the broad smoke test without launching real agent CLIs.
 """
 from __future__ import annotations
 
+import io
 import json
 import sys
 import time
@@ -252,6 +253,29 @@ def main() -> int:
         )
         with hidden.out_lock:
             assert list(hidden.out_lines) == []
+
+        class DoneProc:
+            pid = 123456
+
+            def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002
+                return 0
+
+        hidden.watchdog_armed_pids.add(DoneProc.pid)
+        manager._result_watchdog(hidden, DoneProc())  # noqa: SLF001
+        assert hidden.watchdog_armed_pids == set()
+
+        class StreamProc:
+            pid = 123457
+            stdout = io.StringIO(json.dumps({"thread_id": "thread-stream"}))
+
+            def poll(self) -> int:
+                return 0
+
+        hidden.proc = StreamProc()  # type: ignore[assignment]
+        manager._pump_output(  # noqa: SLF001
+            hidden, hidden.proc, suppress_assistant=True,
+        )
+        assert hidden.proc is None
     finally:
         manager.shutdown()
 

@@ -91,6 +91,12 @@ class Merger:
     def stop(self) -> None:
         self._stop.set()
         self._wake.set()
+        if (
+            self._thread is not None
+            and self._thread.is_alive()
+            and self._thread is not threading.current_thread()
+        ):
+            self._thread.join(timeout=5.0)
 
     def wake(self) -> None:
         """Dispatcher calls this when an agent run finishes successfully;
