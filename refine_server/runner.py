@@ -11,14 +11,15 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, changes_index, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, search_index
+from refine_server import activity, changes_index, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
     M_CHAT_RESET_ALL, M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
-    M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS, M_RUNNING,
+    M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
+    M_RETRY_MERGE, M_RUNNING,
     M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -202,6 +203,7 @@ class Runner:
             M_CANCEL: self._h_cancel,
             M_CANCEL_ALL: self._h_cancel_all,
             M_VERIFY: self._h_verify,
+            M_RETRY_MERGE: self._h_retry_merge,
             M_CREATE_GAP: self._h_create_gap,
             M_APPEND_ROUND: self._h_append_round,
             M_EDIT_ROUND: self._h_edit_round,
@@ -359,6 +361,83 @@ class Runner:
         # `ready-merge`.
         self._require_active_gap(params["gap_id"])
         return verify_op.approve_review(self._conn, params["gap_id"])
+
+    def _h_retry_merge(self, params: dict) -> dict:
+        gap_id = params["gap_id"]
+        row = self._require_active_gap(
+            gap_id,
+            columns="status, branch_name, instance_id",
+        )
+        if row["status"] != "failed":
+            return {
+                "ok": False,
+                "message": (
+                    "Retry merge is only valid from failed "
+                    f"(status={row['status']})"
+                ),
+            }
+        if not self._failed_from_ready_merge(gap_id):
+            return {
+                "ok": False,
+                "message": "Retry merge is only valid after a failed merge attempt.",
+            }
+        branch = row["branch_name"]
+        if not branch:
+            return {
+                "ok": False,
+                "message": "Retry merge needs the Gap branch to still exist.",
+            }
+        if not git_ops.local_branch_exists(branch):
+            return {
+                "ok": False,
+                "message": f"Retry merge needs local branch `{branch}`.",
+            }
+        with db.transaction(self._conn):
+            self._conn.execute(
+                "UPDATE gaps_index SET status = 'ready-merge', updated = ? "
+                "WHERE id = ?",
+                (now_iso(), gap_id),
+            )
+        try:
+            gap_writer.update_fields(gap_id, status="ready-merge")
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="state",
+                actor="refine",
+                message=(
+                    "Workflow status changed: failed → ready-merge; "
+                    "merge retry requested"
+                ),
+            )
+        except Exception:
+            pass
+        activity.append(
+            self._conn,
+            message="Merge retry requested",
+            severity="info",
+            category="state",
+            gap_id=gap_id,
+            actor="refine",
+        )
+        self.merger.wake()
+        return {"ok": True, "message": "Queued for merge"}
+
+    def _failed_from_ready_merge(self, gap_id: str) -> bool:
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
+        rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+        if not rounds:
+            return False
+        latest_workflow_log = round_logs.latest_workflow_for_round(
+            gap_id,
+            len(rounds) - 1,
+        )
+        msg = str((latest_workflow_log or {}).get("message") or "")
+        return (
+            "Workflow status changed:" in msg
+            and "ready-merge" in msg
+            and "failed" in msg
+        )
 
     def _h_create_gap(self, params: dict) -> dict:
         gap_id = params["gap_id"]

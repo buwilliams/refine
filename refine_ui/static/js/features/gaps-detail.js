@@ -111,7 +111,8 @@ async function loadGapDetail(gapId) {
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
-// from done). Use back to send the Gap back to todo and rerun.
+// from done). Failed Gaps normally go back to todo and rerun; merge-stage
+// failures use the latest workflow transition to requeue the existing branch.
 const GAP_WORKFLOW = {
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
@@ -124,6 +125,20 @@ const GAP_WORKFLOW = {
   failed:       { back:    { label: "← Todo",     next: "todo"   } },
   cancelled:    { back:    { label: "← Todo",     next: "todo"   } },
 };
+
+function workflowForGap(gap, latest) {
+  if (gap.status === "failed" && isMergeRetryGap(latest)) {
+    return { back: { label: "← Merge", next: "ready-merge", retryMerge: true } };
+  }
+  return GAP_WORKFLOW[gap.status] || {};
+}
+
+function isMergeRetryGap(latest) {
+  const message = latest?.latest_workflow_log?.message || "";
+  return message.includes("Workflow status changed:") &&
+         message.includes("ready-merge") &&
+         message.includes("failed");
+}
 
 function drawGapDetail(gap) {
   if (!gap) return;
@@ -166,7 +181,7 @@ function drawGapDetail(gap) {
   // skips system-owned statuses. Forward from review goes through the existing
   // `verify` endpoint for approval; everything else is a bookkeeping status
   // update via PATCH /api/gaps/<id>.
-  const workflow = GAP_WORKFLOW[gap.status] || {};
+  const workflow = workflowForGap(gap, latest);
   const backBtn = workflow.back ? `
     <button id="btn-state-back">${htmlEscape(workflow.back.label)}</button>
   ` : "";
@@ -271,13 +286,21 @@ function drawGapDetail(gap) {
     if (!target) return;
     $(btnId)?.addEventListener("click", async () => {
       const btn = $(btnId);
-      const busyLabel = target.verify ? "Verifying…" : `Moving to ${target.next}…`;
+      const busyLabel = target.verify
+        ? "Verifying…"
+        : target.retryMerge
+          ? "Queueing merge…"
+          : `Moving to ${target.next}…`;
       await withButtonBusy(btn, busyLabel, async () => {
         try {
           if (target.verify) {
             const r = await api("POST", `/api/gaps/${gap.id}/verify`);
             if (r.ok) toast(r.message || "Verified", "info");
             else toast(r.message || "Verify did not complete", "error");
+          } else if (target.retryMerge) {
+            const r = await api("POST", `/api/gaps/${gap.id}/retry-merge`);
+            if (r.ok) toast(r.message || "Queued for merge", "info");
+            else toast(r.message || "Merge retry did not queue", "error");
           } else {
             await api("PATCH", `/api/gaps/${gap.id}`, { status: target.next });
             toast(`Moved to ${target.next}`, "info");

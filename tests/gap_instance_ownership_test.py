@@ -94,6 +94,7 @@ def main() -> int:
         }))
         assert_ownership_blocked(api.verify(default_gap))
         assert_ownership_blocked(api.retry(default_gap))
+        assert_ownership_blocked(api.retry_merge(default_gap))
         assert_ownership_blocked(api.cancel(default_gap))
 
         status, body = api.transfer_instance_gaps({

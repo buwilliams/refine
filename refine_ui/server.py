@@ -116,6 +116,11 @@ def _h_retry(_h, m, _b, _q):
     return api.retry(m.group(1).upper())
 
 
+@route("POST", r"/api/gaps/([0-9A-Za-z]{26})/retry-merge")
+def _h_retry_merge(_h, m, _b, _q):
+    return api.retry_merge(m.group(1).upper())
+
+
 @route("POST", r"/api/gaps/([0-9A-Za-z]{26})/cancel")
 def _h_cancel(_h, m, _b, _q):
     return api.cancel(m.group(1).upper())

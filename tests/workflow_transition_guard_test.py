@@ -98,6 +98,15 @@ def main() -> int:
             "reason": "status:ready-merge",
         }], body
         assert db_status(conn, gid_bulk_ready) == "ready-merge"
+
+        root = Path(__file__).resolve().parents[1]
+        gaps_detail_js = (
+            root / "refine_ui/static/js/features/gaps-detail.js"
+        ).read_text(encoding="utf-8")
+        assert "← Merge" in gaps_detail_js
+        assert "/retry-merge" in gaps_detail_js
+        assert "isMergeRetryGap" in gaps_detail_js
+        assert "latest_workflow_log" in gaps_detail_js
     finally:
         conn.close()
         cleanup_tmp(tmp)

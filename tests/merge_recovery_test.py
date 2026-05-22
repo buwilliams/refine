@@ -168,6 +168,85 @@ def main() -> int:
         assert result["final_status"] == "awaiting-rebuild", result
         assert db_status(conn, gid_default) == "awaiting-rebuild"
 
+        # A merge-stage failure should be recoverable without re-running the
+        # implementation agent: failed -> ready-merge wakes the normal Merger.
+        gid_retry_merge = "01MERGERETRYMERGEAAAAAAA"
+        branch_retry_merge = "refine/retry-merge"
+        make_ready_branch(
+            conn, gid_retry_merge, branch_retry_merge,
+            "retry-merge.txt", "retry\n",
+        )
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'failed' WHERE id = ?",
+                (gid_retry_merge,),
+            )
+        gap_writer.update_fields(gid_retry_merge, status="failed")
+        gap_writer.append_latest_round_log(
+            gap_id=gid_retry_merge,
+            severity="warn",
+            category="state",
+            actor="runner",
+            message=(
+                "Workflow status changed: ready-merge → failed; "
+                "Local branch diverged from remote"
+            ),
+        )
+        gap_writer.append_latest_round_log(
+            gap_id=gid_retry_merge,
+            severity="info",
+            category="git",
+            actor="runner",
+            message="Diagnostic log after merge failure",
+        )
+        from refine_server.runner import Runner
+
+        runner = Runner()
+        wakeups: list[str] = []
+
+        class WakeOnlyMerger:
+            def wake(self) -> None:
+                wakeups.append("wake")
+
+        runner.merger = WakeOnlyMerger()  # type: ignore[assignment]
+        try:
+            result = runner._h_retry_merge({"gap_id": gid_retry_merge})  # noqa: SLF001
+        finally:
+            runner._conn.close()  # noqa: SLF001
+        assert result["ok"], result
+        assert wakeups == ["wake"], wakeups
+        assert db_status(conn, gid_retry_merge) == "ready-merge"
+        retry_messages = latest_messages(gid_retry_merge)
+        assert any("failed → ready-merge" in msg for msg in retry_messages), retry_messages
+
+        gid_agent_failed = "01MERGEAGENTFAILEDRETRYAA"
+        branch_agent_failed = "refine/agent-failed-retry"
+        make_ready_branch(
+            conn, gid_agent_failed, branch_agent_failed,
+            "agent-failed-retry.txt", "agent\n",
+        )
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'failed' WHERE id = ?",
+                (gid_agent_failed,),
+            )
+        gap_writer.update_fields(gid_agent_failed, status="failed")
+        gap_writer.append_latest_round_log(
+            gap_id=gid_agent_failed,
+            severity="warn",
+            category="state",
+            actor="runner",
+            message="Workflow status changed: in-progress → failed; agent errored",
+        )
+        runner = Runner()
+        try:
+            result = runner._h_retry_merge({"gap_id": gid_agent_failed})  # noqa: SLF001
+        finally:
+            runner._conn.close()  # noqa: SLF001
+        assert not result["ok"], result
+        assert "failed merge attempt" in result["message"], result
+        assert db_status(conn, gid_agent_failed) == "failed"
+
         # Remote target advances while a Gap branch is waiting, and the host has
         # dirty `.refine` state. The Merge agent must update target first; if it
         # commits `.refine` before pulling, `git pull --ff-only` sees a false

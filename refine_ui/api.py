@@ -22,7 +22,7 @@ from refine_server.backend_protocol import (
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
-    M_RENAME_REPORTER, M_SET_NOTES, M_TARGET_APP_GENERATE,
+    M_RENAME_REPORTER, M_RETRY_MERGE, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
@@ -1401,10 +1401,13 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     for idx, round_obj in enumerate(rounds):
         round_obj["log_count"] = log_counts.get(idx, 0)
         latest_log, latest_error_log = round_logs.latest_for_round(gap_id, idx)
+        latest_workflow_log = round_logs.latest_workflow_for_round(gap_id, idx)
         if latest_log:
             round_obj["latest_log"] = _compact_log(latest_log)
         if latest_error_log:
             round_obj["latest_error_log"] = _compact_log(latest_error_log)
+        if latest_workflow_log:
+            round_obj["latest_workflow_log"] = _compact_log(latest_workflow_log)
     log_count = sum(log_counts.values())
     gap["rounds"] = rounds
     perf_metrics.record(
@@ -2153,6 +2156,26 @@ def retry(gap_id: str) -> tuple[int, dict]:
     except BackendError:
         pass
     return 200, {"ok": True}
+
+
+@_exclusive_mutation("Retry Merge")
+def retry_merge(gap_id: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        _, ownership_err = _require_active_gap(conn, gap_id)
+    finally:
+        conn.close()
+    if ownership_err is not None:
+        return ownership_err
+    try:
+        result = get_client().call(
+            M_RETRY_MERGE,
+            {"gap_id": gap_id},
+            timeout=10.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    return (200 if result.get("ok") else 409), result
 
 
 def cancel(gap_id: str) -> tuple[int, dict]:
