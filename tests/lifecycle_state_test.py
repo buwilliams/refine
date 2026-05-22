@@ -118,6 +118,8 @@ def main() -> int:
             (None, "exit 2"),
             ("idle", "stuck"),
             ("hard_cap", "wall-clock cap"),
+            ("memory_limit", "smaller-scope Gaps"),
+            ("cpu_limit", "CPU limit"),
         ):
             gid = f"01LIFECYCLEFAIL{(reason or 'EXIT').upper():0<8}"[:26]
             branch = f"refine/{gid.lower()}"

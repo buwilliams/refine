@@ -50,6 +50,10 @@ case "$*" in
       sleep 1
     done
     ;;
+  *MEMKILLRUN*)
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"allocating memory"}]}}'
+    kill -9 $$
+    ;;
   *)
     printf '%s\n' '{"type":"result","is_error":true,"error":"unknown prompt"}'
     exit 2
@@ -96,12 +100,24 @@ def latest_run(conn, gap_id: str):
     ).fetchone()
 
 
-def latest_log_messages(gap_id: str) -> list[str]:
+def latest_logs(gap_id: str) -> list[dict]:
     from refine_server import gaps
 
     gap = gaps.read_gap_json(gap_id)
     assert gap is not None
-    return [log["message"] for log in gap["rounds"][-1]["logs"]]
+    return gap["rounds"][-1]["logs"]
+
+
+def latest_log_messages(gap_id: str) -> list[str]:
+    return [log["message"] for log in latest_logs(gap_id)]
+
+
+def activity_messages(conn, gap_id: str) -> list[str]:
+    rows = conn.execute(
+        "SELECT message FROM activity WHERE gap_id = ? ORDER BY id",
+        (gap_id,),
+    ).fetchall()
+    return [row["message"] for row in rows]
 
 
 def wait_for_log(gap_id: str, fragment: str, *, timeout: float = 5.0) -> None:
@@ -142,6 +158,7 @@ def main() -> int:
         db.set_setting(conn, "backlog_promote_after_seconds", "-1")
         db.set_setting(conn, "agent_idle_timeout_seconds", "1")
         db.set_setting(conn, "agent_hard_cap_seconds", "60")
+        db.set_setting(conn, "worker_cpu_priority", "low")
 
         sub_mgr = SubprocessManager(lambda: conn)
         merger_wakeups: list[str] = []
@@ -164,6 +181,11 @@ def main() -> int:
         run = latest_run(conn, gid_success)
         assert run["status"] == "finished"
         assert run["failure_category"] is None
+        wait_for_log(gid_success, "CPU throttling active")
+        assert any(
+            "CPU throttling active" in msg
+            for msg in activity_messages(conn, gid_success)
+        )
         wait_for_log(gid_success, "Agent run completed")
 
         gid_fail = "01SUBPROCESSFAILRUNAAAAA"
@@ -191,7 +213,27 @@ def main() -> int:
         assert run["failure_category"] == "hard_cap"
         wait_for_log(gid_hard, "wall-clock cap")
 
+        gid_mem = "01SUBPROCESSMEMKILLRUNAA"
+        db.set_setting(conn, "worker_memory_limit_mb", "4096")
+        assert run_gap(gid_mem, idle=0, hard=60) == "failed"
+        run = latest_run(conn, gid_mem)
+        assert run["status"] == "killed"
+        assert run["failure_category"] == "memory_limit"
+        wait_for_log(gid_mem, "memory limit")
+        wait_for_log(gid_mem, "smaller-scope Gaps")
+        assert any(
+            log["severity"] == "error"
+            and log["category"] == "resource"
+            and "memory limit" in log["message"]
+            for log in latest_logs(gid_mem)
+        )
+        assert any(
+            "memory limit" in msg
+            for msg in activity_messages(conn, gid_mem)
+        )
+
         gid_cancel = "01SUBPROCESSCANCELRUNAAA"
+        db.set_setting(conn, "worker_memory_limit_mb", "0")
         db.set_setting(conn, "agent_idle_timeout_seconds", "0")
         db.set_setting(conn, "agent_hard_cap_seconds", "60")
         create_indexed_gap(conn, gid_cancel, status="todo")

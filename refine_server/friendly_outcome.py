@@ -8,7 +8,7 @@ from dataclasses import dataclass
 @dataclass(frozen=True)
 class Outcome:
     kind: str          # success | failure
-    category: str      # auth | cli | git | state
+    category: str      # auth | cli | git | resource | state
     severity: str      # info | warn | error
     message: str
     details: str | None = None
@@ -23,6 +23,28 @@ def classify_outcome(*, exit_code: int, killed_reason: str | None,
         return Outcome("failure", "cli", "error", "Agent appears stuck — no output during the idle window")
     if killed_reason == "hard_cap":
         return Outcome("failure", "cli", "error", "Agent exceeded the hard wall-clock cap")
+    if killed_reason == "memory_limit":
+        return Outcome(
+            "failure",
+            "resource",
+            "error",
+            (
+                "Agent was killed after exceeding the configured memory limit — "
+                "break this Gap into a set of smaller-scope Gaps and retry"
+            ),
+            _trim_details(failure_text),
+        )
+    if killed_reason == "cpu_limit":
+        return Outcome(
+            "failure",
+            "resource",
+            "error",
+            (
+                "Agent was killed after exceeding a CPU limit — break this Gap "
+                "into a set of smaller-scope Gaps and retry"
+            ),
+            _trim_details(failure_text),
+        )
     if killed_reason == "cancel":
         return Outcome("failure", "state", "info", "Agent run cancelled")
     limit_kind = None

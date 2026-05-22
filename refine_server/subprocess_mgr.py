@@ -227,6 +227,10 @@ class RunHandle:
     base_ref: str          # commit before the run, for "no commits produced" detection
     output_format: str = "plain"
     provider: str = ""
+    worker_memory_limit_mb: int = 0
+    worker_cpu_priority: str = "normal"
+    resource_backend: str = ""
+    resource_isolation: str = ""
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
     # Set to time.monotonic() when stream-json emits a `result` event.
@@ -302,7 +306,9 @@ class SubprocessManager:
         bin_path = agent_cli.resolve_binary(spec, env)
         args = spec.agent_args(bin_path, prompt, cwd=cwd)
         settings = db.list_settings(self._get_conn())
-        manager = ResourceManager(ResourceSettings.from_settings(settings))
+        resource_settings = ResourceSettings.from_settings(settings)
+        manager = ResourceManager(resource_settings)
+        capabilities = manager.capabilities()
         proc = manager.popen(
             args,
             cwd=cwd,
@@ -327,6 +333,10 @@ class SubprocessManager:
             base_ref=base_ref,
             output_format=spec.output_format,
             provider=spec.name,
+            worker_memory_limit_mb=resource_settings.worker_memory_limit_mb,
+            worker_cpu_priority=resource_settings.worker_cpu_priority,
+            resource_backend=capabilities.name,
+            resource_isolation=capabilities.isolation,
         )
         with self._lock:
             self._runs[gap_id] = handle
@@ -339,6 +349,8 @@ class SubprocessManager:
                 "VALUES (?, ?, ?, ?, 'running', ?)",
                 (gap_id, round_idx, now_iso(), proc.pid, now_iso()),
             )
+
+        self._write_resource_launch_logs(handle)
 
         t = threading.Thread(
             target=self._supervise,
@@ -424,6 +436,8 @@ class SubprocessManager:
                 if h.finished.wait(timeout=2.0):
                     break  # already finished
             exit_code = h.proc.wait()
+            if h.killed_reason is None:
+                h.killed_reason = self._infer_resource_kill_reason(h, exit_code)
             if (h.output_format == "codex_json" and exit_code == 0
                     and h.agent_reported_success is None):
                 h.agent_reported_success = True
@@ -477,6 +491,8 @@ class SubprocessManager:
                 "truncated_bytes": h.truncated_bytes,
                 "skipped_bytes": h.skipped_bytes,
                 "killed_reason": h.killed_reason or "",
+                "resource_backend": h.resource_backend,
+                "resource_isolation": h.resource_isolation,
             },
         )
         perf_metrics.record(
@@ -491,6 +507,9 @@ class SubprocessManager:
                 "exit_code": exit_code,
                 "killed_reason": h.killed_reason or "",
                 "agent_reported_success": h.agent_reported_success,
+                "worker_memory_limit_mb": h.worker_memory_limit_mb,
+                "worker_cpu_priority": h.worker_cpu_priority,
+                "resource_backend": h.resource_backend,
             },
         )
 
@@ -628,6 +647,91 @@ class SubprocessManager:
         if not h.recent_output:
             return ""
         return "\n".join(h.recent_output)
+
+    def _write_resource_launch_logs(self, h: RunHandle) -> None:
+        if h.worker_memory_limit_mb:
+            self._write_resource_log(
+                h,
+                severity="info",
+                message=(
+                    "Agent memory limit active: "
+                    f"{h.worker_memory_limit_mb} MB"
+                ),
+                details=(
+                    f"backend={h.resource_backend}; "
+                    f"isolation={h.resource_isolation}"
+                ),
+            )
+        if h.worker_cpu_priority != "normal":
+            self._write_resource_log(
+                h,
+                severity="warn",
+                message=(
+                    "Agent CPU throttling active: worker CPU priority is "
+                    f"{h.worker_cpu_priority}"
+                ),
+                details=(
+                    f"backend={h.resource_backend}; "
+                    f"isolation={h.resource_isolation}"
+                ),
+            )
+
+    def _write_resource_log(
+        self,
+        h: RunHandle,
+        *,
+        severity: str,
+        message: str,
+        details: str | None = None,
+    ) -> None:
+        try:
+            gap_writer.append_round_log(
+                gap_id=h.gap_id,
+                round_idx=h.round_idx,
+                severity=severity,
+                category="resource",
+                message=message,
+                details=details,
+                actor="runner",
+            )
+        except Exception:
+            pass
+        try:
+            activity.append(
+                self._get_conn(),
+                message=message,
+                severity=severity,
+                category="resource",
+                gap_id=h.gap_id,
+                actor="runner",
+                details=details,
+            )
+        except Exception:
+            pass
+
+    def _infer_resource_kill_reason(
+        self,
+        h: RunHandle,
+        exit_code: int,
+    ) -> str | None:
+        if exit_code in (-signal.SIGXCPU, 128 + signal.SIGXCPU):
+            return "cpu_limit"
+        if h.worker_memory_limit_mb and exit_code in (
+            -signal.SIGKILL,
+            128 + signal.SIGKILL,
+        ):
+            return "memory_limit"
+        text = self._failure_text(h).lower()
+        if h.worker_memory_limit_mb and (
+            "memory limit" in text
+            or "out of memory" in text
+            or "oom" in text
+            or "cannot allocate memory" in text
+        ):
+            return "memory_limit"
+        if "cpu limit" in text or "sigxcpu" in text:
+            return "cpu_limit"
+        return None
 
     def _kill(self, h: RunHandle, reason: str) -> None:
         h.killed_reason = reason
