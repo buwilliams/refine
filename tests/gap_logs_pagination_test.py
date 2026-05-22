@@ -137,8 +137,13 @@ def main() -> int:
         assert "const GAP_LOG_PAGE_SIZE = 10;" in gaps_detail_js
         assert "function refreshGapRoundLogs(gapId)" in gaps_detail_js
         assert "loadRoundLogs(gapId, roundIdx, { page })" in gaps_detail_js
+        assert "total: logState.total" in gaps_detail_js
+        assert "{ boundaries: true }" in gaps_detail_js
+        assert "return `${pager}${loading}${body}`;" in gaps_detail_js
         assert "data-round-logs-more" not in gaps_detail_js
         assert "Load more" not in gaps_detail_js
+        assert ">First</button>" in common_js
+        assert ">Last</button>" in common_js
         activity_block = common_js.split(
             'sseSource.addEventListener("activity_added"', 1,
         )[1].split('sseSource.addEventListener("status_change"', 1)[0]

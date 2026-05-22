@@ -554,12 +554,15 @@ function fmtCount(n) {
 }
 
 function renderPaginationControls(idPrefix, pageMeta = {}, itemCount = 0,
-                                  noun = "entry") {
+                                  noun = "entry", opts = {}) {
   const limit = Math.max(1, parseInt(pageMeta.limit || itemCount || 1, 10));
   const offset = Math.max(0, parseInt(pageMeta.offset || 0, 10));
   const page = Math.floor(offset / limit) + 1;
   const hasPrev = offset > 0;
   const hasNext = !!pageMeta.has_more;
+  const total = Number.isFinite(pageMeta.total) ? pageMeta.total : null;
+  const lastPage = total === null ? null : Math.max(1, Math.ceil(total / limit));
+  const showBoundaries = !!opts.boundaries && lastPage !== null;
   if (!hasPrev && !hasNext) return "";
   const start = itemCount ? offset + 1 : offset;
   const end = offset + itemCount;
@@ -570,9 +573,11 @@ function renderPaginationControls(idPrefix, pageMeta = {}, itemCount = 0,
     <div class="pagination" id="${htmlEscape(idPrefix)}-pagination">
       <span class="muted small">${htmlEscape(label)}</span>
       <span class="spacer"></span>
+      ${showBoundaries ? `<button class="secondary small" data-page="1" ${hasPrev ? "" : "disabled"}>First</button>` : ""}
       <button class="secondary small" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>Previous</button>
       <span class="muted small">Page ${page}</span>
       <button class="secondary small" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Next</button>
+      ${showBoundaries ? `<button class="secondary small" data-page="${lastPage}" ${page < lastPage ? "" : "disabled"}>Last</button>` : ""}
     </div>`;
 }
 

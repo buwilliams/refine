@@ -508,14 +508,16 @@ function renderRoundLogsBody(gapId, roundIdx) {
     limit: logState.limit || GAP_LOG_PAGE_SIZE,
     offset: logState.offset || 0,
     has_more: !!logState.hasMore,
+    total: logState.total,
   };
   const pager = renderPaginationControls(
     `gap-round-${roundIdx}-logs`,
     pageMeta,
     logs.length,
     "log",
+    { boundaries: true },
   );
-  return `${body}${loading}${pager}`;
+  return `${pager}${loading}${body}`;
 }
 
 function updateRoundLogsPanel(gapId, roundIdx) {
