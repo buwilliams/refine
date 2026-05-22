@@ -8,9 +8,25 @@ from pathlib import Path
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    settings_js = (root / "refine_ui/static/js/features/settings.js").read_text(
+    settings_core_js = (root / "refine_ui/static/js/features/settings.js").read_text(
         encoding="utf-8",
     )
+    settings_tab_files = {
+        name: (root / f"refine_ui/static/js/features/{name}.js").read_text(
+            encoding="utf-8",
+        )
+        for name in (
+            "settings_application",
+            "settings_processes",
+            "settings_guidance",
+            "settings_runtime",
+            "settings_performance",
+            "settings_governance",
+            "settings_instances",
+            "settings_reporters",
+        )
+    }
+    settings_js = settings_core_js + "\n".join(settings_tab_files.values())
     router_js = (root / "refine_ui/static/js/router.js").read_text(
         encoding="utf-8",
     )
@@ -179,15 +195,18 @@ def main() -> int:
 
     assert '<a href="#/system/processes" data-route="settings">System</a>' in index_html
     assert 'id="target-app-indicator" class="target-app-indicator"\n         href="#/system/processes"' in index_html
+    for name in settings_tab_files:
+        assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
+        assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
     assert 'slug: "instances"' in settings_js
     assert 'api("GET", "/api/instances")' in settings_js
     assert "const transferTargetInstances = instances.filter((inst) => !inst.archived);" in settings_js
     assert "Pause, cancel, and transfer" in settings_js
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
-    processes_body = settings_js.split("function renderProcessesTab", 1)[1].split("function backendProcessLabel", 1)[0]
-    application_body = settings_js.split('${pane("application", `', 1)[1].split('${pane("processes", `', 1)[0]
-    runtime_body = settings_js.split('${pane("runtime", `', 1)[1].split('${pane("performance", `', 1)[0]
+    processes_body = settings_tab_files["settings_processes"]
+    application_body = settings_tab_files["settings_application"]
+    runtime_body = settings_tab_files["settings_runtime"]
     assert 'id="s-rebuild-cache"' not in runtime_body
     assert 'id="s-target-run-rebuild"' in processes_body
     assert 'id="s-target-run-start"' in processes_body
@@ -279,7 +298,7 @@ def main() -> int:
     assert ".process-table .process-details-cell:focus-visible" in common_css
     assert ".target-app-action-slot" in common_css
     assert ".target-app-action-hidden" in common_css
-    instances_body = settings_js.split('${pane("instances", `', 1)[1].split('<h3>Transfer Gaps</h3>', 1)[0]
+    instances_body = settings_tab_files["settings_instances"].split('<h3>Transfer Gaps</h3>', 1)[0]
     assert '<button class="secondary" id="s-project-sync-now">Trigger sync repo</button>' in instances_body
     assert instances_body.index('id="s-project-sync-now"') < instances_body.index('id="instance-add"')
     assert 'api("GET", "/api/guidance")' in settings_js

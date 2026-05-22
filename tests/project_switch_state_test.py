@@ -15,7 +15,13 @@ def test_client_switch_path(root: Path) -> None:
     index_html = (root / "refine_ui/static/index.html").read_text(encoding="utf-8")
     base_css = (root / "refine_ui/static/css/base.css").read_text(encoding="utf-8")
     common_js = (root / "refine_ui/static/js/common.js").read_text(encoding="utf-8")
-    settings_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
+    settings_js = (
+        root / "refine_ui/static/js/features/settings.js"
+    ).read_text(encoding="utf-8") + (
+        root / "refine_ui/static/js/features/settings_application.js"
+    ).read_text(encoding="utf-8") + (
+        root / "refine_ui/static/js/features/settings_instances.js"
+    ).read_text(encoding="utf-8")
     chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
 
