@@ -91,6 +91,8 @@ def main() -> int:
     assert 'id="s-worker-memory"' in settings_js
     assert 'id="s-ui-memory"' in settings_js
     assert 'id="s-worker-cpu-priority"' in settings_js
+    assert 'id="s-cap-resource-label"' in settings_js
+    assert "function workerResourceBudgetLabel" in settings_js
     assert 'id="s-resource-isolation"' in settings_js
     assert '["very_low", "Very low"]' in settings_js
     assert '["best_effort", "Best effort"]' in settings_js
@@ -208,8 +210,12 @@ def main() -> int:
     assert 'class="table process-table runner-workers-table"' in processes_body
     managed_table = processes_body.split('class="table process-table managed-process-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table"', 1)[1].split("</table>", 1)[0]
+    assert "<th>CPU limit</th>" in managed_table
+    assert "<th>Max memory</th>" in managed_table
     assert "<th>Elapsed</th>" not in managed_table
     assert "<th>Idle</th>" not in managed_table
+    assert "<th>CPU limit</th>" in agents_table
+    assert "<th>Max memory</th>" in agents_table
     assert "<th>Elapsed</th>" in agents_table
     assert "<th>Idle</th>" in agents_table
     assert "renderAgentProcessRow" in processes_body
@@ -236,7 +242,9 @@ def main() -> int:
     assert 'id="s-target-run-start"' not in application_body
     assert 'id="s-project-sync-now"' not in processes_body
     assert ".process-table {" in common_css
-    assert ".managed-process-table .actions-col { width: 292px; }" in common_css
+    assert ".process-table .cpu-col { width: 86px; }" in common_css
+    assert ".process-table .memory-col { width: 92px; }" in common_css
+    assert ".managed-process-table .actions-col { width: 274px; }" in common_css
     assert ".agents-process-table .agent-col" in common_css
     assert ".agents-process-table .agent-actions-col" in common_css
     assert ".process-table td[data-process-details]" in common_css

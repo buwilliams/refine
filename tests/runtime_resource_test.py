@@ -5,6 +5,8 @@ from refine_runtime.backends.systemd import SystemdBackend
 from refine_runtime.resources import (
     ResourceSettings,
     detect_capabilities,
+    effective_worker_memory_limit_mb,
+    worker_slot_count,
     validate_setting,
 )
 
@@ -27,6 +29,8 @@ def main() -> int:
         ui_memory_limit_mb=1024,
         worker_cpu_priority="low",
     )
+    assert worker_slot_count(settings) == 30
+    assert effective_worker_memory_limit_mb(settings) == 136
     agent_spec = LaunchSpec(
         args=["echo", "ok"],
         cwd=Path.cwd(),
@@ -35,8 +39,8 @@ def main() -> int:
         settings=settings,
     )
     agent_cmd = SystemdBackend().command(agent_spec)
-    assert "CPUWeight=50" in agent_cmd, agent_cmd
-    assert "MemoryMax=4096M" in agent_cmd, agent_cmd
+    assert "CPUWeight=1" in agent_cmd, agent_cmd
+    assert "MemoryMax=136M" in agent_cmd, agent_cmd
 
     ui_spec = LaunchSpec(
         args=["echo", "ok"],

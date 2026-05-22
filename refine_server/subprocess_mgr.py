@@ -24,7 +24,7 @@ from typing import Callable
 from refine_server import activity, db, perf_metrics
 from refine_server.gaps import now_iso
 from refine_runtime.manager import ResourceManager
-from refine_runtime.resources import ResourceSettings
+from refine_runtime.resources import ResourceSettings, memory_limit_mb
 
 from . import gap_writer  # local module; sole owner of gap.json writes
 
@@ -333,7 +333,7 @@ class SubprocessManager:
             base_ref=base_ref,
             output_format=spec.output_format,
             provider=spec.name,
-            worker_memory_limit_mb=resource_settings.worker_memory_limit_mb,
+            worker_memory_limit_mb=memory_limit_mb(resource_settings, "agent"),
             worker_cpu_priority=resource_settings.worker_cpu_priority,
             resource_backend=capabilities.name,
             resource_isolation=capabilities.isolation,

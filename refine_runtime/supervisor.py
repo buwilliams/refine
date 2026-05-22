@@ -64,12 +64,14 @@ def main() -> int:
     signal.signal(signal.SIGTERM, _on_signal)
 
     if cfg_path:
-        worker = subprocess.Popen(
+        worker = resources.popen(
             [sys.executable, "-m", "refine_runtime.worker"],
             cwd=str(Path.cwd()),
             env=env,
+            kind="worker",
             stdin=subprocess.DEVNULL,
-            start_new_session=True,
+            stdout=None,
+            stderr=None,
         )
         _wait_for_socket(sock, worker)
 

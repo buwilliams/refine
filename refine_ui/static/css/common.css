@@ -213,11 +213,13 @@ select {
 }
 .process-table .status-col { width: 88px; }
 .process-table .pid-col { width: 72px; }
+.process-table .cpu-col { width: 86px; }
+.process-table .memory-col { width: 92px; }
 .process-table .elapsed-col { width: 76px; }
 .process-table .details-col { width: 18%; }
-.managed-process-table .process-col { width: 24%; }
-.managed-process-table .actions-col { width: 292px; }
-.agents-process-table .agent-col { width: 28%; }
+.managed-process-table .process-col { width: 18%; }
+.managed-process-table .actions-col { width: 274px; }
+.agents-process-table .agent-col { width: 22%; }
 .agents-process-table .round-col { width: 68px; }
 .agents-process-table .idle-col { width: 68px; }
 .agents-process-table .agent-actions-col { width: 92px; }

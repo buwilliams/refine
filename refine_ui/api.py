@@ -2706,10 +2706,28 @@ def process_summary() -> tuple[int, dict]:
     supervisor_pid = _int_or_none(os.environ.get("REFINE_SUPERVISOR_PID"))
     conn = _conn()
     try:
+        settings = db.list_settings(conn)
         paused = (db.get_setting(conn, "paused") or "0") == "1"
         target_app = _target_app_snapshot(conn)
     finally:
         conn.close()
+    resource_caps = _process_resource_caps(settings)
+    worker_caps = {
+        "cpu_limit": resource_caps["worker_cpu_limit"],
+        "max_memory": resource_caps["worker_max_memory"],
+    }
+    ui_caps = {
+        "cpu_limit": resource_caps["ui_cpu_limit"],
+        "max_memory": resource_caps["ui_max_memory"],
+    }
+    unmanaged_caps = {
+        "cpu_limit": {"label": "unmanaged"},
+        "max_memory": {"label": "unmanaged"},
+    }
+    no_caps = {
+        "cpu_limit": {"label": "-"},
+        "max_memory": {"label": "-"},
+    }
 
     processes: list[dict[str, Any]] = []
     if backend.get("process_model") == "supervisor":
@@ -2720,6 +2738,7 @@ def process_summary() -> tuple[int, dict]:
             "status": "running" if supervisor_pid else "unknown",
             "pid": supervisor_pid,
             "actions": [],
+            **no_caps,
         })
     processes.extend([
         {
@@ -2729,6 +2748,7 @@ def process_summary() -> tuple[int, dict]:
             "status": "running",
             "pid": os.getpid(),
             "actions": [],
+            **ui_caps,
         },
         {
             "id": "runner",
@@ -2741,6 +2761,7 @@ def process_summary() -> tuple[int, dict]:
             "status": "running" if runner_reachable else "unreachable",
             "pid": runner_pid,
             "actions": [],
+            **worker_caps,
         },
         {
             "id": "target-app",
@@ -2750,6 +2771,7 @@ def process_summary() -> tuple[int, dict]:
             "pid": None,
             "actions": ["start", "rebuild", "stop", "check"],
             "target_app": target_app,
+            **unmanaged_caps,
         },
     ])
 
@@ -2771,6 +2793,7 @@ def process_summary() -> tuple[int, dict]:
             "mode": chat.get("mode"),
             "elapsed_seconds": chat.get("elapsed_seconds") or 0,
             "actions": ["stop"],
+            **worker_caps,
         })
 
     for run in runner_snap.get("running") or []:
@@ -2786,6 +2809,7 @@ def process_summary() -> tuple[int, dict]:
             "elapsed_seconds": run.get("elapsed_seconds") or 0,
             "idle_seconds": run.get("idle_seconds") or 0,
             "actions": ["cancel"],
+            **worker_caps,
         })
 
     return 200, {
@@ -2800,6 +2824,7 @@ def process_summary() -> tuple[int, dict]:
         "governance": governance,
         "target_app_rebuild": target_app_rebuild,
         "target_app": target_app,
+        "resource_caps": resource_caps,
     }
 
 
@@ -2854,6 +2879,43 @@ def _runner_work_summary(
             "details": target_app_rebuild.get("last_reason") or "",
         })
     return work
+
+
+def _process_resource_caps(settings: dict[str, str]) -> dict[str, Any]:
+    resource_settings = runtime_resources.ResourceSettings.from_settings(settings)
+    worker_slots = runtime_resources.worker_slot_count(resource_settings)
+    worker_memory_mb = runtime_resources.memory_limit_mb(resource_settings, "agent")
+    ui_memory_mb = runtime_resources.memory_limit_mb(resource_settings, "ui")
+    worker_cpu_weight = runtime_resources.cpu_weight(resource_settings, "agent")
+    return {
+        "parallel_run_cap": resource_settings.parallel_run_cap,
+        "background_worker_slots": resource_settings.background_worker_slots,
+        "worker_slot_count": worker_slots,
+        "worker_cpu_limit": {
+            "label": f"weight {worker_cpu_weight}",
+            "weight": worker_cpu_weight,
+            "priority": resource_settings.worker_cpu_priority,
+        },
+        "ui_cpu_limit": {
+            "label": "weight 100",
+            "weight": 100,
+            "priority": "normal",
+        },
+        "worker_max_memory": {
+            "label": _memory_limit_label(worker_memory_mb),
+            "mb": worker_memory_mb,
+            "configured_mb": resource_settings.worker_memory_limit_mb,
+        },
+        "ui_max_memory": {
+            "label": _memory_limit_label(ui_memory_mb),
+            "mb": ui_memory_mb,
+            "configured_mb": resource_settings.ui_memory_limit_mb,
+        },
+    }
+
+
+def _memory_limit_label(memory_mb: int) -> str:
+    return f"{memory_mb} MB" if memory_mb else "uncapped"
 
 
 _ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "awaiting-rebuild", "review")

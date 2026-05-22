@@ -7,8 +7,8 @@ import subprocess
 from refine_runtime.backends.base import LaunchSpec, ResourceBackend
 from refine_runtime.resources import (
     BackendCapabilities,
+    cpu_weight,
     memory_limit_mb,
-    priority_to_cpu_weight,
 )
 
 
@@ -39,8 +39,7 @@ class SystemdBackend(ResourceBackend):
             "--quiet",
             "--same-dir",
             "-p",
-            "CPUWeight=100" if spec.kind == "ui"
-            else f"CPUWeight={priority_to_cpu_weight(settings.worker_cpu_priority)}",
+            f"CPUWeight={cpu_weight(settings, spec.kind)}",
         ]
         memory_mb = memory_limit_mb(settings, spec.kind)
         if memory_mb:
