@@ -5,7 +5,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Callable
 
-from refine_server import db
+from refine_server import db, project_state
 
 
 AUTO_REBUILD_MODES = ("never", "on_worktree_merge", "hourly", "nightly")
@@ -67,7 +67,9 @@ class TargetAppRebuilder:
             if self._queued or self._running:
                 return False
         row = self._get_conn().execute(
-            "SELECT COUNT(*) AS n FROM gaps_index WHERE status = 'awaiting-rebuild'"
+            "SELECT COUNT(*) AS n FROM gaps_index "
+            "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
+            (project_state.active_instance_id(),),
         ).fetchone()
         n = int(row["n"] if row else 0)
         if n <= 0:

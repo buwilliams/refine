@@ -3518,17 +3518,19 @@ def _record_target_app_operation(conn: sqlite3.Connection, kind: str,
 
 
 def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
+    active_instance = project_state.active_instance_id()
     rows = conn.execute(
         "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
-        "ORDER BY updated ASC"
+        "AND instance_id = ? ORDER BY updated ASC",
+        (active_instance,),
     ).fetchall()
     if not rows:
         return 0
     with db.transaction(conn):
         conn.execute(
             "UPDATE gaps_index SET status = 'review', updated = ? "
-            "WHERE status = 'awaiting-rebuild'",
-            (now_iso(),),
+            "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
+            (now_iso(), active_instance),
         )
     for row in rows:
         gid = row["id"]

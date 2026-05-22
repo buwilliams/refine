@@ -42,7 +42,7 @@ import threading
 import time
 from collections.abc import Callable
 
-from refine_server import activity, db
+from refine_server import activity, db, project_state
 from refine_server.gaps import now_iso
 
 from . import gap_writer, git_ops, mutation_guard, subprocess_mgr, verify_op
@@ -116,8 +116,11 @@ class Merger:
         # system-owned and only ever set by the dispatcher after a
         # successful agent run, so the count is the merge backlog.
         queued = 0
+        active_instance = project_state.active_instance_id()
         for row in self._get_conn().execute(
-            "SELECT id FROM gaps_index WHERE status = 'ready-merge'"
+            "SELECT id FROM gaps_index "
+            "WHERE status = 'ready-merge' AND instance_id = ?",
+            (active_instance,),
         ):
             gid = row["id"]
             if gid == gap_id:
@@ -207,8 +210,10 @@ class Merger:
         """`ready-merge` Gaps are waiting on the merger. Process
         oldest-flipped first (FIFO) so Gaps don't starve."""
         row = self._get_conn().execute(
-            "SELECT id FROM gaps_index WHERE status = 'ready-merge' "
-            "ORDER BY updated ASC LIMIT 1"
+            "SELECT id FROM gaps_index "
+            "WHERE status = 'ready-merge' AND instance_id = ? "
+            "ORDER BY updated ASC LIMIT 1",
+            (project_state.active_instance_id(),),
         ).fetchone()
         return row["id"] if row else None
 
@@ -225,7 +230,9 @@ class Merger:
         if mode != "on_worktree_merge":
             return False
         row = conn.execute(
-            "SELECT COUNT(*) AS n FROM gaps_index WHERE status = 'awaiting-rebuild'"
+            "SELECT COUNT(*) AS n FROM gaps_index "
+            "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
+            (project_state.active_instance_id(),),
         ).fetchone()
         pending = int(row["n"] if row else 0)
         if pending <= 0:
@@ -236,6 +243,17 @@ class Merger:
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()
+        active_instance = project_state.active_instance_id()
+        row = conn.execute(
+            "SELECT instance_id FROM gaps_index WHERE id = ?",
+            (gap_id,),
+        ).fetchone()
+        if (
+            row
+            and str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+            != active_instance
+        ):
+            return
         # Mark this Gap as the one we're working on so the snapshot
         # surfaces it on the Agents screen with a live elapsed timer.
         with self._snap_lock:

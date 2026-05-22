@@ -35,7 +35,7 @@ def main() -> int:
     os.chdir(client)
 
     try:
-        from refine_server import config, db, gap_writer, gaps, governance
+        from refine_server import config, db, gap_writer, gaps, governance, project_state
         from refine_server.dispatcher import Dispatcher
         from refine_server.governance_agent import GovernanceAgent
 
@@ -61,18 +61,21 @@ def main() -> int:
         assert [r["text"] for r in saved["rules"]] == ["Rule one", "Rule two"]
 
         def insert_gap(gid: str, status: str = "todo",
-                       priority: str = "low") -> None:
+                       priority: str = "low",
+                       instance_id: str | None = None) -> None:
             gap = gap_writer.create_gap(
                 gap_id=gid,
                 name=gid,
                 initial_round=gaps.new_round("Reporter", "Actual", "Target"),
+                instance_id=instance_id,
             )
             conn.execute(
                 "INSERT INTO gaps_index "
-                "(id, name, status, priority, reporter, created, updated, json_path) "
-                "VALUES (?, ?, ?, ?, 'Reporter', ?, ?, ?)",
+                "(id, name, status, priority, reporter, created, updated, "
+                "instance_id, json_path) "
+                "VALUES (?, ?, ?, ?, 'Reporter', ?, ?, ?, ?)",
                 (gid, gid, status, priority, gap["created"], gap["updated"],
-                 f"gaps/{gid}.json"),
+                 gap.get("instance_id") or "default", f"gaps/{gid}.json"),
             )
 
         launched: list[str] = []
@@ -119,6 +122,13 @@ def main() -> int:
         )
         conn.execute("DELETE FROM gaps_index")
         shutil.rmtree(client / ".refine" / "gaps", ignore_errors=True)
+        other_instance = project_state.create_instance("Remote Governance Host")
+        insert_gap(
+            "01REMOTECCCCCCCCCCCCCCCCC",
+            "todo",
+            "high",
+            instance_id=other_instance["id"],
+        )
         insert_gap("01CCCCCCCCCCCCCCCCCCCCCCCC", "todo", "medium")
 
         old_classify = governance.classify_gap
@@ -133,6 +143,13 @@ def main() -> int:
                 "rule_actions": [],
             })
             agent = GovernanceAgent(get_conn=lambda: conn)
+            pending = agent._find_pending(limit=10)  # noqa: SLF001
+            assert [r["id"] for r in pending] == ["01CCCCCCCCCCCCCCCCCCCCCCCC"]
+            agent._review_one("01REMOTECCCCCCCCCCCCCCCCC")
+            row = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = '01REMOTECCCCCCCCCCCCCCCCC'"
+            ).fetchone()
+            assert row["status"] == "todo", dict(row)
             agent._review_one("01CCCCCCCCCCCCCCCCCCCCCCCC")
         finally:
             governance.classify_gap = old_classify

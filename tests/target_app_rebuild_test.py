@@ -17,7 +17,7 @@ def main() -> int:
     try:
         from refine_server import (
             db, gap_writer, gaps, runner as runner_mod,
-            target_app, target_app_rebuilder,
+            project_state, target_app, target_app_rebuilder,
         )
         from refine_server.backend_protocol import (
             M_TARGET_APP_REBUILD_PENDING,
@@ -54,6 +54,16 @@ def main() -> int:
         rebuilder._drain_queue()  # noqa: SLF001
         assert len(runs) == 3, runs
         db.set_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
+        other_instance = project_state.create_instance("Remote Rebuild Host")
+        gid_remote_pending = "01TARGETAPPREMOTEPENDINGA"
+        create_indexed_gap(
+            conn,
+            gid_remote_pending,
+            status="awaiting-rebuild",
+            branch=None,
+            instance_id=other_instance["id"],
+        )
+        assert rebuilder.queue_pending_awaiting_rebuild() is False
         gid_pending = "01TARGETAPPPENDINGREBUILDA"
         create_indexed_gap(conn, gid_pending, status="awaiting-rebuild", branch=None)
         assert rebuilder.queue_pending_awaiting_rebuild() is True
@@ -209,6 +219,10 @@ def main() -> int:
                 "SELECT status FROM gaps_index WHERE id = ?", (gid_auto,),
             ).fetchone()
             assert row["status"] == "review", dict(row)
+            row = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = ?", (gid_remote_pending,),
+            ).fetchone()
+            assert row["status"] == "awaiting-rebuild", dict(row)
             assert db.get_setting(conn, "target_app_auto_rebuild_last_ok") == "1"
             target_activity = [
                 r["message"]
@@ -297,6 +311,10 @@ def main() -> int:
             "SELECT status FROM gaps_index WHERE id = '01TARGETAPPFAILEDREBUILDA'",
         ).fetchone()
         assert row["status"] == "review"
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (gid_remote_pending,),
+        ).fetchone()
+        assert row["status"] == "awaiting-rebuild"
         gap = gaps.read_gap_json(gid)
         assert gap["status"] == "review"
         assert gap.get("branch_name") is None

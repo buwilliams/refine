@@ -84,6 +84,17 @@ def main() -> int:
             sub_mgr=FakeSubprocessManager(),
             on_worktree_merged=rebuilder.queue_for_worktree_merge,
         )
+        other_instance = project_state.create_instance("Remote Recovery Host")
+        gid_remote_ready = "01MERGEREMOTEREADYAAAAAA"
+        create_indexed_gap(
+            conn,
+            gid_remote_ready,
+            status="ready-merge",
+            branch="refine/remote-ready",
+            instance_id=other_instance["id"],
+        )
+        assert merger._find_one_ready() is None  # noqa: SLF001
+        assert merger.snapshot()["queued"] == 0
 
         # Successful Merge-agent path: ready-merge -> awaiting-rebuild,
         # branch/worktree cleanup, merge commit pushed to the bare remote.
@@ -211,7 +222,6 @@ def main() -> int:
             "VALUES (?, 0, ?, 999999, 'running', NULL)",
             (gid_orphan, now_iso()),
         )
-        other_instance = project_state.create_instance("Remote Recovery Host")
         gid_other_instance = "01RECOVERYREMOTEINSTANCEAA"
         create_indexed_gap(
             conn,
