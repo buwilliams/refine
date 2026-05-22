@@ -39,7 +39,7 @@ git clone https://github.com/buwilliams/refine.git <refine-checkout> && cd <refi
 - Git
 - Python
 - uv, a replacement for pip
-- OS: Linux or Windows/WSL2 with systemd and systemd-run, or macOS with launchctl
+- OS: Linux or Windows/WSL2 (systemd and systemd-run for process management), or macOS (launchctl for process management)
 
 Use `uv run refine install [port]` for a persistent service; `start [port]` runs a non-installed background process.
 
