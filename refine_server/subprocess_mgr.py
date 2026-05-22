@@ -378,6 +378,29 @@ class SubprocessManager:
             self._kill(h, reason)
         return len(handles)
 
+    def cancel_all_and_wait(
+        self, reason: str = "shutdown", *, timeout: float = 8.0,
+    ) -> tuple[int, int]:
+        """Kill every running Gap subprocess and wait for cleanup callbacks.
+
+        Returns `(killed, still_running)`. `RunHandle.finished` is set after
+        the dispatcher callback has had a chance to reset Gap/worktree state,
+        so callers that need a clean host worktree can wait on this.
+        """
+        with self._lock:
+            handles = list(self._runs.values())
+        for h in handles:
+            self._kill(h, reason)
+        deadline = time.monotonic() + max(0.0, timeout)
+        for h in handles:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            h.finished.wait(timeout=remaining)
+        with self._lock:
+            still_running = sum(1 for h in handles if h.gap_id in self._runs)
+        return len(handles), still_running
+
     def is_running(self, gap_id: str) -> bool:
         with self._lock:
             return gap_id in self._runs
@@ -462,7 +485,6 @@ class SubprocessManager:
                 ),
             )
 
-        h.finished.set()
         if on_finished is not None:
             try:
                 on_finished(h.gap_id, exit_code, h.killed_reason,
@@ -474,6 +496,7 @@ class SubprocessManager:
                     severity="error", category="cli",
                     gap_id=h.gap_id, actor="runner",
                 )
+        h.finished.set()
         elapsed = max(0.001, time.monotonic() - h.started_at)
         perf_metrics.record(
             "agent_log_append",

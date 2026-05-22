@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, changes_index, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
+from refine_server import activity, changes_index, config, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
@@ -286,9 +286,83 @@ class Runner:
         return {"queued": True}
 
     def _h_enforce_scheduling(self, params: dict) -> dict:
+        if db.get_setting_int(self._conn, "paused", 0):
+            killed, still_running = self.sub_mgr.cancel_all_and_wait(
+                "paused",
+                timeout=float(params.get("settle_timeout_seconds") or 8.0),
+            )
+            cleanup = self._clean_target_worktree_for_pause()
+            self.governance_agent.wake()
+            return {
+                "ok": bool(cleanup.get("ok")),
+                "killed_subprocesses": killed,
+                "still_running": still_running,
+                "target_worktree_clean": bool(cleanup.get("clean")),
+                "cleanup": cleanup,
+            }
         self.dispatcher.enforce_now()
         self.governance_agent.wake()
         return {"ok": True}
+
+    def _clean_target_worktree_for_pause(self) -> dict:
+        """Leave the host/target worktree clean after the operator pauses agents."""
+        def commit_and_check() -> dict:
+            committed = False
+            try:
+                committed = self.state_committer.commit_now(
+                    ignore_mutation_block=True,
+                )
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "commit_refine_state",
+                    "message": f"could not commit Refine state after pause: {e!r}",
+                }
+            stuck = git_ops.in_progress_op()
+            dirty_paths = self._target_worktree_dirty_paths()
+            if stuck:
+                op_name, hint = stuck
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "git_operation",
+                    "message": (
+                        f"target worktree still has unfinished `{op_name}` "
+                        f"after pause cleanup. {hint}"
+                    ),
+                }
+            if dirty_paths:
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "dirty_worktree",
+                    "message": "target worktree is still dirty after pause cleanup",
+                    "details": "\n".join(dirty_paths[:200]),
+                }
+            return {"ok": True, "clean": True, "committed": committed}
+
+        return self.merger.run_under_host_lock(
+            commit_and_check,
+            label="pause agents",
+        )
+
+    def _target_worktree_dirty_paths(self) -> list[str]:
+        paths = git_ops.dirty_paths()
+        try:
+            repo = config.get().client_repo.resolve()
+            run_dir = config.local_run_dir().resolve()
+            run_rel = run_dir.relative_to(repo).as_posix()
+        except Exception:
+            run_rel = ""
+        if not run_rel:
+            return paths
+        git_ops.ensure_info_exclude(f"/{run_rel.rstrip('/')}/")
+        paths = git_ops.dirty_paths()
+        return [
+            path for path in paths
+            if path != run_rel and not path.startswith(run_rel.rstrip("/") + "/")
+        ]
 
     def _h_cancel(self, params: dict) -> dict:
         gap_id = params["gap_id"]

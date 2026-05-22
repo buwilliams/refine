@@ -2503,9 +2503,22 @@ def update_settings(body: dict) -> tuple[int, dict]:
         conn.close()
     if "paused" in normalized:
         try:
-            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+            result = get_client().call(
+                M_ENFORCE_SCHEDULING,
+                {"settle_timeout_seconds": 8.0}
+                if normalized.get("paused") == "1"
+                else {},
+                timeout=30.0 if normalized.get("paused") == "1" else 10.0,
+            )
         except BackendError as e:
             return _backend_err(e)
+        if normalized.get("paused") == "1" and not result.get("ok", True):
+            cleanup = result.get("cleanup") or {}
+            return err(
+                409,
+                cleanup.get("message")
+                or "agents paused but target worktree cleanup did not complete",
+            )
     if (
         normalized.get("target_app_auto_rebuild") == "on_worktree_merge"
         or "target_app_rebuild_command" in normalized

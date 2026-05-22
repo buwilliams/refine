@@ -21,6 +21,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import signal
@@ -632,7 +633,11 @@ def cmd_stop(args: argparse.Namespace) -> int:
     port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
+        if not _pause_agents_for_clean_shutdown(cfg, port):
+            return 1
         return _stop_systemd_ui(clone, unit, cfg, port)
+    if not _pause_agents_for_clean_shutdown(cfg, port):
+        return 1
     stopped = _stop_background_ui(clone, cfg, port)
     if stopped:
         print(f"Stopped UI backend on port {port}.")
@@ -663,6 +668,8 @@ def cmd_restart(args: argparse.Namespace) -> int:
     port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
+        if not _pause_agents_for_clean_shutdown(cfg, port):
+            return 1
         return _restart_systemd_ui(clone, unit, cfg, port)
     restart_args = argparse.Namespace(**vars(args))
     restart_args.port = port
@@ -1422,6 +1429,30 @@ def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> 
             pass
     _unlink_quietly(pid_path)
     return True
+
+
+def _pause_agents_for_clean_shutdown(cfg: "config.Config", port: int) -> bool:
+    """Pause through the UI API before stop/restart tears down agents."""
+    host = "127.0.0.1" if cfg.web_host in ("0.0.0.0", "::") else cfg.web_host
+    url = f"http://{host}:{port}/api/settings"
+    body = json.dumps({"paused": "1"}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="PATCH",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30.0):
+            return True
+    except urllib.error.HTTPError as e:
+        print(
+            f"refine: pause cleanup failed before shutdown: {e}",
+            file=sys.stderr,
+        )
+        return False
+    except (OSError, urllib.error.URLError):
+        return True
 
 
 def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:

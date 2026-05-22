@@ -379,6 +379,7 @@ def main() -> int:
     old_print_status_block = refine_cli._print_status_block
     old_start_background = refine_cli._start_background_ui
     old_stop_background = refine_cli._stop_background_ui
+    old_pause_for_shutdown = refine_cli._pause_agents_for_clean_shutdown
     old_cwd = Path.cwd()
     lifecycle_calls: list[tuple[str, ...]] = []
 
@@ -398,6 +399,9 @@ def main() -> int:
         )
         refine_cli._start_background_ui = fail_start_background
         refine_cli._stop_background_ui = fail_stop_background
+        refine_cli._pause_agents_for_clean_shutdown = lambda cfg_arg, port_arg: (
+            lifecycle_calls.append(("pause", str(port_arg))) or True
+        )
         no_port_args = type("Args", (), {"port": None, "config": str(unit_cfg_path)})()
 
         assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 18124
@@ -430,10 +434,12 @@ def main() -> int:
         refine_cli._print_status_block = old_print_status_block
         refine_cli._start_background_ui = old_start_background
         refine_cli._stop_background_ui = old_stop_background
+        refine_cli._pause_agents_for_clean_shutdown = old_pause_for_shutdown
     assert ("start", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("stop", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("restart", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("status", "refine-unit-clone", "18124") in lifecycle_calls
+    assert lifecycle_calls.count(("pause", "18124")) == 2, lifecycle_calls
     print("[ok] refine start/stop/restart route installed UI units through systemd")
 
     bg_cfg = config.Config.load(ui_client / ".refine" / "refine.toml")

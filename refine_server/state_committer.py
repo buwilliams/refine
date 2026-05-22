@@ -42,12 +42,12 @@ class StateCommitter:
     def stop(self) -> None:
         self._stop.set()
 
-    def commit_now(self) -> bool:
+    def commit_now(self, *, ignore_mutation_block: bool = False) -> bool:
         """Synchronously commit any dirty .refine/** paths. Safe to call from
         other code paths that want a clean tree (e.g., right before verify).
         Returns True if anything was committed.
         """
-        return self._tick()
+        return self._tick(ignore_mutation_block=ignore_mutation_block)
 
     def _loop(self) -> None:
         # Initial brief delay so the runner finishes wiring up.
@@ -60,8 +60,12 @@ class StateCommitter:
                 pass
             self._stop.wait(self.interval)
 
-    def _tick(self) -> bool:
-        if self.mutation_blocked is not None and self.mutation_blocked():
+    def _tick(self, *, ignore_mutation_block: bool = False) -> bool:
+        if (
+            not ignore_mutation_block
+            and self.mutation_blocked is not None
+            and self.mutation_blocked()
+        ):
             return False
         config.ensure_refine_gitignore(config.get().volume_root)
         paths = git_ops.dirty_paths_under(".refine")

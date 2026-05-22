@@ -100,8 +100,37 @@ def working_copy_dirty(cwd: Path | None = None) -> bool:
     return bool(r.ok and r.stdout.strip())
 
 
+def dirty_paths(cwd: Path | None = None) -> list[str]:
+    r = _run(["status", "--porcelain"], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return []
+    paths: list[str] = []
+    for line in r.stdout.splitlines():
+        if len(line) < 3:
+            continue
+        path_part = line[3:]
+        if " -> " in path_part:
+            path_part = path_part.split(" -> ", 1)[1]
+        paths.append(path_part.strip().strip('"'))
+    return paths
+
+
 def fetch(cwd: Path | None = None) -> GitResult:
     return _run(["fetch", "--prune"], cwd=cwd or client_repo_path(), timeout=300.0)
+
+
+def ensure_info_exclude(pattern: str, cwd: Path | None = None) -> None:
+    root = cwd or client_repo_path()
+    r = _run(["rev-parse", "--git-dir"], cwd=root)
+    if not r.ok:
+        return
+    git_dir = (root / r.stdout.strip()).resolve()
+    path = git_dir / "info" / "exclude"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    if pattern not in existing:
+        existing.append(pattern)
+        path.write_text("\n".join(existing).rstrip() + "\n", encoding="utf-8")
 
 
 def rev_parse(ref: str = "HEAD", cwd: Path | None = None) -> str | None:
