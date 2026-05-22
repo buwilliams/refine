@@ -13,7 +13,7 @@ from __future__ import annotations
 import os
 import sqlite3
 
-from refine_server import activity, db
+from refine_server import activity, db, project_state
 from refine_server.gaps import now_iso
 
 from . import gap_writer
@@ -73,7 +73,9 @@ def _reconcile_in_progress(
     startup: bool,
 ) -> int:
     rows = conn.execute(
-        "SELECT id FROM gaps_index WHERE status = 'in-progress'"
+        "SELECT id FROM gaps_index "
+        "WHERE status = 'in-progress' AND instance_id = ?",
+        (project_state.active_instance_id(),),
     ).fetchall()
     moved = 0
     for row in rows:

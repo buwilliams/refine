@@ -56,7 +56,7 @@ def main() -> int:
     try:
         from refine_server import (
             conflict_resolver, db, gap_writer, git_ops, recovery,
-            target_app_rebuilder, verify_op,
+            project_state, target_app_rebuilder, verify_op,
         )
         from refine_server.gaps import now_iso
         from refine_server.merger import Merger
@@ -211,10 +211,25 @@ def main() -> int:
             "VALUES (?, 0, ?, 999999, 'running', NULL)",
             (gid_orphan, now_iso()),
         )
+        other_instance = project_state.create_instance("Remote Recovery Host")
+        gid_other_instance = "01RECOVERYREMOTEINSTANCEAA"
+        create_indexed_gap(
+            conn,
+            gid_other_instance,
+            status="in-progress",
+            instance_id=other_instance["id"],
+        )
+        conn.execute(
+            "INSERT INTO runs "
+            "(gap_id, round_idx, started_at, pid, status, failure_category) "
+            "VALUES (?, 0, ?, 999998, 'running', NULL)",
+            (gid_other_instance, now_iso()),
+        )
         moved = recovery.reconcile_on_start(conn)
         assert moved == 1
         assert db_status(conn, gid_finished) == "ready-merge"
         assert db_status(conn, gid_orphan) == "failed"
+        assert db_status(conn, gid_other_instance) == "in-progress"
         assert any(
             "in-progress → ready-merge" in msg
             for msg in latest_messages(gid_finished)
@@ -227,6 +242,40 @@ def main() -> int:
         assert run["status"] == "killed"
         assert run["failure_category"] == "runner_restart"
         assert run["finished_at"]
+        other_run = conn.execute(
+            "SELECT status, failure_category, finished_at FROM runs "
+            "WHERE gap_id = ? ORDER BY id DESC LIMIT 1",
+            (gid_other_instance,),
+        ).fetchone()
+        assert other_run["status"] == "running"
+        assert other_run["failure_category"] is None
+        assert other_run["finished_at"] is None
+
+        gid_runtime_local = "01RECOVERYRUNTIMELOCALAA"
+        create_indexed_gap(conn, gid_runtime_local, status="in-progress")
+        conn.execute(
+            "INSERT INTO runs "
+            "(gap_id, round_idx, started_at, pid, status, failure_category) "
+            "VALUES (?, 0, ?, 999997, 'running', NULL)",
+            (gid_runtime_local, now_iso()),
+        )
+        gid_runtime_remote = "01RECOVERYRUNTIMEREMOTEA"
+        create_indexed_gap(
+            conn,
+            gid_runtime_remote,
+            status="in-progress",
+            instance_id=other_instance["id"],
+        )
+        conn.execute(
+            "INSERT INTO runs "
+            "(gap_id, round_idx, started_at, pid, status, failure_category) "
+            "VALUES (?, 0, ?, 999996, 'running', NULL)",
+            (gid_runtime_remote, now_iso()),
+        )
+        moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
+        assert moved == 1
+        assert db_status(conn, gid_runtime_local) == "failed"
+        assert db_status(conn, gid_runtime_remote) == "in-progress"
     finally:
         try:
             conn.close()
