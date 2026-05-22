@@ -376,7 +376,7 @@ Single landing view summarizing:
 - View the managed-process table: supervisor when present, UI process, runner worker, target application, agent scheduler, and chat subprocesses.
 - View the agents table for currently running agent subprocesses, including elapsed and idle time.
 - View the runner-workers table for internal runner work such as merger, governance, and target-app rebuild.
-- Managed process and agent rows show CPU limit and max-memory labels. Worker caps are divided across `parallel-run cap * 2 + background worker slots`, so the displayed value is the effective per-worker cap rather than the configured pool total.
+- Managed process and agent rows show CPU priority and max-memory labels. Worker memory limits are per process, UI memory limits apply to the UI process, and target-app commands are unmanaged. CPU values are priority weights, not hard CPU quotas.
 - Start / stop / rebuild / check the target application from the process list using saved host commands and configured health checks. The target application may not have a known PID.
 - Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. The pause flag is stored in SQLite, so it survives runner restarts.
 - Cancel an in-flight agent Gap — kills the CLI subprocess, releases the lock, and moves the Gap to `cancelled` (worktree and branch are cleaned up).
@@ -421,7 +421,6 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 | Setting               | Default                                    | Notes |
 |-----------------------|--------------------------------------------|-------|
 | Parallel-run cap      | `10`                                       | Max agent subprocesses running concurrently. |
-| Effective worker cap  | derived                                   | Displayed beside Parallel-run cap; divides worker CPU/memory by `parallel-run cap * 2 + background worker slots` to reserve capacity for chat agents and background runner/UI work. |
 | Branch name pattern   | `refine/<gap-id>`                          | `<gap-id>` is substituted at branch creation. |
 | Merge target          | client repo's current branch at merge time | **Fixed policy** — not configurable. Refine always merges into whatever branch is checked out at merge time. |
 | Agent idle timeout    | `15 min`                                   | Kill the subprocess if it produces no output for this long. Primary stuck-detector. Set to `0` to disable. |

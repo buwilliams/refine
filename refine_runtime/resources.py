@@ -10,7 +10,6 @@ from typing import Mapping
 
 CPU_PRIORITIES = {"normal", "low", "very_low"}
 ISOLATION_MODES = {"auto", "enforced", "best_effort"}
-BACKGROUND_WORKER_SLOTS = 10
 
 
 @dataclass(frozen=True)
@@ -19,8 +18,6 @@ class ResourceSettings:
     ui_memory_limit_mb: int = 0
     worker_cpu_priority: str = "low"
     resource_isolation_mode: str = "auto"
-    parallel_run_cap: int = 10
-    background_worker_slots: int = BACKGROUND_WORKER_SLOTS
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, str]) -> "ResourceSettings":
@@ -42,9 +39,6 @@ class ResourceSettings:
                 settings.get("resource_isolation_mode", "auto"),
                 ISOLATION_MODES,
                 "resource_isolation_mode",
-            ),
-            parallel_run_cap=_parallel_cap(
-                settings.get("parallel_run_cap", "10"),
             ),
         )
 
@@ -117,30 +111,16 @@ def priority_to_cpu_weight(priority: str) -> int:
     return {"normal": 100, "low": 50, "very_low": 10}[priority]
 
 
-def worker_slot_count(settings: ResourceSettings) -> int:
-    return max(1, settings.parallel_run_cap * 2 + settings.background_worker_slots)
-
-
-def effective_worker_memory_limit_mb(settings: ResourceSettings) -> int:
-    if not settings.worker_memory_limit_mb:
-        return 0
-    return max(1, settings.worker_memory_limit_mb // worker_slot_count(settings))
-
-
-def effective_worker_cpu_weight(settings: ResourceSettings) -> int:
-    return max(1, priority_to_cpu_weight(settings.worker_cpu_priority) // worker_slot_count(settings))
-
-
 def cpu_weight(settings: ResourceSettings, kind: str) -> int:
     if kind == "ui":
         return 100
-    return effective_worker_cpu_weight(settings)
+    return priority_to_cpu_weight(settings.worker_cpu_priority)
 
 
 def memory_limit_mb(settings: ResourceSettings, kind: str) -> int:
     if kind == "ui":
         return settings.ui_memory_limit_mb
-    return effective_worker_memory_limit_mb(settings)
+    return settings.worker_memory_limit_mb
 
 
 def _memory_value(value: object, key: str) -> int:
@@ -153,14 +133,6 @@ def _memory_value(value: object, key: str) -> int:
     if n < 256 or n > 262144:
         raise ValueError(f"{key} must be 0 or between 256 and 262144")
     return n
-
-
-def _parallel_cap(value: object) -> int:
-    try:
-        n = int(value or 10)
-    except (TypeError, ValueError):
-        return 10
-    return min(100, max(1, n))
 
 
 def _choice(value: object, choices: set[str], key: str) -> str:

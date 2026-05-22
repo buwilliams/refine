@@ -2713,19 +2713,19 @@ def process_summary() -> tuple[int, dict]:
         conn.close()
     resource_caps = _process_resource_caps(settings)
     worker_caps = {
-        "cpu_limit": resource_caps["worker_cpu_limit"],
+        "cpu_priority": resource_caps["worker_cpu_priority"],
         "max_memory": resource_caps["worker_max_memory"],
     }
     ui_caps = {
-        "cpu_limit": resource_caps["ui_cpu_limit"],
+        "cpu_priority": resource_caps["ui_cpu_priority"],
         "max_memory": resource_caps["ui_max_memory"],
     }
     unmanaged_caps = {
-        "cpu_limit": {"label": "unmanaged"},
+        "cpu_priority": {"label": "unmanaged"},
         "max_memory": {"label": "unmanaged"},
     }
     no_caps = {
-        "cpu_limit": {"label": "-"},
+        "cpu_priority": {"label": "-"},
         "max_memory": {"label": "-"},
     }
 
@@ -2883,21 +2883,20 @@ def _runner_work_summary(
 
 def _process_resource_caps(settings: dict[str, str]) -> dict[str, Any]:
     resource_settings = runtime_resources.ResourceSettings.from_settings(settings)
-    worker_slots = runtime_resources.worker_slot_count(resource_settings)
     worker_memory_mb = runtime_resources.memory_limit_mb(resource_settings, "agent")
     ui_memory_mb = runtime_resources.memory_limit_mb(resource_settings, "ui")
     worker_cpu_weight = runtime_resources.cpu_weight(resource_settings, "agent")
     return {
-        "parallel_run_cap": resource_settings.parallel_run_cap,
-        "background_worker_slots": resource_settings.background_worker_slots,
-        "worker_slot_count": worker_slots,
-        "worker_cpu_limit": {
-            "label": f"weight {worker_cpu_weight}",
+        "worker_cpu_priority": {
+            "label": _cpu_priority_label(
+                resource_settings.worker_cpu_priority,
+                worker_cpu_weight,
+            ),
             "weight": worker_cpu_weight,
             "priority": resource_settings.worker_cpu_priority,
         },
-        "ui_cpu_limit": {
-            "label": "weight 100",
+        "ui_cpu_priority": {
+            "label": "normal (weight 100)",
             "weight": 100,
             "priority": "normal",
         },
@@ -2916,6 +2915,11 @@ def _process_resource_caps(settings: dict[str, str]) -> dict[str, Any]:
 
 def _memory_limit_label(memory_mb: int) -> str:
     return f"{memory_mb} MB" if memory_mb else "uncapped"
+
+
+def _cpu_priority_label(priority: str, weight: int) -> str:
+    label = priority.replace("_", " ")
+    return f"{label} (weight {weight})"
 
 
 _ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "awaiting-rebuild", "review")

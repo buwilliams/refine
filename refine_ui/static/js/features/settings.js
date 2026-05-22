@@ -556,7 +556,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
           </colgroup>
           <thead><tr>
             <th>Process</th><th>Status</th><th>PID</th>
-            <th>CPU limit</th><th>Max memory</th><th>Details</th><th></th>
+            <th>CPU priority</th><th>Max memory</th><th>Details</th><th></th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>` : `<p class="muted">No managed processes found.</p>`}
@@ -579,7 +579,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
           </colgroup>
           <thead><tr>
             <th>Agent</th><th>Status</th><th>PID</th><th>Round</th>
-            <th>CPU limit</th><th>Max memory</th><th>Elapsed</th><th>Idle</th><th></th>
+            <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Idle</th><th></th>
           </tr></thead>
           <tbody>${agentRows}</tbody>
         </table>` : `<p class="muted">No active agent subprocesses.</p>`}
@@ -624,7 +624,7 @@ function buildManagedProcessRows(processes, paused, backend, runnerReachable, di
       ? "New agent subprocesses wait; running subprocesses continue."
       : "New agent subprocesses launch on demand.",
     actions: [paused ? "resume" : "pause"],
-    cpu_limit: { label: "-" },
+    cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
   const insertAt = rows.findIndex((proc) => proc.kind === "chat");
@@ -661,7 +661,7 @@ function renderManagedProcessRow(proc) {
       <td>${label}</td>
       <td data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td>${pid}</td>
-      <td>${htmlEscape(processResourceLabel(proc.cpu_limit))}</td>
+      <td>${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
       <td>${htmlEscape(processResourceLabel(proc.max_memory))}</td>
       <td data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
       <td class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
@@ -688,7 +688,7 @@ function renderAgentProcessRow(proc, anchorMs) {
       <td>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td>${pid}</td>
       <td>${round ? htmlEscape(round) : `<span class="muted small">-</span>`}</td>
-      <td>${htmlEscape(processResourceLabel(proc.cpu_limit))}</td>
+      <td>${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
       <td>${htmlEscape(processResourceLabel(proc.max_memory))}</td>
       <td>${elapsed}</td>
       <td>${idle}</td>
@@ -709,38 +709,6 @@ function processResourceLabel(resource) {
   if (!resource) return "-";
   if (typeof resource === "string") return resource;
   return resource.label || "-";
-}
-
-function workerResourceBudget(settings = {}) {
-  const parallelCap = Math.min(100, Math.max(1, Number(settings.parallel_run_cap || 10)));
-  const backgroundSlots = 10;
-  const slots = parallelCap * 2 + backgroundSlots;
-  const configuredMemory = Math.max(0, Number(settings.worker_memory_limit_mb || 0));
-  const priority = String(settings.worker_cpu_priority || "low");
-  const priorityWeight = { normal: 100, low: 50, very_low: 10 }[priority] || 50;
-  return {
-    parallelCap,
-    backgroundSlots,
-    slots,
-    cpuWeight: Math.max(1, Math.floor(priorityWeight / slots)),
-    memoryMb: configuredMemory ? Math.max(1, Math.floor(configuredMemory / slots)) : 0,
-  };
-}
-
-function workerResourceBudgetLabel(settings = {}) {
-  const budget = workerResourceBudget(settings);
-  const memory = budget.memoryMb ? `${budget.memoryMb} MB` : "uncapped";
-  return `effective worker cap: CPU weight ${budget.cpuWeight}; memory ${memory}; ${budget.slots} slots`;
-}
-
-function refreshRuntimeResourceBudgetLabel() {
-  const label = $("#s-cap-resource-label");
-  if (!label) return;
-  label.textContent = `— ${workerResourceBudgetLabel({
-    parallel_run_cap: $("#s-cap")?.value || 10,
-    worker_memory_limit_mb: $("#s-worker-memory")?.value || 0,
-    worker_cpu_priority: $("#s-worker-cpu-priority")?.value || "low",
-  })}`;
 }
 
 function targetAppProcessDetails(snap = {}) {
@@ -1199,8 +1167,7 @@ function drawSettings(
     <section class="settings-section">
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
-      <div class="form-row"><label>Parallel-run cap
-        <span class="muted small" id="s-cap-resource-label">— ${htmlEscape(workerResourceBudgetLabel(s))}</span></label>
+      <div class="form-row"><label>Parallel-run cap</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 10}"></div>
       <div class="form-row"><label>Branch name pattern</label>
         <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
@@ -1467,11 +1434,6 @@ function drawSettings(
   // Tab click handlers — purely DOM-local, no re-fetch.
   bindSettingsTabHandlers();
   bindProcessDetailCells();
-  ["#s-cap", "#s-worker-memory", "#s-worker-cpu-priority"].forEach((selector) => {
-    $(selector)?.addEventListener("input", refreshRuntimeResourceBudgetLabel);
-    $(selector)?.addEventListener("change", refreshRuntimeResourceBudgetLabel);
-  });
-  refreshRuntimeResourceBudgetLabel();
   $("#btn-pause")?.addEventListener("click", async () => {
     const paused = s.paused === "1";
     await withButtonBusy($("#btn-pause"), paused ? "Resuming…" : "Pausing…", async () => {

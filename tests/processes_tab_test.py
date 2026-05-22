@@ -85,9 +85,8 @@ def main() -> int:
         assert status == 200, body
         assert body["paused"] is True, body
         assert body["backend"]["process_model"] == "supervisor", body
-        assert body["resource_caps"]["worker_slot_count"] == 16, body
-        assert body["resource_caps"]["worker_max_memory"]["mb"] == 256, body
-        assert body["resource_caps"]["worker_cpu_limit"]["label"] == "weight 6", body
+        assert body["resource_caps"]["worker_max_memory"]["mb"] == 4096, body
+        assert body["resource_caps"]["worker_cpu_priority"]["label"] == "normal (weight 100)", body
         kinds = [p["kind"] for p in body["processes"]]
         assert kinds[:4] == ["supervisor", "ui", "runner", "target_app"], kinds
         assert "agent" in kinds, kinds
@@ -98,11 +97,11 @@ def main() -> int:
         assert supervisor["pid"] == 3030, supervisor
         runner = next(p for p in body["processes"] if p["kind"] == "runner")
         assert runner["pid"] == 3131, runner
-        assert runner["max_memory"]["label"] == "256 MB", runner
-        assert runner["cpu_limit"]["label"] == "weight 6", runner
+        assert runner["max_memory"]["label"] == "4096 MB", runner
+        assert runner["cpu_priority"]["label"] == "normal (weight 100)", runner
         ui = next(p for p in body["processes"] if p["kind"] == "ui")
         assert ui["max_memory"]["label"] == "1024 MB", ui
-        assert ui["cpu_limit"]["label"] == "weight 100", ui
+        assert ui["cpu_priority"]["label"] == "normal (weight 100)", ui
         target = next(p for p in body["processes"] if p["kind"] == "target_app")
         assert target["status"] == "running", target
         assert target["actions"] == ["start", "rebuild", "stop", "check"], target
@@ -110,11 +109,11 @@ def main() -> int:
         agent = next(p for p in body["processes"] if p["kind"] == "agent")
         assert agent["pid"] == 4242, agent
         assert agent["actions"] == ["cancel"], agent
-        assert agent["max_memory"]["label"] == "256 MB", agent
+        assert agent["max_memory"]["label"] == "4096 MB", agent
         chat = next(p for p in body["processes"] if p["kind"] == "chat")
         assert chat["pid"] == 5151, chat
         assert chat["actions"] == ["stop"], chat
-        assert chat["cpu_limit"]["label"] == "weight 6", chat
+        assert chat["cpu_priority"]["label"] == "normal (weight 100)", chat
         work_kinds = [w["kind"] for w in body["runner_work"]]
         assert work_kinds == ["merger", "governance", "target_app_rebuilder"], work_kinds
     finally:
