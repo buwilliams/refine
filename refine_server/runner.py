@@ -66,10 +66,6 @@ class Runner:
         self._conn.execute("PRAGMA journal_mode = WAL")
         self._conn.execute("PRAGMA synchronous = NORMAL")
         self._conn.execute("PRAGMA foreign_keys = ON")
-        self._governance_conn_local = threading.local()
-        self._governance_conns: list[sqlite3.Connection] = []
-        self._governance_conns_lock = threading.Lock()
-
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
         self._target_app_lock = threading.Lock()
         self._bulk_update_lock = threading.Lock()
@@ -95,6 +91,7 @@ class Runner:
         self.governance_agent = GovernanceAgent(
             get_conn=self._get_governance_conn,
             on_pass=lambda _gid: self.dispatcher.enforce_now(),
+            close_conn=True,
         )
         self.chat = ChatManager(
             get_standalone_idle_timeout=lambda: db.get_setting_int(
@@ -114,23 +111,7 @@ class Runner:
         return self._conn
 
     def _get_governance_conn(self) -> sqlite3.Connection:
-        conn = getattr(self._governance_conn_local, "conn", None)
-        if conn is None:
-            from refine_server.paths import sqlite_path
-
-            conn = sqlite3.connect(
-                str(sqlite_path()),
-                check_same_thread=False,
-                isolation_level=None,
-                timeout=5.0,
-            )
-            conn.row_factory = sqlite3.Row
-            conn.execute("PRAGMA journal_mode = WAL")
-            conn.execute("PRAGMA synchronous = NORMAL")
-            conn.execute("PRAGMA foreign_keys = ON")
-            self._governance_conn_local.conn = conn
-            with self._governance_conns_lock:
-                self._governance_conns.append(conn)
+        conn = db.connect()
         project_state.ensure_sqlite_cache_current(conn)
         return conn
 
@@ -170,15 +151,6 @@ class Runner:
             self._conn, message="refine-server stopping",
             severity="info", category="state", actor="runner",
         )
-        with self._governance_conns_lock:
-            conns = list(self._governance_conns)
-            self._governance_conns.clear()
-        for conn in conns:
-            try:
-                conn.close()
-            except Exception:
-                pass
-
     # ---- direct backend routing ---------------------------------------------
 
     def call(self, method: str, params: dict | None = None) -> dict:

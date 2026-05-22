@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from pathlib import Path
 
 
@@ -200,6 +201,59 @@ def main() -> int:
         assert "Governance review started" in passed_messages, passed_messages
         assert "Governance auto-applied 1 rule change" in passed_messages, passed_messages
         assert "Governance passed." in passed_messages, passed_messages
+
+        # Runner status snapshots are served by short-lived IPC handler threads.
+        # Governance connections must be closed per call instead of cached on
+        # thread-local storage until runner shutdown.
+        from refine_server.runner import Runner
+
+        original_connect = db.connect
+        opened = 0
+        closed = 0
+
+        class CountingConnection:
+            def __init__(self, raw_conn) -> None:
+                self._raw_conn = raw_conn
+
+            def __getattr__(self, name: str):
+                return getattr(self._raw_conn, name)
+
+            def close(self) -> None:
+                nonlocal closed
+                closed += 1
+                self._raw_conn.close()
+
+        def counting_connect(*args, **kwargs):
+            nonlocal opened
+            opened += 1
+            return CountingConnection(original_connect(*args, **kwargs))
+
+        runner = None
+        try:
+            db.connect = counting_connect
+            runner = Runner()
+            errors: list[BaseException] = []
+
+            def take_snapshot() -> None:
+                try:
+                    runner.governance_agent.snapshot()
+                except BaseException as exc:  # pragma: no cover - asserted below
+                    errors.append(exc)
+
+            threads = [threading.Thread(target=take_snapshot) for _ in range(8)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+            assert errors == [], errors
+            assert opened >= 8, opened
+            assert closed == opened, (opened, closed)
+            assert not hasattr(runner, "_governance_conns")
+        finally:
+            db.connect = original_connect
+            if runner is not None:
+                runner.shutdown()
+                runner._conn.close()  # noqa: SLF001
     finally:
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)
