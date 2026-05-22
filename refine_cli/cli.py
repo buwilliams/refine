@@ -12,6 +12,7 @@ Subcommands:
 - stop    — stop the UI backend.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
+- performance — show host process CPU/memory usage for refine.
 - test    — run the repository's script-style test suite.
 - server  — start the server component in the foreground for debugging.
 - ui      — start the UI backend foreground process (supervised in normal use).
@@ -49,7 +50,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(
         dest="command",
         required=True,
-        metavar="{init,install,uninstall,reset,start,restart,stop,status,test,server,ui,doctor}",
+        metavar="{init,install,uninstall,reset,start,restart,stop,status,performance,test,server,ui,doctor}",
     )
 
     p_init = sub.add_parser(
@@ -166,6 +167,32 @@ def main(argv: list[str] | None = None) -> int:
         help="Web server port. Defaults to the configured port.",
     )
     p_status.set_defaults(fn=cmd_status)
+
+    p_performance = sub.add_parser(
+        "performance",
+        help="Show CPU and memory usage for refine processes.",
+        description=(
+            "Samples host process stats for the Refine UI/supervisor process "
+            "and its children, including agent CLI subprocesses."
+        ),
+    )
+    p_performance.add_argument(
+        "port", nargs="?", type=int, default=None,
+        help="Web server port. Defaults to the configured port.",
+    )
+    p_performance.add_argument(
+        "--sample", type=float, default=0.5,
+        help="Seconds to sample CPU usage before printing. Default: 0.5.",
+    )
+    p_performance.add_argument(
+        "--watch", nargs="?", const=2.0, type=float, default=None,
+        help="Repeat every N seconds. Default when supplied without N: 2.",
+    )
+    p_performance.add_argument(
+        "--limit", type=int, default=30,
+        help="Maximum process rows to print per port. Default: 30.",
+    )
+    p_performance.set_defaults(fn=cmd_performance)
 
     p_test = sub.add_parser(
         "test",
@@ -746,6 +773,59 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_performance(args: argparse.Namespace) -> int:
+    if args.sample < 0:
+        print("refine performance: --sample must be 0 or greater", file=sys.stderr)
+        return 1
+    if args.watch is not None and args.watch <= 0:
+        print("refine performance: --watch interval must be greater than 0", file=sys.stderr)
+        return 1
+    if args.limit <= 0:
+        print("refine performance: --limit must be greater than 0", file=sys.stderr)
+        return 1
+
+    try:
+        while True:
+            if args.watch is not None:
+                if sys.stdout.isatty():
+                    print("\033[H\033[J", end="")
+                else:
+                    print()
+                print(f"refine performance sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+            rc = _print_performance_snapshot(args)
+            if args.watch is None:
+                return rc
+            time.sleep(args.watch)
+    except KeyboardInterrupt:
+        print()
+        return 130
+
+
+def _print_performance_snapshot(args: argparse.Namespace) -> int:
+    setup_clone = _setup_source_dir()
+    if setup_clone is not None:
+        for port in _status_ports(args, setup_clone, None):
+            _print_performance_block(
+                setup_clone, None, None, port=port,
+                sample_seconds=args.sample, limit=args.limit,
+            )
+        return 0
+
+    clone, unit = _resolve_clone_and_unit_or_exit()
+    try:
+        cfg = config.get(path=args.config) if args.config else config.get()
+    except config.ConfigError as e:
+        print(f"refine performance: {e}", file=sys.stderr)
+        return 1
+    _sync_bound_project_registry(clone, cfg)
+    for port in _status_ports(args, clone, cfg, unit):
+        _print_performance_block(
+            clone, cfg, unit, port=port,
+            sample_seconds=args.sample, limit=args.limit,
+        )
+    return 0
+
+
 def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
                         port: int | None = None) -> None:
     effective_port = port or cfg.web_port
@@ -789,6 +869,294 @@ def _print_setup_status_block(clone: Path, *, port: int) -> None:
     print(f"  logs:     {_runtime_log_path(clone, None, port)}")
     print(f"  stop:     uv run refine stop {port}")
     print()
+
+
+def _print_performance_block(
+    clone: Path,
+    cfg: "config.Config | None",
+    unit: str | None,
+    *,
+    port: int,
+    sample_seconds: float,
+    limit: int,
+) -> None:
+    display_cfg = cfg
+    root_pids = _refine_performance_roots(clone, cfg, unit, port)
+    if display_cfg is None and root_pids:
+        display_cfg = _running_config(root_pids[0])
+    pids = _process_tree_pids(root_pids)
+    rows = _sample_process_rows(pids, sample_seconds=sample_seconds)
+    total_cpu = sum(row["cpu_percent"] for row in rows)
+    total_rss = sum(row["rss_kb"] for row in rows)
+    total_vms = sum(row["vms_kb"] for row in rows)
+
+    print()
+    print(_bold("refine performance"))
+    print(f"  checkout: {clone}")
+    print(f"  app:      {display_cfg.client_repo if display_cfg is not None else 'setup mode'}")
+    print(f"  port:     {port}")
+    print(f"  roots:    {_format_pid_list(root_pids) if root_pids else 'none'}")
+    print(
+        f"  totals:   {len(rows)} process(es), "
+        f"CPU {total_cpu:.1f}%, RSS {_format_mib(total_rss)}, VMS {_format_mib(total_vms)}"
+    )
+    if not rows:
+        print("  No refine UI/supervisor processes found for this port.")
+        print()
+        return
+
+    print()
+    print(
+        "  "
+        f"{'PID':>7} {'PPID':>7} {'PGID':>7} {'S':<2} "
+        f"{'CPU%':>6} {'MEM%':>6} {'RSS':>9} {'VMS':>9} "
+        f"{'ELAPSED':>10} {'ROLE':<10} COMMAND"
+    )
+    shown = rows[:limit]
+    for row in shown:
+        print(
+            "  "
+            f"{row['pid']:>7} {row['ppid']:>7} {row['pgid']:>7} {row['state']:<2} "
+            f"{row['cpu_percent']:>6.1f} {row['mem_percent']:>6.1f} "
+            f"{_format_mib(row['rss_kb']):>9} {_format_mib(row['vms_kb']):>9} "
+            f"{_format_elapsed(row['elapsed_seconds']):>10} "
+            f"{_process_role(row['pid'], root_pids, row['command']):<10} "
+            f"{_truncate(row['command'], 100)}"
+        )
+    if len(rows) > len(shown):
+        print(f"  ... {len(rows) - len(shown)} more process(es); rerun with --limit {len(rows)}")
+    print()
+
+
+def _refine_performance_roots(
+    clone: Path,
+    cfg: "config.Config | None",
+    unit: str | None,
+    port: int,
+) -> list[int]:
+    roots: list[int] = []
+    running = _running_pid(clone, cfg, port)
+    if running is not None:
+        roots.append(running)
+    if unit is not None:
+        service_pid = _systemd_main_pid(_ui_unit_name(unit, port))
+        if service_pid is not None:
+            roots.append(service_pid)
+    return _dedupe_ints(pid for pid in roots if _pid_alive(pid))
+
+
+def _systemd_main_pid(unit: str) -> int | None:
+    try:
+        out = subprocess.run(
+            ["systemctl", "--user", "show", unit, "-p", "MainPID", "--value"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        ).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if not out.isdigit():
+        return None
+    pid = int(out)
+    return pid if pid > 0 else None
+
+
+def _process_tree_pids(root_pids: list[int]) -> list[int]:
+    if not root_pids:
+        return []
+    children: dict[int, list[int]] = {}
+    for pid in _proc_pids():
+        stat = _read_proc_stat(pid)
+        if stat is None:
+            continue
+        children.setdefault(int(stat["ppid"]), []).append(pid)
+
+    found: list[int] = []
+    seen: set[int] = set()
+    stack = list(root_pids)
+    while stack:
+        pid = stack.pop()
+        if pid in seen:
+            continue
+        seen.add(pid)
+        found.append(pid)
+        stack.extend(children.get(pid, []))
+    return sorted(found)
+
+
+def _sample_process_rows(pids: list[int], *, sample_seconds: float) -> list[dict[str, object]]:
+    if not pids:
+        return []
+    first = {pid: sample for pid in pids if (sample := _read_proc_sample(pid)) is not None}
+    if sample_seconds > 0:
+        time.sleep(sample_seconds)
+    second = {pid: sample for pid in pids if (sample := _read_proc_sample(pid)) is not None}
+    mem_total_kb = _mem_total_kb()
+    rows: list[dict[str, object]] = []
+    for pid in pids:
+        sample = second.get(pid) or first.get(pid)
+        if sample is None:
+            continue
+        prev = first.get(pid)
+        if prev is not None and sample is second.get(pid) and sample_seconds > 0:
+            cpu_percent = max(
+                0.0,
+                (sample["ticks"] - prev["ticks"]) / _clk_tck() / sample_seconds * 100.0,
+            )
+        else:
+            elapsed = max(float(sample["elapsed_seconds"]), 0.001)
+            cpu_percent = max(0.0, sample["ticks"] / _clk_tck() / elapsed * 100.0)
+        rss_kb = int(sample["rss_kb"])
+        row = {
+            **sample,
+            "cpu_percent": cpu_percent,
+            "mem_percent": (rss_kb / mem_total_kb * 100.0) if mem_total_kb else 0.0,
+        }
+        rows.append(row)
+    rows.sort(key=lambda row: (float(row["cpu_percent"]), int(row["rss_kb"])), reverse=True)
+    return rows
+
+
+def _read_proc_sample(pid: int) -> dict[str, object] | None:
+    stat = _read_proc_stat(pid)
+    if stat is None:
+        return None
+    rss_kb, vms_kb = _read_proc_memory_kb(pid)
+    return {
+        **stat,
+        "rss_kb": rss_kb,
+        "vms_kb": vms_kb,
+        "command": _pid_cmdline(pid) or stat["comm"],
+    }
+
+
+def _read_proc_stat(pid: int) -> dict[str, object] | None:
+    try:
+        text = (Path("/proc") / str(pid) / "stat").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    close = text.rfind(")")
+    open_ = text.find("(")
+    if open_ < 0 or close < open_:
+        return None
+    comm = text[open_ + 1:close]
+    fields = text[close + 2:].split()
+    if len(fields) < 20:
+        return None
+    try:
+        ticks = int(fields[11]) + int(fields[12])
+        start_ticks = int(fields[19])
+    except ValueError:
+        return None
+    elapsed = max(0.0, _proc_uptime_seconds() - (start_ticks / _clk_tck()))
+    return {
+        "pid": pid,
+        "ppid": int(fields[1]),
+        "pgid": int(fields[2]),
+        "state": fields[0],
+        "comm": comm,
+        "ticks": ticks,
+        "elapsed_seconds": elapsed,
+    }
+
+
+def _read_proc_memory_kb(pid: int) -> tuple[int, int]:
+    try:
+        parts = (Path("/proc") / str(pid) / "statm").read_text(encoding="utf-8").split()
+    except OSError:
+        return 0, 0
+    if len(parts) < 2:
+        return 0, 0
+    page_kb = _page_size_kb()
+    try:
+        vms_kb = int(parts[0]) * page_kb
+        rss_kb = int(parts[1]) * page_kb
+    except ValueError:
+        return 0, 0
+    return rss_kb, vms_kb
+
+
+def _proc_pids() -> list[int]:
+    try:
+        entries = list(Path("/proc").iterdir())
+    except OSError:
+        return []
+    return [int(path.name) for path in entries if path.name.isdigit()]
+
+
+def _proc_uptime_seconds() -> float:
+    try:
+        return float(Path("/proc/uptime").read_text(encoding="utf-8").split()[0])
+    except (OSError, ValueError, IndexError):
+        return time.monotonic()
+
+
+def _mem_total_kb() -> int:
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            if line.startswith("MemTotal:"):
+                return int(line.split()[1])
+    except (OSError, ValueError, IndexError):
+        return 0
+    return 0
+
+
+def _clk_tck() -> int:
+    try:
+        return int(os.sysconf("SC_CLK_TCK"))
+    except (OSError, ValueError):
+        return 100
+
+
+def _page_size_kb() -> int:
+    try:
+        return max(1, int(os.sysconf("SC_PAGE_SIZE")) // 1024)
+    except (OSError, ValueError):
+        return 4
+
+
+def _process_role(pid: int, root_pids: list[int], command: str) -> str:
+    lowered = command.lower()
+    if pid in root_pids:
+        return "root"
+    if any(token in lowered for token in ("codex", "claude", "gemini")):
+        return "agent"
+    return "child"
+
+
+def _format_pid_list(pids: list[int]) -> str:
+    return ", ".join(str(pid) for pid in pids)
+
+
+def _format_mib(kb: int) -> str:
+    return f"{kb / 1024.0:.1f}M"
+
+
+def _format_elapsed(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    if days:
+        return f"{days}d{hours:02d}h"
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def _truncate(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    return value[: max(0, limit - 3)] + "..."
+
+
+def _dedupe_ints(values) -> list[int]:  # noqa: ANN001
+    out: list[int] = []
+    for value in values:
+        if value not in out:
+            out.append(value)
+    return out
 
 
 def _running_config(pid: int | None) -> "config.Config | None":
@@ -1134,7 +1502,10 @@ def _pid_matches_refine_ui(pid: int, clone: Path) -> bool:
     cmdline = _pid_cmdline(pid)
     if not cmdline:
         return False
-    if "refine" not in cmdline or re.search(r"(?:^|\s)ui(?:\s|$)", cmdline) is None:
+    if (
+        "refine" not in cmdline
+        or re.search(r"(?:^|\s)(?:ui|supervisor)(?:\s|$)", cmdline) is None
+    ):
         return False
     cwd = _pid_cwd(pid)
     return cwd is not None and cwd == clone.resolve()

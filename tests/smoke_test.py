@@ -526,6 +526,48 @@ def main() -> int:
             p.unlink(missing_ok=True)
     print("[ok] refine status lists every checkout-local UI backend")
 
+    old_print_performance = refine_cli._print_performance_block
+    perf_calls: list[tuple[str, int, float, int]] = []
+    old_cwd = Path.cwd()
+    try:
+        os.chdir(clone)
+        refine_cli._owned_refine_ui_ports = lambda clone_arg: [18122] if clone_arg == clone else []
+        refine_cli._print_performance_block = (
+            lambda clone_arg, cfg_arg, unit_arg, *, port, sample_seconds, limit: perf_calls.append(
+                (str(clone_arg), port, sample_seconds, limit),
+            )
+        )
+        perf_args = type("Args", (), {
+            "config": str(bg_cfg.config_path),
+            "port": None,
+            "sample": 0.0,
+            "watch": None,
+            "limit": 5,
+        })()
+        assert refine_cli.cmd_performance(perf_args) == 0
+    finally:
+        os.chdir(old_cwd)
+        refine_cli._owned_refine_ui_ports = old_owned_ports
+        refine_cli._print_performance_block = old_print_performance
+    assert (str(clone), 18111, 0.0, 5) in perf_calls
+    assert (str(clone), 18122, 0.0, 5) in perf_calls
+    print("[ok] refine performance lists checkout-local UI backend ports")
+
+    old_print_performance_snapshot = refine_cli._print_performance_snapshot
+    try:
+        refine_cli._print_performance_snapshot = lambda args: (_ for _ in ()).throw(KeyboardInterrupt())
+        interrupted_args = type("Args", (), {
+            "config": str(bg_cfg.config_path),
+            "port": None,
+            "sample": 0.0,
+            "watch": 1.0,
+            "limit": 5,
+        })()
+        assert refine_cli.cmd_performance(interrupted_args) == 130
+    finally:
+        refine_cli._print_performance_snapshot = old_print_performance_snapshot
+    print("[ok] refine performance exits cleanly on Ctrl+C")
+
     setup_clone = tmp / "setup-refine-clone"
     (setup_clone / "refine_cli").mkdir(parents=True)
     (setup_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
