@@ -2713,7 +2713,11 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
             "GROUP BY reporter, status",
             reporter_args,
         ).fetchall()
-        known_reporters = [r["name"] for r in reporters.list_all(conn)]
+        known_reporters = (
+            [r["name"] for r in reporters.list_all(conn)]
+            if instance_scope == "all"
+            else []
+        )
         provider = (db.get_setting(conn, "agent_cli") or "claude").strip().lower()
     finally:
         conn.close()

@@ -62,6 +62,7 @@ def main() -> int:
         assert row["reporter"] == "Jane"
         assert row["instance_id"] == active
         assert reporters.list_all(conn)[0]["name"] == "Jane"
+        reporters.add(conn, "Alex")
 
         laptop = project_state.create_instance("Laptop")
         result = project_state.transfer_gaps(active, laptop["id"])
@@ -89,6 +90,7 @@ def main() -> int:
         failed_active = "01PROJECTSTATEDASHFAILAAA"
         failed_laptop = "01PROJECTSTATEDASHFAILBBB"
         done_laptop = "01PROJECTSTATEDASHDONEBBB"
+        alex_done_laptop = "01PROJECTSTATEDASHDONECCC"
         gap_writer.create_gap(
             gap_id=failed_active,
             name="Active failed",
@@ -113,6 +115,14 @@ def main() -> int:
             priority="medium",
             instance_id=laptop["id"],
         )
+        gap_writer.create_gap(
+            gap_id=alex_done_laptop,
+            name="Laptop Alex done",
+            initial_round=gaps.new_round("Alex", "Actual", "Target"),
+            status="done",
+            priority="medium",
+            instance_id=laptop["id"],
+        )
         project_state.rebuild_sqlite_cache(conn)
         status, dash_current = api.dashboard_summary()
         assert status == 200, dash_current
@@ -123,6 +133,9 @@ def main() -> int:
             r for r in dash_current["reporter_stats"] if r["reporter"] == "Jane"
         )
         assert jane_current["reported"] == 2, dash_current
+        assert all(
+            r["reporter"] != "Alex" for r in dash_current["reporter_stats"]
+        ), dash_current
         assert dash_current["needs_attention"][-1]["filter"] == {
             "status": "failed",
             "instance": "current",
@@ -136,6 +149,11 @@ def main() -> int:
             r for r in dash_all["reporter_stats"] if r["reporter"] == "Jane"
         )
         assert jane_all["reported"] == 5, dash_all
+        alex_all = next(
+            r for r in dash_all["reporter_stats"] if r["reporter"] == "Alex"
+        )
+        assert alex_all["reported"] == 1, dash_all
+        assert alex_all["done"] == 1, dash_all
         assert dash_all["needs_attention"][-1]["filter"] == {
             "status": "failed",
             "instance": "all",
