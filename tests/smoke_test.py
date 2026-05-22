@@ -20,6 +20,8 @@ import subprocess
 import sys
 import tempfile
 import time
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 
@@ -554,6 +556,7 @@ def main() -> int:
     print("[ok] refine performance lists checkout-local UI backend ports")
 
     old_print_performance_snapshot = refine_cli._print_performance_snapshot
+    old_sleep = refine_cli.time.sleep
     try:
         refine_cli._print_performance_snapshot = lambda args: (_ for _ in ()).throw(KeyboardInterrupt())
         interrupted_args = type("Args", (), {
@@ -563,9 +566,40 @@ def main() -> int:
             "watch": 1.0,
             "limit": 5,
         })()
-        assert refine_cli.cmd_performance(interrupted_args) == 130
+        watched = StringIO()
+        with redirect_stdout(watched):
+            assert refine_cli.cmd_performance(interrupted_args) == 130
+        assert "\033" not in watched.getvalue(), watched.getvalue()
+
+        class TtyBuffer(StringIO):
+            def isatty(self) -> bool:
+                return True
+
+        snapshots = {"count": 0}
+        sleeps = {"count": 0}
+
+        def fake_snapshot(_args):  # noqa: ANN001
+            snapshots["count"] += 1
+            print(f"frame {snapshots['count']}")
+            return 0
+
+        def fake_sleep(_seconds):  # noqa: ANN001
+            sleeps["count"] += 1
+            if sleeps["count"] >= 2:
+                raise KeyboardInterrupt()
+
+        refine_cli._print_performance_snapshot = fake_snapshot
+        refine_cli.time.sleep = fake_sleep
+        live_output = TtyBuffer()
+        with redirect_stdout(live_output):
+            assert refine_cli.cmd_performance(interrupted_args) == 130
+        rendered = live_output.getvalue()
+        assert "frame 1" in rendered and "frame 2" in rendered, rendered
+        assert "\033[2K" in rendered, rendered
+        assert "\033[H\033[J" not in rendered, rendered
     finally:
         refine_cli._print_performance_snapshot = old_print_performance_snapshot
+        refine_cli.time.sleep = old_sleep
     print("[ok] refine performance exits cleanly on Ctrl+C")
 
     setup_clone = tmp / "setup-refine-clone"

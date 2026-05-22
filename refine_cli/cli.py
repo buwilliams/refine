@@ -30,6 +30,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 from refine_server import config, project_registry
@@ -784,17 +786,24 @@ def cmd_performance(args: argparse.Namespace) -> int:
         print("refine performance: --limit must be greater than 0", file=sys.stderr)
         return 1
 
+    if args.watch is None:
+        try:
+            return _print_performance_snapshot(args)
+        except KeyboardInterrupt:
+            print()
+            return 130
+
+    live = sys.stdout.isatty()
+    rendered_lines = 0
     try:
         while True:
-            if args.watch is not None:
-                if sys.stdout.isatty():
-                    print("\033[H\033[J", end="")
-                else:
-                    print()
-                print(f"refine performance sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
-            rc = _print_performance_snapshot(args)
-            if args.watch is None:
-                return rc
+            rc, frame = _render_performance_watch_frame(args, is_tty=live)
+            if live:
+                rendered_lines = _write_in_place_frame(frame, rendered_lines)
+            else:
+                print()
+                sys.stdout.write(frame)
+                sys.stdout.flush()
             time.sleep(args.watch)
     except KeyboardInterrupt:
         print()
@@ -824,6 +833,36 @@ def _print_performance_snapshot(args: argparse.Namespace) -> int:
             sample_seconds=args.sample, limit=args.limit,
         )
     return 0
+
+
+class _PerformanceCapture(StringIO):
+    def __init__(self, *, is_tty: bool) -> None:
+        super().__init__()
+        self._is_tty = is_tty
+
+    def isatty(self) -> bool:
+        return self._is_tty
+
+
+def _render_performance_watch_frame(args: argparse.Namespace, *, is_tty: bool) -> tuple[int, str]:
+    buf = _PerformanceCapture(is_tty=is_tty)
+    with redirect_stdout(buf):
+        print(f"refine performance sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        rc = _print_performance_snapshot(args)
+    return rc, buf.getvalue()
+
+
+def _write_in_place_frame(frame: str, previous_lines: int) -> int:
+    if previous_lines > 0:
+        sys.stdout.write(f"\033[{previous_lines}F")
+    lines = frame.splitlines()
+    printed_lines = max(previous_lines, len(lines))
+    for line in lines:
+        sys.stdout.write(f"\033[2K{line}\n")
+    for _ in range(printed_lines - len(lines)):
+        sys.stdout.write("\033[2K\n")
+    sys.stdout.flush()
+    return printed_lines
 
 
 def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
