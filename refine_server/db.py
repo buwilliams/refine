@@ -246,8 +246,8 @@ DEFAULT_SETTINGS = {
     "chat_idle_timeout_seconds": "300",    # 5 min — auto-close idle chats
     # Pause new agent launches after rate-limit or token-limit failures.
     "agent_limit_pause_seconds": "60",
-    "worker_memory_limit_mb": "0",
-    "ui_memory_limit_mb": "0",
+    "worker_memory_limit_mb": "2000",
+    "ui_memory_limit_mb": "2000",
     "worker_cpu_priority": "low",
     "resource_isolation_mode": "auto",
     # How long a Gap can sit in 'backlog' before the dispatcher auto-promotes

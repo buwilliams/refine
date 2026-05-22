@@ -90,6 +90,8 @@ def main() -> int:
     assert "project_update_pulse_interval_seconds" in settings_js
     assert 'id="s-worker-memory"' in settings_js
     assert 'id="s-ui-memory"' in settings_js
+    assert 'id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 2000}"' in settings_js
+    assert 'id="s-ui-memory" min="0" value="${s.ui_memory_limit_mb ?? 2000}"' in settings_js
     assert 'id="s-worker-cpu-priority"' in settings_js
     assert 'id="s-cap-resource-label"' not in settings_js
     assert "function workerResourceBudgetLabel" not in settings_js

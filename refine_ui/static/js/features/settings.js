@@ -1178,10 +1178,10 @@ function drawSettings(
       <div class="form-grid two">
         <div class="form-row"><label>Worker memory limit (MB)
           <span class="muted small">— 0 disables the per-process limit</span></label>
-          <input type="number" id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 0}"></div>
+          <input type="number" id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 2000}"></div>
         <div class="form-row"><label>UI memory limit (MB)
           <span class="muted small">— 0 disables the supervised UI process limit</span></label>
-          <input type="number" id="s-ui-memory" min="0" value="${s.ui_memory_limit_mb ?? 0}"></div>
+          <input type="number" id="s-ui-memory" min="0" value="${s.ui_memory_limit_mb ?? 2000}"></div>
       </div>
       <div class="form-grid two">
         <div class="form-row"><label>Worker CPU priority</label>

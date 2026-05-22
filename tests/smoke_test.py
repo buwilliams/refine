@@ -63,7 +63,26 @@ def main() -> int:
     assert settings["agent_idle_timeout_seconds"] == "900"
     assert settings["agent_hard_cap_seconds"] == "86400"
     assert settings["agent_limit_pause_seconds"] == "60"
+    assert settings["worker_memory_limit_mb"] == "2000"
+    assert settings["ui_memory_limit_mb"] == "2000"
     print("[ok] DB init + defaults seeded")
+    deployed_db = tmp / "deployed.sqlite3"
+    db.init_db(deployed_db)
+    deployed_conn = db.connect(deployed_db)
+    try:
+        db.set_setting(deployed_conn, "worker_memory_limit_mb", "0", persist=False)
+        db.set_setting(deployed_conn, "ui_memory_limit_mb", "0", persist=False)
+    finally:
+        deployed_conn.close()
+    db.init_db(deployed_db)
+    deployed_conn = db.connect(deployed_db)
+    try:
+        deployed_settings = db.list_settings(deployed_conn)
+        assert deployed_settings["worker_memory_limit_mb"] == "0"
+        assert deployed_settings["ui_memory_limit_mb"] == "0"
+    finally:
+        deployed_conn.close()
+    print("[ok] DB init preserves deployed memory-limit settings")
 
     # --- Agent CLI abstraction ---------------------------------------------
     codex = agent_cli.get_spec("codex")

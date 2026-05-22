@@ -12,6 +12,7 @@ from refine_runtime.resources import (
 def main() -> int:
     assert validate_setting("worker_memory_limit_mb", "0") == "0"
     assert validate_setting("worker_memory_limit_mb", "4096") == "4096"
+    assert validate_setting("ui_memory_limit_mb", "2000") == "2000"
     try:
         validate_setting("worker_memory_limit_mb", "128")
         raise AssertionError("small memory limits should be rejected")
@@ -21,6 +22,10 @@ def main() -> int:
     assert validate_setting("worker_cpu_priority", "VERY_LOW") == "very_low"
     assert validate_setting("resource_isolation_mode", "best_effort") == "best_effort"
     assert detect_capabilities("best_effort").name == "posix"
+    assert ResourceSettings().worker_memory_limit_mb == 2000
+    assert ResourceSettings().ui_memory_limit_mb == 2000
+    assert ResourceSettings.from_settings({}).worker_memory_limit_mb == 2000
+    assert ResourceSettings.from_settings({}).ui_memory_limit_mb == 2000
 
     settings = ResourceSettings(
         worker_memory_limit_mb=4096,

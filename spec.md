@@ -421,6 +421,8 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 | Setting               | Default                                    | Notes |
 |-----------------------|--------------------------------------------|-------|
 | Parallel-run cap      | `10`                                       | Max agent subprocesses running concurrently. |
+| Worker memory limit   | `2000 MB`                                  | Per-process memory cap for runner, agent, and chat worker processes. Set to `0` to disable. |
+| UI memory limit       | `2000 MB`                                  | Per-process memory cap for the supervised UI process. Set to `0` to disable. |
 | Branch name pattern   | `refine/<gap-id>`                          | `<gap-id>` is substituted at branch creation. |
 | Merge target          | client repo's current branch at merge time | **Fixed policy** — not configurable. Refine always merges into whatever branch is checked out at merge time. |
 | Agent idle timeout    | `15 min`                                   | Kill the subprocess if it produces no output for this long. Primary stuck-detector. Set to `0` to disable. |

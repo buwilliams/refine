@@ -14,8 +14,8 @@ ISOLATION_MODES = {"auto", "enforced", "best_effort"}
 
 @dataclass(frozen=True)
 class ResourceSettings:
-    worker_memory_limit_mb: int = 0
-    ui_memory_limit_mb: int = 0
+    worker_memory_limit_mb: int = 2000
+    ui_memory_limit_mb: int = 2000
     worker_cpu_priority: str = "low"
     resource_isolation_mode: str = "auto"
 
@@ -23,11 +23,11 @@ class ResourceSettings:
     def from_settings(cls, settings: Mapping[str, str]) -> "ResourceSettings":
         return cls(
             worker_memory_limit_mb=_memory_value(
-                settings.get("worker_memory_limit_mb", "0"),
+                settings.get("worker_memory_limit_mb", "2000"),
                 "worker_memory_limit_mb",
             ),
             ui_memory_limit_mb=_memory_value(
-                settings.get("ui_memory_limit_mb", "0"),
+                settings.get("ui_memory_limit_mb", "2000"),
                 "ui_memory_limit_mb",
             ),
             worker_cpu_priority=_choice(
