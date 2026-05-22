@@ -17,6 +17,7 @@ def test_client_switch_path(root: Path) -> None:
     common_js = (root / "refine_ui/static/js/common.js").read_text(encoding="utf-8")
     settings_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
     chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
+    api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
 
     assert 'id="active-instance-label"' in index_html
     assert ".brand-instance" in base_css
@@ -70,6 +71,8 @@ def test_client_switch_path(root: Path) -> None:
     assert "active_instance_id: result.active_instance_id" in settings_js
     assert "updateActiveInstanceLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
+    assert "Switching apps requires restarting the supervised Refine process." in api_py
+    assert "processes use the same .refine config" in api_py
 
 
 def test_runtime_switch_resets_services() -> None:

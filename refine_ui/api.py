@@ -628,13 +628,15 @@ def performance_summary(*, operation: str | None = None,
             success_filter = True
         elif success in ("0", "false", "failed", "failure"):
             success_filter = False
-        return 200, perf_metrics.snapshot(
+        snapshot = perf_metrics.snapshot(
             conn,
             days=perf_metrics.RETENTION_DAYS,
             limit=limit,
             operation=operation or None,
             success=success_filter,
         )
+        snapshot["backend"] = runtime.backend_info()
+        return 200, snapshot
     finally:
         conn.close()
 
@@ -702,12 +704,16 @@ def _rebuild_sqlite_cache_sync(
     restart_services = body.get("restart_services") is not False
     cfg = config.get(reload=True)
     sqlite_file = cfg.sqlite_path
+    backend = runtime.backend_info()
+    controls_runner_lifecycle = bool(backend.get("ui_controls_runner_lifecycle"))
     mode = "rebuilt"
     details = ""
     removed: list[str] = []
 
-    if restart_services:
+    if restart_services and controls_runner_lifecycle:
         runtime.stop_all()
+    elif restart_services:
+        runtime.stop_poller()
     try:
         try:
             db.init_db(sqlite_file)
@@ -749,13 +755,17 @@ def _rebuild_sqlite_cache_sync(
     finally:
         if restart_services:
             runtime.ensure_poller()
-            runtime.ensure_runner()
+            if controls_runner_lifecycle:
+                runtime.ensure_runner()
 
     return 200, {
         "ok": True,
         "mode": mode,
         "path": str(sqlite_file),
         "removed": removed,
+        "backend": backend,
+        "runner_restarted": bool(restart_services and controls_runner_lifecycle),
+        "poller_restarted": bool(restart_services),
         **counts,
     }
 
@@ -914,6 +924,15 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     """Stop active agents and leave the current target app clean before switching."""
     warnings: list[str] = []
     cfg = config.get(reload=True)
+    if runtime.backend_info().get("process_model") == "supervisor":
+        raise _SwitchBlocked(
+            "Switching apps requires restarting the supervised Refine process.",
+            (
+                "The supervisor starts the UI and runner worker with one config "
+                "path. Stop Refine, then start it for the selected app so both "
+                "processes use the same .refine config."
+            ),
+        )
     runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)
@@ -2514,12 +2533,17 @@ def recheck_auth() -> tuple[int, dict]:
 
 
 def backend_diagnostics() -> tuple[int, dict]:
+    backend = runtime.backend_info()
     try:
         result = get_client().call(M_DIAGNOSTICS, {}, timeout=5.0)
     except BackendError as e:
-        return 200, {"reachable": False, "error": {"message": e.message,
-                                                    "code": e.code}}
+        return 200, {
+            "reachable": False,
+            "backend": backend,
+            "error": {"message": e.message, "code": e.code},
+        }
     result["reachable"] = True
+    result["backend"] = backend
     return 200, result
 
 

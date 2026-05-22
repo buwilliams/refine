@@ -512,6 +512,8 @@ function addGovernanceRuleRow(text = "") {
 
 function renderRuntimeAgentCards(dash, settings, diag) {
   const paused = settings.paused === "1";
+  const backend = diag.backend || dash.backend || {};
+  const supervisorMode = backend.process_model === "supervisor";
   const merger = dash.merger || null;
   const governance = dash.governance || null;
   const agents = dash.running || [];
@@ -565,7 +567,7 @@ function renderRuntimeAgentCards(dash, settings, diag) {
         ? `<p class="muted small" style="margin-top:8px">Merger: ${merger.state}${merger.last_outcome ? ` · last outcome <code>${htmlEscape(merger.last_outcome)}</code>` : ""}.</p>`
         : "");
   const mergerUnreachable = !merger
-    ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — backend runner unavailable.</p>`
+    ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — ${supervisorMode ? "runner worker unreachable" : "backend runner unavailable"}.</p>`
     : "";
   const governanceLine = governance
     ? `<p class="muted small" style="margin-top:8px">Governance: ${governance.configured ? governance.state : "not configured"}${governanceQueued ? ` · queue ${governanceQueued}` : ""}${governance.last_outcome ? ` · last outcome <code>${htmlEscape(governance.last_outcome)}</code>` : ""}.</p>`
@@ -591,9 +593,13 @@ function renderRuntimeAgentCards(dash, settings, diag) {
       </p>
 
       <dl class="kv" style="margin-top:12px">
-        <dt>Backend reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.mode ? `<dt>Backend mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
+        <dt>Process model</dt><dd>${htmlEscape(backendProcessLabel(backend))}</dd>
+        <dt>Runner transport</dt><dd>${htmlEscape(backendTransportLabel(backend))}</dd>
+        <dt>Runner reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
+        ${diag.mode ? `<dt>Runner mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
         ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
+        ${backend.socket_path ? `<dt>Runner socket</dt><dd><code>${htmlEscape(shortPath(backend.socket_path))}</code></dd>` : ""}
+        ${diag.error?.message ? `<dt>Runner error</dt><dd>${htmlEscape(diag.error.message)}</dd>` : ""}
       </dl>
 
       <h4 style="margin:16px 0 8px">Currently running</h4>
@@ -606,6 +612,23 @@ function renderRuntimeAgentCards(dash, settings, diag) {
       ${queueLine}
       ${mergerUnreachable}
     </section>`;
+}
+
+function backendProcessLabel(backend = {}) {
+  if (backend.process_model === "supervisor") return "Supervisor: UI + worker process";
+  if (backend.process_model === "single_process") return "Single UI process";
+  return "Unknown";
+}
+
+function backendTransportLabel(backend = {}) {
+  if (backend.transport === "unix_socket") return "Unix socket";
+  if (backend.transport === "direct_call") return "Direct in-process call";
+  return "Unknown";
+}
+
+function shortPath(path) {
+  const text = String(path || "");
+  return text.split(/[\\/]/).pop() || text;
 }
 
 function fmtPerfMs(value) {
@@ -659,7 +682,7 @@ function renderPerformanceEvents(perf = {}) {
       <table class="table">
         <thead><tr>
           <th>When</th><th>Operation</th><th>Elapsed</th><th>Outcome</th>
-          <th>Gap</th><th>Provider</th><th>Mode</th><th>Rows</th>
+          <th>Gap</th><th>Provider</th><th>Mode</th><th>Resource</th><th>Rows</th>
         </tr></thead>
         <tbody>
           ${events.map((event) => `
@@ -671,10 +694,20 @@ function renderPerformanceEvents(perf = {}) {
               <td>${event.gap_id ? `<a href="#/gaps/${htmlEscape(event.gap_id)}">${htmlEscape(event.gap_id.slice(0, 10))}...</a>` : ""}</td>
               <td>${htmlEscape(event.provider || "")}</td>
               <td>${htmlEscape(event.query_mode || "")}</td>
+              <td class="muted small">${htmlEscape(performanceResourceLabel(event))}</td>
               <td class="muted small">${event.rows_returned ?? ""}${event.rows_scanned != null ? ` / ${event.rows_scanned}` : ""}</td>
             </tr>`).join("")}
         </tbody>
       </table>` : `<p class="muted">No recent events match the current filters.</p>`}`;
+}
+
+function performanceResourceLabel(event = {}) {
+  const details = event.details || {};
+  const parts = [];
+  if (details.resource_backend) parts.push(details.resource_backend);
+  if (details.resource_isolation) parts.push(details.resource_isolation);
+  if (details.killed_reason) parts.push(details.killed_reason);
+  return parts.join(" / ");
 }
 
 function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = {}, guidanceData = {}, performanceData = {}) {
@@ -690,6 +723,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   const instanceCounts = instanceData.counts || {};
   const guidanceItems = guidanceData.guidance || [];
   const performance = performanceData || {};
+  const performanceBackend = performance.backend || diag.backend || {};
   const appOptions = projectApps.map((app) => `
     <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
       ${htmlEscape(app.name || app.path)}
@@ -895,7 +929,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
           <span class="muted small">— 0 disables the per-process limit</span></label>
           <input type="number" id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 0}"></div>
         <div class="form-row"><label>UI memory limit (MB)
-          <span class="muted small">— 0 disables the supervisor limit</span></label>
+          <span class="muted small">— 0 disables the supervised UI process limit</span></label>
           <input type="number" id="s-ui-memory" min="0" value="${s.ui_memory_limit_mb ?? 0}"></div>
       </div>
       <div class="form-grid two">
@@ -1011,6 +1045,8 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         ${Number(performance.retention_days || 30)} days.
       </p>
       <dl class="kv">
+        <dt>Process model</dt><dd>${htmlEscape(backendProcessLabel(performanceBackend))}</dd>
+        <dt>Metric store</dt><dd>Shared SQLite runtime history</dd>
         <dt>Events retained</dt><dd>${fmtCount(performance.event_count || 0)}</dd>
         <dt>Total stored</dt><dd>${fmtCount(performance.total_event_count || 0)}</dd>
       </dl>

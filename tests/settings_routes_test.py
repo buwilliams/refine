@@ -102,6 +102,12 @@ def main() -> int:
     assert '@route("GET", r"/api/performance")' in server_py
     assert '@route("POST", r"/api/performance/cleanup")' in server_py
     assert "def performance_summary" in api_py
+    assert "snapshot[\"backend\"] = runtime.backend_info()" in api_py
+    assert "def backend_info" in (root / "refine_ui/runtime.py").read_text(encoding="utf-8")
+    assert "function backendProcessLabel" in settings_js
+    assert "function performanceResourceLabel" in settings_js
+    assert "<dt>Process model</dt>" in settings_js
+    assert "<th>Resource</th>" in settings_js
     assert 'withButtonBusy($("#s-rebuild-cache"), "Rebuilding…"' in settings_js
     assert "function drawRuntimeRecovery(error)" in settings_js
     assert '@route("POST", r"/api/cache/rebuild")' in server_py

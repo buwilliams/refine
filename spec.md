@@ -10,7 +10,7 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 
 ## Architecture
 
-- **Runtime split:** The UI backend runs natively on the host, either as a detached background process from `refine start` or as a persistent systemd --user service from `refine install`, and owns the runner in-process. Agent CLI subprocesses, git operations, web requests, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
+- **Runtime split:** The supervisor runs natively on the host, starts a UI/control process plus a runner worker process, and connects them over a checkout-local Unix socket. Agent CLI subprocesses, git operations, web requests, and flat-file I/O all use host paths and host credentials. See **Runtime topology** below.
 - **Backend:** Python (stdlib-first; minimal external deps).
 - **Frontend:** Static HTML and vanilla JavaScript. No JS framework or build step.
 - **Storage:** Canonical project state lives in JSON under the client repo's `.refine/` directory. SQLite is a disposable per-application cache rebuilt from JSON on startup and app switch.
@@ -20,15 +20,20 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 
 ## Runtime topology
 
-Refine runs as one host-native UI backend on the same machine as the target app. The backend owns a runner object in-process.
+Refine runs as host-native processes on the same machine as the target app. The supervisor owns process lifecycle, the UI process owns HTTP/API/SSE, and the runner worker owns agent lifecycle plus serialized state mutations. Tests and setup mode may still use an in-process runner fallback.
+
+**Supervisor (`refine supervisor`):**
+
+- Starts the runner worker with `REFINE_RUNNER_SOCKET` and then starts the UI process with the same socket path.
+- Applies configured UI resource limits to the UI process and shuts down the worker when the UI exits.
 
 **Host UI service (`refine_ui`):**
 
 - Python web server (UI + JSON API + SSE).
 - **Reads** the SQLite cache and canonical JSON files directly from the active app's `.refine/` directory. **Writes** settings, reporters, instance state, and Gap workflow fields through JSON-backed helpers that refresh SQLite projections. User-action activity-feed entries are runtime history in SQLite only.
-- Calls the runner directly for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
+- Calls the runner worker over local IPC for everything that touches `gap.json` (round submissions, round edits, log appends) and for agent subprocess lifecycle (launch, cancel, status query).
 
-**On the host (`refine_server`):**
+**Runner worker (`refine_runtime.worker` + `refine_server`):**
 
 - Spawns Claude Code CLI subprocesses (`claude --print ...`) directly on the host — they inherit the host's `~/.claude/` auth, PATH, and shell.
 - Runs every `git` operation against the client repo — fetch, branch, worktree, merge, push — using the host's SSH keys and git config.
@@ -37,9 +42,9 @@ Refine runs as one host-native UI backend on the same machine as the target app.
 
 **Shared filesystem state:**
 
-- The client repository lives on the host. Inside it sits refine's volume root (`.refine/`). The UI backend and in-process runner both access it natively. JSON files are authoritative for project config, instances, instance settings/reporters, and Gap workflow state; SQLite is a shared cache plus runtime-history store. WAL mode plus short transactions keep runtime-history writers from contending.
+- The client repository lives on the host. Inside it sits refine's volume root (`.refine/`). The UI process and runner worker both access it natively. JSON files are authoritative for project config, instances, instance settings/reporters, and Gap workflow state; SQLite is a shared cache plus runtime-history store. WAL mode plus short transactions keep runtime-history writers from contending.
 
-**Why this split:** The runner owns subprocess and file-write decisions while the UI backend owns HTTP/UI concerns. Running everything natively in one backend process avoids container path mapping, interprocess transport overhead, duplicated environment setup, and credential forwarding; refine reuses whatever auth and tooling the operator already has set up.
+**Why this split:** The runner owns subprocess and file-write decisions while the UI process owns HTTP/UI concerns. Running everything natively avoids container path mapping, credential forwarding, and duplicated environment setup; the supervisor keeps the UI/control process separate from long-running agent work while refine reuses whatever auth and tooling the operator already has set up.
 
 ## Core entity — Gap
 
@@ -389,7 +394,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 - **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.
 - **Re-check auth** — on-demand re-run of the host runner's Claude auth pre-flight; clears the auth banner if it now passes.
-- **Backend diagnostics** — in-process runner mode, last call timestamp, recent backend errors.
+- **Backend diagnostics** — process model, runner transport, worker mode, last call timestamp, recent backend errors.
 - Changes take effect immediately.
 
 ## UI

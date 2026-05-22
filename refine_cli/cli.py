@@ -767,7 +767,7 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     print(f"  service:  {_dot(service_active)} systemd unit `{ui_unit}` "
           f"({'active' if service_active else 'inactive'})")
     print(f"  server:   {_dot((process_pid is not None or service_active) and web_up)} "
-          "in-process with UI backend")
+          "supervisor-managed UI + runner worker")
     print(f"  logs:     {_runtime_log_path(clone, display_cfg, effective_port)}")
     print(f"  journal:  journalctl --user -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop {effective_port}")

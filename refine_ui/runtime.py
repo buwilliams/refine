@@ -18,13 +18,19 @@ class _SocketRunnerClient:
     def __init__(self, socket_path: str) -> None:
         self.socket_path = socket_path
 
-    def call(self, method: str, params: dict | None = None) -> dict:
+    def call(
+        self,
+        method: str,
+        params: dict | None = None,
+        *,
+        timeout: float = 30.0,
+    ) -> dict:
         from refine_runtime import ipc
 
-        return ipc.request(self.socket_path, method, params or {})
+        return ipc.request(self.socket_path, method, params or {}, timeout=timeout)
 
     def status_snapshot(self) -> dict:
-        return self.call(M_RUNNING, {})
+        return self.call(M_RUNNING, {}, timeout=5.0)
 
     def shutdown(self) -> None:
         return None
@@ -113,8 +119,30 @@ def stop_runner() -> None:
     _runner = None
 
 
-def runner_call(method: str, params: dict | None = None) -> dict:
-    return ensure_runner().call(method, params or {})
+def runner_call(
+    method: str,
+    params: dict | None = None,
+    *,
+    timeout: float = 30.0,
+) -> dict:
+    runner = ensure_runner()
+    if isinstance(runner, _SocketRunnerClient):
+        return runner.call(method, params or {}, timeout=timeout)
+    return runner.call(method, params or {})
+
+
+def backend_info() -> dict:
+    socket_path = os.environ.get("REFINE_RUNNER_SOCKET") or ""
+    external = bool(socket_path)
+    no_inprocess = os.environ.get("REFINE_NO_INPROCESS_RUNNER") == "1"
+    return {
+        "process_model": "supervisor" if external else "single_process",
+        "transport": "unix_socket" if external else "direct_call",
+        "socket_path": socket_path,
+        "in_process_runner_allowed": not no_inprocess,
+        "runner_client_loaded": _runner is not None,
+        "ui_controls_runner_lifecycle": not external,
+    }
 
 
 def runner_status_snapshot() -> dict:
@@ -128,6 +156,7 @@ def runner_status_snapshot() -> dict:
     if runner is None:
         return {
             "runner_reachable": False,
+            "backend": backend_info(),
             "running": [],
             "merger": None,
             "governance": None,
@@ -138,12 +167,13 @@ def runner_status_snapshot() -> dict:
     except Exception:
         return {
             "runner_reachable": False,
+            "backend": backend_info(),
             "running": [],
             "merger": None,
             "governance": None,
             "target_app_rebuild": None,
         }
-    return {"runner_reachable": True, **snap}
+    return {"runner_reachable": True, "backend": backend_info(), **snap}
 
 
 def stop_all() -> None:
