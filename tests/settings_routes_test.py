@@ -362,6 +362,15 @@ def main() -> int:
     assert "DASHBOARD_REFRESH_TIMEOUT_MS" in dashboard_js
     assert "state.dashboardReviewSnapshot" in dashboard_js
     assert "scheduleDashboardRetry()" in dashboard_js
+    assert "function dashboardScopeFromHash()" in dashboard_js
+    assert "function dashboardHash(scope)" in dashboard_js
+    assert "`/api/dashboard?instance=${instanceParam}`" in dashboard_js
+    assert "`&instance=${instanceParam}&limit=200`" in dashboard_js
+    assert 'data-dashboard-scope="current"' in dashboard_js
+    assert 'data-dashboard-scope="all"' in dashboard_js
+    assert "instance: x.filter?.instance || scope" in dashboard_js
+    assert "gapsHash({ status: s, instance: scope })" in dashboard_js
+    assert "gapsHash({ reporter: row.dataset.reporter, instance: scope })" in dashboard_js
     assert "options.signal" in common_js
     assert 'id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}' in dashboard_js
     assert 'id="dashboard-reporter-stats-shell"${reporterStatsShellOpen ? " open" : ""}' in dashboard_js

@@ -33,8 +33,8 @@ def route(method: str, pattern: str) -> Callable[[Handler], Handler]:
 
 
 @route("GET", r"/api/dashboard")
-def _h_dashboard(_h, _m, _b, _q):
-    return api.dashboard_summary()
+def _h_dashboard(_h, _m, _b, q):
+    return api.dashboard_summary(instance=_get_one(q, "instance"))
 
 
 @route("GET", r"/api/gaps")

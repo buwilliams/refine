@@ -86,6 +86,70 @@ def main() -> int:
         assert result["skipped"] == 1, result
         assert result["skipped_details"][0]["reason"] == "status:in-progress"
 
+        failed_active = "01PROJECTSTATEDASHFAILAAA"
+        failed_laptop = "01PROJECTSTATEDASHFAILBBB"
+        done_laptop = "01PROJECTSTATEDASHDONEBBB"
+        gap_writer.create_gap(
+            gap_id=failed_active,
+            name="Active failed",
+            initial_round=gaps.new_round("Jane", "Actual", "Target"),
+            status="failed",
+            priority="medium",
+            instance_id=active,
+        )
+        gap_writer.create_gap(
+            gap_id=failed_laptop,
+            name="Laptop failed",
+            initial_round=gaps.new_round("Jane", "Actual", "Target"),
+            status="failed",
+            priority="medium",
+            instance_id=laptop["id"],
+        )
+        gap_writer.create_gap(
+            gap_id=done_laptop,
+            name="Laptop done",
+            initial_round=gaps.new_round("Jane", "Actual", "Target"),
+            status="done",
+            priority="medium",
+            instance_id=laptop["id"],
+        )
+        project_state.rebuild_sqlite_cache(conn)
+        status, dash_current = api.dashboard_summary()
+        assert status == 200, dash_current
+        assert dash_current["instance_scope"] == "current", dash_current
+        assert dash_current["counts"].get("failed") == 1, dash_current
+        assert dash_current["counts"].get("in-progress", 0) == 0, dash_current
+        jane_current = next(
+            r for r in dash_current["reporter_stats"] if r["reporter"] == "Jane"
+        )
+        assert jane_current["reported"] == 2, dash_current
+        assert dash_current["needs_attention"][-1]["filter"] == {
+            "status": "failed",
+            "instance": "current",
+        }
+        status, dash_all = api.dashboard_summary(instance="all")
+        assert status == 200, dash_all
+        assert dash_all["instance_scope"] == "all", dash_all
+        assert dash_all["counts"].get("failed") == 2, dash_all
+        assert dash_all["counts"].get("in-progress") == 1, dash_all
+        jane_all = next(
+            r for r in dash_all["reporter_stats"] if r["reporter"] == "Jane"
+        )
+        assert jane_all["reported"] == 5, dash_all
+        assert dash_all["needs_attention"][-1]["filter"] == {
+            "status": "failed",
+            "instance": "all",
+        }
+        status, body = api.list_gaps(status="failed", instance="current")
+        assert status == 200, body
+        assert [g["id"] for g in body["gaps"]] == [failed_active], body
+        status, body = api.list_gaps(status="failed", instance="all")
+        assert status == 200, body
+        assert {g["id"] for g in body["gaps"]} == {
+            failed_active,
+            failed_laptop,
+        }, body
+
         stale_gap = "01PROJECTSTATESTALECACHEAA"
         gap_writer.create_gap(
             gap_id=stale_gap,

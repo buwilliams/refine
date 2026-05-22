@@ -2666,16 +2666,27 @@ def cleanup_logs(body: dict) -> tuple[int, dict]:
     return 200, {"deleted": deleted, "days_kept": days}
 
 
-def dashboard_summary() -> tuple[int, dict]:
+def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
     runner_snap = runtime.runner_status_snapshot()
+    instance_scope = (instance or "current").strip() or "current"
+    if instance_scope not in ("all", "current"):
+        instance_scope = "current"
+    active_instance_id = project_state.active_instance_id()
+    instance_where = ""
+    instance_args: list[Any] = []
+    if instance_scope == "current":
+        instance_where = "WHERE instance_id = ?"
+        instance_args.append(active_instance_id)
     conn = _conn()
     try:
         counts = {}
         for row in conn.execute(
-            "SELECT status, COUNT(*) AS n FROM gaps_index GROUP BY status"
+            "SELECT status, COUNT(*) AS n FROM gaps_index "
+            f"{instance_where} GROUP BY status",
+            instance_args,
         ):
             counts[row["status"]] = row["n"]
         pf = conn.execute(
@@ -2690,11 +2701,17 @@ def dashboard_summary() -> tuple[int, dict]:
         # Per-reporter stats: the runner mirrors the latest round's
         # reporter onto `gaps_index.reporter`, so the SQL aggregation
         # gives us exact counts without reading every gap.json.
+        reporter_where = "WHERE reporter != ''"
+        reporter_args = []
+        if instance_where:
+            reporter_where += " AND instance_id = ?"
+            reporter_args.append(active_instance_id)
         stat_rows = conn.execute(
             "SELECT reporter, status, COUNT(*) AS n "
             "FROM gaps_index "
-            "WHERE reporter != '' "
-            "GROUP BY reporter, status"
+            f"{reporter_where} "
+            "GROUP BY reporter, status",
+            reporter_args,
         ).fetchall()
         known_reporters = [r["name"] for r in reporters.list_all(conn)]
         provider = (db.get_setting(conn, "agent_cli") or "claude").strip().lower()
@@ -2711,8 +2728,13 @@ def dashboard_summary() -> tuple[int, dict]:
         "activity": feed,
         "runner_reachable": runner_reachable,
         "reporter_stats": reporter_stats,
+        "instance_scope": instance_scope,
+        "instance_filter": "all" if instance_scope == "all" else "current",
+        "active_instance_id": active_instance_id,
+        "active_instance_display_name": project_state.gap_instance_display(active_instance_id),
         "needs_attention": _compute_needs_attention(
             counts, preflight, runner_reachable, provider,
+            instance_filter="all" if instance_scope == "all" else "current",
         ),
     }
 
@@ -3107,7 +3129,8 @@ def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]
 
 def _compute_needs_attention(counts: dict, preflight: dict | None,
                               runner_reachable: bool,
-                              provider: str = "claude") -> list[dict]:
+                              provider: str = "claude",
+                              instance_filter: str = "current") -> list[dict]:
     items: list[dict] = []
     if not runner_reachable:
         items.append({
@@ -3128,7 +3151,7 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
         items.append({
             "kind": "filter", "severity": "warn",
             "message": f"{counts['failed']} failed Gaps",
-            "filter": {"status": "failed"},
+            "filter": {"status": "failed", "instance": instance_filter},
         })
     return items
 

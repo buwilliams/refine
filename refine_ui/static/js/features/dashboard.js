@@ -14,6 +14,19 @@ const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
   "awaiting-rebuild",
 ]);
 
+function dashboardScopeFromHash() {
+  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  return hashQs.get("instance") === "all" ? "all" : "current";
+}
+
+function dashboardHash(scope) {
+  return scope === "all" ? "#/?instance=all" : "#/";
+}
+
+function dashboardScopeParam(d = null) {
+  return d?.instance_filter || dashboardScopeFromHash();
+}
+
 async function renderDashboard() {
   // First paint only: lay out the outer chrome and a `Loading…`
   // placeholder. SSE-triggered refreshes route through `refreshDashboard`
@@ -44,10 +57,12 @@ async function refreshDashboard() {
   const refreshSeq = ++dashboardRefreshSeq;
   try {
     const reporter = state.lastReporter || "";
+    const scope = dashboardScopeFromHash();
+    const instanceParam = encodeURIComponent(scope);
     const [d, reviews] = await Promise.all([
-      dashboardApi("GET", "/api/dashboard"),
+      dashboardApi("GET", `/api/dashboard?instance=${instanceParam}`),
       reporter
-        ? dashboardApi("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + "&limit=200")
+        ? dashboardApi("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + `&instance=${instanceParam}&limit=200`)
         : Promise.resolve({ gaps: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
@@ -95,9 +110,11 @@ function scheduleDashboardRetry() {
 function drawDashboard(d, opts = {}) {
   const reviewsForReporter = opts.reviewsForReporter || [];
   const reviewReporter = opts.reporter || "";
-  if (dashboardReviewSelectedReporter !== reviewReporter) {
+  const scope = dashboardScopeParam(d);
+  const reviewSelectionKey = `${scope}:${reviewReporter}`;
+  if (dashboardReviewSelectedReporter !== reviewSelectionKey) {
     dashboardReviewSelectedIds.clear();
-    dashboardReviewSelectedReporter = reviewReporter;
+    dashboardReviewSelectedReporter = reviewSelectionKey;
   }
   if (!reviewsForReporter.length) dashboardReviewSelectedIds.clear();
   // Global banners
@@ -122,6 +139,9 @@ function drawDashboard(d, opts = {}) {
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
+  const scopeLabel = scope === "all"
+    ? "All instances"
+    : (d.active_instance_display_name || "Current instance");
   const orderedStatuses = WORKFLOW_STATUSES;
   const dash = $("#dash");
   const reporterStats = d.reporter_stats || [];
@@ -132,12 +152,28 @@ function drawDashboard(d, opts = {}) {
   // away — the container is gone, so just bail silently.
   if (!dash) return;
   dash.innerHTML = `
+    <div class="row" style="align-items:center;margin-bottom:12px">
+      <span class="muted small">Stats for</span>
+      <div class="actions" role="group" aria-label="Dashboard instance scope">
+        <button class="secondary small" data-dashboard-scope="current" ${scope === "current" ? "disabled" : ""}>
+          Current instance
+        </button>
+        <button class="secondary small" data-dashboard-scope="all" ${scope === "all" ? "disabled" : ""}>
+          All instances
+        </button>
+      </div>
+      <span class="filter-pill">${htmlEscape(scopeLabel)}</span>
+    </div>
+
     ${needsAttention.length ? `
       <section class="card">
         <h3>Needs attention</h3>
         <div class="actions">
           ${needsAttention.map((x) => `
-            <a href="#/gaps?status=${encodeURIComponent(x.filter?.status || "")}" class="btn">
+            <a href="${gapsHash({
+              status: x.filter?.status || "",
+              instance: x.filter?.instance || scope,
+            })}" class="btn">
               ${htmlEscape(x.message)}
             </a>`).join("")}
         </div>
@@ -147,7 +183,7 @@ function drawDashboard(d, opts = {}) {
       ${orderedStatuses.map((s) => {
         const agentManaged = AGENT_MANAGED_DASHBOARD_STATUSES.has(s);
         return `
-        <a class="card dashboard-status-card${agentManaged ? " dashboard-status-card-agent" : ""}" href="#/gaps?status=${s}" style="text-decoration:none;color:inherit"
+        <a class="card dashboard-status-card${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, instance: scope })}" style="text-decoration:none;color:inherit"
            title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
           ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="Agent-managed automation">Auto</span>` : ""}
           <div class="muted small dashboard-status-label">${s}</div>
@@ -234,12 +270,17 @@ function drawDashboard(d, opts = {}) {
     </details>
 
   `;
+  $$("[data-dashboard-scope]", dash).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      location.hash = dashboardHash(btn.dataset.dashboardScope || "current");
+    });
+  });
   // Click any reporter row → deep-link into the Gaps list filtered by
   // that reporter. We use data-reporter + a delegated listener so the
   // name can contain spaces/quotes without HTML-escaping hazards.
   $$(".reporter-stats-row").forEach((row) => {
     row.addEventListener("click", () => {
-      location.hash = gapsHash({ reporter: row.dataset.reporter });
+      location.hash = gapsHash({ reporter: row.dataset.reporter, instance: scope });
     });
   });
 
