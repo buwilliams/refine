@@ -34,6 +34,13 @@ refine puts automation at the forefront, reduces feedback loops by orders of mag
 git clone https://github.com/buwilliams/refine.git <refine-checkout> && cd <refine-checkout> && uv run refine start
 ```
 
+### Prerequisites
+
+- Git
+- Python
+- uv, a replacement for pip
+- OS: Linux or Windows/WSL2 with systemd and systemd-run, or macOS with launchctl
+
 Use `uv run refine install [port]` for a persistent service; `start [port]` runs a non-installed background process.
 
 ## Workflow
