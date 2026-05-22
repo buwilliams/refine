@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import hashlib
+import errno
 import json
 import os
+import select
 import socket
 import socketserver
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable
 
@@ -47,13 +50,15 @@ def request(path: Path | str, method: str, params: dict[str, Any] | None = None,
         "method": method,
         "params": params or {},
     }
+    wire_payload = (
+        json.dumps(payload, separators=(",", ":")).encode("utf-8") + b"\n"
+    )
+    deadline = time.monotonic() + timeout
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-        sock.settimeout(timeout)
-        sock.connect(str(path))
-        f = sock.makefile("rwb")
-        f.write(json.dumps(payload, separators=(",", ":")).encode("utf-8") + b"\n")
-        f.flush()
-        line = f.readline()
+        sock.setblocking(False)
+        _connect_unix(sock, str(path), deadline)
+        _send_all(sock, wire_payload, deadline)
+        line = _recv_line(sock, deadline)
     if not line:
         raise RuntimeError("runner closed the IPC connection without a response")
     body = json.loads(line.decode("utf-8"))
@@ -69,6 +74,73 @@ def request(path: Path | str, method: str, params: dict[str, Any] | None = None,
     return result if isinstance(result, dict) else {"value": result}
 
 
+_CONNECT_IN_PROGRESS = {
+    errno.EAGAIN,
+    errno.EALREADY,
+    errno.EINPROGRESS,
+    errno.EWOULDBLOCK,
+}
+
+
+def _connect_unix(sock: socket.socket, path: str, deadline: float) -> None:
+    err = sock.connect_ex(path)
+    if err in (0, errno.EISCONN):
+        return
+    if err not in _CONNECT_IN_PROGRESS:
+        raise OSError(err, os.strerror(err))
+    _wait_for_socket(sock, deadline, write=True)
+    err = sock.getsockopt(socket.SOL_SOCKET, socket.SO_ERROR)
+    if err not in (0, errno.EISCONN):
+        raise OSError(err, os.strerror(err))
+
+
+def _send_all(sock: socket.socket, payload: bytes, deadline: float) -> None:
+    view = memoryview(payload)
+    while view:
+        try:
+            sent = sock.send(view)
+        except BlockingIOError:
+            _wait_for_socket(sock, deadline, write=True)
+            continue
+        if sent == 0:
+            raise RuntimeError("runner IPC socket closed while sending request")
+        view = view[sent:]
+
+
+def _recv_line(sock: socket.socket, deadline: float) -> bytes:
+    chunks: list[bytes] = []
+    while True:
+        try:
+            chunk = sock.recv(65536)
+        except BlockingIOError:
+            _wait_for_socket(sock, deadline, write=False)
+            continue
+        if not chunk:
+            break
+        chunks.append(chunk)
+        if b"\n" in chunk:
+            break
+    data = b"".join(chunks)
+    line, _sep, _rest = data.partition(b"\n")
+    return line
+
+
+def _wait_for_socket(
+    sock: socket.socket,
+    deadline: float,
+    *,
+    write: bool,
+) -> None:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("runner IPC request timed out")
+    rlist = [] if write else [sock]
+    wlist = [sock] if write else []
+    ready_r, ready_w, _ready_x = select.select(rlist, wlist, [], remaining)
+    if not ready_r and not ready_w:
+        raise TimeoutError("runner IPC request timed out")
+
+
 class IpcError(Exception):
     def __init__(self, code: str, message: str, details: str | None = None) -> None:
         super().__init__(message)
@@ -80,6 +152,7 @@ class IpcError(Exception):
 class ThreadingUnixServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     daemon_threads = True
     allow_reuse_address = True
+    request_queue_size = 128
 
 
 class JsonRequestHandler(socketserver.StreamRequestHandler):
