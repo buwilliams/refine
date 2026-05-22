@@ -24,6 +24,8 @@ import time
 from pathlib import Path
 
 from refine_server import db
+from refine_runtime.manager import ResourceManager
+from refine_runtime.resources import ResourceSettings
 
 from . import agent_cli, git_ops
 from .chat_mgr import _chat_env
@@ -75,16 +77,17 @@ def attempt_auto_resolve(
         f"file{'' if len(files) == 1 else 's'} via {spec.display_name}...",
         severity="info", category="git")
     try:
-        proc = subprocess.Popen(
+        manager = ResourceManager(ResourceSettings.from_settings(db.list_settings(conn)))
+        proc = manager.popen(
             spec.agent_args(bin_path, prompt, cwd=repo),
-            cwd=str(repo),
+            cwd=repo,
             env=env,
+            kind="conflict-resolver",
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            start_new_session=True,
         )
     except (OSError, FileNotFoundError) as e:
         return {"ok": False,

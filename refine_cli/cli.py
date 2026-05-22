@@ -14,7 +14,7 @@ Subcommands:
 - status  — show what's running (read-only).
 - test    — run the repository's script-style test suite.
 - server  — start the server component in the foreground for debugging.
-- ui      — start the UI backend in-process (used by the systemd unit).
+- ui      — start the UI backend foreground process (supervised in normal use).
 - doctor  — deeper diagnostic snapshot (config, agent CLI, git).
 """
 from __future__ import annotations
@@ -123,8 +123,9 @@ def main(argv: list[str] | None = None) -> int:
             "Starts the host-native UI backend, then prints a status block. "
             "If this checkout has an installed systemd user unit, the command "
             "starts that service; otherwise it starts a detached background "
-            "process. The backend owns the runner in-process. Pass a port to "
-            "run multiple Refine instances on one host."
+            "supervisor. The supervisor keeps the UI/control process separate "
+            "from the work runner. Pass a port to run multiple Refine "
+            "instances on one host."
         ),
     )
     p_start.add_argument(
@@ -186,6 +187,12 @@ def main(argv: list[str] | None = None) -> int:
 
     p_ui = sub.add_parser("ui", help="Start the UI backend in the foreground.")
     p_ui.set_defaults(fn=cmd_ui)
+
+    p_supervisor = sub.add_parser(
+        "supervisor",
+        help=argparse.SUPPRESS,
+    )
+    p_supervisor.set_defaults(fn=cmd_supervisor)
 
     # Backwards-compatible aliases without advertising the old names in help.
     sub._name_parser_map["runner"] = p_server  # noqa: SLF001
@@ -422,7 +429,7 @@ def _write_and_enable_ui_unit(
         f"Environment=REFINE_UI_PORT={port}\n"
         f"Environment=REFINE_UI_SCOPE={port}\n"
         f"Environment=REFINE_CONFIG_PATH={client_repo / '.refine' / config.CONFIG_FILENAME}\n"
-        f"ExecStart={uv} run refine ui\n"
+        f"ExecStart={uv} run refine supervisor\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
         "TimeoutStopSec=30s\n"
@@ -801,7 +808,8 @@ def _running_config(pid: int | None) -> "config.Config | None":
 def cmd_server_foreground(args: argparse.Namespace) -> int:
     """Run the server component in the foreground for debugging.
 
-    The production path is `refine ui`, which owns the runner in-process.
+    The production path is `refine supervisor`, which keeps the UI/control
+    process separate from the work runner.
     """
     _load_config_or_exit(args)
     from refine_server.__main__ import main as server_main
@@ -921,9 +929,10 @@ def _start_background_ui(
     if cfg is not None:
         env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
     env.setdefault("PYTHONUNBUFFERED", "1")
+    command = [uv, "run", "refine", "ui" if cfg is None else "supervisor"]
     with log_path.open("ab") as log:
         proc = subprocess.Popen(
-            [uv, "run", "refine", "ui"],
+            command,
             cwd=str(clone),
             stdin=subprocess.DEVNULL,
             stdout=log,
@@ -933,6 +942,12 @@ def _start_background_ui(
         )
     pid_path.write_text(f"{proc.pid}\n", encoding="utf-8")
     return proc.pid
+
+
+def cmd_supervisor(args: argparse.Namespace) -> int:  # noqa: ARG001
+    from refine_runtime.supervisor import main as supervisor_main
+
+    return supervisor_main()
 
 
 def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> bool:

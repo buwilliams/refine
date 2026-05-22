@@ -5,6 +5,7 @@ The runner is the sole writer of gap.json.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -269,7 +270,10 @@ class Runner:
     def _h_diagnostics(self, _: dict) -> dict:
         with self._diag_lock:
             return {
-                "mode": "in-process",
+                "mode": (
+                    "worker-process"
+                    if os.environ.get("REFINE_RUNNER_SOCKET") else "in-process"
+                ),
                 "last_call_at": self._last_call_at,
                 "recent_errors": list(self._recent_errors[-10:]),
             }

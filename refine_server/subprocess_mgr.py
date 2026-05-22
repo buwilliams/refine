@@ -23,6 +23,8 @@ from typing import Callable
 
 from refine_server import activity, db, perf_metrics
 from refine_server.gaps import now_iso
+from refine_runtime.manager import ResourceManager
+from refine_runtime.resources import ResourceSettings
 
 from . import gap_writer  # local module; sole owner of gap.json writes
 
@@ -299,16 +301,18 @@ class SubprocessManager:
         )
         bin_path = agent_cli.resolve_binary(spec, env)
         args = spec.agent_args(bin_path, prompt, cwd=cwd)
-        proc = subprocess.Popen(
+        settings = db.list_settings(self._get_conn())
+        manager = ResourceManager(ResourceSettings.from_settings(settings))
+        proc = manager.popen(
             args,
-            cwd=str(cwd),
+            cwd=cwd,
             env=env,
+            kind="agent",
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,  # line-buffered
-            start_new_session=True,  # so we can kill the process group
         )
         now = time.monotonic()
         handle = RunHandle(
@@ -628,7 +632,7 @@ class SubprocessManager:
     def _kill(self, h: RunHandle, reason: str) -> None:
         h.killed_reason = reason
         try:
-            # Kill the whole process group (start_new_session=True at spawn)
+            # Kill the whole process group created by the resource backend.
             os.killpg(os.getpgid(h.proc.pid), signal.SIGTERM)
         except (ProcessLookupError, PermissionError):
             pass

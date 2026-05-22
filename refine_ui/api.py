@@ -25,6 +25,7 @@ from refine_server.backend_protocol import (
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
+from refine_runtime import resources as runtime_resources
 
 from .backend_client import BackendError, get_client
 from . import background_jobs, runtime
@@ -814,7 +815,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
 
     runner = {"started": False, "message": ""}
     if body.get("start_runner") is not False:
-        runner = {"started": True, "message": "Backend runner started in the UI process."}
+        runner = {"started": True, "message": "Backend runner started."}
 
     return 200, {
         "attached": True,
@@ -2240,6 +2241,8 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "parallel_run_cap", "branch_name_pattern",
         "agent_idle_timeout_seconds", "agent_hard_cap_seconds",
         "agent_limit_pause_seconds",
+        "worker_memory_limit_mb", "ui_memory_limit_mb",
+        "worker_cpu_priority", "resource_isolation_mode",
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
         "project_update_pulse_interval_seconds",
@@ -2312,6 +2315,16 @@ def update_settings(body: dict) -> tuple[int, dict]:
             if n < 1 or n > 100:
                 return err(400, "parallel_run_cap must be between 1 and 100")
             normalized[k] = str(n)
+        elif k in {
+            "worker_memory_limit_mb",
+            "ui_memory_limit_mb",
+            "worker_cpu_priority",
+            "resource_isolation_mode",
+        }:
+            try:
+                normalized[k] = runtime_resources.validate_setting(k, v)
+            except ValueError as e:
+                return err(400, str(e))
         elif k == "target_app_cwd":
             cwd = str(v or "").strip()
             if cwd and "\0" in cwd:

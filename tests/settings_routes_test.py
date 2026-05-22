@@ -86,6 +86,12 @@ def main() -> int:
     assert "Feature flag changes are saved with Save runtime." in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
+    assert 'id="s-worker-memory"' in settings_js
+    assert 'id="s-ui-memory"' in settings_js
+    assert 'id="s-worker-cpu-priority"' in settings_js
+    assert 'id="s-resource-isolation"' in settings_js
+    assert '["very_low", "Very low"]' in settings_js
+    assert '["best_effort", "Best effort"]' in settings_js
     assert 'class="danger" id="s-rebuild-cache"' in settings_js
     assert 'api("POST", "/api/cache/rebuild", { background: true })' in settings_js
     assert "function drawSqliteCacheProgress" in settings_js
@@ -116,6 +122,10 @@ def main() -> int:
     feature_toggle_body = settings_js.split('$$("[data-feature-cell]").forEach', 1)[1]
     feature_toggle_body = feature_toggle_body.split('$$("[data-feature-clear]").forEach', 1)[0]
     assert 'api("POST", "/api/features/override"' in runtime_save_body
+    assert 'worker_memory_limit_mb: $("#s-worker-memory").value' in runtime_save_body
+    assert 'ui_memory_limit_mb: $("#s-ui-memory").value' in runtime_save_body
+    assert 'worker_cpu_priority: $("#s-worker-cpu-priority").value' in runtime_save_body
+    assert 'resource_isolation_mode: $("#s-resource-isolation").value' in runtime_save_body
     assert 'agent_limit_pause_seconds: $("#s-agent-limit-pause").value' in runtime_save_body
     assert 'api("POST", "/api/features/override"' not in feature_toggle_body
     assert 'await api("PATCH", "/api/settings", {' in application_save_body

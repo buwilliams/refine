@@ -17,6 +17,9 @@ dist/
 # Host runner state (pidfile + log) for this clone. Host-specific; do not commit.
 /run/
 
+# Local investigation artifacts and copied production logs.
+/debug/
+
 # Local volume root if anyone tries refine against this repo itself
 *.sqlite
 *.sqlite-wal

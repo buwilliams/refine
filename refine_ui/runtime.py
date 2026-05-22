@@ -5,12 +5,29 @@ import os
 from pathlib import Path
 
 from refine_server import config, db
+from refine_server.backend_protocol import M_RUNNING
 
 from .poller import SqlitePoller
 
 _poller: SqlitePoller | None = None
 _runner = None
 _loaded_config_path: Path | None = None
+
+
+class _SocketRunnerClient:
+    def __init__(self, socket_path: str) -> None:
+        self.socket_path = socket_path
+
+    def call(self, method: str, params: dict | None = None) -> dict:
+        from refine_runtime import ipc
+
+        return ipc.request(self.socket_path, method, params or {})
+
+    def status_snapshot(self) -> dict:
+        return self.call(M_RUNNING, {})
+
+    def shutdown(self) -> None:
+        return None
 
 
 def load_configured(
@@ -75,6 +92,12 @@ def ensure_runner():
     global _runner
     if _runner is not None:
         return _runner
+    socket_path = os.environ.get("REFINE_RUNNER_SOCKET")
+    if socket_path:
+        _runner = _SocketRunnerClient(socket_path)
+        return _runner
+    if os.environ.get("REFINE_NO_INPROCESS_RUNNER") == "1":
+        raise config.ConfigError("Backend runner socket is not configured.")
     from refine_server.runner import Runner
 
     _runner = Runner()

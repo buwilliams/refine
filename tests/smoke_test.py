@@ -341,7 +341,7 @@ def main() -> int:
     assert 'Environment="CLAUDE_CODE_USE_FOUNDRY=1"' in unit_text
     assert 'Environment="ANTHROPIC_FOUNDRY_RESOURCE=refine-foundry"' in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
-    assert f"ExecStart={fake_uv} run refine ui" in unit_text
+    assert f"ExecStart={fake_uv} run refine supervisor" in unit_text
     assert "Restart=on-failure" in unit_text
     assert ("enable", "refine-unit-clone-8080-ui") in systemctl_calls
     print("[ok] refine install writes per-port host-native UI backend systemd unit")
@@ -439,7 +439,7 @@ def main() -> int:
     assert pid == 43210
     assert (clone / "run" / "ui-18111.pid").read_text(encoding="utf-8").strip() == "43210"
     assert not (bg_cfg.volume_root / "run" / "ui-18111.pid").exists()
-    assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "ui"]
+    assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "supervisor"]
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
     try:

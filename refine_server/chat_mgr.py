@@ -26,6 +26,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Deque
 
+from refine_runtime.manager import ResourceManager
+from refine_runtime.resources import ResourceSettings
+
 from . import agent_cli
 
 
@@ -144,6 +147,17 @@ def _chat_env() -> dict[str, str]:
     return env
 
 
+def _resource_manager_for_chat() -> ResourceManager:
+    from refine_server import db
+
+    conn = db.connect()
+    try:
+        settings = db.list_settings(conn)
+    finally:
+        conn.close()
+    return ResourceManager(ResourceSettings.from_settings(settings))
+
+
 def _resolve_agent(provider: str | None,
                    env: dict[str, str]) -> tuple[agent_cli.CliSpec, str]:
     spec = agent_cli.get_spec(provider)
@@ -247,16 +261,16 @@ class ChatManager:
             spec, binary = _resolve_agent(s.provider, env)
             args = spec.chat_args(binary, priming_text, cwd=s.cwd)
             try:
-                proc = subprocess.Popen(
+                proc = _resource_manager_for_chat().popen(
                     args,
-                    cwd=str(s.cwd),
+                    cwd=s.cwd,
                     env=env,
+                    kind="chat-prime",
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
-                    start_new_session=True,
                 )
             except (OSError, FileNotFoundError) as e:
                 with s.out_lock:
@@ -331,16 +345,16 @@ class ChatManager:
                 cwd=s.cwd,
             )
             try:
-                s.proc = subprocess.Popen(
+                s.proc = _resource_manager_for_chat().popen(
                     args,
-                    cwd=str(s.cwd),
+                    cwd=s.cwd,
                     env=env,
+                    kind="chat",
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
-                    start_new_session=True,
                 )
             except (OSError, FileNotFoundError) as e:
                 with s.out_lock:

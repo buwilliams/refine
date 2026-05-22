@@ -1,6 +1,8 @@
 """In-process backend client used by HTTP handlers."""
 from __future__ import annotations
 
+from refine_runtime.ipc import IpcError
+
 
 class BackendError(Exception):
     def __init__(self, code: str, message: str, details: str | None = None) -> None:
@@ -19,6 +21,8 @@ class BackendClient:
             return runtime.runner_call(method, params or {})
         except config.ConfigError as e:
             raise BackendError("backend_unavailable", str(e)) from e
+        except IpcError as e:
+            raise BackendError(e.code, e.message, e.details) from e
         except KeyError as e:
             raise BackendError("unknown_method", str(e)) from e
         except ValueError as e:
