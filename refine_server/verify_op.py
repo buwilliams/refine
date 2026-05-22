@@ -130,6 +130,17 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
              f"Switched host HEAD: `{host_branch}` → `{target}` for merge",
              severity="info", category="git", actor=actor)
 
+    # Reconcile the target with upstream before creating any local Refine
+    # bookkeeping commits. If the remote advanced while the Gap's worktree was
+    # running, committing `.refine/` first would make the branch diverge and the
+    # later fast-forward pull would fail.
+    if has_upstream:
+        r = _reconcile_target_before_local_commits(conn, gap_id, target, actor)
+        if not r.get("ok"):
+            return _restore_host_branch_and_return(
+                conn, gap_id, switched_from, pre_switch_stash, actor, r,
+            )
+
     # Auto-commit refine's own state (`.refine/`) — gap.json and friends
     # are tracked content per the spec, and the runner writes them as it
     # goes, so they show up as dirty between rounds. Commit them on the
@@ -233,6 +244,69 @@ def _restore_host_branch_and_return(conn, gap_id, switched_from,
     return ret
 
 
+def _reconcile_target_before_local_commits(
+    conn: sqlite3.Connection,
+    gap_id: str,
+    target: str,
+    actor: str,
+) -> dict:
+    stashed = False
+    if git_ops.working_copy_dirty():
+        sr = git_ops.stash_push(
+            f"refine auto-stash before updating {target}",
+        )
+        if not sr.ok:
+            msg = f"Could not stash uncommitted changes before updating {target}"
+            _log(conn, gap_id, msg, details=sr.stderr,
+                 severity="error", category="git", actor=actor)
+            return {"ok": False, "stage": "precheck",
+                    "message": msg, "details": sr.stderr}
+        stashed = True
+        _log(conn, gap_id,
+             f"Auto-stashed WIP before updating `{target}` from upstream",
+             severity="info", category="git", actor=actor)
+
+    result: dict = {"ok": True}
+    try:
+        r = git_ops.fetch()
+        if not r.ok:
+            _log(conn, gap_id, "git fetch failed during verify", details=r.stderr,
+                 severity="error", category="git", actor=actor)
+            result = {"ok": False, "stage": "fetch",
+                      "message": "git fetch failed", "details": r.stderr}
+            return result
+
+        r = git_ops.pull_ff_only()
+        if not r.ok:
+            _log(conn, gap_id,
+                 "Local branch diverged from remote — manual reconciliation needed",
+                 details=r.stderr, severity="error", category="git", actor=actor)
+            result = {"ok": False, "stage": "pull",
+                      "message": "Local branch diverged from remote",
+                      "details": r.stderr}
+            return result
+
+        _log(conn, gap_id,
+             f"Updated `{target}` from upstream before merging Gap branch",
+             severity="info", category="git", actor=actor)
+        return result
+    finally:
+        if stashed:
+            pop = git_ops.stash_pop()
+            if not pop.ok:
+                _log(conn, gap_id,
+                     "Auto-stash pop failed after updating target branch",
+                     details=pop.stderr,
+                     severity="error", category="git", actor=actor)
+                if result.get("ok"):
+                    result.update(
+                        ok=False,
+                        stage="precheck",
+                        message="Auto-stash pop failed after updating target branch",
+                        details=pop.stderr,
+                    )
+
+
 def approve_review(conn: sqlite3.Connection, gap_id: str, *,
                    actor: str = "refine") -> dict:
     """Approve a reviewed Gap without running any merge operation.
@@ -281,25 +355,11 @@ def approve_review(conn: sqlite3.Connection, gap_id: str, *,
 def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
                  branch: str, *, has_upstream: bool, actor: str,
                  final_status: str = "awaiting-rebuild") -> dict:
-    # 1. fetch (only if there's a remote-tracking upstream).
-    if has_upstream:
-        r = git_ops.fetch()
-        if not r.ok:
-            _log(conn, gap_id, "git fetch failed during verify", details=r.stderr,
-                 severity="error", category="git", actor=actor)
-            return {"ok": False, "stage": "fetch", "message": "git fetch failed",
-                    "details": r.stderr}
+    # The target branch has already been fast-forwarded from upstream before
+    # any local Refine bookkeeping commits are created. From here, push-time
+    # races are handled by push_ops.push_current_after_pull.
 
-        # 2. pull --ff-only
-        r = git_ops.pull_ff_only()
-        if not r.ok:
-            _log(conn, gap_id,
-                 "Local branch diverged from remote — manual reconciliation needed",
-                 details=r.stderr, severity="error", category="git", actor=actor)
-            return {"ok": False, "stage": "pull",
-                    "message": "Local branch diverged from remote", "details": r.stderr}
-
-    # 3. merge (idempotent if already merged) — always runs.
+    # Merge (idempotent if already merged) — always runs.
     if git_ops.is_already_merged(branch):
         _log(conn, gap_id, "Branch already merged into current — proceeding",
              severity="info", category="git", actor=actor)

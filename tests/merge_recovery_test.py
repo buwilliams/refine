@@ -168,6 +168,40 @@ def main() -> int:
         assert result["final_status"] == "awaiting-rebuild", result
         assert db_status(conn, gid_default) == "awaiting-rebuild"
 
+        # Remote target advances while a Gap branch is waiting, and the host has
+        # dirty `.refine` state. The Merge agent must update target first; if it
+        # commits `.refine` before pulling, `git pull --ff-only` sees a false
+        # local/remote divergence and fails the Gap.
+        gid_remote_advance = "01MERGEREMOTEADVANCEAAAA"
+        branch_remote_advance = "refine/remote-advance"
+        make_ready_branch(
+            conn,
+            gid_remote_advance,
+            branch_remote_advance,
+            "feature-remote-advance.txt",
+            "gap\n",
+        )
+        peer = tmp / "peer"
+        git(tmp, "clone", str(tmp / "origin.git"), "peer")
+        git(peer, "config", "user.email", "t@x")
+        git(peer, "config", "user.name", "t")
+        (peer / "remote-advance.txt").write_text("remote\n", encoding="utf-8")
+        git(peer, "add", "remote-advance.txt")
+        git(peer, "commit", "-m", "remote advance")
+        git(peer, "push")
+        (client / ".refine" / "dirty-before-merge.txt").write_text(
+            "local refine state\n",
+            encoding="utf-8",
+        )
+        merger._merge_one(gid_remote_advance)
+        assert db_status(conn, gid_remote_advance) == "awaiting-rebuild"
+        origin_files = git(
+            client, "ls-tree", "-r", "--name-only", "origin/main",
+        ).stdout
+        assert "remote-advance.txt" in origin_files
+        assert "feature-remote-advance.txt" in origin_files
+        assert ".refine/dirty-before-merge.txt" in origin_files
+
         # Merge conflict path: unresolved conflict is recoverable user work, so
         # the Gap fails instead of becoming review-ready or blocking queue.
         gid_conflict = "01MERGECONFLICTAAAAAAAAAA"
