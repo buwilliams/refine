@@ -24,7 +24,7 @@ from refine_server.backend_protocol import (
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, merger as _merger, mutation_guard, preflight, project_sync, recovery, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, mutation_guard, preflight, project_sync, push_ops, recovery, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
 from .chat_mgr import ChatManager
 from .governance_agent import GovernanceAgent
 
@@ -1065,8 +1065,20 @@ class Runner:
             # Push if there's an upstream; local-only repos still get
             # the revert in their working state.
             if git_ops.upstream_branch(target) is not None:
-                p = git_ops.push_current()
-                if p.ok:
+                p = push_ops.push_current_after_pull(
+                    self._conn,
+                    actor="refine",
+                    gap_id=gap_id,
+                    target=target,
+                    merge_message=f"Merge upstream before pushing undo of {gap_id}",
+                    prompt_context=(
+                        f"A pull is in progress before pushing an undo on `{target}`.\n"
+                        "HEAD contains a local revert of a Refine merge commit.\n"
+                        "The incoming side contains newer upstream commits.\n"
+                        "Preserve the local revert and integrate upstream changes."
+                    ),
+                )
+                if p.get("ok") and p.get("pushed"):
                     pushed = True
                 else:
                     push_warning = (
@@ -1078,7 +1090,7 @@ class Runner:
                         self._conn, message=push_warning,
                         severity="warn", category="git",
                         gap_id=gap_id, actor="refine",
-                        details=p.stderr[:2000],
+                        details=str(p.get("details") or p.get("message") or "")[:2000],
                     )
         finally:
             if switched_from:

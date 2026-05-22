@@ -950,7 +950,7 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
 
 
 def _commit_refine_state(repo: Path) -> None:
-    from refine_server import git_ops
+    from refine_server import git_ops, push_ops
 
     config.ensure_refine_gitignore(repo / ".refine")
     dirty_refine = _git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
@@ -962,8 +962,32 @@ def _commit_refine_state(repo: Path) -> None:
         state_message="refine: sync project state before switch",
         cwd=repo,
     )
-    if result.ok:
+    if result.ok and result.stderr == "(nothing to commit)":
         return
+    if result.ok:
+        conn = _conn()
+        try:
+            push = push_ops.push_current_after_pull(
+                conn,
+                actor="refine",
+                cwd=repo,
+                merge_message="Merge upstream before pushing Refine project state",
+                prompt_context=(
+                    "A pull is in progress before pushing Refine project state.\n"
+                    "HEAD contains local `.refine/` state commits created by Refine.\n"
+                    "The incoming side contains newer upstream commits.\n"
+                    "Preserve durable `.refine/` state from both sides. If JSON files "
+                    "conflict, keep valid JSON and include all non-duplicate entries."
+                ),
+            )
+        finally:
+            conn.close()
+        if push.get("ok"):
+            return
+        raise _SwitchBlocked(
+            "Could not push current app Refine state.",
+            str(push.get("details") or push.get("message") or "git push failed").strip(),
+        )
     raise _SwitchBlocked(
         "Could not commit current app Refine state.",
         (result.stderr or result.stdout or "git commit failed").strip(),

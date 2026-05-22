@@ -58,6 +58,25 @@ def main() -> int:
             encoding="utf-8",
         ) == "from peer\n"
 
+        peer_marker2 = peer / ".refine" / "sync-peer-before-push.txt"
+        peer_marker2.write_text("peer before push\n", encoding="utf-8")
+        git(peer, "add", ".refine/sync-peer-before-push.txt")
+        git(peer, "commit", "-m", "peer update before local state push")
+        git(peer, "push")
+        local_marker = client / ".refine" / "sync-local-before-push.txt"
+        local_marker.write_text("local before push\n", encoding="utf-8")
+        result = project_sync.sync_latest(conn)
+        assert result["ok"], result
+        assert result["committed_state"] is True, result
+        assert result["pushed_state"] is True, result
+        assert peer_marker2.relative_to(peer).as_posix() in git(
+            client, "ls-tree", "-r", "--name-only", "HEAD",
+        ).stdout
+        assert ".refine/sync-local-before-push.txt" in git(
+            client, "ls-tree", "-r", "--name-only", "origin/main",
+        ).stdout
+        git(peer, "pull", "--ff-only")
+
         from refine_server import config, gap_writer, gaps, project_state
 
         config.get(path=peer / ".refine" / "refine.toml", reload=True)

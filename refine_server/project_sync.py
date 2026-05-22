@@ -5,7 +5,7 @@ import sqlite3
 
 from refine_server import activity, config, db, perf_metrics, project_state
 
-from . import git_ops
+from . import git_ops, push_ops
 
 _PULSE_BRANCH_KEY = "__refine_project_pulse_branch"
 _PULSE_HEAD_KEY = "__refine_project_pulse_head"
@@ -75,6 +75,49 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
             "upstream": "",
             "committed_state": committed_state,
             "pulled": False,
+            "message": msg,
+        })
+
+    if committed_state:
+        push = push_ops.push_current_after_pull(
+            conn,
+            actor=actor,
+            target=branch,
+            merge_message="Merge upstream before pushing Refine project state",
+            prompt_context=(
+                "A pull is in progress before pushing Refine project state.\n"
+                "HEAD contains local `.refine/` state commits created by Refine.\n"
+                "The incoming side contains newer upstream commits.\n"
+                "Preserve durable `.refine/` state from both sides. If JSON files "
+                "conflict, keep valid JSON and include all non-duplicate entries."
+            ),
+        )
+        if not push.get("ok"):
+            return finish({
+                "ok": False,
+                "stage": push.get("stage") or "push",
+                "branch": branch,
+                "upstream": upstream,
+                "committed_state": committed_state,
+                "message": "Could not push local Refine project state.",
+                "details": push.get("details") or push.get("message"),
+            })
+        config.get(reload=True)
+        rebuild_start = perf_metrics.now()
+        project_state.rebuild_sqlite_cache(conn)
+        metric_details["rebuild_ms"] = round(perf_metrics.elapsed_ms(rebuild_start), 2)
+        msg = f"Synced `{branch}` with `{upstream}`, pushed local Refine state, and rebuilt the cache."
+        activity.append(
+            conn, message=msg, severity="info", category="git", actor=actor,
+        )
+        return finish({
+            "ok": True,
+            "stage": "synced",
+            "branch": branch,
+            "upstream": upstream,
+            "committed_state": committed_state,
+            "pulled": True,
+            "pushed_state": bool(push.get("pushed")),
             "message": msg,
         })
 

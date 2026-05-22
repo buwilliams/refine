@@ -51,6 +51,8 @@ def attempt_auto_resolve(
     merge_message: str,
     actor: str,
     log: callable,
+    prompt_context: str | None = None,
+    cwd: Path | None = None,
 ) -> dict:
     """Returns `{"ok": True}` when the merge is resolved and committed,
     or `{"ok": False, "message": str, "details": str?}` when the
@@ -61,14 +63,17 @@ def attempt_auto_resolve(
     verify_op `_log` partial — keeps every step audit-trailed against
     the Gap's latest round + the global activity feed.
     """
-    repo = git_ops.client_repo_path()
-    files = git_ops.unmerged_paths()
+    repo = cwd or git_ops.client_repo_path()
+    files = git_ops.unmerged_paths(cwd=repo)
     if not files:
         # No conflicts to resolve — caller mis-routed us here.
         return {"ok": False, "message":
                 "auto-resolve called with no unmerged paths"}
 
-    prompt = _build_prompt(branch=branch, target=target, files=files)
+    prompt = _build_prompt(
+        branch=branch, target=target, files=files,
+        context=prompt_context,
+    )
 
     env = _chat_env()
     spec = agent_cli.get_spec(db.get_setting(conn, "agent_cli"))
@@ -95,17 +100,17 @@ def attempt_auto_resolve(
 
     _stream_and_supervise(proc, log, output_format=spec.output_format)
 
-    return _finalize(merge_message=merge_message, log=log)
+    return _finalize(merge_message=merge_message, log=log, cwd=repo)
 
 
 # ---- internals --------------------------------------------------------------
 
 
-def _build_prompt(*, branch: str, target: str, files: list[str]) -> str:
+def _build_prompt(*, branch: str, target: str, files: list[str],
+                  context: str | None = None) -> str:
     file_list = "\n".join(f"  - {f}" for f in files)
-    return f"""You are resolving a git merge conflict in this repository.
-
-A merge is in progress: branch `{branch}` is being merged into `{target}`.
+    if context is None:
+        context = f"""A merge is in progress: branch `{branch}` is being merged into `{target}`.
 The following files have unresolved conflict markers:
 
 {file_list}
@@ -117,7 +122,19 @@ For EACH file in the list above:
        and approved — its behavior changes should be preserved.
      - `{target}` represents the current state of the project.
      - Default to integrating BOTH changes. If they conflict semantically,
-       prefer the incoming branch's intent (it's the resolved Gap).
+       prefer the incoming branch's intent (it's the resolved Gap)."""
+    else:
+        context = f"""{context.strip()}
+The following files have unresolved conflict markers:
+
+{file_list}
+
+For EACH file in the list above:
+  1. Read the file and locate the `<<<<<<<`, `=======`, `>>>>>>>` markers.
+  2. Decide the correct merged content by considering both sides."""
+    return f"""You are resolving a git merge conflict in this repository.
+
+{context}
   3. Replace the entire conflict block (`<<<<<<<` through `>>>>>>>`,
      inclusive) with the resolved content.
   4. Run `git add <file>` to stage the resolved file.
@@ -244,10 +261,10 @@ def _short_tool_input(name: str, inp: dict) -> str:
     return ""
 
 
-def _finalize(*, merge_message: str, log) -> dict:
+def _finalize(*, merge_message: str, log, cwd: Path | None = None) -> dict:
     """Inspect the post-agent state and either commit the merge or
     return a failure with enough detail to surface in the round log."""
-    remaining = git_ops.unmerged_paths()
+    remaining = git_ops.unmerged_paths(cwd=cwd)
     if remaining:
         msg = (f"Auto-resolve left {len(remaining)} file"
                f"{'' if len(remaining) == 1 else 's'} unresolved — "
@@ -257,9 +274,9 @@ def _finalize(*, merge_message: str, log) -> dict:
         return {"ok": False, "message": msg,
                 "details": "\n".join(remaining)}
 
-    op = git_ops.in_progress_op()
+    op = git_ops.in_progress_op(cwd=cwd)
     if op and op[0] == "merge":
-        cr = git_ops.commit_pending_merge(merge_message)
+        cr = git_ops.commit_pending_merge(merge_message, cwd=cwd)
         if not cr.ok:
             msg = ("Auto-resolve cleared all conflicts but the commit "
                    "failed")
@@ -271,7 +288,7 @@ def _finalize(*, merge_message: str, log) -> dict:
 
     # MERGE_HEAD gone and no unmerged paths — the agent either committed
     # itself (despite our instructions) or aborted/reset. Check HEAD.
-    parents = git_ops.head_parents()
+    parents = git_ops.head_parents(cwd=cwd)
     if len(parents) >= 2:
         log("Auto-resolve agent committed the merge itself — accepting",
             severity="warn", category="git")

@@ -11,7 +11,7 @@ import sqlite3
 from refine_server import activity, changes_index, db
 from refine_server.gaps import now_iso
 
-from . import conflict_resolver, gap_writer, git_ops
+from . import conflict_resolver, gap_writer, git_ops, push_ops
 
 
 def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
@@ -352,26 +352,36 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
                         "details": stderr}
 
     # 4. push — only when an upstream exists. Without one, the local
-    # merge IS the ship.
+    # merge IS the ship. Every push first re-pulls upstream so a remote
+    # race can be merged before we publish.
     pushed = False
     if has_upstream:
-        r = git_ops.push_current()
-        if not r.ok and ("non-fast-forward" in r.stderr or
-                         "fetch first" in r.stderr or
-                         "rejected" in r.stderr):
-            # Retry: re-fetch, re-pull --ff-only, re-merge if needed, re-push.
-            f2 = git_ops.fetch()
-            if f2.ok:
-                p2 = git_ops.pull_ff_only()
-                if p2.ok and not git_ops.is_already_merged(branch):
-                    git_ops.merge_branch(branch, message=f"Merge {branch}")
-                r = git_ops.push_current()
-        if not r.ok:
+        upstream = git_ops.upstream_branch(current) or "upstream"
+        r = push_ops.push_current_after_pull(
+            conn,
+            actor=actor,
+            gap_id=gap_id,
+            target=current,
+            conflict_branch=upstream,
+            merge_message=f"Merge {upstream} before pushing Refine Gap {gap_id}",
+            prompt_context=(
+                f"A pull is in progress before pushing `{current}` to `{upstream}`.\n"
+                "HEAD contains the Refine Gap merge that is ready to publish.\n"
+                f"The incoming side contains newer upstream commits from `{upstream}`.\n"
+                "Preserve the local Refine Gap changes and integrate the upstream changes."
+            ),
+            log=lambda message, *, severity, category, details=None: _log(
+                conn, gap_id, message,
+                severity=severity, category=category, actor=actor,
+                details=details,
+            ),
+        )
+        if not r.get("ok"):
             _log(conn, gap_id,
                  "Push failed — environment issue; Gap is not ready for review",
-                 details=r.stderr, severity="error", category="git", actor=actor)
+                 details=r.get("details"), severity="error", category="git", actor=actor)
             return {"ok": False, "stage": "push",
-                    "message": "Push failed", "details": r.stderr}
+                    "message": "Push failed", "details": r.get("details")}
         pushed = True
 
     # Merge landed; clean up branch + worktree and park the Gap in the requested

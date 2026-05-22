@@ -10,7 +10,7 @@ from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo
 
 
 def main() -> int:
-    tmp, client = make_client_repo("refine-state-committer-")
+    tmp, client = make_client_repo("refine-state-committer-", with_remote=True)
     conn = init_refine(client)
     try:
         from refine_server import gap_writer, gaps, state_committer
@@ -24,6 +24,7 @@ def main() -> int:
         )
         git(client, "add", ".refine")
         git(client, "commit", "-m", "init refine state")
+        git(client, "push")
 
         runtime_paths = [
             ".refine/app.pid",
@@ -36,6 +37,7 @@ def main() -> int:
             p.write_text("tracked runtime\n", encoding="utf-8")
         git(client, "add", "-f", *runtime_paths)
         git(client, "commit", "-m", "track runtime noise")
+        git(client, "push")
 
         for rel in runtime_paths:
             (client / rel).write_text("changed runtime\n", encoding="utf-8")
@@ -44,6 +46,9 @@ def main() -> int:
         assert git(client, "log", "-1", "--format=%s").stdout.strip() == (
             "refine: stop tracking runtime state"
         )
+        assert git(client, "rev-parse", "HEAD").stdout == git(
+            client, "rev-parse", "origin/main",
+        ).stdout
         assert git(client, "ls-files", *runtime_paths).stdout.strip() == ""
 
         head = git(client, "rev-parse", "HEAD").stdout.strip()
@@ -57,6 +62,9 @@ def main() -> int:
         assert git(client, "log", "-1", "--format=%s").stdout.strip() == (
             "refine: sync project state"
         )
+        assert git(client, "rev-parse", "HEAD").stdout == git(
+            client, "rev-parse", "origin/main",
+        ).stdout
         assert "gap.json" in git(client, "show", "--name-only", "--format=", "HEAD").stdout
         assert "logs.jsonl" not in git(client, "show", "--name-only", "--format=", "HEAD").stdout
     finally:

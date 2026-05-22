@@ -526,6 +526,14 @@ def pull_ff_only(cwd: Path | None = None) -> GitResult:
     return _run(["pull", "--ff-only", "--no-rebase"], cwd=cwd or client_repo_path())
 
 
+def pull_merge(cwd: Path | None = None) -> GitResult:
+    return _run(["pull", "--no-rebase", "--no-edit"], cwd=cwd or client_repo_path())
+
+
+def merge_abort(cwd: Path | None = None) -> GitResult:
+    return _run(["merge", "--abort"], cwd=cwd or client_repo_path())
+
+
 def merge_branch(branch: str, *, cwd: Path | None = None,
                  message: str | None = None,
                  no_ff: bool = False) -> GitResult:
