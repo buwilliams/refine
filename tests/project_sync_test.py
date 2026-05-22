@@ -77,6 +77,24 @@ def main() -> int:
         ).stdout
         git(peer, "pull", "--ff-only")
 
+        local_clean_marker = client / ".refine" / "sync-local-clean-ahead.txt"
+        local_clean_marker.write_text("local clean ahead\n", encoding="utf-8")
+        git(client, "add", ".refine/sync-local-clean-ahead.txt")
+        git(client, "commit", "-m", "local clean state commit")
+        peer_marker3 = peer / ".refine" / "sync-peer-after-local-commit.txt"
+        peer_marker3.write_text("peer after local commit\n", encoding="utf-8")
+        git(peer, "add", ".refine/sync-peer-after-local-commit.txt")
+        git(peer, "commit", "-m", "peer update after local clean commit")
+        git(peer, "push")
+        result = project_sync.sync_latest(conn)
+        assert result["ok"], result
+        assert result["pulled"] is True, result
+        assert result["pushed_state"] is True, result
+        origin_tree = git(client, "ls-tree", "-r", "--name-only", "origin/main").stdout
+        assert ".refine/sync-local-clean-ahead.txt" in origin_tree
+        assert ".refine/sync-peer-after-local-commit.txt" in origin_tree
+        git(peer, "pull", "--ff-only")
+
         from refine_server import config, gap_writer, gaps, project_state
 
         config.get(path=peer / ".refine" / "refine.toml", reload=True)

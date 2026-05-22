@@ -121,32 +121,28 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
             "message": msg,
         })
 
-    fetch_start = perf_metrics.now()
-    fetched = git_ops.fetch()
-    metric_details["fetch_ms"] = round(perf_metrics.elapsed_ms(fetch_start), 2)
-    if not fetched.ok:
+    sync = push_ops.push_current_after_pull(
+        conn,
+        actor=actor,
+        target=branch,
+        merge_message="Merge upstream before syncing Refine project state",
+        prompt_context=(
+            "A pull is in progress before syncing Refine project state.\n"
+            "HEAD may contain local Refine commits that are not yet upstream.\n"
+            "The incoming side contains newer upstream commits.\n"
+            "Preserve durable `.refine/` state from both sides. If JSON files "
+            "conflict, keep valid JSON and include all non-duplicate entries."
+        ),
+    )
+    if not sync.get("ok"):
         return finish({
             "ok": False,
-            "stage": "fetch",
+            "stage": sync.get("stage") or "sync",
             "branch": branch,
             "upstream": upstream,
             "committed_state": committed_state,
-            "message": "Could not fetch latest target-app updates.",
-            "details": fetched.stderr or fetched.stdout,
-        })
-
-    pull_start = perf_metrics.now()
-    pulled = git_ops.pull_ff_only()
-    metric_details["pull_ms"] = round(perf_metrics.elapsed_ms(pull_start), 2)
-    if not pulled.ok:
-        return finish({
-            "ok": False,
-            "stage": "pull",
-            "branch": branch,
-            "upstream": upstream,
-            "committed_state": committed_state,
-            "message": "Could not fast-forward pull latest target-app updates.",
-            "details": pulled.stderr or pulled.stdout,
+            "message": "Could not sync latest target-app updates.",
+            "details": sync.get("details") or sync.get("message"),
         })
 
     config.get(reload=True)
@@ -164,6 +160,7 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
         "upstream": upstream,
         "committed_state": committed_state,
         "pulled": True,
+        "pushed_state": bool(sync.get("pushed")),
         "message": msg,
     })
 
