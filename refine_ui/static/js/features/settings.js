@@ -22,7 +22,10 @@ async function refreshSettings(options = {}) {
     return;
   }
   try {
-    const [s, diag, reps, feats, project, gov, dash, instances, guidance, performance] = await Promise.all([
+    const [
+      s, diag, reps, feats, project, gov, dash, instances, guidance,
+      performance, processes,
+    ] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
@@ -33,6 +36,7 @@ async function refreshSettings(options = {}) {
       api("GET", "/api/instances"),
       api("GET", "/api/guidance"),
       api("GET", "/api/performance"),
+      api("GET", "/api/processes"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
     state.features = feats;
@@ -41,6 +45,7 @@ async function refreshSettings(options = {}) {
     drawSettings(
       s.settings || {}, diag, reps.reporters || [], feats,
       gov || {}, dash || {}, instances || {}, guidance || {}, performance || {},
+      processes || {},
     );
   } catch (e) {
     const root = document.getElementById("settings-content");
@@ -50,13 +55,14 @@ async function refreshSettings(options = {}) {
 
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
-  { slug: "application",  label: "Application" },
-  { slug: "reporters",    label: "Reporters" },
+  { slug: "processes",    label: "Processes" },
   { slug: "instances",    label: "Instances" },
-  { slug: "runtime",      label: "Runtime" },
   { slug: "performance",  label: "Performance" },
+  { slug: "reporters",    label: "Reporters" },
   { slug: "guidance",     label: "Guidance" },
   { slug: "governance",   label: "Governance" },
+  { slug: "application",  label: "Application" },
+  { slug: "runtime",      label: "Runtime" },
 ];
 
 function normalizeSettingsTab(slug) {
@@ -75,6 +81,12 @@ function readSettingsTab(tabs = SETTINGS_TABS) {
   if (routed) {
     localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, routed);
     return routed;
+  }
+  const parsed = typeof parseHash === "function" ? parseHash() : {};
+  if (parsed.route === "settings" && !parsed.tab) {
+    const first = tabs[0]?.slug;
+    if (first) localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, first);
+    return first;
   }
   const stored = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
   const normalizedStored = normalizeSettingsTab(stored);
@@ -510,108 +522,342 @@ function addGovernanceRuleRow(text = "") {
   row.querySelector("input")?.focus();
 }
 
-function renderRuntimeAgentCards(dash, settings, diag) {
-  const paused = settings.paused === "1";
-  const backend = diag.backend || dash.backend || {};
-  const supervisorMode = backend.process_model === "supervisor";
-  const merger = dash.merger || null;
-  const governance = dash.governance || null;
-  const agents = dash.running || [];
-  const mergerActive = !!(merger && merger.state === "merging" && merger.gap_id);
-  const governanceActive = !!(governance && governance.state === "reviewing" && governance.gap_id);
-  const mergerQueued = merger?.queued || 0;
-  const governanceQueued = governance?.queued || 0;
-  const hasWork = mergerActive || governanceActive || agents.length > 0;
+function renderProcessesTab(processData, settings, diag, dash) {
+  const paused = typeof processData.paused === "boolean"
+    ? processData.paused
+    : settings.paused === "1";
+  const backend = processData.backend || diag.backend || dash.backend || {};
+  const processes = processData.processes || [];
+  const runnerWork = processData.runner_work || [];
+  const runnerReachable = typeof processData.runner_reachable === "boolean"
+    ? processData.runner_reachable
+    : !!diag.reachable;
   const anchorMs = Date.now();
-  const mergerRow = mergerActive ? `
-    <tr class="merger-row">
-      <td>
-        <span class="role-pill merger">merger</span>
-        <a href="#/gaps/${htmlEscape(merger.gap_id)}">${htmlEscape(merger.gap_id.slice(0, 10))}...</a>
-      </td>
-      <td class="js-elapsed-tick"
-          data-base="${merger.elapsed_seconds || 0}"
-          data-anchor-ms="${anchorMs}">${fmtElapsed(merger.elapsed_seconds || 0)}</td>
-      <td class="muted small">-</td>
-      <td><span class="muted small">merging</span></td>
-    </tr>` : "";
-  const governanceRow = governanceActive ? `
-    <tr class="governance-row">
-      <td>
-        <span class="role-pill merger">governance</span>
-        <a href="#/gaps/${htmlEscape(governance.gap_id)}">${htmlEscape(governance.gap_id.slice(0, 10))}...</a>
-      </td>
-      <td class="js-elapsed-tick"
-          data-base="${governance.elapsed_seconds || 0}"
-          data-anchor-ms="${anchorMs}">${fmtElapsed(governance.elapsed_seconds || 0)}</td>
-      <td class="muted small">-</td>
-      <td><span class="muted small">reviewing governance</span></td>
-    </tr>` : "";
-  const agentRows = agents.map((r) => `
-    <tr>
-      <td>
-        <span class="role-pill agent">agent</span>
-        <a href="#/gaps/${htmlEscape(r.gap_id)}">${htmlEscape(r.gap_id.slice(0, 10))}...</a>
-      </td>
-      <td class="js-elapsed-tick"
-          data-base="${r.elapsed_seconds}"
-          data-anchor-ms="${anchorMs}">${fmtElapsed(r.elapsed_seconds)}</td>
-      <td class="js-idle-tick"
-          data-base="${r.idle_seconds}"
-          data-anchor-ms="${anchorMs}">${fmtElapsed(r.idle_seconds)}</td>
-      <td><button class="danger" data-cancel-agent="${r.gap_id}">Cancel</button></td>
-    </tr>`).join("");
-  const queueLine = mergerQueued > 0
-    ? `<p class="muted small" style="margin-top:8px">Merger queue: ${mergerQueued} Gap${mergerQueued === 1 ? "" : "s"} waiting.</p>`
-    : (merger
-        ? `<p class="muted small" style="margin-top:8px">Merger: ${merger.state}${merger.last_outcome ? ` · last outcome <code>${htmlEscape(merger.last_outcome)}</code>` : ""}.</p>`
-        : "");
-  const mergerUnreachable = !merger
-    ? `<p class="muted small" style="margin-top:8px">Merger state unavailable — ${supervisorMode ? "runner worker unreachable" : "backend runner unavailable"}.</p>`
-    : "";
-  const governanceLine = governance
-    ? `<p class="muted small" style="margin-top:8px">Governance: ${governance.configured ? governance.state : "not configured"}${governanceQueued ? ` · queue ${governanceQueued}` : ""}${governance.last_outcome ? ` · last outcome <code>${htmlEscape(governance.last_outcome)}</code>` : ""}.</p>`
-    : "";
+  const rows = buildManagedProcessRows(
+    processes, paused, backend, runnerReachable, diag,
+  ).map((proc) => renderManagedProcessRow(proc)).join("");
+  const agentRows = (processes || [])
+    .filter((proc) => proc.kind === "agent")
+    .map((proc) => renderAgentProcessRow(proc, anchorMs)).join("");
+  const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
   return `
     <section class="settings-section">
+      <h3>Managed processes</h3>
+      ${rows ? `
+        <table class="table process-table managed-process-table">
+          <colgroup>
+            <col class="process-col">
+            <col class="status-col">
+            <col class="pid-col">
+            <col class="details-col">
+            <col class="actions-col">
+          </colgroup>
+          <thead><tr>
+            <th>Process</th><th>Status</th><th>PID</th><th>Details</th><th></th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>` : `<p class="muted">No managed processes found.</p>`}
+    </section>
+
+    <section class="settings-section">
       <h3>Agents</h3>
-      <div class="actions">
-        <button id="btn-pause" class="${paused ? "" : "secondary"}">
-          ${paused ? "Resume" : "Pause"} agents
-        </button>
-        <span class="muted small">
-          ${paused
-            ? "Paused — agent subprocesses are stopped, new subprocesses won't launch, and the merger won't pick up new merges."
-            : "Active — new subprocesses launch on demand and the merger processes Gaps as they finish."}
-        </span>
-      </div>
-      <p class="muted small" style="margin-top:8px">
-        The merger is a single-threaded worker that owns the host worktree,
-        cleans up any half-finished git operation, and merges
-        <code>ready-merge</code> Gaps one at a time so concurrent agent runs
-        can't race on <code>git merge</code>.
-      </p>
+      ${agentRows ? `
+        <table class="table process-table agents-process-table">
+          <colgroup>
+            <col class="agent-col">
+            <col class="status-col">
+            <col class="pid-col">
+            <col class="round-col">
+            <col class="elapsed-col">
+            <col class="idle-col">
+            <col class="agent-actions-col">
+          </colgroup>
+          <thead><tr>
+            <th>Agent</th><th>Status</th><th>PID</th><th>Round</th>
+            <th>Elapsed</th><th>Idle</th><th></th>
+          </tr></thead>
+          <tbody>${agentRows}</tbody>
+        </table>` : `<p class="muted">No active agent subprocesses.</p>`}
+    </section>
 
-      <dl class="kv" style="margin-top:12px">
-        <dt>Process model</dt><dd>${htmlEscape(backendProcessLabel(backend))}</dd>
-        <dt>Runner transport</dt><dd>${htmlEscape(backendTransportLabel(backend))}</dd>
-        <dt>Runner reachable</dt><dd>${diag.reachable ? "yes" : "no"}</dd>
-        ${diag.mode ? `<dt>Runner mode</dt><dd>${htmlEscape(diag.mode)}</dd>` : ""}
-        ${diag.last_call_at ? `<dt>Last backend call</dt><dd>${fmtTime(diag.last_call_at)}</dd>` : ""}
-        ${backend.socket_path ? `<dt>Runner socket</dt><dd><code>${htmlEscape(shortPath(backend.socket_path))}</code></dd>` : ""}
-        ${diag.error?.message ? `<dt>Runner error</dt><dd>${htmlEscape(diag.error.message)}</dd>` : ""}
-      </dl>
-
-      <h4 style="margin:16px 0 8px">Currently running</h4>
-      ${hasWork ? `
-        <table class="table">
-          <thead><tr><th>Worker</th><th>Elapsed</th><th>Idle</th><th></th></tr></thead>
-          <tbody>${governanceRow}${mergerRow}${agentRows}</tbody>
-        </table>` : `<p class="muted">Nothing running.</p>`}
-      ${governanceLine}
-      ${queueLine}
-      ${mergerUnreachable}
+    <section class="settings-section">
+      <h3>Runner workers</h3>
+      ${workRows ? `
+        <table class="table process-table runner-workers-table">
+          <colgroup>
+            <col class="worker-col">
+            <col class="status-col">
+            <col class="gap-col">
+            <col class="elapsed-col">
+            <col class="queue-col">
+            <col class="details-col">
+          </colgroup>
+          <thead><tr>
+            <th>Worker</th><th>Status</th><th>Gap</th>
+            <th>Elapsed</th><th>Queue</th><th>Details</th>
+          </tr></thead>
+          <tbody>${workRows}</tbody>
+        </table>` : `<p class="muted">No active runner work.</p>`}
     </section>`;
+}
+
+function buildManagedProcessRows(processes, paused, backend, runnerReachable, diag) {
+  const rows = (processes || []).filter((proc) => proc.kind !== "agent").map((proc) => {
+    if (proc.kind !== "runner") return proc;
+    return {
+      ...proc,
+      details: runnerProcessDetails(backend, runnerReachable, diag),
+    };
+  });
+  const scheduler = {
+    id: "agent-scheduler",
+    kind: "agent_scheduler",
+    label: "Agent scheduler",
+    status: paused ? "paused" : "active",
+    pid: null,
+    details: paused
+      ? "New agent subprocesses wait; running subprocesses continue."
+      : "New agent subprocesses launch on demand.",
+    actions: [paused ? "resume" : "pause"],
+  };
+  const insertAt = rows.findIndex((proc) => proc.kind === "chat");
+  if (insertAt === -1) rows.push(scheduler);
+  else rows.splice(insertAt, 0, scheduler);
+  return rows;
+}
+
+function runnerProcessDetails(backend = {}, runnerReachable, diag = {}) {
+  const bits = [
+    backendProcessLabel(backend),
+    backendTransportLabel(backend),
+    runnerReachable ? "runner reachable" : "runner unreachable",
+  ];
+  if (diag.mode) bits.push(`mode ${diag.mode}`);
+  if (diag.last_call_at) bits.push(`last call ${fmtTime(diag.last_call_at)}`);
+  if (backend.socket_path) bits.push(`socket ${shortPath(backend.socket_path)}`);
+  if (diag.error?.message) bits.push(`error ${diag.error.message}`);
+  return bits.filter(Boolean).join(" · ");
+}
+
+function renderManagedProcessRow(proc) {
+  const kind = proc.kind || "process";
+  const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
+  const label = proc.session_id
+    ? `<code>${htmlEscape(proc.session_id)}</code>`
+    : htmlEscape(proc.label || processKindLabel(kind));
+  const details = managedProcessDetails(proc);
+  const detailsAttrs = details
+    ? ` class="process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Process details" title="${htmlEscape(details)}"`
+    : "";
+  return `
+    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+      <td>${label}</td>
+      <td data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+      <td>${pid}</td>
+      <td data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
+    </tr>`;
+}
+
+function renderAgentProcessRow(proc, anchorMs) {
+  const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
+  const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
+    ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
+    : `<span class="muted small">-</span>`;
+  const idle = Number.isFinite(Number(proc.idle_seconds))
+    ? `<span class="js-idle-tick" data-base="${Number(proc.idle_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.idle_seconds || 0)}</span>`
+    : `<span class="muted small">-</span>`;
+  const label = proc.gap_id
+    ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
+    : htmlEscape(proc.label || "Agent");
+  const round = proc.round_idx != null
+    ? String(Number(proc.round_idx) + 1)
+    : "";
+  return `
+    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="agent">
+      <td>${label}</td>
+      <td>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+      <td>${pid}</td>
+      <td>${round ? htmlEscape(round) : `<span class="muted small">-</span>`}</td>
+      <td>${elapsed}</td>
+      <td>${idle}</td>
+      <td class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
+    </tr>`;
+}
+
+function managedProcessDetails(proc) {
+  if (proc.details) return proc.details;
+  if (proc.kind === "target_app") return targetAppProcessDetails(proc.target_app || {});
+  if (proc.kind === "chat") {
+    return [proc.provider, proc.mode].filter(Boolean).join(" · ");
+  }
+  return "";
+}
+
+function targetAppProcessDetails(snap = {}) {
+  const bits = [];
+  if (snap.has_status_checks) {
+    const checkAt = snap.last_check_at || snap.last_health_at || "";
+    const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
+    bits.push(checkAt
+      ? `last status check ${checkOk ? "OK" : "FAIL"} ${fmtTime(checkAt)}`
+      : "status checks configured");
+  } else {
+    bits.push("no status checks configured");
+  }
+  if (snap.last_operation?.kind) {
+    bits.push(`last operation ${snap.last_operation.kind} ${snap.last_operation.state || ""}`.trim());
+  }
+  if (snap.last_error) bits.push(`last error ${snap.last_error}`);
+  if (snap.legacy_config_present) bits.push("legacy target-app settings detected");
+  return bits.join(" · ");
+}
+
+function processKindLabel(kind) {
+  return {
+    ui: "UI",
+    supervisor: "supervisor",
+    runner: "runner",
+    target_app: "application",
+    agent_scheduler: "agent scheduler",
+    agent: "agent",
+    chat: "chat",
+  }[kind] || "process";
+}
+
+function processStatusLabel(status) {
+  return {
+    running: "running",
+    unreachable: "unreachable",
+    reviewing: "reviewing",
+    merging: "merging",
+    queued: "queued",
+    degraded: "degraded",
+    starting: "starting",
+    rebuilding: "rebuilding",
+    stopping: "stopping",
+    stopped: "stopped",
+    failed: "failed",
+    unknown: "unknown",
+    active: "active",
+    paused: "paused",
+  }[status] || status || "unknown";
+}
+
+function renderProcessActions(proc) {
+  if (proc.kind === "agent_scheduler") {
+    const paused = proc.status === "paused";
+    return `<button id="btn-pause" class="${paused ? "" : "secondary"}">${paused ? "Resume" : "Pause"} agents</button>`;
+  }
+  if (proc.kind === "agent" && proc.gap_id) {
+    return `<button class="danger" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
+  }
+  if (proc.kind === "chat" && proc.session_id) {
+    return `<button class="danger" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
+  }
+  if (proc.kind === "target_app") {
+    const snap = proc.target_app || {};
+    const inFlight = ["starting", "stopping", "rebuilding"].includes(snap.state);
+    const isRunning = snap.state === "running" || snap.state === "degraded";
+    const isStopped = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
+    const showStop = targetAppShowsStopAction(snap.state);
+    return `
+      <span class="target-app-action-slot">
+        <button id="s-target-run-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !snap.has_start_command ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
+        <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
+      </span>
+      <button class="secondary" id="s-target-run-rebuild" ${inFlight || !snap.has_rebuild_command ? "disabled" : ""}>Rebuild</button>
+      <button class="secondary" id="s-target-health-now">Check</button>`;
+  }
+  return `<span class="muted small">-</span>`;
+}
+
+function targetAppShowsStopAction(state) {
+  return ["running", "degraded", "stopping", "rebuilding"].includes(state);
+}
+
+function setTargetAppActionVisible(button, visible) {
+  button.classList.toggle("target-app-action-hidden", !visible);
+  if (visible) {
+    button.removeAttribute("aria-hidden");
+    button.removeAttribute("tabindex");
+  } else {
+    button.setAttribute("aria-hidden", "true");
+    button.tabIndex = -1;
+  }
+}
+
+function renderRunnerWorkRow(work, anchorMs) {
+  const gap = work.gap_id
+    ? `<a href="#/gaps/${htmlEscape(work.gap_id)}">${htmlEscape(work.gap_id.slice(0, 10))}...</a>`
+    : `<span class="muted small">-</span>`;
+  const elapsed = Number.isFinite(Number(work.elapsed_seconds))
+    ? `<span class="js-elapsed-tick" data-base="${Number(work.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(work.elapsed_seconds || 0)}</span>`
+    : `<span class="muted small">-</span>`;
+  const queued = Number(work.queued || 0);
+  const details = work.details || work.last_outcome || "";
+  const detailsAttrs = details
+    ? ` class="runner-work-details process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Runner worker details" title="${htmlEscape(details)}"`
+    : ` class="runner-work-details"`;
+  return `
+    <tr>
+      <td><span class="role-pill merger">${htmlEscape(runnerWorkKindLabel(work.kind))}</span></td>
+      <td>${htmlEscape(processStatusLabel(work.status || ""))}</td>
+      <td>${gap}</td>
+      <td>${elapsed}</td>
+      <td>${queued ? fmtCount(queued) : `<span class="muted small">-</span>`}</td>
+      <td${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+    </tr>`;
+}
+
+function runnerWorkKindLabel(kind) {
+  return {
+    merger: "merger",
+    governance: "governance",
+    target_app_rebuilder: "target-app rebuilder",
+  }[kind] || "worker";
+}
+
+function bindProcessDetailCells() {
+  updateProcessDetailAffordances();
+  $$(".process-details-cell").forEach((cell) => {
+    cell.addEventListener("click", () => openProcessDetailsIfOverflowing(cell));
+    cell.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter" && ev.key !== " ") return;
+      if (!cell.classList.contains("is-overflowing")) return;
+      ev.preventDefault();
+      openProcessDetailsIfOverflowing(cell);
+    });
+  });
+}
+
+function updateProcessDetailAffordances() {
+  $$(".process-details-cell").forEach((cell) => {
+    const overflow = !!cell.dataset.fullDetails
+      && cell.scrollWidth > cell.clientWidth + 1;
+    cell.classList.toggle("is-overflowing", overflow);
+    if (overflow) {
+      cell.tabIndex = 0;
+      cell.setAttribute("role", "button");
+      cell.setAttribute("aria-label", "View full details");
+      cell.title = "Click to view full details";
+    } else {
+      cell.removeAttribute("tabindex");
+      cell.removeAttribute("role");
+      cell.removeAttribute("aria-label");
+      cell.title = cell.dataset.fullDetails || "";
+    }
+  });
+}
+
+async function openProcessDetailsIfOverflowing(cell) {
+  if (!cell.classList.contains("is-overflowing")) return;
+  const details = cell.dataset.fullDetails || "";
+  if (!details) return;
+  await modalAlert(details, {
+    title: cell.dataset.detailTitle || "Details",
+    okLabel: "Close",
+  });
 }
 
 function backendProcessLabel(backend = {}) {
@@ -710,7 +956,10 @@ function performanceResourceLabel(event = {}) {
   return parts.join(" / ");
 }
 
-function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = {}, guidanceData = {}, performanceData = {}) {
+function drawSettings(
+  s, diag, reps, feats, gov = {}, dash = {}, instanceData = {},
+  guidanceData = {}, performanceData = {}, processData = {},
+) {
   const cli = (s.agent_cli || "claude").toLowerCase();
   const projectApps = state.project?.apps || [];
   const currentProject = state.project?.client_repo || "";
@@ -785,23 +1034,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         <input type="text" id="s-merge-target"
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
-    </section>
-
-    <section class="settings-section">
-      <h3>Current status</h3>
-      <div id="target-app-status-block" class="muted">Loading…</div>
-      <div class="actions" style="margin-top:10px">
-        <button id="s-target-run-start">Start application</button>
-        <button class="secondary" id="s-target-run-rebuild">Rebuild application</button>
-        <button class="danger" id="s-target-run-stop">Stop application</button>
-        <span class="spacer"></span>
-        <button class="secondary" id="s-target-health-now">Check status now</button>
-      </div>
-      <p class="muted small" style="margin-top:6px">
-        Start / Stop live here on purpose — the indicator next to the
-        reporter dropdown is read-only so typical users can't take the
-        application down by accident.
-      </p>
     </section>
 
     <section class="settings-section">
@@ -894,6 +1126,10 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       <div class="actions"><button id="s-save-application">Save application</button></div>
     </section>`)}
 
+    ${pane("processes", `
+      ${renderProcessesTab(processData, s, diag, dash)}
+    `)}
+
     ${pane("guidance", `
     <section class="settings-section">
       <h3>Guidance</h3>
@@ -911,8 +1147,6 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     </section>`)}
 
     ${pane("runtime", `
-    ${renderRuntimeAgentCards(dash, s, diag)}
-
     <section class="settings-section">
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
@@ -1182,6 +1416,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
   `;
   // Tab click handlers — purely DOM-local, no re-fetch.
   bindSettingsTabHandlers();
+  bindProcessDetailCells();
   $("#btn-pause")?.addEventListener("click", async () => {
     const paused = s.paused === "1";
     await withButtonBusy($("#btn-pause"), paused ? "Resuming…" : "Pausing…", async () => {
@@ -1203,6 +1438,23 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
       await withButtonBusy(b, "Cancelling…", async () => {
         try {
           await api("POST", `/api/gaps/${id}/cancel`);
+          await refreshSettings();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$("[data-stop-chat]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const id = b.dataset.stopChat;
+      const ok = await modalConfirm(
+        "Stop this chat subprocess?",
+        { title: "Stop chat", okLabel: "Stop chat", danger: true,
+          cancelLabel: "Keep running" },
+      );
+      if (!ok) return;
+      await withButtonBusy(b, "Stopping…", async () => {
+        try {
+          await api("POST", `/api/chat/${id}/stop`);
           await refreshSettings();
         } catch (e) { await showActionError(e); }
       });
@@ -1547,7 +1799,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     } catch (e) { await showActionError(e); }
   });
 
-  // --- Target application controls on the Application tab -------------------
+  // --- Target application controls on the Processes tab ---------------------
   $("#s-save-application")?.addEventListener("click", async () => {
     await withButtonBusy($("#s-save-application"), "Saving…", async () => {
       try {
@@ -1602,18 +1854,21 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
     const btn = $("#s-target-run-start");
     await withButtonBusy(btn, "Starting…", async () => {
       await runTargetAppAction("start");
+      await refreshSettings({ force: true });
     });
   });
   $("#s-target-run-stop")?.addEventListener("click", async () => {
     const btn = $("#s-target-run-stop");
     await withButtonBusy(btn, "Stopping…", async () => {
       await runTargetAppAction("stop");
+      await refreshSettings({ force: true });
     });
   });
   $("#s-target-run-rebuild")?.addEventListener("click", async () => {
     const btn = $("#s-target-run-rebuild");
     await withButtonBusy(btn, "Rebuilding…", async () => {
       await runTargetAppAction("rebuild");
+      await refreshSettings({ force: true });
     });
   });
   $("#s-project-sync-now")?.addEventListener("click", async () => {
@@ -1637,6 +1892,7 @@ function drawSettings(s, diag, reps, feats, gov = {}, dash = {}, instanceData = 
         toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"),
               ok ? "info" : "error");
         drawTargetAppStatusBlock(r);
+        await refreshSettings({ force: true });
       } catch (e) { await showActionError(e); }
     });
   });
@@ -1673,22 +1929,25 @@ function applyGeneratedTargetAppConfig(cfg) {
   }
 }
 
-// Re-fetch + repaint the target-app status block inside the System panel.
+// Re-fetch + repaint target-app controls inside the System panel.
 // Cheap to call from anywhere — silently no-ops if System isn't rendered.
 async function refreshTargetAppStatus() {
   const block = document.getElementById("target-app-status-block");
-  if (!block) return;
+  const hasControls = document.getElementById("s-target-run-start")
+    || document.getElementById("s-target-run-rebuild")
+    || document.getElementById("s-target-run-stop");
+  if (!block && !hasControls) return;
   try {
     const r = await api("GET", "/api/target-app/status");
     drawTargetAppStatusBlock(r);
   } catch (e) {
-    block.innerHTML = `<span class="muted">Status unavailable: ${htmlEscape(e.message)}</span>`;
+    if (block) {
+      block.innerHTML = `<span class="muted">Status unavailable: ${htmlEscape(e.message)}</span>`;
+    }
   }
 }
 
 function drawTargetAppStatusBlock(snap) {
-  const block = document.getElementById("target-app-status-block");
-  if (!block) return;
   const stateLabel = {
     running:  "Running",
     degraded: "Degraded",
@@ -1722,36 +1981,38 @@ function drawTargetAppStatusBlock(snap) {
       ? ` · last ${snap.auto_rebuild_last_ok ? "OK" : "failed"} at ${fmtTime(snap.auto_rebuild_last_finished_at)}`
       : ""
   }</p>`;
-  block.innerHTML = `
-    <div style="display:flex;align-items:center;gap:10px">
-      <span class="target-app-dot" data-status-dot></span>
-      <strong>${htmlEscape(stateLabel)}</strong>
-      ${snap.has_status_checks ? `<span class="muted small">status checks configured</span>` : `<span class="muted small">No status checks configured</span>`}
-    </div>
-    <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
-    ${healthDetail}
-    ${op}
-    ${autoRebuild}
-    ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
-    ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
-  `;
-  // Apply dot colour from the parent state via a CSS hook — the .target-app-dot
-  // colour rules key off `data-state` on an ancestor, so set it here too.
-  const dot = block.querySelector("[data-status-dot]");
-  if (dot) {
-    dot.style.background = ({
-      running:  "#1f9d4d",
-      degraded: "#d4a106",
-      stopped:  "#c63838",
-      starting: "#d4a106",
-      rebuilding: "#d4a106",
-      stopping: "#d4a106",
-      failed:   "#c63838",
-    }[snap.state]) || "#b8bcc6";
+  const block = document.getElementById("target-app-status-block");
+  if (block) {
+    block.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="target-app-dot" data-status-dot></span>
+        <strong>${htmlEscape(stateLabel)}</strong>
+        ${snap.has_status_checks ? `<span class="muted small">status checks configured</span>` : `<span class="muted small">No status checks configured</span>`}
+      </div>
+      <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
+      ${healthDetail}
+      ${op}
+      ${autoRebuild}
+      ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
+      ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
+    `;
+    // Apply dot colour from the parent state via a CSS hook — the .target-app-dot
+    // colour rules key off `data-state` on an ancestor, so set it here too.
+    const dot = block.querySelector("[data-status-dot]");
+    if (dot) {
+      dot.style.background = ({
+        running:  "#1f9d4d",
+        degraded: "#d4a106",
+        stopped:  "#c63838",
+        starting: "#d4a106",
+        rebuilding: "#d4a106",
+        stopping: "#d4a106",
+        failed:   "#c63838",
+      }[snap.state]) || "#b8bcc6";
+    }
   }
-  // Reflect state on the Start / Stop buttons: only one applies at a
-  // time. Both are disabled while a transition is in flight so the
-  // user can't fire a second action mid-agent-run.
+  // Keep the target-app action set visually stable. State changes only
+  // enable/disable buttons so the action column does not flicker.
   const startBtn = document.getElementById("s-target-run-start");
   const rebuildBtn = document.getElementById("s-target-run-rebuild");
   const stopBtn  = document.getElementById("s-target-run-stop");
@@ -1759,25 +2020,59 @@ function drawTargetAppStatusBlock(snap) {
     const isRunning  = snap.state === "running" || snap.state === "degraded";
     const isStopped  = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
     const inFlight   = snap.state === "starting" || snap.state === "stopping" || snap.state === "rebuilding";
-    startBtn.style.display = (isStopped || inFlight) ? "" : "none";
-    stopBtn.style.display  = (isRunning || inFlight) ? "" : "none";
-    startBtn.disabled = inFlight || !snap.has_start_command;
+    const showStop = targetAppShowsStopAction(snap.state);
+    setTargetAppActionVisible(startBtn, !showStop);
+    setTargetAppActionVisible(stopBtn, showStop);
+    startBtn.disabled = showStop || isRunning || inFlight || !snap.has_start_command;
     rebuildBtn.disabled = inFlight || !snap.has_rebuild_command;
-    stopBtn.disabled  = inFlight || !snap.has_stop_command;
+    stopBtn.disabled  = !showStop || isStopped || inFlight || !snap.has_stop_command;
     if (!snap.has_start_command) {
       startBtn.title = "Configure a start command above first.";
+    } else if (isRunning) {
+      startBtn.title = "Application is already running.";
+    } else if (inFlight) {
+      startBtn.title = "Application state is changing.";
     } else {
       startBtn.title = "";
     }
     if (!snap.has_stop_command) {
       stopBtn.title = "Configure a stop command above first.";
+    } else if (isStopped) {
+      stopBtn.title = "Application is already stopped.";
+    } else if (inFlight) {
+      stopBtn.title = "Application state is changing.";
     } else {
       stopBtn.title = "";
     }
     if (!snap.has_rebuild_command) {
       rebuildBtn.title = "Configure a rebuild command above first.";
+    } else if (inFlight) {
+      rebuildBtn.title = "Application state is changing.";
     } else {
       rebuildBtn.title = "";
+    }
+  }
+  const targetRow = document.querySelector('[data-process-id="target-app"]');
+  if (targetRow) {
+    const statusCell = targetRow.querySelector("[data-process-status]");
+    const detailsCell = targetRow.querySelector("[data-process-details]");
+    if (statusCell) statusCell.textContent = processStatusLabel(snap.state || "unknown");
+    if (detailsCell) {
+      const details = targetAppProcessDetails(snap);
+      detailsCell.textContent = details || "-";
+      detailsCell.classList.toggle("muted", !details);
+      detailsCell.classList.toggle("small", !details);
+      detailsCell.classList.toggle("process-details-cell", !!details);
+      if (details) {
+        detailsCell.dataset.fullDetails = details;
+        detailsCell.dataset.detailTitle = "Process details";
+        detailsCell.title = details;
+      } else {
+        delete detailsCell.dataset.fullDetails;
+        delete detailsCell.dataset.detailTitle;
+        detailsCell.title = "";
+      }
+      updateProcessDetailAffordances();
     }
   }
 }

@@ -366,17 +366,19 @@ Single landing view summarizing:
 ### Gap Manager
 
 - **CRUD** — Gaps are fully CRUD. Rounds are **append-only**: only the **latest** round can be edited, and only while it is still unaddressed (Gap status `todo` or `failed`); all prior rounds are sealed, read-only.
-- **Cancel** — available on the Gap detail page for any non-terminal status (`todo`, `in-progress`, `review`, `failed`); moves the Gap to `cancelled` and cleans up worktree+branch. Agent Manager's Cancel is a shortcut for the `in-progress` case.
+- **Cancel** — available on the Gap detail page for any non-terminal status (`todo`, `in-progress`, `review`, `failed`); moves the Gap to `cancelled` and cleans up worktree+branch. Processes tab Cancel is a shortcut for the `in-progress` case.
 - **Delete by status** — deleting an `in-progress` Gap cancels it first (kills the subprocess, releases the lock) and then removes the record. Deleting from `review` or `failed` cleans up the Gap's worktree and branch. Deleting from `todo` or `cancelled` removes just the record (no worktree to clean up — `todo` may not have one yet, `cancelled` was already cleaned up). Deleting from `done` removes only the Gap record; the merged commits stay in the client repo.
 - **Search** — over name, round `actual` / `target` / `reporter`, status, dates.
 - **Import** — paste free-form text (meeting transcript, bug report, feedback dump); an LLM call extracts a list of discrete Gaps, each with a seeded initial round. The user picks a reporter (defaulting to the last-used name) to attribute the imported rounds to, then reviews and confirms before persisting.
 
-### Agent Manager
+### Processes
 
-- View currently running agent subprocesses (which Gap each is on, elapsed time).
-- Configure the parallel-run cap at runtime.
+- View the managed-process table: supervisor when present, UI process, runner worker, target application, agent scheduler, and chat subprocesses.
+- View the agents table for currently running agent subprocesses, including elapsed and idle time.
+- View the runner-workers table for internal runner work such as merger, governance, and target-app rebuild.
+- Start / stop / rebuild / check the target application from the process list using saved host commands and configured health checks. The target application may not have a known PID.
 - Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. The pause flag is stored in SQLite, so it survives runner restarts.
-- Cancel an in-flight Gap — kills the CLI subprocess, releases the lock, and moves the Gap to `cancelled` (worktree and branch are cleaned up).
+- Cancel an in-flight agent Gap — kills the CLI subprocess, releases the lock, and moves the Gap to `cancelled` (worktree and branch are cleaned up).
 
 ### Chat
 
@@ -391,10 +393,16 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 ### System
 
-- **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
+- **Processes** — default System tab with managed-process, agents, and runner-workers tables; includes target application start/stop/rebuild/status check, pause/resume agents, runner diagnostics, chat subprocess stop, and in-flight agent cancellation.
+- **Instances** — active application instance selection, sync, and Gap transfer.
+- **Performance** — backend timing metrics and cache/runtime maintenance.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.
+- **Guidance** — project-wide agent instructions selected per Gap before work starts.
+- **Governance** — project-wide governance settings and generated rules.
+- **Application** — target application registry, scope, and target-app command configuration.
+- **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
 - **Re-check auth** — on-demand re-run of the host runner's Claude auth pre-flight; clears the auth banner if it now passes.
-- **Backend diagnostics** — process model, runner transport, worker mode, last call timestamp, recent backend errors.
+- **Backend diagnostics** — shown in the runner row on Processes: process model, runner transport, worker mode, last call timestamp, recent backend errors.
 - Changes take effect immediately.
 
 ## UI

@@ -258,7 +258,9 @@ class Runner:
         queue behind writer-heavy agent work.
         """
         return {
+            "pid": os.getpid(),
             "running": self.sub_mgr.running_snapshot(),
+            "chat": self.chat.snapshot(),
             "merger": self.merger.snapshot(),
             "governance": self.governance_agent.snapshot(),
             "target_app_rebuild": self.target_app_rebuilder.snapshot(),

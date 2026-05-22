@@ -5,6 +5,7 @@ Returns (status_code, body_dict) tuples. The server module wraps these.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import subprocess
@@ -2690,6 +2691,169 @@ def dashboard_summary() -> tuple[int, dict]:
             counts, preflight, runner_reachable, provider,
         ),
     }
+
+
+def process_summary() -> tuple[int, dict]:
+    """Return managed process state for System > Processes."""
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+
+    runner_snap = runtime.runner_status_snapshot()
+    backend = runner_snap.get("backend") or runtime.backend_info()
+    runner_reachable = bool(runner_snap.get("runner_reachable"))
+    runner_pid = runner_snap.get("pid")
+    supervisor_pid = _int_or_none(os.environ.get("REFINE_SUPERVISOR_PID"))
+    conn = _conn()
+    try:
+        paused = (db.get_setting(conn, "paused") or "0") == "1"
+        target_app = _target_app_snapshot(conn)
+    finally:
+        conn.close()
+
+    processes: list[dict[str, Any]] = []
+    if backend.get("process_model") == "supervisor":
+        processes.append({
+            "id": "supervisor",
+            "kind": "supervisor",
+            "label": "Supervisor",
+            "status": "running" if supervisor_pid else "unknown",
+            "pid": supervisor_pid,
+            "actions": [],
+        })
+    processes.extend([
+        {
+            "id": "ui",
+            "kind": "ui",
+            "label": "UI process",
+            "status": "running",
+            "pid": os.getpid(),
+            "actions": [],
+        },
+        {
+            "id": "runner",
+            "kind": "runner",
+            "label": (
+                "Runner worker"
+                if backend.get("process_model") == "supervisor"
+                else "In-process runner"
+            ),
+            "status": "running" if runner_reachable else "unreachable",
+            "pid": runner_pid,
+            "actions": [],
+        },
+        {
+            "id": "target-app",
+            "kind": "target_app",
+            "label": "Target application",
+            "status": target_app.get("state") or "unknown",
+            "pid": None,
+            "actions": ["start", "rebuild", "stop", "check"],
+            "target_app": target_app,
+        },
+    ])
+
+    merger = runner_snap.get("merger") or None
+    governance = runner_snap.get("governance") or None
+    target_app_rebuild = runner_snap.get("target_app_rebuild") or None
+    runner_work = _runner_work_summary(merger, governance, target_app_rebuild)
+
+    for chat in runner_snap.get("chat") or []:
+        session_id = str(chat.get("session_id") or "")
+        processes.append({
+            "id": f"chat:{session_id}",
+            "kind": "chat",
+            "label": "Chat",
+            "status": "running",
+            "session_id": session_id,
+            "pid": chat.get("pid"),
+            "provider": chat.get("provider"),
+            "mode": chat.get("mode"),
+            "elapsed_seconds": chat.get("elapsed_seconds") or 0,
+            "actions": ["stop"],
+        })
+
+    for run in runner_snap.get("running") or []:
+        gap_id = str(run.get("gap_id") or "")
+        processes.append({
+            "id": f"agent:{gap_id}",
+            "kind": "agent",
+            "label": "Agent",
+            "status": "running",
+            "gap_id": gap_id,
+            "round_idx": run.get("round_idx"),
+            "pid": run.get("pid"),
+            "elapsed_seconds": run.get("elapsed_seconds") or 0,
+            "idle_seconds": run.get("idle_seconds") or 0,
+            "actions": ["cancel"],
+        })
+
+    return 200, {
+        "paused": paused,
+        "backend": backend,
+        "runner_reachable": runner_reachable,
+        "processes": processes,
+        "running": runner_snap.get("running") or [],
+        "chat": runner_snap.get("chat") or [],
+        "runner_work": runner_work,
+        "merger": merger,
+        "governance": governance,
+        "target_app_rebuild": target_app_rebuild,
+        "target_app": target_app,
+    }
+
+
+def _int_or_none(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _runner_work_summary(
+    merger: dict | None,
+    governance_state: dict | None,
+    target_app_rebuild: dict | None,
+) -> list[dict[str, Any]]:
+    work: list[dict[str, Any]] = []
+    if merger and (merger.get("state") == "merging" or merger.get("queued")):
+        work.append({
+            "id": "merger",
+            "kind": "merger",
+            "label": "Merger",
+            "status": merger.get("state") or "idle",
+            "gap_id": merger.get("gap_id"),
+            "elapsed_seconds": merger.get("elapsed_seconds") or 0,
+            "queued": merger.get("queued") or 0,
+            "last_outcome": merger.get("last_outcome") or "",
+        })
+    if governance_state and (
+        governance_state.get("state") == "reviewing"
+        or governance_state.get("queued")
+    ):
+        work.append({
+            "id": "governance",
+            "kind": "governance",
+            "label": "Governance",
+            "status": governance_state.get("state") or "idle",
+            "gap_id": governance_state.get("gap_id"),
+            "elapsed_seconds": governance_state.get("elapsed_seconds") or 0,
+            "queued": governance_state.get("queued") or 0,
+            "last_outcome": governance_state.get("last_outcome") or "",
+        })
+    if target_app_rebuild and (
+        target_app_rebuild.get("running") or target_app_rebuild.get("queued")
+    ):
+        status = "running" if target_app_rebuild.get("running") else "queued"
+        work.append({
+            "id": "target-app-rebuilder",
+            "kind": "target_app_rebuilder",
+            "label": "Target-app rebuilder",
+            "status": status,
+            "queued": 1 if target_app_rebuild.get("queued") else 0,
+            "details": target_app_rebuild.get("last_reason") or "",
+        })
+    return work
 
 
 _ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "awaiting-rebuild", "review")

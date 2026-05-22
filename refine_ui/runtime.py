@@ -157,7 +157,9 @@ def runner_status_snapshot() -> dict:
         return {
             "runner_reachable": False,
             "backend": backend_info(),
+            "pid": None,
             "running": [],
+            "chat": [],
             "merger": None,
             "governance": None,
             "target_app_rebuild": None,
@@ -168,7 +170,9 @@ def runner_status_snapshot() -> dict:
         return {
             "runner_reachable": False,
             "backend": backend_info(),
+            "pid": None,
             "running": [],
+            "chat": [],
             "merger": None,
             "governance": None,
             "target_app_rebuild": None,

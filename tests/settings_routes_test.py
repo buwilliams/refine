@@ -58,11 +58,13 @@ def main() -> int:
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
-        "application", "reporters", "instances", "runtime", "performance",
-        "guidance", "governance",
+        "processes", "instances", "performance", "reporters",
+        "guidance", "governance", "application", "runtime",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
+    assert 'parsed.route === "settings" && !parsed.tab' in settings_js
+    assert 'return first;' in settings_js
     assert 'if (slug === "system" || slug === "project") return "application";' in settings_js
     assert 'if (slug === "agents") return "guidance";' in settings_js
     assert "function activeSettingsTabFromRoute()" in settings_js
@@ -98,6 +100,13 @@ def main() -> int:
     assert "onProgress: drawSqliteCacheProgress" in settings_js
     assert 'slug: "performance"' in settings_js
     assert 'api("GET", "/api/performance")' in settings_js
+    assert 'slug: "processes"' in settings_js
+    assert 'api("GET", "/api/processes")' in settings_js
+    assert '@route("GET", r"/api/processes")' in server_py
+    assert "def process_summary" in api_py
+    assert "function renderProcessesTab" in settings_js
+    assert "function renderRunnerWorkRow" in settings_js
+    assert "function renderRuntimeAgentCards" not in settings_js
     assert 'api("POST", "/api/performance/cleanup"' in settings_js
     assert '@route("GET", r"/api/performance")' in server_py
     assert '@route("POST", r"/api/performance/cleanup")' in server_py
@@ -166,16 +175,76 @@ def main() -> int:
         assert settings_js.count(f'pane("{slug}",') == 1
     assert 'pane("project",' not in settings_js
 
-    assert 'href="#/system/application"' in index_html
+    assert '<a href="#/system/processes" data-route="settings">System</a>' in index_html
+    assert 'id="target-app-indicator" class="target-app-indicator"\n         href="#/system/processes"' in index_html
     assert 'slug: "instances"' in settings_js
     assert 'api("GET", "/api/instances")' in settings_js
     assert "const transferTargetInstances = instances.filter((inst) => !inst.archived);" in settings_js
     assert "Pause, cancel, and transfer" in settings_js
     assert "cancel_active: true" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
-    assert 'id="s-target-run-rebuild"' in settings_js
-    current_status_body = settings_js.split("<h3>Current status</h3>", 1)[1].split("<h3>Target application</h3>", 1)[0]
-    assert 'id="s-project-sync-now"' not in current_status_body
+    processes_body = settings_js.split("function renderProcessesTab", 1)[1].split("function backendProcessLabel", 1)[0]
+    application_body = settings_js.split('${pane("application", `', 1)[1].split('${pane("processes", `', 1)[0]
+    runtime_body = settings_js.split('${pane("runtime", `', 1)[1].split('${pane("performance", `', 1)[0]
+    assert 'id="s-target-run-rebuild"' in processes_body
+    assert 'id="s-target-run-start"' in processes_body
+    assert 'id="s-target-run-stop"' in processes_body
+    assert 'id="s-target-health-now"' in processes_body
+    assert processes_body.index('id="s-target-run-start"') < processes_body.index('id="s-target-run-stop"') < processes_body.index('id="s-target-run-rebuild"')
+    assert 'class="target-app-action-slot"' in processes_body
+    assert "function targetAppShowsStopAction" in processes_body
+    assert "function setTargetAppActionVisible" in processes_body
+    assert 'id="btn-pause"' in processes_body
+    assert 'data-cancel-agent="' in processes_body
+    assert 'data-stop-chat="' in processes_body
+    assert "startBtn.style.display" not in settings_js
+    assert "stopBtn.style.display" not in settings_js
+    assert "setTargetAppActionVisible(startBtn, !showStop);" in settings_js
+    assert "setTargetAppActionVisible(stopBtn, showStop);" in settings_js
+    assert "startBtn.disabled = showStop || isRunning || inFlight || !snap.has_start_command;" in settings_js
+    assert "stopBtn.disabled  = !showStop || isStopped || inFlight || !snap.has_stop_command;" in settings_js
+    assert 'class="table process-table managed-process-table"' in processes_body
+    assert 'class="table process-table agents-process-table"' in processes_body
+    assert 'class="table process-table runner-workers-table"' in processes_body
+    managed_table = processes_body.split('class="table process-table managed-process-table"', 1)[1].split("</table>", 1)[0]
+    agents_table = processes_body.split('class="table process-table agents-process-table"', 1)[1].split("</table>", 1)[0]
+    assert "<th>Elapsed</th>" not in managed_table
+    assert "<th>Idle</th>" not in managed_table
+    assert "<th>Elapsed</th>" in agents_table
+    assert "<th>Idle</th>" in agents_table
+    assert "renderAgentProcessRow" in processes_body
+    assert 'data-full-details="${htmlEscape(details)}"' in processes_body
+    assert "function bindProcessDetailCells" in processes_body
+    assert "function openProcessDetailsIfOverflowing" in processes_body
+    assert 'modalAlert(details' in processes_body
+    assert '<span class="role-pill ${kind === "agent"' not in processes_body
+    assert 'class="process-actions"><div class="actions">' in processes_body
+    assert "<h3>Managed processes</h3>" in processes_body
+    assert "<h3>Agents</h3>" in processes_body
+    assert "<h3>Runner workers</h3>" in processes_body
+    assert 'data-process-id="${htmlEscape(proc.id || "")}"' in processes_body
+    assert '[data-process-id="target-app"]' in settings_js
+    assert "Agent scheduler" in processes_body
+    assert "runnerProcessDetails" in processes_body
+    assert "<h3>Backend</h3>" not in processes_body
+    assert 'id="target-app-status-block"' not in processes_body
+    assert "<dt>Process model</dt>" not in processes_body
+    assert "<dt>Runner transport</dt>" not in processes_body
+    assert '<h3>Agents</h3>' not in runtime_body
+    assert 'id="btn-pause"' not in runtime_body
+    assert 'data-cancel-agent="' not in runtime_body
+    assert 'id="s-target-run-start"' not in application_body
+    assert 'id="s-project-sync-now"' not in processes_body
+    assert ".process-table {" in common_css
+    assert ".managed-process-table .actions-col { width: 292px; }" in common_css
+    assert ".agents-process-table .agent-col" in common_css
+    assert ".agents-process-table .agent-actions-col" in common_css
+    assert ".process-table td[data-process-details]" in common_css
+    assert ".process-table .process-actions .actions" in common_css
+    assert ".process-table .process-details-cell.is-overflowing" in common_css
+    assert ".process-table .process-details-cell:focus-visible" in common_css
+    assert ".target-app-action-slot" in common_css
+    assert ".target-app-action-hidden" in common_css
     instances_body = settings_js.split('${pane("instances", `', 1)[1].split('<h3>Transfer Gaps</h3>', 1)[0]
     assert '<button class="secondary" id="s-project-sync-now">Trigger sync repo</button>' in instances_body
     assert instances_body.index('id="s-project-sync-now"') < instances_body.index('id="instance-add"')

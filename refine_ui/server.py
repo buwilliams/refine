@@ -216,6 +216,11 @@ def _h_performance(_h, _m, _b, q):
     )
 
 
+@route("GET", r"/api/processes")
+def _h_processes(_h, _m, _b, _q):
+    return api.process_summary()
+
+
 @route("POST", r"/api/performance/cleanup")
 def _h_performance_cleanup(_h, _m, body, _q):
     return api.performance_cleanup(body or {})

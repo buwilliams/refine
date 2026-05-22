@@ -20,6 +20,7 @@ def main() -> int:
     cfg_path = os.environ.get(config.ENV_CONFIG_PATH)
     sock = ipc.runner_socket_path(port=port, config_path=cfg_path)
     env = os.environ.copy()
+    env["REFINE_SUPERVISOR_PID"] = str(os.getpid())
     env["REFINE_RUNNER_SOCKET"] = str(sock)
     env["REFINE_NO_INPROCESS_RUNNER"] = "1"
     env.setdefault("PYTHONUNBUFFERED", "1")

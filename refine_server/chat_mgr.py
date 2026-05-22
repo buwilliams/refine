@@ -225,6 +225,25 @@ class ChatManager:
             self._terminate(session, reason=reason)
         return len(sessions)
 
+    def snapshot(self) -> list[dict]:
+        out: list[dict] = []
+        now = time.monotonic()
+        with self._lock:
+            sessions = list(self._sessions.values())
+        for s in sessions:
+            with s.proc_lock:
+                proc = s.proc
+                if proc is None or proc.poll() is not None:
+                    continue
+                out.append({
+                    "session_id": s.session_id,
+                    "pid": proc.pid,
+                    "provider": s.provider,
+                    "mode": "standalone" if s.is_standalone else "gap",
+                    "elapsed_seconds": int(now - s.last_activity_ts),
+                })
+        return out
+
     def start(self, cwd: Path, *, is_standalone: bool = True,
               provider: str | None = None,
               priming_prompt: str | None = None,
