@@ -170,6 +170,7 @@ async function startGapChatSession(tab) {
     tab.sessionId = r.session_id;
     tab.closedReason = null;
     saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
     drawChatDock();
     $("#chat-input")?.focus();
   } catch (e) {
@@ -392,6 +393,12 @@ function wireChatDockResize(root) {
 // Back-compat alias used by helpers below; thin wrapper.
 function drawChat() { drawChatDock(); }
 
+function refreshProcessesTabForChatChange() {
+  if (state.currentRoute !== "settings") return;
+  if (typeof refreshSettings !== "function") return;
+  refreshSettings().catch(() => {});
+}
+
 function applyPendingIndicator(tab) {
   const ind = $("#chat-pending");
   const input = $("#chat-input");
@@ -424,6 +431,7 @@ async function closeChatTab(tabId) {
   if (!t) return;
   if (t.sessionId) {
     try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
+    refreshProcessesTabForChatChange();
   }
   delete chatState.tabs[tabId];
   if (chatState.activeTabId === tabId) chatState.activeTabId = "standalone";
@@ -446,6 +454,7 @@ async function clearActiveChat() {
   await withButtonBusy(btn, "Clearing…", async () => {
     if (t.sessionId) {
       try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
+      refreshProcessesTabForChatChange();
     }
     t.sessionId = null;
     t.output = "";
@@ -466,6 +475,7 @@ async function toggleActiveChat() {
       t.sessionId = null;
       t.closedReason = "stopped by user";
       saveChatStateToStorage();
+      refreshProcessesTabForChatChange();
       drawChat();
     });
     return;
@@ -478,6 +488,7 @@ async function toggleActiveChat() {
       t.closedReason = null;
       t.output = "";
       saveChatStateToStorage();
+      refreshProcessesTabForChatChange();
       drawChat();
       $("#chat-input")?.focus();
     } catch (e) {
@@ -514,11 +525,13 @@ async function pollChat() {
     const wasPending = !!t.pending;
     t.pending = !!r.in_flight;
     if (wasPending !== t.pending) applyPendingIndicator(t);
+    if (wasPending !== t.pending) refreshProcessesTabForChatChange();
     if (r.alive === false) {
       t.closedReason = r.closed_reason || "session ended";
       t.sessionId = null;
       t.pending = false;
       saveChatStateToStorage();
+      refreshProcessesTabForChatChange();
       drawChat();
     }
   } catch {
@@ -545,6 +558,7 @@ async function sendChatLine() {
   t.pending = true;
   applyPendingIndicator(t);
   saveChatStateToStorage();
+  refreshProcessesTabForChatChange();
   try {
     await api("POST", `/api/chat/${t.sessionId}/input`, { text });
     // Trigger a poll right away so we pick up `in_flight` and (likely soon)

@@ -171,6 +171,8 @@ class ChatSession:
     is_standalone: bool
     last_activity_ts: float        # monotonic timestamp of last user activity
     provider: str = "claude"
+    gap_id: str | None = None
+    started_ts: float = field(default_factory=time.monotonic)
     # Discovered from provider structured output after the first send;
     # reused by provider-specific resume args to thread context.
     provider_session_id: str | None = None
@@ -231,21 +233,28 @@ class ChatManager:
         with self._lock:
             sessions = list(self._sessions.values())
         for s in sessions:
+            if not s.alive:
+                continue
             with s.proc_lock:
                 proc = s.proc
-                if proc is None or proc.poll() is not None:
-                    continue
+                running = proc is not None and proc.poll() is None
+                pid = proc.pid if running else None
+                idle_base = s.last_chunk_at if running and s.last_chunk_at else s.last_activity_ts
                 out.append({
                     "session_id": s.session_id,
-                    "pid": proc.pid,
+                    "pid": pid,
+                    "status": "running" if running else "idle",
                     "provider": s.provider,
                     "mode": "standalone" if s.is_standalone else "gap",
-                    "elapsed_seconds": int(now - s.last_activity_ts),
+                    "gap_id": s.gap_id,
+                    "elapsed_seconds": int(now - s.started_ts),
+                    "idle_seconds": int(now - idle_base),
                 })
         return out
 
     def start(self, cwd: Path, *, is_standalone: bool = True,
               provider: str | None = None,
+              gap_id: str | None = None,
               priming_prompt: str | None = None,
               priming_intro: str | None = None) -> str:
         sid = uuid.uuid4().hex[:12]
@@ -254,6 +263,7 @@ class ChatManager:
             cwd=cwd,
             is_standalone=is_standalone,
             provider=agent_cli.get_spec(provider).name,
+            gap_id=gap_id,
             last_activity_ts=time.monotonic(),
             pending_priming_text=priming_prompt or None,
         )

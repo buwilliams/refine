@@ -41,10 +41,13 @@ def main() -> int:
                 },
                 "chat": [{
                     "session_id": "chat123",
-                    "pid": 5151,
+                    "pid": None,
+                    "status": "idle",
                     "provider": "claude",
                     "mode": "standalone",
+                    "gap_id": None,
                     "elapsed_seconds": 5,
+                    "idle_seconds": 5,
                 }],
                 "running": [{
                     "gap_id": "01PROCESSAGENTGAP0000000001",
@@ -111,8 +114,10 @@ def main() -> int:
         assert agent["actions"] == ["cancel"], agent
         assert agent["max_memory"]["label"] == "4096 MB", agent
         chat = next(p for p in body["processes"] if p["kind"] == "chat")
-        assert chat["pid"] == 5151, chat
+        assert chat["pid"] is None, chat
+        assert chat["status"] == "idle", chat
         assert chat["actions"] == ["stop"], chat
+        assert chat["idle_seconds"] == 5, chat
         assert chat["cpu_priority"]["label"] == "normal (weight 100)", chat
         work_kinds = [w["kind"] for w in body["runner_work"]]
         assert work_kinds == ["merger", "governance", "target_app_rebuilder"], work_kinds

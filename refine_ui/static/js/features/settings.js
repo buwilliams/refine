@@ -537,7 +537,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     processes, paused, backend, runnerReachable, diag,
   ).map((proc) => renderManagedProcessRow(proc)).join("");
   const agentRows = (processes || [])
-    .filter((proc) => proc.kind === "agent")
+    .filter((proc) => proc.kind === "agent" || proc.kind === "chat")
     .map((proc) => renderAgentProcessRow(proc, anchorMs)).join("");
   const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
   return `
@@ -578,11 +578,11 @@ function renderProcessesTab(processData, settings, diag, dash) {
             <col class="agent-actions-col">
           </colgroup>
           <thead><tr>
-            <th>Agent</th><th>Status</th><th>PID</th><th>Round</th>
+            <th>Agent</th><th>Status</th><th>PID</th><th>Context</th>
             <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Idle</th><th></th>
           </tr></thead>
           <tbody>${agentRows}</tbody>
-        </table>` : `<p class="muted">No active agent subprocesses.</p>`}
+        </table>` : `<p class="muted">No active agent subprocesses or chat sessions.</p>`}
     </section>
 
     <section class="settings-section">
@@ -607,13 +607,15 @@ function renderProcessesTab(processData, settings, diag, dash) {
 }
 
 function buildManagedProcessRows(processes, paused, backend, runnerReachable, diag) {
-  const rows = (processes || []).filter((proc) => proc.kind !== "agent").map((proc) => {
-    if (proc.kind !== "runner") return proc;
-    return {
-      ...proc,
-      details: runnerProcessDetails(backend, runnerReachable, diag),
-    };
-  });
+  const rows = (processes || [])
+    .filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")
+    .map((proc) => {
+      if (proc.kind !== "runner") return proc;
+      return {
+        ...proc,
+        details: runnerProcessDetails(backend, runnerReachable, diag),
+      };
+    });
   const scheduler = {
     id: "agent-scheduler",
     kind: "agent_scheduler",
@@ -627,9 +629,7 @@ function buildManagedProcessRows(processes, paused, backend, runnerReachable, di
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
-  const insertAt = rows.findIndex((proc) => proc.kind === "chat");
-  if (insertAt === -1) rows.push(scheduler);
-  else rows.splice(insertAt, 0, scheduler);
+  rows.push(scheduler);
   return rows;
 }
 
@@ -669,6 +669,7 @@ function renderManagedProcessRow(proc) {
 }
 
 function renderAgentProcessRow(proc, anchorMs) {
+  const kind = proc.kind || "agent";
   const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
   const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
     ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
@@ -676,18 +677,24 @@ function renderAgentProcessRow(proc, anchorMs) {
   const idle = Number.isFinite(Number(proc.idle_seconds))
     ? `<span class="js-idle-tick" data-base="${Number(proc.idle_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.idle_seconds || 0)}</span>`
     : `<span class="muted small">-</span>`;
-  const label = proc.gap_id
+  const label = kind === "chat"
+    ? `${htmlEscape(proc.mode === "gap" ? "Gap chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
+    : proc.gap_id
     ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
     : htmlEscape(proc.label || "Agent");
-  const round = proc.round_idx != null
+  const context = kind === "chat"
+    ? proc.gap_id
+      ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
+      : "standalone"
+    : proc.round_idx != null
     ? String(Number(proc.round_idx) + 1)
     : "";
   return `
-    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="agent">
+    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
       <td>${label}</td>
       <td>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td>${pid}</td>
-      <td>${round ? htmlEscape(round) : `<span class="muted small">-</span>`}</td>
+      <td>${context ? context : `<span class="muted small">-</span>`}</td>
       <td>${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
       <td>${htmlEscape(processResourceLabel(proc.max_memory))}</td>
       <td>${elapsed}</td>
@@ -758,6 +765,7 @@ function processStatusLabel(status) {
     unknown: "unknown",
     active: "active",
     paused: "paused",
+    idle: "idle",
   }[status] || status || "unknown";
 }
 
@@ -1464,7 +1472,7 @@ function drawSettings(
     b.addEventListener("click", async () => {
       const id = b.dataset.stopChat;
       const ok = await modalConfirm(
-        "Stop this chat subprocess?",
+        "Stop this chat session?",
         { title: "Stop chat", okLabel: "Stop chat", danger: true,
           cancelLabel: "Keep running" },
       );

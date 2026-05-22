@@ -1202,6 +1202,7 @@ class Runner:
         sid = self.chat.start(
             cwd, is_standalone=is_standalone,
             provider=db.get_setting(self._conn, "agent_cli"),
+            gap_id=gap_id,
             priming_prompt=priming_prompt,
             priming_intro=priming_intro,
         )

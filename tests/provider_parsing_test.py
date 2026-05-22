@@ -191,6 +191,15 @@ def main() -> int:
 
     # --- Chat stream parsing ------------------------------------------------
     manager = ChatManager(get_standalone_idle_timeout=lambda: 0)
+    snapshot_manager = ChatManager(get_standalone_idle_timeout=lambda: 999)
+    sid = snapshot_manager.start(Path.cwd(), is_standalone=True, provider="codex")
+    snapshot = snapshot_manager.snapshot()
+    assert len(snapshot) == 1, snapshot
+    assert snapshot[0]["session_id"] == sid, snapshot
+    assert snapshot[0]["status"] == "idle", snapshot
+    assert snapshot[0]["pid"] is None, snapshot
+    assert snapshot[0]["mode"] == "standalone", snapshot
+    snapshot_manager.stop_all(reason="test complete")
     session = ChatSession(
         session_id="chat-test",
         cwd=Path.cwd(),

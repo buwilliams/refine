@@ -220,7 +220,13 @@ def main() -> int:
     assert "<th>Max memory</th>" in agents_table
     assert "<th>Elapsed</th>" in agents_table
     assert "<th>Idle</th>" in agents_table
+    assert "<th>Context</th>" in agents_table
     assert "renderAgentProcessRow" in processes_body
+    assert '.filter((proc) => proc.kind === "agent" || proc.kind === "chat")' in processes_body
+    assert '.filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")' in processes_body
+    assert "No active agent subprocesses or chat sessions." in processes_body
+    assert "refreshProcessesTabForChatChange" in (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
+    assert 'idle: "idle"' in processes_body
     assert 'data-full-details="${htmlEscape(details)}"' in processes_body
     assert "function bindProcessDetailCells" in processes_body
     assert "function openProcessDetailsIfOverflowing" in processes_body
