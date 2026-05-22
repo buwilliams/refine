@@ -12,7 +12,7 @@ Subcommands:
 - stop    — stop the UI backend.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
-- performance — show host process CPU/memory usage for refine.
+- ps      — show host process CPU/memory usage for refine.
 - test    — run the repository's script-style test suite.
 - server  — start the server component in the foreground for debugging.
 - ui      — start the UI backend foreground process (supervised in normal use).
@@ -52,7 +52,7 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(
         dest="command",
         required=True,
-        metavar="{init,install,uninstall,reset,start,restart,stop,status,performance,test,server,ui,doctor}",
+        metavar="{init,install,uninstall,reset,start,restart,stop,status,ps,test,server,ui,doctor}",
     )
 
     p_init = sub.add_parser(
@@ -170,31 +170,31 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_status.set_defaults(fn=cmd_status)
 
-    p_performance = sub.add_parser(
-        "performance",
+    p_ps = sub.add_parser(
+        "ps",
         help="Show CPU and memory usage for refine processes.",
         description=(
             "Samples host process stats for the Refine UI/supervisor process "
             "and its children, including agent CLI subprocesses."
         ),
     )
-    p_performance.add_argument(
+    p_ps.add_argument(
         "port", nargs="?", type=int, default=None,
         help="Web server port. Defaults to the configured port.",
     )
-    p_performance.add_argument(
+    p_ps.add_argument(
         "--sample", type=float, default=0.5,
         help="Seconds to sample CPU usage before printing. Default: 0.5.",
     )
-    p_performance.add_argument(
+    p_ps.add_argument(
         "--watch", nargs="?", const=2.0, type=float, default=None,
         help="Repeat every N seconds. Default when supplied without N: 2.",
     )
-    p_performance.add_argument(
+    p_ps.add_argument(
         "--limit", type=int, default=30,
         help="Maximum process rows to print per port. Default: 30.",
     )
-    p_performance.set_defaults(fn=cmd_performance)
+    p_ps.set_defaults(fn=cmd_ps)
 
     p_test = sub.add_parser(
         "test",
@@ -775,15 +775,15 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_performance(args: argparse.Namespace) -> int:
+def cmd_ps(args: argparse.Namespace) -> int:
     if args.sample < 0:
-        print("refine performance: --sample must be 0 or greater", file=sys.stderr)
+        print("refine ps: --sample must be 0 or greater", file=sys.stderr)
         return 1
     if args.watch is not None and args.watch <= 0:
-        print("refine performance: --watch interval must be greater than 0", file=sys.stderr)
+        print("refine ps: --watch interval must be greater than 0", file=sys.stderr)
         return 1
     if args.limit <= 0:
-        print("refine performance: --limit must be greater than 0", file=sys.stderr)
+        print("refine ps: --limit must be greater than 0", file=sys.stderr)
         return 1
 
     if args.watch is None:
@@ -797,7 +797,7 @@ def cmd_performance(args: argparse.Namespace) -> int:
     rendered_lines = 0
     try:
         while True:
-            rc, frame = _render_performance_watch_frame(args, is_tty=live)
+            rc, frame = _render_performance_watch_frame(args, is_tty=False)
             if live:
                 rendered_lines = _write_in_place_frame(frame, rendered_lines)
             else:
@@ -824,7 +824,7 @@ def _print_performance_snapshot(args: argparse.Namespace) -> int:
     try:
         cfg = config.get(path=args.config) if args.config else config.get()
     except config.ConfigError as e:
-        print(f"refine performance: {e}", file=sys.stderr)
+        print(f"refine ps: {e}", file=sys.stderr)
         return 1
     _sync_bound_project_registry(clone, cfg)
     for port in _status_ports(args, clone, cfg, unit):
@@ -847,15 +847,15 @@ class _PerformanceCapture(StringIO):
 def _render_performance_watch_frame(args: argparse.Namespace, *, is_tty: bool) -> tuple[int, str]:
     buf = _PerformanceCapture(is_tty=is_tty)
     with redirect_stdout(buf):
-        print(f"refine performance sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"refine ps sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         rc = _print_performance_snapshot(args)
     return rc, buf.getvalue()
 
 
 def _write_in_place_frame(frame: str, previous_lines: int) -> int:
     if previous_lines > 0:
-        sys.stdout.write(f"\033[{previous_lines}F")
-    lines = frame.splitlines()
+        sys.stdout.write(f"\033[{previous_lines}A\r")
+    lines = _terminal_frame_lines(frame)
     printed_lines = max(previous_lines, len(lines))
     for line in lines:
         sys.stdout.write(f"\033[2K{line}\n")
@@ -863,6 +863,12 @@ def _write_in_place_frame(frame: str, previous_lines: int) -> int:
         sys.stdout.write("\033[2K\n")
     sys.stdout.flush()
     return printed_lines
+
+
+def _terminal_frame_lines(frame: str) -> list[str]:
+    width = max(20, shutil.get_terminal_size((120, 24)).columns)
+    limit = max(1, width - 1)
+    return [_truncate(line, limit) for line in frame.splitlines()]
 
 
 def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
@@ -930,7 +936,7 @@ def _print_performance_block(
     total_vms = sum(row["vms_kb"] for row in rows)
 
     print()
-    print(_bold("refine performance"))
+    print(_bold("refine ps"))
     print(f"  checkout: {clone}")
     print(f"  app:      {display_cfg.client_repo if display_cfg is not None else 'setup mode'}")
     print(f"  port:     {port}")

@@ -546,17 +546,18 @@ def main() -> int:
             "watch": None,
             "limit": 5,
         })()
-        assert refine_cli.cmd_performance(perf_args) == 0
+        assert refine_cli.cmd_ps(perf_args) == 0
     finally:
         os.chdir(old_cwd)
         refine_cli._owned_refine_ui_ports = old_owned_ports
         refine_cli._print_performance_block = old_print_performance
     assert (str(clone), 18111, 0.0, 5) in perf_calls
     assert (str(clone), 18122, 0.0, 5) in perf_calls
-    print("[ok] refine performance lists checkout-local UI backend ports")
+    print("[ok] refine ps lists checkout-local UI backend ports")
 
     old_print_performance_snapshot = refine_cli._print_performance_snapshot
     old_sleep = refine_cli.time.sleep
+    old_terminal_size = refine_cli.shutil.get_terminal_size
     try:
         refine_cli._print_performance_snapshot = lambda args: (_ for _ in ()).throw(KeyboardInterrupt())
         interrupted_args = type("Args", (), {
@@ -568,7 +569,7 @@ def main() -> int:
         })()
         watched = StringIO()
         with redirect_stdout(watched):
-            assert refine_cli.cmd_performance(interrupted_args) == 130
+            assert refine_cli.cmd_ps(interrupted_args) == 130
         assert "\033" not in watched.getvalue(), watched.getvalue()
 
         class TtyBuffer(StringIO):
@@ -592,15 +593,25 @@ def main() -> int:
         refine_cli.time.sleep = fake_sleep
         live_output = TtyBuffer()
         with redirect_stdout(live_output):
-            assert refine_cli.cmd_performance(interrupted_args) == 130
+            assert refine_cli.cmd_ps(interrupted_args) == 130
         rendered = live_output.getvalue()
         assert "frame 1" in rendered and "frame 2" in rendered, rendered
         assert "\033[2K" in rendered, rendered
+        assert "\033[" in rendered and "A\r" in rendered, rendered
         assert "\033[H\033[J" not in rendered, rendered
+
+        refine_cli.shutil.get_terminal_size = lambda fallback=(120, 24): os.terminal_size((24, 24))
+        live_output = TtyBuffer()
+        with redirect_stdout(live_output):
+            refine_cli._write_in_place_frame("short\n" + ("x" * 80) + "\n", 0)
+        rendered = live_output.getvalue()
+        assert "x" * 30 not in rendered, rendered
+        assert "..." in rendered, rendered
     finally:
         refine_cli._print_performance_snapshot = old_print_performance_snapshot
         refine_cli.time.sleep = old_sleep
-    print("[ok] refine performance exits cleanly on Ctrl+C")
+        refine_cli.shutil.get_terminal_size = old_terminal_size
+    print("[ok] refine ps exits cleanly on Ctrl+C")
 
     setup_clone = tmp / "setup-refine-clone"
     (setup_clone / "refine_cli").mkdir(parents=True)
