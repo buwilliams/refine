@@ -186,9 +186,14 @@ def main(argv: list[str] | None = None) -> int:
         "--sample", type=float, default=0.5,
         help="Seconds to sample CPU usage before printing. Default: 0.5.",
     )
-    p_ps.add_argument(
+    watch_group = p_ps.add_mutually_exclusive_group()
+    watch_group.add_argument(
         "--watch", nargs="?", const=2.0, type=float, default=None,
         help="Repeat every N seconds. Default when supplied without N: 2.",
+    )
+    watch_group.add_argument(
+        "--once", action="store_true",
+        help="Print one snapshot. This is the default.",
     )
     p_ps.add_argument(
         "--limit", type=int, default=30,
@@ -779,15 +784,20 @@ def cmd_ps(args: argparse.Namespace) -> int:
     if args.sample < 0:
         print("refine ps: --sample must be 0 or greater", file=sys.stderr)
         return 1
-    if args.watch is not None and args.watch <= 0:
+    watch_interval = args.watch
+    if watch_interval is not None and watch_interval <= 0:
         print("refine ps: --watch interval must be greater than 0", file=sys.stderr)
         return 1
     if args.limit <= 0:
         print("refine ps: --limit must be greater than 0", file=sys.stderr)
         return 1
 
-    if args.watch is None:
+    if watch_interval is None:
         try:
+            if sys.stdout.isatty():
+                rc, frame = _render_performance_snapshot_frame(args)
+                _write_truncated_frame(frame)
+                return rc
             return _print_performance_snapshot(args)
         except KeyboardInterrupt:
             print()
@@ -804,7 +814,7 @@ def cmd_ps(args: argparse.Namespace) -> int:
                 print()
                 sys.stdout.write(frame)
                 sys.stdout.flush()
-            time.sleep(args.watch)
+            time.sleep(watch_interval)
     except KeyboardInterrupt:
         print()
         return 130
@@ -850,6 +860,19 @@ def _render_performance_watch_frame(args: argparse.Namespace, *, is_tty: bool) -
         print(f"refine ps sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
         rc = _print_performance_snapshot(args)
     return rc, buf.getvalue()
+
+
+def _render_performance_snapshot_frame(args: argparse.Namespace) -> tuple[int, str]:
+    buf = _PerformanceCapture(is_tty=False)
+    with redirect_stdout(buf):
+        rc = _print_performance_snapshot(args)
+    return rc, buf.getvalue()
+
+
+def _write_truncated_frame(frame: str) -> None:
+    lines = _terminal_frame_lines(frame)
+    for line in lines:
+        print(line)
 
 
 def _write_in_place_frame(frame: str, previous_lines: int) -> int:

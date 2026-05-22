@@ -544,6 +544,7 @@ def main() -> int:
             "port": None,
             "sample": 0.0,
             "watch": None,
+            "once": True,
             "limit": 5,
         })()
         assert refine_cli.cmd_ps(perf_args) == 0
@@ -565,6 +566,7 @@ def main() -> int:
             "port": None,
             "sample": 0.0,
             "watch": 1.0,
+            "once": False,
             "limit": 5,
         })()
         watched = StringIO()
@@ -600,7 +602,36 @@ def main() -> int:
         assert "\033[" in rendered and "A\r" in rendered, rendered
         assert "\033[H\033[J" not in rendered, rendered
 
+        once_sleeps: list[float] = []
+
+        def fake_once_sleep(seconds):  # noqa: ANN001
+            once_sleeps.append(seconds)
+            raise KeyboardInterrupt()
+
+        def fake_long_snapshot(_args):  # noqa: ANN001
+            print("short")
+            print("x" * 80)
+            return 0
+
+        refine_cli._print_performance_snapshot = fake_long_snapshot
+        refine_cli.time.sleep = fake_once_sleep
         refine_cli.shutil.get_terminal_size = lambda fallback=(120, 24): os.terminal_size((24, 24))
+        default_once_args = type("Args", (), {
+            "config": str(bg_cfg.config_path),
+            "port": None,
+            "sample": 0.0,
+            "watch": None,
+            "once": False,
+            "limit": 5,
+        })()
+        once_output = TtyBuffer()
+        with redirect_stdout(once_output):
+            assert refine_cli.cmd_ps(default_once_args) == 0
+        rendered = once_output.getvalue()
+        assert once_sleeps == [], once_sleeps
+        assert "x" * 30 not in rendered, rendered
+        assert "..." in rendered, rendered
+
         live_output = TtyBuffer()
         with redirect_stdout(live_output):
             refine_cli._write_in_place_frame("short\n" + ("x" * 80) + "\n", 0)
