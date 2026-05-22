@@ -54,7 +54,7 @@ Use `uv run refine install [port]` for a persistent service; `start [port]` runs
 - All data is owned by an instance and synced through git.
 - Governance and Guidance are global across all instances.
 
-![refine architecture](refine_ui/static/refine-architecture.svg)
+![refine architecture](refine_ui/static/images/refine-architecture.svg)
 
 ## License
 
