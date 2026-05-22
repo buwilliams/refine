@@ -563,27 +563,6 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>Runner workers</h3>
-      <table class="table process-table runner-workers-table">
-        <colgroup>
-          <col class="worker-col">
-          <col class="status-col">
-          <col class="gap-col">
-          <col class="elapsed-col">
-          <col class="queue-col">
-          <col class="details-col">
-          <col class="worker-actions-col">
-        </colgroup>
-        <thead><tr>
-          <th>Worker</th><th>Status</th><th>Gap</th>
-          <th>Elapsed</th><th>Queue</th><th>Details</th><th></th>
-        </tr></thead>
-        <tbody>${workRows}</tbody>
-      </table>
-      <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
-    </section>
-
-    <section class="settings-section">
       <h3>Agents</h3>
       ${agentRows ? `
         <table class="table process-table agents-process-table">
@@ -604,6 +583,27 @@ function renderProcessesTab(processData, settings, diag, dash) {
           </tr></thead>
           <tbody>${agentRows}</tbody>
         </table>` : `<p class="muted">No active agent subprocesses or chat sessions.</p>`}
+    </section>
+
+    <section class="settings-section">
+      <h3>Runner workers</h3>
+      <table class="table process-table runner-workers-table">
+        <colgroup>
+          <col class="worker-col">
+          <col class="status-col">
+          <col class="gap-col">
+          <col class="elapsed-col">
+          <col class="queue-col">
+          <col class="details-col">
+          <col class="worker-actions-col">
+        </colgroup>
+        <thead><tr>
+          <th>Worker</th><th>Status</th><th>Gap</th>
+          <th>Elapsed</th><th>Queue</th><th>Details</th><th></th>
+        </tr></thead>
+        <tbody>${workRows}</tbody>
+      </table>
+      <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
     </section>`;
 }
 

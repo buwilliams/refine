@@ -209,7 +209,7 @@ def main() -> int:
     assert 'class="table process-table managed-process-table"' in processes_body
     assert 'class="table process-table agents-process-table"' in processes_body
     assert 'class="table process-table runner-workers-table"' in processes_body
-    assert processes_body.index("<h3>Managed processes</h3>") < processes_body.index("<h3>Runner workers</h3>") < processes_body.index("<h3>Agents</h3>")
+    assert processes_body.index("<h3>Managed processes</h3>") < processes_body.index("<h3>Agents</h3>") < processes_body.index("<h3>Runner workers</h3>")
     managed_table = processes_body.split('class="table process-table managed-process-table"', 1)[1].split("</table>", 1)[0]
     runner_table = processes_body.split('class="table process-table runner-workers-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table"', 1)[1].split("</table>", 1)[0]

@@ -394,7 +394,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 
 ### System
 
-- **Processes** — default System tab with managed-process, runner-workers, and agents tables; includes target application start/stop/rebuild/status check, pause/resume agents, runner diagnostics, chat session stop, target-app rebuilder queueing, target-app config generation, SQLite cache rebuild, activity-log cleanup, and in-flight agent cancellation.
+- **Processes** — default System tab with managed-process, agents, and runner-workers tables; includes target application start/stop/rebuild/status check, pause/resume agents, runner diagnostics, chat session stop, target-app rebuilder queueing, target-app config generation, SQLite cache rebuild, activity-log cleanup, and in-flight agent cancellation.
 - **Instances** — active application instance selection, sync, and Gap transfer.
 - **Performance** — backend timing metrics and cache/runtime maintenance.
 - **Reporters** — rename or remove names from the dropdown of known reporters. See the **Reporters** section.
