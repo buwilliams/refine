@@ -855,8 +855,7 @@ function initSSE() {
       try {
         const data = JSON.parse(e.data);
         if (!data.gap_id || data.gap_id === state.currentGap) {
-          if (typeof invalidateGapRoundLogs === "function") invalidateGapRoundLogs(state.currentGap);
-          loadGapDetail(state.currentGap);
+          if (typeof refreshGapRoundLogs === "function") refreshGapRoundLogs(state.currentGap);
         }
       } catch {}
     }
@@ -899,13 +898,13 @@ function initSSE() {
   });
   sseSource.addEventListener("round_log_added", (e) => {
     // Subprocess flushed new stdout to the active round's log file. If the user
-    // is viewing that gap's detail, refresh so the new lines appear live.
+    // is viewing that gap's detail, refresh only the open log panels so the
+    // modal does not repaint on every streamed line.
     if (state.currentRoute !== "gaps_detail" || !state.currentGap) return;
     try {
       const data = JSON.parse(e.data);
       if (data.gap_id === state.currentGap) {
-        if (typeof invalidateGapRoundLogs === "function") invalidateGapRoundLogs(state.currentGap);
-        loadGapDetail(state.currentGap);
+        if (typeof refreshGapRoundLogs === "function") refreshGapRoundLogs(state.currentGap);
       }
     } catch {}
   });

@@ -11,7 +11,7 @@ async function renderGapDetail(r) {
 }
 
 let _gapModalRoot = null;
-const GAP_LOG_PAGE_SIZE = 100;
+const GAP_LOG_PAGE_SIZE = 10;
 const gapRoundLogState = new Map();
 
 function gapDetailContainer() {
@@ -138,9 +138,8 @@ function drawGapDetail(gap) {
     `.notes-card[data-gap-id="${gap.id}"]`,
   )?.open ?? false;
   // Same idea for the per-round wrapper and its inner Logs disclosure.
-  // SSE round_log_added events trigger a full drawGapDetail re-render
-  // every time the agent emits a new event; without this, an expanded
-  // round or expanded Logs collapses each time a new log arrives.
+  // Metadata refreshes still redraw the modal; preserve expanded sections
+  // so status or project updates do not collapse the user's working context.
   const prevRoundOpen = {};
   const prevLogsOpen = {};
   document.querySelectorAll("details.round[data-round-idx]").forEach((el) => {
@@ -462,6 +461,29 @@ function invalidateGapRoundLogs(gapId) {
   for (const key of gapRoundLogState.keys()) {
     if (key.startsWith(`${gapId}:`)) gapRoundLogState.delete(key);
   }
+}
+
+function refreshGapRoundLogs(gapId) {
+  if (!gapId || state.currentGap !== gapId) return false;
+  const openRounds = new Set();
+  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
+    const roundIdx = Number(el.dataset.roundIdx);
+    if (!Number.isFinite(roundIdx)) return;
+    if (el.open) openRounds.add(roundIdx);
+  });
+  for (const key of Array.from(gapRoundLogState.keys())) {
+    if (!key.startsWith(`${gapId}:`)) continue;
+    const roundIdx = Number(key.slice(gapId.length + 1));
+    if (!openRounds.has(roundIdx)) gapRoundLogState.delete(key);
+  }
+  for (const roundIdx of openRounds) {
+    const existing = gapRoundLogState.get(roundLogKey(gapId, roundIdx));
+    const limit = existing?.limit || GAP_LOG_PAGE_SIZE;
+    const offset = existing?.offset || 0;
+    const page = Math.floor(offset / limit) + 1;
+    loadRoundLogs(gapId, roundIdx, { page });
+  }
+  return openRounds.size > 0;
 }
 
 function renderRoundLogsBody(gapId, roundIdx) {

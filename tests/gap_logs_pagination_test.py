@@ -129,10 +129,27 @@ def main() -> int:
         gaps_detail_js = (
             root / "refine_ui/static/js/features/gaps-detail.js"
         ).read_text(encoding="utf-8")
+        common_js = (
+            root / "refine_ui/static/js/common.js"
+        ).read_text(encoding="utf-8")
         assert "renderPaginationControls(" in gaps_detail_js
         assert "bindPaginationControls(body, pagerId" in gaps_detail_js
+        assert "const GAP_LOG_PAGE_SIZE = 10;" in gaps_detail_js
+        assert "function refreshGapRoundLogs(gapId)" in gaps_detail_js
+        assert "loadRoundLogs(gapId, roundIdx, { page })" in gaps_detail_js
         assert "data-round-logs-more" not in gaps_detail_js
         assert "Load more" not in gaps_detail_js
+        activity_block = common_js.split(
+            'sseSource.addEventListener("activity_added"', 1,
+        )[1].split('sseSource.addEventListener("status_change"', 1)[0]
+        round_log_block = common_js.split(
+            'sseSource.addEventListener("round_log_added"', 1,
+        )[1].split("sseSource.onerror", 1)[0]
+        assert "refreshGapRoundLogs(state.currentGap)" in activity_block
+        assert "loadGapDetail(state.currentGap)" not in activity_block
+        assert "refreshGapRoundLogs(state.currentGap)" in round_log_block
+        assert "loadGapDetail(state.currentGap)" not in round_log_block
+        assert "invalidateGapRoundLogs(state.currentGap)" not in round_log_block
     finally:
         try:
             conn.close()
