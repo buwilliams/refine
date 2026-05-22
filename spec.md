@@ -20,7 +20,7 @@ Refine is always available: when a Gap enters `todo`, refine launches an agent C
 
 ## Runtime topology
 
-Refine runs as host-native processes on the same machine as the target app. The supervisor owns process lifecycle, the UI process owns HTTP/API/SSE, and the runner worker owns agent lifecycle plus serialized state mutations. Tests and setup mode may still use an in-process runner fallback.
+Refine runs as host-native processes on the same machine as the target app. The supervisor owns process lifecycle, the UI process owns HTTP/API/SSE, and the runner worker owns agent lifecycle plus serialized state mutations. This supervisor-managed topology is the runtime architecture; there is no alternate single-process runtime mode.
 
 **Supervisor (`refine supervisor`):**
 
@@ -403,7 +403,7 @@ Both modes share the same chat UI; entry points differ (top nav vs Gap detail pa
 - **Application** — target application registry, scope, and target-app command configuration.
 - **Runtime configuration** — parallel-run cap, branch name pattern, merge target. See the catalog under **Application settings** below.
 - **Re-check auth** — on-demand re-run of the host runner's Claude auth pre-flight; clears the auth banner if it now passes.
-- **Backend diagnostics** — shown in the runner row on Processes: process model, runner transport, worker mode, last call timestamp, recent backend errors.
+- **Backend diagnostics** — shown in the runner row on Processes: runner transport, worker state, last call timestamp, recent backend errors.
 - Changes take effect immediately.
 
 ## UI
