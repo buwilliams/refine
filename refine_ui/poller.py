@@ -35,6 +35,10 @@ class SqlitePoller:
         # Previously-observed target-app state — emit an SSE event when
         # it transitions so the nav button updates without a poll.
         self._last_target_app_state: str | None = None
+        # Previously-observed reporter dropdown contents. The runner can add
+        # reporters while creating Gaps, so the web UI process rebroadcasts
+        # list changes from SQLite.
+        self._last_reporters_signature: tuple[tuple[int, str, str], ...] | None = None
         self._last_project_update_pulse_at: float = 0.0
 
     def start(self) -> None:
@@ -63,6 +67,7 @@ class SqlitePoller:
             conn = self._conn()
             row = conn.execute("SELECT COALESCE(MAX(id), 0) AS m FROM activity").fetchone()
             self._last_activity_id = int(row["m"] or 0)
+            self._last_reporters_signature = self._reporters_signature(conn)
             conn.close()
         except Exception:
             pass
@@ -129,6 +134,8 @@ class SqlitePoller:
             elif cur_state != self._last_target_app_state:
                 self._last_target_app_state = cur_state
                 sse.publish("target_app_state", {"state": cur_state})
+
+            self._poll_reporter_changes(conn)
         finally:
             conn.close()
 
@@ -205,3 +212,25 @@ class SqlitePoller:
                 "upstream": result.get("upstream"),
                 "message": result.get("message"),
             })
+
+    def _poll_reporter_changes(self, conn: sqlite3.Connection) -> None:
+        signature = self._reporters_signature(conn)
+        if self._last_reporters_signature is None:
+            self._last_reporters_signature = signature
+            return
+        if signature == self._last_reporters_signature:
+            return
+        self._last_reporters_signature = signature
+        sse.publish("reporters_changed", {"count": len(signature)})
+
+    def _reporters_signature(
+        self,
+        conn: sqlite3.Connection,
+    ) -> tuple[tuple[int, str, str], ...]:
+        rows = conn.execute(
+            "SELECT id, name, created FROM reporters ORDER BY name COLLATE NOCASE"
+        ).fetchall()
+        return tuple(
+            (int(r["id"]), str(r["name"] or ""), str(r["created"] or ""))
+            for r in rows
+        )

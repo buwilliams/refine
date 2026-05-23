@@ -904,6 +904,13 @@ function initSSE() {
   sseSource.addEventListener("target_app_health", () => {
     refreshTargetAppToggle();
   });
+  sseSource.addEventListener("reporters_changed", async () => {
+    await refreshReporters();
+    if (state.currentRoute === "settings"
+        && document.querySelector('[data-tab-pane="reporters"].active')) {
+      refreshCurrentSettingsSurface();
+    }
+  });
   sseSource.addEventListener("project_updated", async () => {
     await refreshProjectStatus();
     await refreshFeatures({ skipSettingsRefresh: true });
