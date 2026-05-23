@@ -42,46 +42,48 @@ function openImportModal() {
          aria-labelledby="import-title" style="max-width:760px">
       <div class="modal-title" id="import-title">Import gaps</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
-        <nav class="import-tabs" role="tablist">
+        <nav class="settings-tabs" id="import-tabs" role="tablist">
           ${Object.entries(IMPORT_MODES).map(([mode, meta]) => `
-            <button type="button" class="import-tab ${mode === "ai" ? "active" : ""}"
+            <button type="button" class="settings-tab ${mode === "ai" ? "active" : ""}"
                     data-import-mode="${mode}" role="tab"
                     aria-selected="${mode === "ai" ? "true" : "false"}">
               ${htmlEscape(meta.label)}
             </button>`).join("")}
         </nav>
-        <section class="import-panel active" data-import-panel="ai">
-          <p class="muted small">Paste free-form text (meeting transcript, bug report,
-          feedback dump). refine extracts a draft list — review and edit before saving.</p>
-          <div class="muted small" style="margin-bottom:8px">
-            Default reporter:
-            <strong class="js-reporter-name">${htmlEscape(reporter || "none selected")}</strong>.
-            Each draft can be edited before saving.
-          </div>
-          <div class="form-row">
-            <label>Source text</label>
-            <textarea id="import-text" rows="8" placeholder="Paste here…"></textarea>
-          </div>
-        </section>
-        <section class="import-panel" data-import-panel="csv">
-          <div class="form-row">
-            <label>CSV text
-              <span class="muted small">— required fields: ${IMPORT_CSV_REQUIRED_FIELDS.map(htmlEscape).join(", ")}</span>
-            </label>
-            <textarea id="import-csv-text" rows="8" placeholder="actual,target,reporter,priority&#10;Current behavior,Desired behavior,Alice,medium"></textarea>
-          </div>
-        </section>
-        <section class="import-panel" data-import-panel="upload">
-          <p class="muted small">
-            Upload a CSV with headers:
-            ${IMPORT_CSV_REQUIRED_FIELDS.map(htmlEscape).join(", ")}.
-          </p>
-          <div class="form-row">
-            <label>CSV file</label>
-            <input type="file" id="import-csv-file" accept=".csv,text/csv">
-          </div>
-        </section>
-        <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
+        <div class="card settings-tab-card import-tab-card">
+          <section class="settings-pane import-panel active" data-import-panel="ai">
+            <p class="muted small">Paste free-form text (meeting transcript, bug report,
+            feedback dump). refine extracts a draft list — review and edit before saving.</p>
+            <div class="muted small" style="margin-bottom:8px">
+              Default reporter:
+              <strong class="js-reporter-name">${htmlEscape(reporter || "none selected")}</strong>.
+              Each draft can be edited before saving.
+            </div>
+            <div class="form-row">
+              <label>Source text</label>
+              <textarea id="import-text" rows="8" placeholder="Paste here…"></textarea>
+            </div>
+          </section>
+          <section class="settings-pane import-panel" data-import-panel="csv">
+            <div class="form-row">
+              <label>CSV text
+                <span class="muted small">— required fields: ${IMPORT_CSV_REQUIRED_FIELDS.map(htmlEscape).join(", ")}</span>
+              </label>
+              <textarea id="import-csv-text" rows="8" placeholder="actual,target,reporter,priority&#10;Current behavior,Desired behavior,Alice,medium"></textarea>
+            </div>
+          </section>
+          <section class="settings-pane import-panel" data-import-panel="upload">
+            <p class="muted small">
+              Upload a CSV with headers:
+              ${IMPORT_CSV_REQUIRED_FIELDS.map(htmlEscape).join(", ")}.
+            </p>
+            <div class="form-row">
+              <label>CSV file</label>
+              <input type="file" id="import-csv-file" accept=".csv,text/csv">
+            </div>
+          </section>
+          <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
+        </div>
       </div>
       <div class="modal-actions">
         <button class="secondary" data-cancel>Cancel</button>

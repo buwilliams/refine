@@ -19,6 +19,12 @@ def main() -> int:
     assert '"AI Import"' in import_js
     assert '"CSV Import"' in import_js
     assert '"CSV Upload"' in import_js
+    assert 'class="settings-tabs" id="import-tabs" role="tablist"' in import_js
+    assert 'class="settings-tab ${mode === "ai" ? "active" : ""}"' in import_js
+    assert 'class="card settings-tab-card import-tab-card"' in import_js
+    assert 'class="settings-pane import-panel active"' in import_js
+    assert 'class="import-tabs"' not in import_js
+    assert 'class="import-tab ' not in import_js
     assert "const IMPORT_CSV_REQUIRED_FIELDS = [" in import_js
     assert "actual (text)" in import_js
     assert "target (text)" in import_js

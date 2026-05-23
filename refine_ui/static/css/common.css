@@ -465,24 +465,9 @@ select {
 .round-body .pair dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
 .round-body .pair dd { margin: 0; }
 
-.import-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 12px;
+.import-tab-card {
+  box-shadow: none;
 }
-.import-tab {
-  background: white;
-  color: var(--fg);
-  border-color: var(--border);
-}
-.import-tab.active {
-  background: var(--accent);
-  color: white;
-  border-color: transparent;
-}
-.import-panel { display: none; }
-.import-panel.active { display: block; }
 .import-drafts .draft { padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
 .import-duplicate {
   background: var(--warn-bg);
