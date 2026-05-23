@@ -39,6 +39,10 @@
 .project-setup-modal .small {
   margin: 8px 0 0;
 }
+.import-modal {
+  width: 80vw;
+  max-width: 80vw;
+}
 .form-error {
   margin-top: 10px;
   color: var(--error);
@@ -98,3 +102,10 @@
   padding: 22px 24px 24px;
 }
 .gap-detail-modal-body .gap-detail h2 { margin-top: 0; }
+
+@media (max-width: 760px) {
+  .import-modal {
+    width: calc(100% - 24px);
+    max-width: calc(100% - 24px);
+  }
+}

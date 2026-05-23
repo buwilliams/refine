@@ -107,7 +107,7 @@ function openImportModal() {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
-         aria-labelledby="import-title" style="max-width:760px">
+         aria-labelledby="import-title">
       <div class="modal-title" id="import-title">Import gaps</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <nav class="settings-tabs" id="import-tabs" role="tablist">
@@ -653,6 +653,10 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     const start = (page - 1) * IMPORT_DRAFT_PAGE_SIZE;
     const pageDrafts = visibleDrafts.slice(start, start + IMPORT_DRAFT_PAGE_SIZE);
     const end = start + pageDrafts.length;
+    const pageSelectedCount = pageDrafts.filter(({ draft }) => draft.selected).length;
+    const pageAllSelected = !!pageDrafts.length && pageSelectedCount === pageDrafts.length;
+    const pageSomeSelected = pageSelectedCount > 0 && !pageAllSelected;
+    const allFilteredSelected = !!visibleDrafts.length && visibleDrafts.every(({ draft }) => draft.selected);
     const duplicateCount = draftState.filter((draft) => draft.duplicate).length;
     const unresolvedCount = draftState.filter(importDraftNeedsResolution).length;
     const selectedCount = draftState.filter((draft) => draft.selected).length;
@@ -672,22 +676,22 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         duplicateCount,
         totalPages,
         page,
+        pageAllSelected,
+        pageSomeSelected,
+        allFilteredSelected,
         updateField: originalUpdateField,
       })}
-      <div class="import-draft-toolbar">
-        ${renderImportDraftPager(page, totalPages)}
-      </div>
-      ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Resolve them with the action bar before saving.</p>` : ""}
+      ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Resolve them with the bulk actions before saving.</p>` : ""}
       ${showNeedsResolutionOnly && !visibleDrafts.length
         ? `<p class="muted">No drafts need resolution.</p>`
-        : `<div class="import-draft-list">
-            ${pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index)).join("")}
-          </div>`}
+        : renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected })}
       <div class="import-draft-footer">
         ${renderImportDraftPager(page, totalPages)}
       </div>
     `;
-    bindImportDraftPage(drafts_root, draftState, saveSession);
+    bindImportDraftPage(drafts_root, draftState, saveSession, {
+      onSelectionChange: renderPage,
+    });
     const persistReviewState = () => {
       syncImportDraftPage(drafts_root, draftState);
       if (saveSession) saveSession({ phase: "review", drafts: draftState });
@@ -698,11 +702,19 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       page = 1;
       renderPage();
     });
-    $("[data-import-select-visible]", drafts_root)?.addEventListener("change", (e) => {
+    $("[data-import-toggle-page]", drafts_root)?.addEventListener("click", () => {
       syncImportDraftPage(drafts_root, draftState);
       for (const { draft } of visibleDrafts.slice(start, start + IMPORT_DRAFT_PAGE_SIZE)) {
-        draft.selected = e.target.checked;
+        draft.selected = !pageAllSelected;
       }
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      renderPage();
+    });
+    $("[data-import-toggle-all]", drafts_root)?.addEventListener("click", () => {
+      persistReviewState();
+      visibleDrafts.forEach(({ draft }) => {
+        draft.selected = !allFilteredSelected;
+      });
       if (saveSession) saveSession({ phase: "review", drafts: draftState });
       renderPage();
     });
@@ -1018,36 +1030,52 @@ function renderImportDraftActionBar({
   duplicateCount,
   totalPages,
   page,
+  pageAllSelected,
+  pageSomeSelected,
+  allFilteredSelected,
   updateField,
 }) {
   const pageInfo = renderImportDraftRange(start, end, visibleCount, totalCount, filtered);
   return `
-    <div class="import-review-actionbar">
-      <div class="import-review-selection">
-        <label class="small">
-          <input type="checkbox" data-import-select-visible>
-          Select page
-        </label>
-        <span class="muted small">${htmlEscape(pageInfo)}</span>
-        <span class="muted small">${selectedCount} selected</span>
+    <details class="filter-shell import-review-shell" open>
+      <summary>
+        <span class="filter-shell-title">Filters &amp; bulk actions</span>
+        <span class="filter-pill">${selectedCount} selected</span>
+        ${filtered ? `<span class="filter-pill">Needs resolution</span>` : ""}
+      </summary>
+      <div class="filter-shell-body">
+        <div class="filter-bar">
+          <div class="filter-row filter-row-primary">
+            <label class="import-resolution-filter small">
+              <input type="checkbox" data-import-unresolved-filter ${filtered ? "checked" : ""}>
+              Needs resolution (${unresolvedCount})
+            </label>
+            <span class="muted small">${htmlEscape(pageInfo)}</span>
+            <span class="muted small">${selectedCount} selected</span>
+            ${duplicateCount ? `<span class="muted small">${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}</span>` : ""}
+          </div>
+          <div class="filter-row filter-row-bulk">
+            <span class="muted small">Bulk update selected:</span>
+            <button type="button" class="secondary small" data-import-toggle-page ${visibleCount ? "" : "disabled"}>
+              ${pageAllSelected ? "Deselect page" : "Select page"}
+            </button>
+            <button type="button" class="secondary small" data-import-toggle-all ${visibleCount ? "" : "disabled"}>
+              ${allFilteredSelected ? "Deselect all" : "Select all"}
+            </button>
+            <button type="button" class="secondary small" data-import-select-duplicates ${duplicateCount ? "" : "disabled"}>Select duplicates</button>
+            <button type="button" class="secondary small" data-import-dismiss-duplicates ${duplicateCount ? "" : "disabled"}>Dismiss duplicates</button>
+            <button type="button" class="secondary small" data-import-originals>Import selected</button>
+            <button type="button" class="secondary small" data-import-backlog-originals>Move originals to backlog</button>
+            <select data-import-update-field aria-label="Original Gap field">
+              ${["actual", "target", "reporter", "priority"].map((field) => `
+                <option value="${field}" ${field === updateField ? "selected" : ""}>${field}</option>`).join("")}
+            </select>
+            <button type="button" class="secondary small" data-import-update-originals>Update originals</button>
+          </div>
+        </div>
         ${totalPages > 1 ? `<span class="muted small">Page ${page} of ${totalPages}</span>` : ""}
       </div>
-      <div class="import-review-actions">
-        <label class="import-resolution-filter small">
-          <input type="checkbox" data-import-unresolved-filter ${filtered ? "checked" : ""}>
-          Needs resolution (${unresolvedCount})
-        </label>
-        <button type="button" class="secondary small" data-import-select-duplicates ${duplicateCount ? "" : "disabled"}>Select duplicates</button>
-        <button type="button" class="secondary small" data-import-dismiss-duplicates ${duplicateCount ? "" : "disabled"}>Dismiss duplicates</button>
-        <button type="button" class="secondary small" data-import-originals>Import selected</button>
-        <button type="button" class="secondary small" data-import-backlog-originals>Move originals to backlog</button>
-        <select data-import-update-field aria-label="Original Gap field">
-          ${["actual", "target", "reporter", "priority"].map((field) => `
-            <option value="${field}" ${field === updateField ? "selected" : ""}>${field}</option>`).join("")}
-        </select>
-        <button type="button" class="secondary small" data-import-update-originals>Update originals</button>
-      </div>
-    </div>`;
+    </details>`;
 }
 
 function renderImportDraftRange(start, end, visibleCount, totalCount, filtered) {
@@ -1077,41 +1105,67 @@ function renderImportDraftPager(page, totalPages) {
     </div>`;
 }
 
+function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected }) {
+  return `
+    <table class="table import-drafts-table">
+      <colgroup>
+        <col class="import-col-select">
+        <col class="import-col-name">
+        <col class="import-col-reporter">
+        <col class="import-col-priority">
+        <col class="import-col-actual">
+        <col class="import-col-target">
+      </colgroup>
+      <thead>
+        <tr>
+          <th class="gap-select-col">
+            <input type="checkbox" data-import-toggle-page-checkbox
+                   aria-label="Select page"
+                   ${pageAllSelected ? "checked" : ""}
+                   data-indeterminate="${pageSomeSelected ? "1" : "0"}">
+          </th>
+          <th>Name</th>
+          <th>Reporter</th>
+          <th>Priority</th>
+          <th>Actual</th>
+          <th>Target</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index)).join("")}
+      </tbody>
+    </table>`;
+}
+
 function renderImportDraftRow(d, index) {
   return `
-    <div class="draft" data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
-      <div class="import-draft-row-head">
-        <label class="small">
-          <input type="checkbox" data-import-draft-select ${d.selected ? "checked" : ""}>
-          Select
-        </label>
-        ${d.duplicate ? `<span class="muted small">${htmlEscape(importDuplicateDecisionLabel(d.duplicateDecision))}</span>` : ""}
-      </div>
-      ${d.error ? `<p class="small draft-error" style="margin-top:0;color:#b42318">${htmlEscape(d.error)}</p>` : ""}
-      ${d.duplicate ? renderImportDuplicateSummary(d.duplicate) : ""}
-      <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
-      <div class="form-grid two" style="margin-top:6px">
-        <div class="form-row">
-          <label class="small muted">Reporter</label>
-          <input type="text" class="d-reporter" value="${htmlEscape(d.reporter)}" placeholder="Reporter">
-        </div>
-        <div class="form-row">
-          <label class="small muted">Priority</label>
-          <select class="d-priority">
-            ${["low", "medium", "high"].map((priority) => `
-              <option value="${priority}" ${d.priority === priority ? "selected" : ""}>${priority}</option>`).join("")}
-          </select>
-        </div>
-      </div>
-      <div class="form-row" style="margin-top:6px">
-        <label class="small muted">Actual</label>
-        <textarea class="d-actual" rows="2">${htmlEscape(d.actual)}</textarea>
-      </div>
-      <div class="form-row">
-        <label class="small muted">Target</label>
+    <tr class="draft ${importDraftNeedsResolution(d) ? "needs-resolution" : ""}"
+        data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
+      <td class="gap-select-col">
+        <input type="checkbox" data-import-draft-select ${d.selected ? "checked" : ""}
+               aria-label="Select draft ${index + 1}">
+      </td>
+      <td>
+        <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
+        ${d.error ? `<p class="small draft-error">${htmlEscape(d.error)}</p>` : ""}
+        ${d.duplicate ? `<p class="muted small import-decision-label">${htmlEscape(importDuplicateDecisionLabel(d.duplicateDecision))}</p>` : ""}
+      </td>
+      <td><input type="text" class="d-reporter" value="${htmlEscape(d.reporter)}" placeholder="Reporter"></td>
+      <td>
+        <select class="d-priority">
+          ${["low", "medium", "high"].map((priority) => `
+            <option value="${priority}" ${d.priority === priority ? "selected" : ""}>${priority}</option>`).join("")}
+        </select>
+      </td>
+      <td>
+        <textarea class="d-actual" rows="3">${htmlEscape(d.actual)}</textarea>
+        ${d.duplicate ? renderImportDuplicateActual(d.duplicate) : ""}
+      </td>
+      <td>
         <textarea class="d-target" rows="3">${htmlEscape(d.target)}</textarea>
-      </div>
-    </div>`;
+        ${d.duplicate ? renderImportDuplicateTarget(d.duplicate) : ""}
+      </td>
+    </tr>`;
 }
 
 function importDuplicateDecisionLabel(decision) {
@@ -1124,7 +1178,7 @@ function importDuplicateDecisionLabel(decision) {
   return "Needs duplicate resolution";
 }
 
-function renderImportDuplicateSummary(match) {
+function renderImportDuplicateActual(match) {
   return `
     <div class="import-duplicate">
       <div class="small" style="font-weight:600">Possible duplicate</div>
@@ -1132,20 +1186,27 @@ function renderImportDuplicateSummary(match) {
         ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.instance_display_name || match.instance_id || "Default")}
         · ${htmlEscape(match.status || "")}
       </p>
-      <div class="import-duplicate-content">
-        <div>
-          <div class="small muted">Matched actual</div>
-          <p>${htmlEscape(match.actual || "")}</p>
-        </div>
-        <div>
-          <div class="small muted">Matched target</div>
-          <p>${htmlEscape(match.target || "")}</p>
-        </div>
-      </div>
+      <div class="small muted">Matched actual</div>
+      <p>${htmlEscape(match.actual || "")}</p>
     </div>`;
 }
 
-function bindImportDraftPage(root, draftState, saveSession = null) {
+function renderImportDuplicateTarget(match) {
+  return `
+    <div class="import-duplicate">
+      <div class="small muted">Matched target</div>
+      <p>${htmlEscape(match.target || "")}</p>
+    </div>`;
+}
+
+function bindImportDraftPage(root, draftState, saveSession = null, options = {}) {
+  const pageToggle = root.querySelector("[data-import-toggle-page-checkbox]");
+  if (pageToggle) {
+    pageToggle.indeterminate = pageToggle.dataset.indeterminate === "1";
+    pageToggle.addEventListener("change", () => {
+      root.querySelector("[data-import-toggle-page]")?.click();
+    });
+  }
   $$(".draft", root).forEach((row) => {
     const draft = draftState[Number(row.dataset.idx)];
     if (!draft) return;
@@ -1153,6 +1214,7 @@ function bindImportDraftPage(root, draftState, saveSession = null) {
     row.querySelector("[data-import-draft-select]")?.addEventListener("change", (e) => {
       draft.selected = e.target.checked;
       if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (typeof options.onSelectionChange === "function") options.onSelectionChange();
     });
     $$(".import-duplicate-actions button", row).forEach((btn) => {
       btn.classList.toggle(
@@ -1187,7 +1249,9 @@ function bindImportDraftPage(root, draftState, saveSession = null) {
         draft.error = "";
         if (saveSession) saveSession({ phase: "review", drafts: draftState });
         row.querySelector(".import-duplicate")?.remove();
+        row.querySelectorAll(".import-duplicate").forEach((el) => el.remove());
         row.querySelector(".draft-error")?.remove();
+        row.querySelector(".import-decision-label")?.remove();
       });
     });
   });

@@ -54,10 +54,13 @@ def main() -> int:
     assert "$$(\"[data-import-page]\", drafts_root).forEach" in import_js
     assert "syncImportDraftPage(drafts_root, draftState)" in import_js
     assert ".map(importDraftPayload)" in import_js
-    assert ".import-draft-toolbar" in common_css
-    assert ".import-review-actionbar" in common_css
-    assert ".import-draft-row-head" in common_css
-    assert ".import-draft-list" in common_css
+    assert ".import-review-shell" in common_css
+    assert ".import-drafts-table" in common_css
+    assert "data-import-toggle-page" in import_js
+    assert "data-import-toggle-all" in import_js
+    assert "Select all" in import_js
+    assert "Deselect all" in import_js
+    assert "Deselect page" in import_js
     assert ".import-draft-footer" in common_css
     assert ".import-resolution-filter" in common_css
     assert 'id="import-csv-file-button"' in import_js
@@ -98,9 +101,10 @@ def main() -> int:
     assert "No, import" in new_gap_js
     assert "Yes, move original to backlog" in new_gap_js
     assert "move_original_to_backlog" in new_gap_js
-    assert "renderImportDuplicateSummary(d.duplicate)" in import_js
-    assert "Resolve them with the action bar before saving." in import_js
-    assert "data-import-select-visible" in import_js
+    assert "renderImportDuplicateActual(d.duplicate)" in import_js
+    assert "renderImportDuplicateTarget(d.duplicate)" in import_js
+    assert "Resolve them with the bulk actions before saving." in import_js
+    assert "data-import-toggle-page" in import_js
     assert "data-import-dismiss-duplicates" in import_js
     assert "data-import-update-originals" in import_js
     assert "update_original_${field}" in import_js

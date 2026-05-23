@@ -498,40 +498,15 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
-.import-draft-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
-}
 .import-draft-pagination {
   margin-top: 0;
 }
-.import-review-actionbar {
-  display: grid;
-  gap: 8px;
-  padding: 8px;
+.import-review-shell {
   margin: 8px 0 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
 }
-.import-review-selection,
-.import-review-actions,
-.import-draft-row-head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.import-review-actions select {
+.import-review-shell .filter-row-bulk select {
   min-width: 120px;
-}
-.import-draft-row-head {
-  justify-content: space-between;
-  margin-bottom: 8px;
+  width: auto;
 }
 .import-resolution-filter {
   display: inline-flex;
@@ -539,29 +514,59 @@ select {
   gap: 6px;
   color: var(--fg);
 }
-.import-draft-list {
-  display: grid;
-  gap: 8px;
+.import-drafts-table {
+  table-layout: fixed;
+  margin-top: 8px;
+  min-width: 920px;
+}
+.import-drafts-table th,
+.import-drafts-table td {
+  vertical-align: top;
+}
+.import-drafts-table tr:hover {
+  cursor: default;
+}
+.import-drafts-table input[type="text"],
+.import-drafts-table textarea,
+.import-drafts-table select {
+  font-size: 13px;
+}
+.import-drafts-table textarea {
+  min-height: 76px;
+}
+.import-drafts-table .import-col-select { width: 38px; }
+.import-drafts-table .import-col-name { width: 18%; }
+.import-drafts-table .import-col-reporter { width: 14%; }
+.import-drafts-table .import-col-priority { width: 104px; }
+.import-drafts-table .import-col-actual,
+.import-drafts-table .import-col-target { width: auto; }
+.import-drafts-table tr.needs-resolution {
+  background: var(--warn-bg);
 }
 .import-draft-footer {
   display: flex;
   justify-content: flex-end;
   margin-top: 10px;
 }
-.import-drafts .draft { padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+.draft-error,
+.import-decision-label {
+  margin: 6px 0 0;
+}
+.draft-error {
+  color: #b42318;
+}
 .import-duplicate {
   background: var(--warn-bg);
   border: 1px solid #e6c766;
   border-radius: var(--radius);
   padding: 10px;
-  margin-bottom: 10px;
-}
-.import-duplicate-content {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 10px;
+  margin-top: 8px;
 }
 .import-duplicate-content p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+.import-duplicate p {
   margin: 4px 0 0;
   white-space: pre-wrap;
 }
