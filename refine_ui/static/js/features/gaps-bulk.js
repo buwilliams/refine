@@ -6,8 +6,14 @@
 
 const BULK_PRIORITY_OPTIONS = ["low", "medium", "high"];
 const BULK_STATUS_OPTIONS = [
-  "backlog", "todo", "awaiting-rebuild", "review",
-  "done", "failed", "cancelled",
+  { value: "__last_workflow_state", label: "(Last workflow state)" },
+  { value: "backlog", label: "backlog" },
+  { value: "todo", label: "todo" },
+  { value: "awaiting-rebuild", label: "awaiting-rebuild" },
+  { value: "review", label: "review" },
+  { value: "done", label: "done" },
+  { value: "failed", label: "failed" },
+  { value: "cancelled", label: "cancelled" },
 ];
 
 async function openBulkModal(field) {
@@ -38,11 +44,12 @@ async function openBulkModal(field) {
   } else if (field === "status") {
     valueControlHtml = `
       <select class="modal-input" id="bulk-value-status" style="width:100%">
-        ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s}">${s}</option>`).join("")}
+        ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s.value}">${htmlEscape(s.label)}</option>`).join("")}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Bulk status updates skip in-progress and ready-merge Gaps.
-        Use per-Gap workflow actions for automated states.
+        Last workflow state sends failed merge attempts back to ready-merge,
+        other failed or reviewable Gaps back to todo, and leaves active
+        automation alone.
       </p>`;
   } else if (field === "reporter") {
     const opts = (state.reporters || [])

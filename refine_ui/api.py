@@ -94,12 +94,19 @@ def _background_job_conflict_response(
     )
 
 
-def _exclusive_mutation(label: str) -> Callable:
+def _exclusive_mutation(
+    label: str,
+    *,
+    allow_active_kinds: set[str] | None = None,
+) -> Callable:
     def decorator(fn: Callable) -> Callable:
         @wraps(fn)
         def wrapped(*args, **kwargs):
             try:
-                with background_jobs.exclusive_operation(label):
+                with background_jobs.exclusive_operation(
+                    label,
+                    allow_active_kinds=allow_active_kinds,
+                ):
                     return fn(*args, **kwargs)
             except background_jobs.BackgroundJobConflict as e:
                 return _background_job_conflict_response(e)
@@ -1035,6 +1042,7 @@ _USER_STATUS_TRANSITIONS = {
 _BULK_STATUS_AUTOMATED_VALUES = {"in-progress", "ready-merge"}
 _BULK_STATUS_VALUES = set(_VALID_STATUSES) - _BULK_STATUS_AUTOMATED_VALUES
 _BULK_STATUS_SOURCE_VALUES = _BULK_STATUS_VALUES
+_BULK_LAST_WORKFLOW_STATUS = "__last_workflow_state"
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
 # injection from the query string. `id` doubles as a chronological sort
@@ -1737,8 +1745,21 @@ def delete_gap(gap_id: str) -> tuple[int, dict]:
     return 200, result
 
 
-@_exclusive_mutation("Bulk update Gaps")
 def bulk_update_gaps(body: dict) -> tuple[int, dict]:
+    allow_active_kinds = (
+        {"merge_agent"} if _is_last_workflow_bulk_update(body) else None
+    )
+    try:
+        with background_jobs.exclusive_operation(
+            "Bulk update Gaps",
+            allow_active_kinds=allow_active_kinds,
+        ):
+            return _bulk_update_gaps_impl(body)
+    except background_jobs.BackgroundJobConflict as e:
+        return _background_job_conflict_response(e)
+
+
+def _bulk_update_gaps_impl(body: dict) -> tuple[int, dict]:
     """Apply a single field update to every Gap matching the supplied filter.
 
     Body shape:
@@ -1750,10 +1771,13 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     to confirm in the UI. `priority` and `status` are SQL-index fields and
     are selected in the UI process, then applied by one runner protocol
     request that carries the ordered Gap ids. Status changes here are
-    bookkeeping-only — they don't trigger workflow side effects like
-    killing a running subprocess or cleaning up a worktree; for those,
-    use the per-Gap action on the detail page.
+    bookkeeping-only except for the special `__last_workflow_state`
+    status operation, which asks the runner to reopen safe retry queues
+    (`todo` or `ready-merge`) from each Gap's latest workflow history.
     """
+    allow_active_kinds = (
+        {"merge_agent"} if _is_last_workflow_bulk_update(body) else None
+    )
     update = body.get("update") or {}
     update = {k: v for k, v in update.items()
               if k in ("priority", "status", "reporter")}
@@ -1769,9 +1793,11 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
             return err(400, "priority must be one of low/medium/high")
     elif field == "status":
         value = value.lower()
-        if value not in _VALID_STATUSES:
+        if value == _BULK_LAST_WORKFLOW_STATUS:
+            pass
+        elif value not in _VALID_STATUSES:
             return err(400, "invalid status")
-        if value not in _BULK_STATUS_VALUES:
+        elif value not in _BULK_STATUS_VALUES:
             return err(
                 409,
                 (
@@ -1789,7 +1815,9 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     code, selected = _select_bulk_update_candidates(
         filt,
         excluded,
-        skip_automated=(field == "status"),
+        skip_automated=(
+            field == "status" and value != _BULK_LAST_WORKFLOW_STATUS
+        ),
         selected_ids=selected_ids,
     )
     if code != 200:
@@ -1846,6 +1874,7 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
                 "bulk_update_gaps",
                 f"Bulk update {len(gap_ids)} Gaps",
                 run_job,
+                allow_active_kinds=allow_active_kinds,
             )
         except background_jobs.BackgroundJobConflict as e:
             return _background_job_conflict_response(e)
@@ -1866,6 +1895,15 @@ def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     if int(result.get("http_status") or 200) >= 400:
         return int(result["http_status"]), result
     return 200, result
+
+
+def _is_last_workflow_bulk_update(body: dict) -> bool:
+    update = body.get("update") or {}
+    raw = update.get("status")
+    return (
+        isinstance(raw, str)
+        and raw.strip().lower() == _BULK_LAST_WORKFLOW_STATUS
+    )
 
 
 def _bulk_update_selected_gaps(
@@ -1895,14 +1933,20 @@ def _bulk_update_selected_gaps(
             "error": body["error"],
             "http_status": code,
         }
+    runner_skipped_details = result.get("skipped_details") or []
+    if not isinstance(runner_skipped_details, list):
+        runner_skipped_details = []
+    all_skipped_details = [*skipped_status_ids, *runner_skipped_details]
     return {
         "updated": int(result.get("updated") or 0),
         "ids": result.get("ids") or [],
         "field": field, "value": value,
-        "skipped": len(skipped_status_ids),
-        "skipped_details": skipped_status_ids,
+        "skipped": len(all_skipped_details),
+        "skipped_details": all_skipped_details,
         "failed": int(result.get("failed") or 0),
         "failures": result.get("failures") or [],
+        "todo": int(result.get("todo") or 0),
+        "ready_merge": int(result.get("ready_merge") or 0),
         "progress": result.get("progress") or {
             "completed": int(result.get("updated") or 0),
             "total": len(gap_ids),
@@ -2158,7 +2202,7 @@ def retry(gap_id: str) -> tuple[int, dict]:
     return 200, {"ok": True}
 
 
-@_exclusive_mutation("Retry Merge")
+@_exclusive_mutation("Retry Merge", allow_active_kinds={"merge_agent"})
 def retry_merge(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:

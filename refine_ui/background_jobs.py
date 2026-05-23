@@ -41,9 +41,15 @@ class BackgroundJobConflict(RuntimeError):
         )
 
 
-def start(kind: str, label: str, fn: Callable[..., dict[str, Any]]) -> dict[str, Any]:
+def start(
+    kind: str,
+    label: str,
+    fn: Callable[..., dict[str, Any]],
+    *,
+    allow_active_kinds: set[str] | None = None,
+) -> dict[str, Any]:
     if kind in EXCLUSIVE_KINDS:
-        conflict = active_exclusive_job()
+        conflict = active_exclusive_job(allow_active_kinds=allow_active_kinds)
         if conflict is not None:
             raise BackgroundJobConflict(conflict)
     job_id = uuid.uuid4().hex
@@ -77,7 +83,10 @@ def start(kind: str, label: str, fn: Callable[..., dict[str, Any]]) -> dict[str,
     return snapshot(job_id) or job
 
 
-def active_exclusive_job() -> dict[str, Any] | None:
+def active_exclusive_job(
+    *,
+    allow_active_kinds: set[str] | None = None,
+) -> dict[str, Any] | None:
     ignore_owner_id = getattr(_LOCAL, "exclusive_owner_id", None)
     with _LOCK:
         job = _active_exclusive_job_locked(ignore_owner_id=ignore_owner_id)
@@ -95,12 +104,19 @@ def active_exclusive_job() -> dict[str, Any] | None:
     if owner is not None:
         if owner.get("id") == ignore_owner_id:
             return None
+        if owner.get("kind") in (allow_active_kinds or set()):
+            return None
         return owner
     return None
 
 
 @contextmanager
-def exclusive_operation(label: str, *, kind: str = "api_operation"):
+def exclusive_operation(
+    label: str,
+    *,
+    kind: str = "api_operation",
+    allow_active_kinds: set[str] | None = None,
+):
     global _EXCLUSIVE_OWNER
     with _LOCK:
         conflict = _active_exclusive_job_locked()
@@ -129,6 +145,9 @@ def exclusive_operation(label: str, *, kind: str = "api_operation"):
                     ):
                         _EXCLUSIVE_OWNER = None
     except mutation_guard.MutationBusy as e:
+        if e.owner.get("kind") in (allow_active_kinds or set()):
+            yield
+            return
         raise BackgroundJobConflict(e.owner) from e
 
 

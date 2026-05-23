@@ -637,7 +637,11 @@ class Runner:
         if field == "priority":
             value = _normalize_priority_required(value)
         elif field == "status":
-            value = _normalize_status_required(value)
+            value = (
+                _BULK_LAST_WORKFLOW_STATUS
+                if value.strip().lower() == _BULK_LAST_WORKFLOW_STATUS
+                else _normalize_status_required(value)
+            )
         elif not value:
             raise ValueError("reporter is required")
         if not isinstance(raw_ids, list):
@@ -658,6 +662,8 @@ class Runner:
         if field in {"priority", "status"}:
             self.dispatcher.enforce_now()
             self.governance_agent.wake()
+        if int(result.get("ready_merge") or 0) > 0:
+            self.merger.wake()
         return result
 
     def _bulk_update_gaps_locked(
@@ -671,7 +677,7 @@ class Runner:
         for chunk in _chunks(gap_ids):
             placeholders = ",".join("?" * len(chunk))
             rows.extend(self._conn.execute(
-                "SELECT id, status, instance_id FROM gaps_index "
+                "SELECT id, status, branch_name, instance_id FROM gaps_index "
                 f"WHERE id IN ({placeholders})",
                 chunk,
             ).fetchall())
@@ -699,6 +705,14 @@ class Runner:
             for gid in gap_ids
         }
         now = now_iso()
+
+        if field == "status" and value == _BULK_LAST_WORKFLOW_STATUS:
+            return self._bulk_restore_last_workflow_state_locked(
+                gap_ids,
+                by_id,
+                now,
+                active,
+            )
 
         if field in {"priority", "status"}:
             with db.transaction(self._conn):
@@ -770,6 +784,131 @@ class Runner:
                 "total": len(gap_ids),
             },
         }
+
+    def _bulk_restore_last_workflow_state_locked(
+        self,
+        gap_ids: list[str],
+        by_id: dict[str, sqlite3.Row],
+        now: str,
+        active: str,
+    ) -> dict:
+        targets_by_id: dict[str, str] = {}
+        skipped: list[dict[str, str]] = []
+        failures: list[dict[str, str]] = []
+        target_counts = {"todo": 0, "ready-merge": 0}
+
+        for gap_id in gap_ids:
+            row = by_id[gap_id]
+            current = str(row["status"] or "")
+            target, reason = self._last_workflow_bulk_target(
+                gap_id,
+                current,
+                str(row["branch_name"] or ""),
+            )
+            if target is None:
+                skipped.append({"id": gap_id, "reason": reason})
+                continue
+            targets_by_id[gap_id] = target
+            if target in target_counts:
+                target_counts[target] += 1
+
+        for target in ("todo", "ready-merge"):
+            ids = [gid for gid in gap_ids if targets_by_id.get(gid) == target]
+            if not ids:
+                continue
+            with db.transaction(self._conn):
+                for chunk in _chunks(ids):
+                    placeholders = ",".join("?" * len(chunk))
+                    self._conn.execute(
+                        "UPDATE gaps_index SET status = ?, updated = ? "
+                        f"WHERE id IN ({placeholders}) AND instance_id = ?",
+                        [target, now, *chunk, active],
+                    )
+
+        updated_ids: list[str] = []
+        for idx, gap_id in enumerate(gap_ids, start=1):
+            target = targets_by_id.get(gap_id)
+            if target is None:
+                self._record_bulk_progress("status", idx, len(gap_ids))
+                continue
+            previous = str(by_id[gap_id]["status"] or "")
+            try:
+                gap_writer.update_fields(gap_id, status=target)
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="info",
+                    category="state",
+                    actor="refine",
+                    message=(
+                        "Workflow status changed by bulk last workflow state: "
+                        f"{previous} → {target}"
+                    ),
+                )
+                try:
+                    gap_writer.edit_latest_round(
+                        gap_id,
+                        actual=None,
+                        target=None,
+                        reporter=None,
+                    )
+                except Exception:
+                    pass
+                updated_ids.append(gap_id)
+            except Exception as e:
+                failures.append({"id": gap_id, "error": str(e) or repr(e)})
+            self._record_bulk_progress("status", idx, len(gap_ids))
+
+        return {
+            "updated": len(updated_ids),
+            "ids": updated_ids,
+            "field": "status",
+            "value": _BULK_LAST_WORKFLOW_STATUS,
+            "failed": len(failures),
+            "failures": failures,
+            "skipped": len(skipped),
+            "skipped_details": skipped,
+            "todo": target_counts["todo"],
+            "ready_merge": target_counts["ready-merge"],
+            "progress": {
+                "completed": len(updated_ids) + len(failures) + len(skipped),
+                "total": len(gap_ids),
+            },
+        }
+
+    def _last_workflow_bulk_target(
+        self,
+        gap_id: str,
+        current_status: str,
+        branch_name: str,
+    ) -> tuple[str | None, str]:
+        if current_status in {"backlog", "todo", "ready-merge"}:
+            return None, f"status:{current_status}"
+        if current_status in {"in-progress", "awaiting-rebuild"}:
+            return None, f"automated:{current_status}"
+        if current_status == "failed":
+            previous = self._previous_workflow_status(gap_id)
+            if previous == "ready-merge":
+                if not branch_name:
+                    return None, "missing-branch"
+                if not git_ops.local_branch_exists(branch_name):
+                    return None, f"missing-branch:{branch_name}"
+                return "ready-merge", "failed-from-ready-merge"
+            return "todo", "failed-from-agent"
+        if current_status in {"review", "done", "cancelled"}:
+            return "todo", f"status:{current_status}"
+        return "todo", f"status:{current_status or 'unknown'}"
+
+    def _previous_workflow_status(self, gap_id: str) -> str | None:
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
+        rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+        if not rounds:
+            return None
+        latest = round_logs.latest_workflow_for_round(gap_id, len(rounds) - 1)
+        message = str((latest or {}).get("message") or "")
+        prefix = "Workflow status changed:"
+        if not message.startswith(prefix) or "→" not in message:
+            return None
+        return message[len(prefix):].split("→", 1)[0].strip()
 
     def _record_bulk_progress(self, field: str, completed: int, total: int) -> None:
         if completed == total or completed == 1 or completed % 25 == 0:
@@ -1788,6 +1927,7 @@ _VALID_STATUSES = (
     "backlog", "todo", "in-progress", "ready-merge", "awaiting-rebuild",
     "review", "done", "failed", "cancelled",
 )
+_BULK_LAST_WORKFLOW_STATUS = "__last_workflow_state"
 
 
 def _normalize_priority(value: Any) -> str:

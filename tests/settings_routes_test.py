@@ -425,9 +425,10 @@ def main() -> int:
     assert 'renderPaginationControls("changes"' in changes_js
     assert 'bindPaginationControls(root, "changes"' in changes_js
     assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
-    assert '"awaiting-rebuild", "review",' in gaps_bulk_js
-    assert '"done", "failed", "cancelled"' in gaps_bulk_js
-    assert "skip in-progress and ready-merge" in gaps_bulk_js
+    assert '"__last_workflow_state"' in gaps_bulk_js
+    assert "(Last workflow state)" in gaps_bulk_js
+    assert 'value: "awaiting-rebuild", label: "awaiting-rebuild"' in gaps_bulk_js
+    assert "failed merge attempts back to ready-merge" in gaps_bulk_js
     assert 'forward: { label: "Review →"' not in gaps_detail_js
     assert 'todo:         { back:    { label: "← Backlog",  next: "backlog" } }' in gaps_detail_js
     assert '<span class="target-app-label">Application</span>' in index_html

@@ -3,14 +3,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo
 
 
 def main() -> int:
     tmp, client = make_client_repo("refine-gaps-bulk-status-")
     conn = init_refine(client)
     try:
-        from refine_server import gap_writer, gaps
+        from refine_server import db, gap_writer, gaps, mutation_guard
         from refine_server.paths import relative_gap_path
         from refine_ui import api
 
@@ -282,6 +282,94 @@ def main() -> int:
                 (delete_unselected,),
             ).fetchone()
             assert remaining is not None, body
+
+            db.set_setting(conn, "paused", "1")
+            last_backlog = "01BULKLASTBACKLOGAAAAAA"
+            last_merge = "01BULKLASTMERGEAAAAAAAA"
+            last_agent = "01BULKLASTAGENTAAAAAAAA"
+            last_review = "01BULKLASTREVIEWAAAAAAA"
+            last_active = "01BULKLASTACTIVEAAAAAAA"
+            branch = "refine/bulk-last-workflow"
+            git(client, "branch", branch)
+            for gid, status, branch_name in (
+                (last_backlog, "backlog", None),
+                (last_merge, "failed", branch),
+                (last_agent, "failed", None),
+                (last_review, "review", None),
+                (last_active, "in-progress", None),
+            ):
+                gap = gap_writer.create_gap(
+                    gap_id=gid,
+                    name=gid,
+                    initial_round=gaps.new_round(
+                        "Workflow Reporter",
+                        "Actual",
+                        "Target",
+                    ),
+                    status=status,
+                    priority="low",
+                )
+                if branch_name:
+                    gap_writer.update_fields(gid, branch_name=branch_name)
+                conn.execute(
+                    "INSERT INTO gaps_index "
+                    "(id, name, status, priority, reporter, created, updated, "
+                    "branch_name, json_path) "
+                    "VALUES (?, ?, ?, 'low', 'Workflow Reporter', ?, ?, ?, ?)",
+                    (
+                        gid,
+                        gid,
+                        status,
+                        gap["created"],
+                        gap["updated"],
+                        branch_name,
+                        relative_gap_path(gid),
+                    ),
+                )
+            gap_writer.append_latest_round_log(
+                gap_id=last_merge,
+                severity="warn",
+                category="state",
+                actor="runner",
+                message=(
+                    "Workflow status changed: ready-merge → failed; "
+                    "merge failed"
+                ),
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=last_agent,
+                severity="warn",
+                category="state",
+                actor="runner",
+                message=(
+                    "Workflow status changed: in-progress → failed; "
+                    "agent failed"
+                ),
+            )
+            tracking.calls.clear()
+            with mutation_guard.exclusive("Merge agent", kind="merge_agent"):
+                code, body = api.bulk_update_gaps({
+                    "filter": {"reporter": "Workflow Reporter"},
+                    "update": {"status": "__last_workflow_state"},
+                    "background": False,
+                })
+            assert code == 200, body
+            assert body["updated"] == 3, body
+            assert body["todo"] == 2, body
+            assert body["ready_merge"] == 1, body
+            assert {c[0] for c in tracking.calls} == {M_BULK_UPDATE_GAPS}
+            rows = {
+                row["id"]: row["status"]
+                for row in conn.execute(
+                    "SELECT id, status FROM gaps_index "
+                    "WHERE reporter = 'Workflow Reporter'",
+                )
+            }
+            assert rows[last_backlog] == "backlog", rows
+            assert rows[last_merge] == "ready-merge", rows
+            assert rows[last_agent] == "todo", rows
+            assert rows[last_review] == "todo", rows
+            assert rows[last_active] == "in-progress", rows
         finally:
             api.get_client = original_get_client
 
@@ -297,12 +385,11 @@ def main() -> int:
         gaps_bulk = (
             root / "refine_ui/static/js/features/gaps-bulk.js"
         ).read_text(encoding="utf-8")
-        expected_options = (
-            '"backlog", "todo", "awaiting-rebuild", "review",\n'
-            '  "done", "failed", "cancelled"'
-        )
-        assert expected_options in gaps_bulk
-        assert "skip in-progress and ready-merge" in gaps_bulk
+        assert '"__last_workflow_state"' in gaps_bulk
+        assert "(Last workflow state)" in gaps_bulk
+        assert 'value: "awaiting-rebuild", label: "awaiting-rebuild"' in gaps_bulk
+        assert 'value: "cancelled", label: "cancelled"' in gaps_bulk
+        assert "failed merge attempts back to ready-merge" in gaps_bulk
         assert "resolveBackgroundJobResponse" in gaps_bulk
         assert "filter, ...selectionFields" in gaps_bulk
         assert "exclude_ids: Array.from(gapsExcludedIds)" in gaps_bulk
