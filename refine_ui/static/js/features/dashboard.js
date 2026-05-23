@@ -166,8 +166,10 @@ function drawDashboard(d, opts = {}) {
         return `
         <a class="card dashboard-status-card${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, instance: scope })}" style="text-decoration:none;color:inherit"
            title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
-          ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="Agent-managed automation">Auto</span>` : ""}
-          <div class="muted small dashboard-status-label">${s}</div>
+          <div class="dashboard-status-head">
+            ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="Agent-managed automation">Auto</span>` : ""}
+            <div class="muted small dashboard-status-label">${s}</div>
+          </div>
           <div class="dashboard-status-count">${fmtCount(counts[s] || 0)}</div>
         </a>`;
       }).join("")}

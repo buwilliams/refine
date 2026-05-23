@@ -63,17 +63,25 @@
   grid-template-columns: repeat(9, minmax(0, 1fr));
 }
 #dash > .dashboard-status-grid > .dashboard-status-card {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: 8px 6px;
-  position: relative;
 }
 #dash > .dashboard-status-grid > .dashboard-status-card-agent {
   border-color: #b9d4ff;
 }
+#dash > .dashboard-status-grid .dashboard-status-head {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  min-height: 15px;
+}
 #dash > .dashboard-status-grid .dashboard-agent-indicator {
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: 0;
+  right: 0;
+  z-index: 1;
   padding: 2px 4px;
   border: 1px solid #b9d4ff;
   border-radius: 999px;
@@ -86,12 +94,13 @@
   pointer-events: none;
 }
 #dash > .dashboard-status-grid .dashboard-status-label {
+  width: 100%;
+  min-width: 0;
   font-size: 11px;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
   line-height: 1.1;
-}
-#dash > .dashboard-status-grid .dashboard-status-card-agent .dashboard-status-label {
-  padding-right: 28px;
 }
 #dash > .dashboard-status-grid .dashboard-status-count {
   font-size: 22px;

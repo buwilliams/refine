@@ -355,6 +355,7 @@ def main() -> int:
     assert '"awaiting-rebuild",' in dashboard_js
     assert "dashboard-status-card-agent" in dashboard_js
     assert "dashboard-agent-indicator" in dashboard_js
+    assert "dashboard-status-head" in dashboard_js
     assert "Agent-managed automation" in dashboard_js
     assert "dashboard-collapsible-shell" in dashboard_js
     assert "dashboardRefreshInFlight" in dashboard_js
@@ -395,6 +396,10 @@ def main() -> int:
     assert "repeat(9, minmax(0, 1fr))" in dashboard_css
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
     assert "dashboard-status-label" in dashboard_css
+    assert ".dashboard-status-head" in dashboard_css
+    assert "white-space: nowrap" in dashboard_css
+    assert "position: absolute" in dashboard_css
+    assert "z-index: 1" in dashboard_css
     assert ".dashboard-status-card-agent" in dashboard_css
     assert ".dashboard-agent-indicator" in dashboard_css
     assert ".dashboard-title-row" in dashboard_css
