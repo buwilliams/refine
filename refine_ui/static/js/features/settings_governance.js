@@ -114,7 +114,7 @@ function bindSettingsGovernanceTab() {
           rules: collectGovernanceRules(),
         });
         toast("Governance saved", "info");
-        await refreshSettings();
+        await refreshSettingsTab("governance", { force: true });
       } catch (e) { await showActionError(e); }
     });
   });

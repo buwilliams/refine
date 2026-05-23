@@ -211,7 +211,7 @@ function bindSettingsApplicationTab(currentProject) {
         const result = await api("DELETE", "/api/projects", { path });
         state.project = { ...(state.project || {}), apps: result.apps || [] };
         toast("App removed", "info");
-        await refreshSettings();
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });
@@ -240,7 +240,7 @@ function bindSettingsApplicationTab(currentProject) {
         });
         _targetAppDraftDirty = false;
         toast("Saved", "info");
-        await refreshSettings({ force: true });
+        await refreshSettingsTab("application", { force: true });
         refreshTargetAppStatus();
       } catch (e) { await showActionError(e); }
     });

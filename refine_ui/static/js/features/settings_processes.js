@@ -566,7 +566,8 @@ function bindSettingsProcessesTab(s) {
     await withButtonBusy($("#btn-pause"), paused ? "Resuming…" : "Pausing…", async () => {
       try {
         await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
-        await refreshSettings();
+        await refreshProcessesSettingsTab({ force: true });
+        if (paused) scheduleProcessesTabRefreshes();
       } catch (e) { await showActionError(e); }
     });
   });
@@ -582,7 +583,7 @@ function bindSettingsProcessesTab(s) {
       await withButtonBusy(b, "Cancelling…", async () => {
         try {
           await api("POST", `/api/gaps/${id}/cancel`);
-          await refreshSettings();
+          await refreshProcessesSettingsTab();
         } catch (e) { await showActionError(e); }
       });
     });
@@ -599,7 +600,7 @@ function bindSettingsProcessesTab(s) {
       await withButtonBusy(b, "Stopping…", async () => {
         try {
           await api("POST", `/api/chat/${id}/stop`);
-          await refreshSettings();
+          await refreshProcessesSettingsTab();
         } catch (e) { await showActionError(e); }
       });
     });
@@ -609,7 +610,7 @@ function bindSettingsProcessesTab(s) {
       await withButtonBusy(b, "Queueing…", async () => {
         try {
           await api("POST", "/api/runner-workers/target-app-rebuilder/rebuild");
-          await refreshSettings({ force: true });
+          await refreshProcessesSettingsTab({ force: true });
         } catch (e) { await showActionError(e); }
       });
     });
@@ -660,7 +661,7 @@ function bindSettingsProcessesTab(s) {
             }
           }
           toast("SQLite cache rebuilt", "info");
-          await refreshSettings({ force: true });
+          await refreshProcessesSettingsTab({ force: true });
         } catch (e) { await showActionError(e, "SQLite cache rebuild failed"); }
       });
     });
@@ -682,7 +683,7 @@ function bindSettingsProcessesTab(s) {
         try {
           const r = await api("POST", "/api/activity/cleanup", { days });
           toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
-          await refreshSettings({ force: true });
+          await refreshProcessesSettingsTab({ force: true });
         } catch (e) { await showActionError(e); }
       });
     });
@@ -691,21 +692,21 @@ function bindSettingsProcessesTab(s) {
     const btn = $("#s-target-run-start");
     await withButtonBusy(btn, "Starting…", async () => {
       await runTargetAppAction("start");
-      await refreshSettings({ force: true });
+      await refreshProcessesSettingsTab({ force: true });
     });
   });
   $("#s-target-run-stop")?.addEventListener("click", async () => {
     const btn = $("#s-target-run-stop");
     await withButtonBusy(btn, "Stopping…", async () => {
       await runTargetAppAction("stop");
-      await refreshSettings({ force: true });
+      await refreshProcessesSettingsTab({ force: true });
     });
   });
   $("#s-target-run-rebuild")?.addEventListener("click", async () => {
     const btn = $("#s-target-run-rebuild");
     await withButtonBusy(btn, "Rebuilding…", async () => {
       await runTargetAppAction("rebuild");
-      await refreshSettings({ force: true });
+      await refreshProcessesSettingsTab({ force: true });
     });
   });
   $("#s-target-health-now")?.addEventListener("click", async () => {
@@ -717,10 +718,32 @@ function bindSettingsProcessesTab(s) {
         toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"),
               ok ? "info" : "error");
         drawTargetAppStatusBlock(r);
-        await refreshSettings({ force: true });
+        await refreshProcessesSettingsTab({ force: true });
       } catch (e) { await showActionError(e); }
     });
   });
   // Kick off the initial status load (and let SSE refresh later).
   refreshTargetAppStatus();
+}
+
+function scheduleProcessesTabRefreshes() {
+  for (const delay of [750, 2000]) {
+    setTimeout(() => {
+      if (state.currentRoute !== "settings") return;
+      if (!document.querySelector('[data-tab-pane="processes"].active')) return;
+      if (typeof refreshActiveSettingsTab === "function") {
+        refreshActiveSettingsTab({ force: true });
+      } else {
+        refreshSettings({ force: true });
+      }
+    }, delay);
+  }
+}
+
+async function refreshProcessesSettingsTab(options = {}) {
+  if (typeof refreshSettingsTab === "function") {
+    await refreshSettingsTab("processes", options);
+  } else {
+    await refreshSettings(options);
+  }
 }

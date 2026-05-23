@@ -59,7 +59,7 @@ function bindSettingsInstancesTab() {
     if (!name || !name.trim()) return;
     try {
       await api("POST", "/api/instances", { display_name: name.trim() });
-      await refreshSettings();
+      await refreshSettingsTab("instances", { force: true });
     } catch (e) { await showActionError(e); }
   });
   $$("[data-instance-activate]").forEach((b) => b.addEventListener("click", async () => {
@@ -74,7 +74,7 @@ function bindSettingsInstancesTab() {
       updateActiveInstanceLabel();
       await refreshInstanceScopedState();
       toast("Instance activated", "info");
-      await refreshSettings();
+      await refreshSettingsTab("instances", { force: true });
     } catch (e) { await showActionError(e); }
   }));
   $$("[data-instance-rename]").forEach((b) => b.addEventListener("click", async () => {
@@ -85,7 +85,7 @@ function bindSettingsInstancesTab() {
       await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceRename), {
         display_name: name.trim(),
       });
-      await refreshSettings();
+      await refreshSettingsTab("instances", { force: true });
     } catch (e) { await showActionError(e); }
   }));
   $$("[data-instance-archive]").forEach((b) => b.addEventListener("click", async () => {
@@ -98,7 +98,7 @@ function bindSettingsInstancesTab() {
       await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceArchive), {
         archived: true,
       });
-      await refreshSettings();
+      await refreshSettingsTab("instances", { force: true });
     } catch (e) { await showActionError(e); }
   }));
   $("#instance-transfer")?.addEventListener("click", async () => {
@@ -128,7 +128,7 @@ function bindSettingsInstancesTab() {
         `stopped ${r.stopped_processes || 0} processes; skipped ${r.skipped}.`,
         "info",
       );
-      await refreshSettings();
+      await refreshSettingsTab("instances", { force: true });
     } catch (e) { await showActionError(e); }
   });
   $("#s-project-sync-now")?.addEventListener("click", async () => {
@@ -137,7 +137,7 @@ function bindSettingsInstancesTab() {
       try {
         await syncProjectUpdates();
         await refreshReporters({ selectFallback: true });
-        await refreshSettings();
+        await refreshSettingsTab("instances", { force: true });
       } catch {
         // syncProjectUpdates already surfaced the specific git error.
       }

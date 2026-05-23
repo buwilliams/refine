@@ -79,6 +79,8 @@ def main() -> int:
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
+    assert 'prevRoute === "settings" && r.route === "settings"' in router_js
+    assert "refreshSettingsTab(slug).catch(showActionError);" in router_js
     assert 'parsed.route === "settings" && !parsed.tab' in settings_js
     assert 'return first;' in settings_js
     assert 'if (slug === "system" || slug === "project") return "application";' in settings_js
@@ -86,6 +88,10 @@ def main() -> int:
     assert "function activeSettingsTabFromRoute()" in settings_js
     assert "let _targetAppDraftDirty = false;" in settings_js
     assert "async function refreshSettings(options = {})" in settings_js
+    assert "async function refreshActiveSettingsTab(options = {})" in settings_js
+    assert "function updateSettingsTabContent(slug, body, bind)" in settings_js
+    assert "if (card.innerHTML === next.innerHTML) return;" in settings_js
+    assert "function reconcileSettingsNode(current, next)" in settings_js
     assert "_targetAppDraftDirty &&" in settings_js
     assert 'document.querySelector(\'[data-tab-pane="application"].active\')' in settings_js
     assert 'href="#/system/${t.slug}"' in settings_js
@@ -163,7 +169,7 @@ def main() -> int:
     assert 'api("POST", "/api/features/override"' not in feature_toggle_body
     assert 'await api("PATCH", "/api/settings", {' in application_save_body
     assert "_targetAppDraftDirty = false;" in application_save_body
-    assert "await refreshSettings({ force: true });" in application_save_body
+    assert 'await refreshSettingsTab("application", { force: true });' in application_save_body
     for old_save_id in (
         'id="s-save"',
         'id="s-save-cli"',
@@ -217,6 +223,13 @@ def main() -> int:
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body
     assert 'id="btn-pause"' in processes_body
+    assert "scheduleProcessesTabRefreshes()" in processes_body
+    assert "function scheduleProcessesTabRefreshes()" in processes_body
+    assert '[data-tab-pane="processes"].active' in processes_body
+    assert "refreshCurrentSettingsSurface()" in common_js
+    assert 'if (state.currentRoute === "settings") {' in common_js
+    assert "refreshActiveSettingsTab({ force: true })" in processes_body
+    assert "function refreshProcessesSettingsTab(options = {})" in processes_body
     assert 'data-cancel-agent="' in processes_body
     assert 'data-stop-chat="' in processes_body
     assert "startBtn.style.display" not in settings_js

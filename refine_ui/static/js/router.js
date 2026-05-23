@@ -79,6 +79,24 @@ function navigate() {
   // since we're already moving to a different one).
   if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
 
+  if (prevRoute === "settings" && r.route === "settings") {
+    state.currentRoute = "settings";
+    state.currentGap = null;
+    state.underlayHash = location.hash || "#/";
+    highlightNav(r.route);
+    if (
+      typeof setSettingsTab === "function" &&
+      typeof refreshSettingsTab === "function" &&
+      typeof normalizeSettingsTab === "function" &&
+      typeof readSettingsTab === "function"
+    ) {
+      const slug = normalizeSettingsTab(r.tab) || readSettingsTab();
+      setSettingsTab(slug);
+      refreshSettingsTab(slug).catch(showActionError);
+      return;
+    }
+  }
+
   state.currentRoute = r.route;
   state.currentGap = r.id || null;
   state.underlayHash = location.hash || "#/";

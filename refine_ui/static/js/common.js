@@ -46,7 +46,7 @@ function updateActiveInstanceLabel() {
   el.title = el.textContent;
 }
 
-async function refreshFeatures() {
+async function refreshFeatures(options = {}) {
   try {
     state.features = await api("GET", "/api/features");
   } catch { /* keep prior value; gates default to permissive */ }
@@ -56,9 +56,20 @@ async function refreshFeatures() {
   // featureEnabled("chat"), so a redraw is needed when the matrix
   // (or the active provider) changes.
   if (typeof drawChatDock === "function") drawChatDock();
-  if (state.currentRoute === "settings") refreshSettings();
+  if (state.currentRoute === "settings" && !options.skipSettingsRefresh) {
+    refreshCurrentSettingsSurface();
+  }
   if (state.currentRoute === "gaps_detail" && state.currentGap) {
     loadGapDetail(state.currentGap);
+  }
+}
+
+function refreshCurrentSettingsSurface(options = {}) {
+  if (typeof refreshActiveSettingsTab === "function") {
+    return refreshActiveSettingsTab(options);
+  }
+  if (typeof refreshSettings === "function") {
+    return refreshSettings(options);
   }
 }
 
@@ -871,9 +882,8 @@ function initSSE() {
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    if (state.currentRoute === "settings" &&
-        document.querySelector('[data-tab-pane="runtime"].active')) {
-      refreshSettings();
+    if (state.currentRoute === "settings") {
+      refreshCurrentSettingsSurface();
     }
     // Changes screen: the Merge agent can land a new merge commit;
     // a cancellation flips an existing row's Undo button state.
@@ -890,12 +900,12 @@ function initSSE() {
   });
   sseSource.addEventListener("project_updated", async () => {
     await refreshProjectStatus();
-    await refreshFeatures();
+    await refreshFeatures({ skipSettingsRefresh: true });
     await refreshReporters();
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    if (state.currentRoute === "settings") refreshSettings();
+    if (state.currentRoute === "settings") refreshCurrentSettingsSurface();
     if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);

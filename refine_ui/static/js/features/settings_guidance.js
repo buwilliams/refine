@@ -119,7 +119,7 @@ function openGuidanceModal(items, index = null) {
         await api("PUT", "/api/guidance", { guidance: next });
         toast(editing ? "Guidance saved" : "Guidance created", "info");
         close();
-        await refreshSettings();
+        await refreshSettingsTab("guidance", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }
@@ -136,7 +136,7 @@ function openGuidanceModal(items, index = null) {
         await api("PUT", "/api/guidance", { guidance: next });
         toast("Guidance deleted", "info");
         close();
-        await refreshSettings();
+        await refreshSettingsTab("guidance", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }

@@ -110,10 +110,12 @@ function renderSettingsPerformanceTab(performance, performanceBackend) {
     </section>`;
 }
 
-function bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceData, guidanceData) {
+function bindSettingsPerformanceTab(
+  s, diag, reps, feats, gov, dash, instanceData, guidanceData, performanceBackend = null,
+) {
   $("#performance-refresh")?.addEventListener("click", async () => {
     await withButtonBusy($("#performance-refresh"), "Refreshing…", async () => {
-      await refreshSettings({ force: true });
+      await refreshSettingsTab("performance", { force: true });
     });
   });
   $("#performance-prune")?.addEventListener("click", async () => {
@@ -121,7 +123,7 @@ function bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceDat
       try {
         const r = await api("POST", "/api/performance/cleanup", {});
         toast(`Deleted ${r.deleted} old metric event${r.deleted === 1 ? "" : "s"}.`, "info");
-        await refreshSettings({ force: true });
+        await refreshSettingsTab("performance", { force: true });
       } catch (e) { await showActionError(e); }
     });
   });
@@ -135,7 +137,7 @@ function bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceDat
       try {
         const r = await api("POST", "/api/performance/cleanup", { clear: true });
         toast(`Deleted ${r.deleted} metric event${r.deleted === 1 ? "" : "s"}.`, "info");
-        await refreshSettings({ force: true });
+        await refreshSettingsTab("performance", { force: true });
       } catch (e) { await showActionError(e); }
     });
   });
@@ -147,7 +149,12 @@ function bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceDat
     if (outcome) params.set("success", outcome);
     try {
       const filtered = await api("GET", "/api/performance?" + params);
-      drawSettings(s, diag, reps, feats, gov, dash, instanceData, guidanceData, filtered);
+      const backend = performanceBackend || filtered.backend || diag?.backend || {};
+      updateSettingsTabContent(
+        "performance",
+        renderSettingsPerformanceTab(filtered, backend),
+        () => bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceData, guidanceData, backend),
+      );
       const opSel = $("#performance-operation-filter");
       const successSel = $("#performance-success-filter");
       if (opSel) opSel.value = op;
