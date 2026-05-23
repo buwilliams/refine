@@ -10,6 +10,7 @@ const DASHBOARD_REFRESH_TIMEOUT_MS = 6000;
 const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
   "todo",
   "in-progress",
+  "qa",
   "ready-merge",
   "awaiting-rebuild",
 ]);

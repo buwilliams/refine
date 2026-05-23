@@ -26,6 +26,7 @@ const WORKFLOW_STATUSES = [
   "backlog",
   "todo",
   "in-progress",
+  "qa",
   "ready-merge",
   "awaiting-rebuild",
   "review",

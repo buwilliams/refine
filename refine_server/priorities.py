@@ -9,7 +9,7 @@ PRIORITY_RANK = {
 
 RANK_PRIORITY = {rank: priority for priority, rank in PRIORITY_RANK.items()}
 
-BLOCKING_STATUSES = ("todo", "in-progress", "ready-merge", "awaiting-rebuild")
+BLOCKING_STATUSES = ("todo", "in-progress", "qa", "ready-merge", "awaiting-rebuild")
 NON_BLOCKING_STATUSES = ("backlog", "review", "done", "failed", "cancelled")
 
 

@@ -47,8 +47,8 @@ async function openBulkModal(field) {
         ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s.value}">${htmlEscape(s.label)}</option>`).join("")}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Last workflow state sends failed merge attempts back to ready-merge,
-        other failed or reviewable Gaps back to todo, and leaves active
+        Last workflow state sends failed QA attempts back to qa, failed merge
+        attempts back to ready-merge, other failed or reviewable Gaps back to todo, and leaves active
         automation alone.
       </p>`;
   } else if (field === "reporter") {
@@ -205,7 +205,7 @@ async function openBulkTransferInstanceModal() {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        In-progress, ready-merge, and awaiting-rebuild Gaps are skipped.
+        In-progress, qa, ready-merge, and awaiting-rebuild Gaps are skipped.
       </p>
     </div>
     <div class="modal-actions">

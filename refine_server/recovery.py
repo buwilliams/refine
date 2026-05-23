@@ -13,14 +13,14 @@ from __future__ import annotations
 import os
 import sqlite3
 
-from refine_server import activity, db, project_state
+from refine_server import activity, db, project_state, quality
 from refine_server.gaps import now_iso
 
 from . import gap_writer
 
 
 def reconcile_on_start(conn: sqlite3.Connection) -> int:
-    """Categorize stranded in-progress Gaps at runner startup.
+    """Categorize stranded in-progress and qa Gaps at runner startup.
 
     Two possibilities for a Gap left in `in-progress` across a restart:
 
@@ -41,7 +41,7 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
 
     Returns count moved to `failed`.
     """
-    return _reconcile_in_progress(
+    return _reconcile_active_agent_states(
         conn,
         live_gap_ids=set(),
         startup=True,
@@ -59,22 +59,22 @@ def reconcile_runtime_in_progress(
     than startup reconciliation: an unfinished run with a still-live PID is
     left alone because it may belong to another still-running process.
     """
-    return _reconcile_in_progress(
+    return _reconcile_active_agent_states(
         conn,
         live_gap_ids=live_gap_ids,
         startup=False,
     )
 
 
-def _reconcile_in_progress(
+def _reconcile_active_agent_states(
     conn: sqlite3.Connection,
     *,
     live_gap_ids: set[str],
     startup: bool,
 ) -> int:
     rows = conn.execute(
-        "SELECT id FROM gaps_index "
-        "WHERE status = 'in-progress' AND instance_id = ?",
+        "SELECT id, status FROM gaps_index "
+        "WHERE status IN ('in-progress', 'qa') AND instance_id = ?",
         (project_state.active_instance_id(),),
     ).fetchall()
     moved = 0
@@ -83,32 +83,45 @@ def _reconcile_in_progress(
         if gid in live_gap_ids:
             continue
         rrow = conn.execute(
-            "SELECT round_idx, finished_at, status, failure_category, pid "
+            "SELECT round_idx, finished_at, status, failure_category, pid, kind "
             "FROM runs WHERE gap_id = ? ORDER BY id DESC LIMIT 1",
             (gid,),
         ).fetchone()
         round_idx = rrow["round_idx"] if rrow else 0
+        current_status = row["status"]
+        run_kind = str(rrow["kind"] or "implementation") if rrow else ""
+
+        quality_enabled = quality.enabled(conn)
+        if current_status == "qa" and not rrow:
+            continue
+        if current_status == "qa" and run_kind != "quality" and quality_enabled:
+            continue
 
         # Awaiting-merge case — bump to `ready-merge` so the merger
         # picks the Gap up on its first tick after startup.
         if (rrow and rrow["finished_at"]
                 and rrow["status"] == "finished"
                 and not rrow["failure_category"]):
+            next_status = (
+                "ready-merge"
+                if current_status == "qa" or not quality_enabled
+                else "qa"
+            )
             with db.transaction(conn):
                 conn.execute(
-                    "UPDATE gaps_index SET status = 'ready-merge', "
+                    "UPDATE gaps_index SET status = ?, "
                     "updated = ? WHERE id = ?",
-                    (now_iso(), gid),
+                    (next_status, now_iso(), gid),
                 )
             try:
-                gap_writer.update_fields(gid, status="ready-merge")
+                gap_writer.update_fields(gid, status=next_status)
                 gap_writer.append_latest_round_log(
                     gap_id=gid,
                     severity="info",
                     category="state",
                     actor="runner",
                     message=(
-                        "Workflow status changed: in-progress → ready-merge; "
+                        f"Workflow status changed: {current_status} → {next_status}; "
                         "runner restarted after agent completion"
                     ),
                 )
@@ -116,8 +129,10 @@ def _reconcile_in_progress(
                 pass
             activity.append(
                 conn,
-                message="Runner restarted while Gap was awaiting merge — "
-                        "promoted to ready-merge for the merger",
+                message=(
+                    "Runner restarted after agent completion — "
+                    f"promoted to {next_status}"
+                ),
                 severity="info", category="state",
                 gap_id=gid, actor="runner",
             )
@@ -134,14 +149,14 @@ def _reconcile_in_progress(
         # Orphan agent case — kill the run record + flip to failed.
         failure_category = "runner_restart" if startup else "agent_orphaned"
         detail_message = (
-            "Runner restarted while this Gap was in-progress — marked failed"
+            f"Runner restarted while this Gap was {current_status} — marked failed"
             if startup
-            else "No live agent subprocess is tracking this in-progress Gap — marked failed"
+            else f"No live agent subprocess is tracking this {current_status} Gap — marked failed"
         )
         activity_message = (
             "Runner restarted; marked Gap as failed"
             if startup
-            else "In-progress Gap had no live agent subprocess; marked failed"
+            else f"{current_status} Gap had no live agent subprocess; marked failed"
         )
         with db.transaction(conn):
             conn.execute(

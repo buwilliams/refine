@@ -25,6 +25,7 @@ META_RULE_STATES = (
     "ambiguous_rule", "stale_rule", "conflicting_rules",
 )
 GOVERNANCE_BINARY_STATES = ("unclassified", "pass", "fail")
+QUALITY_STATES = ("unclassified", "passed", "failed")
 
 
 def now_iso() -> str:
@@ -123,6 +124,10 @@ def default_round_governance() -> dict[str, Any]:
         "governance_details": "",
         "governance_checked_at": "",
         "governance_rule_actions": [],
+        "quality_state": "unclassified",
+        "quality_message": "",
+        "quality_details": "",
+        "quality_checked_at": "",
     }
 
 
@@ -142,6 +147,11 @@ def normalize_round_governance(round_obj: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(round_obj.get("governance_rule_actions"), list):
         round_obj["governance_rule_actions"] = []
     for key in ("governance_message", "governance_details", "governance_checked_at"):
+        if round_obj.get(key) is None:
+            round_obj[key] = ""
+    if round_obj.get("quality_state") not in QUALITY_STATES:
+        round_obj["quality_state"] = "unclassified"
+    for key in ("quality_message", "quality_details", "quality_checked_at"):
         if round_obj.get(key) is None:
             round_obj[key] = ""
     return round_obj

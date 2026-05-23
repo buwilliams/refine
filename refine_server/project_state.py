@@ -28,11 +28,14 @@ PROJECT_SETTING_KEYS = {
     "governance_product",
     "governance_constitution",
     "governance_rules_json",
+    "quality_business_requirements",
+    "quality_instructions",
 }
 
 APPLICATION_SETTING_KEYS = {
     "agent_subpath",
     "merge_target_branch",
+    "quality_enabled",
 }
 
 RUNTIME_SETTING_KEYS = {
@@ -620,7 +623,7 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
     if target.get("archived"):
         raise ValueError(f"archived target instance: {target_instance_id}")
     allowed = statuses or {
-        "backlog", "todo", "failed", "awaiting-rebuild",
+        "backlog", "todo", "failed", "qa", "awaiting-rebuild",
         "review", "done", "cancelled",
     }
     skipped: list[dict[str, str]] = []

@@ -19,7 +19,7 @@ from refine_server.backend_protocol import (
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_MERGE_REPORTER, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
-    M_RETRY_MERGE, M_RUNNING,
+    M_RETRY_MERGE, M_RETRY_QA, M_RUNNING,
     M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -185,6 +185,7 @@ class Runner:
             M_CANCEL_ALL: self._h_cancel_all,
             M_VERIFY: self._h_verify,
             M_RETRY_MERGE: self._h_retry_merge,
+            M_RETRY_QA: self._h_retry_qa,
             M_CREATE_GAP: self._h_create_gap,
             M_APPEND_ROUND: self._h_append_round,
             M_EDIT_ROUND: self._h_edit_round,
@@ -591,6 +592,56 @@ class Runner:
         self.merger.wake()
         return {"ok": True, "message": "Queued for merge"}
 
+    def _h_retry_qa(self, params: dict) -> dict:
+        gap_id = params["gap_id"]
+        row = self._require_active_gap(
+            gap_id,
+            columns="status, branch_name, instance_id",
+        )
+        if row["status"] != "failed":
+            return {
+                "ok": False,
+                "message": f"Retry QA is only valid from failed (status={row['status']})",
+            }
+        if not self._failed_from_quality(gap_id):
+            return {
+                "ok": False,
+                "message": "Retry QA is only valid after a failed Quality run.",
+            }
+        branch = row["branch_name"]
+        if not branch:
+            return {"ok": False, "message": "Retry QA needs the Gap branch to still exist."}
+        if not git_ops.local_branch_exists(branch):
+            return {"ok": False, "message": f"Retry QA needs local branch `{branch}`."}
+        if not git_ops.gap_worktree_path(gap_id).exists():
+            return {"ok": False, "message": "Retry QA needs the Gap worktree to still exist."}
+        with db.transaction(self._conn):
+            self._conn.execute(
+                "UPDATE gaps_index SET status = 'qa', updated = ? WHERE id = ?",
+                (now_iso(), gap_id),
+            )
+        try:
+            gap_writer.update_fields(gap_id, status="qa")
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="state",
+                actor="refine",
+                message="Workflow status changed: failed → qa; QA retry requested",
+            )
+        except Exception:
+            pass
+        activity.append(
+            self._conn,
+            message="QA retry requested",
+            severity="info",
+            category="quality",
+            gap_id=gap_id,
+            actor="refine",
+        )
+        self.dispatcher.enforce_now()
+        return {"ok": True, "message": "Queued for QA"}
+
     def _failed_from_ready_merge(self, gap_id: str) -> bool:
         gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
         rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
@@ -604,6 +655,22 @@ class Runner:
         return (
             "Workflow status changed:" in msg
             and "ready-merge" in msg
+            and "failed" in msg
+        )
+
+    def _failed_from_quality(self, gap_id: str) -> bool:
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
+        rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+        if not rounds:
+            return False
+        latest_workflow_log = round_logs.latest_workflow_for_round(
+            gap_id,
+            len(rounds) - 1,
+        )
+        msg = str((latest_workflow_log or {}).get("message") or "")
+        return (
+            "Workflow status changed:" in msg
+            and "qa" in msg
             and "failed" in msg
         )
 
@@ -908,7 +975,7 @@ class Runner:
         targets_by_id: dict[str, str] = {}
         skipped: list[dict[str, str]] = []
         failures: list[dict[str, str]] = []
-        target_counts = {"todo": 0, "ready-merge": 0}
+        target_counts = {"todo": 0, "qa": 0, "ready-merge": 0}
 
         for gap_id in gap_ids:
             row = by_id[gap_id]
@@ -925,7 +992,7 @@ class Runner:
             if target in target_counts:
                 target_counts[target] += 1
 
-        for target in ("todo", "ready-merge"):
+        for target in ("todo", "qa", "ready-merge"):
             ids = [gid for gid in gap_ids if targets_by_id.get(gid) == target]
             if not ids:
                 continue
@@ -981,6 +1048,7 @@ class Runner:
             "skipped": len(skipped),
             "skipped_details": skipped,
             "todo": target_counts["todo"],
+            "qa": target_counts["qa"],
             "ready_merge": target_counts["ready-merge"],
             "progress": {
                 "completed": len(updated_ids) + len(failures) + len(skipped),
@@ -994,7 +1062,7 @@ class Runner:
         current_status: str,
         branch_name: str,
     ) -> tuple[str | None, str]:
-        if current_status in {"backlog", "todo", "ready-merge"}:
+        if current_status in {"backlog", "todo", "qa", "ready-merge"}:
             return None, f"status:{current_status}"
         if current_status in {"in-progress", "awaiting-rebuild"}:
             return None, f"automated:{current_status}"
@@ -1006,6 +1074,12 @@ class Runner:
                 if not git_ops.local_branch_exists(branch_name):
                     return None, f"missing-branch:{branch_name}"
                 return "ready-merge", "failed-from-ready-merge"
+            if previous == "qa":
+                if not branch_name:
+                    return None, "missing-branch"
+                if not git_ops.local_branch_exists(branch_name):
+                    return None, f"missing-branch:{branch_name}"
+                return "qa", "failed-from-qa"
             return "todo", "failed-from-agent"
         if current_status in {"review", "done", "cancelled"}:
             return "todo", f"status:{current_status}"
@@ -2117,7 +2191,7 @@ class Runner:
 
 _VALID_PRIORITIES = ("low", "medium", "high")
 _VALID_STATUSES = (
-    "backlog", "todo", "in-progress", "ready-merge", "awaiting-rebuild",
+    "backlog", "todo", "in-progress", "qa", "ready-merge", "awaiting-rebuild",
     "review", "done", "failed", "cancelled",
 )
 _BULK_LAST_WORKFLOW_STATUS = "__last_workflow_state"

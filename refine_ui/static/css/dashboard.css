@@ -60,32 +60,35 @@
 #dash > .dashboard-status-grid {
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(9, minmax(0, 1fr));
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  padding-top: 7px;
 }
 #dash > .dashboard-status-grid > .dashboard-status-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
   padding: 8px 6px;
+  overflow: visible;
 }
 #dash > .dashboard-status-grid > .dashboard-status-card-agent {
   border-color: #b9d4ff;
 }
 #dash > .dashboard-status-grid .dashboard-status-head {
-  position: relative;
   width: 100%;
   min-width: 0;
-  min-height: 15px;
+  min-height: 0;
 }
 #dash > .dashboard-status-grid .dashboard-agent-indicator {
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -8px;
+  right: 5px;
   z-index: 1;
   padding: 2px 4px;
   border: 1px solid #b9d4ff;
   border-radius: 999px;
   background: #e8f2ff;
+  box-shadow: 0 1px 2px rgba(20, 40, 70, 0.12);
   color: #24528f;
   font-size: 9px;
   font-weight: 700;

@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS runs (
     pid             INTEGER,
     status          TEXT NOT NULL,
     last_output_at  TEXT,
-    failure_category TEXT
+    failure_category TEXT,
+    kind            TEXT NOT NULL DEFAULT 'implementation'
 );
 CREATE INDEX IF NOT EXISTS idx_runs_gap    ON runs(gap_id);
 CREATE INDEX IF NOT EXISTS idx_runs_active ON runs(gap_id, finished_at);
@@ -280,6 +281,11 @@ DEFAULT_SETTINGS = {
     "governance_product": "",
     "governance_constitution": "",
     "governance_rules_json": "[]",
+    # Quality gate. Business requirements + instructions are project-wide;
+    # quality_enabled is instance/application scoped.
+    "quality_business_requirements": "",
+    "quality_instructions": "",
+    "quality_enabled": "0",
     # Target-application management. New installs use structured one-line
     # shell commands and checks. The legacy prose settings stay present so
     # old databases can display and convert existing configuration.
@@ -407,6 +413,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
     if "instance_id" not in cols:
         conn.execute(
             "ALTER TABLE gaps_index ADD COLUMN instance_id TEXT NOT NULL DEFAULT 'default'"
+        )
+    run_cols = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
+    if "kind" not in run_cols:
+        conn.execute(
+            "ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'implementation'"
         )
     # Always (re-)assert indexes. CREATE INDEX IF NOT EXISTS is a no-op on
     # fresh databases (just after the executescript built the table) and on

@@ -102,10 +102,10 @@ async function loadGapDetail(gapId) {
 
 // User-driven workflow transitions for a Gap. Each state declares its
 // `back` and `forward` neighbors. System-owned states have no user buttons —
-// `in-progress` (dispatcher owns), `ready-merge` (merger owns), and
-// `awaiting-rebuild` (target-app rebuild owns) have no user buttons
+// `in-progress` (dispatcher owns), `qa` (Quality owns), `ready-merge`
+// (merger owns), and `awaiting-rebuild` (target-app rebuild owns) have no user buttons
 // because they're system-driven phases the agent passes through
-// automatically (todo → in-progress → ready-merge → awaiting-rebuild → review).
+// automatically (todo → in-progress → qa → ready-merge → awaiting-rebuild → review).
 // Forward from `review` goes through the dedicated /verify endpoint for
 // approval. No user action moves a Gap into `review`; successful rebuild does.
 //
@@ -117,6 +117,7 @@ const GAP_WORKFLOW = {
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
   // in-progress: no user buttons — dispatcher owns.
+  // qa: no user buttons — Quality owns.
   // ready-merge: no user buttons — merger owns.
   // awaiting-rebuild: no user buttons — target-app rebuild owns.
   review:       { back:    { label: "← Todo",     next: "todo"   },
@@ -127,10 +128,20 @@ const GAP_WORKFLOW = {
 };
 
 function workflowForGap(gap, latest) {
+  if (gap.status === "failed" && isQualityRetryGap(latest)) {
+    return { back: { label: "← QA", next: "qa", retryQuality: true } };
+  }
   if (gap.status === "failed" && isMergeRetryGap(latest)) {
     return { back: { label: "← Merge", next: "ready-merge", retryMerge: true } };
   }
   return GAP_WORKFLOW[gap.status] || {};
+}
+
+function isQualityRetryGap(latest) {
+  const message = latest?.latest_workflow_log?.message || "";
+  return message.includes("Workflow status changed:") &&
+         message.includes("qa") &&
+         message.includes("failed");
 }
 
 function isMergeRetryGap(latest) {
@@ -223,6 +234,7 @@ function drawGapDetail(gap) {
         </div>` : ""}
 
       ${latest ? renderGovernanceSummary(latest) : ""}
+      ${latest ? renderQualitySummary(latest) : ""}
 
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
@@ -297,6 +309,10 @@ function drawGapDetail(gap) {
             const r = await api("POST", `/api/gaps/${gap.id}/verify`);
             if (r.ok) toast(r.message || "Verified", "info");
             else toast(r.message || "Verify did not complete", "error");
+          } else if (target.retryQuality) {
+            const r = await api("POST", `/api/gaps/${gap.id}/retry-quality`);
+            if (r.ok) toast(r.message || "Queued for QA", "info");
+            else toast(r.message || "QA retry did not queue", "error");
           } else if (target.retryMerge) {
             const r = await api("POST", `/api/gaps/${gap.id}/retry-merge`);
             if (r.ok) toast(r.message || "Queued for merge", "info");
@@ -456,6 +472,9 @@ function renderRound(gapId, rnd, idx, isLatest, editable,
         ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
         ${isLatest && rnd.rule_state && rnd.rule_state !== "unclassified"
           ? `<span class="status-pill ${rnd.rule_state === "passed" ? "done" : "failed"}">governance: ${htmlEscape(rnd.rule_state)}</span>`
+          : ""}
+        ${isLatest && rnd.quality_state && rnd.quality_state !== "unclassified"
+          ? `<span class="status-pill ${rnd.quality_state === "passed" ? "qa" : "failed"}">quality: ${htmlEscape(rnd.quality_state)}</span>`
           : ""}
         <span class="spacer"></span>
         <span class="muted small">${htmlEscape(rnd.reporter || "(no reporter)")} · ${fmtTime(rnd.created)}</span>
@@ -652,6 +671,22 @@ function renderGovernanceSummary(round) {
               ${a.reason ? `<div class="meta">${htmlEscape(a.reason)}</div>` : ""}
             </div>`).join("")}
         </details>` : ""}
+    </div>`;
+}
+
+function renderQualitySummary(round) {
+  if (!round || !round.quality_state || round.quality_state === "unclassified") {
+    return "";
+  }
+  return `
+    <div class="card" style="margin:0 0 14px">
+      <h3>Quality</h3>
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <span class="status-pill ${round.quality_state === "passed" ? "qa" : "failed"}">quality: ${htmlEscape(round.quality_state)}</span>
+        ${round.quality_checked_at ? `<span class="muted small">${fmtTime(round.quality_checked_at)}</span>` : ""}
+      </div>
+      ${round.quality_message ? `<p style="margin-bottom:6px">${htmlEscape(round.quality_message)}</p>` : ""}
+      ${round.quality_details ? `<details><summary>Details</summary><pre>${htmlEscape(round.quality_details)}</pre></details>` : ""}
     </div>`;
 }
 

@@ -121,6 +121,11 @@ def _h_retry_merge(_h, m, _b, _q):
     return api.retry_merge(m.group(1).upper())
 
 
+@route("POST", r"/api/gaps/([0-9A-Za-z]{26})/retry-quality")
+def _h_retry_quality(_h, m, _b, _q):
+    return api.retry_qa(m.group(1).upper())
+
+
 @route("POST", r"/api/gaps/([0-9A-Za-z]{26})/cancel")
 def _h_cancel(_h, m, _b, _q):
     return api.cancel(m.group(1).upper())
@@ -185,6 +190,16 @@ def _h_governance_get(_h, _m, _b, _q):
 @route("PATCH", r"/api/governance")
 def _h_governance_save(_h, _m, body, _q):
     return api.governance_save(body or {})
+
+
+@route("GET", r"/api/quality")
+def _h_quality_get(_h, _m, _b, _q):
+    return api.quality_get()
+
+
+@route("PATCH", r"/api/quality")
+def _h_quality_save(_h, _m, body, _q):
+    return api.quality_save(body or {})
 
 
 @route("POST", r"/api/governance/generate-rules")

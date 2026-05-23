@@ -384,8 +384,9 @@ def main() -> int:
         assert db_status(conn, gid_push) == "failed"
         assert any("Push failed" in msg for msg in latest_messages(gid_push))
 
-        # Recovery: finished in-progress run is promoted to ready-merge; orphan
-        # in-progress run is failed with its run row marked killed.
+        # Recovery: finished in-progress run is promoted to ready-merge when
+        # QA is disabled; orphan in-progress run is failed with its run row
+        # marked killed.
         gid_finished = "01RECOVERYFINISHEDAAAAAAA"
         create_indexed_gap(conn, gid_finished, status="in-progress")
         conn.execute(

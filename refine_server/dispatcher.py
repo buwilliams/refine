@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from refine_server import activity, changes_index, db, governance, project_state
+from refine_server import activity, changes_index, db, governance, project_state, quality
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
@@ -25,6 +25,8 @@ from .friendly_outcome import classify_outcome
 _RESET_TO_TODO_REASONS = {"priority_preempted", "paused"}
 _LIMIT_PAUSE_UNTIL_KEY = "__refine_agent_limit_pause_until"
 _LIMIT_PAUSE_REASON_KEY = "__refine_agent_limit_pause_reason"
+_DISPATCH_NEXT_LANE_KEY = "__refine_dispatch_next_lane"
+_LANES = ("todo", "qa")
 
 
 @dataclass
@@ -96,6 +98,7 @@ class Dispatcher:
             live_gap_ids={r["gap_id"] for r in running_snapshot if r.get("gap_id")},
         )
         self._promote_backlog(conn)
+        self._promote_disabled_quality(conn)
         if self._agent_limit_pause_active(conn):
             return
 
@@ -109,25 +112,7 @@ class Dispatcher:
         running = self._active_run_count(conn, running_snapshot=running_snapshot)
         if running >= cap:
             return
-        rows = conn.execute(
-            "SELECT id, name, branch_name FROM gaps_index "
-            f"WHERE status = 'todo' AND instance_id = ? AND {priority_case_sql()} = ? "
-            "ORDER BY updated ASC LIMIT ?",
-            (project_state.active_instance_id(), active_rank, cap - running),
-        ).fetchall()
-        for row in rows:
-            gid = row["id"]
-            # already running? (race)
-            if self.sub_mgr.is_running(gid):
-                continue
-            if governance.is_configured(conn):
-                gap = read_gap_json(gid, include_logs=False)
-                latest = (gap.get("rounds") or [])[-1] if gap and gap.get("rounds") else None
-                if not latest or not governance.has_passed(latest):
-                    continue
-            if self._active_run_count(conn) >= cap:
-                return
-            self._launch_one(conn, gid, row["branch_name"])
+        self._launch_ready_lanes(conn, active_rank, cap - running)
 
     def _parallel_run_cap(self, conn: sqlite3.Connection) -> int:
         return max(1, db.get_setting_int(conn, "parallel_run_cap", 10))
@@ -144,7 +129,16 @@ class Dispatcher:
             "WHERE status = 'in-progress' AND instance_id = ?",
             (active_instance,),
         ).fetchone()
-        indexed = int(row["n"] if row else 0)
+        in_progress = int(row["n"] if row else 0)
+        row = conn.execute(
+            "SELECT COUNT(DISTINCT r.gap_id) AS n "
+            "FROM runs r "
+            "JOIN gaps_index g ON g.id = r.gap_id "
+            "WHERE r.status = 'running' AND r.kind = 'quality' "
+            "AND g.status = 'qa' AND g.instance_id = ?",
+            (active_instance,),
+        ).fetchone()
+        indexed = in_progress + int(row["n"] if row else 0)
         # The SQLite state is the shared cross-runner reservation source. Keep
         # the local process snapshot in the count as a defensive fallback for
         # any launch window before the index is updated.
@@ -154,6 +148,65 @@ class Dispatcher:
             else self.sub_mgr.running_snapshot()
         )
         return max(indexed, local)
+
+    def _launch_ready_lanes(
+        self,
+        conn: sqlite3.Connection,
+        active_rank: int,
+        available_slots: int,
+    ) -> None:
+        if available_slots <= 0:
+            return
+        active_instance = project_state.active_instance_id()
+        limit = max(1, available_slots * 2)
+        pending = {
+            lane: list(conn.execute(
+                "SELECT id, name, branch_name FROM gaps_index "
+                f"WHERE status = ? AND instance_id = ? AND {priority_case_sql()} = ? "
+                "ORDER BY updated ASC LIMIT ?",
+                (lane, active_instance, active_rank, limit),
+            ).fetchall())
+            for lane in _LANES
+        }
+        next_lane = self._next_lane(conn)
+        launched = 0
+        while launched < available_slots and (pending["todo"] or pending["qa"]):
+            lane = next_lane if pending[next_lane] else self._other_lane(next_lane)
+            if not pending[lane]:
+                return
+            row = pending[lane].pop(0)
+            next_lane = self._other_lane(lane)
+            db.set_setting(conn, _DISPATCH_NEXT_LANE_KEY, next_lane)
+            gid = row["id"]
+            if self.sub_mgr.is_running(gid):
+                continue
+            if lane == "todo":
+                if governance.is_configured(conn):
+                    gap = read_gap_json(gid, include_logs=False)
+                    latest = (
+                        (gap.get("rounds") or [])[-1]
+                        if gap and gap.get("rounds") else None
+                    )
+                    if not latest or not governance.has_passed(latest):
+                        continue
+                if self._active_run_count(conn) >= self._parallel_run_cap(conn):
+                    return
+                self._launch_one(conn, gid, row["branch_name"])
+            else:
+                if not quality.enabled(conn):
+                    self._promote_quality_bypass(conn, gid)
+                    continue
+                if self._active_run_count(conn) >= self._parallel_run_cap(conn):
+                    return
+                self._launch_quality(conn, gid, row["branch_name"])
+            launched += 1
+
+    def _next_lane(self, conn: sqlite3.Connection) -> str:
+        lane = (db.get_setting(conn, _DISPATCH_NEXT_LANE_KEY, "todo") or "todo").strip()
+        return lane if lane in _LANES else "todo"
+
+    def _other_lane(self, lane: str) -> str:
+        return "qa" if lane == "todo" else "todo"
 
     def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
         placeholders = ",".join("?" * len(BLOCKING_STATUSES))
@@ -248,6 +301,68 @@ class Dispatcher:
                     severity="info", category="state",
                     gap_id=gid, actor="runner",
                 )
+
+    def _promote_disabled_quality(self, conn: sqlite3.Connection) -> None:
+        if quality.enabled(conn):
+            return
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE status = 'qa' AND instance_id = ? "
+            "ORDER BY updated ASC",
+            (project_state.active_instance_id(),),
+        ).fetchall()
+        for row in rows:
+            if self.sub_mgr.is_running(row["id"]):
+                continue
+            self._promote_quality_bypass(conn, row["id"])
+
+    def _promote_quality_bypass(self, conn: sqlite3.Connection, gap_id: str) -> None:
+        active_instance = project_state.active_instance_id()
+        with db.transaction(conn):
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = 'ready-merge', updated = ? "
+                "WHERE id = ? AND status = 'qa' AND instance_id = ?",
+                (now_iso(), gap_id, active_instance),
+            )
+        if not cur.rowcount:
+            return
+        fields = {
+            "quality_state": "passed",
+            "quality_message": "Quality disabled; QA bypassed.",
+            "quality_details": "",
+            "quality_checked_at": now_iso(),
+        }
+        try:
+            gap_writer.update_fields(gap_id, status="ready-merge")
+            gap_writer.set_latest_round_quality(gap_id, fields)
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="quality",
+                actor="runner",
+                message="Quality disabled; QA bypassed",
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="state",
+                actor="runner",
+                message="Workflow status changed: qa → ready-merge; quality disabled",
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message="Quality disabled; QA bypassed",
+            severity="info",
+            category="quality",
+            gap_id=gap_id,
+            actor="runner",
+        )
+        if self.on_run_finished is not None:
+            try:
+                self.on_run_finished(gap_id)
+            except Exception:
+                pass
 
     def _launch_one(self, conn: sqlite3.Connection, gap_id: str,
                     existing_branch: str | None) -> None:
@@ -454,6 +569,123 @@ class Dispatcher:
                 f"Agent subprocess failed to start: {e!r}",
             )
 
+    def _launch_quality(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+        branch_name: str | None,
+    ) -> None:
+        if not branch_name:
+            self._fail_quality(
+                conn,
+                gap_id,
+                "Quality cannot run because the Gap has no branch recorded.",
+                category="state",
+            )
+            return
+        worktree_root = git_ops.gap_worktree_path(gap_id)
+        if not worktree_root.exists():
+            self._fail_quality(
+                conn,
+                gap_id,
+                "Quality cannot run because the Gap worktree is missing.",
+                category="git",
+            )
+            return
+        gap = read_gap_json(gap_id, include_logs=False)
+        if not gap or not gap.get("rounds"):
+            self._fail_quality(
+                conn,
+                gap_id,
+                "Quality cannot run because the Gap has no rounds.",
+                category="state",
+            )
+            return
+        round_idx = len(gap["rounds"]) - 1
+        rev = git_ops._run(["rev-parse", "HEAD"], cwd=worktree_root)
+        if not rev.ok:
+            self._fail_quality(
+                conn,
+                gap_id,
+                "Quality cannot determine the Gap branch HEAD.",
+                category="git",
+                details=rev.stderr or rev.stdout,
+            )
+            return
+        base_commit = rev.stdout.strip()
+        prompt = quality.format_prompt(gap, settings=quality.load_settings(conn))
+        try:
+            gap_writer.set_latest_round_quality(
+                gap_id,
+                {
+                    "quality_state": "unclassified",
+                    "quality_message": "Quality review started.",
+                    "quality_details": "",
+                    "quality_checked_at": "",
+                },
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="quality",
+                actor="runner",
+                message="Quality review started",
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message="Quality review started",
+            severity="info",
+            category="quality",
+            gap_id=gap_id,
+            actor="runner",
+        )
+        idle = db.get_setting_int(conn, "agent_idle_timeout_seconds", 900)
+        hard_cap = db.get_setting_int(conn, "agent_hard_cap_seconds", 86400)
+        agent_subpath = db.get_setting(conn, "agent_subpath") or ""
+        agent_cwd = git_ops.apply_agent_subpath(
+            worktree_root,
+            agent_subpath,
+            log=lambda msg: activity.append(
+                conn,
+                message=f"agent_subpath: {msg}",
+                severity="warn",
+                category="state",
+                gap_id=gap_id,
+                actor="runner",
+            ),
+        )
+        try:
+            self.sub_mgr.launch(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                prompt=prompt,
+                cwd=agent_cwd,
+                base_ref=base_commit,
+                idle_window=idle,
+                hard_cap=hard_cap,
+                kind="quality",
+                on_finished=(
+                    lambda gid, code, reason, agent_ok, failure_text="": self._on_quality_finished(
+                        gid,
+                        round_idx,
+                        code,
+                        reason,
+                        base_commit,
+                        agent_reported_success=agent_ok,
+                        failure_text=failure_text,
+                    )
+                ),
+            )
+        except Exception as e:
+            self._fail_quality(
+                conn,
+                gap_id,
+                f"Quality subprocess failed to start: {e!r}",
+                category="cli",
+            )
+
     def _reserve_in_progress_slot(
         self,
         conn: sqlite3.Connection,
@@ -469,10 +701,15 @@ class Dispatcher:
                 "AND ("
                 "  SELECT COUNT(*) FROM gaps_index "
                 "  WHERE status = 'in-progress' AND instance_id = ?"
+                ") + ("
+                "  SELECT COUNT(DISTINCT r.gap_id) FROM runs r "
+                "  JOIN gaps_index g ON g.id = r.gap_id "
+                "  WHERE r.status = 'running' AND r.kind = 'quality' "
+                "  AND g.status = 'qa' AND g.instance_id = ?"
                 ") < ?",
                 (
                     now_iso(), branch_name, gap_id, active_instance,
-                    active_instance, parallel_cap,
+                    active_instance, active_instance, parallel_cap,
                 ),
             )
         return bool(cur.rowcount)
@@ -628,12 +865,9 @@ class Dispatcher:
         success = outcome.kind == "success"
 
         # Failure path: move straight to `failed` and we're done.
-        # Success path: transition to `ready-merge`. That's the
-        # system-owned status — picked up by the Merger, never set or
-        # cleared by the user. The dispatcher owns the
-        # `in-progress -> ready-merge` flip; the merger owns the
-        # `ready-merge -> awaiting-rebuild` merge step.
-        next_status = "ready-merge" if success else "failed"
+        # Success path: transition to `qa`; Quality owns the pre-merge
+        # validation pass and promotes to `ready-merge` only after it passes.
+        next_status = "qa" if success else "failed"
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = ?, updated = ? "
@@ -642,11 +876,6 @@ class Dispatcher:
             )
         if cur.rowcount == 0:
             return
-        if success and self.on_run_finished is not None:
-            try:
-                self.on_run_finished(gap_id)
-            except Exception:
-                pass
         try:
             gap_writer.update_fields(gap_id, status=next_status)
             gap_writer.append_latest_round_log(
@@ -683,12 +912,179 @@ class Dispatcher:
         if outcome.limit_kind:
             self._pause_after_limit_failure(conn, outcome.limit_kind, gap_id=gap_id)
 
-        # Merging is owned by the Merger now — a single-threaded worker
-        # that serializes every operation on the host worktree.
-        # The dispatcher just flipped the Gap to `ready-merge`; tell
-        # the merger to scan promptly instead of waiting on its
-        # periodic tick. The Gap stays in `ready-merge` until the
-        # merger parks it in `awaiting-rebuild`.
+        if success and not quality.enabled(conn):
+            self._promote_quality_bypass(conn, gap_id)
+            return
+
+        # Passing implementation now waits in `qa`; the Quality run will
+        # wake the Merger after it promotes the Gap to `ready-merge`.
+
+    def _on_quality_finished(
+        self,
+        gap_id: str,
+        round_idx: int,
+        exit_code: int,
+        killed_reason: str | None,
+        base_commit: str,
+        *,
+        agent_reported_success: bool | None = None,
+        failure_text: str | None = None,
+    ) -> None:
+        conn = self.get_conn()
+        if killed_reason in _RESET_TO_TODO_REASONS:
+            self._reset_stopped_quality(conn, gap_id, round_idx, killed_reason, base_commit)
+            return
+
+        outcome = classify_outcome(
+            exit_code=exit_code,
+            killed_reason=killed_reason,
+            no_new_commits=False,
+            agent_reported_success=agent_reported_success,
+            failure_text=failure_text,
+        )
+        success = outcome.kind == "success"
+        if success:
+            commit = self._commit_quality_changes(gap_id)
+            if not commit.get("ok"):
+                outcome = type(outcome)(
+                    "failure",
+                    "git",
+                    "error",
+                    commit.get("message") or "Quality changes could not be committed",
+                    commit.get("details"),
+                    None,
+                )
+                success = False
+
+        next_status = "ready-merge" if success else "failed"
+        with db.transaction(conn):
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = ?, updated = ? "
+                "WHERE id = ? AND status = 'qa' AND instance_id = ?",
+                (next_status, now_iso(), gap_id, project_state.active_instance_id()),
+            )
+        if cur.rowcount == 0:
+            return
+
+        fields = {
+            "quality_state": "passed" if success else "failed",
+            "quality_message": (
+                "Quality passed." if success
+                else (outcome.message or "Quality failed.")
+            ),
+            "quality_details": outcome.details or "",
+            "quality_checked_at": now_iso(),
+        }
+        try:
+            gap_writer.update_fields(gap_id, status=next_status)
+            gap_writer.set_latest_round_quality(gap_id, fields)
+            gap_writer.append_round_log(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                severity="info" if success else outcome.severity,
+                category="quality",
+                actor="runner",
+                message=fields["quality_message"],
+                details=fields["quality_details"] or None,
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info" if success else outcome.severity,
+                category="state",
+                actor="runner",
+                message=f"Workflow status changed: qa → {next_status}",
+            )
+        except Exception:
+            pass
+
+        activity.append(
+            conn,
+            message=fields["quality_message"],
+            severity="info" if success else outcome.severity,
+            category="quality",
+            gap_id=gap_id,
+            actor="runner",
+            details=fields["quality_details"] or None,
+        )
+        if outcome.limit_kind:
+            self._pause_after_limit_failure(conn, outcome.limit_kind, gap_id=gap_id)
+        if success and self.on_run_finished is not None:
+            try:
+                self.on_run_finished(gap_id)
+            except Exception:
+                pass
+
+    def _commit_quality_changes(self, gap_id: str) -> dict:
+        cwd = git_ops.gap_worktree_path(gap_id)
+        paths = git_ops.dirty_paths(cwd=cwd)
+        if not paths:
+            return {"ok": True, "message": "No quality test changes to commit."}
+        result = git_ops.add_and_commit(
+            paths,
+            f"refine: quality checks for {gap_id}",
+            cwd=cwd,
+        )
+        if not result.ok:
+            return {
+                "ok": False,
+                "message": "Quality changes could not be committed.",
+                "details": result.stderr or result.stdout,
+            }
+        return {"ok": True, "message": "Quality changes committed."}
+
+    def _fail_quality(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+        message: str,
+        *,
+        category: str,
+        details: str | None = None,
+    ) -> None:
+        with db.transaction(conn):
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = 'failed', updated = ? "
+                "WHERE id = ? AND status = 'qa' AND instance_id = ?",
+                (now_iso(), gap_id, project_state.active_instance_id()),
+            )
+        if not cur.rowcount:
+            return
+        fields = {
+            "quality_state": "failed",
+            "quality_message": message,
+            "quality_details": details or "",
+            "quality_checked_at": now_iso(),
+        }
+        try:
+            gap_writer.update_fields(gap_id, status="failed")
+            gap_writer.set_latest_round_quality(gap_id, fields)
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="error",
+                category="quality",
+                actor="runner",
+                message=message,
+                details=details,
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="error",
+                category="state",
+                actor="runner",
+                message=f"Workflow status changed: qa → failed; {message}",
+                details=details,
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message=message,
+            severity="error",
+            category=category,
+            gap_id=gap_id,
+            actor="runner",
+            details=details,
+        )
 
     def _agent_limit_pause_active(self, conn: sqlite3.Connection) -> bool:
         raw = db.get_setting(conn, _LIMIT_PAUSE_UNTIL_KEY, "") or ""
@@ -779,6 +1175,47 @@ class Dispatcher:
             message=message,
             severity="warn",
             category="state",
+            gap_id=gap_id,
+            actor="runner",
+        )
+
+    def _reset_stopped_quality(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+        round_idx: int,
+        reason: str,
+        base_commit: str,
+    ) -> None:
+        cwd = git_ops.gap_worktree_path(gap_id)
+        git_ops._run(["reset", "--hard", base_commit], cwd=cwd)
+        git_ops._run(["clean", "-fd"], cwd=cwd)
+        if reason == "priority_preempted":
+            message = (
+                "Quality run stopped because higher-priority Gap work is blocking "
+                "lower priorities — moved back to qa and discarded partial QA work."
+            )
+        else:
+            message = (
+                "Quality run stopped because agents were paused — moved back to "
+                "qa and discarded partial QA work."
+            )
+        try:
+            gap_writer.append_round_log(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                severity="warn",
+                category="quality",
+                actor="runner",
+                message=message,
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message=message,
+            severity="warn",
+            category="quality",
             gap_id=gap_id,
             actor="runner",
         )

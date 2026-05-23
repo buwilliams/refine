@@ -231,6 +231,7 @@ class RunHandle:
     worker_cpu_priority: str = "normal"
     resource_backend: str = ""
     resource_isolation: str = ""
+    kind: str = "implementation"
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
     # Set to time.monotonic() when stream-json emits a `result` event.
@@ -281,6 +282,7 @@ class SubprocessManager:
         base_ref: str,
         idle_window: int,
         hard_cap: int,
+        kind: str = "implementation",
         on_finished: Callable[..., None] | None = None,
     ) -> int:
         """Spawn an agent CLI subprocess in the Gap's worktree.
@@ -337,6 +339,7 @@ class SubprocessManager:
             worker_cpu_priority=resource_settings.worker_cpu_priority,
             resource_backend=capabilities.name,
             resource_isolation=capabilities.isolation,
+            kind=kind,
         )
         with self._lock:
             self._runs[gap_id] = handle
@@ -345,9 +348,10 @@ class SubprocessManager:
         conn = self._get_conn()
         with db.transaction(conn):
             conn.execute(
-                "INSERT INTO runs (gap_id, round_idx, started_at, pid, status, last_output_at) "
-                "VALUES (?, ?, ?, ?, 'running', ?)",
-                (gap_id, round_idx, now_iso(), proc.pid, now_iso()),
+                "INSERT INTO runs "
+                "(gap_id, round_idx, started_at, pid, status, last_output_at, kind) "
+                "VALUES (?, ?, ?, ?, 'running', ?, ?)",
+                (gap_id, round_idx, now_iso(), proc.pid, now_iso(), kind),
             )
 
         self._write_resource_launch_logs(handle)
@@ -414,6 +418,7 @@ class SubprocessManager:
                     "gap_id": h.gap_id,
                     "round_idx": h.round_idx,
                     "pid": h.proc.pid,
+                    "kind": h.kind,
                     "elapsed_seconds": int(now - h.started_at),
                     "idle_seconds": int(now - h.last_output),
                 })

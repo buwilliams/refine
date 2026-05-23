@@ -34,8 +34,8 @@ function renderSettingsInstancesTab(instances, instanceCounts, activeInstanceId,
       <h3>Transfer Gaps</h3>
       <p class="muted small" style="margin-top:0">
         Transfers matching Gaps to another instance. If active work is present,
-        Refine pauses agents, stops agent processes, cancels in-progress and
-        ready-merge and awaiting-rebuild Gaps, then transfers them.
+        Refine pauses agents, stops agent processes, cancels in-progress, qa,
+        ready-merge, and awaiting-rebuild Gaps, then transfers them.
       </p>
       <div class="form-grid two">
         <div class="form-row"><label>From</label>
@@ -107,7 +107,7 @@ function bindSettingsInstancesTab() {
     if (!target) return;
     const ok = await modalConfirm(
       "Refine will pause agents, stop all running agent processes, mark matching " +
-      "in-progress, ready-merge, and awaiting-rebuild Gaps as cancelled, then transfer all matching " +
+      "in-progress, qa, ready-merge, and awaiting-rebuild Gaps as cancelled, then transfer all matching " +
       "Gaps to the selected instance.",
       {
         title: "Transfer Gaps",

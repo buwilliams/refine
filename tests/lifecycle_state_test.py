@@ -73,7 +73,8 @@ def main() -> int:
             on_run_finished=lambda gid: merger_wakeups.append(gid),
         )
 
-        # Agent success with real new commits moves in-progress -> ready-merge.
+        # With QA disabled, agent success still enters qa and is immediately
+        # bypassed to ready-merge.
         gid_success = "01LIFECYCLESUCCESSAAAAAA"
         branch_success = "refine/lifecycle-success"
         create_indexed_gap(
@@ -84,6 +85,66 @@ def main() -> int:
         dispatcher._on_finished(gid_success, 0, 0, None, base)
         assert status(conn, gid_success) == "ready-merge"
         assert merger_wakeups == [gid_success]
+
+        db.set_setting(conn, "quality_enabled", "1")
+        gid_quality_enabled = "01LIFECYCLEQAGATEAAAAA"
+        branch_quality_enabled = "refine/lifecycle-qa-gate"
+        create_indexed_gap(
+            conn,
+            gid_quality_enabled,
+            status="in-progress",
+            branch=branch_quality_enabled,
+        )
+        wt_quality_enabled, base_quality_enabled = launchable_worktree(
+            gid_quality_enabled,
+            branch_quality_enabled,
+        )
+        commit_in_worktree(wt_quality_enabled, "qa-gate.txt", "changed\n")
+        dispatcher._on_finished(gid_quality_enabled, 0, 0, None, base_quality_enabled)
+        assert status(conn, gid_quality_enabled) == "qa"
+        assert merger_wakeups == [gid_success]
+
+        gid_quality_pass = "01LIFECYCLEQAPASSAAAAAA"
+        branch_quality_pass = "refine/lifecycle-qa-pass"
+        create_indexed_gap(
+            conn,
+            gid_quality_pass,
+            status="qa",
+            branch=branch_quality_pass,
+        )
+        _wt_quality_pass, base_quality_pass = launchable_worktree(
+            gid_quality_pass,
+            branch_quality_pass,
+        )
+        dispatcher._on_quality_finished(gid_quality_pass, 0, 0, None, base_quality_pass)
+        assert status(conn, gid_quality_pass) == "ready-merge"
+        assert merger_wakeups == [gid_success, gid_quality_pass]
+
+        gid_quality_fail = "01LIFECYCLEQAFAILAAAAAA"
+        branch_quality_fail = "refine/lifecycle-qa-fail"
+        create_indexed_gap(
+            conn,
+            gid_quality_fail,
+            status="qa",
+            branch=branch_quality_fail,
+        )
+        _wt_quality_fail, base_quality_fail = launchable_worktree(
+            gid_quality_fail,
+            branch_quality_fail,
+        )
+        dispatcher._on_quality_finished(gid_quality_fail, 0, 1, None, base_quality_fail)
+        assert status(conn, gid_quality_fail) == "failed"
+
+        retry_runner = Runner()
+        retry_runner.dispatcher = NoopDispatcher()  # type: ignore[assignment]
+        try:
+            result = retry_runner._h_retry_qa({"gap_id": gid_quality_fail})  # noqa: SLF001
+        finally:
+            retry_runner._conn.close()  # noqa: SLF001
+        assert result["ok"], result
+        assert status(conn, gid_quality_fail) == "qa"
+
+        db.set_setting(conn, "quality_enabled", "0")
 
         # Clean exit with no commits is a user-visible failure unless the
         # provider explicitly reported success/no-op.

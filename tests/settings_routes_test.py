@@ -22,6 +22,7 @@ def main() -> int:
             "settings_runtime",
             "settings_performance",
             "settings_governance",
+            "settings_quality",
             "settings_instances",
             "settings_reporters",
         )
@@ -78,7 +79,7 @@ def main() -> int:
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
         "processes", "instances", "performance", "reporters",
-        "guidance", "governance", "application", "runtime",
+        "guidance", "governance", "quality", "application", "runtime",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
@@ -110,6 +111,7 @@ def main() -> int:
         "s-save-application",
         "s-save-runtime",
         "s-governance-save",
+        "s-quality-save",
     ], save_button_ids
     assert "Feature flag changes are saved with Save runtime." in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
@@ -254,6 +256,7 @@ def main() -> int:
     assert "const transferTargetInstances = instances.filter((inst) => !inst.archived);" in settings_js
     assert "Pause, cancel, and transfer" in settings_js
     assert "cancel_active: true" in settings_js
+    assert "in-progress, qa, ready-merge, and awaiting-rebuild" in settings_js
     assert "stopped ${r.stopped_processes || 0} processes" in settings_js
     processes_body = settings_tab_files["settings_processes"]
     application_body = settings_tab_files["settings_application"]
@@ -397,6 +400,14 @@ def main() -> int:
     assert "renderSettingsApplicationTab({" in application_refresh_body
     assert "target_app_url" not in common_js
     assert 'id="s-target-auto-rebuild"' in settings_js
+    assert 'id="s-quality-enabled"' in settings_js
+    assert 'quality_enabled: $("#s-quality-enabled").checked ? "1" : "0"' in settings_js
+    assert 'api("GET", "/api/quality")' in settings_js
+    assert 'api("PATCH", "/api/quality"' in settings_js
+    assert '@route("GET", r"/api/quality")' in server_py
+    assert '@route("PATCH", r"/api/quality")' in server_py
+    assert "def quality_get" in api_py
+    assert "def quality_save" in api_py
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
     assert '"on_worktree_merge", "On worktree merge"' in settings_js
@@ -421,12 +432,14 @@ def main() -> int:
     ):
         assert expected in settings_js
     assert "const WORKFLOW_STATUSES = [" in common_js
+    assert '"qa",' in common_js
     assert '"awaiting-rebuild",' in common_js
     assert "const orderedStatuses = WORKFLOW_STATUSES;" in dashboard_js
     assert "dashboard-status-grid" in dashboard_js
     assert "const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([" in dashboard_js
     assert '"todo",' in dashboard_js
     assert '"in-progress",' in dashboard_js
+    assert '"qa",' in dashboard_js
     assert '"ready-merge",' in dashboard_js
     assert '"awaiting-rebuild",' in dashboard_js
     assert "dashboard-status-card-agent" in dashboard_js
@@ -469,7 +482,7 @@ def main() -> int:
         < dashboard_js.index("Needs attention")
     )
     assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter stats")
-    assert "repeat(9, minmax(0, 1fr))" in dashboard_css
+    assert "repeat(10, minmax(0, 1fr))" in dashboard_css
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
     assert "dashboard-status-label" in dashboard_css
     assert ".dashboard-status-head" in dashboard_css
@@ -504,7 +517,12 @@ def main() -> int:
     assert '"__last_workflow_state"' in gaps_bulk_js
     assert "(Last workflow state)" in gaps_bulk_js
     assert 'value: "awaiting-rebuild", label: "awaiting-rebuild"' in gaps_bulk_js
-    assert "failed merge attempts back to ready-merge" in gaps_bulk_js
+    assert "failed merge" in gaps_bulk_js
+    assert "attempts back to ready-merge" in gaps_bulk_js
+    assert "failed QA attempts back to qa" in gaps_bulk_js
+    assert "/retry-quality" in gaps_detail_js
+    assert "isQualityRetryGap" in gaps_detail_js
+    assert "renderQualitySummary" in gaps_detail_js
     assert 'forward: { label: "Review →"' not in gaps_detail_js
     assert 'todo:         { back:    { label: "← Backlog",  next: "backlog" } }' in gaps_detail_js
     assert '<span class="target-app-label">Application</span>' in index_html

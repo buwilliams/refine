@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters, round_logs, search_index
+from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, reporters, round_logs, search_index
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -27,7 +27,7 @@ from refine_server.backend_protocol import (
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
-    M_MERGE_REPORTER, M_RENAME_REPORTER, M_RETRY_MERGE, M_SET_NOTES, M_TARGET_APP_GENERATE,
+    M_MERGE_REPORTER, M_RENAME_REPORTER, M_RETRY_MERGE, M_RETRY_QA, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
@@ -541,7 +541,7 @@ def _cancel_active_transfer_gaps(
     try:
         project_state.set_setting("paused", "1")
         db.set_setting(conn, "paused", "1")
-        where = ["status IN ('in-progress', 'ready-merge', 'awaiting-rebuild')"]
+        where = ["status IN ('in-progress', 'qa', 'ready-merge', 'awaiting-rebuild')"]
         args: list[Any] = []
         if source_instance_id:
             where.append("instance_id = ?")
@@ -1040,7 +1040,7 @@ def _git_checked(repo: Path, args: list[str]) -> None:
 
 _VALID_PRIORITIES = ("low", "medium", "high")
 _VALID_STATUSES = (
-    "backlog", "todo", "in-progress", "ready-merge", "awaiting-rebuild",
+    "backlog", "todo", "in-progress", "qa", "ready-merge", "awaiting-rebuild",
     "review", "done", "failed", "cancelled",
 )
 _USER_STATUS_TRANSITIONS = {
@@ -1051,7 +1051,7 @@ _USER_STATUS_TRANSITIONS = {
     "failed": {"todo"},
     "cancelled": {"todo"},
 }
-_BULK_STATUS_AUTOMATED_VALUES = {"in-progress", "ready-merge"}
+_BULK_STATUS_AUTOMATED_VALUES = {"in-progress", "qa", "ready-merge"}
 _BULK_STATUS_VALUES = set(_VALID_STATUSES) - _BULK_STATUS_AUTOMATED_VALUES
 _BULK_STATUS_SOURCE_VALUES = _BULK_STATUS_VALUES
 _BULK_LAST_WORKFLOW_STATUS = "__last_workflow_state"
@@ -1063,6 +1063,7 @@ _DUPLICATE_UPDATE_FIELDS = {"actual", "target", "reporter", "priority"}
 _DUPLICATE_BACKLOG_PROTECTED_STATUSES = {
     "todo",
     "in-progress",
+    "qa",
     "ready-merge",
     "awaiting-rebuild",
     "awaiting-review",
@@ -1851,7 +1852,7 @@ def _bulk_update_gaps_impl(body: dict) -> tuple[int, dict]:
             return err(
                 409,
                 (
-                    "Bulk status updates cannot set in-progress or ready-merge. "
+                    "Bulk status updates cannot set in-progress, qa, or ready-merge. "
                     "Use per-Gap workflow actions for automated states."
                 ),
             )
@@ -2272,6 +2273,26 @@ def retry_merge(gap_id: str) -> tuple[int, dict]:
     return (200 if result.get("ok") else 409), result
 
 
+@_exclusive_mutation("Retry QA")
+def retry_qa(gap_id: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        _, ownership_err = _require_active_gap(conn, gap_id)
+    finally:
+        conn.close()
+    if ownership_err is not None:
+        return ownership_err
+    try:
+        result = get_client().call(
+            M_RETRY_QA,
+            {"gap_id": gap_id},
+            timeout=10.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    return (200 if result.get("ok") else 409), result
+
+
 def cancel(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
@@ -2427,6 +2448,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "backlog_promote_after_seconds",
         "project_update_pulse_interval_seconds",
         "agent_subpath", "merge_target_branch",
+        "quality_enabled",
         "agent_cli",
         "paused",
         # Target-app configuration. The state fields
@@ -2485,9 +2507,17 @@ def update_settings(body: dict) -> tuple[int, dict]:
         elif k == "agent_cli":
             choice = str(v or "").strip().lower()
             if choice not in valid_agent_clis:
-                return err(400,
-                    f"agent_cli must be one of {', '.join(valid_agent_clis)}")
+                return err(
+                    400,
+                    f"agent_cli must be one of {', '.join(valid_agent_clis)}",
+                )
             normalized[k] = choice
+        elif k == "quality_enabled":
+            normalized[k] = (
+                "1"
+                if str(v).strip().lower() in {"1", "true", "yes", "on"}
+                else "0"
+            )
         elif k == "parallel_run_cap":
             try:
                 n = int(v)
@@ -2641,6 +2671,11 @@ def update_settings(body: dict) -> tuple[int, dict]:
                 cleanup.get("message")
                 or "agents paused but target worktree cleanup did not complete",
             )
+    if "quality_enabled" in normalized:
+        try:
+            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+        except BackendError:
+            pass
     if (
         normalized.get("target_app_auto_rebuild") == "on_worktree_merge"
         or "target_app_rebuild_command" in normalized
@@ -2688,6 +2723,37 @@ def governance_save(body: dict) -> tuple[int, dict]:
         get_client().call(M_GOVERNANCE_WAKE, {}, timeout=10.0)
     except BackendError:
         pass
+    return 200, result
+
+
+def quality_get() -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        result = quality.load_settings(conn)
+        result["configured"] = quality.is_configured(conn)
+        return 200, result
+    finally:
+        conn.close()
+
+
+def quality_save(body: dict) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        result = quality.save_settings(
+            conn,
+            business_requirements=body.get("business_requirements"),
+            instructions=body.get("instructions"),
+        )
+        result["configured"] = quality.is_configured(conn)
+        activity.append(
+            conn,
+            message="Quality settings updated",
+            severity="info",
+            category="quality",
+            actor="refine",
+        )
+    finally:
+        conn.close()
     return 200, result
 
 
@@ -3013,13 +3079,15 @@ def process_summary() -> tuple[int, dict]:
 
     for run in runner_snap.get("running") or []:
         gap_id = str(run.get("gap_id") or "")
+        run_kind = str(run.get("kind") or "implementation")
         processes.append({
             "id": f"agent:{gap_id}",
             "kind": "agent",
-            "label": "Agent",
+            "label": "Quality agent" if run_kind == "quality" else "Agent",
             "status": "running",
             "gap_id": gap_id,
             "round_idx": run.get("round_idx"),
+            "run_kind": run_kind,
             "pid": run.get("pid"),
             "elapsed_seconds": run.get("elapsed_seconds") or 0,
             "idle_seconds": run.get("idle_seconds") or 0,
@@ -3263,7 +3331,7 @@ def _cpu_priority_label(priority: str, weight: int) -> str:
     return f"{label} (weight {weight})"
 
 
-_ACTIVE_STATUSES = ("todo", "in-progress", "ready-merge", "awaiting-rebuild", "review")
+_ACTIVE_STATUSES = ("todo", "in-progress", "qa", "ready-merge", "awaiting-rebuild", "review")
 
 
 def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]:

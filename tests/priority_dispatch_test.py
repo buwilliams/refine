@@ -95,12 +95,12 @@ def main() -> int:
                 (gid, gid, status, priority, ts, ts, branch, f"gaps/{gid}.json"),
             )
 
-        def insert_running_run(gid: str) -> None:
+        def insert_running_run(gid: str, *, kind: str = "implementation") -> None:
             conn.execute(
                 "INSERT INTO runs "
-                "(gap_id, round_idx, started_at, pid, status, failure_category) "
-                "VALUES (?, 0, ?, ?, 'running', NULL)",
-                (gid, now_iso(), os.getpid()),
+                "(gap_id, round_idx, started_at, pid, status, failure_category, kind) "
+                "VALUES (?, 0, ?, ?, 'running', NULL, ?)",
+                (gid, now_iso(), os.getpid(), kind),
             )
 
         reset()
@@ -185,6 +185,54 @@ def main() -> int:
         insert_gap("low-todo", "todo", "low")
         dispatcher._tick()
         assert launched == [], launched
+
+        reset()
+        db.set_setting(conn, "quality_enabled", "1")
+        db.set_setting(conn, "__refine_dispatch_next_lane", "todo")
+        insert_gap("todo-a", "todo", "high")
+        insert_gap("todo-b", "todo", "high")
+        insert_gap("qa-a", "qa", "high", "refine/qa-a")
+        insert_gap("qa-b", "qa", "high", "refine/qa-b")
+        quality_launched: list[str] = []
+
+        def launch_quality(_conn, gap_id: str, _branch: str | None) -> None:
+            quality_launched.append(gap_id)
+            insert_running_run(gap_id, kind="quality")
+
+        dispatcher._launch_quality = launch_quality  # type: ignore[method-assign]
+        db.set_setting(conn, "parallel_run_cap", "4")
+        dispatcher._tick()
+        assert launched == ["todo-a", "todo-b"], launched
+        assert quality_launched == ["qa-a", "qa-b"], quality_launched
+
+        reset()
+        launched.clear()
+        quality_launched.clear()
+        db.set_setting(conn, "quality_enabled", "1")
+        db.set_setting(conn, "parallel_run_cap", "1")
+        insert_gap("qa-running", "qa", "high", "refine/qa-running")
+        insert_gap("qa-blocked-by-cap", "qa", "high", "refine/qa-blocked-by-cap")
+        insert_running_run("qa-running", kind="quality")
+        assert dispatcher._active_run_count(conn) == 1  # noqa: SLF001
+        dispatcher._tick()
+        assert quality_launched == [], quality_launched
+
+        insert_gap("todo-blocked-by-qa-cap", "todo", "high")
+        assert not dispatcher._reserve_in_progress_slot(  # noqa: SLF001
+            conn,
+            "todo-blocked-by-qa-cap",
+            "refine/todo-blocked-by-qa-cap",
+        )
+
+        reset()
+        db.set_setting(conn, "quality_enabled", "0")
+        insert_gap("qa-disabled", "qa", "high", "refine/qa-disabled")
+        dispatcher._tick()
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'qa-disabled'",
+        ).fetchone()
+        assert row["status"] == "ready-merge", dict(row)
+        assert quality_launched == [], quality_launched
 
         for status in ("review", "done", "failed", "cancelled"):
             reset()

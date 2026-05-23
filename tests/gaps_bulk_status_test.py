@@ -373,13 +373,13 @@ def main() -> int:
         finally:
             api.get_client = original_get_client
 
-        for target in ("in-progress", "ready-merge"):
+        for target in ("in-progress", "qa", "ready-merge"):
             code, body = api.bulk_update_gaps({
                 "filter": {"reporter": "Reporter"},
                 "update": {"status": target},
             })
             assert code == 409, (target, body)
-            assert "cannot set in-progress or ready-merge" in body["error"]["message"]
+            assert "cannot set in-progress, qa, or ready-merge" in body["error"]["message"]
 
         root = Path(__file__).resolve().parents[1]
         gaps_bulk = (
@@ -389,7 +389,9 @@ def main() -> int:
         assert "(Last workflow state)" in gaps_bulk
         assert 'value: "awaiting-rebuild", label: "awaiting-rebuild"' in gaps_bulk
         assert 'value: "cancelled", label: "cancelled"' in gaps_bulk
-        assert "failed merge attempts back to ready-merge" in gaps_bulk
+        assert "failed merge" in gaps_bulk
+        assert "attempts back to ready-merge" in gaps_bulk
+        assert "failed QA attempts back to qa" in gaps_bulk
         assert "resolveBackgroundJobResponse" in gaps_bulk
         assert "filter, ...selectionFields" in gaps_bulk
         assert "exclude_ids: Array.from(gapsExcludedIds)" in gaps_bulk

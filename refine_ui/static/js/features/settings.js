@@ -23,7 +23,7 @@ async function refreshSettings(options = {}) {
   }
   try {
     const [
-      s, diag, reps, feats, project, gov, dash, instances, guidance,
+      s, diag, reps, feats, project, gov, quality, dash, instances, guidance,
       performance, processes,
     ] = await Promise.all([
       api("GET", "/api/settings"),
@@ -32,6 +32,7 @@ async function refreshSettings(options = {}) {
       api("GET", "/api/features"),
       api("GET", "/api/project/status"),
       api("GET", "/api/governance"),
+      api("GET", "/api/quality"),
       api("GET", "/api/dashboard"),
       api("GET", "/api/instances"),
       api("GET", "/api/guidance"),
@@ -44,8 +45,8 @@ async function refreshSettings(options = {}) {
     updateActiveInstanceLabel();
     drawSettings(
       s.settings || {}, diag, reps.reporters || [], feats,
-      gov || {}, dash || {}, instances || {}, guidance || {}, performance || {},
-      processes || {},
+      gov || {}, quality || {}, dash || {}, instances || {}, guidance || {},
+      performance || {}, processes || {},
     );
   } catch (e) {
     const root = document.getElementById("settings-content");
@@ -141,6 +142,13 @@ async function refreshSettingsTab(slug, options = {}) {
         "governance",
         renderSettingsGovernanceTab(gov || {}),
         bindSettingsGovernanceTab,
+      );
+    } else if (activeSlug === "quality") {
+      const quality = await api("GET", "/api/quality");
+      updateSettingsTabContent(
+        "quality",
+        renderSettingsQualityTab(quality || {}),
+        bindSettingsQualityTab,
       );
     } else if (activeSlug === "application") {
       const [s, project] = await Promise.all([
@@ -285,6 +293,7 @@ const SETTINGS_TABS = [
   { slug: "reporters",    label: "Reporters" },
   { slug: "guidance",     label: "Guidance" },
   { slug: "governance",   label: "Governance" },
+  { slug: "quality",      label: "Quality" },
   { slug: "application",  label: "Application" },
   { slug: "runtime",      label: "Runtime" },
 ];
@@ -443,7 +452,7 @@ function bindRebuildCacheHandler() {
 
 
 function drawSettings(
-  s, diag, reps, feats, gov = {}, dash = {}, instanceData = {},
+  s, diag, reps, feats, gov = {}, quality = {}, dash = {}, instanceData = {},
   guidanceData = {}, performanceData = {}, processData = {},
 ) {
   const cli = (s.agent_cli || "claude").toLowerCase();
@@ -480,6 +489,7 @@ function drawSettings(
     ${pane("runtime", renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli))}
     ${pane("performance", renderSettingsPerformanceTab(performance, performanceBackend))}
     ${pane("governance", renderSettingsGovernanceTab(gov))}
+    ${pane("quality", renderSettingsQualityTab(quality))}
     ${pane("instances", renderSettingsInstancesTab(
       instances, instanceCounts, activeInstanceId, transferTargetInstances,
     ))}
@@ -492,6 +502,7 @@ function drawSettings(
   bindSettingsRuntimeTab();
   bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceData, guidanceData);
   bindSettingsGovernanceTab();
+  bindSettingsQualityTab();
   bindSettingsApplicationTab(currentProject);
   bindSettingsInstancesTab();
   bindSettingsReportersTab();

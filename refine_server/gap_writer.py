@@ -172,6 +172,31 @@ def set_latest_round_governance(gap_id: str, fields: dict[str, Any]) -> dict[str
         return gap
 
 
+def set_latest_round_quality(gap_id: str, fields: dict[str, Any]) -> dict[str, Any]:
+    with _lock_for(gap_id):
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
+        if gap is None:
+            raise FileNotFoundError(f"gap.json missing for {gap_id}")
+        if not gap["rounds"]:
+            raise ValueError("Gap has no rounds")
+        r = gap["rounds"][-1]
+        shared_gaps.normalize_round_governance(r)
+        allowed = {
+            "quality_state",
+            "quality_message",
+            "quality_details",
+            "quality_checked_at",
+        }
+        for key, value in fields.items():
+            if key in allowed:
+                r[key] = value
+        shared_gaps.normalize_round_governance(r)
+        r["updated"] = now_iso()
+        gap["updated"] = r["updated"]
+        shared_gaps.write_gap_json(gap)
+        return gap
+
+
 def rename_reporter_in_rounds(
     conn,
     old_name: str,
