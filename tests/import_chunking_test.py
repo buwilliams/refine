@@ -42,7 +42,7 @@ def main() -> int:
     assert "const visibleDrafts = draftState" in import_js
     assert "function importDraftNeedsResolution(draft)" in import_js
     assert "function renderImportDraftRange(start, end, visibleCount, totalCount, filtered)" in import_js
-    assert "Needs resolution only (${unresolvedCount})" in import_js
+    assert "Needs resolution (${unresolvedCount})" in import_js
     assert "data-import-unresolved-filter" in import_js
     assert "showNeedsResolutionOnly = true" in import_js
     assert "Resolve ${unresolved.length} draft" in import_js
@@ -55,6 +55,8 @@ def main() -> int:
     assert "syncImportDraftPage(drafts_root, draftState)" in import_js
     assert ".map(importDraftPayload)" in import_js
     assert ".import-draft-toolbar" in common_css
+    assert ".import-review-actionbar" in common_css
+    assert ".import-draft-row-head" in common_css
     assert ".import-draft-list" in common_css
     assert ".import-draft-footer" in common_css
     assert ".import-resolution-filter" in common_css
@@ -96,8 +98,13 @@ def main() -> int:
     assert "No, import" in new_gap_js
     assert "Yes, move original to backlog" in new_gap_js
     assert "move_original_to_backlog" in new_gap_js
-    assert "renderGapDuplicatePrompt(d.duplicate)" in import_js
-    assert "Choose whether each is a duplicate before saving again." in import_js
+    assert "renderImportDuplicateSummary(d.duplicate)" in import_js
+    assert "Resolve them with the action bar before saving." in import_js
+    assert "data-import-select-visible" in import_js
+    assert "data-import-dismiss-duplicates" in import_js
+    assert "data-import-update-originals" in import_js
+    assert "update_original_${field}" in import_js
+    assert "Move originals to backlog" in import_js
     assert "failure.code === \"duplicate_gap\"" in import_js
     assert "duplicate_decision:" in import_js
     assert "err.code === \"duplicate_gap\"" in new_gap_js
@@ -120,6 +127,8 @@ def main() -> int:
     assert "def import_dedup(body: dict)" in api_py
     assert "def _find_import_duplicate(" in api_py
     assert "def _move_duplicate_original_to_backlog(" in api_py
+    assert "def _update_duplicate_original_from_draft(" in api_py
+    assert "_DUPLICATE_UPDATE_FIELDS = {\"actual\", \"target\", \"reporter\", \"priority\"}" in api_py
     assert '"awaiting-rebuild",' in api_py
     assert '"awaiting-review",' in api_py
     assert "IMPORT_DEDUP_THRESHOLD = 0.62" in api_py

@@ -1058,6 +1058,8 @@ _BULK_LAST_WORKFLOW_STATUS = "__last_workflow_state"
 _DUPLICATE_DECISION_IGNORE = "duplicate"
 _DUPLICATE_DECISION_IMPORT = "original"
 _DUPLICATE_DECISION_MOVE_ORIGINAL = "move_original_to_backlog"
+_DUPLICATE_UPDATE_PREFIX = "update_original_"
+_DUPLICATE_UPDATE_FIELDS = {"actual", "target", "reporter", "priority"}
 _DUPLICATE_BACKLOG_PROTECTED_STATUSES = {
     "todo",
     "in-progress",
@@ -3813,16 +3815,19 @@ def import_persist(body: dict) -> tuple[int, dict]:
 def _cancel_import_if_requested(
     created: list[str],
     duplicate_moves: list[dict[str, Any]] | None = None,
+    duplicate_updates: list[dict[str, Any]] | None = None,
 ) -> None:
     if not background_jobs.current_cancelled():
         return
     rolled_back = _rollback_import_created_gaps(created)
     restored = _rollback_import_duplicate_moves(duplicate_moves or [])
+    restored_updates = _rollback_import_duplicate_updates(duplicate_updates or [])
     raise background_jobs.CancellationRequested({
         "cancelled": True,
         "created": created,
         "rolled_back": rolled_back,
         "restored_duplicates": restored,
+        "restored_original_updates": restored_updates,
         "count": 0,
         "failures": [],
         "failed": 0,
@@ -3889,6 +3894,132 @@ def _rollback_import_duplicate_moves(moves: list[dict[str, Any]]) -> int:
     return restored
 
 
+def _rollback_import_duplicate_updates(updates: list[dict[str, Any]]) -> int:
+    restored = 0
+    for update in reversed(updates):
+        gap_id = str(update.get("gap_id") or "")
+        before = update.get("before") if isinstance(update.get("before"), dict) else {}
+        if not gap_id or not before:
+            continue
+        try:
+            if any(field in before for field in ("actual", "target", "reporter")):
+                gap_writer.edit_latest_round(
+                    gap_id,
+                    actual=before.get("actual") if "actual" in before else None,
+                    target=before.get("target") if "target" in before else None,
+                    reporter=before.get("reporter") if "reporter" in before else None,
+                )
+            if "priority" in before:
+                _update_gap_priority_no_ownership(gap_id, str(before["priority"]))
+            if "reporter" in before:
+                _update_gap_reporter_index_no_ownership(gap_id, str(before["reporter"]))
+            _upsert_gap_search_no_ownership(gap_id)
+            _append_gap_workflow_log(
+                gap_id,
+                "Original Gap restored after cancelled import update",
+            )
+            restored += 1
+        except Exception:
+            continue
+    return restored
+
+
+def _duplicate_update_field(decision: str) -> str:
+    if not decision.startswith(_DUPLICATE_UPDATE_PREFIX):
+        return ""
+    field = decision[len(_DUPLICATE_UPDATE_PREFIX):]
+    return field if field in _DUPLICATE_UPDATE_FIELDS else ""
+
+
+def _latest_round_snapshot(gap_id: str) -> dict[str, Any]:
+    gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
+    rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+    latest = rounds[-1] if rounds else {}
+    return {
+        "actual": str(latest.get("actual") or ""),
+        "target": str(latest.get("target") or ""),
+        "reporter": str(latest.get("reporter") or ""),
+        "priority": str(gap.get("priority") or "low"),
+    }
+
+
+def _update_gap_priority_no_ownership(gap_id: str, priority: str) -> None:
+    updated_at = now_iso()
+    conn = _conn()
+    try:
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET priority = ?, updated = ? WHERE id = ?",
+                (priority, updated_at, gap_id),
+            )
+    finally:
+        conn.close()
+    gap_writer.update_fields(gap_id, priority=priority)
+
+
+def _update_gap_reporter_index_no_ownership(gap_id: str, reporter: str) -> None:
+    updated_at = now_iso()
+    conn = _conn()
+    try:
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET reporter = ?, updated = ? WHERE id = ?",
+                (reporter, updated_at, gap_id),
+            )
+    finally:
+        conn.close()
+
+
+def _upsert_gap_search_no_ownership(gap_id: str) -> None:
+    gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
+    if not gap:
+        return
+    conn = _conn()
+    try:
+        with db.transaction(conn):
+            search_index.upsert_gap(conn, gap)
+    finally:
+        conn.close()
+
+
+def _update_duplicate_original_from_draft(
+    *,
+    duplicate: dict[str, Any],
+    draft: dict[str, str],
+    field: str,
+) -> dict[str, Any]:
+    gap_id = str(duplicate.get("match", {}).get("id") or "")
+    if not gap_id:
+        raise ValueError("duplicate match is missing")
+    before_all = _latest_round_snapshot(gap_id)
+    before = {field: before_all[field]}
+    if field in {"actual", "target", "reporter"}:
+        value = str(draft.get(field) or "").strip()
+        if field == "reporter" and (not value or not _VALID_REPORTER.match(value)):
+            raise ValueError("invalid reporter name")
+        gap_writer.edit_latest_round(
+            gap_id,
+            actual=value if field == "actual" else None,
+            target=value if field == "target" else None,
+            reporter=value if field == "reporter" else None,
+        )
+        if field == "reporter":
+            _update_gap_reporter_index_no_ownership(gap_id, value)
+    elif field == "priority":
+        value = str(draft.get("priority") or "low").strip().lower()
+        if value not in _VALID_PRIORITIES:
+            raise ValueError("priority must be one of low/medium/high")
+        _update_gap_priority_no_ownership(gap_id, value)
+    else:
+        raise ValueError("unsupported original update field")
+    _upsert_gap_search_no_ownership(gap_id)
+    _append_gap_workflow_log(
+        gap_id,
+        f"Original Gap {field} updated from duplicate import",
+    )
+    return {"gap_id": gap_id, "field": field, "before": before}
+
+
 def _import_persist_progress(completed: int, total: int, message: str) -> None:
     job_id = background_jobs.current_job_id()
     if not job_id:
@@ -3918,12 +4049,15 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
         "ignored": 0,
         "moved_to_backlog": 0,
         "move_noop": 0,
+        "updated_original": 0,
+        "updated_original_fields": {},
     }
     duplicate_moves: list[dict[str, Any]] = []
+    duplicate_updates: list[dict[str, Any]] = []
     total = len(drafts)
     _import_persist_progress(0, total, f"Importing 0 of {total} Gaps")
     for idx, d in enumerate(drafts, start=1):
-        _cancel_import_if_requested(created, duplicate_moves)
+        _cancel_import_if_requested(created, duplicate_moves, duplicate_updates)
         _import_persist_progress(
             idx - 1,
             total,
@@ -4008,6 +4142,55 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
             target,
             candidates=dedup_candidates,
         )
+        update_field = _duplicate_update_field(duplicate_decision)
+        if update_field and not duplicate:
+            failures.append({
+                "index": idx,
+                "error": "original Gap no longer matches this draft",
+                "code": "duplicate_update_missing",
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                },
+            })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
+            continue
+        if duplicate and update_field:
+            try:
+                update = _update_duplicate_original_from_draft(
+                    duplicate=duplicate,
+                    draft={
+                        "actual": actual,
+                        "target": target,
+                        "reporter": draft_reporter,
+                        "priority": priority,
+                    },
+                    field=update_field,
+                )
+                duplicate_updates.append(update)
+                duplicate_actions["updated_original"] += 1
+                field_counts = duplicate_actions["updated_original_fields"]
+                field_counts[update_field] = int(field_counts.get(update_field) or 0) + 1
+            except Exception as e:
+                failures.append({
+                    "index": idx,
+                    "error": str(e) or "Could not update original Gap",
+                    "code": "duplicate_update_failed",
+                    "duplicate": duplicate,
+                    "draft": {
+                        "name": name,
+                        "actual": actual,
+                        "target": target,
+                        "reporter": draft_reporter,
+                        "priority": priority,
+                    },
+                })
+            _cancel_import_if_requested(created, duplicate_moves, duplicate_updates)
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
+            continue
         if duplicate and duplicate_decision == _DUPLICATE_DECISION_MOVE_ORIGINAL:
             move = _move_duplicate_original_to_backlog(duplicate["match"]["id"])
             if move.get("moved"):
@@ -4015,7 +4198,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                 duplicate_moves.append(move)
             else:
                 duplicate_actions["move_noop"] += 1
-            _cancel_import_if_requested(created, duplicate_moves)
+            _cancel_import_if_requested(created, duplicate_moves, duplicate_updates)
             _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         if duplicate and duplicate_decision != _DUPLICATE_DECISION_IMPORT:
@@ -4041,7 +4224,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                 "priority": priority, "actual": actual, "target": target,
             })
             created.append(gap_id)
-            _cancel_import_if_requested(created, duplicate_moves)
+            _cancel_import_if_requested(created, duplicate_moves, duplicate_updates)
             _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
         except BackendError as e:
             failures.append({
@@ -4057,7 +4240,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                 },
             })
             _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
-    _cancel_import_if_requested(created, duplicate_moves)
+    _cancel_import_if_requested(created, duplicate_moves, duplicate_updates)
     status = 201 if created and not failures else 200
     return status, {
         "created": created,

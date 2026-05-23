@@ -642,6 +642,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   const saveSession = options.saveSession || null;
   let page = 1;
   let showNeedsResolutionOnly = false;
+  let originalUpdateField = "actual";
 
   function renderPage() {
     const visibleDrafts = draftState
@@ -654,20 +655,29 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     const end = start + pageDrafts.length;
     const duplicateCount = draftState.filter((draft) => draft.duplicate).length;
     const unresolvedCount = draftState.filter(importDraftNeedsResolution).length;
+    const selectedCount = draftState.filter((draft) => draft.selected).length;
     const title = options.retry
       ? `Failed drafts (${draftState.length}) — correct &amp; retry`
       : `Drafts (${draftState.length}) — review &amp; confirm`;
     drafts_root.innerHTML = `
       <h3 style="margin-top:0">${title}</h3>
+      ${renderImportDraftActionBar({
+        start,
+        end,
+        visibleCount: visibleDrafts.length,
+        totalCount: draftState.length,
+        filtered: showNeedsResolutionOnly,
+        unresolvedCount,
+        selectedCount,
+        duplicateCount,
+        totalPages,
+        page,
+        updateField: originalUpdateField,
+      })}
       <div class="import-draft-toolbar">
-        <span class="muted small">${renderImportDraftRange(start, end, visibleDrafts.length, draftState.length, showNeedsResolutionOnly)}</span>
-        <label class="import-resolution-filter small">
-          <input type="checkbox" data-import-unresolved-filter ${showNeedsResolutionOnly ? "checked" : ""}>
-          Needs resolution only (${unresolvedCount})
-        </label>
         ${renderImportDraftPager(page, totalPages)}
       </div>
-      ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Choose whether each is a duplicate before saving again.</p>` : ""}
+      ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Resolve them with the action bar before saving.</p>` : ""}
       ${showNeedsResolutionOnly && !visibleDrafts.length
         ? `<p class="muted">No drafts need resolution.</p>`
         : `<div class="import-draft-list">
@@ -678,17 +688,95 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       </div>
     `;
     bindImportDraftPage(drafts_root, draftState, saveSession);
-    $("[data-import-unresolved-filter]", drafts_root)?.addEventListener("change", (e) => {
+    const persistReviewState = () => {
       syncImportDraftPage(drafts_root, draftState);
       if (saveSession) saveSession({ phase: "review", drafts: draftState });
+    };
+    $("[data-import-unresolved-filter]", drafts_root)?.addEventListener("change", (e) => {
+      persistReviewState();
       showNeedsResolutionOnly = e.target.checked;
       page = 1;
       renderPage();
     });
+    $("[data-import-select-visible]", drafts_root)?.addEventListener("change", (e) => {
+      syncImportDraftPage(drafts_root, draftState);
+      for (const { draft } of visibleDrafts.slice(start, start + IMPORT_DRAFT_PAGE_SIZE)) {
+        draft.selected = e.target.checked;
+      }
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      renderPage();
+    });
+    $("[data-import-select-duplicates]", drafts_root)?.addEventListener("click", () => {
+      persistReviewState();
+      draftState.forEach((draft) => {
+        draft.selected = !!draft.duplicate;
+      });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      renderPage();
+    });
+    $("[data-import-dismiss-duplicates]", drafts_root)?.addEventListener("click", () => {
+      persistReviewState();
+      const targets = draftState.filter((draft) => draft.duplicate);
+      targets.forEach((draft) => {
+        draft.duplicateDecision = "duplicate";
+        draft.selected = false;
+      });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      toast(`Dismissed ${targets.length} duplicate${targets.length === 1 ? "" : "s"}`, "info");
+      renderPage();
+    });
+    $("[data-import-originals]", drafts_root)?.addEventListener("click", () => {
+      persistReviewState();
+      const targets = draftState.filter((draft) => draft.selected && draft.duplicate);
+      if (!targets.length) {
+        toast("Select duplicate drafts to import as originals.", "warn");
+        return;
+      }
+      targets.forEach((draft) => {
+        draft.duplicateDecision = "original";
+        draft.selected = false;
+      });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      toast(`Marked ${targets.length} duplicate draft${targets.length === 1 ? "" : "s"} to import`, "info");
+      renderPage();
+    });
+    $("[data-import-backlog-originals]", drafts_root)?.addEventListener("click", () => {
+      persistReviewState();
+      const targets = draftState.filter((draft) => draft.selected && draft.duplicate);
+      if (!targets.length) {
+        toast("Select duplicate drafts whose originals should move to backlog.", "warn");
+        return;
+      }
+      targets.forEach((draft) => {
+        draft.duplicateDecision = "move_original_to_backlog";
+        draft.selected = false;
+      });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for backlog`, "info");
+      renderPage();
+    });
+    $("[data-import-update-field]", drafts_root)?.addEventListener("change", (e) => {
+      originalUpdateField = e.target.value || "actual";
+    });
+    $("[data-import-update-originals]", drafts_root)?.addEventListener("click", () => {
+      persistReviewState();
+      const field = $("[data-import-update-field]", drafts_root)?.value || "actual";
+      const targets = draftState.filter((draft) => draft.selected && draft.duplicate);
+      if (!targets.length) {
+        toast("Select duplicate drafts to update originals.", "warn");
+        return;
+      }
+      targets.forEach((draft) => {
+        draft.duplicateDecision = `update_original_${field}`;
+        draft.selected = false;
+      });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for ${field} update`, "info");
+      renderPage();
+    });
     $$("[data-import-page]", drafts_root).forEach((btn) => {
       btn.addEventListener("click", () => {
-        syncImportDraftPage(drafts_root, draftState);
-        if (saveSession) saveSession({ phase: "review", drafts: draftState });
+        persistReviewState();
         page += btn.dataset.importPage === "next" ? 1 : -1;
         renderPage();
       });
@@ -866,6 +954,7 @@ function handleImportPersistResult(root, r, payload, skipped, close, saveSession
     skipped
     + (duplicateActions.moved_to_backlog || 0)
     + (duplicateActions.move_noop || 0)
+    + (duplicateActions.updated_original || 0)
   );
   if (failures.length) {
     const failedDrafts = failures.map((failure) => {
@@ -909,12 +998,56 @@ function normalizeImportDraft(draft) {
     priority: String(draft.priority || "low").toLowerCase(),
     duplicate: draft.duplicate || null,
     duplicateDecision: draft.duplicateDecision || "",
+    selected: !!draft.selected,
     error: draft.error || "",
   };
 }
 
 function importDraftNeedsResolution(draft) {
   return !!draft.error || (!!draft.duplicate && !draft.duplicateDecision);
+}
+
+function renderImportDraftActionBar({
+  start,
+  end,
+  visibleCount,
+  totalCount,
+  filtered,
+  unresolvedCount,
+  selectedCount,
+  duplicateCount,
+  totalPages,
+  page,
+  updateField,
+}) {
+  const pageInfo = renderImportDraftRange(start, end, visibleCount, totalCount, filtered);
+  return `
+    <div class="import-review-actionbar">
+      <div class="import-review-selection">
+        <label class="small">
+          <input type="checkbox" data-import-select-visible>
+          Select page
+        </label>
+        <span class="muted small">${htmlEscape(pageInfo)}</span>
+        <span class="muted small">${selectedCount} selected</span>
+        ${totalPages > 1 ? `<span class="muted small">Page ${page} of ${totalPages}</span>` : ""}
+      </div>
+      <div class="import-review-actions">
+        <label class="import-resolution-filter small">
+          <input type="checkbox" data-import-unresolved-filter ${filtered ? "checked" : ""}>
+          Needs resolution (${unresolvedCount})
+        </label>
+        <button type="button" class="secondary small" data-import-select-duplicates ${duplicateCount ? "" : "disabled"}>Select duplicates</button>
+        <button type="button" class="secondary small" data-import-dismiss-duplicates ${duplicateCount ? "" : "disabled"}>Dismiss duplicates</button>
+        <button type="button" class="secondary small" data-import-originals>Import selected</button>
+        <button type="button" class="secondary small" data-import-backlog-originals>Move originals to backlog</button>
+        <select data-import-update-field aria-label="Original Gap field">
+          ${["actual", "target", "reporter", "priority"].map((field) => `
+            <option value="${field}" ${field === updateField ? "selected" : ""}>${field}</option>`).join("")}
+        </select>
+        <button type="button" class="secondary small" data-import-update-originals>Update originals</button>
+      </div>
+    </div>`;
 }
 
 function renderImportDraftRange(start, end, visibleCount, totalCount, filtered) {
@@ -947,8 +1080,15 @@ function renderImportDraftPager(page, totalPages) {
 function renderImportDraftRow(d, index) {
   return `
     <div class="draft" data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
+      <div class="import-draft-row-head">
+        <label class="small">
+          <input type="checkbox" data-import-draft-select ${d.selected ? "checked" : ""}>
+          Select
+        </label>
+        ${d.duplicate ? `<span class="muted small">${htmlEscape(importDuplicateDecisionLabel(d.duplicateDecision))}</span>` : ""}
+      </div>
       ${d.error ? `<p class="small draft-error" style="margin-top:0;color:#b42318">${htmlEscape(d.error)}</p>` : ""}
-      ${d.duplicate ? renderGapDuplicatePrompt(d.duplicate) : ""}
+      ${d.duplicate ? renderImportDuplicateSummary(d.duplicate) : ""}
       <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
       <div class="form-grid two" style="margin-top:6px">
         <div class="form-row">
@@ -974,11 +1114,46 @@ function renderImportDraftRow(d, index) {
     </div>`;
 }
 
+function importDuplicateDecisionLabel(decision) {
+  if (decision === "duplicate") return "Duplicate dismissed";
+  if (decision === "original") return "Will import as original";
+  if (decision === "move_original_to_backlog") return "Will move original to backlog";
+  if (decision?.startsWith("update_original_")) {
+    return `Will update original ${decision.replace("update_original_", "")}`;
+  }
+  return "Needs duplicate resolution";
+}
+
+function renderImportDuplicateSummary(match) {
+  return `
+    <div class="import-duplicate">
+      <div class="small" style="font-weight:600">Possible duplicate</div>
+      <p class="muted small" style="margin:4px 0">
+        ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.instance_display_name || match.instance_id || "Default")}
+        · ${htmlEscape(match.status || "")}
+      </p>
+      <div class="import-duplicate-content">
+        <div>
+          <div class="small muted">Matched actual</div>
+          <p>${htmlEscape(match.actual || "")}</p>
+        </div>
+        <div>
+          <div class="small muted">Matched target</div>
+          <p>${htmlEscape(match.target || "")}</p>
+        </div>
+      </div>
+    </div>`;
+}
+
 function bindImportDraftPage(root, draftState, saveSession = null) {
   $$(".draft", root).forEach((row) => {
     const draft = draftState[Number(row.dataset.idx)];
     if (!draft) return;
     row.dataset.duplicateDecision = draft.duplicateDecision || "";
+    row.querySelector("[data-import-draft-select]")?.addEventListener("change", (e) => {
+      draft.selected = e.target.checked;
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+    });
     $$(".import-duplicate-actions button", row).forEach((btn) => {
       btn.classList.toggle(
         "selected",
@@ -1025,6 +1200,7 @@ function syncImportDraftPage(root, draftState) {
 function syncImportDraftRow(row, draftState) {
   const draft = draftState[Number(row.dataset.idx)];
   if (!draft) return;
+  draft.selected = !!row.querySelector("[data-import-draft-select]")?.checked;
   draft.name = row.querySelector(".d-name")?.value || "";
   draft.actual = row.querySelector(".d-actual")?.value || "";
   draft.target = row.querySelector(".d-target")?.value || "";

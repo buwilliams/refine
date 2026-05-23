@@ -509,6 +509,30 @@ select {
 .import-draft-pagination {
   margin-top: 0;
 }
+.import-review-actionbar {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  margin: 8px 0 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.import-review-selection,
+.import-review-actions,
+.import-draft-row-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.import-review-actions select {
+  min-width: 120px;
+}
+.import-draft-row-head {
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
 .import-resolution-filter {
   display: inline-flex;
   align-items: center;

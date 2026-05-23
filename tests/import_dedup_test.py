@@ -233,6 +233,30 @@ def main() -> int:
         assert prepared["http_status"] == 200, prepared
         assert prepared["count"] == 1, prepared
         assert prepared["drafts"][0]["duplicate"]["id"] == "01IMPORTDEDUP0000000000001", prepared
+
+        status, body = api.import_persist({
+            "reporter": "Reporter",
+            "background": False,
+            "drafts": [{
+                "name": "Update duplicate original",
+                "actual": "CSV replacement actual for 01IMPORTDEDUP0000000000001",
+                "target": "Target behavior for 01IMPORTDEDUP0000000000001",
+                "reporter": "Reporter",
+                "priority": "medium",
+                "duplicate_decision": "update_original_actual",
+            }],
+        })
+        assert status == 200, body
+        assert body["count"] == 0, body
+        assert body["failed"] == 0, body
+        assert body["duplicate_actions"]["updated_original"] == 1, body
+        from refine_server import gaps as shared_gaps
+
+        updated_gap = shared_gaps.read_gap_json("01IMPORTDEDUP0000000000001")
+        assert (
+            updated_gap["rounds"][-1]["actual"]
+            == "CSV replacement actual for 01IMPORTDEDUP0000000000001"
+        ), updated_gap
     finally:
         try:
             conn.close()
