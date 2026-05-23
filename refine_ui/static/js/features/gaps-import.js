@@ -211,7 +211,8 @@ function openImportModal() {
     });
   }
   function setImportMode(mode) {
-    if (mode !== activeMode && importSessionHasDrafts(session)) {
+    const extractButton = root.querySelector("#btn-extract");
+    if (mode !== activeMode && (importSessionHasDrafts(session) || !extractButton)) {
       toast("Cancel this import before changing import type.", "error");
       return;
     }
@@ -225,7 +226,7 @@ function openImportModal() {
     root.querySelectorAll("[data-import-panel]").forEach((panel) => {
       panel.classList.toggle("active", panel.dataset.importPanel === mode);
     });
-    root.querySelector("#btn-extract").textContent = IMPORT_MODES[mode].action;
+    if (extractButton) extractButton.textContent = IMPORT_MODES[mode].action;
     const draftsRoot = root.querySelector("#import-drafts");
     if (draftsRoot && !importSessionHasDrafts(session)) draftsRoot.innerHTML = "";
     const focusTarget = mode === "ai"

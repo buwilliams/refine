@@ -32,6 +32,10 @@ def main() -> int:
     assert 'class="settings-pane import-panel active"' in import_js
     assert 'class="import-tabs"' not in import_js
     assert 'class="import-tab ' not in import_js
+    assert 'const extractButton = root.querySelector("#btn-extract");' in import_js
+    assert "importSessionHasDrafts(session) || !extractButton" in import_js
+    assert "if (extractButton) extractButton.textContent = IMPORT_MODES[mode].action;" in import_js
+    assert 'root.querySelector("#btn-extract").textContent' not in import_js
     assert "const IMPORT_CSV_REQUIRED_FIELDS = [" in import_js
     assert "actual (text)" in import_js
     assert "target (text)" in import_js
