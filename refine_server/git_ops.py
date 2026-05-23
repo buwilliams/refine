@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -169,6 +170,103 @@ def stash_pop(cwd: Path | None = None) -> GitResult:
     return _run(["stash", "pop"], cwd=cwd or client_repo_path())
 
 
+def reset_unmerged_index_preserving_wip(
+    message: str,
+    *,
+    cwd: Path | None = None,
+) -> dict:
+    """Clear sentinel-less unmerged index state without silently dropping WIP.
+
+    `git stash push` refuses to run while the index has unmerged entries. To
+    keep cleanup recoverable, capture tracked changes as a binary patch first,
+    reset the index/worktree, then reapply that patch and stash the resulting
+    ordinary dirty tree together with untracked files.
+    """
+    repo = cwd or client_repo_path()
+    patch = _run(["diff", "HEAD", "--binary"], cwd=repo)
+    if not patch.ok:
+        return {
+            "ok": False,
+            "message": "Could not snapshot dirty worktree before reset",
+            "details": patch.stderr or patch.stdout,
+        }
+
+    patch_path: Path | None = None
+    if patch.stdout.strip():
+        git_dir = _git_dir(repo)
+        if git_dir is None:
+            return {
+                "ok": False,
+                "message": "Could not locate git dir for cleanup rescue patch",
+            }
+        rescue_dir = git_dir / "refine-rescue"
+        rescue_dir.mkdir(parents=True, exist_ok=True)
+        patch_path = (
+            rescue_dir
+            / f"{int(time.time())}-{os.getpid()}-cleanup.patch"
+        )
+        patch_path.write_text(patch.stdout, encoding="utf-8")
+
+    reset = _run(["reset", "--hard", "HEAD"], cwd=repo)
+    if not reset.ok:
+        return {
+            "ok": False,
+            "message": "Could not reset unmerged index state",
+            "details": reset.stderr or reset.stdout,
+            "patch_path": str(patch_path) if patch_path else "",
+        }
+
+    if patch_path is None:
+        return {
+            "ok": True,
+            "stashed": False,
+            "message": "Reset unmerged index state",
+            "details": reset.stdout,
+        }
+
+    apply = _run(
+        ["apply", "--whitespace=nowarn", str(patch_path)],
+        cwd=repo,
+    )
+    if not apply.ok:
+        return {
+            "ok": True,
+            "stashed": False,
+            "message": "Reset unmerged index state; dirty worktree patch preserved",
+            "details": (
+                f"Patch: {patch_path}\n"
+                f"git apply failed:\n{apply.stderr or apply.stdout}"
+            ),
+            "patch_path": str(patch_path),
+        }
+
+    stash = stash_push(message, cwd=repo)
+    if stash.ok:
+        try:
+            patch_path.unlink()
+        except OSError:
+            pass
+        return {
+            "ok": True,
+            "stashed": True,
+            "message": "Reset unmerged index state; dirty worktree saved to stash",
+            "details": stash.stdout or stash.stderr,
+        }
+
+    cleanup = _run(["reset", "--hard", "HEAD"], cwd=repo)
+    return {
+        "ok": True,
+        "stashed": False,
+        "message": "Reset unmerged index state; dirty worktree patch preserved",
+        "details": (
+            f"Patch: {patch_path}\n"
+            f"git stash failed:\n{stash.stderr or stash.stdout}\n"
+            f"cleanup reset:\n{cleanup.stderr or cleanup.stdout}"
+        ),
+        "patch_path": str(patch_path),
+    }
+
+
 def unmerged_paths(cwd: Path | None = None) -> list[str]:
     """Files left in conflict state by a half-finished merge.
 
@@ -216,12 +314,9 @@ def in_progress_op(cwd: Path | None = None) -> tuple[str, str] | None:
     then trips on `git commit` (MERGE_HEAD blocks non-merge commits).
     """
     root = cwd or client_repo_path()
-    # Locate the actual `.git` dir; in a worktree `.git` is a file
-    # pointing at the real gitdir. Use `rev-parse --git-dir` to resolve.
-    r = _run(["rev-parse", "--git-dir"], cwd=root)
-    if not r.ok:
+    git_dir = _git_dir(root)
+    if git_dir is None:
         return None
-    git_dir = (root / r.stdout.strip()).resolve()
     checks = (
         ("MERGE_HEAD",            "merge",
          "Run `git merge --abort` to discard, or resolve conflicts and "
@@ -255,6 +350,15 @@ def in_progress_op(cwd: Path | None = None) -> tuple[str, str] | None:
         )
         return ("unmerged-index", hint)
     return None
+
+
+def _git_dir(root: Path) -> Path | None:
+    # Locate the actual `.git` dir; in a worktree `.git` is a file
+    # pointing at the real gitdir. Use `rev-parse --git-dir` to resolve.
+    r = _run(["rev-parse", "--git-dir"], cwd=root)
+    if not r.ok:
+        return None
+    return (root / r.stdout.strip()).resolve()
 
 
 def dirty_paths_under(prefix: str) -> list[str]:

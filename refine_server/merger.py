@@ -15,10 +15,10 @@ is serialized through this one component. The two problems it solves:
    bailed straight to `review`, cascading every queued Gap into
    `review` for "merge conflict — human resolution". A conflicted
    `git stash apply` can also leave unmerged index entries without any
-   `.git/` sentinel. The merger now aborts or resets leftover stuck
-   state at the start of every tick — and again before each merge
-   attempt — so a single stuck Gap can never block the rest of the
-   queue.
+   `.git/` sentinel. The merger now aborts leftover git operations, or
+   resets sentinel-less unmerged index state after first preserving WIP,
+   at the start of every tick — and again before each merge attempt —
+   so a single stuck Gap can never block the rest of the queue.
 
 Status semantics:
 
@@ -341,20 +341,45 @@ class Merger:
         """Abort any half-finished git op left on the host worktree.
 
         Operational assumption (per spec): the host running refine is
-        dedicated to refine — no human edits the working copy
-        directly. So aborting a stale merge/rebase here is safe; the
-        only reason it would be sitting there is a prior refine merge
-        that conflicted and never got cleaned up.
+        dedicated to refine — no human edits the working copy directly.
+        Stale merge/rebase sentinels still get aborted. Sentinel-less
+        unmerged index state is more dangerous because it can coexist
+        with unrelated WIP, so preserve that dirty tree before resetting.
         """
         op = git_ops.in_progress_op()
         if not op:
             return
         op_name, _hint = op
+        conn = self._get_conn()
+        if op_name == "unmerged-index":
+            result = git_ops.reset_unmerged_index_preserving_wip(
+                f"refine cleanup auto-stash ({reason})",
+            )
+            if result.get("ok"):
+                activity.append(
+                    conn,
+                    message=(
+                        f"Merger cleanup: reset leftover `{op_name}` "
+                        f"on host worktree ({reason})"
+                    ),
+                    severity="info", category="git", actor="runner",
+                    details=str(result.get("details") or "")[:2000],
+                )
+            else:
+                activity.append(
+                    conn,
+                    message=(
+                        f"Merger cleanup: failed to reset leftover "
+                        f"`{op_name}` ({reason})"
+                    ),
+                    severity="warn", category="git", actor="runner",
+                    details=str(result.get("details") or "")[:2000],
+                )
+            return
         abort_args = _ABORT_ARGS.get(op_name)
         if abort_args is None:
             return
         r = git_ops._run(abort_args)
-        conn = self._get_conn()
         if r.ok:
             activity.append(
                 conn,
@@ -378,5 +403,4 @@ _ABORT_ARGS = {
     "cherry-pick": ["cherry-pick", "--abort"],
     "revert":      ["revert", "--abort"],
     "bisect":      ["bisect", "reset"],
-    "unmerged-index": ["reset", "--hard", "HEAD"],
 }

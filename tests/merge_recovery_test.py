@@ -189,6 +189,17 @@ def main() -> int:
         (client / "stash-conflict.txt").write_text("upstream\n", encoding="utf-8")
         git(client, "add", "stash-conflict.txt")
         git(client, "commit", "-m", "stash conflict upstream")
+        (client / "host-wip.txt").write_text("base\n", encoding="utf-8")
+        (client / "host-staged.txt").write_text("base\n", encoding="utf-8")
+        git(client, "add", "host-wip.txt", "host-staged.txt")
+        git(client, "commit", "-m", "host wip base")
+        (client / "host-wip.txt").write_text("dirty\n", encoding="utf-8")
+        (client / "host-staged.txt").write_text("staged\n", encoding="utf-8")
+        git(client, "add", "host-staged.txt")
+        (client / "host-untracked.txt").write_text(
+            "untracked\n",
+            encoding="utf-8",
+        )
         apply = subprocess.run(
             ["git", "stash", "apply"],
             cwd=client,
@@ -205,6 +216,19 @@ def main() -> int:
         merger._tick()  # noqa: SLF001
         assert git_ops.in_progress_op() is None
         assert git_ops.unmerged_paths() == []
+        stash_list = git(client, "stash", "list").stdout
+        assert "refine cleanup auto-stash" in stash_list, stash_list
+        stash_files = git(
+            client,
+            "stash",
+            "show",
+            "--include-untracked",
+            "--name-only",
+            "stash@{0}",
+        ).stdout.splitlines()
+        assert "host-wip.txt" in stash_files, stash_files
+        assert "host-staged.txt" in stash_files, stash_files
+        assert "host-untracked.txt" in stash_files, stash_files
         assert db_status(conn, gid_stash_conflict) == "awaiting-rebuild"
         origin_files = git(
             client, "ls-tree", "-r", "--name-only", "origin/main",
