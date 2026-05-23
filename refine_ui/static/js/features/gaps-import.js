@@ -79,7 +79,11 @@ function openImportModal() {
             </p>
             <div class="form-row">
               <label>CSV file</label>
-              <input type="file" id="import-csv-file" accept=".csv,text/csv">
+              <div class="import-file-control">
+                <button type="button" class="secondary" id="import-csv-file-button">Choose CSV</button>
+                <span class="import-file-name muted" id="import-csv-file-name" aria-live="polite">No file selected</span>
+              </div>
+              <input type="file" id="import-csv-file" class="visually-hidden" accept=".csv,text/csv">
             </div>
           </section>
           <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
@@ -130,7 +134,7 @@ function openImportModal() {
       ? "#import-text"
       : mode === "csv"
         ? "#import-csv-text"
-        : "#import-csv-file";
+        : "#import-csv-file-button";
     root.querySelector(focusTarget)?.focus();
   }
   document.addEventListener("keydown", onKey, true);
@@ -138,6 +142,13 @@ function openImportModal() {
     if (e.target === root) close(true);
   });
   root.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+  root.querySelector("#import-csv-file-button").addEventListener("click", () => {
+    root.querySelector("#import-csv-file").click();
+  });
+  root.querySelector("#import-csv-file").addEventListener("change", (e) => {
+    const name = e.target.files?.[0]?.name || "No file selected";
+    root.querySelector("#import-csv-file-name").textContent = name;
+  });
   root.querySelectorAll("[data-import-mode]").forEach((btn) => {
     btn.addEventListener("click", () => setImportMode(btn.dataset.importMode));
   });

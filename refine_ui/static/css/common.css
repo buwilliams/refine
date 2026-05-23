@@ -8,6 +8,18 @@
 
 .card-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .status-pill {
   display: inline-block;
   padding: 2px 8px;
@@ -465,11 +477,26 @@ select {
 .round-body .pair dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
 .round-body .pair dd { margin: 0; }
 
-.import-modal .modal-body {
-  min-height: min(430px, 72vh);
-}
 .import-tab-card {
   box-shadow: none;
+  min-height: min(360px, 58vh);
+}
+.import-file-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.import-file-name {
+  min-height: 36px;
+  min-width: min(280px, 100%);
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 .import-drafts .draft { padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
 .import-duplicate {

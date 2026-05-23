@@ -23,8 +23,9 @@ def main() -> int:
     assert '"CSV Import"' in import_js
     assert '"CSV Upload"' in import_js
     assert 'class="modal import-modal"' in import_js
-    assert ".import-modal .modal-body" in common_css
-    assert "min-height: min(430px, 72vh)" in common_css
+    assert ".import-modal .modal-body" not in common_css
+    assert ".import-tab-card" in common_css
+    assert "min-height: min(360px, 58vh)" in common_css
     assert 'class="settings-tabs" id="import-tabs" role="tablist"' in import_js
     assert 'class="settings-tab ${mode === "ai" ? "active" : ""}"' in import_js
     assert 'class="card settings-tab-card import-tab-card"' in import_js
@@ -36,7 +37,13 @@ def main() -> int:
     assert "target (text)" in import_js
     assert "reporter (text)" in import_js
     assert "priority (low, medium, high)" in import_js
-    assert 'input type="file" id="import-csv-file"' in import_js
+    assert 'id="import-csv-file-button"' in import_js
+    assert 'id="import-csv-file-name" aria-live="polite"' in import_js
+    assert 'input type="file" id="import-csv-file" class="visually-hidden"' in import_js
+    assert "#import-csv-file-button" in import_js
+    assert ".import-file-control" in common_css
+    assert ".import-file-name" in common_css
+    assert ".visually-hidden" in common_css
     assert "async function parseImportCsvBackend(text)" in import_js
     assert 'api("POST", "/api/import/csv/parse", { text })' in import_js
     assert "function parseImportCsvRows" not in import_js
