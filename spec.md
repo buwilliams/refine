@@ -434,8 +434,8 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 
 - Active app binding — checkout-local `.refine-binding` points to the active target app.
 - Active instance selection — checkout-local `run/active-instances.json` records each target app's selected instance for this Refine checkout.
-- Background UI process — `refine start <port>` launches a detached `uv run refine ui` process and records its PID/log under checkout-local `run/`.
-- UI backend unit — `refine install <port>` writes a checkout-local, per-port systemd user unit that starts `uv run refine ui`, restarts on failure, and survives terminal close. `refine uninstall <port>` stops and removes it.
+- Background UI process — `refine start <port>` launches a detached `uv run refine supervisor` process and records its PID/log under checkout-local `run/`.
+- UI backend unit — `refine install <port>` writes a system-level, per-port systemd unit (using sudo when needed) that starts `uv run refine supervisor` as the installing user, restarts on failure, survives terminal close, and starts at boot. `refine uninstall <port>` stops and removes it.
 
 ## Out of scope (initial version)
 

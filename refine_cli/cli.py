@@ -3,8 +3,8 @@
 Subcommands:
 - init    — write refine.toml + gaps/ in a chosen volume root,
             then write the active-app binding for this checkout.
-- install — install + start a persistent systemd --user UI backend.
-- uninstall — stop + remove a persistent systemd --user UI backend.
+- install — install + start a persistent systemd UI backend.
+- uninstall — stop + remove a persistent systemd UI backend.
 - reset   — undo `init` in this checkout (remove binding and persistent units);
             optional --purge also deletes the active app's .refine/ data so
             you can attach a different app.
@@ -21,6 +21,7 @@ Subcommands:
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
 import os
 import re
@@ -38,6 +39,7 @@ from pathlib import Path
 from refine_server import config, project_registry
 
 
+SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
 SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SETUP_UI_HOST = "0.0.0.0"
 _LOGIN_PATH_CACHE: str | None = None
@@ -78,9 +80,10 @@ def main(argv: list[str] | None = None) -> int:
         "install",
         help="Install and start a persistent UI backend.",
         description=(
-            "Writes, enables, and starts a systemd --user unit for this "
-            "checkout. The service restarts on failure and survives terminal "
-            "close. Pass a port to run multiple Refine instances on one host."
+            "Writes, enables, and starts a system-level systemd unit for this "
+            "checkout. The service runs as the installing user, restarts on "
+            "failure, survives terminal close, and starts at boot. Pass a port "
+            "to run multiple Refine instances on one host."
         ),
     )
     p_install.add_argument(
@@ -104,7 +107,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Undo `refine init` in this checkout so it can attach a different app.",
         description=(
             "Removes the .refine-binding and .refine-apps.json files from "
-            "this checkout, disables + removes persistent systemd --user UI "
+            "this checkout, disables + removes persistent systemd UI "
             "units, and (with --purge) wipes the active app's .refine/ "
             "directory. The app source tree is never touched."
         ),
@@ -125,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Start the UI backend.",
         description=(
             "Starts the host-native UI backend, then prints a status block. "
-            "If this checkout has an installed systemd user unit, the command "
+            "If this checkout has an installed systemd service, the command "
             "starts that service; otherwise it starts a detached background "
             "supervisor. The supervisor keeps the UI/control process separate "
             "from the work runner. Pass a port to run multiple Refine "
@@ -281,8 +284,8 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"  refine doctor                 # sanity check the config")
         print()
         print("Note: full refine start/stop/status/install orchestration requires running")
-        print("`refine init` from inside a refine source dir so the systemd user")
-        print("units can be wired up.")
+        print("`refine init` from inside a refine source dir so the systemd")
+        print("service can be wired up.")
     return 0
 
 
@@ -414,20 +417,21 @@ def _write_and_enable_ui_unit(
     host: str = "0.0.0.0",
     port: int = 8080,
 ) -> Path:
-    """Write the UI backend systemd user unit, daemon-reload, and enable it.
+    """Write the UI backend systemd system unit, daemon-reload, and enable it.
 
     Refuses if a unit by the same name already points at a different checkout,
     unless --force is given (in which case it's overwritten).
     """
     runner_unit = runner_unit_name or config.unit_name_for(clone_dir)
     ui_unit = _ui_unit_name(runner_unit, port)
-    ui_unit_path = SYSTEMD_USER_DIR / f"{ui_unit}.service"
-    SYSTEMD_USER_DIR.mkdir(parents=True, exist_ok=True)
+    ui_unit_path = SYSTEMD_SYSTEM_DIR / f"{ui_unit}.service"
     _remove_legacy_runtime_units(runner_unit)
+    _remove_legacy_user_ui_unit(ui_unit)
 
     if not force:
-        if ui_unit_path.exists():
-            existing_wd = _grep_first(ui_unit_path.read_text(encoding="utf-8"), "WorkingDirectory=")
+        existing = _read_unit_text(ui_unit_path)
+        if existing is not None:
+            existing_wd = _grep_first(existing, "WorkingDirectory=")
             if existing_wd and existing_wd != str(clone_dir):
                 raise _InitError(
                     f"systemd unit {ui_unit} already exists for a different checkout:\n"
@@ -448,16 +452,19 @@ def _write_and_enable_ui_unit(
         login_path = _user_login_path()
         if login_path:
             captured_env["PATH"] = login_path
+    service_user = _service_user()
 
     ui_body = (
         "# Auto-generated by `refine init`. Do not edit by hand — re-run\n"
         "# `refine init --force` to regenerate.\n"
         "[Unit]\n"
         f"Description=refine UI backend — {clone_dir} → {client_repo}\n"
-        "After=network.target\n"
+        "After=network-online.target\n"
+        "Wants=network-online.target\n"
         "\n"
         "[Service]\n"
         "Type=simple\n"
+        f"User={service_user}\n"
         f"WorkingDirectory={clone_dir}\n"
         f"{_systemd_environment_lines(captured_env)}"
         f"Environment=REFINE_UI_HOST={host}\n"
@@ -470,16 +477,16 @@ def _write_and_enable_ui_unit(
         "TimeoutStopSec=30s\n"
         "\n"
         "[Install]\n"
-        "WantedBy=default.target\n"
+        "WantedBy=multi-user.target\n"
     )
-    ui_unit_path.write_text(ui_body, encoding="utf-8")
+    _write_system_unit(ui_unit_path, ui_body)
 
     rc, out = _systemctl("daemon-reload")
     if rc != 0:
-        raise _InitError(f"systemctl --user daemon-reload failed: {out.strip()}")
+        raise _InitError(f"systemctl daemon-reload failed: {out.strip()}")
     rc, out = _systemctl("enable", ui_unit)
     if rc != 0:
-        raise _InitError(f"systemctl --user enable {ui_unit} failed: {out.strip()}")
+        raise _InitError(f"systemctl enable {ui_unit} failed: {out.strip()}")
 
     return ui_unit_path
 
@@ -513,7 +520,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         return 1
     ui_unit = _ui_unit_name(unit, port)
     print(f"Installed UI backend unit: {ui_unit_path}")
-    print(f"Starting persistent UI backend (systemctl --user start {ui_unit})...")
+    print(f"Starting persistent UI backend (systemctl start {ui_unit})...")
     rc, out = _systemctl("start", ui_unit)
     if rc != 0:
         print(f"refine install: {out.strip()}", file=sys.stderr)
@@ -522,7 +529,7 @@ def cmd_install(args: argparse.Namespace) -> int:
         print(
             f"refine install: UI backend did not start listening on "
             f"{cfg.web_host}:{port} within 20s. "
-            f"Check `journalctl --user -u {ui_unit} -n 200`.",
+            f"Check `journalctl -u {ui_unit} -n 200`.",
             file=sys.stderr,
         )
         return 1
@@ -536,20 +543,25 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
     cfg = config.get()
     port = _effective_port(args, cfg)
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent UI backend (systemctl --user stop {ui_unit})...")
+    print(f"Stopping persistent UI backend (systemctl stop {ui_unit})...")
     rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
     rc, out = _systemctl("disable", ui_unit)
     if rc != 0:
         print(f"  (systemctl disable {ui_unit}: {out.strip()})", file=sys.stderr)
-    unit_path = SYSTEMD_USER_DIR / f"{ui_unit}.service"
-    if unit_path.exists():
-        unit_path.unlink()
-        print(f"Removed {unit_path}")
-        _systemctl("daemon-reload")
+    unit_path = SYSTEMD_SYSTEM_DIR / f"{ui_unit}.service"
+    if _unit_file_exists(unit_path):
+        if _remove_system_unit(unit_path):
+            print(f"Removed {unit_path}")
+            _systemctl("daemon-reload")
+        else:
+            print(f"Could not remove {unit_path}", file=sys.stderr)
     else:
         print(f"No unit file found at {unit_path}")
+    legacy_path = SYSTEMD_USER_DIR / f"{ui_unit}.service"
+    if _remove_legacy_user_ui_unit(ui_unit):
+        print(f"Removed legacy user unit {legacy_path}")
     _remove_legacy_runtime_units(unit)
     return 0
 
@@ -734,13 +746,21 @@ def cmd_reset(args: argparse.Namespace) -> int:
         if rc != 0:
             # If it wasn't enabled or doesn't exist, that's fine.
             print(f"  (systemctl disable {unit_name}: {out.strip()})", file=sys.stderr)
-        unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
-        if unit_path.exists():
-            unit_path.unlink()
+        unit_path = SYSTEMD_SYSTEM_DIR / f"{unit_name}.service"
+        if _unit_file_exists(unit_path):
+            if _remove_system_unit(unit_path):
+                removed_units = True
+                print(f"Removed {unit_path}")
+        legacy_unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
+        if legacy_unit_path.exists():
+            _systemctl_user("stop", unit_name)
+            _systemctl_user("disable", unit_name)
+            _remove_user_unit_file(legacy_unit_path)
             removed_units = True
-            print(f"Removed {unit_path}")
+            print(f"Removed {legacy_unit_path}")
     if removed_units:
         _systemctl("daemon-reload")
+        _systemctl_user("daemon-reload")
 
     # 3. Remove binding + known-app registry from the checkout.
     binding_path.unlink()
@@ -924,7 +944,7 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     print(f"  server:   {_dot((process_pid is not None or service_active) and web_up)} "
           "supervisor-managed UI + runner worker")
     print(f"  logs:     {_runtime_log_path(clone, display_cfg, effective_port)}")
-    print(f"  journal:  journalctl --user -u {ui_unit} -f")
+    print(f"  journal:  journalctl -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop {effective_port}")
     print()
 
@@ -1023,7 +1043,7 @@ def _refine_performance_roots(
 def _systemd_main_pid(unit: str) -> int | None:
     try:
         out = subprocess.run(
-            ["systemctl", "--user", "show", unit, "-p", "MainPID", "--value"],
+            ["systemctl", "show", unit, "-p", "MainPID", "--value"],
             check=False,
             capture_output=True,
             text=True,
@@ -1457,10 +1477,10 @@ def _pause_agents_for_clean_shutdown(cfg: "config.Config", port: int) -> bool:
 
 def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Starting persistent UI backend (systemctl --user start {ui_unit})...")
+    print(f"Starting persistent UI backend (systemctl start {ui_unit})...")
     rc, out = _systemctl("start", ui_unit)
     if rc != 0:
-        print(f"refine start: systemctl --user start {ui_unit} failed: {out.strip()}",
+        print(f"refine start: systemctl start {ui_unit} failed: {out.strip()}",
               file=sys.stderr)
         return 1
     _unlink_quietly(_runtime_pid_path(clone, cfg, port))
@@ -1477,10 +1497,10 @@ def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -
 
 def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent UI backend (systemctl --user stop {ui_unit})...")
+    print(f"Stopping persistent UI backend (systemctl stop {ui_unit})...")
     rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
-        print(f"refine stop: systemctl --user stop {ui_unit} failed: {out.strip()}",
+        print(f"refine stop: systemctl stop {ui_unit} failed: {out.strip()}",
               file=sys.stderr)
         return 1
     _unlink_quietly(_runtime_pid_path(clone, cfg, port))
@@ -1490,11 +1510,11 @@ def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) ->
 
 def _restart_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Restarting persistent UI backend (systemctl --user restart {ui_unit})...")
+    print(f"Restarting persistent UI backend (systemctl restart {ui_unit})...")
     rc, out = _systemctl("restart", ui_unit)
     if rc != 0:
         print(
-            f"refine restart: systemctl --user restart {ui_unit} failed: {out.strip()}",
+            f"refine restart: systemctl restart {ui_unit} failed: {out.strip()}",
             file=sys.stderr,
         )
         return 1
@@ -1783,6 +1803,7 @@ def _unlink_quietly(path: Path) -> None:
 def _unit_names_for_reset(unit: str) -> list[str]:
     names = [unit, _legacy_pre_ui_unit_name(unit), f"{unit}-ui"]
     try:
+        names.extend(path.stem for path in SYSTEMD_SYSTEM_DIR.glob(f"{unit}-*-ui.service"))
         names.extend(path.stem for path in SYSTEMD_USER_DIR.glob(f"{unit}-*-ui.service"))
     except OSError:
         pass
@@ -1795,7 +1816,7 @@ def _unit_names_for_reset(unit: str) -> list[str]:
 
 def _installed_ui_unit(unit: str, port: int) -> str | None:
     ui_unit = _ui_unit_name(unit, port)
-    if (SYSTEMD_USER_DIR / f"{ui_unit}.service").exists():
+    if _unit_file_exists(SYSTEMD_SYSTEM_DIR / f"{ui_unit}.service"):
         return ui_unit
     return None
 
@@ -1804,7 +1825,7 @@ def _installed_ui_unit_ports(unit: str) -> list[int]:
     ports: set[int] = set()
     pattern = re.compile(rf"^{re.escape(unit)}-(\d+)-ui\.service$")
     try:
-        paths = list(SYSTEMD_USER_DIR.glob(f"{unit}-*-ui.service"))
+        paths = list(SYSTEMD_SYSTEM_DIR.glob(f"{unit}-*-ui.service"))
     except OSError:
         return []
     for path in paths:
@@ -1859,13 +1880,124 @@ def _systemd_environment_line(name: str, value: str | None) -> str:
     return f'Environment="{name}={escaped}"\n'
 
 
+def _service_user() -> str:
+    """User account the system service should run as.
+
+    `refine install` may be invoked directly by an unprivileged user, in which
+    case the CLI uses sudo only for writing/enabling the system unit. If the
+    operator invokes the whole command through sudo, preserve the original
+    account via SUDO_USER so the service still owns files as the operator.
+    """
+    sudo_user = (os.environ.get("SUDO_USER") or "").strip()
+    if sudo_user and sudo_user != "root":
+        return sudo_user
+    return getpass.getuser()
+
+
+def _read_unit_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+    except PermissionError:
+        try:
+            out = subprocess.run(
+                _sudo_cmd(["cat", str(path)]),
+                capture_output=True, text=True, timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return out.stdout if out.returncode == 0 else None
+    except OSError:
+        return None
+
+
+def _unit_file_exists(path: Path) -> bool:
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
+def _write_system_unit(path: Path, text: str) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+        return
+    except PermissionError:
+        pass
+    except OSError as e:
+        if path.parent != SYSTEMD_SYSTEM_DIR:
+            raise _InitError(f"could not write {path}: {e}") from e
+    tmp = _runtime_temp_unit_file(text)
+    try:
+        proc = subprocess.run(
+            _sudo_cmd(["install", "-m", "0644", str(tmp), str(path)]),
+            capture_output=True, text=True, timeout=15,
+        )
+    finally:
+        _unlink_quietly(tmp)
+    if proc.returncode != 0:
+        raise _InitError(
+            f"could not install systemd unit {path}: "
+            f"{(proc.stderr or proc.stdout).strip()}"
+        )
+
+
+def _remove_system_unit(path: Path) -> bool:
+    try:
+        path.unlink()
+        return True
+    except FileNotFoundError:
+        return True
+    except PermissionError:
+        pass
+    except OSError:
+        if path.parent != SYSTEMD_SYSTEM_DIR:
+            return False
+    try:
+        proc = subprocess.run(
+            _sudo_cmd(["rm", "-f", str(path)]),
+            capture_output=True, text=True, timeout=15,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return proc.returncode == 0
+
+
+def _remove_user_unit_file(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
+def _runtime_temp_unit_file(text: str) -> Path:
+    import tempfile
+
+    fd, tmp = tempfile.mkstemp(prefix="refine-unit-", suffix=".service")
+    path = Path(tmp)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    return path
+
+
+def _sudo_cmd(args: list[str]) -> list[str]:
+    if os.geteuid() == 0:
+        return args
+    sudo = shutil.which("sudo")
+    if sudo is None:
+        return args
+    return [sudo, *args]
+
+
 def _user_login_path() -> str | None:
     """Return the PATH an interactive login shell sees.
 
-    systemd --user services often run with a minimal PATH that misses uv
-    installs in ~/.local/bin, ~/.cargo/bin, asdf/mise shims, Homebrew, etc.
-    Project setup may run inside the host-native UI service, so resolving uv
-    must match the operator's terminal rather than systemd's stripped env.
+    systemd services run with a minimal PATH that may miss uv installs in
+    ~/.local/bin, ~/.cargo/bin, asdf/mise shims, Homebrew, etc. Project setup
+    may run inside the host-native UI service, so resolving uv must match the
+    operator's terminal rather than systemd's stripped env.
     """
     global _LOGIN_PATH_CACHE, _LOGIN_PATH_RESOLVED
     if _LOGIN_PATH_RESOLVED:
@@ -1889,9 +2021,9 @@ def _user_login_path() -> str | None:
 
 def _ensure_host_unit_installed(clone: Path, cfg: "config.Config", runner_unit: str) -> None:
     ui_unit = _ui_unit_name(runner_unit, cfg.web_port)
-    ui_path = SYSTEMD_USER_DIR / f"{ui_unit}.service"
+    ui_path = SYSTEMD_SYSTEM_DIR / f"{ui_unit}.service"
     _remove_legacy_runtime_units(runner_unit)
-    if ui_path.exists():
+    if _unit_file_exists(ui_path):
         return
     _write_and_enable_ui_unit(
         clone, cfg.client_repo, force=True, runner_unit_name=runner_unit,
@@ -1905,16 +2037,33 @@ def _remove_legacy_runtime_units(runner_unit: str) -> None:
 
 
 def _remove_unit(unit_name: str) -> None:
-    unit_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
-    if not unit_path.exists():
-        return
     _systemctl("stop", unit_name)
     _systemctl("disable", unit_name)
-    try:
-        unit_path.unlink()
-    except OSError:
+    unit_path = SYSTEMD_SYSTEM_DIR / f"{unit_name}.service"
+    removed = False
+    if _unit_file_exists(unit_path):
+        removed = _remove_system_unit(unit_path)
+    legacy_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
+    if legacy_path.exists():
+        _systemctl_user("stop", unit_name)
+        _systemctl_user("disable", unit_name)
+        _remove_user_unit_file(legacy_path)
+        removed = True
+    if not removed:
         return
     _systemctl("daemon-reload")
+    _systemctl_user("daemon-reload")
+
+
+def _remove_legacy_user_ui_unit(unit_name: str) -> bool:
+    legacy_path = SYSTEMD_USER_DIR / f"{unit_name}.service"
+    if not legacy_path.exists():
+        return False
+    _systemctl_user("stop", unit_name)
+    _systemctl_user("disable", unit_name)
+    _remove_user_unit_file(legacy_path)
+    _systemctl_user("daemon-reload")
+    return True
 
 
 def _remove_legacy_docker_artifacts(clone: Path, *, verbose: bool = False) -> None:
@@ -1983,13 +2132,16 @@ def _systemctl(*args: str) -> tuple[int, str]:
     # processes for.
     cmd = args[0] if args else ""
     timeout = 60 if cmd in ("stop", "start", "restart") else 15
+    base = ["systemctl", *args]
+    if cmd in {"daemon-reload", "enable", "disable", "start", "stop", "restart"}:
+        base = _sudo_cmd(base)
     try:
         out = subprocess.run(
-            ["systemctl", "--user", *args],
+            base,
             capture_output=True, text=True, timeout=timeout,
         )
     except FileNotFoundError:
-        return 127, "systemctl not found (systemd --user required)"
+        return 127, "systemctl not found (systemd required)"
     except subprocess.TimeoutExpired:
         return 124, "systemctl timed out"
     return out.returncode, (out.stderr or out.stdout)
@@ -1998,6 +2150,21 @@ def _systemctl(*args: str) -> tuple[int, str]:
 def _systemctl_is_active(unit: str) -> bool:
     rc, _ = _systemctl("is-active", "--quiet", unit)
     return rc == 0
+
+
+def _systemctl_user(*args: str) -> tuple[int, str]:
+    cmd = args[0] if args else ""
+    timeout = 60 if cmd in ("stop", "start", "restart") else 15
+    try:
+        out = subprocess.run(
+            ["systemctl", "--user", *args],
+            capture_output=True, text=True, timeout=timeout,
+        )
+    except FileNotFoundError:
+        return 127, "systemctl not found (systemd --user required)"
+    except subprocess.TimeoutExpired:
+        return 124, "systemctl --user timed out"
+    return out.returncode, (out.stderr or out.stdout)
 
 
 def _wait_for_port(host: str, port: int, *, timeout: float) -> bool:

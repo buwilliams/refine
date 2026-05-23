@@ -79,9 +79,9 @@ _login_path_resolved = False
 def _user_login_path() -> str | None:
     """Capture the PATH the user's interactive login shell sees.
 
-    The systemd --user manager runs the runner with a minimal PATH that
+    The systemd service manager runs the runner with a minimal PATH that
     typically lacks `~/.local/bin`, `~/.npm-global/bin`, `/opt/homebrew/bin`,
-    and other host-specific bin dirs the user has set up — so
+    and other host-specific bin dirs the service user has set up — so
     `shutil.which("claude")` lands on a stale system-wide binary (or
     nothing) instead of the Claude Code CLI the user actually logged into.
 

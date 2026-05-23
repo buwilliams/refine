@@ -31,7 +31,7 @@ def _spec_for(conn: sqlite3.Connection) -> agent_cli.CliSpec:
 def check(conn: sqlite3.Connection, *, actor: str = "runner") -> tuple[bool, str | None]:
     """Run a tiny authenticated prompt. Returns (ok, message)."""
     # Use the chat env so we hit the same PATH the user's interactive
-    # shell sees — otherwise systemd-user's stripped PATH might miss
+    # shell sees — otherwise systemd's stripped PATH might miss
     # ~/.local/bin/<binary> and we'd preflight a different installation
     # than the agent runs against.
     from .chat_mgr import _chat_env

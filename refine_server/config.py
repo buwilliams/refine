@@ -35,7 +35,7 @@ ENV_CONFIG_PATH = "REFINE_CONFIG_PATH"
 ENV_UI_SCOPE = "REFINE_UI_SCOPE"
 ENV_UI_PORT = "REFINE_UI_PORT"
 
-# Marker line in the binding file recording the systemd --user service base name
+# Marker line in the binding file recording the systemd service base name
 # associated with this refine checkout, so `refine start/stop/status` don't
 # need to re-derive it (and so a future rename of the checkout dir doesn't
 # silently produce a second, orphan unit).
@@ -43,12 +43,12 @@ _BINDING_UNIT_MARKER = "# unit:"
 
 
 def unit_name_for(clone_dir: Path) -> str:
-    """Return the systemd --user unit name for a refine checkout.
+    """Return the systemd unit name for a refine checkout.
 
     Derived from the checkout directory's basename, lowercased, with anything
     outside [a-z0-9._-] collapsed to '-'. The prefix `refine-` is added
     if the basename does not already start with it, so
-    `systemctl --user list-units 'refine*'` lists every refine instance.
+    `systemctl list-units 'refine*'` lists every refine instance.
     """
     import re
     base = clone_dir.resolve().name.lower()
@@ -248,7 +248,7 @@ def read_binding(binding_path: Path) -> Path:
 def write_binding(refine_source_dir: Path, client_repo: Path) -> Path:
     """Write `.refine-binding` in the refine source dir pointing at the active app.
 
-    Also records the systemd --user service base name so `refine start/stop/status`
+    Also records the systemd service base name so `refine start/stop/status`
     can look it up without re-deriving from the directory basename (which
     might drift if the checkout is later renamed).
 

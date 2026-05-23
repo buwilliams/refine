@@ -41,7 +41,7 @@ git clone https://github.com/buwilliams/refine.git <refine-checkout> && cd <refi
 - uv, a replacement for pip
 - OS: Linux or Windows/WSL2 (systemd and systemd-run for process management), or macOS (launchctl for process management)
 
-Use `uv run refine install [port]` for a persistent service; `start [port]` runs a non-installed background process.
+Use `uv run refine install [port]` for a persistent system service that runs as the installing user and may prompt for sudo; `start [port]` runs a non-installed background process.
 
 ## Workflow
 

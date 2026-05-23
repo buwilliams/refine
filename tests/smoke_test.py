@@ -278,8 +278,11 @@ def main() -> int:
     fake_uv = fake_uv_bin / "uv"
     fake_uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     fake_uv.chmod(0o755)
-    old_systemd_dir = refine_cli.SYSTEMD_USER_DIR
+    old_systemd_dir = refine_cli.SYSTEMD_SYSTEM_DIR
+    old_user_systemd_dir = refine_cli.SYSTEMD_USER_DIR
     old_systemctl = refine_cli._systemctl
+    old_systemctl_user = refine_cli._systemctl_user
+    old_service_user = refine_cli._service_user
     old_which = refine_cli.shutil.which
     old_login_path = refine_cli._user_login_path
     old_env_path = os.environ.get("PATH")
@@ -289,9 +292,14 @@ def main() -> int:
     old_foundry_resource_unit = os.environ.get("ANTHROPIC_FOUNDRY_RESOURCE")
     git_bin = Path(old_which("git") or "/usr/bin/git").parent
     systemctl_calls: list[tuple[str, ...]] = []
+    systemctl_user_calls: list[tuple[str, ...]] = []
 
     def fake_systemctl(*args: str) -> tuple[int, str]:
         systemctl_calls.append(args)
+        return 0, ""
+
+    def fake_systemctl_user(*args: str) -> tuple[int, str]:
+        systemctl_user_calls.append(args)
         return 0, ""
 
     def fake_which(name: str, path: str | None = None) -> str | None:
@@ -302,10 +310,18 @@ def main() -> int:
         return old_which(name, path=path)
 
     try:
+        refine_cli.SYSTEMD_SYSTEM_DIR = tmp / "systemd-system"
         refine_cli.SYSTEMD_USER_DIR = tmp / "systemd-user"
         refine_cli._systemctl = fake_systemctl
+        refine_cli._systemctl_user = fake_systemctl_user
+        refine_cli._service_user = lambda: "installing-user"
         refine_cli.shutil.which = fake_which
         refine_cli._user_login_path = lambda: str(fake_uv_bin)
+        legacy_user_unit = (
+            refine_cli.SYSTEMD_USER_DIR / "refine-unit-clone-8080-ui.service"
+        )
+        legacy_user_unit.parent.mkdir(parents=True)
+        legacy_user_unit.write_text("[Service]\nExecStart=old\n", encoding="utf-8")
         os.environ["PATH"] = (
             f"{fake_uv_bin}{os.pathsep}/custom/claude/bin"
             f"{os.pathsep}/literal%bin{os.pathsep}{git_bin}"
@@ -324,8 +340,11 @@ def main() -> int:
             install_unit=True,
         )
     finally:
-        refine_cli.SYSTEMD_USER_DIR = old_systemd_dir
+        refine_cli.SYSTEMD_SYSTEM_DIR = old_systemd_dir
+        refine_cli.SYSTEMD_USER_DIR = old_user_systemd_dir
         refine_cli._systemctl = old_systemctl
+        refine_cli._systemctl_user = old_systemctl_user
+        refine_cli._service_user = old_service_user
         refine_cli.shutil.which = old_which
         refine_cli._user_login_path = old_login_path
         if old_env_path is None:
@@ -362,9 +381,25 @@ def main() -> int:
     assert 'Environment="CLAUDE_CODE_USE_FOUNDRY=1"' in unit_text
     assert 'Environment="ANTHROPIC_FOUNDRY_RESOURCE=refine-foundry"' in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
+    assert "User=installing-user" in unit_text
     assert f"ExecStart={fake_uv} run refine supervisor" in unit_text
     assert "Restart=on-failure" in unit_text
+    assert "WantedBy=multi-user.target" in unit_text
     assert ("enable", "refine-unit-clone-8080-ui") in systemctl_calls
+    assert ("stop", "refine-unit-clone-8080-ui") in systemctl_user_calls
+    assert ("disable", "refine-unit-clone-8080-ui") in systemctl_user_calls
+    assert not legacy_user_unit.exists()
+    old_sudo_user = os.environ.get("SUDO_USER")
+    try:
+        os.environ["SUDO_USER"] = "sudo-invoker"
+        assert refine_cli._service_user() == "sudo-invoker"
+        os.environ["SUDO_USER"] = "root"
+        assert refine_cli._service_user() != "root"
+    finally:
+        if old_sudo_user is None:
+            os.environ.pop("SUDO_USER", None)
+        else:
+            os.environ["SUDO_USER"] = old_sudo_user
     print("[ok] refine install writes per-port host-native UI backend systemd unit")
 
     unit_name = "refine-unit-clone"
@@ -373,7 +408,7 @@ def main() -> int:
     nondefault_unit = ui_unit.with_name("refine-unit-clone-18124-ui.service")
     ui_unit.rename(nondefault_unit)
     nondefault_unit.write_text(unit_text.replace("8080", "18124"), encoding="utf-8")
-    old_systemd_dir = refine_cli.SYSTEMD_USER_DIR
+    old_systemd_dir = refine_cli.SYSTEMD_SYSTEM_DIR
     old_systemctl = refine_cli._systemctl
     old_wait_for_port = refine_cli._wait_for_port
     old_print_status_block = refine_cli._print_status_block
@@ -391,7 +426,7 @@ def main() -> int:
 
     try:
         os.chdir(unit_clone)
-        refine_cli.SYSTEMD_USER_DIR = tmp / "systemd-user"
+        refine_cli.SYSTEMD_SYSTEM_DIR = tmp / "systemd-system"
         refine_cli._systemctl = fake_systemctl
         refine_cli._wait_for_port = lambda host, port, timeout: True
         refine_cli._print_status_block = lambda clone_arg, unit_arg, cfg_arg, *, port: (
@@ -428,7 +463,7 @@ def main() -> int:
             schema_conn.close()
     finally:
         os.chdir(old_cwd)
-        refine_cli.SYSTEMD_USER_DIR = old_systemd_dir
+        refine_cli.SYSTEMD_SYSTEM_DIR = old_systemd_dir
         refine_cli._systemctl = old_systemctl
         refine_cli._wait_for_port = old_wait_for_port
         refine_cli._print_status_block = old_print_status_block
