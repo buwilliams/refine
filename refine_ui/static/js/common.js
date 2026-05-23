@@ -870,6 +870,7 @@ function initSSE() {
     // Refresh dashboard activity if visible; refresh current gap if relevant.
     // Route through the silent `refresh*` paths — not `render*` — so the
     // screen doesn't blink back to `Loading…` on every event.
+    if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "changes") loadChanges();
@@ -883,6 +884,7 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("status_change", () => {
+    if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (state.currentRoute === "dashboard") refreshDashboard();
     // Refresh only the table on background updates so an in-progress
     // keystroke in the search box isn't interrupted by a full re-render.
@@ -915,6 +917,7 @@ function initSSE() {
     await refreshProjectStatus();
     await refreshFeatures({ skipSettingsRefresh: true });
     await refreshReporters();
+    if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();

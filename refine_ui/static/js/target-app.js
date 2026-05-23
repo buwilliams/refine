@@ -7,6 +7,7 @@
 // The visible label names the active project.
 
 let _targetAppSnapshot = null;
+let _agentStatusRefreshTimer = null;
 
 function targetAppProjectLabel() {
   const project = state.project || {};
@@ -22,10 +23,11 @@ function targetAppProjectLabel() {
 
 function initTargetAppToggle() {
   const indicator = document.getElementById("target-app-indicator");
-  if (!indicator) return;
-  refreshTargetAppToggle();
+  if (indicator) refreshTargetAppToggle();
+  refreshAgentStatusIndicator();
   // Backup poll so the dot isn't stale if SSE drops.
   setInterval(refreshTargetAppToggle, 30000);
+  setInterval(refreshAgentStatusIndicator, 30000);
 }
 
 async function refreshTargetAppToggle() {
@@ -37,6 +39,56 @@ async function refreshTargetAppToggle() {
   } catch {
     // Leave whatever state the dot was showing; we'll retry on the next tick.
   }
+}
+
+function scheduleAgentStatusRefresh() {
+  if (_agentStatusRefreshTimer) return;
+  _agentStatusRefreshTimer = setTimeout(() => {
+    _agentStatusRefreshTimer = null;
+    refreshAgentStatusIndicator();
+  }, 250);
+}
+
+async function refreshAgentStatusIndicator() {
+  const indicator = document.getElementById("agent-status-indicator");
+  if (!indicator) return;
+  try {
+    const snap = await api("GET", "/api/processes");
+    applyAgentStatusSnapshot(snap);
+  } catch {
+    applyAgentStatusSnapshot({
+      runner_reachable: false,
+      paused: false,
+      processes: [],
+      error: "Process status unavailable",
+    });
+  }
+}
+
+function applyAgentStatusSnapshot(snap) {
+  const indicator = document.getElementById("agent-status-indicator");
+  if (!indicator) return;
+  const processes = Array.isArray(snap.processes) ? snap.processes : [];
+  const agentCount = processes.filter((proc) => proc.kind === "agent").length;
+  const status = !snap.runner_reachable
+    ? "down"
+    : snap.paused
+      ? "paused"
+      : "running";
+  indicator.dataset.state = status;
+  indicator.href = "#/system/processes";
+  indicator.removeAttribute("target");
+  indicator.removeAttribute("rel");
+  const label = `Agents (${agentCount})`;
+  const statusLabel = {
+    running: "running",
+    paused: "paused",
+    down: "process down",
+  }[status];
+  const lbl = indicator.querySelector(".agent-status-label");
+  if (lbl) lbl.textContent = label;
+  indicator.setAttribute("aria-label", `${label}: ${statusLabel}; click to view processes`);
+  indicator.title = `${label}: ${statusLabel}`;
 }
 
 function applyTargetAppSnapshot(snap) {

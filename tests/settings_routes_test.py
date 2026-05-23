@@ -65,6 +65,9 @@ def main() -> int:
     dashboard_css = (root / "refine_ui/static/css/dashboard.css").read_text(
         encoding="utf-8",
     )
+    base_css = (root / "refine_ui/static/css/base.css").read_text(
+        encoding="utf-8",
+    )
 
     settings_tab_block = re.search(
         r"const SETTINGS_TABS = \[(.*?)\];",
@@ -201,10 +204,21 @@ def main() -> int:
     assert 'pane("project",' not in settings_js
 
     assert '<a href="#/system/processes" data-route="settings">System</a>' in index_html
-    assert 'id="target-app-indicator" class="target-app-indicator"\n         href="#/system/processes"' in index_html
+    assert 'class="nav-status-group" aria-label="Runtime status"' in index_html
+    assert 'id="target-app-indicator" class="target-app-indicator nav-status-indicator"' in index_html
+    assert 'id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"' in index_html
+    assert '<span class="agent-status-label">Agents (0)</span>' in index_html
     assert 'indicator.href = opensApp ? appUrl : "#/system/processes";' in target_app_js
     assert 'indicator.target = "_blank";' in target_app_js
     assert 'indicator.removeAttribute("target");' in target_app_js
+    assert 'api("GET", "/api/processes")' in target_app_js
+    assert 'processes.filter((proc) => proc.kind === "agent").length' in target_app_js
+    assert 'const label = `Agents (${agentCount})`;' in target_app_js
+    assert 'scheduleAgentStatusRefresh()' in common_js
+    assert ".nav-status-group" in base_css
+    assert '.agent-status-indicator[data-state="running"] .target-app-dot' in base_css
+    assert '.agent-status-indicator[data-state="paused"] .target-app-dot' in base_css
+    assert '.agent-status-indicator[data-state="down"] .target-app-dot' in base_css
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
         assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
@@ -224,6 +238,7 @@ def main() -> int:
     assert 'id="s-target-health-now"' in processes_body
     assert processes_body.index('id="s-target-run-start"') < processes_body.index('id="s-target-run-stop"') < processes_body.index('id="s-target-run-rebuild"')
     assert 'class="target-app-action-slot"' in processes_body
+    assert 'refreshAgentStatusIndicator === "function"' in processes_body
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body
     assert 'id="btn-pause"' in processes_body

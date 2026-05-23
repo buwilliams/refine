@@ -29,14 +29,24 @@
       <a class="btn nav-action" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
       <a class="btn secondary nav-action" href="#/gaps/import" id="btn-import">Import…</a>
       <select id="global-reporter" aria-label="Reporter"></select>
-      <a id="target-app-indicator" class="target-app-indicator"
-         href="#/system/processes"
-         aria-label="Target application status (click to manage)"
-        title="Target application status"
-         data-state="unknown">
-        <span class="target-app-dot" aria-hidden="true"></span>
-        <span class="target-app-label">Application</span>
-      </a>
+      <div class="nav-status-group" aria-label="Runtime status">
+        <a id="target-app-indicator" class="target-app-indicator nav-status-indicator"
+           href="#/system/processes"
+           aria-label="Target application status (click to manage)"
+           title="Target application status"
+           data-state="unknown">
+          <span class="target-app-dot" aria-hidden="true"></span>
+          <span class="target-app-label">Application</span>
+        </a>
+        <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
+           href="#/system/processes"
+           aria-label="Agent status (click to view processes)"
+           title="Agent status"
+           data-state="unknown">
+          <span class="target-app-dot" aria-hidden="true"></span>
+          <span class="agent-status-label">Agents (0)</span>
+        </a>
+      </div>
     </div>
   </header>
 

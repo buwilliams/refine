@@ -568,6 +568,7 @@ function bindSettingsProcessesTab(s) {
       try {
         await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
         await refreshProcessesSettingsTab({ force: true });
+        if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
         if (paused) scheduleProcessesTabRefreshes();
       } catch (e) { await showActionError(e); }
     });
