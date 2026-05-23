@@ -356,6 +356,85 @@ class Runner:
             label="pause agents",
         )
 
+    def _clean_target_worktree_for_app_start(self) -> dict:
+        """Leave the host/target worktree clean before starting the app."""
+        def commit_and_stash() -> dict:
+            committed = False
+            try:
+                committed = self.state_committer.commit_now(
+                    ignore_mutation_block=True,
+                )
+            except Exception as e:
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "commit_refine_state",
+                    "message": f"could not commit Refine state before app start: {e!r}",
+                }
+
+            stuck = git_ops.in_progress_op()
+            if stuck:
+                op_name, hint = stuck
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "git_operation",
+                    "message": (
+                        f"target worktree still has unfinished `{op_name}` "
+                        f"before app start. {hint}"
+                    ),
+                }
+
+            dirty_paths = self._target_worktree_dirty_paths()
+            if not dirty_paths:
+                return {"ok": True, "clean": True, "committed": committed}
+
+            stash = git_ops.stash_push(
+                "refine target-app start auto-stash",
+            )
+            if not stash.ok:
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "dirty_worktree",
+                    "message": "could not stash dirty target worktree before app start",
+                    "details": stash.stderr or stash.stdout,
+                }
+
+            still_stuck = git_ops.in_progress_op()
+            still_dirty = self._target_worktree_dirty_paths()
+            if still_stuck or still_dirty:
+                op_name = still_stuck[0] if still_stuck else ""
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "dirty_worktree",
+                    "message": "target worktree is still dirty after app-start stash",
+                    "details": (
+                        (f"unfinished git operation: {op_name}\n" if op_name else "")
+                        + "\n".join(still_dirty[:200])
+                    ).strip(),
+                }
+
+            activity.append(
+                self._get_conn(),
+                message="Auto-stashed dirty target worktree before target-app start",
+                severity="info", category="git", actor="runner",
+                details="\n".join(dirty_paths[:200]),
+            )
+            return {
+                "ok": True,
+                "clean": True,
+                "committed": committed,
+                "stashed": True,
+                "dirty_paths": dirty_paths,
+            }
+
+        return self.merger.run_under_host_lock(
+            commit_and_stash,
+            label="target-app start",
+        )
+
     def _target_worktree_dirty_paths(self) -> list[str]:
         paths = git_ops.dirty_paths()
         try:
@@ -1531,7 +1610,22 @@ class Runner:
                 severity="info", category="target_app", actor="refine",
             )
         try:
+            cleanup = None
+            if kind == "start":
+                cleanup = self._clean_target_worktree_for_app_start()
+                if not cleanup.get("ok"):
+                    return {
+                        "ok": False,
+                        "kind": kind,
+                        "state": "failed",
+                        "message": cleanup.get("message")
+                                   or "target worktree cleanup failed before app start",
+                        "cleanup": cleanup,
+                        "checks": [],
+                    }
             result = target_app.run_operation(kind, config)
+            if cleanup is not None:
+                result["cleanup"] = cleanup
             sev = "info" if result.get("ok") else "error"
             msg = (
                 f"target-app: {kind} "
@@ -1676,6 +1770,29 @@ class Runner:
         steps: list[dict[str, Any]] = []
 
         def run_step(kind: str) -> dict[str, Any]:
+            if kind == "start":
+                cleanup = self._clean_target_worktree_for_app_start()
+                if not cleanup.get("ok"):
+                    result = {
+                        "ok": False,
+                        "kind": kind,
+                        "state": "failed",
+                        "command": "",
+                        "cwd": "",
+                        "exit_code": None,
+                        "stdout_tail": "",
+                        "stderr_tail": "",
+                        "message": cleanup.get("message")
+                                   or "target worktree cleanup failed before app start",
+                        "started_at": now_iso(),
+                        "finished_at": now_iso(),
+                        "checks_configured": False,
+                        "checks": [],
+                        "cleanup": cleanup,
+                    }
+                    steps.append(result)
+                    self._log_target_app_rebuild_step(conn, result)
+                    return result
             result = target_app.run_operation(kind, cfg)
             steps.append(result)
             self._log_target_app_rebuild_step(conn, result)
