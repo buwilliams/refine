@@ -4,11 +4,15 @@ Returns (status_code, body_dict) tuples. The server module wraps these.
 """
 from __future__ import annotations
 
+import csv
+import difflib
+import io
 import json
 import os
 import re
 import sqlite3
 import subprocess
+from collections import Counter
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -1044,6 +1048,16 @@ _BULK_STATUS_AUTOMATED_VALUES = {"in-progress", "ready-merge"}
 _BULK_STATUS_VALUES = set(_VALID_STATUSES) - _BULK_STATUS_AUTOMATED_VALUES
 _BULK_STATUS_SOURCE_VALUES = _BULK_STATUS_VALUES
 _BULK_LAST_WORKFLOW_STATUS = "__last_workflow_state"
+_DUPLICATE_DECISION_IGNORE = "duplicate"
+_DUPLICATE_DECISION_IMPORT = "original"
+_DUPLICATE_DECISION_MOVE_ORIGINAL = "move_original_to_backlog"
+_DUPLICATE_BACKLOG_PROTECTED_STATUSES = {
+    "todo",
+    "in-progress",
+    "ready-merge",
+    "awaiting-rebuild",
+    "awaiting-review",
+}
 
 # Map a public sort key to a SQL expression. Whitelisted to prevent SQL
 # injection from the query string. `id` doubles as a chronological sort
@@ -1585,6 +1599,7 @@ def create_gap(body: dict) -> tuple[int, dict]:
     target = (body.get("target") or "").strip()
     name = (body.get("name") or "").strip() or _autoname(actual, target)
     priority = (body.get("priority") or "low").strip().lower()
+    duplicate_decision = str(body.get("duplicate_decision") or "").strip()
     if priority not in _VALID_PRIORITIES:
         return err(400, "priority must be one of low/medium/high")
     if not reporter:
@@ -1593,6 +1608,31 @@ def create_gap(body: dict) -> tuple[int, dict]:
         return err(400, "actual or target must be non-empty")
     if not _VALID_REPORTER.match(reporter):
         return err(400, "invalid reporter name")
+    duplicate = _find_import_duplicate(actual, target)
+    if duplicate and duplicate_decision == _DUPLICATE_DECISION_IGNORE:
+        return 200, {
+            "ok": True,
+            "created": False,
+            "duplicate_action": "ignored",
+            "duplicate": duplicate,
+        }
+    if duplicate and duplicate_decision == _DUPLICATE_DECISION_MOVE_ORIGINAL:
+        move = _move_duplicate_original_to_backlog(duplicate["match"]["id"])
+        return 200, {
+            "ok": True,
+            "created": False,
+            "duplicate_action": "move_original_to_backlog",
+            "duplicate": duplicate,
+            "move": move,
+        }
+    if duplicate and duplicate_decision != _DUPLICATE_DECISION_IMPORT:
+        return 409, {
+            "error": {
+                "message": "Possible duplicate Gap found",
+                "code": "duplicate_gap",
+                "duplicate": duplicate,
+            }
+        }
     gap_id = new_ulid()
     try:
         result = get_client().call(M_CREATE_GAP, {
@@ -3253,6 +3293,12 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
 
 # --- Import (LLM extraction) --------------------------------------------------
 
+IMPORT_DEDUP_THRESHOLD = 0.62
+_IMPORT_DEDUP_STOPWORDS = {
+    "a", "an", "and", "are", "as", "be", "can", "for", "from", "in", "is",
+    "it", "of", "on", "or", "the", "to", "user", "users", "when", "with",
+}
+
 def import_extract(body: dict) -> tuple[int, dict]:
     """LLM-driven extraction: hand the raw text to the host agent CLI
     via the runner and return the parsed `{name, actual, target}` drafts
@@ -3293,6 +3339,361 @@ def _import_extract_chunks(text: str) -> list[dict[str, Any]]:
     return chunks
 
 
+def import_parse_csv(body: dict) -> tuple[int, dict]:
+    raw = str(body.get("text") or "")
+    if not raw.strip():
+        return err(400, "CSV text is required")
+    try:
+        drafts = _import_parse_csv_drafts(raw)
+    except ValueError as e:
+        return err(400, str(e))
+    return 200, {"drafts": drafts, "count": len(drafts)}
+
+
+def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
+    text = raw.lstrip("\ufeff")
+    try:
+        sample = text[:8192]
+        dialect = csv.Sniffer().sniff(sample, delimiters=",\t;|")
+    except csv.Error:
+        dialect = csv.excel
+    stream = io.StringIO(text, newline="")
+    try:
+        reader = csv.DictReader(stream, dialect=dialect, skipinitialspace=True)
+    except csv.Error as e:
+        raise ValueError(f"CSV could not be parsed: {e}") from e
+    if not reader.fieldnames:
+        raise ValueError("CSV header row is required")
+    headers = {
+        str(name or "").strip().lower(): name
+        for name in reader.fieldnames
+    }
+    required = ("actual", "target", "reporter", "priority")
+    missing = [field for field in required if field not in headers]
+    if missing:
+        noun = "field" if len(missing) == 1 else "fields"
+        raise ValueError(f"CSV is missing required {noun}: {', '.join(missing)}")
+    drafts: list[dict[str, str]] = []
+    try:
+        for row_number, row in enumerate(reader, start=2):
+            values = {
+                key: str(row.get(original) or "").strip()
+                for key, original in headers.items()
+            }
+            if not any(values.values()):
+                continue
+            actual = values.get("actual", "")
+            target = values.get("target", "")
+            reporter = values.get("reporter", "")
+            priority = values.get("priority", "").lower()
+            if not actual or not target or not reporter or not priority:
+                raise ValueError(
+                    f"CSV row {row_number} must include actual, target, reporter, and priority"
+                )
+            if priority not in _VALID_PRIORITIES:
+                raise ValueError(
+                    f"CSV row {row_number} priority must be low, medium, or high"
+                )
+            if not _VALID_REPORTER.match(reporter):
+                raise ValueError(f"CSV row {row_number} has an invalid reporter")
+            drafts.append({
+                "name": values.get("name", ""),
+                "actual": actual,
+                "target": target,
+                "reporter": reporter,
+                "priority": priority,
+            })
+    except csv.Error as e:
+        raise ValueError(f"CSV could not be parsed: {e}") from e
+    if not drafts:
+        raise ValueError("CSV has no importable rows")
+    return drafts
+
+
+def import_dedup(body: dict) -> tuple[int, dict]:
+    drafts = body.get("drafts") or []
+    if not isinstance(drafts, list):
+        return err(400, "drafts must be a list")
+    conn = _conn()
+    try:
+        candidates = _import_dedup_candidates(conn)
+    finally:
+        conn.close()
+    matches: list[dict[str, Any]] = []
+    for idx, draft in enumerate(drafts, start=1):
+        if not isinstance(draft, dict):
+            continue
+        actual = (draft.get("actual") or "").strip()
+        target = (draft.get("target") or "").strip()
+        if not actual and not target:
+            continue
+        best, best_score = _best_import_duplicate(actual, target, candidates)
+        if best and best_score >= IMPORT_DEDUP_THRESHOLD:
+            matches.append({
+                "index": idx,
+                "score": round(best_score, 3),
+                "draft": {"actual": actual, "target": target},
+                "match": best,
+            })
+    return 200, {
+        "matches": matches,
+        "threshold": IMPORT_DEDUP_THRESHOLD,
+        "algorithm": (
+            "deterministic normalized actual/target scoring: "
+            "token/bigram cosine, character-trigram cosine, token Jaccard, "
+            "and sequence ratio"
+        ),
+    }
+
+
+def _duplicate_move_to_backlog_status(status: str | None) -> dict[str, Any]:
+    current = str(status or "").strip() or "unknown"
+    if current == "backlog":
+        return {
+            "can_move_to_backlog": False,
+            "move_to_backlog_reason": "already_backlog",
+        }
+    if current in _DUPLICATE_BACKLOG_PROTECTED_STATUSES:
+        return {
+            "can_move_to_backlog": False,
+            "move_to_backlog_reason": "protected_status",
+        }
+    return {
+        "can_move_to_backlog": True,
+        "move_to_backlog_reason": "",
+    }
+
+
+def _move_duplicate_original_to_backlog(gap_id: str) -> dict[str, Any]:
+    conn = _conn()
+    try:
+        row = conn.execute(
+            "SELECT id, status, instance_id FROM gaps_index WHERE id = ?",
+            (gap_id,),
+        ).fetchone()
+        if row is None:
+            return {
+                "moved": False,
+                "reason": "missing",
+                "gap_id": gap_id,
+                "from": "unknown",
+                "to": "backlog",
+            }
+        previous = str(row["status"] or "backlog")
+        gate = _duplicate_move_to_backlog_status(previous)
+        if not gate["can_move_to_backlog"]:
+            return {
+                "moved": False,
+                "reason": gate["move_to_backlog_reason"],
+                "gap_id": gap_id,
+                "from": previous,
+                "to": "backlog",
+            }
+        updated_at = now_iso()
+        with db.transaction(conn):
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = 'backlog', updated = ? "
+                "WHERE id = ? AND status = ?",
+                (updated_at, gap_id, previous),
+            )
+        if not cur.rowcount:
+            reread = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = ?",
+                (gap_id,),
+            ).fetchone()
+            current = str(reread["status"] if reread else "unknown")
+            return {
+                "moved": False,
+                "reason": "status_changed",
+                "gap_id": gap_id,
+                "from": current,
+                "to": "backlog",
+            }
+    finally:
+        conn.close()
+    try:
+        gap = gap_writer.update_fields(gap_id, status="backlog")
+        conn = _conn()
+        try:
+            with db.transaction(conn):
+                search_index.upsert_gap(conn, gap)
+        finally:
+            conn.close()
+        _append_gap_workflow_log(
+            gap_id,
+            f"Workflow status changed: {previous} → backlog; duplicate import recovery",
+        )
+    except Exception:
+        pass
+    return {
+        "moved": True,
+        "reason": "",
+        "gap_id": gap_id,
+        "from": previous,
+        "to": "backlog",
+    }
+
+
+def _import_dedup_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT id, name, status, priority, instance_id FROM gaps_index"
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        gap = shared_gaps.read_gap_json(row["id"], include_logs=False) or {}
+        rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+        if not rounds:
+            continue
+        latest = rounds[-1]
+        actual = str(latest.get("actual") or "").strip()
+        target = str(latest.get("target") or "").strip()
+        if not actual and not target:
+            continue
+        move_gate = _duplicate_move_to_backlog_status(row["status"])
+        out.append({
+            "id": row["id"],
+            "name": row["name"] or gap.get("name") or row["id"],
+            "status": row["status"],
+            "priority": row["priority"] or gap.get("priority") or "low",
+            "instance_id": row["instance_id"] or project_state.DEFAULT_INSTANCE_ID,
+            "instance_display_name": project_state.gap_instance_display(row["instance_id"]),
+            "actual": actual,
+            "target": target,
+            **move_gate,
+        })
+    return out
+
+
+def _find_import_duplicate(
+    actual: str,
+    target: str,
+    candidates: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    if candidates is None:
+        conn = _conn()
+        try:
+            candidates = _import_dedup_candidates(conn)
+        finally:
+            conn.close()
+    best, best_score = _best_import_duplicate(actual, target, candidates)
+    if best and best_score >= IMPORT_DEDUP_THRESHOLD:
+        return {"score": round(best_score, 3), "match": best}
+    return None
+
+
+def _best_import_duplicate(
+    actual: str,
+    target: str,
+    candidates: list[dict[str, Any]],
+) -> tuple[dict[str, Any] | None, float]:
+    best: dict[str, Any] | None = None
+    best_score = 0.0
+    for candidate in candidates:
+        score = _import_dedup_score(
+            actual,
+            target,
+            candidate["actual"],
+            candidate["target"],
+        )
+        if score > best_score:
+            best_score = score
+            best = candidate
+    return best, best_score
+
+
+def _import_dedup_score(
+    draft_actual: str,
+    draft_target: str,
+    candidate_actual: str,
+    candidate_target: str,
+) -> float:
+    draft = _import_dedup_normalize(f"{draft_actual}\n{draft_target}")
+    candidate = _import_dedup_normalize(f"{candidate_actual}\n{candidate_target}")
+    if not draft or not candidate:
+        return 0.0
+    if draft == candidate:
+        return 1.0
+    draft_numbers = set(re.findall(r"\d+", draft))
+    candidate_numbers = set(re.findall(r"\d+", candidate))
+    trigram = _import_trigram_cosine(draft, candidate)
+    jaccard = _import_token_jaccard(draft, candidate)
+    sequence = difflib.SequenceMatcher(None, draft, candidate).ratio()
+    strict_score = (0.55 * trigram) + (0.30 * jaccard) + (0.15 * sequence)
+    feature_score = _import_feature_cosine(draft, candidate)
+    fuzzy_score = (0.45 * feature_score) + (0.35 * sequence) + (0.20 * trigram)
+    score = max(strict_score, fuzzy_score)
+    if draft_numbers and candidate_numbers and draft_numbers != candidate_numbers:
+        score = min(score, 0.5)
+    return score
+
+
+def _import_dedup_normalize(text: str) -> str:
+    text = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _import_token_jaccard(a: str, b: str) -> float:
+    aa = set(a.split())
+    bb = set(b.split())
+    if not aa or not bb:
+        return 0.0
+    return len(aa & bb) / len(aa | bb)
+
+
+def _import_feature_cosine(a: str, b: str) -> float:
+    ca = _import_token_features(a)
+    cb = _import_token_features(b)
+    if not ca or not cb:
+        return 0.0
+    dot = sum(ca[key] * cb.get(key, 0) for key in ca)
+    mag_a = sum(v * v for v in ca.values()) ** 0.5
+    mag_b = sum(v * v for v in cb.values()) ** 0.5
+    if not mag_a or not mag_b:
+        return 0.0
+    return dot / (mag_a * mag_b)
+
+
+def _import_token_features(text: str) -> Counter[str]:
+    tokens = [
+        _import_stem_token(token)
+        for token in text.split()
+        if token not in _IMPORT_DEDUP_STOPWORDS
+    ]
+    counts: Counter[str] = Counter(tokens)
+    counts.update(
+        f"{left} {right}"
+        for left, right in zip(tokens, tokens[1:])
+    )
+    return counts
+
+
+def _import_stem_token(token: str) -> str:
+    for suffix in ("ing", "ed", "es", "s"):
+        if len(token) > len(suffix) + 3 and token.endswith(suffix):
+            return token[:-len(suffix)]
+    return token
+
+
+def _import_trigram_cosine(a: str, b: str) -> float:
+    ca = _import_char_ngrams(a)
+    cb = _import_char_ngrams(b)
+    if not ca or not cb:
+        return 0.0
+    dot = sum(ca[key] * cb.get(key, 0) for key in ca)
+    mag_a = sum(v * v for v in ca.values()) ** 0.5
+    mag_b = sum(v * v for v in cb.values()) ** 0.5
+    if not mag_a or not mag_b:
+        return 0.0
+    return dot / (mag_a * mag_b)
+
+
+def _import_char_ngrams(text: str, n: int = 3) -> Counter[str]:
+    compact = f"  {text}  "
+    if len(compact) <= n:
+        return Counter([compact])
+    return Counter(compact[i:i + n] for i in range(len(compact) - n + 1))
+
+
 @_exclusive_mutation("Import Gaps")
 def import_persist(body: dict) -> tuple[int, dict]:
     """Persist user-confirmed extracted Gaps."""
@@ -3302,11 +3703,8 @@ def import_persist(body: dict) -> tuple[int, dict]:
         and len(drafts) >= IMPORT_BACKGROUND_THRESHOLD
         and body.get("background") is not False
     ):
-        reporter = (body.get("reporter") or "").strip()
-        if not reporter:
-            return err(400, "reporter is required")
         job_body = json.loads(json.dumps({
-            "reporter": reporter,
+            "reporter": (body.get("reporter") or "").strip(),
             "drafts": drafts,
             "background": False,
         }))
@@ -3328,12 +3726,20 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
     """Persist user-confirmed extracted Gaps synchronously."""
     reporter = (body.get("reporter") or "").strip()
     drafts = body.get("drafts") or []
-    if not reporter:
-        return err(400, "reporter is required")
     if not isinstance(drafts, list) or not drafts:
         return err(400, "drafts must be a non-empty list")
+    conn = _conn()
+    try:
+        dedup_candidates = _import_dedup_candidates(conn)
+    finally:
+        conn.close()
     created: list[str] = []
     failures: list[dict[str, Any]] = []
+    duplicate_actions = {
+        "ignored": 0,
+        "moved_to_backlog": 0,
+        "move_noop": 0,
+    }
     for idx, d in enumerate(drafts, start=1):
         if not isinstance(d, dict):
             failures.append({
@@ -3345,18 +3751,96 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
         actual = (d.get("actual") or "").strip()
         target = (d.get("target") or "").strip()
         name = (d.get("name") or "").strip() or _autoname(actual, target)
+        draft_reporter = (d.get("reporter") or reporter).strip()
+        priority = (d.get("priority") or "low").strip().lower()
+        if priority not in _VALID_PRIORITIES:
+            failures.append({
+                "index": idx,
+                "error": "priority must be one of low/medium/high",
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                },
+            })
+            continue
+        if not draft_reporter:
+            failures.append({
+                "index": idx,
+                "error": "reporter is required",
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": "",
+                    "priority": priority,
+                },
+            })
+            continue
+        if not _VALID_REPORTER.match(draft_reporter):
+            failures.append({
+                "index": idx,
+                "error": "invalid reporter name",
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                },
+            })
+            continue
         if not actual and not target:
             failures.append({
                 "index": idx,
                 "error": "actual or target must be non-empty",
-                "draft": {"name": name, "actual": actual, "target": target},
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                },
+            })
+            continue
+        duplicate_decision = str(d.get("duplicate_decision") or "").strip()
+        if duplicate_decision == _DUPLICATE_DECISION_IGNORE:
+            duplicate_actions["ignored"] += 1
+            continue
+        duplicate = _find_import_duplicate(
+            actual,
+            target,
+            candidates=dedup_candidates,
+        )
+        if duplicate and duplicate_decision == _DUPLICATE_DECISION_MOVE_ORIGINAL:
+            move = _move_duplicate_original_to_backlog(duplicate["match"]["id"])
+            if move.get("moved"):
+                duplicate_actions["moved_to_backlog"] += 1
+            else:
+                duplicate_actions["move_noop"] += 1
+            continue
+        if duplicate and duplicate_decision != _DUPLICATE_DECISION_IMPORT:
+            failures.append({
+                "index": idx,
+                "error": "possible duplicate Gap found",
+                "code": "duplicate_gap",
+                "duplicate": duplicate,
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                },
             })
             continue
         gap_id = new_ulid()
         try:
             get_client().call(M_CREATE_GAP, {
-                "gap_id": gap_id, "name": name, "reporter": reporter,
-                "actual": actual, "target": target,
+                "gap_id": gap_id, "name": name, "reporter": draft_reporter,
+                "priority": priority, "actual": actual, "target": target,
             })
             created.append(gap_id)
         except BackendError as e:
@@ -3364,7 +3848,13 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                 "index": idx,
                 "error": e.message,
                 "code": e.code,
-                "draft": {"name": name, "actual": actual, "target": target},
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                },
             })
     status = 201 if created and not failures else 200
     return status, {
@@ -3372,6 +3862,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
         "count": len(created),
         "failures": failures,
         "failed": len(failures),
+        "duplicate_actions": duplicate_actions,
     }
 
 

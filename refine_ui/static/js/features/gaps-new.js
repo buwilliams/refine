@@ -62,6 +62,8 @@ function openNewGapModal() {
   document.body.appendChild(root);
 
   let closed = false;
+  let duplicateDecision = "";
+  let duplicateDecisionKey = "";
   function close(navigateAway) {
     if (closed) return;
     closed = true;
@@ -95,6 +97,15 @@ function openNewGapModal() {
 
   const form = root.querySelector("#new-gap-form");
   form.addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+  $$("#new-gap-form textarea[name='actual'], #new-gap-form textarea[name='target']", root).forEach((field) => {
+    field.addEventListener("input", () => {
+      duplicateDecision = "";
+      duplicateDecisionKey = "";
+      root.querySelector("#new-gap-duplicate")?.remove();
+      const ok = root.querySelector("[data-ok]");
+      if (ok) ok.textContent = "Create Gap";
+    });
+  });
 
   async function submit() {
     const currentReporter = state.lastReporter || "";
@@ -104,10 +115,33 @@ function openNewGapModal() {
     const target = (fd.get("target") || "").toString().trim();
     const priority = (fd.get("priority") || "low").toString();
     if (!actual && !target) return toast("Provide actual or target", "error");
+    const duplicateKey = `${actual}\n${target}`;
+    const effectiveDuplicateDecision = (
+      duplicateDecision && duplicateDecisionKey === duplicateKey
+    ) ? duplicateDecision : "";
     try {
-      await api("POST", "/api/gaps", {
+      const r = await api("POST", "/api/gaps", {
         reporter: currentReporter, actual, target, priority,
+        duplicate_decision: effectiveDuplicateDecision,
       });
+      if (r?.created === false) {
+        const move = r.move || {};
+        if (r.duplicate_action === "move_original_to_backlog") {
+          if (move.moved) {
+            toast("Original Gap moved to backlog; duplicate not created", "info");
+          } else if (move.reason === "protected_status") {
+            toast(`Original Gap is ${move.from}; duplicate not created`, "info");
+          } else if (move.reason === "already_backlog") {
+            toast("Original Gap is already in backlog; duplicate not created", "info");
+          } else {
+            toast("Duplicate not created", "info");
+          }
+        } else {
+          toast("Duplicate not created", "info");
+        }
+        close(true);
+        return;
+      }
       toast("Gap created", "info");
       // Stay on whatever screen the modal was layered over — Dashboard,
       // Gaps list, etc. `close(true)` only re-routes if we came in via
@@ -115,10 +149,91 @@ function openNewGapModal() {
       // preserved so the user doesn't lose their place.
       close(true);
     } catch (err) {
+      if (err.code === "duplicate_gap" && err.error?.duplicate?.match) {
+        duplicateDecision = "";
+        duplicateDecisionKey = duplicateKey;
+        const ok = root.querySelector("[data-ok]");
+        if (ok) ok.textContent = "Move original to backlog";
+        drawNewGapDuplicatePrompt(root, err.error.duplicate.match, {
+          onIgnore: () => {
+            duplicateDecision = "duplicate";
+            duplicateDecisionKey = duplicateKey;
+            submit();
+          },
+          onImport: () => {
+            duplicateDecision = "original";
+            duplicateDecisionKey = duplicateKey;
+            const ok = root.querySelector("[data-ok]");
+            if (ok) ok.textContent = "Create anyway";
+          },
+          onMoveOriginal: () => {
+            duplicateDecision = "move_original_to_backlog";
+            duplicateDecisionKey = duplicateKey;
+            submit();
+          },
+        });
+        duplicateDecision = "move_original_to_backlog";
+        return;
+      }
       toast(err.message, "error");
     }
   }
 
   const firstField = root.querySelector("textarea[name='actual']");
   if (firstField) firstField.focus();
+}
+
+function drawNewGapDuplicatePrompt(root, match, {
+  onIgnore,
+  onImport,
+  onMoveOriginal,
+}) {
+  let prompt = root.querySelector("#new-gap-duplicate");
+  if (!prompt) {
+    prompt = document.createElement("div");
+    prompt.id = "new-gap-duplicate";
+    const form = root.querySelector("#new-gap-form");
+    form?.prepend(prompt);
+  }
+  prompt.innerHTML = renderGapDuplicatePrompt(match);
+  prompt.querySelector('[data-duplicate-decision="duplicate"]')
+    ?.addEventListener("click", onIgnore);
+  prompt.querySelector('[data-duplicate-decision="original"]')
+    ?.addEventListener("click", () => {
+      prompt.querySelectorAll("[data-duplicate-decision]").forEach((btn) => {
+        btn.classList.toggle(
+          "selected",
+          btn.dataset.duplicateDecision === "original",
+        );
+      });
+      onImport();
+    });
+  prompt.querySelector('[data-duplicate-decision="move_original_to_backlog"]')
+    ?.addEventListener("click", onMoveOriginal);
+}
+
+function renderGapDuplicatePrompt(match) {
+  return `
+    <div class="import-duplicate">
+      <div class="small" style="font-weight:600">Possible duplicate</div>
+      <p class="muted small" style="margin:4px 0">
+        ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.instance_display_name || match.instance_id || "Default")}
+        · ${htmlEscape(match.status || "")}
+      </p>
+      <div class="import-duplicate-content">
+        <div>
+          <div class="small muted">Matched actual</div>
+          <p>${htmlEscape(match.actual || "")}</p>
+        </div>
+        <div>
+          <div class="small muted">Matched target</div>
+          <p>${htmlEscape(match.target || "")}</p>
+        </div>
+      </div>
+      <div class="actions import-duplicate-actions">
+        <button type="button" data-duplicate-decision="move_original_to_backlog" class="selected">Yes, move original to backlog</button>
+        <button type="button" class="secondary" data-duplicate-decision="duplicate">Yes, ignore</button>
+        <button type="button" class="secondary" data-duplicate-decision="original">No, import</button>
+      </div>
+    </div>`;
 }

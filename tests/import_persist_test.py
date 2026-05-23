@@ -35,6 +35,7 @@ def main() -> int:
                         "name": f"Async import {i}",
                         "actual": f"Async actual {i}",
                         "target": f"Async target {i}",
+                        "duplicate_decision": "original",
                     }
                     for i in range(1, 4)
                 ],
@@ -82,8 +83,26 @@ def main() -> int:
                 "name": "Needs correction",
                 "actual": "",
                 "target": "",
+                "reporter": "Reporter",
+                "priority": "low",
             },
         }, body
+
+        status, body = api.import_persist({
+            "drafts": [{
+                "name": "Per draft metadata",
+                "actual": "Metadata actual",
+                "target": "Metadata target",
+                "reporter": "Csv Reporter",
+                "priority": "high",
+            }],
+        })
+        assert status == 201, body
+        row = conn.execute(
+            "SELECT reporter, priority FROM gaps_index WHERE id = ?",
+            (body["created"][0],),
+        ).fetchone()
+        assert dict(row) == {"reporter": "Csv Reporter", "priority": "high"}
 
         from refine_server.paths import relative_gap_path
         from refine_server.runner import Runner
@@ -99,11 +118,12 @@ def main() -> int:
             status, body = api.import_persist({
                 "reporter": "Reporter",
                 "drafts": [{
-                    "name": "Activity side effect should not fail import",
-                    "actual": "Current",
-                    "target": "Target",
-                }],
-            })
+                "name": "Activity side effect should not fail import",
+                "actual": "Current",
+                "target": "Target",
+                "duplicate_decision": "original",
+            }],
+        })
         finally:
             runner_mod.activity.append = original_activity_append
 

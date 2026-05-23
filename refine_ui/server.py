@@ -264,6 +264,16 @@ def _h_import_extract(_h, _m, body, _q):
     return api.import_extract(body or {})
 
 
+@route("POST", r"/api/import/csv/parse")
+def _h_import_parse_csv(_h, _m, body, _q):
+    return api.import_parse_csv(body or {})
+
+
+@route("POST", r"/api/import/dedup")
+def _h_import_dedup(_h, _m, body, _q):
+    return api.import_dedup(body or {})
+
+
 @route("POST", r"/api/import/persist")
 def _h_import_persist(_h, _m, body, _q):
     return api.import_persist(body or {})

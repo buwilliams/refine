@@ -125,6 +125,7 @@ async function api(method, path, body, options = {}) {
     err.status = res.status;
     err.details = details;
     err.code = code;
+    err.error = data?.error || null;
     throw err;
   }
   return data;
