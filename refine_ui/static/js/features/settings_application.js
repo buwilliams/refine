@@ -51,17 +51,6 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
     </section>
 
     <section class="settings-section">
-      <h3>Quality gate</h3>
-      <p class="muted small" style="margin-top:0">
-        Runs pre-merge QA in the Gap worktree before the Merge agent lands work.
-      </p>
-      <label class="checkbox-row">
-        <input type="checkbox" id="s-quality-enabled" ${(String(s.quality_enabled || "0") === "1") ? "checked" : ""}>
-        <span>Enable QA for all Gaps</span>
-      </label>
-    </section>
-
-    <section class="settings-section">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
         The AI provider drafts this configuration from the codebase.
@@ -237,7 +226,6 @@ function bindSettingsApplicationTab(currentProject) {
         await api("PATCH", "/api/settings", {
           agent_subpath: $("#s-subpath").value,
           merge_target_branch: $("#s-merge-target").value,
-          quality_enabled: $("#s-quality-enabled").checked ? "1" : "0",
           target_app_url: $("#s-target-app-url").value,
           target_app_start_command: $("#s-target-start-command").value,
           target_app_stop_command: $("#s-target-stop-command").value,

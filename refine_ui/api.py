@@ -2730,6 +2730,7 @@ def quality_get() -> tuple[int, dict]:
     conn = _conn()
     try:
         result = quality.load_settings(conn)
+        result["enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"
         result["configured"] = quality.is_configured(conn)
         return 200, result
     finally:
@@ -2738,12 +2739,23 @@ def quality_get() -> tuple[int, dict]:
 
 def quality_save(body: dict) -> tuple[int, dict]:
     conn = _conn()
+    enabled_changed = False
     try:
+        if "enabled" in body:
+            enabled = (
+                "1"
+                if str(body.get("enabled")).strip().lower()
+                in {"1", "true", "yes", "on"}
+                else "0"
+            )
+            enabled_changed = enabled != (db.get_setting(conn, "quality_enabled", "0") or "0")
+            db.set_setting(conn, "quality_enabled", enabled)
         result = quality.save_settings(
             conn,
             business_requirements=body.get("business_requirements"),
             instructions=body.get("instructions"),
         )
+        result["enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"
         result["configured"] = quality.is_configured(conn)
         activity.append(
             conn,
@@ -2754,6 +2766,11 @@ def quality_save(body: dict) -> tuple[int, dict]:
         )
     finally:
         conn.close()
+    if enabled_changed:
+        try:
+            get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
+        except BackendError:
+            pass
     return 200, result
 
 

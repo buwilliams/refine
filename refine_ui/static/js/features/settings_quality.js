@@ -1,7 +1,23 @@
 // ---- System / Quality -------------------------------------------------------
 
 function renderSettingsQualityTab(quality) {
+  const qualityEnabled = String(quality.enabled || "0") === "1";
   return `
+    <section class="settings-section">
+      <h3>Quality gate</h3>
+      <p class="scope-label muted small">Instance-scoped</p>
+      <p class="muted small" style="margin-top:0">
+        Runs pre-merge QA in the Gap worktree before the Merge agent lands work.
+      </p>
+      <button type="button"
+              id="s-quality-enabled"
+              class="${qualityEnabled ? "" : "warn"}"
+              aria-pressed="${qualityEnabled ? "true" : "false"}"
+              data-enabled="${qualityEnabled ? "1" : "0"}">
+        QA ${qualityEnabled ? "enabled" : "disabled"}
+      </button>
+    </section>
+
     <section class="settings-section">
       <h3>Business requirements</h3>
       <p class="scope-label muted small">Project-wide</p>
@@ -32,6 +48,7 @@ function bindSettingsQualityTab() {
     await withButtonBusy($("#s-quality-save"), "Saving…", async () => {
       try {
         await api("PATCH", "/api/quality", {
+          enabled: $("#s-quality-enabled").dataset.enabled === "1" ? "1" : "0",
           business_requirements: $("#s-quality-business-requirements").value,
           instructions: $("#s-quality-instructions").value,
         });
@@ -39,5 +56,13 @@ function bindSettingsQualityTab() {
         await refreshSettingsTab("quality", { force: true });
       } catch (e) { await showActionError(e); }
     });
+  });
+  $("#s-quality-enabled")?.addEventListener("click", () => {
+    const btn = $("#s-quality-enabled");
+    const enabled = btn.dataset.enabled !== "1";
+    btn.dataset.enabled = enabled ? "1" : "0";
+    btn.setAttribute("aria-pressed", enabled ? "true" : "false");
+    btn.classList.toggle("warn", !enabled);
+    btn.textContent = enabled ? "QA enabled" : "QA disabled";
   });
 }

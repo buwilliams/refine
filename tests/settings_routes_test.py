@@ -400,8 +400,17 @@ def main() -> int:
     assert "renderSettingsApplicationTab({" in application_refresh_body
     assert "target_app_url" not in common_js
     assert 'id="s-target-auto-rebuild"' in settings_js
+    assert 'id="s-quality-enabled"' not in application_body
     assert 'id="s-quality-enabled"' in settings_js
-    assert 'quality_enabled: $("#s-quality-enabled").checked ? "1" : "0"' in settings_js
+    assert 'const qualityEnabled = String(quality.enabled || "0") === "1";' in settings_js
+    assert 'aria-pressed="${qualityEnabled ? "true" : "false"}"' in settings_js
+    assert 'class="${qualityEnabled ? "" : "warn"}"' in settings_js
+    assert 'QA ${qualityEnabled ? "enabled" : "disabled"}' in settings_js
+    assert 'enabled: $("#s-quality-enabled").dataset.enabled === "1" ? "1" : "0"' in settings_js
+    assert 'btn.classList.toggle("warn", !enabled);' in settings_js
+    assert 'btn.textContent = enabled ? "QA enabled" : "QA disabled";' in settings_js
+    assert ".toggle-button.on" not in common_css
+    assert '"enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"' in api_py
     assert 'api("GET", "/api/quality")' in settings_js
     assert 'api("PATCH", "/api/quality"' in settings_js
     assert '@route("GET", r"/api/quality")' in server_py

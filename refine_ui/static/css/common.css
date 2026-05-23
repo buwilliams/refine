@@ -208,18 +208,6 @@ select {
 
 .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
 .form-row label { font-weight: 500; font-size: 13px; }
-.checkbox-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 500;
-}
-.checkbox-row input[type="checkbox"] {
-  width: auto;
-  height: auto;
-}
-
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td {
   text-align: left;
