@@ -47,6 +47,26 @@ def main() -> int:
         assert match["match"]["actual"].startswith("Current behavior"), match
         assert match["match"]["target"].startswith("Target behavior"), match
 
+        status, body = api.import_dedup({
+            "drafts": [
+                {
+                    "name": "Unrelated first row",
+                    "actual": "A completely unrelated current behavior",
+                    "target": "A completely unrelated future behavior",
+                },
+                {
+                    "name": "Same CSV uploaded again",
+                    "actual": "Current behavior for 01IMPORTDEDUP0000000000001",
+                    "target": "Target behavior for 01IMPORTDEDUP0000000000001",
+                    "reporter": "Reporter",
+                    "priority": "medium",
+                },
+            ],
+        })
+        assert status == 200, body
+        assert [m["index"] for m in body["matches"]] == [2], body
+        assert body["matches"][0]["match"]["id"] == "01IMPORTDEDUP0000000000001", body
+
         score = api._import_dedup_score(  # noqa: SLF001
             "Login button is missing on the home page",
             "Users can sign in from the home page",

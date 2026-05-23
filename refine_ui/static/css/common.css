@@ -509,9 +509,20 @@ select {
 .import-draft-pagination {
   margin-top: 0;
 }
+.import-resolution-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg);
+}
 .import-draft-list {
   display: grid;
   gap: 8px;
+}
+.import-draft-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
 }
 .import-drafts .draft { padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
 .import-duplicate {

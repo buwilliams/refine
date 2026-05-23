@@ -39,15 +39,25 @@ def main() -> int:
     assert "priority (low, medium, high)" in import_js
     assert "const IMPORT_DRAFT_PAGE_SIZE = 25;" in import_js
     assert "const draftState = drafts.map(normalizeImportDraft);" in import_js
-    assert "pageDrafts.map((d, i) => renderImportDraftRow(d, start + i))" in import_js
-    assert "Showing ${start + 1}-${end} of ${draftState.length}" in import_js
+    assert "const visibleDrafts = draftState" in import_js
+    assert "function importDraftNeedsResolution(draft)" in import_js
+    assert "function renderImportDraftRange(start, end, visibleCount, totalCount, filtered)" in import_js
+    assert "Needs resolution only (${unresolvedCount})" in import_js
+    assert "data-import-unresolved-filter" in import_js
+    assert "showNeedsResolutionOnly = true" in import_js
+    assert "Resolve ${unresolved.length} draft" in import_js
+    assert "pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index))" in import_js
     assert "function renderImportDraftPager(page, totalPages)" in import_js
+    assert 'class="import-draft-footer"' in import_js
     assert "data-import-page=\"prev\"" in import_js
     assert "data-import-page=\"next\"" in import_js
+    assert "$$(\"[data-import-page]\", drafts_root).forEach" in import_js
     assert "syncImportDraftPage(drafts_root, draftState)" in import_js
     assert ".map(importDraftPayload)" in import_js
     assert ".import-draft-toolbar" in common_css
     assert ".import-draft-list" in common_css
+    assert ".import-draft-footer" in common_css
+    assert ".import-resolution-filter" in common_css
     assert 'id="import-csv-file-button"' in import_js
     assert 'id="import-csv-file-name" aria-live="polite"' in import_js
     assert 'input type="file" id="import-csv-file" class="visually-hidden"' in import_js
@@ -58,6 +68,10 @@ def main() -> int:
     assert "async function parseImportCsvBackend(text)" in import_js
     assert 'api("POST", "/api/import/csv/parse", { text })' in import_js
     assert "function parseImportCsvRows" not in import_js
+    assert "async function annotateImportDuplicateDrafts(drafts)" in import_js
+    assert 'api("POST", "/api/import/dedup", { drafts })' in import_js
+    assert "duplicate: duplicate.match" in import_js
+    assert 'duplicateDecision: draft.duplicateDecision || ""' in import_js
     assert "function importTextChunks(text)" in import_js
     assert "i += IMPORT_CHUNK_LINE_COUNT" in import_js
     assert "chunkLines = lines.slice(i, i + IMPORT_CHUNK_LINE_COUNT)" in import_js
@@ -72,13 +86,11 @@ def main() -> int:
     assert 'withButtonBusy(btn, "Saving…"' in import_js
     assert "Failed drafts (${draftState.length})" in import_js
     assert "drawImportDrafts(root, failedDrafts, close, { retry: true })" in import_js
-    assert 'api("POST", "/api/import/dedup", { drafts })' not in import_js
-    assert "Checking for duplicate Gaps across all instances." not in import_js
     assert "Yes, ignore" in new_gap_js
     assert "No, import" in new_gap_js
     assert "Yes, move original to backlog" in new_gap_js
     assert "move_original_to_backlog" in new_gap_js
-    assert "move_original_to_backlog" in import_js
+    assert "renderGapDuplicatePrompt(d.duplicate)" in import_js
     assert "Choose whether each is a duplicate before saving again." in import_js
     assert "failure.code === \"duplicate_gap\"" in import_js
     assert "duplicate_decision:" in import_js

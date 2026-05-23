@@ -307,7 +307,22 @@ function drawImportProgress(root, state) {
 }
 
 async function reviewImportDrafts(root, drafts, close) {
-  drawImportDrafts(root, drafts, close);
+  drawImportDrafts(root, await annotateImportDuplicateDrafts(drafts), close);
+}
+
+async function annotateImportDuplicateDrafts(drafts) {
+  if (!drafts.length) return drafts;
+  const r = await api("POST", "/api/import/dedup", { drafts });
+  const byIndex = new Map((r.matches || []).map((match) => [match.index - 1, match]));
+  return drafts.map((draft, idx) => {
+    const duplicate = byIndex.get(idx);
+    if (!duplicate) return draft;
+    return {
+      ...draft,
+      duplicate: duplicate.match,
+      duplicateDecision: draft.duplicateDecision || "",
+    };
+  });
 }
 
 function readImportCsvFile(input) {
@@ -334,38 +349,55 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   }
   const draftState = drafts.map(normalizeImportDraft);
   let page = 1;
+  let showNeedsResolutionOnly = false;
 
   function renderPage() {
-    const totalPages = Math.max(1, Math.ceil(draftState.length / IMPORT_DRAFT_PAGE_SIZE));
+    const visibleDrafts = draftState
+      .map((draft, index) => ({ draft, index }))
+      .filter(({ draft }) => !showNeedsResolutionOnly || importDraftNeedsResolution(draft));
+    const totalPages = Math.max(1, Math.ceil(visibleDrafts.length / IMPORT_DRAFT_PAGE_SIZE));
     page = Math.min(Math.max(1, page), totalPages);
     const start = (page - 1) * IMPORT_DRAFT_PAGE_SIZE;
-    const pageDrafts = draftState.slice(start, start + IMPORT_DRAFT_PAGE_SIZE);
+    const pageDrafts = visibleDrafts.slice(start, start + IMPORT_DRAFT_PAGE_SIZE);
     const end = start + pageDrafts.length;
     const duplicateCount = draftState.filter((draft) => draft.duplicate).length;
+    const unresolvedCount = draftState.filter(importDraftNeedsResolution).length;
     const title = options.retry
       ? `Failed drafts (${draftState.length}) — correct &amp; retry`
       : `Drafts (${draftState.length}) — review &amp; confirm`;
     drafts_root.innerHTML = `
       <h3 style="margin-top:0">${title}</h3>
       <div class="import-draft-toolbar">
-        <span class="muted small">Showing ${start + 1}-${end} of ${draftState.length}</span>
+        <span class="muted small">${renderImportDraftRange(start, end, visibleDrafts.length, draftState.length, showNeedsResolutionOnly)}</span>
+        <label class="import-resolution-filter small">
+          <input type="checkbox" data-import-unresolved-filter ${showNeedsResolutionOnly ? "checked" : ""}>
+          Needs resolution only (${unresolvedCount})
+        </label>
         ${renderImportDraftPager(page, totalPages)}
       </div>
       ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Choose whether each is a duplicate before saving again.</p>` : ""}
-      <div class="import-draft-list">
-        ${pageDrafts.map((d, i) => renderImportDraftRow(d, start + i)).join("")}
+      ${showNeedsResolutionOnly && !visibleDrafts.length
+        ? `<p class="muted">No drafts need resolution.</p>`
+        : `<div class="import-draft-list">
+            ${pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index)).join("")}
+          </div>`}
+      <div class="import-draft-footer">
+        ${renderImportDraftPager(page, totalPages)}
       </div>
     `;
     bindImportDraftPage(drafts_root, draftState);
-    $("[data-import-page='prev']", drafts_root)?.addEventListener("click", () => {
+    $("[data-import-unresolved-filter]", drafts_root)?.addEventListener("change", (e) => {
       syncImportDraftPage(drafts_root, draftState);
-      page -= 1;
+      showNeedsResolutionOnly = e.target.checked;
+      page = 1;
       renderPage();
     });
-    $("[data-import-page='next']", drafts_root)?.addEventListener("click", () => {
-      syncImportDraftPage(drafts_root, draftState);
-      page += 1;
-      renderPage();
+    $$("[data-import-page]", drafts_root).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        syncImportDraftPage(drafts_root, draftState);
+        page += btn.dataset.importPage === "next" ? 1 : -1;
+        renderPage();
+      });
     });
   }
 
@@ -381,6 +413,17 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     const btn = actions.querySelector("#btn-persist");
     if (btn.disabled) return;
     syncImportDraftPage(drafts_root, draftState);
+    const unresolved = draftState.filter(importDraftNeedsResolution);
+    if (unresolved.length) {
+      showNeedsResolutionOnly = true;
+      page = 1;
+      renderPage();
+      toast(
+        `Resolve ${unresolved.length} draft${unresolved.length === 1 ? "" : "s"} before saving`,
+        "error",
+      );
+      return;
+    }
     const skipped = draftState.filter((draft) => draft.duplicateDecision === "duplicate").length;
     const payload = draftState
       .filter((draft) => draft.duplicateDecision !== "duplicate")
@@ -449,11 +492,19 @@ function normalizeImportDraft(draft) {
     reporter: draft.reporter || state.lastReporter || "",
     priority: String(draft.priority || "low").toLowerCase(),
     duplicate: draft.duplicate || null,
-    duplicateDecision: draft.duplicate
-      ? (draft.duplicateDecision || "move_original_to_backlog")
-      : (draft.duplicateDecision || ""),
+    duplicateDecision: draft.duplicateDecision || "",
     error: draft.error || "",
   };
+}
+
+function importDraftNeedsResolution(draft) {
+  return !!draft.error || (!!draft.duplicate && !draft.duplicateDecision);
+}
+
+function renderImportDraftRange(start, end, visibleCount, totalCount, filtered) {
+  if (!visibleCount) return filtered ? `Showing 0 of ${totalCount}` : "Showing 0";
+  const base = `Showing ${start + 1}-${end} of ${visibleCount}`;
+  return filtered ? `${base} needing resolution (${totalCount} total)` : `${base} of ${totalCount}`;
 }
 
 function importDraftPayload(draft) {
@@ -526,8 +577,13 @@ function bindImportDraftPage(root, draftState) {
       });
     });
     $$(".d-name, .d-reporter, .d-priority, .d-actual, .d-target", row).forEach((field) => {
-      field.addEventListener("input", () => syncImportDraftRow(row, draftState));
-      field.addEventListener("change", () => syncImportDraftRow(row, draftState));
+      const syncAndClearError = () => {
+        syncImportDraftRow(row, draftState);
+        draft.error = "";
+        row.querySelector(".draft-error")?.remove();
+      };
+      field.addEventListener("input", syncAndClearError);
+      field.addEventListener("change", syncAndClearError);
     });
     $$(".d-actual, .d-target", row).forEach((field) => {
       field.addEventListener("input", () => {
