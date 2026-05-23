@@ -1352,6 +1352,7 @@ class Runner:
             gap_id=gap_id,
             priming_prompt=priming_prompt,
             priming_intro=priming_intro,
+            show_priming_output=bool(gap_id),
         )
         return {"session_id": sid}
 
@@ -1890,13 +1891,16 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
         "`git status`, `git diff`, and other tools to investigate the agent's",
         "progress.",
         "",
-        "Below is the context the user has on their end. When they ask about",
-        "the Gap's progress, status, or what's happening, treat their question",
-        "as being about THIS GAP — not as small talk. Use the context and the",
-        "live worktree state to give a specific, grounded answer. If they ask",
-        "an open-ended question (e.g. \"how is it going?\"), summarize the",
-        "current state: status, what the latest round asks for, what commits",
-        "the agent has made on this branch, and any recent errors.",
+        "First, analyze the Gap logs and context below and respond with a",
+        "concise summary for this Gap. Summarize the current status, what the",
+        "latest round asks for, what the logs show happened recently, and any",
+        "recent errors or blockers. Do not wait for another user message before",
+        "giving that opening summary.",
+        "",
+        "After that opening summary, when the user asks about the Gap's",
+        "progress, status, or what's happening, treat their question as being",
+        "about THIS GAP — not as small talk. Use the context and the live",
+        "worktree state to give a specific, grounded answer.",
         "",
         "## Gap context",
         f"- Name: {row['name']}",
@@ -1916,7 +1920,7 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
             parts.append(f"- Target (desired behavior): {latest['target']}")
     if recent_activity:
         parts.append("")
-        parts.append("## Recent activity (oldest first)")
+        parts.append("## Recent Gap logs/activity (oldest first)")
         for entry in recent_activity:
             ts = entry.get("datetime", "")
             msg = entry.get("message", "")
@@ -1945,7 +1949,7 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
         "",
         "Don't commit anything to git unless I explicitly ask. Don't repeat",
         "this context block back to me verbatim — synthesize it in your",
-        "answer. The user's first message follows.",
+        "answer.",
     ]
     priming_prompt = "\n".join(parts)
     intro = (

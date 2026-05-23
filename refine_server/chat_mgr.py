@@ -196,6 +196,7 @@ class ChatSession:
     # chats to seed the conversation with the Gap's context). Cleared after
     # the first send.
     pending_priming_text: str | None = None
+    show_priming_output: bool = False
 
 
 class ChatManager:
@@ -262,7 +263,8 @@ class ChatManager:
               provider: str | None = None,
               gap_id: str | None = None,
               priming_prompt: str | None = None,
-              priming_intro: str | None = None) -> str:
+              priming_intro: str | None = None,
+              show_priming_output: bool = False) -> str:
         sid = uuid.uuid4().hex[:12]
         session = ChatSession(
             session_id=sid,
@@ -272,6 +274,7 @@ class ChatManager:
             gap_id=gap_id,
             last_activity_ts=time.monotonic(),
             pending_priming_text=priming_prompt or None,
+            show_priming_output=show_priming_output,
         )
         if priming_intro:
             with session.out_lock:
@@ -317,13 +320,13 @@ class ChatManager:
                 s.proc = proc
             s.last_activity_ts = time.monotonic()
             s.last_chunk_at = time.monotonic()
-            # Use the same JSON-buffered consumer as user-facing chat, but
-            # ask it to suppress assistant text so the priming reply doesn't
-            # priming doesn't leak into the user-visible chat buffer.
+            # Use the same JSON-buffered consumer as user-facing chat. Gap
+            # chats intentionally show the priming assistant message as the
+            # opening log summary; other priming uses remain silent.
             pump = threading.Thread(
                 target=self._pump_output,
                 args=(s, proc),
-                kwargs={"suppress_assistant": True},
+                kwargs={"suppress_assistant": not s.show_priming_output},
                 name=f"refine-chat-prime-pump-{s.session_id}",
                 daemon=True,
             )

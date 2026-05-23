@@ -15,7 +15,7 @@ from pathlib import Path
 def main() -> int:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-    from refine_server import agent_cli, llm, preflight, target_app
+    from refine_server import agent_cli, chat_mgr, llm, preflight, target_app
     from refine_server.chat_mgr import ChatManager, ChatSession
     from refine_server.subprocess_mgr import _summarize_codex_event
 
@@ -276,6 +276,73 @@ def main() -> int:
             hidden, hidden.proc, suppress_assistant=True,
         )
         assert hidden.proc is None
+
+        class FakePrimingProc:
+            pid = 123458
+            stdout = io.StringIO(
+                json.dumps({"thread_id": "thread-visible"})
+                + "\n"
+                + json.dumps({
+                    "type": "item.completed",
+                    "item": {
+                        "type": "agent_message",
+                        "text": "opening summary\nwith log details",
+                    },
+                })
+            )
+
+            def poll(self) -> int:
+                return 0
+
+            def wait(self, timeout: float | None = None) -> int:  # noqa: ARG002
+                return 0
+
+        class FakeResourceManager:
+            def popen(self, *args, **kwargs):  # noqa: ANN002, ANN003
+                return FakePrimingProc()
+
+        original_chat_env = chat_mgr._chat_env
+        original_resolve_agent = chat_mgr._resolve_agent
+        original_resource_manager = chat_mgr._resource_manager_for_chat
+        chat_mgr._chat_env = lambda: {}
+        chat_mgr._resolve_agent = (
+            lambda provider, env: (agent_cli.get_spec("codex"), "/bin/codex")
+        )
+        chat_mgr._resource_manager_for_chat = lambda: FakeResourceManager()
+        visible_manager = ChatManager(get_standalone_idle_timeout=lambda: 999)
+        try:
+            visible_sid = visible_manager.start(
+                Path.cwd(),
+                is_standalone=False,
+                provider="codex",
+                gap_id="01VISIBLEPRIMING",
+                priming_prompt="Analyze the logs.",
+                priming_intro="[refine] intro",
+                show_priming_output=True,
+            )
+            collected: list[str] = []
+            deadline = time.monotonic() + 2.0
+            while time.monotonic() < deadline:
+                read = visible_manager.read(visible_sid)
+                collected.extend(read["lines"])
+                if "with log details" in collected:
+                    break
+                time.sleep(0.01)
+            visible_lines = [line for line in collected if line]
+            assert visible_lines[:3] == [
+                "[refine] intro",
+                "opening summary",
+                "with log details",
+            ], collected
+            with visible_manager._lock:  # noqa: SLF001
+                visible_session = visible_manager._sessions[visible_sid]  # noqa: SLF001
+            assert visible_session.provider_session_id == "thread-visible"
+            assert visible_session.pending_priming_text is None
+        finally:
+            visible_manager.shutdown()
+            chat_mgr._chat_env = original_chat_env
+            chat_mgr._resolve_agent = original_resolve_agent
+            chat_mgr._resource_manager_for_chat = original_resource_manager
     finally:
         manager.shutdown()
 
