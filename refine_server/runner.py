@@ -315,7 +315,7 @@ class Runner:
 
     def _clean_target_worktree_for_pause(self) -> dict:
         """Leave the host/target worktree clean after the operator pauses agents."""
-        def commit_and_check() -> dict:
+        def commit_and_stash() -> dict:
             committed = False
             try:
                 committed = self.state_committer.commit_now(
@@ -342,17 +342,50 @@ class Runner:
                     ),
                 }
             if dirty_paths:
+                stash = git_ops.stash_push(
+                    "refine pause cleanup auto-stash",
+                )
+                if not stash.ok:
+                    return {
+                        "ok": False,
+                        "clean": False,
+                        "stage": "dirty_worktree",
+                        "message": "could not stash dirty target worktree after pause",
+                        "details": stash.stderr or stash.stdout,
+                    }
+
+                still_stuck = git_ops.in_progress_op()
+                still_dirty = self._target_worktree_dirty_paths()
+                if still_stuck or still_dirty:
+                    op_name = still_stuck[0] if still_stuck else ""
+                    return {
+                        "ok": False,
+                        "clean": False,
+                        "stage": "dirty_worktree",
+                        "message": "target worktree is still dirty after pause stash",
+                        "details": (
+                            (f"unfinished git operation: {op_name}\n" if op_name else "")
+                            + "\n".join(still_dirty[:200])
+                        ).strip(),
+                    }
+
+                activity.append(
+                    self._get_conn(),
+                    message="Auto-stashed dirty target worktree after pausing agents",
+                    severity="info", category="git", actor="runner",
+                    details="\n".join(dirty_paths[:200]),
+                )
                 return {
-                    "ok": False,
-                    "clean": False,
-                    "stage": "dirty_worktree",
-                    "message": "target worktree is still dirty after pause cleanup",
-                    "details": "\n".join(dirty_paths[:200]),
+                    "ok": True,
+                    "clean": True,
+                    "committed": committed,
+                    "stashed": True,
+                    "dirty_paths": dirty_paths,
                 }
             return {"ok": True, "clean": True, "committed": committed}
 
         return self.merger.run_under_host_lock(
-            commit_and_check,
+            commit_and_stash,
             label="pause agents",
         )
 

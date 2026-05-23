@@ -50,6 +50,16 @@ def main() -> int:
         assert git(client, "log", "-1", "--format=%s").stdout.strip() == (
             "refine: sync project state"
         )
+
+        (client / "app.txt").write_text("operator wip\n", encoding="utf-8")
+        assert git(client, "status", "--porcelain").stdout.strip()
+        status, body = api.update_settings({"paused": "1"})
+        assert status == 200, body
+        assert body["ok"] is True, body
+        assert git(client, "status", "--porcelain").stdout.strip() == ""
+        assert "refine pause cleanup auto-stash" in git(
+            client, "stash", "list",
+        ).stdout
     finally:
         try:
             from refine_ui import runtime

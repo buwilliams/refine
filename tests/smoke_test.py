@@ -435,7 +435,7 @@ def main() -> int:
         refine_cli._start_background_ui = fail_start_background
         refine_cli._stop_background_ui = fail_stop_background
         refine_cli._pause_agents_for_clean_shutdown = lambda cfg_arg, port_arg: (
-            lifecycle_calls.append(("pause", str(port_arg))) or True
+            lifecycle_calls.append(("pause", str(port_arg))) or False
         )
         no_port_args = type("Args", (), {"port": None, "config": str(unit_cfg_path)})()
 

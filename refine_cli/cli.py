@@ -645,11 +645,9 @@ def cmd_stop(args: argparse.Namespace) -> int:
     port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
-        if not _pause_agents_for_clean_shutdown(cfg, port):
-            return 1
+        _pause_agents_for_clean_shutdown(cfg, port)
         return _stop_systemd_ui(clone, unit, cfg, port)
-    if not _pause_agents_for_clean_shutdown(cfg, port):
-        return 1
+    _pause_agents_for_clean_shutdown(cfg, port)
     stopped = _stop_background_ui(clone, cfg, port)
     if stopped:
         print(f"Stopped UI backend on port {port}.")
@@ -680,8 +678,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
     port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
-        if not _pause_agents_for_clean_shutdown(cfg, port):
-            return 1
+        _pause_agents_for_clean_shutdown(cfg, port)
         return _restart_systemd_ui(clone, unit, cfg, port)
     restart_args = argparse.Namespace(**vars(args))
     restart_args.port = port
@@ -1467,7 +1464,7 @@ def _pause_agents_for_clean_shutdown(cfg: "config.Config", port: int) -> bool:
             return True
     except urllib.error.HTTPError as e:
         print(
-            f"refine: pause cleanup failed before shutdown: {e}",
+            f"refine: pause cleanup failed before shutdown; continuing: {e}",
             file=sys.stderr,
         )
         return False
