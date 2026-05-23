@@ -101,10 +101,9 @@ pre {
   min-width: 180px;
 }
 
-/* Target-app status indicator in the topbar — read-only. Clicking it
-   opens System (where the actual start/stop controls live), but it
-   is deliberately NOT a one-click toggle so typical users can't take
-   the app down by accident. Dot colour is the status (green=running,
+/* Target-app status indicator in the topbar — read-only. Green/running opens
+   the configured App URL when present; all other states open System, where the
+   actual start/stop controls live. Dot colour is the status (green=running,
    red=stopped, amber=in-flight, grey=unknown). */
 .target-app-indicator {
   display: inline-flex;

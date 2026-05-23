@@ -63,6 +63,11 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
           workers → target-app config generator to convert them into structured
           commands, then Save.
         </p>` : ""}
+      <div class="form-row"><label>App URL
+        <span class="muted small">— opened from the status indicator when the app is running.</span></label>
+        <input type="url" id="s-target-app-url"
+               placeholder="http://localhost:3000"
+               value="${htmlEscape(s.target_app_url || "")}"></div>
       <div class="form-row"><label>Start command
         <span class="muted small">— one-line shell command that starts the app and returns promptly.</span></label>
         <input type="text" id="s-target-start-command"
@@ -221,6 +226,7 @@ function bindSettingsApplicationTab(currentProject) {
         await api("PATCH", "/api/settings", {
           agent_subpath: $("#s-subpath").value,
           merge_target_branch: $("#s-merge-target").value,
+          target_app_url: $("#s-target-app-url").value,
           target_app_start_command: $("#s-target-start-command").value,
           target_app_stop_command: $("#s-target-stop-command").value,
           target_app_rebuild_command: $("#s-target-rebuild-command").value,

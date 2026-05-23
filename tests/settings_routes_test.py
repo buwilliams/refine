@@ -201,6 +201,9 @@ def main() -> int:
 
     assert '<a href="#/system/processes" data-route="settings">System</a>' in index_html
     assert 'id="target-app-indicator" class="target-app-indicator"\n         href="#/system/processes"' in index_html
+    assert 'indicator.href = opensApp ? appUrl : "#/system/processes";' in target_app_js
+    assert 'indicator.target = "_blank";' in target_app_js
+    assert 'indicator.removeAttribute("target");' in target_app_js
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
         assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
@@ -336,13 +339,18 @@ def main() -> int:
         root / "refine_ui/static/js/common.js"
     ).read_text(encoding="utf-8")
     assert 'id="s-target-rebuild-command"' in settings_js
+    assert 'id="s-target-app-url"' in settings_js
+    assert 'target_app_url: $("#s-target-app-url").value' in settings_js
     assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
     assert '"on_worktree_merge", "On worktree merge"' in settings_js
     assert '"nightly", "Nightly (midnight)"' in settings_js
     assert "Nightly (12 PM)" not in settings_js
-    assert "target_app_auto_rebuild" in (root / "refine_ui/api.py").read_text(encoding="utf-8")
+    api_source = (root / "refine_ui/api.py").read_text(encoding="utf-8")
+    assert "target_app_auto_rebuild" in api_source
+    assert '"target_app_url"' in api_source
+    assert '"app_url": settings.get("target_app_url") or ""' in api_source
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
     assert "function applyGeneratedTargetAppConfig(cfg)" in settings_js
     generated_body = settings_js.split("function applyGeneratedTargetAppConfig(cfg)", 1)[1]

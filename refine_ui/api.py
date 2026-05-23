@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable
+from urllib.parse import urlparse
 
 from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, reporters, round_logs, search_index
 from refine_server import perf_metrics
@@ -2366,6 +2367,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "target_app_start_instructions",
         "target_app_stop_instructions",
         "target_app_health_url",
+        "target_app_url",
         "target_app_start_command",
         "target_app_stop_command",
         "target_app_rebuild_command",
@@ -2457,6 +2459,13 @@ def update_settings(body: dict) -> tuple[int, dict]:
             if not isinstance(env_obj, dict):
                 return err(400, "target_app_env_json must be a JSON object")
             normalized[k] = json.dumps({str(ek): str(ev) for ek, ev in env_obj.items()})
+        elif k == "target_app_url":
+            app_url = str(v or "").strip()
+            if app_url:
+                parsed = urlparse(app_url)
+                if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                    return err(400, "target_app_url must be an http:// or https:// URL")
+            normalized[k] = app_url
         elif k in {
             "target_app_start_timeout_seconds",
             "target_app_stop_timeout_seconds",
@@ -3438,6 +3447,7 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
     return {
         "state": state if state in _TARGET_APP_STATES else "unknown",
         "health_url": cfg.get("http_check_url") or "",
+        "app_url": settings.get("target_app_url") or "",
         "has_start_command": bool(cfg.get("start_command")),
         "has_stop_command": bool(cfg.get("stop_command")),
         "has_rebuild_command": bool(cfg.get("rebuild_command")),

@@ -2,10 +2,9 @@
 //
 // The topbar dot is a *read-only* status indicator (deliberately not a
 // one-click toggle, so typical users can't take the app down by
-// accident). It links to System, where the actual Start / Stop
-// button lives. The dot's colour reflects the current state
-// (green=running, red=stopped, amber=in-flight, grey=unknown), while
-// the visible label names the active project.
+// accident). Green/running links to the configured App URL when present;
+// every other state links to System, where the Start / Stop controls live.
+// The visible label names the active project.
 
 let _targetAppSnapshot = null;
 
@@ -59,12 +58,24 @@ function applyTargetAppSnapshot(snap) {
   }[appState] || "unknown";
   const checkAt = snap.last_check_at || snap.last_health_at || "";
   const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
+  const appUrl = (snap.app_url || "").trim();
+  const opensApp = appState === "running" && appUrl;
+  indicator.href = opensApp ? appUrl : "#/system/processes";
+  if (opensApp) {
+    indicator.target = "_blank";
+    indicator.rel = "noopener noreferrer";
+    indicator.setAttribute("aria-label", "Open target application");
+  } else {
+    indicator.removeAttribute("target");
+    indicator.removeAttribute("rel");
+    indicator.setAttribute("aria-label", "Target application status (click to manage)");
+  }
   indicator.title = `${projectLabel}: ${stateLabel}`
     + (checkAt
         ? ` · last check ${checkOk ? "OK" : "FAIL"} at ${fmtTime(checkAt)}`
         : "")
     + (snap.last_error ? ` · ${snap.last_error}` : "")
-    + " — click to manage in System";
+    + (opensApp ? " — open target application" : " — click to manage in System");
   const lbl = indicator.querySelector(".target-app-label");
   if (lbl) lbl.textContent = projectLabel;
   // Repaint the System status block (and the start/stop button)

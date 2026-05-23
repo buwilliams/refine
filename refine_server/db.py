@@ -286,6 +286,7 @@ DEFAULT_SETTINGS = {
     "target_app_start_instructions": "",
     "target_app_stop_instructions": "",
     "target_app_health_url": "",
+    "target_app_url": "",
     "target_app_start_command": "",
     "target_app_stop_command": "",
     "target_app_rebuild_command": "",

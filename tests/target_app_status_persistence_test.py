@@ -19,6 +19,7 @@ def main() -> int:
         from refine_ui import api
 
         db.set_setting(conn, "target_app_state", "stopped")
+        db.set_setting(conn, "target_app_url", "http://localhost:4173")
         db.set_setting(conn, "target_app_last_check_at", "2000-01-01T00:00:00+00:00")
         conn.close()
         target_app_path = client / ".refine" / "instances" / "default" / "target-app.json"
@@ -47,6 +48,7 @@ def main() -> int:
         assert status == 200, body
         assert calls and calls[0].get("quiet") is True, calls
         assert body["state"] == "running", body
+        assert body["app_url"] == "http://localhost:4173", body
         assert body["last_check_ok"] is True, body
         assert body["last_check_at"] != "2000-01-01T00:00:00+00:00", body
         assert target_app_path.read_bytes() == before
@@ -59,6 +61,12 @@ def main() -> int:
         assert explicit_status == 200, explicit_body
         assert calls[-1].get("quiet") is False, calls
         assert target_app_path.read_bytes() == before
+
+        invalid_status, invalid_body = api.update_settings({
+            "target_app_url": "javascript:alert(1)",
+        })
+        assert invalid_status == 400, invalid_body
+        assert "http:// or https:// URL" in invalid_body["error"]["message"]
 
         conn = db.connect()
         try:
