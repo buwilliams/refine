@@ -271,6 +271,7 @@ function renderProcessActions(proc) {
         <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
       </span>
       <button class="secondary" id="s-target-run-rebuild" ${inFlight || !snap.has_rebuild_command ? "disabled" : ""}>Rebuild</button>
+      <button class="secondary" id="s-target-sync-now">Sync</button>
       <button class="secondary" id="s-target-health-now">Check</button>`;
   }
   return `<span class="muted small">-</span>`;
@@ -708,6 +709,14 @@ function bindSettingsProcessesTab(s) {
     const btn = $("#s-target-run-rebuild");
     await withButtonBusy(btn, "Rebuilding…", async () => {
       await runTargetAppAction("rebuild");
+      await refreshProcessesSettingsTab({ force: true });
+    });
+  });
+  $("#s-target-sync-now")?.addEventListener("click", async () => {
+    const btn = $("#s-target-sync-now");
+    await withButtonBusy(btn, "Syncing…", async () => {
+      await syncProjectUpdates();
+      await refreshReporters({ selectFallback: true });
       await refreshProcessesSettingsTab({ force: true });
     });
   });

@@ -235,6 +235,7 @@ def main() -> int:
     assert 'id="s-target-run-rebuild"' in processes_body
     assert 'id="s-target-run-start"' in processes_body
     assert 'id="s-target-run-stop"' in processes_body
+    assert 'id="s-target-sync-now"' in processes_body
     assert 'id="s-target-health-now"' in processes_body
     assert processes_body.index('id="s-target-run-start"') < processes_body.index('id="s-target-run-stop"') < processes_body.index('id="s-target-run-rebuild"')
     assert 'class="target-app-action-slot"' in processes_body
@@ -314,10 +315,13 @@ def main() -> int:
     assert 'data-cancel-agent="' not in runtime_body
     assert 'id="s-target-run-start"' not in application_body
     assert 'id="s-project-sync-now"' not in processes_body
+    assert "await withButtonBusy(btn, \"Syncing…\", async () => {" in processes_body
+    assert "await syncProjectUpdates();" in processes_body
+    assert "await refreshProcessesSettingsTab({ force: true });" in processes_body
     assert ".process-table {" in common_css
     assert ".process-table .cpu-col { width: 86px; }" in common_css
     assert ".process-table .memory-col { width: 92px; }" in common_css
-    assert ".managed-process-table .actions-col { width: 274px; }" in common_css
+    assert ".managed-process-table .actions-col { width: 326px; }" in common_css
     assert ".agents-process-table .agent-col" in common_css
     assert ".agents-process-table .agent-actions-col" in common_css
     assert ".runner-workers-table .worker-actions-col" in common_css
