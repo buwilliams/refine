@@ -112,6 +112,9 @@ def main() -> int:
     assert "Move originals to backlog" in import_js
     assert "failure.code === \"duplicate_gap\"" in import_js
     assert "duplicate_decision:" in import_js
+    assert "async function handleImportPersistResult" in import_js
+    assert "await refreshReportersAfterImport();" in import_js
+    assert "async function refreshReportersAfterImport()" in import_js
     assert "err.code === \"duplicate_gap\"" in new_gap_js
     assert "duplicate_decision: effectiveDuplicateDecision" in new_gap_js
     assert "effectiveDuplicateDecision" in new_gap_js

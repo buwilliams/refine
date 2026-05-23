@@ -852,7 +852,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         } else {
           if (saveSession) saveSession({ phase: "saving", drafts: draftState, jobId: "", result: null, error: "" });
         }
-        handleImportPersistResult(root, r, payload, skipped, close, saveSession);
+        await handleImportPersistResult(root, r, payload, skipped, close, saveSession);
       } catch (e) {
         if (e.code === "job_cancelled" || e.name === "AbortError") return;
         await showActionError(e, "Import failed");
@@ -959,7 +959,8 @@ async function waitForImportJobCancellation(jobId, root, close, saveSession = nu
   }
 }
 
-function handleImportPersistResult(root, r, payload, skipped, close, saveSession = null) {
+async function handleImportPersistResult(root, r, payload, skipped, close, saveSession = null) {
+  await refreshReportersAfterImport();
   const failures = r.failures || [];
   const createdCount = r.count || 0;
   const duplicateActions = r.duplicate_actions || {};
@@ -999,6 +1000,14 @@ function handleImportPersistResult(root, r, payload, skipped, close, saveSession
     toast(`Created ${createdCount} gap(s)${duplicateText}`, "info");
     clearImportSession();
     if (root.isConnected) close(true, { force: true });
+  }
+}
+
+async function refreshReportersAfterImport() {
+  try {
+    await refreshReporters();
+  } catch {
+    // SSE still refreshes reporters for other tabs or transient API failures.
   }
 }
 
