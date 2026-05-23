@@ -70,6 +70,41 @@ def main() -> int:
 
         conn = db.connect()
         try:
+            db.set_setting(conn, "target_app_health_url", "http://localhost:4173/health")
+            db.set_setting(conn, "target_app_start_instructions", "Start the app")
+            db.set_setting(conn, "target_app_stop_instructions", "Stop the app")
+        finally:
+            conn.close()
+
+        status, body = api.list_settings()
+        assert status == 200, body
+        settings = body["settings"]
+        assert settings["target_app_http_check_url"] == "http://localhost:4173/health"
+        assert settings["target_app_health_url"] == ""
+        assert settings["target_app_start_instructions"] == "Start the app"
+        assert settings["target_app_stop_instructions"] == "Stop the app"
+
+        status, body = api.update_settings({
+            "target_app_start_command": "npm run dev",
+            "target_app_stop_command": "pkill -f node",
+        })
+        assert status == 200, body
+        status, body = api.list_settings()
+        assert status == 200, body
+        settings = body["settings"]
+        assert settings["target_app_start_instructions"] == ""
+        assert settings["target_app_stop_instructions"] == ""
+        target_config = json.loads(target_app_path.read_text(encoding="utf-8"))
+        assert target_config["target_app_health_url"] == ""
+        assert target_config["target_app_http_check_url"] == "http://localhost:4173/health"
+        assert target_config["target_app_start_instructions"] == ""
+        assert target_config["target_app_stop_instructions"] == ""
+        status, snap = api.target_app_status()
+        assert status == 200, snap
+        assert snap["legacy_config_present"] is False, snap
+
+        conn = db.connect()
+        try:
             assert db.get_setting(conn, "target_app_state") == "running"
             assert db.get_setting(conn, "target_app_last_check_ok") == "1"
             assert db.get_setting(conn, "target_app_last_check_message") == "ok"

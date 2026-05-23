@@ -2296,6 +2296,7 @@ def delete_reporter(rid: int) -> tuple[int, dict]:
 def list_settings() -> tuple[int, dict]:
     conn = _conn()
     try:
+        _cleanup_legacy_target_app_settings(conn)
         return 200, {"settings": db.list_settings(conn)}
     finally:
         conn.close()
@@ -2548,6 +2549,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
     try:
         for k, v in normalized.items():
             db.set_setting(conn, k, v)
+        _cleanup_legacy_target_app_settings(conn)
         activity.append(
             conn, message=f"Settings updated: {', '.join(normalized.keys())}",
             severity="info", category="user", actor="refine",
@@ -3436,6 +3438,7 @@ def target_app_status() -> tuple[int, dict]:
 
 def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
     state = db.get_setting(conn, "target_app_state") or "unknown"
+    _cleanup_legacy_target_app_settings(conn)
     settings = db.list_settings(conn)
     cfg = _target_app_config(settings)
     last_op = conn.execute(
@@ -3471,6 +3474,29 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
         "auto_rebuild_last_message": settings.get("target_app_auto_rebuild_last_message") or "",
         "legacy_config_present": bool(legacy_start or legacy_stop or (settings.get("target_app_health_url") or "").strip()),
     }
+
+
+def _cleanup_legacy_target_app_settings(conn: sqlite3.Connection) -> bool:
+    settings = db.list_settings(conn)
+    updates: dict[str, str] = {}
+    legacy_health = (settings.get("target_app_health_url") or "").strip()
+    if legacy_health:
+        if not (settings.get("target_app_http_check_url") or "").strip():
+            updates["target_app_http_check_url"] = legacy_health
+        updates["target_app_health_url"] = ""
+    if (
+        (settings.get("target_app_start_instructions") or "").strip()
+        and (settings.get("target_app_start_command") or "").strip()
+    ):
+        updates["target_app_start_instructions"] = ""
+    if (
+        (settings.get("target_app_stop_instructions") or "").strip()
+        and (settings.get("target_app_stop_command") or "").strip()
+    ):
+        updates["target_app_stop_instructions"] = ""
+    for key, value in updates.items():
+        db.set_setting(conn, key, value)
+    return bool(updates)
 
 
 def _target_app_config(settings: dict[str, str]) -> dict[str, Any]:

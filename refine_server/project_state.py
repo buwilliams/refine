@@ -1087,6 +1087,7 @@ def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
             _write_json(p, {k: defaults[k] for k in keys if k in defaults})
         elif name == "target-app.json":
             _prune_instance_file(p, keys)
+            _cleanup_legacy_target_app_config(p)
     reps = d / "reporters.json"
     if not reps.exists():
         _write_json(reps, {"reporters": [], "updated_at": now_iso()})
@@ -1120,6 +1121,35 @@ def _prune_instance_file(path: Path, allowed_keys: set[str]) -> None:
         return
     pruned["updated_at"] = now_iso()
     _write_json(path, pruned)
+
+
+def _cleanup_legacy_target_app_config(path: Path) -> None:
+    data = _read_json(path, {})
+    if not isinstance(data, dict):
+        return
+    changed = False
+    legacy_health = str(data.get("target_app_health_url") or "").strip()
+    if legacy_health:
+        if not str(data.get("target_app_http_check_url") or "").strip():
+            data["target_app_http_check_url"] = legacy_health
+        data["target_app_health_url"] = ""
+        changed = True
+    if (
+        str(data.get("target_app_start_instructions") or "").strip()
+        and str(data.get("target_app_start_command") or "").strip()
+    ):
+        data["target_app_start_instructions"] = ""
+        changed = True
+    if (
+        str(data.get("target_app_stop_instructions") or "").strip()
+        and str(data.get("target_app_stop_command") or "").strip()
+    ):
+        data["target_app_stop_instructions"] = ""
+        changed = True
+    if not changed:
+        return
+    data["updated_at"] = now_iso()
+    _write_json(path, data)
 
 
 def _string_map(value: dict[str, Any], *,
