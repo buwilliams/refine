@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+import subprocess
 import sys
 from pathlib import Path
 
@@ -167,6 +168,48 @@ def main() -> int:
         assert result["ok"], result
         assert result["final_status"] == "awaiting-rebuild", result
         assert db_status(conn, gid_default) == "awaiting-rebuild"
+
+        # A conflicted stash apply/pop leaves unmerged index entries without a
+        # MERGE_HEAD sentinel. The merger must clear that once before picking
+        # up ready Gaps; otherwise every queued Gap fails on the dirty tree.
+        gid_stash_conflict = "01MERGESTASHCONFLICTAAAA"
+        branch_stash_conflict = "refine/stash-conflict-cleanup"
+        make_ready_branch(
+            conn,
+            gid_stash_conflict,
+            branch_stash_conflict,
+            "stash-conflict-gap.txt",
+            "merged after cleanup\n",
+        )
+        (client / "stash-conflict.txt").write_text("base\n", encoding="utf-8")
+        git(client, "add", "stash-conflict.txt")
+        git(client, "commit", "-m", "stash conflict base")
+        (client / "stash-conflict.txt").write_text("stashed\n", encoding="utf-8")
+        git(client, "stash", "push", "-m", "test conflicting stash")
+        (client / "stash-conflict.txt").write_text("upstream\n", encoding="utf-8")
+        git(client, "add", "stash-conflict.txt")
+        git(client, "commit", "-m", "stash conflict upstream")
+        apply = subprocess.run(
+            ["git", "stash", "apply"],
+            cwd=client,
+            capture_output=True,
+            text=True,
+        )
+        assert apply.returncode != 0, apply.stdout + apply.stderr
+        stuck = git_ops.in_progress_op()
+        assert stuck and stuck[0] == "unmerged-index", stuck
+        conn.execute(
+            "UPDATE gaps_index SET status = 'review' "
+            "WHERE status = 'awaiting-rebuild'"
+        )
+        merger._tick()  # noqa: SLF001
+        assert git_ops.in_progress_op() is None
+        assert git_ops.unmerged_paths() == []
+        assert db_status(conn, gid_stash_conflict) == "awaiting-rebuild"
+        origin_files = git(
+            client, "ls-tree", "-r", "--name-only", "origin/main",
+        ).stdout
+        assert "stash-conflict-gap.txt" in origin_files
 
         # A merge-stage failure should be recoverable without re-running the
         # implementation agent: failed -> ready-merge wakes the normal Merger.

@@ -206,8 +206,9 @@ def in_progress_op(cwd: Path | None = None) -> tuple[str, str] | None:
 
     Returns `(op_name, recovery_hint)` when one of merge / rebase /
     cherry-pick / revert / am / bisect has left state behind in `.git/`,
-    or `None` when the repo is in a clean operational state. We look
-    only for sentinel files — fast and works without invoking git.
+    or when the index still has unmerged entries from an operation like
+    a conflicted `git stash apply`. Returns `None` when the repo is in a
+    clean operational state.
 
     Catches the common refine failure mode where an earlier verify
     merged a Gap's branch into the target, hit code-level conflicts,
@@ -246,6 +247,13 @@ def in_progress_op(cwd: Path | None = None) -> tuple[str, str] | None:
     for name, op, hint in checks:
         if (git_dir / name).exists():
             return (op, hint)
+    unmerged = unmerged_paths(cwd=root)
+    if unmerged:
+        hint = (
+            "Resolve the conflicted paths and `git add` them, or run "
+            "`git reset --hard HEAD` to discard the unmerged index state."
+        )
+        return ("unmerged-index", hint)
     return None
 
 

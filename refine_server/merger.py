@@ -13,10 +13,12 @@ is serialized through this one component. The two problems it solves:
    could leave `MERGE_HEAD` (or `REBASE_HEAD`, etc.) lying around in
    `.git/`. Every later verify then tripped on the precheck and
    bailed straight to `review`, cascading every queued Gap into
-   `review` for "merge conflict — human resolution". The merger now
-   aborts any leftover op at the start of every tick — and again
-   before each merge attempt — so a single stuck Gap can never block
-   the rest of the queue.
+   `review` for "merge conflict — human resolution". A conflicted
+   `git stash apply` can also leave unmerged index entries without any
+   `.git/` sentinel. The merger now aborts or resets leftover stuck
+   state at the start of every tick — and again before each merge
+   attempt — so a single stuck Gap can never block the rest of the
+   queue.
 
 Status semantics:
 
@@ -376,4 +378,5 @@ _ABORT_ARGS = {
     "cherry-pick": ["cherry-pick", "--abort"],
     "revert":      ["revert", "--abort"],
     "bisect":      ["bisect", "reset"],
+    "unmerged-index": ["reset", "--hard", "HEAD"],
 }
