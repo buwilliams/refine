@@ -3355,6 +3355,7 @@ def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
     try:
         sample = text[:8192]
         dialect = csv.Sniffer().sniff(sample, delimiters=",\t;|")
+        dialect.doublequote = True
     except csv.Error:
         dialect = csv.excel
     stream = io.StringIO(text, newline="")
@@ -3386,9 +3387,9 @@ def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
             target = values.get("target", "")
             reporter = values.get("reporter", "")
             priority = values.get("priority", "").lower()
-            if not actual or not target or not reporter or not priority:
+            if (not actual and not target) or not reporter or not priority:
                 raise ValueError(
-                    f"CSV row {row_number} must include actual, target, reporter, and priority"
+                    f"CSV row {row_number} must include actual or target, plus reporter and priority"
                 )
             if priority not in _VALID_PRIORITIES:
                 raise ValueError(
