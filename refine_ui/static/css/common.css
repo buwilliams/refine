@@ -171,7 +171,7 @@ button.subtle, .btn.subtle       { background: transparent; color: var(--muted);
 button:disabled, .btn:disabled   { opacity: 0.5; cursor: not-allowed; }
 button:hover:not(:disabled), .btn:hover { filter: brightness(0.95); }
 
-input[type="text"], input[type="number"], textarea, select {
+input[type="text"], input[type="number"], input[type="url"], textarea, select {
   font: inherit;
   line-height: 1.3;
   padding: 5px 8px;

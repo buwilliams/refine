@@ -97,6 +97,7 @@ def main() -> int:
     assert 'href="#/system/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
     assert '<div class="card settings-tab-card">${body}</div>' in settings_js
+    assert 'input[type="text"], input[type="number"], input[type="url"], textarea, select' in common_css
     assert settings_js.count('<div class="card') == 1
     save_button_ids = re.findall(
         r'<button id="([^"]+)">Save[^<]*</button>',
@@ -340,7 +341,15 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     assert 'id="s-target-rebuild-command"' in settings_js
     assert 'id="s-target-app-url"' in settings_js
+    assert '<input type="url" id="s-target-app-url"' in settings_js
     assert 'target_app_url: $("#s-target-app-url").value' in settings_js
+    application_refresh_body = settings_core_js.split(
+        '} else if (activeSlug === "application") {',
+        1,
+    )[1].split('} else if (activeSlug === "runtime") {', 1)[0]
+    assert 'api("GET", "/api/settings")' in application_refresh_body
+    assert "renderSettingsApplicationTab({" in application_refresh_body
+    assert "target_app_url" not in common_js
     assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
