@@ -204,21 +204,38 @@ def main() -> int:
     assert 'pane("project",' not in settings_js
 
     assert '<a href="#/system/processes" data-route="settings">System</a>' in index_html
-    assert 'class="nav-status-group" aria-label="Runtime status"' in index_html
-    assert 'id="target-app-indicator" class="target-app-indicator nav-status-indicator"' in index_html
+    assert 'class="nav-menu nav-context-menu" id="nav-context-menu"' in index_html
+    assert 'id="nav-context-app-summary">Application</span>' in index_html
+    assert 'id="nav-context-reporter-summary">No reporter</span>' in index_html
+    assert '<select id="global-reporter" aria-label="Reporter"></select>' in index_html
+    assert 'class="nav-create-group"' in index_html
+    assert 'id="btn-new-gap">+ New Gap</a>' in index_html
+    assert 'class="nav-menu nav-create-menu" id="nav-create-menu"' in index_html
+    assert 'id="btn-import">Import gaps</a>' in index_html
+    assert 'id="target-app-indicator" class="target-app-indicator nav-context-status"' in index_html
     assert 'id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"' in index_html
-    assert '<span class="agent-status-label">Agents (0)</span>' in index_html
+    assert '<span class="agent-status-label">0</span>' in index_html
     assert 'indicator.href = opensApp ? appUrl : "#/system/processes";' in target_app_js
     assert 'indicator.target = "_blank";' in target_app_js
     assert 'indicator.removeAttribute("target");' in target_app_js
+    assert 'const contextMenu = document.getElementById("nav-context-menu");' in target_app_js
+    assert "updateNavAppContextLabel(projectLabel)" in target_app_js
     assert 'api("GET", "/api/processes")' in target_app_js
     assert 'processes.filter((proc) => proc.kind === "agent").length' in target_app_js
     assert 'const label = `Agents (${agentCount})`;' in target_app_js
+    assert "const compactLabel = String(agentCount);" in target_app_js
     assert 'scheduleAgentStatusRefresh()' in common_js
-    assert ".nav-status-group" in base_css
+    assert "function updateNavReporterContext()" in common_js
+    assert "function updateNavAppContextLabel(label)" in common_js
+    assert "function closeTopbarMenus(target = null)" in common_js
+    assert 'const createMenu = document.getElementById("nav-create-menu");' in common_js
+    assert ".nav-context-summary" in base_css
+    assert ".nav-create-group" in base_css
+    assert ".nav-menu-panel" in base_css
     assert '.agent-status-indicator[data-state="running"] .target-app-dot' in base_css
     assert '.agent-status-indicator[data-state="paused"] .target-app-dot' in base_css
     assert '.agent-status-indicator[data-state="down"] .target-app-dot' in base_css
+    assert '.nav-context-menu[data-state="running"] .nav-context-summary-dot' in base_css
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
         assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")

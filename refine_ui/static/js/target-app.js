@@ -80,13 +80,14 @@ function applyAgentStatusSnapshot(snap) {
   indicator.removeAttribute("target");
   indicator.removeAttribute("rel");
   const label = `Agents (${agentCount})`;
+  const compactLabel = String(agentCount);
   const statusLabel = {
     running: "running",
     paused: "paused",
     down: "process down",
   }[status];
   const lbl = indicator.querySelector(".agent-status-label");
-  if (lbl) lbl.textContent = label;
+  if (lbl) lbl.textContent = compactLabel;
   indicator.setAttribute("aria-label", `${label}: ${statusLabel}; click to view processes`);
   indicator.title = `${label}: ${statusLabel}`;
 }
@@ -97,7 +98,10 @@ function applyTargetAppSnapshot(snap) {
   if (!indicator) return;
   const appState = snap.state || "unknown";
   indicator.dataset.state = appState;
+  const contextMenu = document.getElementById("nav-context-menu");
+  if (contextMenu) contextMenu.dataset.state = appState;
   const projectLabel = targetAppProjectLabel();
+  if (typeof updateNavAppContextLabel === "function") updateNavAppContextLabel(projectLabel);
   const stateLabel = {
     running: "running",
     degraded: "degraded",

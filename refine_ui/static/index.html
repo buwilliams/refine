@@ -26,27 +26,44 @@
       <a href="#/system/processes" data-route="settings">System</a>
     </nav>
     <div class="topbar-actions">
-      <a class="btn nav-action" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
-      <a class="btn secondary nav-action" href="#/gaps/import" id="btn-import">Import…</a>
-      <select id="global-reporter" aria-label="Reporter"></select>
-      <div class="nav-status-group" aria-label="Runtime status">
-        <a id="target-app-indicator" class="target-app-indicator nav-status-indicator"
-           href="#/system/processes"
-           aria-label="Target application status (click to manage)"
-           title="Target application status"
-           data-state="unknown">
-          <span class="target-app-dot" aria-hidden="true"></span>
-          <span class="target-app-label">Application</span>
-        </a>
-        <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
-           href="#/system/processes"
-           aria-label="Agent status (click to view processes)"
-           title="Agent status"
-           data-state="unknown">
-          <span class="target-app-dot" aria-hidden="true"></span>
-          <span class="agent-status-label">Agents (0)</span>
-        </a>
+      <details class="nav-menu nav-context-menu" id="nav-context-menu">
+        <summary class="nav-context-summary" aria-label="Current context">
+          <span class="target-app-dot nav-context-summary-dot" aria-hidden="true"></span>
+          <span class="nav-context-app" id="nav-context-app-summary">Application</span>
+          <span class="nav-context-separator" aria-hidden="true">/</span>
+          <span class="nav-context-reporter" id="nav-context-reporter-summary">No reporter</span>
+        </summary>
+        <div class="nav-menu-panel nav-context-panel">
+          <div class="nav-menu-label">Application</div>
+          <a id="target-app-indicator" class="target-app-indicator nav-context-status"
+             href="#/system/processes"
+             aria-label="Target application status (click to manage)"
+             title="Target application status"
+             data-state="unknown">
+            <span class="target-app-dot" aria-hidden="true"></span>
+            <span class="target-app-label">Application</span>
+          </a>
+          <label class="nav-menu-label" for="global-reporter">Reporter</label>
+          <select id="global-reporter" aria-label="Reporter"></select>
+        </div>
+      </details>
+      <div class="nav-create-group">
+        <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
+        <details class="nav-menu nav-create-menu" id="nav-create-menu">
+          <summary class="btn nav-action nav-create-more" aria-label="More create actions"></summary>
+          <div class="nav-menu-panel nav-create-panel">
+            <a class="nav-menu-item" href="#/gaps/import" id="btn-import">Import gaps</a>
+          </div>
+        </details>
       </div>
+      <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
+         href="#/system/processes"
+         aria-label="Agent status (click to view processes)"
+         title="Agent status"
+         data-state="unknown">
+        <span class="target-app-dot" aria-hidden="true"></span>
+        <span class="agent-status-label">0</span>
+      </a>
     </div>
   </header>
 

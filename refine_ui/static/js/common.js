@@ -46,6 +46,20 @@ function updateActiveInstanceLabel() {
   el.title = el.textContent;
 }
 
+function updateNavReporterContext() {
+  const el = document.getElementById("nav-context-reporter-summary");
+  if (!el) return;
+  el.textContent = state.lastReporter || "No reporter";
+  el.title = el.textContent;
+}
+
+function updateNavAppContextLabel(label) {
+  const el = document.getElementById("nav-context-app-summary");
+  if (!el) return;
+  el.textContent = label || "Application";
+  el.title = el.textContent;
+}
+
 async function refreshFeatures(options = {}) {
   try {
     state.features = await api("GET", "/api/features");
@@ -85,13 +99,18 @@ function featureEnabled(featureKey) {
 }
 
 function applyFeatureGates() {
-  // Top-bar Import button: hide entirely when LLM extraction isn't
+  // Top-bar Import action: hide entirely when LLM extraction isn't
   // supported for this provider. Hiding vs. graying-out is
   // intentional — the action has no fallback, so the affordance
   // shouldn't tease the user.
   const importBtn = document.getElementById("btn-import");
+  const createMenu = document.getElementById("nav-create-menu");
+  const importEnabled = featureEnabled("import_gaps");
   if (importBtn) {
-    importBtn.style.display = featureEnabled("import_gaps") ? "" : "none";
+    importBtn.style.display = importEnabled ? "" : "none";
+  }
+  if (createMenu) {
+    createMenu.style.display = importEnabled ? "" : "none";
   }
   // Chat dock toggle: keep visible (the dock is part of the layout)
   // but mark disabled when chat isn't supported. The dock itself
@@ -768,6 +787,7 @@ function populateAllReporterDropdowns() {
     const stillValid = state.reporters.some((r) => r.name === current);
     sel.value = stillValid ? current : "";
   }
+  updateNavReporterContext();
 }
 
 async function handleReporterAdd(sel) {
@@ -797,6 +817,7 @@ function setLastReporter(name) {
   else localStorage.removeItem("refine_last_reporter");
   const g = $("#global-reporter");
   if (g) g.value = name;
+  updateNavReporterContext();
   // Keep any in-page "Submitting as X" indicator in sync without re-rendering
   // the form (which would lose the user's typed-but-unsubmitted text).
   for (const el of $$(".js-reporter-name")) el.textContent = name;
@@ -825,18 +846,38 @@ document.addEventListener("change", async (e) => {
   }
 });
 
-// "+ New Gap" and "Import…" in the topbar open modals in place rather than
+function closeTopbarMenus(target = null) {
+  for (const menu of $$(".topbar-actions details[open]")) {
+    if (!target || !menu.contains(target)) menu.open = false;
+  }
+}
+
+// "+ New Gap" and "Import gaps" in the topbar open modals in place rather than
 // navigating to dedicated screens. The hrefs are kept for deep-linking /
 // accessibility; click handlers intercept so the user's current view stays
 // underneath.
 document.addEventListener("click", (e) => {
+  const menuSummary = e.target.closest(".nav-menu > summary");
+  if (menuSummary) {
+    closeTopbarMenus(menuSummary);
+  }
   if (e.target.closest("#btn-new-gap")) {
     e.preventDefault();
+    closeTopbarMenus();
     openNewGapModal();
   } else if (e.target.closest("#btn-import")) {
     e.preventDefault();
+    closeTopbarMenus();
     openImportModal();
+  } else if (e.target.closest("#target-app-indicator")) {
+    closeTopbarMenus();
+  } else if (!e.target.closest(".nav-menu")) {
+    closeTopbarMenus();
   }
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeTopbarMenus();
 });
 
 // ---- Banners ----------------------------------------------------------------
