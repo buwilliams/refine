@@ -52,7 +52,7 @@ FEATURES = {
 
 # Canonical provider list — kept in sync with `agent_cli.CLI_NAMES`.
 # Keep this literal to avoid importing CLI-launch code during settings reads.
-PROVIDERS = ("claude", "codex", "gemini")
+PROVIDERS = ("claude", "codex", "gemini", "copilot")
 DEFAULT_PROVIDER = "claude"
 
 
@@ -65,6 +65,8 @@ _DEFAULTS: dict[tuple[str, str], bool] = {
     ("codex",  "import_gaps"): True,
     ("gemini", "chat"):        False,
     ("gemini", "import_gaps"): False,
+    ("copilot", "chat"):        True,
+    ("copilot", "import_gaps"): True,
 }
 
 

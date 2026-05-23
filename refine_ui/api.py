@@ -2477,7 +2477,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "target_app_process_check_command",
         "target_app_auto_rebuild",
     }
-    valid_agent_clis = ("claude", "codex", "gemini")
+    valid_agent_clis = ("claude", "codex", "gemini", "copilot")
     normalized: dict[str, str] = {}
     for k, v in body.items():
         if k not in allowed:
@@ -3397,6 +3397,7 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
             "claude": "claude login",
             "codex": "codex login",
             "gemini": "gemini auth login",
+            "copilot": "copilot login",
         }.get(provider, f"{provider} login")
         items.append({
             "kind": "banner", "severity": "error",

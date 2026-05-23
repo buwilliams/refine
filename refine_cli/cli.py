@@ -1212,7 +1212,7 @@ def _process_role(pid: int, root_pids: list[int], command: str) -> str:
     lowered = command.lower()
     if pid in root_pids:
         return "root"
-    if any(token in lowered for token in ("codex", "claude", "gemini")):
+    if any(token in lowered for token in ("codex", "claude", "gemini", "copilot")):
         return "agent"
     return "child"
 
@@ -2194,7 +2194,7 @@ def _configured_agent_cli(sqlite_path: Path) -> str:
         conn.close()
         value = (row[0] if row else "claude") or "claude"
         value = str(value).strip().lower()
-        return value if value in ("claude", "codex", "gemini") else "claude"
+        return value if value in ("claude", "codex", "gemini", "copilot") else "claude"
     except Exception:
         return "claude"
 

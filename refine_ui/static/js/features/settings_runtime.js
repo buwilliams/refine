@@ -165,19 +165,20 @@ function renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli) {
     <section class="settings-section">
       <h3>AI Provider</h3>
       <div class="form-row"><label>Which AI provider refine drives
-        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code and Codex.</span></label>
+        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code, Codex, and Copilot.</span></label>
         <select id="s-cli">
           ${cliOption("claude", "Claude Code (default)")}
           ${cliOption("codex", "OpenAI Codex")}
           ${cliOption("gemini", "Gemini")}
+          ${cliOption("copilot", "GitHub Copilot")}
         </select></div>
       <p class="muted small" style="margin-top:6px">
         After switching: re-check auth below to confirm the chosen provider is
         installed and authed on the host. Round logs are structured for Claude
-        Code and Codex where their CLIs expose machine-readable events; Gemini
-        falls back to plain stdout passthrough.
+        Code, Codex, and Copilot where their CLIs expose machine-readable
+        events; Gemini falls back to plain stdout passthrough.
       </p>
-      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code>).</p>
+      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>).</p>
       <button id="s-recheck">Re-check auth</button>
     </section>
 

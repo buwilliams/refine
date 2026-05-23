@@ -2,8 +2,9 @@
 
 Refine drives an AI coding agent CLI on the host. Originally that was
 Claude Code only; this module lets the operator pick between
-`claude`, `codex` (OpenAI Codex CLI), and `gemini` (Google Gemini CLI)
-via the `agent_cli` setting. Default is `claude`.
+`claude`, `codex` (OpenAI Codex CLI), `gemini` (Google Gemini CLI), and
+`copilot` (GitHub Copilot CLI) via the `agent_cli` setting. Default is
+`claude`.
 
 The abstraction covers provider-specific subprocess construction for:
 
@@ -15,28 +16,31 @@ The abstraction covers provider-specific subprocess construction for:
 
 Output parsing: Claude produces `--output-format=stream-json`; Codex
 produces `codex exec --json` JSONL. Refine maps both into round-log/chat
-entries where possible. Gemini remains plain line passthrough.
+entries where possible. Copilot produces `--output-format json` JSONL.
+Gemini remains plain line passthrough.
 """
 from __future__ import annotations
 
+import json
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 
-CLI_NAMES = ("claude", "codex", "gemini")
+CLI_NAMES = ("claude", "codex", "gemini", "copilot")
 DEFAULT_CLI = "claude"
 
 
 @dataclass(frozen=True)
 class CliSpec:
-    name: str            # canonical setting value: "claude" | "codex" | "gemini"
+    name: str            # canonical setting value: one of CLI_NAMES
     display_name: str    # human-facing label for the Settings dropdown
     binary: str          # name to look up on PATH
 
     # Output format parser known by refine:
     #   claude_json = Claude Code stream-json
     #   codex_json  = Codex exec JSONL
+    #   copilot_json = GitHub Copilot CLI JSONL
     #   plain       = line-by-line passthrough
     output_format: str = "plain"
 
@@ -191,10 +195,57 @@ class _GeminiSpec(CliSpec):
         return self.agent_args(binary_path, prompt, cwd=cwd)
 
 
+class _CopilotSpec(CliSpec):
+    def __init__(self) -> None:
+        super().__init__(
+            name="copilot", display_name="GitHub Copilot",
+            binary="copilot", output_format="copilot_json",
+        )
+
+    def agent_args(self, binary_path: str, prompt: str, *,
+                   cwd: Path | None = None) -> list[str]:
+        args = [binary_path, *self._automation_flags()]
+        if cwd is not None:
+            args.extend(["-C", str(cwd)])
+        args.extend(["-p", prompt])
+        return args
+
+    def chat_args(self, binary_path: str, prompt: str, *,
+                  session_id: str | None = None,
+                  cwd: Path | None = None) -> list[str]:
+        args = [binary_path, *self._automation_flags()]
+        if cwd is not None:
+            args.extend(["-C", str(cwd)])
+        if session_id:
+            args.append(f"--resume={session_id}")
+        args.extend(["-p", prompt])
+        return args
+
+    def one_shot_args(self, binary_path: str, prompt: str, *,
+                      cwd: Path | None = None,
+                      output_last_message: Path | None = None,
+                      output_schema: Path | None = None,
+                      json_output: bool = False) -> list[str]:
+        return self.agent_args(binary_path, prompt, cwd=cwd)
+
+    @staticmethod
+    def _automation_flags() -> list[str]:
+        # `-p` is Copilot's non-interactive prompt mode. `--allow-all`
+        # matches refine's autonomous-agent contract, and JSONL output lets
+        # the backend extract final assistant text and session ids.
+        return [
+            "--allow-all",
+            "--output-format", "json",
+            "--no-color",
+            "--no-auto-update",
+        ]
+
+
 _SPECS: dict[str, CliSpec] = {
     "claude": _ClaudeSpec(),
     "codex":  _CodexSpec(),
     "gemini": _GeminiSpec(),
+    "copilot": _CopilotSpec(),
 }
 
 
@@ -216,3 +267,61 @@ def resolve_binary(spec: CliSpec, env: dict[str, str]) -> str:
     the bare name so the resulting subprocess.Popen produces a
     `FileNotFoundError` with a useful message."""
     return shutil.which(spec.binary, path=env.get("PATH")) or spec.binary
+
+
+def extract_final_text(stdout: str) -> str:
+    """Return final assistant text from supported provider JSONL, or stdout.
+
+    Codex emits `item` events. Copilot emits `assistant.message` events with
+    a `data.content` payload, plus deltas when streaming is enabled. Claude
+    one-shot callers generally use plain output, but the wrapped assistant
+    shape is handled here too.
+    """
+    last = ""
+    deltas: list[str] = []
+    for line in stdout.splitlines():
+        try:
+            evt = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(evt, dict):
+            continue
+
+        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
+        item_type = item.get("type")
+        text = item.get("text") or item.get("content") or evt.get("text")
+        if text and item_type in ("agent_message", "assistant_message"):
+            last = str(text)
+            continue
+
+        data = evt.get("data") if isinstance(evt.get("data"), dict) else {}
+        if evt.get("type") == "assistant.message":
+            content = data.get("content")
+            if content:
+                last = str(content)
+            continue
+        if evt.get("type") == "assistant.message_delta":
+            delta = data.get("deltaContent")
+            if delta:
+                deltas.append(str(delta))
+            continue
+
+        if evt.get("type") == "assistant":
+            message = evt.get("message") or {}
+            content = message.get("content") if isinstance(message, dict) else []
+            text = _text_from_content(content)
+            if text:
+                last = text
+    return last or "".join(deltas) or stdout
+
+
+def _text_from_content(content: object) -> str:
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for block in content:
+        if isinstance(block, dict) and block.get("type") == "text":
+            text = block.get("text")
+            if text:
+                parts.append(str(text))
+    return "\n".join(parts).strip()

@@ -12,7 +12,7 @@ from refine_server import db, gaps as shared_gaps, perf_metrics
 from refine_server.gaps import now_iso
 
 from . import git_ops
-from .agent_cli import get_spec, resolve_binary
+from .agent_cli import extract_final_text, get_spec, resolve_binary
 from .chat_mgr import _chat_env
 
 
@@ -299,7 +299,7 @@ def _run_one_shot(prompt: str, *, provider: str | None,
     if output_last_message is not None and output_last_message.exists():
         raw = output_last_message.read_text(encoding="utf-8", errors="replace")
     if not raw:
-        raw = _extract_final_text(out.stdout or "")
+        raw = extract_final_text(out.stdout or "")
     if tmp is not None:
         tmp.cleanup()
     perf_metrics.record(
@@ -348,20 +348,7 @@ def _strip_code_fence(text: str) -> str:
 
 
 def _extract_final_text(stdout: str) -> str:
-    if not stdout.lstrip().startswith("{"):
-        return stdout
-    last = ""
-    for line in stdout.splitlines():
-        try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
-        text = item.get("text") or evt.get("text")
-        item_type = item.get("type")
-        if text and item_type in ("agent_message", "assistant_message"):
-            last = str(text)
-    return last or stdout
+    return extract_final_text(stdout)
 
 
 def _binary_state(value: Any) -> str:

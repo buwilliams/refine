@@ -176,6 +176,8 @@ def main() -> int:
     assert '"3600",  "1 hour"' in settings_js
     assert '"10800", "3 hours"' in settings_js
     assert "project_update_pulse_interval_seconds" in api_py
+    assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
+    assert '"copilot": "copilot login"' in api_py
     runtime_save_body = settings_js.split('$("#s-save-runtime")?.addEventListener', 1)[1]
     runtime_save_body = runtime_save_body.split("\n  });", 1)[0]
     application_save_body = settings_js.split('$("#s-save-application")?.addEventListener', 1)[1]

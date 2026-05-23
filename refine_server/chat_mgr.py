@@ -88,9 +88,9 @@ def _user_login_path() -> str | None:
     Rather than hardcode any particular install location (which would
     break on macOS, NixOS, asdf/mise setups, etc.), we ask the user's
     interactive login shell exactly once for its PATH. Whatever that
-    shell prints is what `claude` / `codex` resolve against in
-    interactive use — matching it makes agent subprocesses behave like
-    the user's terminal.
+    shell prints is what provider binaries resolve against in interactive
+    use — matching it makes agent subprocesses behave like the user's
+    terminal.
     """
     global _login_path_cache, _login_path_resolved
     if _login_path_resolved:
@@ -134,9 +134,9 @@ def _chat_env() -> dict[str, str]:
 
     Strip inherited agent/session vars while preserving provider auth and
     endpoint configuration. Merge the user's interactive-login-shell PATH
-    with the process PATH captured by the installed unit, so `claude`,
-    `codex`, or `gemini` resolve the same way they do in the terminal used
-    to install/run Refine.
+    with the process PATH captured by the installed unit, so the selected
+    provider CLI resolves the same way it does in the terminal used to
+    install/run Refine.
     """
     env = os.environ.copy()
     for key in _INHERITED_AGENT_CONTEXT_VARS:
@@ -584,8 +584,14 @@ class ChatManager:
         role = evt.get("role")
 
         # ---- session id capture -----------------------------------------
-        for key in ("session_id", "conversation_id", "thread_id"):
+        for key in ("session_id", "conversation_id", "thread_id", "sessionId"):
             sid = evt.get(key)
+            if sid and not s.provider_session_id:
+                s.provider_session_id = str(sid)
+                break
+        data = evt.get("data") if isinstance(evt.get("data"), dict) else {}
+        for key in ("session_id", "conversation_id", "thread_id", "sessionId"):
+            sid = data.get(key)
             if sid and not s.provider_session_id:
                 s.provider_session_id = str(sid)
                 break
@@ -593,6 +599,27 @@ class ChatManager:
             sid = evt.get("session_id")
             if sid and not s.provider_session_id:
                 s.provider_session_id = sid
+            return
+
+        # ---- Copilot JSONL events ---------------------------------------
+        if t == "assistant.message":
+            content = data.get("content")
+            if content and not suppress_assistant:
+                self._emit_text(s, str(content))
+            return
+        if t == "result":
+            exit_code = data.get("exitCode", evt.get("exitCode"))
+            if exit_code not in (None, 0):
+                with s.out_lock:
+                    s.out_lines.append(
+                        f"[refine] Copilot exited {exit_code}"
+                    )
+            return
+        if t == "error" and not isinstance(evt.get("item"), dict):
+            message = data.get("message") or evt.get("message") \
+                or evt.get("error") or "Copilot returned an error."
+            with s.out_lock:
+                s.out_lines.append(f"[refine] {message}")
             return
 
         # ---- Codex JSONL item events ------------------------------------

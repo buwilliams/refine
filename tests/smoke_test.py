@@ -98,8 +98,20 @@ def main() -> int:
     assert codex.chat_args("/bin/codex", "hi", session_id="abc")[:3] == [
         "/bin/codex", "exec", "resume",
     ]
+    copilot = agent_cli.get_spec("copilot")
+    copilot_args = copilot.agent_args("/bin/copilot", "do it", cwd=client)
+    assert copilot_args[0] == "/bin/copilot"
+    assert "--allow-all" in copilot_args
+    assert "--output-format" in copilot_args and "json" in copilot_args
+    assert "-C" in copilot_args
+    assert copilot_args[-2:] == ["-p", "do it"]
+    assert "--resume=abc" in copilot.chat_args(
+        "/bin/copilot", "hi", session_id="abc",
+    )
     from refine_server.llm import _extract_final_text
-    from refine_server.subprocess_mgr import _summarize_codex_event
+    from refine_server.subprocess_mgr import (
+        _summarize_codex_event, _summarize_copilot_event,
+    )
     codex_jsonl = (
         '{"type":"item.completed","item":{"type":"agent_message",'
         '"text":"[{\\\"name\\\":\\\"N\\\",\\\"actual\\\":\\\"A\\\",'
@@ -109,6 +121,15 @@ def main() -> int:
     assert _summarize_codex_event({
         "type": "item.completed",
         "item": {"type": "agent_message", "text": "done"},
+    }) == ["done"]
+    copilot_jsonl = (
+        '{"type":"assistant.message","data":{"content":"done"}}\n'
+        '{"type":"result","data":{"exitCode":0,"sessionId":"sid"}}\n'
+    )
+    assert _extract_final_text(copilot_jsonl) == "done"
+    assert _summarize_copilot_event({
+        "type": "assistant.message",
+        "data": {"content": "done"},
     }) == ["done"]
     from refine_server import chat_mgr
     old_openai_key = os.environ.get("OPENAI_API_KEY")

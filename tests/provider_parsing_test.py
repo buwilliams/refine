@@ -17,12 +17,16 @@ def main() -> int:
 
     from refine_server import agent_cli, chat_mgr, llm, preflight, target_app
     from refine_server.chat_mgr import ChatManager, ChatSession
-    from refine_server.subprocess_mgr import _summarize_codex_event
+    from refine_server.subprocess_mgr import (
+        _summarize_codex_event, _summarize_copilot_event,
+    )
 
     # --- Agent CLI abstraction ---------------------------------------------
     assert agent_cli.get_spec(None).name == "claude"
     assert agent_cli.get_spec("unknown").name == "claude"
-    assert [s.name for s in agent_cli.all_specs()] == ["claude", "codex", "gemini"]
+    assert [s.name for s in agent_cli.all_specs()] == [
+        "claude", "codex", "gemini", "copilot",
+    ]
 
     codex = agent_cli.get_spec("codex")
     cwd = Path("/tmp/refine-client")
@@ -71,12 +75,30 @@ def main() -> int:
     assert auth_check[auth_check.index("--output-last-message") + 1] == "/tmp/auth.txt"
     assert auth_check[-1] == "Say exactly hello"
 
+    copilot = agent_cli.get_spec("copilot")
+    copilot_args = copilot.agent_args("/bin/copilot", "fix it", cwd=cwd)
+    assert copilot_args[0] == "/bin/copilot"
+    assert "--allow-all" in copilot_args
+    assert "--output-format" in copilot_args and "json" in copilot_args
+    assert copilot_args[copilot_args.index("-C") + 1] == str(cwd)
+    assert copilot_args[-2:] == ["-p", "fix it"]
+
+    copilot_chat = copilot.chat_args(
+        "/bin/copilot", "continue", session_id="077b8993", cwd=cwd,
+    )
+    assert "--resume=077b8993" in copilot_chat
+    assert copilot_chat[-2:] == ["-p", "continue"]
+
     assert preflight._is_hello_response("hello\n")
     assert preflight._is_hello_response('"hello"')
     assert not preflight._is_hello_response("hello world")
-    assert preflight._extract_response_text(json.dumps({
+    assert agent_cli.extract_final_text(json.dumps({
         "type": "item.completed",
         "item": {"type": "agent_message", "text": "hello"},
+    })) == "hello"
+    assert agent_cli.extract_final_text(json.dumps({
+        "type": "assistant.message",
+        "data": {"content": "hello"},
     })) == "hello"
 
     # --- Codex JSONL summarization -----------------------------------------
@@ -105,6 +127,16 @@ def main() -> int:
     }) == ["[error] {'message': 'bad flag'}"]
     assert _summarize_codex_event({"type": "turn.completed"}) == []
     assert _summarize_codex_event("not a dict") == []
+
+    # --- Copilot JSONL summarization --------------------------------------
+    assert _summarize_copilot_event({
+        "type": "assistant.message",
+        "data": {"content": "line one\nline two"},
+    }) == ["line one", "line two"]
+    assert _summarize_copilot_event({
+        "type": "result",
+        "data": {"exitCode": 2},
+    }) == ["[result error] copilot exited 2"]
 
     # --- Import extraction JSON parsing ------------------------------------
     pasted = (
@@ -336,6 +368,10 @@ def main() -> int:
             ], collected
             with visible_manager._lock:  # noqa: SLF001
                 visible_session = visible_manager._sessions[visible_sid]  # noqa: SLF001
+            deadline = time.monotonic() + 2.0
+            while (visible_session.pending_priming_text is not None
+                   and time.monotonic() < deadline):
+                time.sleep(0.01)
             assert visible_session.provider_session_id == "thread-visible"
             assert visible_session.pending_priming_text is None
         finally:

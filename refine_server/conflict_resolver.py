@@ -227,6 +227,9 @@ def _summarize_event(evt: dict, *, output_format: str) -> list[str]:
     if output_format == "codex_json":
         from .subprocess_mgr import _summarize_codex_event
         return [f"[auto-resolve] {s[:200]}" for s in _summarize_codex_event(evt)]
+    if output_format == "copilot_json":
+        from .subprocess_mgr import _summarize_copilot_event
+        return [f"[auto-resolve] {s[:200]}" for s in _summarize_copilot_event(evt)]
 
     t = evt.get("type")
     if t == "assistant":

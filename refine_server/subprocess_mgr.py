@@ -149,6 +149,50 @@ def _summarize_codex_event(evt: dict) -> list[str]:
     return [s for s in out if s]
 
 
+def _summarize_copilot_event(evt: dict) -> list[str]:
+    """Translate one Copilot CLI JSONL event into round-log entries."""
+    if not isinstance(evt, dict):
+        return []
+    out: list[str] = []
+    t = str(evt.get("type") or "")
+    data = evt.get("data") if isinstance(evt.get("data"), dict) else {}
+
+    if t == "assistant.message":
+        content = data.get("content")
+        if content:
+            out.extend(str(content).strip().splitlines())
+        return [s for s in out if s]
+
+    if t == "assistant.tool_call":
+        name = data.get("name") or data.get("toolName") or "tool"
+        command = data.get("command") or data.get("input") or ""
+        if isinstance(command, dict):
+            command = command.get("command") or command.get("cmd") or str(command)
+        first = str(command).strip().splitlines()
+        out.append(f"[{name}] {first[0][:160] if first else ''}".strip())
+        return [s for s in out if s]
+
+    if t == "assistant.tool_result":
+        content = data.get("content") or data.get("output") or data.get("text")
+        if content:
+            summary = " ".join(str(content).strip().split())
+            if summary:
+                out.append(f"[tool result] {summary[:160]}")
+        return out
+
+    if t == "result":
+        exit_code = data.get("exitCode", evt.get("exitCode"))
+        if exit_code not in (None, 0):
+            out.append(f"[result error] copilot exited {exit_code}")
+        return out
+
+    if t == "error":
+        message = data.get("message") or evt.get("message") or evt.get("error")
+        if message:
+            out.append(f"[error] {message}")
+    return [s for s in out if s]
+
+
 def _summarize_tool_input(name: str, inp: dict) -> str:
     """Short, human-readable description of a tool_use input block."""
     if not isinstance(inp, dict):
@@ -298,8 +342,8 @@ class SubprocessManager:
         from .chat_mgr import _chat_env
         from . import agent_cli
         env = _chat_env()
-        # The CLI to drive is operator-configurable (claude / codex /
-        # gemini); we look up the binary on the user's interactive-
+        # The CLI to drive is operator-configurable; we look up the binary
+        # on the user's interactive-
         # login PATH that `_chat_env` already provides. Stream-json
         # parsing in `_drain_stdout` is gated on `spec.output_format`.
         spec = agent_cli.get_spec(
@@ -466,7 +510,7 @@ class SubprocessManager:
             exit_code = h.proc.wait()
             if h.killed_reason is None:
                 h.killed_reason = self._infer_resource_kill_reason(h, exit_code)
-            if (h.output_format == "codex_json" and exit_code == 0
+            if (h.output_format in ("codex_json", "copilot_json") and exit_code == 0
                     and h.agent_reported_success is None):
                 h.agent_reported_success = True
         except Exception:
@@ -589,6 +633,16 @@ class SubprocessManager:
                         elif t in ("turn.completed", "session.completed",
                                    "exec.completed"):
                             h.agent_reported_success = True
+                elif h.output_format == "copilot_json":
+                    summaries = _summarize_copilot_event(evt)
+                    if isinstance(evt, dict):
+                        t = str(evt.get("type") or "")
+                        data = evt.get("data") if isinstance(evt.get("data"), dict) else {}
+                        if t == "error":
+                            h.agent_reported_success = False
+                        elif t == "result":
+                            exit_code = data.get("exitCode", evt.get("exitCode"))
+                            h.agent_reported_success = exit_code in (None, 0)
                 else:
                     summaries = _summarize_agent_event(evt)
                 for s in summaries:

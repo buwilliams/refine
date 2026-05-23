@@ -18,7 +18,7 @@ from typing import Any
 
 from . import git_ops
 from . import perf_metrics
-from .agent_cli import get_spec, resolve_binary
+from .agent_cli import extract_final_text, get_spec, resolve_binary
 from .chat_mgr import _chat_env
 
 
@@ -134,7 +134,7 @@ def extract_gaps(text: str, *, provider: str | None = None) -> list[dict]:
     if output_last_message is not None and output_last_message.exists():
         raw = output_last_message.read_text(encoding="utf-8", errors="replace")
     if not raw:
-        raw = _extract_final_text(out.stdout or "")
+        raw = extract_final_text(out.stdout or "")
     if tmp is not None:
         tmp.cleanup()
     drafts = _normalize_drafts(_parse_json_array(raw))
@@ -193,18 +193,4 @@ def _normalize_drafts(raw: list[Any]) -> list[dict]:
 
 
 def _extract_final_text(stdout: str) -> str:
-    """Return final assistant text from Codex JSONL, or raw stdout."""
-    last = ""
-    for line in stdout.splitlines():
-        try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(evt, dict):
-            continue
-        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
-        text = item.get("text") or evt.get("text")
-        item_type = item.get("type")
-        if text and item_type in ("agent_message", "assistant_message"):
-            last = str(text)
-    return last or stdout
+    return extract_final_text(stdout)

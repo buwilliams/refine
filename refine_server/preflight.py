@@ -1,13 +1,11 @@
 """Agent CLI pre-flight check — send a tiny prompt and verify the answer.
 
-Runs against the operator-configured `agent_cli` setting (claude /
-codex / gemini). Result lives in SQLite (`preflight` table) so the
-webapp can read it without re-running the check, and a failure
-also lands in the activity feed.
+Runs against the operator-configured `agent_cli` setting. Result lives in
+SQLite (`preflight` table) so the webapp can read it without re-running the
+check, and a failure also lands in the activity feed.
 """
 from __future__ import annotations
 
-import json
 import re
 import sqlite3
 import subprocess
@@ -63,7 +61,7 @@ def check(conn: sqlite3.Connection, *, actor: str = "runner") -> tuple[bool, str
         if output_last_message is not None and output_last_message.exists():
             raw = output_last_message.read_text(encoding="utf-8", errors="replace")
         if not raw:
-            raw = _extract_response_text(out.stdout or "")
+            raw = agent_cli.extract_final_text(out.stdout or "")
         if out.returncode == 0 and _is_hello_response(raw):
             _store(conn, ok=True, message=None)
             return True, None
@@ -103,39 +101,6 @@ def check(conn: sqlite3.Connection, *, actor: str = "runner") -> tuple[bool, str
     finally:
         if tmp is not None:
             tmp.cleanup()
-
-
-def _extract_response_text(stdout: str) -> str:
-    last = ""
-    for line in stdout.splitlines():
-        try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
-        text = item.get("text") or evt.get("text")
-        item_type = item.get("type")
-        if text and item_type in ("agent_message", "assistant_message"):
-            last = str(text)
-            continue
-        if evt.get("type") == "assistant":
-            message = evt.get("message") or {}
-            text = _text_from_content(message.get("content") or [])
-            if text:
-                last = text
-    return last or stdout
-
-
-def _text_from_content(content: object) -> str:
-    if not isinstance(content, list):
-        return ""
-    parts: list[str] = []
-    for block in content:
-        if isinstance(block, dict) and block.get("type") == "text":
-            text = block.get("text")
-            if text:
-                parts.append(str(text))
-    return "\n".join(parts).strip()
 
 
 def _is_hello_response(text: str) -> bool:

@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from . import git_ops, perf_metrics
-from .agent_cli import get_spec, resolve_binary
+from .agent_cli import extract_final_text, get_spec, resolve_binary
 from .chat_mgr import _chat_env, _merge_paths, _user_login_path
 
 
@@ -474,20 +474,7 @@ def _parse_json_object(text: str) -> dict[str, Any] | None:
 
 
 def _last_agent_text(stdout: str) -> str:
-    """Extract final assistant text from Codex JSONL, or return plain stdout."""
-    last = ""
-    for line in stdout.splitlines():
-        try:
-            evt = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        item = evt.get("item") if isinstance(evt.get("item"), dict) else {}
-        text = item.get("text") or evt.get("text")
-        typ = item.get("type") or evt.get("type")
-        if text and typ in ("agent_message", "assistant_message",
-                            "item.completed"):
-            last = str(text)
-    return last or stdout
+    return extract_final_text(stdout)
 
 
 def http_health(url: str, *, timeout: float = 5.0) -> dict[str, Any]:
