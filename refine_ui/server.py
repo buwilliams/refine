@@ -48,7 +48,7 @@ def _h_list_gaps(_h, _m, _b, q):
         actor=_get_one(q, "actor"),
         reporter=_get_one(q, "reporter"),
         instance=_get_one(q, "instance"),
-        limit=int(_get_one(q, "limit", "200")),
+        limit=int(_get_one(q, "limit", "50")),
         offset=int(_get_one(q, "offset", "0")),
         sort=_get_one(q, "sort"),
         direction=_get_one(q, "dir"),
@@ -81,7 +81,7 @@ def _h_get_gap_logs(_h, m, _b, q):
     return api.get_gap_logs(
         m.group(1).upper(),
         round_idx=int(_get_one(q, "round_idx", "0")),
-        limit=int(_get_one(q, "limit", "100")),
+        limit=int(_get_one(q, "limit", "50")),
         offset=int(_get_one(q, "offset", "0")),
     )
 
@@ -237,7 +237,8 @@ def _h_performance(_h, _m, _b, q):
     return api.performance_summary(
         operation=_get_one(q, "operation"),
         success=_get_one(q, "success"),
-        limit=int(_get_one(q, "limit", "100")),
+        limit=int(_get_one(q, "limit", "50")),
+        offset=int(_get_one(q, "offset", "0")),
     )
 
 
@@ -267,7 +268,7 @@ def _h_activity(_h, _m, _b, q):
     since = int(sid) if sid else None
     facets = _get_one(q, "facets")
     return api.list_activity(
-        limit=int(_get_one(q, "limit", "100")),
+        limit=int(_get_one(q, "limit", "50")),
         gap_id=_get_one(q, "gap_id"),
         since_id=since,
         severity=_get_one(q, "severity"),

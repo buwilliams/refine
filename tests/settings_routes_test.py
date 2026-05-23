@@ -55,6 +55,9 @@ def main() -> int:
     changes_js = (root / "refine_ui/static/js/features/changes.js").read_text(
         encoding="utf-8",
     )
+    logs_js = (root / "refine_ui/static/js/features/logs.js").read_text(
+        encoding="utf-8",
+    )
     index_html = (root / "refine_ui/static/index.html").read_text(
         encoding="utf-8",
     )
@@ -130,7 +133,7 @@ def main() -> int:
     assert "function drawSqliteCacheProgress" in settings_js
     assert "onProgress: drawSqliteCacheProgress" in settings_js
     assert 'slug: "performance"' in settings_js
-    assert 'api("GET", "/api/performance")' in settings_js
+    assert 'api("GET", typeof performanceApiPath === "function"' in settings_js
     assert 'slug: "processes"' in settings_js
     assert 'api("GET", "/api/processes")' in settings_js
     assert '@route("GET", r"/api/processes")' in server_py
@@ -140,12 +143,25 @@ def main() -> int:
     assert "function renderRuntimeAgentCards" not in settings_js
     assert 'api("POST", "/api/performance/cleanup"' in settings_js
     assert '@route("GET", r"/api/performance")' in server_py
+    assert 'limit=int(_get_one(q, "limit", "50"))' in server_py
+    assert 'offset=int(_get_one(q, "offset", "0"))' in server_py
     assert '@route("POST", r"/api/performance/cleanup")' in server_py
     assert "def performance_summary" in api_py
+    assert "offset: int = 0" in api_py
+    assert "offset=offset" in api_py
     assert "snapshot[\"backend\"] = runtime.backend_info()" in api_py
     assert "def backend_info" in (root / "refine_ui/runtime.py").read_text(encoding="utf-8")
     assert "function backendProcessLabel" in settings_js
     assert "function performanceResourceLabel" in settings_js
+    assert "const PERFORMANCE_DEFAULT_LIMIT = 50;" in settings_js
+    assert "function performanceFiltersFromHash()" in settings_js
+    assert "function performanceHashFromFilters(f)" in settings_js
+    assert "function performanceApiPath" in settings_js
+    assert 'renderPaginationControls("performance"' in settings_js
+    assert 'bindPaginationControls(root, "performance"' in settings_js
+    assert 'id="performance-filter-shell"' in settings_js
+    assert 'id="performance-filter-clear"' in settings_js
+    assert 'params.set("offset", String((f.page - 1) * f.limit));' in settings_js
     assert "<dt>Process model</dt>" in settings_js
     assert "<th>Resource</th>" in settings_js
     assert "function drawRuntimeRecovery(error)" in settings_js
@@ -505,6 +521,7 @@ def main() -> int:
     assert ".dashboard-scope-switch button.active" in dashboard_css
     assert "#dash > .dashboard-collapsible-shell" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
+    assert "const GAPS_DEFAULT_LIMIT = 50;" in gaps_list_js
     assert 'renderPaginationControls("gaps"' in gaps_list_js
     assert 'bindPaginationControls(root, "gaps"' in gaps_list_js
     assert '<table class="table gaps-table">' in gaps_list_js
@@ -518,10 +535,13 @@ def main() -> int:
     assert ".gaps-status-cell" in gaps_css
     assert "white-space: nowrap;" in gaps_css
     assert "${STATUS_FILTER_OPTIONS" in changes_js
-    assert "const CHANGES_DEFAULT_LIMIT = 100;" in changes_js
+    assert "const CHANGES_DEFAULT_LIMIT = 50;" in changes_js
     assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
     assert 'renderPaginationControls("changes"' in changes_js
     assert 'bindPaginationControls(root, "changes"' in changes_js
+    assert "const LOGS_DEFAULT_LIMIT = 50;" in logs_js
+    assert 'renderPaginationControls("logs"' in logs_js
+    assert 'bindPaginationControls(root, "logs"' in logs_js
     assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
     assert '"__last_workflow_state"' in gaps_bulk_js
     assert "(Last workflow state)" in gaps_bulk_js

@@ -1,7 +1,7 @@
 // ---- Logs -------------------------------------------------------------------
 
 const LOGS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
-const LOGS_DEFAULT_LIMIT = 100;
+const LOGS_DEFAULT_LIMIT = 50;
 
 function logsFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");

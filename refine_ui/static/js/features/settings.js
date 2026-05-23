@@ -36,7 +36,9 @@ async function refreshSettings(options = {}) {
       api("GET", "/api/dashboard"),
       api("GET", "/api/instances"),
       api("GET", "/api/guidance"),
-      api("GET", "/api/performance"),
+      api("GET", typeof performanceApiPath === "function"
+        ? performanceApiPath()
+        : "/api/performance"),
       api("GET", "/api/processes"),
     ]);
     // Keep the cached matrix fresh so gates elsewhere react too.
@@ -106,7 +108,9 @@ async function refreshSettingsTab(slug, options = {}) {
       );
     } else if (activeSlug === "performance") {
       const [performance, diag] = await Promise.all([
-        api("GET", "/api/performance"),
+        api("GET", typeof performanceApiPath === "function"
+          ? performanceApiPath()
+          : "/api/performance"),
         api("GET", "/api/diagnostics"),
       ]);
       const backend = (performance || {}).backend || (diag || {}).backend || {};

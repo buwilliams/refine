@@ -7,7 +7,7 @@
 // `cancelled` with a log entry.
 
 const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
-const CHANGES_DEFAULT_LIMIT = 100;
+const CHANGES_DEFAULT_LIMIT = 50;
 
 function changesFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");

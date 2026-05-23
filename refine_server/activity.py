@@ -46,7 +46,7 @@ def append(
 def recent(
     conn: sqlite3.Connection,
     *,
-    limit: int = 100,
+    limit: int = 50,
     offset: int = 0,
     gap_id: str | None = None,
     since_id: int | None = None,

@@ -640,7 +640,8 @@ def cancel_background_job(job_id: str) -> tuple[int, dict]:
 
 def performance_summary(*, operation: str | None = None,
                         success: str | None = None,
-                        limit: int = 100) -> tuple[int, dict]:
+                        limit: int = 50,
+                        offset: int = 0) -> tuple[int, dict]:
     conn = _conn()
     try:
         success_filter: bool | None = None
@@ -652,6 +653,7 @@ def performance_summary(*, operation: str | None = None,
             conn,
             days=perf_metrics.RETENTION_DAYS,
             limit=limit,
+            offset=offset,
             operation=operation or None,
             success=success_filter,
         )
@@ -1135,7 +1137,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
               actor: str | None = None,
               reporter: str | None = None,
               instance: str | None = None,
-              limit: int = 200,
+              limit: int = 50,
               offset: int = 0,
               sort: str | None = None,
               direction: str | None = None,
@@ -1485,7 +1487,7 @@ def get_gap_logs(
     gap_id: str,
     *,
     round_idx: int,
-    limit: int = 100,
+    limit: int = 50,
     offset: int = 0,
 ) -> tuple[int, dict]:
     blocked = _schema_block_response()
@@ -2136,7 +2138,7 @@ def verify(gap_id: str) -> tuple[int, dict]:
     return 200, result
 
 
-def list_changes(*, limit: int = 100, offset: int = 0,
+def list_changes(*, limit: int = 50, offset: int = 0,
                  q: str | None = None, status: str | None = None,
                  priority: str | None = None) -> tuple[int, dict]:
     """List refine merge commits on the target branch (plus the Gap
@@ -2815,7 +2817,7 @@ def backend_diagnostics() -> tuple[int, dict]:
 
 # --- Activity / Dashboard -----------------------------------------------------
 
-def list_activity(*, limit: int = 100, gap_id: str | None = None,
+def list_activity(*, limit: int = 50, gap_id: str | None = None,
                   since_id: int | None = None,
                   severity: str | None = None,
                   category: str | None = None,

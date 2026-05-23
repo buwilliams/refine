@@ -7,7 +7,7 @@ const GAPS_DEFAULT_DIR = {
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
 const GAPS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
-const GAPS_DEFAULT_LIMIT = 100;
+const GAPS_DEFAULT_LIMIT = 50;
 
 function gapsHash(parts) {
   const next = new URLSearchParams();

@@ -111,6 +111,7 @@ def snapshot(
     *,
     days: int = RETENTION_DAYS,
     limit: int = RECENT_LIMIT,
+    offset: int = 0,
     operation: str | None = None,
     success: bool | None = None,
 ) -> dict[str, Any]:
@@ -129,9 +130,11 @@ def snapshot(
         "SELECT id, occurred_at, operation, elapsed_ms, success, gap_id, provider, "
         "query_mode, rows_scanned, rows_returned, bytes_in, bytes_out, details_json "
         f"FROM performance_events WHERE {where_sql} "
-        "ORDER BY occurred_at DESC LIMIT ?",
-        (*args, max(1, int(limit))),
+        "ORDER BY occurred_at DESC LIMIT ? OFFSET ?",
+        (*args, max(1, int(limit)) + 1, max(0, int(offset))),
     ).fetchall()
+    has_more = len(rows) > max(1, int(limit))
+    page_rows = rows[:max(1, int(limit))]
     summary_rows = conn.execute(
         "SELECT operation, elapsed_ms, success, occurred_at "
         "FROM performance_events WHERE occurred_at >= ?",
@@ -144,13 +147,26 @@ def snapshot(
     total_count = conn.execute(
         "SELECT COUNT(*) AS n FROM performance_events",
     ).fetchone()["n"]
+    filtered_count = conn.execute(
+        f"SELECT COUNT(*) AS n FROM performance_events WHERE {where_sql}",
+        args,
+    ).fetchone()["n"]
+    page_limit = max(1, int(limit))
+    page_offset = max(0, int(offset))
     return {
         "retention_days": days,
         "event_count": int(event_count or 0),
         "total_event_count": int(total_count or 0),
+        "filtered_event_count": int(filtered_count or 0),
         "summary": _summary(summary_rows),
-        "recent": [_row_to_event(row) for row in rows],
+        "recent": [_row_to_event(row) for row in page_rows],
         "operations": sorted({str(row["operation"]) for row in summary_rows}),
+        "page": {
+            "limit": page_limit,
+            "offset": page_offset,
+            "has_more": has_more,
+            "total": int(filtered_count or 0),
+        },
     }
 
 

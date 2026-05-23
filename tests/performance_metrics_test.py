@@ -71,8 +71,33 @@ def main() -> int:
             assert len(filtered["recent"]) == 1
             assert filtered["recent"][0]["gap_id"] == "01PERFMETRICSGAPID000000"
 
+            for idx in range(55):
+                perf_metrics.record(
+                    "paged_operation",
+                    conn=conn,
+                    elapsed_ms=idx,
+                    rows_returned=idx,
+                )
+            page1 = perf_metrics.snapshot(conn, operation="paged_operation", limit=50)
+            assert len(page1["recent"]) == 50
+            assert page1["filtered_event_count"] == 55
+            assert page1["page"] == {
+                "limit": 50,
+                "offset": 0,
+                "has_more": True,
+                "total": 55,
+            }
+            page2 = perf_metrics.snapshot(
+                conn,
+                operation="paged_operation",
+                limit=50,
+                offset=50,
+            )
+            assert len(page2["recent"]) == 5
+            assert page2["page"]["has_more"] is False
+
             deleted = perf_metrics.clear(conn)
-            assert deleted == 3
+            assert deleted == 58
             assert perf_metrics.snapshot(conn)["event_count"] == 0
         finally:
             conn.close()

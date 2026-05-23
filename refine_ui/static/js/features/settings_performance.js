@@ -6,6 +6,40 @@ function fmtPerfMs(value) {
   return `${(n / 1000).toFixed(n < 10_000 ? 2 : 1)} s`;
 }
 
+const PERFORMANCE_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
+const PERFORMANCE_DEFAULT_LIMIT = 50;
+
+function performanceFiltersFromHash() {
+  const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  return {
+    operation: hashQs.get("operation") || "",
+    success: hashQs.get("success") || "",
+    limit: parseInt(hashQs.get("limit") || String(PERFORMANCE_DEFAULT_LIMIT), 10)
+           || PERFORMANCE_DEFAULT_LIMIT,
+    page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
+  };
+}
+
+function performanceHashFromFilters(f) {
+  const next = new URLSearchParams();
+  if (f.operation) next.set("operation", f.operation);
+  if (f.success) next.set("success", f.success);
+  if (f.limit && f.limit !== PERFORMANCE_DEFAULT_LIMIT) {
+    next.set("limit", String(f.limit));
+  }
+  if (f.page && f.page > 1) next.set("page", String(f.page));
+  return "#/system/performance" + (next.toString() ? "?" + next : "");
+}
+
+function performanceApiPath(f = performanceFiltersFromHash()) {
+  const params = new URLSearchParams();
+  if (f.operation) params.set("operation", f.operation);
+  if (f.success) params.set("success", f.success);
+  params.set("limit", String(f.limit));
+  params.set("offset", String((f.page - 1) * f.limit));
+  return "/api/performance?" + params;
+}
+
 function renderPerformanceSummary(perf = {}) {
   const summary = perf.summary || [];
   if (!summary.length) return `<p class="muted">No performance metrics recorded yet.</p>`;
@@ -31,22 +65,49 @@ function renderPerformanceSummary(perf = {}) {
 }
 
 function renderPerformanceEvents(perf = {}) {
+  const f = performanceFiltersFromHash();
   const events = perf.recent || [];
   const operations = perf.operations || [];
-  const option = (op) => `<option value="${htmlEscape(op)}">${htmlEscape(op)}</option>`;
+  const pageMeta = perf.page || {
+    limit: f.limit,
+    offset: (f.page - 1) * f.limit,
+    has_more: false,
+    total: perf.filtered_event_count || events.length,
+  };
+  const filterShellOpen = !!document.getElementById("performance-filter-shell")?.open;
   return `
-    <div class="filter-row" style="margin-bottom:10px">
-      <select id="performance-operation-filter">
-        <option value="">All operations</option>
-        ${operations.map(option).join("")}
-      </select>
-      <select id="performance-success-filter">
-        <option value="">All outcomes</option>
-        <option value="1">Success</option>
-        <option value="0">Failure</option>
-      </select>
-      <button class="secondary" id="performance-filter-apply">Apply</button>
-    </div>
+    <details class="filter-shell" id="performance-filter-shell"${filterShellOpen ? " open" : ""}>
+      <summary>
+        <span class="filter-shell-title">Filters</span>
+        <span class="spacer"></span>
+        <span class="muted small"><span id="performance-count">${events.length} ${events.length === 1 ? "event" : "events"}</span></span>
+        <span id="performance-filtered" class="filter-pill" hidden>Filtered</span>
+      </summary>
+      <div class="filter-shell-body">
+        <div class="filter-bar">
+          <div class="filter-row filter-row-filters">
+            <select id="performance-operation-filter">
+              <option value="">all operations</option>
+              ${operations.map((op) => `
+                <option value="${htmlEscape(op)}" ${op === f.operation ? "selected" : ""}>${htmlEscape(op)}</option>`).join("")}
+              ${f.operation && !operations.includes(f.operation)
+                ? `<option value="${htmlEscape(f.operation)}" selected>${htmlEscape(f.operation)}</option>` : ""}
+            </select>
+            <select id="performance-success-filter">
+              <option value="" ${f.success === "" ? "selected" : ""}>all outcomes</option>
+              <option value="1" ${f.success === "1" ? "selected" : ""}>success</option>
+              <option value="0" ${f.success === "0" ? "selected" : ""}>failure</option>
+            </select>
+            <select id="performance-limit">
+              ${PERFORMANCE_LIMIT_OPTIONS.map((n) =>
+                `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} events</option>`).join("")}
+            </select>
+            <span class="spacer"></span>
+            <button class="secondary" id="performance-filter-clear">Clear filters</button>
+          </div>
+        </div>
+      </div>
+    </details>
     ${events.length ? `
       <table class="table">
         <thead><tr>
@@ -67,7 +128,8 @@ function renderPerformanceEvents(perf = {}) {
               <td class="muted small">${event.rows_returned ?? ""}${event.rows_scanned != null ? ` / ${event.rows_scanned}` : ""}</td>
             </tr>`).join("")}
         </tbody>
-      </table>` : `<p class="muted">No recent events match the current filters.</p>`}`;
+      </table>` : `<p class="muted">No recent events match the current filters.</p>`}
+    ${renderPaginationControls("performance", pageMeta, events.length, "event")}`;
 }
 
 function performanceResourceLabel(event = {}) {
@@ -141,24 +203,71 @@ function bindSettingsPerformanceTab(
       } catch (e) { await showActionError(e); }
     });
   });
-  $("#performance-filter-apply")?.addEventListener("click", async () => {
-    const params = new URLSearchParams();
-    const op = $("#performance-operation-filter")?.value || "";
-    const outcome = $("#performance-success-filter")?.value || "";
-    if (op) params.set("operation", op);
-    if (outcome) params.set("success", outcome);
-    try {
-      const filtered = await api("GET", "/api/performance?" + params);
-      const backend = performanceBackend || filtered.backend || diag?.backend || {};
-      updateSettingsTabContent(
-        "performance",
-        renderSettingsPerformanceTab(filtered, backend),
-        () => bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceData, guidanceData, backend),
-      );
-      const opSel = $("#performance-operation-filter");
-      const successSel = $("#performance-success-filter");
-      if (opSel) opSel.value = op;
-      if (successSel) successSel.value = outcome;
-    } catch (e) { await showActionError(e); }
+  $("#performance-operation-filter")?.addEventListener("change", (e) =>
+    updatePerformanceFilter({ operation: e.target.value, page: 1 }));
+  $("#performance-success-filter")?.addEventListener("change", (e) =>
+    updatePerformanceFilter({ success: e.target.value, page: 1 }));
+  $("#performance-limit")?.addEventListener("change", (e) =>
+    updatePerformanceFilter({
+      limit: parseInt(e.target.value, 10) || PERFORMANCE_DEFAULT_LIMIT,
+      page: 1,
+    }));
+  $("#performance-filter-clear")?.addEventListener("click", () => {
+    history.replaceState(null, "", "#/system/performance");
+    loadPerformanceEvents(performanceBackend || diag?.backend || {});
   });
+  const root = document.querySelector('[data-tab-pane="performance"]');
+  if (root) {
+    bindPaginationControls(root, "performance", (page) =>
+      updatePerformanceFilter({ page }));
+  }
+  applyPerformanceFilterIndicator(performanceFiltersFromHash());
+}
+
+function updatePerformanceFilter(patch) {
+  const current = performanceFiltersFromHash();
+  const next = {
+    operation: "operation" in patch ? patch.operation : current.operation,
+    success: "success" in patch ? patch.success : current.success,
+    limit: "limit" in patch ? patch.limit : current.limit,
+    page: "page" in patch ? patch.page : current.page,
+  };
+  history.replaceState(null, "", performanceHashFromFilters(next));
+  loadPerformanceEvents();
+}
+
+async function loadPerformanceEvents(performanceBackend = null) {
+  try {
+    const filtered = await api("GET", performanceApiPath());
+    const backend = performanceBackend || filtered.backend || {};
+    updateSettingsTabContent(
+      "performance",
+      renderSettingsPerformanceTab(filtered, backend),
+      () => bindSettingsPerformanceTab(null, {}, [], null, {}, {}, {}, {}, backend),
+    );
+  } catch (e) { await showActionError(e); }
+}
+
+function applyPerformanceFilterIndicator(f) {
+  const active = {
+    "performance-operation-filter": !!f.operation,
+    "performance-success-filter": !!f.success,
+    "performance-limit": f.limit !== PERFORMANCE_DEFAULT_LIMIT,
+  };
+  let anyActive = false;
+  for (const [id, on] of Object.entries(active)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.classList.toggle("filter-active", on);
+    if (on) anyActive = true;
+  }
+  const pill = $("#performance-filtered");
+  if (pill) pill.hidden = !anyActive;
+  const pane = document.querySelector('[data-tab-pane="performance"]');
+  if (pane) {
+    pane.querySelector(".settings-section:last-child")?.classList.toggle(
+      "results-filtered",
+      anyActive,
+    );
+  }
 }
