@@ -347,6 +347,7 @@ function runnerWorkKindLabel(kind) {
     target_app_config_generator: "target-app config generator",
     sqlite_cache_rebuild: "SQLite cache rebuilder",
     activity_log_cleanup: "activity log cleanup",
+    import_prepare: "import preparer",
     import_persist: "import persister",
     bulk_update_gaps: "bulk Gap updater",
     bulk_delete_gaps: "bulk Gap deleter",

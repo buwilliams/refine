@@ -51,6 +51,7 @@ function newImportSession() {
     uploadText: "",
     fileName: "",
     drafts: [],
+    prepareJobId: "",
     jobId: "",
     result: null,
     error: "",
@@ -84,6 +85,7 @@ function importSessionIsDirty(session = readImportSession()) {
     || (session.csvText || "").trim()
     || (session.uploadText || "").trim()
     || (session.drafts || []).length
+    || session.prepareJobId
     || session.jobId
   );
 }
@@ -255,6 +257,15 @@ function openImportModal() {
         return;
       }
     }
+    if (session.prepareJobId) {
+      try {
+        await api("POST", `/api/jobs/${session.prepareJobId}/cancel`, {});
+        await waitForImportJobCancellation(session.prepareJobId, root, close, saveSession);
+      } catch (e) {
+        await showActionError(e, "Could not cancel import preparation");
+        return;
+      }
+    }
     clearImportSession();
     close(true, { force: true });
   }
@@ -329,10 +340,16 @@ function openImportModal() {
           ? root.querySelector("#import-csv-text").value
           : session.uploadText || await readImportCsvFile(root.querySelector("#import-csv-file"));
         saveSession(activeMode === "csv" ? { csvText } : { uploadText: csvText });
-        const drafts = await parseImportCsvBackend(csvText);
-        await reviewImportDrafts(root, drafts, close, saveSession);
+        drawImportPrepareProgress(draftsRoot, {
+          message: "Preparing CSV import",
+          completed: 0,
+          total: estimateImportCsvRows(csvText),
+        });
+        const drafts = await parseImportCsvBackend(csvText, draftsRoot, saveSession);
+        if (saveSession) saveSession({ phase: "review", drafts, prepareJobId: "", error: "" });
+        drawImportDrafts(root, drafts, close, { saveSession });
       } catch (e) {
-        saveSession({ phase: "editing", error: e.message });
+        saveSession({ phase: "editing", prepareJobId: "", error: e.message });
         if (draftsRoot) {
           draftsRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message)}</p>`;
         }
@@ -347,7 +364,27 @@ function openImportModal() {
     root.querySelector("#import-csv-file-name").textContent = session.fileName;
   }
   setImportMode(activeMode);
-  if (session.jobId) {
+  if (session.prepareJobId) {
+    drawImportPrepareProgress(root.querySelector("#import-drafts"), session.progress || {
+      message: "Preparing CSV import",
+      completed: 0,
+      total: 0,
+    });
+    waitForImportPrepareJob(session.prepareJobId, root.querySelector("#import-drafts"), saveSession)
+      .then((r) => {
+        const drafts = r.drafts || [];
+        if (saveSession) saveSession({ phase: "review", drafts, prepareJobId: "", error: "" });
+        drawImportDrafts(root, drafts, close, { saveSession });
+      })
+      .catch(async (e) => {
+        if (e.code === "job_cancelled") {
+          clearImportSession();
+          close(true, { force: true });
+          return;
+        }
+        await showActionError(e, "Import failed");
+      });
+  } else if (session.jobId) {
     drawImportSaving(root, session, close, saveSession);
     const restoredDrafts = (session.drafts || []).map(normalizeImportDraft);
     const skipped = restoredDrafts.filter((draft) => draft.duplicateDecision === "duplicate").length;
@@ -505,6 +542,10 @@ async function annotateImportDuplicateDrafts(drafts) {
   });
 }
 
+function estimateImportCsvRows(text) {
+  return Math.max(0, countImportLines(text) - 1);
+}
+
 function readImportCsvFile(input) {
   const file = input?.files?.[0];
   if (!file) throw new Error("Choose a CSV file first");
@@ -516,9 +557,79 @@ function readImportCsvFile(input) {
   });
 }
 
-async function parseImportCsvBackend(text) {
-  const r = await api("POST", "/api/import/csv/parse", { text });
+async function parseImportCsvBackend(text, progressRoot = null, saveSession = null) {
+  let r = await api("POST", "/api/import/csv/parse", {
+    text,
+    background: true,
+    dedup: true,
+  });
+  if (r.job) {
+    if (saveSession) {
+      saveSession({
+        phase: "parsing",
+        prepareJobId: r.job.id,
+        progress: r.job.progress || {},
+      });
+    }
+    r = await waitForImportPrepareJob(r.job.id, progressRoot, saveSession);
+  }
   return r.drafts || [];
+}
+
+function drawImportPrepareProgress(root, progress = {}) {
+  if (!root) return;
+  const completed = Number(progress.completed || 0);
+  const total = Number(progress.total || 0);
+  const message = progress.message || "Preparing CSV import";
+  const detail = total
+    ? `${completed} of ${total} Gaps processed.`
+    : "Preparing imported Gaps for review.";
+  root.innerHTML = `
+    <div class="loading-row">
+      <span class="loading-spinner"></span>
+      <span>${htmlEscape(message)}</span>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${htmlEscape(detail)}</p>
+  `;
+}
+
+async function waitForImportPrepareJob(jobId, progressRoot = null, saveSession = null) {
+  while (true) {
+    const snap = await api("GET", `/api/jobs/${jobId}`);
+    const job = snap.job || {};
+    const progress = job.progress || {};
+    if (saveSession) {
+      saveSession({
+        phase: "parsing",
+        prepareJobId: jobId,
+        progress,
+      });
+    }
+    drawImportPrepareProgress(progressRoot, progress);
+    if (job.status === "complete") {
+      const result = job.result || {};
+      if (result.http_status && result.http_status >= 400) {
+        const raw = result.error || {};
+        const err = new Error(raw.message || "CSV import preparation failed");
+        err.details = raw.details;
+        err.code = raw.code;
+        throw err;
+      }
+      return result;
+    }
+    if (job.status === "cancelled") {
+      const err = new Error("Import preparation cancelled");
+      err.code = "job_cancelled";
+      throw err;
+    }
+    if (job.status === "failed") {
+      const err = new Error(job.error?.message || "CSV import preparation failed");
+      err.details = job.error?.details;
+      err.code = job.error?.code;
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
 }
 
 function drawImportDrafts(root, drafts, close, options = {}) {

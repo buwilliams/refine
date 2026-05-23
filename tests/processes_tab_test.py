@@ -141,12 +141,13 @@ def main() -> int:
             "target_app_config_generator",
             "sqlite_cache_rebuild",
             "activity_log_cleanup",
+            "import_prepare",
             "import_persist",
             "bulk_update_gaps",
             "bulk_delete_gaps",
         ], work_kinds
         assert [w["status"] for w in body["runner_work"]] == [
-            "idle", "idle", "idle", "idle", "idle", "idle", "running", "idle", "idle",
+            "idle", "idle", "idle", "idle", "idle", "idle", "idle", "running", "idle", "idle",
         ], body["runner_work"]
         assert body["runner_work"][2]["details"] == "Rebuilds the target application after merged work.", body["runner_work"]
         import_worker = next(w for w in body["runner_work"] if w["kind"] == "import_persist")

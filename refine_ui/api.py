@@ -3100,6 +3100,12 @@ def _runner_work_summary(
             "Deletes activity log entries older than the selected retention window.",
         ),
         _background_worker_row(
+            "import-preparer",
+            "import_prepare",
+            "Import preparer",
+            "Parses and deduplicates imported Gap drafts before review.",
+        ),
+        _background_worker_row(
             "import-persister",
             "import_persist",
             "Import persister",
@@ -3350,11 +3356,44 @@ def import_parse_csv(body: dict) -> tuple[int, dict]:
     raw = str(body.get("text") or "")
     if not raw.strip():
         return err(400, "CSV text is required")
+    if body.get("background") is True:
+        job_body = {"text": raw, "background": False, "dedup": bool(body.get("dedup"))}
+
+        def run_job() -> dict[str, Any]:
+            status, result = import_parse_csv(job_body)
+            return {"http_status": status, **result}
+
+        job = background_jobs.start(
+            "import_prepare",
+            "Prepare CSV import",
+            run_job,
+        )
+        return 202, {"queued": True, "job": job}
     try:
         drafts = _import_parse_csv_drafts(raw)
     except ValueError as e:
         return err(400, str(e))
+    if body.get("dedup"):
+        matches = _import_dedup_matches(drafts)
+        drafts = _annotate_import_duplicate_drafts(drafts, matches)
     return 200, {"drafts": drafts, "count": len(drafts)}
+
+
+def _import_prepare_cancel_if_requested() -> None:
+    if background_jobs.current_cancelled():
+        raise background_jobs.CancellationRequested({"cancelled": True})
+
+
+def _import_prepare_progress(completed: int, total: int, message: str) -> None:
+    job_id = background_jobs.current_job_id()
+    if not job_id:
+        return
+    background_jobs.progress(
+        job_id,
+        completed=completed,
+        total=total,
+        message=message,
+    )
 
 
 def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
@@ -3381,8 +3420,8 @@ def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
     if missing:
         noun = "field" if len(missing) == 1 else "fields"
         raise ValueError(f"CSV is missing required {noun}: {', '.join(missing)}")
-    drafts: list[dict[str, str]] = []
     try:
+        prepared_rows: list[tuple[int, dict[str, str]]] = []
         for row_number, row in enumerate(reader, start=2):
             values = {
                 key: str(row.get(original) or "").strip()
@@ -3390,6 +3429,12 @@ def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
             }
             if not any(values.values()):
                 continue
+            prepared_rows.append((row_number, values))
+        total = len(prepared_rows)
+        _import_prepare_progress(0, total, f"Parsing CSV 0 of {total} Gaps")
+        drafts: list[dict[str, str]] = []
+        for idx, (row_number, values) in enumerate(prepared_rows, start=1):
+            _import_prepare_cancel_if_requested()
             actual = values.get("actual", "")
             target = values.get("target", "")
             reporter = values.get("reporter", "")
@@ -3411,6 +3456,7 @@ def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
                 "reporter": reporter,
                 "priority": priority,
             })
+            _import_prepare_progress(idx, total, f"Parsed {idx} of {total} Gaps")
     except csv.Error as e:
         raise ValueError(f"CSV could not be parsed: {e}") from e
     if not drafts:
@@ -3422,27 +3468,7 @@ def import_dedup(body: dict) -> tuple[int, dict]:
     drafts = body.get("drafts") or []
     if not isinstance(drafts, list):
         return err(400, "drafts must be a list")
-    conn = _conn()
-    try:
-        candidates = _import_dedup_candidates(conn)
-    finally:
-        conn.close()
-    matches: list[dict[str, Any]] = []
-    for idx, draft in enumerate(drafts, start=1):
-        if not isinstance(draft, dict):
-            continue
-        actual = (draft.get("actual") or "").strip()
-        target = (draft.get("target") or "").strip()
-        if not actual and not target:
-            continue
-        best, best_score = _best_import_duplicate(actual, target, candidates)
-        if best and best_score >= IMPORT_DEDUP_THRESHOLD:
-            matches.append({
-                "index": idx,
-                "score": round(best_score, 3),
-                "draft": {"actual": actual, "target": target},
-                "match": best,
-            })
+    matches = _import_dedup_matches(drafts)
     return 200, {
         "matches": matches,
         "threshold": IMPORT_DEDUP_THRESHOLD,
@@ -3452,6 +3478,55 @@ def import_dedup(body: dict) -> tuple[int, dict]:
             "and sequence ratio"
         ),
     }
+
+
+def _import_dedup_matches(drafts: list[Any]) -> list[dict[str, Any]]:
+    conn = _conn()
+    try:
+        candidates = _import_dedup_candidates(conn)
+    finally:
+        conn.close()
+    matches: list[dict[str, Any]] = []
+    total = len(drafts)
+    _import_prepare_progress(0, total, f"Checking duplicates 0 of {total} Gaps")
+    for idx, draft in enumerate(drafts, start=1):
+        _import_prepare_cancel_if_requested()
+        if not isinstance(draft, dict):
+            _import_prepare_progress(idx, total, f"Checked duplicates for {idx} of {total} Gaps")
+            continue
+        actual = (draft.get("actual") or "").strip()
+        target = (draft.get("target") or "").strip()
+        if not actual and not target:
+            _import_prepare_progress(idx, total, f"Checked duplicates for {idx} of {total} Gaps")
+            continue
+        best, best_score = _best_import_duplicate(actual, target, candidates)
+        if best and best_score >= IMPORT_DEDUP_THRESHOLD:
+            matches.append({
+                "index": idx,
+                "score": round(best_score, 3),
+                "draft": {"actual": actual, "target": target},
+                "match": best,
+            })
+        _import_prepare_progress(idx, total, f"Checked duplicates for {idx} of {total} Gaps")
+    return matches
+
+
+def _annotate_import_duplicate_drafts(
+    drafts: list[dict[str, Any]],
+    matches: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    by_index = {int(match["index"]) - 1: match for match in matches}
+    out: list[dict[str, Any]] = []
+    for idx, draft in enumerate(drafts):
+        match = by_index.get(idx)
+        if not match:
+            out.append(draft)
+            continue
+        annotated = dict(draft)
+        annotated["duplicate"] = match["match"]
+        annotated["duplicateDecision"] = str(draft.get("duplicateDecision") or "")
+        out.append(annotated)
+    return out
 
 
 def _duplicate_move_to_backlog_status(status: str | None) -> dict[str, Any]:

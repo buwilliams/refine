@@ -65,8 +65,14 @@ def main() -> int:
     assert ".import-file-control" in common_css
     assert ".import-file-name" in common_css
     assert ".visually-hidden" in common_css
-    assert "async function parseImportCsvBackend(text)" in import_js
-    assert 'api("POST", "/api/import/csv/parse", { text })' in import_js
+    assert "async function parseImportCsvBackend(text, progressRoot = null, saveSession = null)" in import_js
+    assert 'api("POST", "/api/import/csv/parse", {' in import_js
+    assert "background: true" in import_js
+    assert "dedup: true" in import_js
+    assert "function drawImportPrepareProgress(root, progress = {})" in import_js
+    assert "async function waitForImportPrepareJob(jobId, progressRoot = null, saveSession = null)" in import_js
+    assert "`${completed} of ${total} Gaps processed.`" in import_js
+    assert "estimateImportCsvRows(csvText)" in import_js
     assert "function parseImportCsvRows" not in import_js
     assert "async function annotateImportDuplicateDrafts(drafts)" in import_js
     assert 'api("POST", "/api/import/dedup", { drafts })' in import_js
@@ -105,6 +111,10 @@ def main() -> int:
     assert "Move original to backlog" in new_gap_js
     assert '@route("POST", r"/api/import/csv/parse")' in server_py
     assert "def import_parse_csv(body: dict)" in api_py
+    assert 'background_jobs.start(\n            "import_prepare"' in api_py
+    assert "def _import_prepare_progress(completed: int, total: int, message: str)" in api_py
+    assert "Parsed {idx} of {total} Gaps" in api_py
+    assert "Checked duplicates for {idx} of {total} Gaps" in api_py
     assert "csv.Sniffer().sniff" in api_py
     assert '@route("POST", r"/api/import/dedup")' in server_py
     assert "def import_dedup(body: dict)" in api_py

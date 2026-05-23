@@ -217,6 +217,22 @@ def main() -> int:
         ).fetchone()["status"]
         assert restored == 1, restored
         assert restored_status == "failed", restored_status
+
+        status, body = api.import_parse_csv({
+            "background": True,
+            "dedup": True,
+            "text": (
+                "actual,target,reporter,priority,name\n"
+                "Current behavior for 01IMPORTDEDUP0000000000001,"
+                "Target behavior for 01IMPORTDEDUP0000000000001,"
+                "Reporter,low,Prepared duplicate\n"
+            ),
+        })
+        assert status == 202, body
+        prepared = wait_job(body["job"]["id"])
+        assert prepared["http_status"] == 200, prepared
+        assert prepared["count"] == 1, prepared
+        assert prepared["drafts"][0]["duplicate"]["id"] == "01IMPORTDEDUP0000000000001", prepared
     finally:
         try:
             conn.close()
@@ -226,6 +242,21 @@ def main() -> int:
 
     print("import dedup tests OK")
     return 0
+
+
+def wait_job(job_id: str, *, timeout: float = 10) -> dict:
+    import time
+    from refine_ui import background_jobs
+
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        job = background_jobs.snapshot(job_id)
+        if job and job["status"] == "complete":
+            return job["result"]
+        if job and job["status"] in {"failed", "cancelled"}:
+            raise AssertionError(job)
+        time.sleep(0.02)
+    raise AssertionError(f"job did not finish: {job_id}")
 
 
 if __name__ == "__main__":
