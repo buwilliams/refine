@@ -37,6 +37,17 @@ def main() -> int:
     assert "target (text)" in import_js
     assert "reporter (text)" in import_js
     assert "priority (low, medium, high)" in import_js
+    assert "const IMPORT_DRAFT_PAGE_SIZE = 25;" in import_js
+    assert "const draftState = drafts.map(normalizeImportDraft);" in import_js
+    assert "pageDrafts.map((d, i) => renderImportDraftRow(d, start + i))" in import_js
+    assert "Showing ${start + 1}-${end} of ${draftState.length}" in import_js
+    assert "function renderImportDraftPager(page, totalPages)" in import_js
+    assert "data-import-page=\"prev\"" in import_js
+    assert "data-import-page=\"next\"" in import_js
+    assert "syncImportDraftPage(drafts_root, draftState)" in import_js
+    assert ".map(importDraftPayload)" in import_js
+    assert ".import-draft-toolbar" in common_css
+    assert ".import-draft-list" in common_css
     assert 'id="import-csv-file-button"' in import_js
     assert 'id="import-csv-file-name" aria-live="polite"' in import_js
     assert 'input type="file" id="import-csv-file" class="visually-hidden"' in import_js
@@ -59,7 +70,7 @@ def main() -> int:
     assert "AI request ${i + 1} of ${chunks.length} failed" in import_js
     assert "lines ${chunk.startLine}-${chunk.endLine}" in import_js
     assert 'withButtonBusy(btn, "Saving…"' in import_js
-    assert "Failed drafts (${drafts.length})" in import_js
+    assert "Failed drafts (${draftState.length})" in import_js
     assert "drawImportDrafts(root, failedDrafts, close, { retry: true })" in import_js
     assert 'api("POST", "/api/import/dedup", { drafts })' not in import_js
     assert "Checking for duplicate Gaps across all instances." not in import_js
@@ -77,7 +88,7 @@ def main() -> int:
     assert ") ? duplicateDecision : \"\"" in new_gap_js
     assert "duplicateDecisionKey === duplicateKey" in new_gap_js
     assert "root.querySelector(\"#new-gap-duplicate\")?.remove()" in new_gap_js
-    assert "draft.querySelector(\".import-duplicate\")?.remove()" in import_js
+    assert "row.querySelector(\".import-duplicate\")?.remove()" in import_js
     assert "Create anyway" in new_gap_js
     assert "Move original to backlog" in new_gap_js
     assert '@route("POST", r"/api/import/csv/parse")' in server_py

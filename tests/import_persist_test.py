@@ -49,6 +49,24 @@ def main() -> int:
 
         status, body = api.import_persist({
             "reporter": "Reporter",
+            "drafts": [
+                {
+                    "name": f"Large async import {i}",
+                    "actual": f"Large async actual unique batch item {i}",
+                    "target": f"Large async target unique batch item {i}",
+                    "duplicate_decision": "original",
+                }
+                for i in range(1, 701)
+            ],
+        })
+        assert status == 202, body
+        assert body["drafts"] == 700, body
+        result = wait_job(body["job"]["id"], timeout=30)
+        assert result["http_status"] == 201, result
+        assert result["count"] == 700, result
+
+        status, body = api.import_persist({
+            "reporter": "Reporter",
             "drafts": [["not", "an", "object"]],
         })
         assert status == 200, body
@@ -201,11 +219,11 @@ def main() -> int:
     return 0
 
 
-def wait_job(job_id: str) -> dict:
+def wait_job(job_id: str, *, timeout: float = 10) -> dict:
     import time
     from refine_ui import background_jobs
 
-    deadline = time.time() + 10
+    deadline = time.time() + timeout
     while time.time() < deadline:
         job = background_jobs.snapshot(job_id)
         if job and job["status"] == "complete":

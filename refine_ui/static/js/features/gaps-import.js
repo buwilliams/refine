@@ -7,6 +7,7 @@ const IMPORT_CSV_REQUIRED_FIELDS = [
   "reporter (text)",
   "priority (low, medium, high)",
 ];
+const IMPORT_DRAFT_PAGE_SIZE = 25;
 const IMPORT_MODES = {
   ai: {
     label: "AI Import",
@@ -331,92 +332,59 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     drafts_root.innerHTML = `<p class="muted">No drafts extracted.</p>`;
     return;
   }
-  const duplicateCount = drafts.filter((draft) => draft.duplicate).length;
-  const title = options.retry
-    ? `Failed drafts (${drafts.length}) — correct &amp; retry`
-    : `Drafts (${drafts.length}) — review &amp; confirm`;
-  drafts_root.innerHTML = `
-    <h3 style="margin-top:0">${title}</h3>
-    ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Choose whether each is a duplicate before saving again.</p>` : ""}
-    ${drafts.map((d, i) => `
-      <div class="draft" data-idx="${i}" data-duplicate-decision="${d.duplicate ? (d.duplicateDecision || "move_original_to_backlog") : (d.duplicateDecision || "")}">
-        ${d.error ? `<p class="small draft-error" style="margin-top:0;color:#b42318">${htmlEscape(d.error)}</p>` : ""}
-        ${d.duplicate ? renderGapDuplicatePrompt(d.duplicate) : ""}
-        <input type="text" class="d-name" value="${htmlEscape(d.name || "")}" placeholder="Name">
-        <div class="form-grid two" style="margin-top:6px">
-          <div class="form-row">
-            <label class="small muted">Reporter</label>
-            <input type="text" class="d-reporter" value="${htmlEscape(d.reporter || state.lastReporter || "")}" placeholder="Reporter">
-          </div>
-          <div class="form-row">
-            <label class="small muted">Priority</label>
-            <select class="d-priority">
-              ${["low", "medium", "high"].map((priority) => `
-                <option value="${priority}" ${String(d.priority || "low").toLowerCase() === priority ? "selected" : ""}>${priority}</option>`).join("")}
-            </select>
-          </div>
-        </div>
-        <div class="form-row" style="margin-top:6px">
-          <label class="small muted">Actual</label>
-          <textarea class="d-actual" rows="2">${htmlEscape(d.actual || "")}</textarea>
-        </div>
-        <div class="form-row">
-          <label class="small muted">Target</label>
-          <textarea class="d-target" rows="3">${htmlEscape(d.target || "")}</textarea>
-        </div>
-      </div>`).join("")}
-  `;
-  $$(".import-duplicate-actions button", drafts_root).forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const draft = btn.closest(".draft");
-      draft.dataset.duplicateDecision = btn.dataset.duplicateDecision;
-      $$(".import-duplicate-actions button", draft).forEach((candidate) => {
-        candidate.classList.toggle("selected", candidate === btn);
-      });
+  const draftState = drafts.map(normalizeImportDraft);
+  let page = 1;
+
+  function renderPage() {
+    const totalPages = Math.max(1, Math.ceil(draftState.length / IMPORT_DRAFT_PAGE_SIZE));
+    page = Math.min(Math.max(1, page), totalPages);
+    const start = (page - 1) * IMPORT_DRAFT_PAGE_SIZE;
+    const pageDrafts = draftState.slice(start, start + IMPORT_DRAFT_PAGE_SIZE);
+    const end = start + pageDrafts.length;
+    const duplicateCount = draftState.filter((draft) => draft.duplicate).length;
+    const title = options.retry
+      ? `Failed drafts (${draftState.length}) — correct &amp; retry`
+      : `Drafts (${draftState.length}) — review &amp; confirm`;
+    drafts_root.innerHTML = `
+      <h3 style="margin-top:0">${title}</h3>
+      <div class="import-draft-toolbar">
+        <span class="muted small">Showing ${start + 1}-${end} of ${draftState.length}</span>
+        ${renderImportDraftPager(page, totalPages)}
+      </div>
+      ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Choose whether each is a duplicate before saving again.</p>` : ""}
+      <div class="import-draft-list">
+        ${pageDrafts.map((d, i) => renderImportDraftRow(d, start + i)).join("")}
+      </div>
+    `;
+    bindImportDraftPage(drafts_root, draftState);
+    $("[data-import-page='prev']", drafts_root)?.addEventListener("click", () => {
+      syncImportDraftPage(drafts_root, draftState);
+      page -= 1;
+      renderPage();
     });
-  });
-  $$(".draft", drafts_root).forEach((draft) => {
-    const decision = draft.dataset.duplicateDecision;
-    if (!decision) return;
-    $$(".import-duplicate-actions button", draft).forEach((btn) => {
-      btn.classList.toggle(
-        "selected",
-        btn.dataset.duplicateDecision === decision,
-      );
+    $("[data-import-page='next']", drafts_root)?.addEventListener("click", () => {
+      syncImportDraftPage(drafts_root, draftState);
+      page += 1;
+      renderPage();
     });
-  });
-  $$(".draft", drafts_root).forEach((draft) => {
-    $$(".d-actual, .d-target", draft).forEach((field) => {
-      field.addEventListener("input", () => {
-        if (!draft.querySelector(".import-duplicate")) return;
-        draft.dataset.duplicateDecision = "";
-        draft.querySelector(".import-duplicate")?.remove();
-        draft.querySelector(".draft-error")?.remove();
-      });
-    });
-  });
+  }
+
+  renderPage();
   // Swap the primary action from "Extract drafts" to "Save N gap(s)".
   const actions = root.querySelector(".modal-actions");
   actions.innerHTML = `
     <button class="secondary" data-cancel>Cancel</button>
-    <button id="btn-persist">Save ${drafts.length} gap${drafts.length === 1 ? "" : "s"}</button>
+    <button id="btn-persist">Save ${draftState.length} gap${draftState.length === 1 ? "" : "s"}</button>
   `;
   actions.querySelector("[data-cancel]").addEventListener("click", () => close(true));
   actions.querySelector("#btn-persist").addEventListener("click", async () => {
     const btn = actions.querySelector("#btn-persist");
     if (btn.disabled) return;
-    const rows = $$(".draft", drafts_root);
-    const skipped = rows.filter((row) => row.dataset.duplicateDecision === "duplicate").length;
-    const payload = rows
-      .filter((row) => row.dataset.duplicateDecision !== "duplicate")
-      .map((row) => ({
-        name: row.querySelector(".d-name").value.trim(),
-        actual: row.querySelector(".d-actual").value.trim(),
-        target: row.querySelector(".d-target").value.trim(),
-        reporter: row.querySelector(".d-reporter").value.trim(),
-        priority: row.querySelector(".d-priority").value,
-        duplicate_decision: row.dataset.duplicateDecision || "",
-      }));
+    syncImportDraftPage(drafts_root, draftState);
+    const skipped = draftState.filter((draft) => draft.duplicateDecision === "duplicate").length;
+    const payload = draftState
+      .filter((draft) => draft.duplicateDecision !== "duplicate")
+      .map(importDraftPayload);
     if (!payload.length) {
       toast(`Skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}; no new gaps created`, "info");
       close(true);
@@ -471,4 +439,121 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       } catch (e) { await showActionError(e, "Import failed"); }
     });
   });
+}
+
+function normalizeImportDraft(draft) {
+  return {
+    name: draft.name || "",
+    actual: draft.actual || "",
+    target: draft.target || "",
+    reporter: draft.reporter || state.lastReporter || "",
+    priority: String(draft.priority || "low").toLowerCase(),
+    duplicate: draft.duplicate || null,
+    duplicateDecision: draft.duplicate
+      ? (draft.duplicateDecision || "move_original_to_backlog")
+      : (draft.duplicateDecision || ""),
+    error: draft.error || "",
+  };
+}
+
+function importDraftPayload(draft) {
+  return {
+    name: draft.name.trim(),
+    actual: draft.actual.trim(),
+    target: draft.target.trim(),
+    reporter: draft.reporter.trim(),
+    priority: draft.priority,
+    duplicate_decision: draft.duplicateDecision || "",
+  };
+}
+
+function renderImportDraftPager(page, totalPages) {
+  if (totalPages <= 1) return "";
+  return `
+    <div class="pagination import-draft-pagination">
+      <button type="button" class="secondary small" data-import-page="prev" ${page <= 1 ? "disabled" : ""}>Previous</button>
+      <span class="muted small">Page ${page} of ${totalPages}</span>
+      <button type="button" class="secondary small" data-import-page="next" ${page >= totalPages ? "disabled" : ""}>Next</button>
+    </div>`;
+}
+
+function renderImportDraftRow(d, index) {
+  return `
+    <div class="draft" data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
+      ${d.error ? `<p class="small draft-error" style="margin-top:0;color:#b42318">${htmlEscape(d.error)}</p>` : ""}
+      ${d.duplicate ? renderGapDuplicatePrompt(d.duplicate) : ""}
+      <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
+      <div class="form-grid two" style="margin-top:6px">
+        <div class="form-row">
+          <label class="small muted">Reporter</label>
+          <input type="text" class="d-reporter" value="${htmlEscape(d.reporter)}" placeholder="Reporter">
+        </div>
+        <div class="form-row">
+          <label class="small muted">Priority</label>
+          <select class="d-priority">
+            ${["low", "medium", "high"].map((priority) => `
+              <option value="${priority}" ${d.priority === priority ? "selected" : ""}>${priority}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="form-row" style="margin-top:6px">
+        <label class="small muted">Actual</label>
+        <textarea class="d-actual" rows="2">${htmlEscape(d.actual)}</textarea>
+      </div>
+      <div class="form-row">
+        <label class="small muted">Target</label>
+        <textarea class="d-target" rows="3">${htmlEscape(d.target)}</textarea>
+      </div>
+    </div>`;
+}
+
+function bindImportDraftPage(root, draftState) {
+  $$(".draft", root).forEach((row) => {
+    const draft = draftState[Number(row.dataset.idx)];
+    if (!draft) return;
+    row.dataset.duplicateDecision = draft.duplicateDecision || "";
+    $$(".import-duplicate-actions button", row).forEach((btn) => {
+      btn.classList.toggle(
+        "selected",
+        btn.dataset.duplicateDecision === row.dataset.duplicateDecision,
+      );
+      btn.addEventListener("click", () => {
+        row.dataset.duplicateDecision = btn.dataset.duplicateDecision;
+        draft.duplicateDecision = btn.dataset.duplicateDecision;
+        $$(".import-duplicate-actions button", row).forEach((candidate) => {
+          candidate.classList.toggle("selected", candidate === btn);
+        });
+      });
+    });
+    $$(".d-name, .d-reporter, .d-priority, .d-actual, .d-target", row).forEach((field) => {
+      field.addEventListener("input", () => syncImportDraftRow(row, draftState));
+      field.addEventListener("change", () => syncImportDraftRow(row, draftState));
+    });
+    $$(".d-actual, .d-target", row).forEach((field) => {
+      field.addEventListener("input", () => {
+        if (!row.querySelector(".import-duplicate")) return;
+        row.dataset.duplicateDecision = "";
+        draft.duplicateDecision = "";
+        draft.duplicate = null;
+        draft.error = "";
+        row.querySelector(".import-duplicate")?.remove();
+        row.querySelector(".draft-error")?.remove();
+      });
+    });
+  });
+}
+
+function syncImportDraftPage(root, draftState) {
+  $$(".draft", root).forEach((row) => syncImportDraftRow(row, draftState));
+}
+
+function syncImportDraftRow(row, draftState) {
+  const draft = draftState[Number(row.dataset.idx)];
+  if (!draft) return;
+  draft.name = row.querySelector(".d-name")?.value || "";
+  draft.actual = row.querySelector(".d-actual")?.value || "";
+  draft.target = row.querySelector(".d-target")?.value || "";
+  draft.reporter = row.querySelector(".d-reporter")?.value || "";
+  draft.priority = row.querySelector(".d-priority")?.value || "low";
+  draft.duplicateDecision = row.dataset.duplicateDecision || "";
 }

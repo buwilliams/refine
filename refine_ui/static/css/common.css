@@ -498,6 +498,21 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
+.import-draft-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.import-draft-pagination {
+  margin-top: 0;
+}
+.import-draft-list {
+  display: grid;
+  gap: 8px;
+}
 .import-drafts .draft { padding: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
 .import-duplicate {
   background: var(--warn-bg);

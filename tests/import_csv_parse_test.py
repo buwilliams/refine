@@ -25,6 +25,16 @@ def main() -> int:
     assert body["drafts"][1]["name"] == "", body
     assert body["drafts"][1]["priority"] == "low", body
 
+    large_csv = "actual,target,reporter,priority,name\n" + "\n".join(
+        f"Large actual {i},Large target {i},Reporter,medium,Large gap {i}"
+        for i in range(1, 701)
+    )
+    status, body = api.import_parse_csv({"text": large_csv})
+    assert status == 200, body
+    assert body["count"] == 700, body
+    assert body["drafts"][699]["name"] == "Large gap 700", body
+    assert body["drafts"][699]["priority"] == "medium", body
+
     status, body = api.import_parse_csv({
         "text": "actual,target,reporter\nA,T,R\n",
     })
