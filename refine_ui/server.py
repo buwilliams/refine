@@ -236,6 +236,11 @@ def _h_job(_h, m, _b, _q):
     return api.background_job(m.group(1))
 
 
+@route("POST", r"/api/jobs/([0-9a-fA-F]+)/cancel")
+def _h_job_cancel(_h, m, _b, _q):
+    return api.cancel_background_job(m.group(1))
+
+
 @route("GET", r"/api/activity")
 def _h_activity(_h, _m, _b, q):
     sid = _get_one(q, "since_id")

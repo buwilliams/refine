@@ -631,6 +631,13 @@ def background_job(job_id: str) -> tuple[int, dict]:
     return 200, {"job": job}
 
 
+def cancel_background_job(job_id: str) -> tuple[int, dict]:
+    job = background_jobs.cancel(job_id)
+    if job is None:
+        return err(404, "Background job not found")
+    return 200, {"job": job}
+
+
 def performance_summary(*, operation: str | None = None,
                         success: str | None = None,
                         limit: int = 100) -> tuple[int, dict]:
@@ -3701,8 +3708,13 @@ def import_persist(body: dict) -> tuple[int, dict]:
     drafts = body.get("drafts") or []
     if (
         isinstance(drafts, list)
-        and len(drafts) >= IMPORT_BACKGROUND_THRESHOLD
-        and body.get("background") is not False
+        and (
+            body.get("background") is True
+            or (
+                len(drafts) >= IMPORT_BACKGROUND_THRESHOLD
+                and body.get("background") is not False
+            )
+        )
     ):
         job_body = json.loads(json.dumps({
             "reporter": (body.get("reporter") or "").strip(),
@@ -3723,6 +3735,85 @@ def import_persist(body: dict) -> tuple[int, dict]:
     return _import_persist_sync(body)
 
 
+def _cancel_import_if_requested(
+    created: list[str],
+    duplicate_moves: list[dict[str, Any]] | None = None,
+) -> None:
+    if not background_jobs.current_cancelled():
+        return
+    rolled_back = _rollback_import_created_gaps(created)
+    restored = _rollback_import_duplicate_moves(duplicate_moves or [])
+    raise background_jobs.CancellationRequested({
+        "cancelled": True,
+        "created": created,
+        "rolled_back": rolled_back,
+        "restored_duplicates": restored,
+        "count": 0,
+        "failures": [],
+        "failed": 0,
+    })
+
+
+def _rollback_import_created_gaps(created: list[str]) -> int:
+    if not created:
+        return 0
+    try:
+        result = get_client().call(
+            M_BULK_DELETE_GAPS,
+            {"gap_ids": list(reversed(created))},
+            timeout=120.0,
+        )
+        return int(result.get("deleted") or 0)
+    except BackendError:
+        rolled_back = 0
+        for gap_id in reversed(created):
+            try:
+                result = get_client().call(M_DELETE_GAP, {"gap_id": gap_id}, timeout=30.0)
+                if result.get("deleted"):
+                    rolled_back += 1
+            except BackendError:
+                continue
+        return rolled_back
+
+
+def _rollback_import_duplicate_moves(moves: list[dict[str, Any]]) -> int:
+    restored = 0
+    for move in reversed(moves):
+        gap_id = str(move.get("gap_id") or "")
+        previous = str(move.get("from") or "")
+        if not gap_id or not previous or previous == "backlog":
+            continue
+        updated_at = now_iso()
+        try:
+            conn = _conn()
+            try:
+                with db.transaction(conn):
+                    cur = conn.execute(
+                        "UPDATE gaps_index SET status = ?, updated = ? "
+                        "WHERE id = ? AND status = 'backlog'",
+                        (previous, updated_at, gap_id),
+                    )
+                if not cur.rowcount:
+                    continue
+            finally:
+                conn.close()
+            gap = gap_writer.update_fields(gap_id, status=previous)
+            conn = _conn()
+            try:
+                with db.transaction(conn):
+                    search_index.upsert_gap(conn, gap)
+            finally:
+                conn.close()
+            _append_gap_workflow_log(
+                gap_id,
+                f"Workflow status changed: backlog → {previous}; import cancel rollback",
+            )
+            restored += 1
+        except Exception:
+            continue
+    return restored
+
+
 def _import_persist_sync(body: dict) -> tuple[int, dict]:
     """Persist user-confirmed extracted Gaps synchronously."""
     reporter = (body.get("reporter") or "").strip()
@@ -3741,7 +3832,9 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
         "moved_to_backlog": 0,
         "move_noop": 0,
     }
+    duplicate_moves: list[dict[str, Any]] = []
     for idx, d in enumerate(drafts, start=1):
+        _cancel_import_if_requested(created, duplicate_moves)
         if not isinstance(d, dict):
             failures.append({
                 "index": idx,
@@ -3819,8 +3912,10 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
             move = _move_duplicate_original_to_backlog(duplicate["match"]["id"])
             if move.get("moved"):
                 duplicate_actions["moved_to_backlog"] += 1
+                duplicate_moves.append(move)
             else:
                 duplicate_actions["move_noop"] += 1
+            _cancel_import_if_requested(created, duplicate_moves)
             continue
         if duplicate and duplicate_decision != _DUPLICATE_DECISION_IMPORT:
             failures.append({
@@ -3844,6 +3939,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                 "priority": priority, "actual": actual, "target": target,
             })
             created.append(gap_id)
+            _cancel_import_if_requested(created, duplicate_moves)
         except BackendError as e:
             failures.append({
                 "index": idx,
@@ -3857,6 +3953,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+    _cancel_import_if_requested(created, duplicate_moves)
     status = 201 if created and not failures else 200
     return status, {
         "created": created,

@@ -1,6 +1,8 @@
 """Focused tests for Gap import persistence."""
 from __future__ import annotations
 
+import threading
+
 from tests.helpers import cleanup_tmp, init_refine, make_client_repo
 
 
@@ -64,6 +66,56 @@ def main() -> int:
         result = wait_job(body["job"]["id"], timeout=30)
         assert result["http_status"] == 201, result
         assert result["count"] == 700, result
+
+        from refine_server.backend_protocol import M_CREATE_GAP
+
+        real_get_client = api.get_client
+        real_client = real_get_client()
+        first_created = threading.Event()
+        release_create = threading.Event()
+
+        class SlowCreateClient:
+            def call(self, method, params, timeout=None):  # noqa: ANN001, ANN202
+                result = real_client.call(method, params, timeout=timeout)
+                if method == M_CREATE_GAP:
+                    first_created.set()
+                    assert release_create.wait(timeout=2), "cancel rollback test was not released"
+                return result
+
+        api.get_client = lambda: SlowCreateClient()
+        try:
+            status, body = api.import_persist({
+                "reporter": "Reporter",
+                "background": True,
+                "drafts": [
+                    {
+                        "name": f"Cancel rollback {i}",
+                        "actual": f"Cancel rollback actual {i}",
+                        "target": f"Cancel rollback target {i}",
+                        "duplicate_decision": "original",
+                    }
+                    for i in range(1, 4)
+                ],
+            })
+            assert status == 202, body
+            job_id = body["job"]["id"]
+            assert first_created.wait(timeout=2), "import job did not create first Gap"
+            from refine_ui import background_jobs
+
+            cancelled = background_jobs.cancel(job_id)
+            assert cancelled and cancelled["progress"]["message"] == "Cancelling", cancelled
+            release_create.set()
+            job = wait_job(job_id, timeout=10)
+        finally:
+            api.get_client = real_get_client
+            release_create.set()
+
+        assert job["status"] == "cancelled", job
+        assert job["result"]["rolled_back"] == 1, job
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE name LIKE 'Cancel rollback%'",
+        ).fetchall()
+        assert rows == [], rows
 
         status, body = api.import_persist({
             "reporter": "Reporter",
@@ -228,6 +280,8 @@ def wait_job(job_id: str, *, timeout: float = 10) -> dict:
         job = background_jobs.snapshot(job_id)
         if job and job["status"] == "complete":
             return job["result"]
+        if job and job["status"] == "cancelled":
+            return job
         if job and job["status"] == "failed":
             raise AssertionError(job["error"])
         time.sleep(0.05)

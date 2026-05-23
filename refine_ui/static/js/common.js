@@ -155,6 +155,11 @@ async function waitForBackgroundJob(jobOrId, {
       err.code = job.error?.code;
       throw err;
     }
+    if (job.status === "cancelled") {
+      const err = new Error("Background job cancelled");
+      err.code = "job_cancelled";
+      throw err;
+    }
     if (Date.now() - started > timeoutMs) {
       throw new Error("Background job timed out");
     }

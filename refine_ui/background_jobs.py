@@ -41,6 +41,12 @@ class BackgroundJobConflict(RuntimeError):
         )
 
 
+class CancellationRequested(RuntimeError):
+    def __init__(self, result: dict[str, Any] | None = None) -> None:
+        self.result = result or {"cancelled": True}
+        super().__init__("Background job cancelled")
+
+
 def start(
     kind: str,
     label: str,
@@ -62,6 +68,7 @@ def start(
         "finished_at": "",
         "result": None,
         "error": None,
+        "cancel_requested": False,
         "progress": {"completed": 0, "total": 0, "message": "Queued"},
     }
     ignore_owner_id = getattr(_LOCAL, "exclusive_owner_id", None)
@@ -162,6 +169,59 @@ def snapshot(job_id: str) -> dict[str, Any] | None:
         return dict(job) if job else None
 
 
+def cancel(job_id: str) -> dict[str, Any] | None:
+    with _LOCK:
+        job = _JOBS.get(job_id)
+    if not job:
+        loaded = _load(job_id)
+        if loaded is None:
+            return None
+        with _LOCK:
+            _JOBS[job_id] = loaded
+            job = loaded
+    with _LOCK:
+        if job.get("status") in {"complete", "failed", "cancelled"}:
+            snap = dict(job)
+        elif job.get("status") == "queued":
+            job["status"] = "cancelled"
+            job["finished_at"] = _now()
+            job["result"] = {"cancelled": True}
+            job["cancel_requested"] = True
+            job["progress"] = {
+                "completed": 0,
+                "total": 0,
+                "message": "Cancelled",
+                "cancel_requested": True,
+            }
+            snap = dict(job)
+        else:
+            job["cancel_requested"] = True
+            current = dict(job.get("progress") or {})
+            current["message"] = "Cancelling"
+            current["cancel_requested"] = True
+            job["progress"] = current
+            snap = dict(job)
+    _persist(snap)
+    return snapshot(job_id) or snap
+
+
+def current_job_id() -> str | None:
+    return getattr(_LOCAL, "job_id", None)
+
+
+def current_cancelled() -> bool:
+    job_id = current_job_id()
+    if not job_id:
+        return False
+    return is_cancelled(job_id)
+
+
+def is_cancelled(job_id: str) -> bool:
+    with _LOCK:
+        job = _JOBS.get(job_id)
+        return bool(job and job.get("cancel_requested"))
+
+
 def progress(
     job_id: str,
     *,
@@ -190,8 +250,16 @@ def _run(job_id: str, fn: Callable[..., dict[str, Any]]) -> None:
     kind = str((job or {}).get("kind") or "")
     kind_lock = _lock_for_kind(kind)
     with kind_lock:
+        job = snapshot(job_id)
+        if job and job.get("status") == "cancelled":
+            return
         _mark_running(job_id)
+        job = snapshot(job_id)
+        if job and job.get("status") == "cancelled":
+            return
         callback = lambda **kwargs: progress(job_id, **kwargs)
+        previous_job_id = getattr(_LOCAL, "job_id", None)
+        _LOCAL.job_id = job_id
         try:
             if kind in EXCLUSIVE_KINDS:
                 label = str((job or {}).get("label") or kind)
@@ -204,6 +272,24 @@ def _run(job_id: str, fn: Callable[..., dict[str, Any]]) -> None:
                 result = fn(callback)
             else:
                 result = fn()
+        except CancellationRequested as e:
+            with _LOCK:
+                job = _JOBS[job_id]
+                job["status"] = "cancelled"
+                job["finished_at"] = _now()
+                job["result"] = e.result
+                job["error"] = None
+                job["cancel_requested"] = True
+                prog = dict(job.get("progress") or {})
+                job["progress"] = {
+                    "completed": int(prog.get("completed") or 0),
+                    "total": int(prog.get("total") or 0),
+                    "message": "Cancelled",
+                    "cancel_requested": True,
+                }
+                snap = dict(job)
+            _persist(snap)
+            return
         except Exception as e:
             with _LOCK:
                 job = _JOBS[job_id]
@@ -216,6 +302,14 @@ def _run(job_id: str, fn: Callable[..., dict[str, Any]]) -> None:
                 snap = dict(job)
             _persist(snap)
             return
+        finally:
+            if previous_job_id is None:
+                try:
+                    delattr(_LOCAL, "job_id")
+                except AttributeError:
+                    pass
+            else:
+                _LOCAL.job_id = previous_job_id
         with _LOCK:
             job = _JOBS[job_id]
             job["status"] = "complete"
@@ -237,6 +331,8 @@ def _run(job_id: str, fn: Callable[..., dict[str, Any]]) -> None:
 def _mark_running(job_id: str) -> None:
     with _LOCK:
         job = _JOBS[job_id]
+        if job.get("status") == "cancelled":
+            return
         job["status"] = "running"
         current = dict(job.get("progress") or {})
         current.setdefault("completed", 0)
@@ -307,7 +403,7 @@ def _trim_locked() -> None:
         return
     done = [
         job for job in _JOBS.values()
-        if job.get("status") in {"complete", "failed"}
+        if job.get("status") in {"complete", "failed", "cancelled"}
     ]
     done.sort(key=lambda job: str(job.get("finished_at") or job.get("started_at") or ""))
     for job in done[:max(0, len(_JOBS) - _MAX_JOBS)]:
@@ -316,6 +412,9 @@ def _trim_locked() -> None:
 
 def _persist(job: dict[str, Any]) -> None:
     try:
+        progress_json = dict(job.get("progress") or {})
+        if job.get("cancel_requested"):
+            progress_json["cancel_requested"] = True
         conn = db.connect()
         try:
             with db.transaction(conn):
@@ -342,7 +441,7 @@ def _persist(job: dict[str, Any]) -> None:
                         job.get("finished_at") or "",
                         json.dumps(job.get("result")),
                         json.dumps(job.get("error")),
-                        json.dumps(job.get("progress") or {}),
+                        json.dumps(progress_json),
                     ),
                 )
         finally:
@@ -391,6 +490,7 @@ def _load(job_id: str) -> dict[str, Any] | None:
         "error": error,
         "progress": _loads(row["progress_json"]) or {},
     }
+    snap["cancel_requested"] = bool((snap.get("progress") or {}).get("cancel_requested"))
     if stale:
         _persist(snap)
     return snap

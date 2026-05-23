@@ -1,6 +1,7 @@
 // ---- Gaps: import -----------------------------------------------------------
 
 const IMPORT_CHUNK_LINE_COUNT = 20;
+const IMPORT_SESSION_KEY = "refine_import_session_v1";
 const IMPORT_CSV_REQUIRED_FIELDS = [
   "actual (text)",
   "target (text)",
@@ -30,6 +31,66 @@ async function renderGapImport() {
 }
 
 let _importModalOpen = false;
+
+function recoverImportSessionOnLoad() {
+  const session = readImportSession();
+  if (!session || !importSessionIsDirty(session)) return false;
+  if (!location.hash.startsWith("#/gaps/import")) {
+    location.hash = "#/gaps/import";
+  }
+  return true;
+}
+
+function newImportSession() {
+  return {
+    id: `import-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    mode: "ai",
+    phase: "empty",
+    sourceText: "",
+    csvText: "",
+    uploadText: "",
+    fileName: "",
+    drafts: [],
+    jobId: "",
+    result: null,
+    error: "",
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function readImportSession() {
+  try {
+    const raw = localStorage.getItem(IMPORT_SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeImportSession(session) {
+  session.updatedAt = new Date().toISOString();
+  localStorage.setItem(IMPORT_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearImportSession() {
+  localStorage.removeItem(IMPORT_SESSION_KEY);
+}
+
+function importSessionIsDirty(session = readImportSession()) {
+  if (!session) return false;
+  if (session.phase && !["empty", "complete", "cancelled"].includes(session.phase)) return true;
+  return !!(
+    (session.sourceText || "").trim()
+    || (session.csvText || "").trim()
+    || (session.uploadText || "").trim()
+    || (session.drafts || []).length
+    || session.jobId
+  );
+}
+
+function importSessionHasDrafts(session) {
+  return !!((session?.drafts || []).length || session?.jobId);
+}
 
 function openImportModal() {
   if (_importModalOpen) return;
@@ -98,10 +159,16 @@ function openImportModal() {
   `;
   document.body.appendChild(root);
 
-  let activeMode = "ai";
+  let session = readImportSession() || newImportSession();
+  let activeMode = session.mode || "ai";
   let closed = false;
-  function close(navigateAway) {
+  let activeAbort = null;
+  function close(navigateAway, options = {}) {
     if (closed) return;
+    if (!options.force && importSessionIsDirty(session)) {
+      toast("Use Cancel to discard or unwind this import before closing.", "error");
+      return;
+    }
     closed = true;
     _importModalOpen = false;
     document.removeEventListener("keydown", onKey, true);
@@ -118,8 +185,28 @@ function openImportModal() {
     // Enter inside textareas always inserts a newline; no global Enter
     // submit, since this modal has two distinct submit steps.
   }
+  function saveSession(changes = {}) {
+    session = { ...session, ...changes };
+    writeImportSession(session);
+  }
+  function markDirtyFromInputs() {
+    const sourceText = root.querySelector("#import-text")?.value || "";
+    const csvText = root.querySelector("#import-csv-text")?.value || "";
+    const hasText = !!(sourceText.trim() || csvText.trim() || (session.uploadText || "").trim());
+    saveSession({
+      mode: activeMode,
+      phase: importSessionHasDrafts(session) ? session.phase : (hasText ? "editing" : "empty"),
+      sourceText,
+      csvText,
+    });
+  }
   function setImportMode(mode) {
+    if (mode !== activeMode && importSessionHasDrafts(session)) {
+      toast("Cancel this import before changing import type.", "error");
+      return;
+    }
     activeMode = mode;
+    saveSession({ mode });
     root.querySelectorAll("[data-import-mode]").forEach((btn) => {
       const active = btn.dataset.importMode === mode;
       btn.classList.toggle("active", active);
@@ -130,7 +217,7 @@ function openImportModal() {
     });
     root.querySelector("#btn-extract").textContent = IMPORT_MODES[mode].action;
     const draftsRoot = root.querySelector("#import-drafts");
-    if (draftsRoot) draftsRoot.innerHTML = "";
+    if (draftsRoot && !importSessionHasDrafts(session)) draftsRoot.innerHTML = "";
     const focusTarget = mode === "ai"
       ? "#import-text"
       : mode === "csv"
@@ -138,18 +225,53 @@ function openImportModal() {
         : "#import-csv-file-button";
     root.querySelector(focusTarget)?.focus();
   }
+  async function cancelImport() {
+    const dirty = importSessionIsDirty(session);
+    if (dirty) {
+      const ok = await modalConfirm(
+        "Cancel this import and discard the recoverable import state? Any running save job will be asked to stop and roll back Gaps it created.",
+        { title: "Cancel import", okLabel: "Cancel import", danger: true },
+      );
+      if (!ok) return;
+    }
+    if (activeAbort) {
+      activeAbort.abort();
+      activeAbort = null;
+    }
+    if (session.jobId) {
+      try {
+        await api("POST", `/api/jobs/${session.jobId}/cancel`, {});
+        await waitForImportJobCancellation(session.jobId, root, close, saveSession);
+      } catch (e) {
+        await showActionError(e, "Could not cancel import job");
+        return;
+      }
+    }
+    clearImportSession();
+    close(true, { force: true });
+  }
   document.addEventListener("keydown", onKey, true);
   root.addEventListener("click", (e) => {
     if (e.target === root) close(true);
   });
-  root.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+  root.querySelector("[data-cancel]").addEventListener("click", () => cancelImport());
   root.querySelector("#import-csv-file-button").addEventListener("click", () => {
     root.querySelector("#import-csv-file").click();
   });
-  root.querySelector("#import-csv-file").addEventListener("change", (e) => {
+  root.querySelector("#import-csv-file").addEventListener("change", async (e) => {
     const name = e.target.files?.[0]?.name || "No file selected";
     root.querySelector("#import-csv-file-name").textContent = name;
+    if (e.target.files?.[0]) {
+      try {
+        const uploadText = await readImportCsvFile(e.target);
+        saveSession({ mode: "upload", phase: "editing", fileName: name, uploadText });
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    }
   });
+  root.querySelector("#import-text").addEventListener("input", markDirtyFromInputs);
+  root.querySelector("#import-csv-text").addEventListener("input", markDirtyFromInputs);
   root.querySelectorAll("[data-import-mode]").forEach((btn) => {
     btn.addEventListener("click", () => setImportMode(btn.dataset.importMode));
   });
@@ -161,6 +283,7 @@ function openImportModal() {
     if (activeMode === "ai") {
       const text = root.querySelector("#import-text").value.trim();
       if (!text) return toast("Paste some text first", "error");
+      saveSession({ phase: "extracting", mode: activeMode, sourceText: text, drafts: [], error: "" });
       if (draftsRoot) {
         drawImportProgress(draftsRoot, {
           current: 0,
@@ -172,13 +295,18 @@ function openImportModal() {
       }
       await withButtonBusy(btn, "Extracting…", async () => {
         try {
-          const drafts = await extractImportDrafts(text, draftsRoot);
+          activeAbort = new AbortController();
+          const drafts = await extractImportDrafts(text, draftsRoot, activeAbort.signal);
+          activeAbort = null;
           drafts.forEach((draft) => {
             draft.reporter = draft.reporter || state.lastReporter || "";
             draft.priority = draft.priority || "low";
           });
-          await reviewImportDrafts(root, drafts, close);
+          await reviewImportDrafts(root, drafts, close, saveSession);
         } catch (e) {
+          activeAbort = null;
+          if (e.name === "AbortError") return;
+          saveSession({ phase: "editing", error: e.message });
           if (draftsRoot) draftsRoot.innerHTML = "";
           toast(e.message, "error");
         }
@@ -188,12 +316,15 @@ function openImportModal() {
 
     await withButtonBusy(btn, "Parsing…", async () => {
       try {
+        saveSession({ phase: "parsing", mode: activeMode, error: "" });
         const csvText = activeMode === "csv"
           ? root.querySelector("#import-csv-text").value
-          : await readImportCsvFile(root.querySelector("#import-csv-file"));
+          : session.uploadText || await readImportCsvFile(root.querySelector("#import-csv-file"));
+        saveSession(activeMode === "csv" ? { csvText } : { uploadText: csvText });
         const drafts = await parseImportCsvBackend(csvText);
-        await reviewImportDrafts(root, drafts, close);
+        await reviewImportDrafts(root, drafts, close, saveSession);
       } catch (e) {
+        saveSession({ phase: "editing", error: e.message });
         if (draftsRoot) {
           draftsRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message)}</p>`;
         }
@@ -202,7 +333,44 @@ function openImportModal() {
     });
   });
 
-  root.querySelector("#import-text").focus();
+  root.querySelector("#import-text").value = session.sourceText || "";
+  root.querySelector("#import-csv-text").value = session.csvText || "";
+  if (session.fileName) {
+    root.querySelector("#import-csv-file-name").textContent = session.fileName;
+  }
+  setImportMode(activeMode);
+  if (session.jobId) {
+    drawImportSaving(root, session, close, saveSession);
+    const restoredDrafts = (session.drafts || []).map(normalizeImportDraft);
+    const skipped = restoredDrafts.filter((draft) => draft.duplicateDecision === "duplicate").length;
+    const payload = restoredDrafts
+      .filter((draft) => draft.duplicateDecision !== "duplicate")
+      .map(importDraftPayload);
+    waitForImportPersistJob(session.jobId, root, close, saveSession)
+      .then((r) => handleImportPersistResult(root, r, payload, skipped, close, saveSession))
+      .catch(async (e) => {
+        if (e.code === "job_cancelled") {
+          clearImportSession();
+          close(true, { force: true });
+          return;
+        }
+        await showActionError(e, "Import failed");
+      });
+  } else if ((session.drafts || []).length) {
+    drawImportDrafts(root, session.drafts, close, { saveSession, retry: session.phase === "failed" });
+  } else if (["extracting", "parsing", "deduping"].includes(session.phase)) {
+    saveSession({ phase: "editing" });
+    const draftsRoot = root.querySelector("#import-drafts");
+    if (draftsRoot) {
+      draftsRoot.innerHTML = `<p class="muted">Import was interrupted before drafts were ready. Continue from the saved input above.</p>`;
+    }
+  }
+  const focusTarget = activeMode === "ai"
+    ? "#import-text"
+    : activeMode === "csv"
+      ? "#import-csv-text"
+      : "#import-csv-file-button";
+  root.querySelector(focusTarget)?.focus();
 }
 
 function countImportLines(text) {
@@ -232,7 +400,7 @@ function importTextChunks(text) {
   return chunks;
 }
 
-async function extractImportDrafts(text, draftsRoot) {
+async function extractImportDrafts(text, draftsRoot, signal = null) {
   const chunks = importTextChunks(text);
   const lineCount = countImportLines(text);
   const drafts = [];
@@ -259,8 +427,9 @@ async function extractImportDrafts(text, draftsRoot) {
     }
     let r = null;
     try {
-      r = await api("POST", "/api/import/extract", { text: chunk.text });
+      r = await api("POST", "/api/import/extract", { text: chunk.text }, { signal });
     } catch (e) {
+      if (e.name === "AbortError") throw e;
       const range = `lines ${chunk.startLine}-${chunk.endLine}`;
       throw new Error(
         `AI request ${i + 1} of ${chunks.length} failed (${range}): ${e.message}`,
@@ -306,8 +475,11 @@ function drawImportProgress(root, state) {
   `;
 }
 
-async function reviewImportDrafts(root, drafts, close) {
-  drawImportDrafts(root, await annotateImportDuplicateDrafts(drafts), close);
+async function reviewImportDrafts(root, drafts, close, saveSession = null) {
+  if (saveSession) saveSession({ phase: "deduping", drafts });
+  const annotated = await annotateImportDuplicateDrafts(drafts);
+  if (saveSession) saveSession({ phase: "review", drafts: annotated, jobId: "", result: null, error: "" });
+  drawImportDrafts(root, annotated, close, { saveSession });
 }
 
 async function annotateImportDuplicateDrafts(drafts) {
@@ -348,6 +520,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     return;
   }
   const draftState = drafts.map(normalizeImportDraft);
+  const saveSession = options.saveSession || null;
   let page = 1;
   let showNeedsResolutionOnly = false;
 
@@ -385,9 +558,10 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         ${renderImportDraftPager(page, totalPages)}
       </div>
     `;
-    bindImportDraftPage(drafts_root, draftState);
+    bindImportDraftPage(drafts_root, draftState, saveSession);
     $("[data-import-unresolved-filter]", drafts_root)?.addEventListener("change", (e) => {
       syncImportDraftPage(drafts_root, draftState);
+      if (saveSession) saveSession({ phase: "review", drafts: draftState });
       showNeedsResolutionOnly = e.target.checked;
       page = 1;
       renderPage();
@@ -395,6 +569,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     $$("[data-import-page]", drafts_root).forEach((btn) => {
       btn.addEventListener("click", () => {
         syncImportDraftPage(drafts_root, draftState);
+        if (saveSession) saveSession({ phase: "review", drafts: draftState });
         page += btn.dataset.importPage === "next" ? 1 : -1;
         renderPage();
       });
@@ -408,11 +583,20 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     <button class="secondary" data-cancel>Cancel</button>
     <button id="btn-persist">Save ${draftState.length} gap${draftState.length === 1 ? "" : "s"}</button>
   `;
-  actions.querySelector("[data-cancel]").addEventListener("click", () => close(true));
+  actions.querySelector("[data-cancel]").addEventListener("click", async () => {
+    const ok = await modalConfirm(
+      "Cancel this import and discard its draft state?",
+      { title: "Cancel import", okLabel: "Cancel import", danger: true },
+    );
+    if (!ok) return;
+    clearImportSession();
+    close(true, { force: true });
+  });
   actions.querySelector("#btn-persist").addEventListener("click", async () => {
     const btn = actions.querySelector("#btn-persist");
     if (btn.disabled) return;
     syncImportDraftPage(drafts_root, draftState);
+    if (saveSession) saveSession({ phase: "review", drafts: draftState });
     const unresolved = draftState.filter(importDraftNeedsResolution);
     if (unresolved.length) {
       showNeedsResolutionOnly = true;
@@ -430,7 +614,8 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       .map(importDraftPayload);
     if (!payload.length) {
       toast(`Skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}; no new gaps created`, "info");
-      close(true);
+      clearImportSession();
+      close(true, { force: true });
       return;
     }
     await withButtonBusy(btn, "Saving…", async () => {
@@ -438,50 +623,159 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         let r = await api("POST", "/api/import/persist", {
           reporter: state.lastReporter || "",
           drafts: payload,
+          background: true,
         });
-        r = await resolveBackgroundJobResponse(
-          r,
-          `Saving ${payload.length} gaps in the background`,
-        );
-        const failures = r.failures || [];
-        const createdCount = r.count || 0;
-        const duplicateActions = r.duplicate_actions || {};
-        const handledDuplicates = (
-          skipped
-          + (duplicateActions.moved_to_backlog || 0)
-          + (duplicateActions.move_noop || 0)
-        );
-        if (failures.length) {
-          const failedDrafts = failures.map((failure) => {
-            const original = payload[(failure.index || 1) - 1] || {};
-            const duplicate = failure.code === "duplicate_gap"
-              ? failure.duplicate?.match
-              : null;
-            return {
-              ...original,
-              ...(failure.draft || {}),
-              duplicate,
-              error: failure.error || "Could not save this Gap.",
-            };
-          });
-          toast(
-            `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`,
-            "error",
-          );
-          drawImportDrafts(root, failedDrafts, close, { retry: true });
+        if (r.job) {
+          if (saveSession) saveSession({ phase: "saving", drafts: draftState, jobId: r.job.id, result: null, error: "" });
+          drawImportSaving(root, readImportSession(), close, saveSession);
+          r = await waitForImportPersistJob(r.job.id, root, close, saveSession);
         } else {
-          const duplicateText = handledDuplicates
-            ? `; handled ${handledDuplicates} duplicate${handledDuplicates === 1 ? "" : "s"}`
-            : "";
-          toast(`Created ${createdCount} gap(s)${duplicateText}`, "info");
-          // Stay on the underlying screen — same behavior as the New Gap
-          // modal. `close(true)` only redirects when the user came in via
-          // the `#/gaps/import` deep link.
-          close(true);
+          if (saveSession) saveSession({ phase: "saving", drafts: draftState, jobId: "", result: null, error: "" });
         }
-      } catch (e) { await showActionError(e, "Import failed"); }
+        handleImportPersistResult(root, r, payload, skipped, close, saveSession);
+      } catch (e) {
+        if (e.code === "job_cancelled" || e.name === "AbortError") return;
+        await showActionError(e, "Import failed");
+      }
     });
   });
+}
+
+function drawImportSaving(root, session, close, saveSession = null) {
+  if (!root.isConnected) return;
+  const draftsRoot = root.querySelector("#import-drafts");
+  const actions = root.querySelector(".modal-actions");
+  if (!draftsRoot || !actions) return;
+  const progress = session?.progress || {};
+  const message = progress.message || "Saving import";
+  const total = Number(progress.total || 0);
+  const completed = Number(progress.completed || 0);
+  draftsRoot.innerHTML = `
+    <div class="loading-row">
+      <span class="loading-spinner"></span>
+      <span>${htmlEscape(message)}</span>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">
+      ${total ? htmlEscape(`${completed} of ${total} processed.`) : "This import is being saved in the background."}
+    </p>
+  `;
+  actions.innerHTML = `
+    <button class="secondary" data-cancel>Cancel</button>
+    <button id="btn-persist" disabled>Saving…</button>
+  `;
+  actions.querySelector("[data-cancel]").addEventListener("click", async () => {
+    const ok = await modalConfirm(
+      "Cancel this import? Refine will stop the save job and roll back Gaps created by this import.",
+      { title: "Cancel import", okLabel: "Cancel import", danger: true },
+    );
+    if (!ok) return;
+    if (session?.jobId) {
+      await api("POST", `/api/jobs/${session.jobId}/cancel`, {});
+      await waitForImportJobCancellation(session.jobId, root, close, saveSession);
+    }
+    if (saveSession) saveSession({ phase: "cancelled", jobId: "", drafts: [] });
+    clearImportSession();
+    close(true, { force: true });
+  });
+}
+
+async function waitForImportPersistJob(jobId, root, close, saveSession = null) {
+  while (true) {
+    const snap = await api("GET", `/api/jobs/${jobId}`);
+    const job = snap.job || {};
+    if (!root.isConnected) {
+      const err = new Error("Import modal closed");
+      err.code = "job_cancelled";
+      throw err;
+    }
+    if (saveSession) saveSession({ phase: "saving", jobId, progress: job.progress || {} });
+    drawImportSaving(root, readImportSession(), close, saveSession);
+    if (job.status === "complete") {
+      const result = job.result || {};
+      if (result.http_status && result.http_status >= 400) {
+        const raw = result.error || {};
+        const err = new Error(raw.message || "Background job failed");
+        err.details = raw.details;
+        err.code = raw.code;
+        throw err;
+      }
+      return result;
+    }
+    if (job.status === "cancelled") {
+      const err = new Error("Import cancelled");
+      err.code = "job_cancelled";
+      throw err;
+    }
+    if (job.status === "failed") {
+      const err = new Error(job.error?.message || "Background job failed");
+      err.details = job.error?.details;
+      err.code = job.error?.code;
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+}
+
+async function waitForImportJobCancellation(jobId, root, close, saveSession = null) {
+  while (true) {
+    const snap = await api("GET", `/api/jobs/${jobId}`);
+    const job = snap.job || {};
+    if (saveSession) {
+      saveSession({
+        phase: "saving",
+        jobId,
+        progress: { ...(job.progress || {}), message: "Cancelling" },
+      });
+    }
+    drawImportSaving(root, readImportSession(), close, saveSession);
+    if (job.status === "cancelled") return job;
+    if (job.status === "complete") return job;
+    if (job.status === "failed") {
+      const err = new Error(job.error?.message || "Background job failed");
+      err.details = job.error?.details;
+      err.code = job.error?.code;
+      throw err;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
+
+function handleImportPersistResult(root, r, payload, skipped, close, saveSession = null) {
+  const failures = r.failures || [];
+  const createdCount = r.count || 0;
+  const duplicateActions = r.duplicate_actions || {};
+  const handledDuplicates = (
+    skipped
+    + (duplicateActions.moved_to_backlog || 0)
+    + (duplicateActions.move_noop || 0)
+  );
+  if (failures.length) {
+    const failedDrafts = failures.map((failure) => {
+      const original = payload[(failure.index || 1) - 1] || {};
+      const duplicate = failure.code === "duplicate_gap"
+        ? failure.duplicate?.match
+        : null;
+      return {
+        ...original,
+        ...(failure.draft || {}),
+        duplicate,
+        error: failure.error || "Could not save this Gap.",
+      };
+    });
+    if (saveSession) saveSession({ phase: "failed", drafts: failedDrafts, jobId: "", result: r });
+    toast(
+      `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`,
+      "error",
+    );
+    drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession });
+  } else {
+    const duplicateText = handledDuplicates
+      ? `; handled ${handledDuplicates} duplicate${handledDuplicates === 1 ? "" : "s"}`
+      : "";
+    toast(`Created ${createdCount} gap(s)${duplicateText}`, "info");
+    clearImportSession();
+    close(true, { force: true });
+  }
 }
 
 function normalizeImportDraft(draft) {
@@ -558,7 +852,7 @@ function renderImportDraftRow(d, index) {
     </div>`;
 }
 
-function bindImportDraftPage(root, draftState) {
+function bindImportDraftPage(root, draftState, saveSession = null) {
   $$(".draft", root).forEach((row) => {
     const draft = draftState[Number(row.dataset.idx)];
     if (!draft) return;
@@ -571,6 +865,7 @@ function bindImportDraftPage(root, draftState) {
       btn.addEventListener("click", () => {
         row.dataset.duplicateDecision = btn.dataset.duplicateDecision;
         draft.duplicateDecision = btn.dataset.duplicateDecision;
+        if (saveSession) saveSession({ phase: "review", drafts: draftState });
         $$(".import-duplicate-actions button", row).forEach((candidate) => {
           candidate.classList.toggle("selected", candidate === btn);
         });
@@ -580,6 +875,7 @@ function bindImportDraftPage(root, draftState) {
       const syncAndClearError = () => {
         syncImportDraftRow(row, draftState);
         draft.error = "";
+        if (saveSession) saveSession({ phase: "review", drafts: draftState });
         row.querySelector(".draft-error")?.remove();
       };
       field.addEventListener("input", syncAndClearError);
@@ -592,6 +888,7 @@ function bindImportDraftPage(root, draftState) {
         draft.duplicateDecision = "";
         draft.duplicate = null;
         draft.error = "";
+        if (saveSession) saveSession({ phase: "review", drafts: draftState });
         row.querySelector(".import-duplicate")?.remove();
         row.querySelector(".draft-error")?.remove();
       });

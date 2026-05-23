@@ -28,6 +28,9 @@ async function init() {
   initTargetAppToggle();
   refreshFeatures();
   setInterval(tickRunningCells, 1000);
+  if (typeof recoverImportSessionOnLoad === "function") {
+    recoverImportSessionOnLoad();
+  }
   navigate();
 }
 

@@ -75,9 +75,9 @@ def main() -> int:
     assert "function importTextChunks(text)" in import_js
     assert "i += IMPORT_CHUNK_LINE_COUNT" in import_js
     assert "chunkLines = lines.slice(i, i + IMPORT_CHUNK_LINE_COUNT)" in import_js
-    assert "async function extractImportDrafts(text, draftsRoot)" in import_js
+    assert "async function extractImportDrafts(text, draftsRoot, signal = null)" in import_js
     assert "for (let i = 0; i < chunks.length; i += 1)" in import_js
-    assert 'api("POST", "/api/import/extract", { text: chunk.text })' in import_js
+    assert 'api("POST", "/api/import/extract", { text: chunk.text }, { signal })' in import_js
     assert 'api("POST", "/api/import/extract", { text });' not in import_js
     assert "Processing AI request ${state.current} of ${state.total}" in import_js
     assert "chunks of ${state.chunkSize}" in import_js
@@ -85,7 +85,7 @@ def main() -> int:
     assert "lines ${chunk.startLine}-${chunk.endLine}" in import_js
     assert 'withButtonBusy(btn, "Saving…"' in import_js
     assert "Failed drafts (${draftState.length})" in import_js
-    assert "drawImportDrafts(root, failedDrafts, close, { retry: true })" in import_js
+    assert "drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession })" in import_js
     assert "Yes, ignore" in new_gap_js
     assert "No, import" in new_gap_js
     assert "Yes, move original to backlog" in new_gap_js
@@ -113,7 +113,19 @@ def main() -> int:
     assert '"awaiting-rebuild",' in api_py
     assert '"awaiting-review",' in api_py
     assert "IMPORT_DEDUP_THRESHOLD = 0.62" in api_py
-    assert "resolveBackgroundJobResponse" in import_js
+    assert "const IMPORT_SESSION_KEY" in import_js
+    assert "function recoverImportSessionOnLoad()" in import_js
+    assert "localStorage.setItem(IMPORT_SESSION_KEY" in import_js
+    assert "Use Cancel to discard or unwind this import before closing." in import_js
+    assert "Cancel this import before changing import type." in import_js
+    assert "background: true" in import_js
+    assert "function drawImportSaving(root, session, close, saveSession = null)" in import_js
+    assert "waitForImportPersistJob(r.job.id, root, close, saveSession)" in import_js
+    assert "async function waitForImportJobCancellation(jobId, root, close, saveSession = null)" in import_js
+    assert "await waitForImportJobCancellation(session.jobId, root, close, saveSession)" in import_js
+    assert "Refine will stop the save job and roll back Gaps created by this import." in import_js
+    assert '@route("POST", r"/api/jobs/([0-9a-fA-F]+)/cancel")' in server_py
+    assert "def cancel_background_job(job_id: str)" in api_py
     assert 'await showActionError(e, "Import failed");' in import_js
 
     print("import chunking tests OK")

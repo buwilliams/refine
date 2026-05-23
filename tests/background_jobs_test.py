@@ -91,6 +91,26 @@ def main() -> int:
         release.set()
         wait_job(exclusive_job["id"])
 
+        cancel_started = threading.Event()
+        cancel_release = threading.Event()
+
+        def cancellable(progress):  # noqa: ANN001, ANN202
+            progress(completed=0, total=1, message="waiting")
+            cancel_started.set()
+            assert cancel_release.wait(timeout=2), "cancel job was not released"
+            if background_jobs.current_cancelled():
+                raise background_jobs.CancellationRequested({"cancelled": True, "rolled_back": 1})
+            return {"updated": 1}
+
+        cancel_job = background_jobs.start("import_persist", "Cancelable import", cancellable)
+        assert cancel_started.wait(timeout=2), "cancel job did not start"
+        cancelled = background_jobs.cancel(cancel_job["id"])
+        assert cancelled and cancelled["progress"]["message"] == "Cancelling", cancelled
+        cancel_release.set()
+        done = wait_job(cancel_job["id"])
+        assert done["status"] == "cancelled", done
+        assert done["result"] == {"cancelled": True, "rolled_back": 1}, done
+
         sync_started = threading.Event()
         sync_release = threading.Event()
 
@@ -129,7 +149,7 @@ def wait_job(job_id: str) -> dict:
     deadline = time.time() + 10
     while time.time() < deadline:
         job = background_jobs.snapshot(job_id)
-        if job and job["status"] in {"complete", "failed"}:
+        if job and job["status"] in {"complete", "failed", "cancelled"}:
             return job
         time.sleep(0.02)
     raise AssertionError(f"job did not finish: {job_id}")

@@ -207,6 +207,16 @@ def main() -> int:
         assert body["failed"] == 0, body
         assert body["duplicate_actions"]["moved_to_backlog"] == 1, body
         assert moved_status == "backlog", moved_status
+
+        restored = api._rollback_import_duplicate_moves([{  # noqa: SLF001
+            "gap_id": "01IMPORTDEDUP0000000000001",
+            "from": "failed",
+        }])
+        restored_status = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = '01IMPORTDEDUP0000000000001'",
+        ).fetchone()["status"]
+        assert restored == 1, restored
+        assert restored_status == "failed", restored_status
     finally:
         try:
             conn.close()
