@@ -239,6 +239,13 @@ def main() -> int:
     assert '.agent-status-indicator[data-state="paused"] .target-app-dot' in base_css
     assert '.agent-status-indicator[data-state="down"] .target-app-dot' in base_css
     assert '.nav-context-menu[data-state="running"] .nav-context-summary-dot' in base_css
+    assert 'data-rmerge="${r.id}"' in settings_js
+    assert "function openReporterMergeModal(source)" in settings_js
+    assert 'api("POST", `/api/reporters/${b.dataset.rmerge}/merge`' in settings_js
+    assert "Merging a reporter moves its Gaps to another" in settings_js
+    assert 'def merge_reporter(rid: int, body: dict)' in api_py
+    assert 'M_MERGE_REPORTER' in api_py
+    assert '@route("POST", r"/api/reporters/(\\d+)/merge")' in server_py
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
         assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")

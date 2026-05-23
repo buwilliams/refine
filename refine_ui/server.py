@@ -157,6 +157,11 @@ def _h_rename_reporter(_h, m, body, _q):
     return api.rename_reporter(int(m.group(1)), body or {})
 
 
+@route("POST", r"/api/reporters/(\d+)/merge")
+def _h_merge_reporter(_h, m, body, _q):
+    return api.merge_reporter(int(m.group(1)), body or {})
+
+
 @route("DELETE", r"/api/reporters/(\d+)")
 def _h_delete_reporter(_h, m, _b, _q):
     return api.delete_reporter(int(m.group(1)))

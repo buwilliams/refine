@@ -1,7 +1,8 @@
 """Reporters list — SQLite-backed dropdown source.
 
 Source of truth for who-submitted-what remains the round's `reporter` string.
-Renaming or deleting a reporter does not touch historical rounds.
+Low-level table mutations here do not touch historical rounds directly; runner
+operations perform the cascades for rename and merge workflows.
 """
 from __future__ import annotations
 

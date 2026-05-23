@@ -18,7 +18,7 @@ from refine_server.backend_protocol import (
     M_CHAT_RESET_ALL, M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
-    M_GOVERNANCE_WAKE, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
+    M_GOVERNANCE_WAKE, M_MERGE_REPORTER, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
     M_RETRY_MERGE, M_RUNNING,
     M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
@@ -199,6 +199,7 @@ class Runner:
             M_CHAT_STOP: self._h_chat_stop,
             M_CHAT_RESET_ALL: self._h_chat_reset_all,
             M_EXTRACT_GAPS: self._h_extract_gaps,
+            M_MERGE_REPORTER: self._h_merge_reporter,
             M_RENAME_REPORTER: self._h_rename_reporter,
             M_RENAME_REPORTER_STRINGS: self._h_rename_reporter_strings,
             M_LIST_CHANGES: self._h_list_changes,
@@ -1183,6 +1184,48 @@ class Runner:
             severity="info", category="state", actor="refine",
         )
         return {"old": old_name, "new": new_name, "touched": touched}
+
+    def _h_merge_reporter(self, params: dict) -> dict:
+        """Merge one reporter into another.
+
+        The source reporter is removed from the dropdown after every matching
+        Gap round is rewritten to the target reporter name.
+        """
+        try:
+            rid = int(params.get("rid"))
+            target_rid = int(params.get("target_rid"))
+        except (TypeError, ValueError):
+            raise ValueError("rid and target_rid are required and must be integers")
+        if rid == target_rid:
+            raise ValueError("cannot merge a reporter into itself")
+        rows = self._conn.execute(
+            "SELECT id, name FROM reporters WHERE id IN (?, ?)",
+            (rid, target_rid),
+        ).fetchall()
+        by_id = {int(row["id"]): row["name"] for row in rows}
+        old_name = by_id.get(rid)
+        new_name = by_id.get(target_rid)
+        if not old_name:
+            raise ValueError(f"reporter {rid} not found")
+        if not new_name:
+            raise ValueError(f"target reporter {target_rid} not found")
+        if old_name == new_name:
+            raise ValueError("cannot merge reporters with the same name")
+        touched = gap_writer.rename_reporter_in_rounds(
+            self._conn,
+            old_name,
+            new_name,
+            instance_id=project_state.active_instance_id(),
+        )
+        reporters.remove(self._conn, rid)
+        activity.append(
+            self._conn,
+            message=(f"Reporter merged: {old_name!r} → {new_name!r}; "
+                     f"{old_name!r} removed "
+                     f"({touched} gap{'' if touched == 1 else 's'} updated)"),
+            severity="info", category="state", actor="refine",
+        )
+        return {"old": old_name, "new": new_name, "removed_id": rid, "touched": touched}
 
     def _h_rename_reporter_strings(self, params: dict) -> dict:
         """Cascade-only: rewrite round.reporter == old to new across all

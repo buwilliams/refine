@@ -27,7 +27,7 @@ from refine_server.backend_protocol import (
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
-    M_RENAME_REPORTER, M_RETRY_MERGE, M_SET_NOTES, M_TARGET_APP_GENERATE,
+    M_MERGE_REPORTER, M_RENAME_REPORTER, M_RETRY_MERGE, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 from refine_server.ulid import new_ulid
@@ -2325,6 +2325,24 @@ def rename_reporter(rid: int, body: dict) -> tuple[int, dict]:
     try:
         result = get_client().call(
             M_RENAME_REPORTER, {"rid": rid, "new_name": name}, timeout=60.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    return 200, {"ok": True, **result}
+
+
+def merge_reporter(rid: int, body: dict) -> tuple[int, dict]:
+    try:
+        target_rid = int(body.get("target_id"))
+    except (TypeError, ValueError):
+        return err(400, "target_id is required")
+    if target_rid == rid:
+        return err(400, "cannot merge a reporter into itself")
+    try:
+        result = get_client().call(
+            M_MERGE_REPORTER,
+            {"rid": rid, "target_rid": target_rid},
+            timeout=60.0,
         )
     except BackendError as e:
         return _backend_err(e)
