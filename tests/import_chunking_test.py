@@ -43,8 +43,20 @@ def main() -> int:
     assert "priority (low, medium, high)" in import_js
     assert "const IMPORT_DRAFT_PAGE_SIZE = 25;" in import_js
     assert "const draftState = drafts.map(normalizeImportDraft);" in import_js
-    assert "const visibleDrafts = draftState" in import_js
+    assert "const reviewDrafts = draftState" in import_js
+    assert ".filter(({ draft }) => !importDraftHiddenFromReview(draft));" in import_js
+    assert "const visibleDrafts = reviewDrafts" in import_js
     assert "function importDraftNeedsResolution(draft)" in import_js
+    assert "function importDraftHiddenFromReview(draft)" in import_js
+    assert 'return draft.duplicateDecision === "duplicate";' in import_js
+    assert "function importDraftCreatesGap(draft)" in import_js
+    assert 'decision === "move_original_to_backlog"' in import_js
+    assert 'decision.startsWith("update_original_")' in import_js
+    assert "function importDraftCreateCount(drafts)" in import_js
+    assert "function updateImportPersistButton(root, draftState)" in import_js
+    assert 'btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}`;' in import_js
+    assert "No drafts remain in this review." in import_js
+    assert "const targets = reviewDrafts" in import_js
     assert "function renderImportDraftRange(start, end, visibleCount, totalCount, filtered)" in import_js
     assert "Needs resolution (${unresolvedCount})" in import_js
     assert "data-import-unresolved-filter" in import_js
@@ -100,7 +112,7 @@ def main() -> int:
     assert "AI request ${i + 1} of ${chunks.length} failed" in import_js
     assert "lines ${chunk.startLine}-${chunk.endLine}" in import_js
     assert 'withButtonBusy(btn, "Saving…"' in import_js
-    assert "Failed drafts (${draftState.length})" in import_js
+    assert "Failed drafts (${reviewDrafts.length})" in import_js
     assert "drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession })" in import_js
     assert "Yes, ignore" in new_gap_js
     assert "No, import" in new_gap_js

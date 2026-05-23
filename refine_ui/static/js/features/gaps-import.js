@@ -647,8 +647,10 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   let originalUpdateField = "actual";
 
   function renderPage() {
-    const visibleDrafts = draftState
+    const reviewDrafts = draftState
       .map((draft, index) => ({ draft, index }))
+      .filter(({ draft }) => !importDraftHiddenFromReview(draft));
+    const visibleDrafts = reviewDrafts
       .filter(({ draft }) => !showNeedsResolutionOnly || importDraftNeedsResolution(draft));
     const totalPages = Math.max(1, Math.ceil(visibleDrafts.length / IMPORT_DRAFT_PAGE_SIZE));
     page = Math.min(Math.max(1, page), totalPages);
@@ -659,19 +661,19 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     const pageAllSelected = !!pageDrafts.length && pageSelectedCount === pageDrafts.length;
     const pageSomeSelected = pageSelectedCount > 0 && !pageAllSelected;
     const allFilteredSelected = !!visibleDrafts.length && visibleDrafts.every(({ draft }) => draft.selected);
-    const duplicateCount = draftState.filter((draft) => draft.duplicate).length;
-    const unresolvedCount = draftState.filter(importDraftNeedsResolution).length;
-    const selectedCount = draftState.filter((draft) => draft.selected).length;
+    const duplicateCount = reviewDrafts.filter(({ draft }) => draft.duplicate).length;
+    const unresolvedCount = reviewDrafts.filter(({ draft }) => importDraftNeedsResolution(draft)).length;
+    const selectedCount = reviewDrafts.filter(({ draft }) => draft.selected).length;
     const title = options.retry
-      ? `Failed drafts (${draftState.length}) — correct &amp; retry`
-      : `Drafts (${draftState.length}) — review &amp; confirm`;
+      ? `Failed drafts (${reviewDrafts.length}) — correct &amp; retry`
+      : `Drafts (${reviewDrafts.length}) — review &amp; confirm`;
     drafts_root.innerHTML = `
       <h3 style="margin-top:0">${title}</h3>
       ${renderImportDraftActionBar({
         start,
         end,
         visibleCount: visibleDrafts.length,
-        totalCount: draftState.length,
+        totalCount: reviewDrafts.length,
         filtered: showNeedsResolutionOnly,
         unresolvedCount,
         selectedCount,
@@ -684,13 +686,14 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         updateField: originalUpdateField,
       })}
       ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Resolve them with the bulk actions before saving.</p>` : ""}
-      ${showNeedsResolutionOnly && !visibleDrafts.length
-        ? `<p class="muted">No drafts need resolution.</p>`
+      ${!visibleDrafts.length
+        ? `<p class="muted">${showNeedsResolutionOnly ? "No drafts need resolution." : "No drafts remain in this review."}</p>`
         : renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected })}
       <div class="import-draft-footer">
         ${renderImportDraftPager(page, totalPages)}
       </div>
     `;
+    updateImportPersistButton(root, draftState);
     bindImportDraftPage(drafts_root, draftState, saveSession, {
       onSelectionChange: renderPage,
     });
@@ -722,7 +725,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     });
     $("[data-import-select-duplicates]", drafts_root)?.addEventListener("click", () => {
       persistReviewState();
-      draftState.forEach((draft) => {
+      reviewDrafts.forEach(({ draft }) => {
         draft.selected = !!draft.duplicate;
       });
       if (saveSession) saveSession({ phase: "review", drafts: draftState });
@@ -730,7 +733,9 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     });
     $("[data-import-dismiss-duplicates]", drafts_root)?.addEventListener("click", () => {
       persistReviewState();
-      const targets = draftState.filter((draft) => draft.duplicate);
+      const targets = reviewDrafts
+        .map(({ draft }) => draft)
+        .filter((draft) => draft.duplicate);
       targets.forEach((draft) => {
         draft.duplicateDecision = "duplicate";
         draft.selected = false;
@@ -802,8 +807,9 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   const actions = root.querySelector(".modal-actions");
   actions.innerHTML = `
     <button class="secondary" data-cancel>Cancel</button>
-    <button id="btn-persist">Save ${draftState.length} gap${draftState.length === 1 ? "" : "s"}</button>
+    <button id="btn-persist"></button>
   `;
+  updateImportPersistButton(root, draftState);
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {
     const ok = await modalConfirm(
       "Cancel this import and discard its draft state?",
@@ -1027,7 +1033,32 @@ function normalizeImportDraft(draft) {
 }
 
 function importDraftNeedsResolution(draft) {
+  if (importDraftHiddenFromReview(draft)) return false;
   return !!draft.error || (!!draft.duplicate && !draft.duplicateDecision);
+}
+
+function importDraftHiddenFromReview(draft) {
+  return draft.duplicateDecision === "duplicate";
+}
+
+function importDraftCreatesGap(draft) {
+  const decision = draft.duplicateDecision || "";
+  return !(
+    decision === "duplicate"
+    || decision === "move_original_to_backlog"
+    || decision.startsWith("update_original_")
+  );
+}
+
+function importDraftCreateCount(drafts) {
+  return drafts.filter(importDraftCreatesGap).length;
+}
+
+function updateImportPersistButton(root, draftState) {
+  const btn = root.querySelector("#btn-persist");
+  if (!btn) return;
+  const count = importDraftCreateCount(draftState);
+  btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}`;
 }
 
 function renderImportDraftActionBar({
