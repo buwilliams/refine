@@ -215,6 +215,9 @@ def main() -> int:
     assert 'id="target-app-indicator" class="target-app-indicator nav-context-status"' in index_html
     assert 'id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"' in index_html
     assert '<span class="agent-status-label">0</span>' in index_html
+    assert index_html.index('id="nav-context-menu"') < index_html.index('id="agent-status-indicator"')
+    assert index_html.index('id="agent-status-indicator"') < index_html.index('class="nav-create-group"')
+    assert index_html.index('class="nav-create-group"') < index_html.index('id="btn-new-gap"')
     assert 'indicator.href = opensApp ? appUrl : "#/system/processes";' in target_app_js
     assert 'indicator.target = "_blank";' in target_app_js
     assert 'indicator.removeAttribute("target");' in target_app_js

@@ -47,6 +47,14 @@
           <select id="global-reporter" aria-label="Reporter"></select>
         </div>
       </details>
+      <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
+         href="#/system/processes"
+         aria-label="Agent status (click to view processes)"
+         title="Agent status"
+         data-state="unknown">
+        <span class="target-app-dot" aria-hidden="true"></span>
+        <span class="agent-status-label">0</span>
+      </a>
       <div class="nav-create-group">
         <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
         <details class="nav-menu nav-create-menu" id="nav-create-menu">
@@ -56,14 +64,6 @@
           </div>
         </details>
       </div>
-      <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
-         href="#/system/processes"
-         aria-label="Agent status (click to view processes)"
-         title="Agent status"
-         data-state="unknown">
-        <span class="target-app-dot" aria-hidden="true"></span>
-        <span class="agent-status-label">0</span>
-      </a>
     </div>
   </header>
 
