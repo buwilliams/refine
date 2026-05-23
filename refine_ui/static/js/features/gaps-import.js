@@ -38,7 +38,7 @@ function openImportModal() {
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true"
+    <div class="modal import-modal" role="dialog" aria-modal="true"
          aria-labelledby="import-title" style="max-width:760px">
       <div class="modal-title" id="import-title">Import gaps</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">

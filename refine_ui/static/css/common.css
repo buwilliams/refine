@@ -465,6 +465,9 @@ select {
 .round-body .pair dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
 .round-body .pair dd { margin: 0; }
 
+.import-modal .modal-body {
+  min-height: min(430px, 72vh);
+}
 .import-tab-card {
   box-shadow: none;
 }

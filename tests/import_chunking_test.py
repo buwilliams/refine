@@ -14,11 +14,17 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     server_py = (root / "refine_ui/server.py").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
+    common_css = (
+        root / "refine_ui/static/css/common.css"
+    ).read_text(encoding="utf-8")
 
     assert "const IMPORT_CHUNK_LINE_COUNT = 20;" in import_js
     assert '"AI Import"' in import_js
     assert '"CSV Import"' in import_js
     assert '"CSV Upload"' in import_js
+    assert 'class="modal import-modal"' in import_js
+    assert ".import-modal .modal-body" in common_css
+    assert "min-height: min(430px, 72vh)" in common_css
     assert 'class="settings-tabs" id="import-tabs" role="tablist"' in import_js
     assert 'class="settings-tab ${mode === "ai" ? "active" : ""}"' in import_js
     assert 'class="card settings-tab-card import-tab-card"' in import_js
