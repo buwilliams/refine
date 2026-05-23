@@ -121,9 +121,14 @@ def main() -> int:
     assert "background: true" in import_js
     assert "function drawImportSaving(root, session, close, saveSession = null)" in import_js
     assert "waitForImportPersistJob(r.job.id, root, close, saveSession)" in import_js
+    assert "Import is running in the background. Reopen Import to check progress" in import_js
+    assert 'button class="secondary" data-hide' in import_js
+    assert "root.isConnected" in import_js
     assert "async function waitForImportJobCancellation(jobId, root, close, saveSession = null)" in import_js
     assert "await waitForImportJobCancellation(session.jobId, root, close, saveSession)" in import_js
     assert "Refine will stop the save job and roll back Gaps created by this import." in import_js
+    assert "def _import_persist_progress(completed: int, total: int, message: str)" in api_py
+    assert "Importing Gap {idx} of {total}" in api_py
     assert '@route("POST", r"/api/jobs/([0-9a-fA-F]+)/cancel")' in server_py
     assert "def cancel_background_job(job_id: str)" in api_py
     assert 'await showActionError(e, "Import failed");' in import_js

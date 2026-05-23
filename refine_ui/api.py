@@ -3814,6 +3814,18 @@ def _rollback_import_duplicate_moves(moves: list[dict[str, Any]]) -> int:
     return restored
 
 
+def _import_persist_progress(completed: int, total: int, message: str) -> None:
+    job_id = background_jobs.current_job_id()
+    if not job_id:
+        return
+    background_jobs.progress(
+        job_id,
+        completed=completed,
+        total=total,
+        message=message,
+    )
+
+
 def _import_persist_sync(body: dict) -> tuple[int, dict]:
     """Persist user-confirmed extracted Gaps synchronously."""
     reporter = (body.get("reporter") or "").strip()
@@ -3833,14 +3845,22 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
         "move_noop": 0,
     }
     duplicate_moves: list[dict[str, Any]] = []
+    total = len(drafts)
+    _import_persist_progress(0, total, f"Importing 0 of {total} Gaps")
     for idx, d in enumerate(drafts, start=1):
         _cancel_import_if_requested(created, duplicate_moves)
+        _import_persist_progress(
+            idx - 1,
+            total,
+            f"Importing Gap {idx} of {total}",
+        )
         if not isinstance(d, dict):
             failures.append({
                 "index": idx,
                 "error": "draft must be an object",
                 "draft": {},
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         actual = (d.get("actual") or "").strip()
         target = (d.get("target") or "").strip()
@@ -3859,6 +3879,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         if not draft_reporter:
             failures.append({
@@ -3872,6 +3893,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         if not _VALID_REPORTER.match(draft_reporter):
             failures.append({
@@ -3885,6 +3907,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         if not actual and not target:
             failures.append({
@@ -3898,10 +3921,12 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         duplicate_decision = str(d.get("duplicate_decision") or "").strip()
         if duplicate_decision == _DUPLICATE_DECISION_IGNORE:
             duplicate_actions["ignored"] += 1
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         duplicate = _find_import_duplicate(
             actual,
@@ -3916,6 +3941,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
             else:
                 duplicate_actions["move_noop"] += 1
             _cancel_import_if_requested(created, duplicate_moves)
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         if duplicate and duplicate_decision != _DUPLICATE_DECISION_IMPORT:
             failures.append({
@@ -3931,6 +3957,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
         gap_id = new_ulid()
         try:
@@ -3940,6 +3967,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
             })
             created.append(gap_id)
             _cancel_import_if_requested(created, duplicate_moves)
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
         except BackendError as e:
             failures.append({
                 "index": idx,
@@ -3953,6 +3981,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
                     "priority": priority,
                 },
             })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
     _cancel_import_if_requested(created, duplicate_moves)
     status = 201 if created and not failures else 200
     return status, {

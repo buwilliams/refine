@@ -92,6 +92,10 @@ function importSessionHasDrafts(session) {
   return !!((session?.drafts || []).length || session?.jobId);
 }
 
+function importSessionIsBackgroundSaving(session) {
+  return !!(session?.phase === "saving" && session?.jobId);
+}
+
 function openImportModal() {
   if (_importModalOpen) return;
   _importModalOpen = true;
@@ -165,7 +169,11 @@ function openImportModal() {
   let activeAbort = null;
   function close(navigateAway, options = {}) {
     if (closed) return;
-    if (!options.force && importSessionIsDirty(session)) {
+    if (!options.force && importSessionIsBackgroundSaving(session)) {
+      toast("Import is running in the background. Reopen Import to check progress; Refine will notify you when it finishes.", "info");
+      options = { ...options, allowBackground: true };
+    }
+    if (!options.force && !options.allowBackground && importSessionIsDirty(session)) {
       toast("Use Cancel to discard or unwind this import before closing.", "error");
       return;
     }
@@ -661,6 +669,7 @@ function drawImportSaving(root, session, close, saveSession = null) {
   `;
   actions.innerHTML = `
     <button class="secondary" data-cancel>Cancel</button>
+    <button class="secondary" data-hide>Hide</button>
     <button id="btn-persist" disabled>Saving…</button>
   `;
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {
@@ -677,17 +686,15 @@ function drawImportSaving(root, session, close, saveSession = null) {
     clearImportSession();
     close(true, { force: true });
   });
+  actions.querySelector("[data-hide]").addEventListener("click", () => {
+    close(true, { allowBackground: true });
+  });
 }
 
 async function waitForImportPersistJob(jobId, root, close, saveSession = null) {
   while (true) {
     const snap = await api("GET", `/api/jobs/${jobId}`);
     const job = snap.job || {};
-    if (!root.isConnected) {
-      const err = new Error("Import modal closed");
-      err.code = "job_cancelled";
-      throw err;
-    }
     if (saveSession) saveSession({ phase: "saving", jobId, progress: job.progress || {} });
     drawImportSaving(root, readImportSession(), close, saveSession);
     if (job.status === "complete") {
@@ -764,17 +771,21 @@ function handleImportPersistResult(root, r, payload, skipped, close, saveSession
     });
     if (saveSession) saveSession({ phase: "failed", drafts: failedDrafts, jobId: "", result: r });
     toast(
-      `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`,
+      root.isConnected
+        ? `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`
+        : `Import created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} draft${failures.length === 1 ? "" : "s"} need fixes. Reopen Import to continue.`,
       "error",
     );
-    drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession });
+    if (root.isConnected) {
+      drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession });
+    }
   } else {
     const duplicateText = handledDuplicates
       ? `; handled ${handledDuplicates} duplicate${handledDuplicates === 1 ? "" : "s"}`
       : "";
     toast(`Created ${createdCount} gap(s)${duplicateText}`, "info");
     clearImportSession();
-    close(true, { force: true });
+    if (root.isConnected) close(true, { force: true });
   }
 }
 

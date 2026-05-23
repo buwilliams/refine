@@ -102,6 +102,9 @@ def main() -> int:
             assert first_created.wait(timeout=2), "import job did not create first Gap"
             from refine_ui import background_jobs
 
+            active_job = background_jobs.snapshot(job_id)
+            assert active_job["progress"]["total"] == 3, active_job
+            assert active_job["progress"]["message"] == "Importing Gap 1 of 3", active_job
             cancelled = background_jobs.cancel(job_id)
             assert cancelled and cancelled["progress"]["message"] == "Cancelling", cancelled
             release_create.set()
