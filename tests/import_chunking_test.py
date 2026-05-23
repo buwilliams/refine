@@ -76,7 +76,8 @@ def main() -> int:
     assert "dedup: true" in import_js
     assert "function drawImportPrepareProgress(root, progress = {})" in import_js
     assert "async function waitForImportPrepareJob(jobId, progressRoot = null, saveSession = null)" in import_js
-    assert "`${completed} of ${total} Gaps processed.`" in import_js
+    assert "const isParsing = /^Pars/i.test(message);" in import_js
+    assert '`${completed} of ${total} Gaps ${isParsing ? "parsed" : "processed"}.`' in import_js
     assert "estimateImportCsvRows(csvText)" in import_js
     assert "function parseImportCsvRows" not in import_js
     assert "async function annotateImportDuplicateDrafts(drafts)" in import_js

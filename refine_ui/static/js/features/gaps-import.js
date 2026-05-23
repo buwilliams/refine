@@ -581,8 +581,9 @@ function drawImportPrepareProgress(root, progress = {}) {
   const completed = Number(progress.completed || 0);
   const total = Number(progress.total || 0);
   const message = progress.message || "Preparing CSV import";
+  const isParsing = /^Pars/i.test(message);
   const detail = total
-    ? `${completed} of ${total} Gaps processed.`
+    ? `${completed} of ${total} Gaps ${isParsing ? "parsed" : "processed"}.`
     : "Preparing imported Gaps for review.";
   root.innerHTML = `
     <div class="loading-row">
