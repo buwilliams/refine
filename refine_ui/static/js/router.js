@@ -7,6 +7,7 @@ const routes = {
   gaps: renderGapsList,
   gaps_new: renderGapNew,
   gaps_import: renderGapImport,
+  gaps_plan: renderGapPlan,
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
@@ -23,6 +24,7 @@ function parseHash() {
   if (parts[0] === "gaps") {
     if (parts.length === 1) return { route: "gaps" };
     if (parts[1] === "new") return { route: "gaps_new" };
+    if (parts[1] === "plan") return { route: "gaps_plan" };
     if (parts[1] === "import") return { route: "gaps_import" };
     return { route: "gaps_detail", id: parts[1] };
   }
@@ -64,7 +66,7 @@ function navigate() {
     // (modal-to-modal swaps shouldn't clobber the true underlay).
     try {
       const prevHash = new URL(_prevHashURL).hash || "#/";
-      if (!/^#\/gaps\/[^/]+/.test(prevHash) || /^#\/gaps\/(new|import)/.test(prevHash)) {
+      if (!/^#\/gaps\/[^/]+/.test(prevHash) || /^#\/gaps\/(new|plan|import)/.test(prevHash)) {
         state.underlayHash = prevHash;
       }
     } catch { /* keep prior state.underlayHash */ }

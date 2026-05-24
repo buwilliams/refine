@@ -528,6 +528,64 @@ async function reviewImportDrafts(root, drafts, close, saveSession = null) {
   drawImportDrafts(root, annotated, close, { saveSession });
 }
 
+async function openPlanDraftModalFromText(text) {
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal import-modal" role="dialog" aria-modal="true"
+         aria-labelledby="plan-drafts-title">
+      <div class="modal-title" id="plan-drafts-title">Plan drafts</div>
+      <div class="modal-body" style="max-height:72vh;overflow:auto">
+        <div class="muted small" style="margin-bottom:8px">
+          Review and edit drafted Gaps before saving.
+        </div>
+        <div id="import-drafts" class="import-drafts"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(root);
+  let closed = false;
+  let abort = new AbortController();
+  function close(_navigateAway, _options = {}) {
+    if (closed) return;
+    closed = true;
+    abort.abort();
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close(false);
+    }
+  }
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close(false);
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", () => close(false));
+  const draftsRoot = root.querySelector("#import-drafts");
+  try {
+    const drafts = await extractImportDrafts(text, draftsRoot, abort.signal);
+    drafts.forEach((draft) => {
+      draft.reporter = draft.reporter || state.lastReporter || "";
+      draft.priority = draft.priority || "low";
+    });
+    if (closed) return;
+    const annotated = await annotateImportDuplicateDrafts(drafts);
+    if (closed) return;
+    drawImportDrafts(root, annotated, close, { clearSession: false });
+  } catch (e) {
+    if (e.name === "AbortError") return;
+    if (draftsRoot) {
+      draftsRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message)}</p>`;
+    }
+  }
+}
+
 async function annotateImportDuplicateDrafts(drafts) {
   if (!drafts.length) return drafts;
   const r = await api("POST", "/api/import/dedup", { drafts });
@@ -642,6 +700,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   }
   const draftState = drafts.map(normalizeImportDraft);
   const saveSession = options.saveSession || null;
+  const clearSessionOnClose = options.clearSession !== false;
   let page = 1;
   let showNeedsResolutionOnly = false;
   let originalUpdateField = "actual";
@@ -816,7 +875,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       { title: "Cancel import", okLabel: "Cancel import", danger: true },
     );
     if (!ok) return;
-    clearImportSession();
+    if (clearSessionOnClose) clearImportSession();
     close(true, { force: true });
   });
   actions.querySelector("#btn-persist").addEventListener("click", async () => {
@@ -841,7 +900,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       .map(importDraftPayload);
     if (!payload.length) {
       toast(`Skipped ${skipped} duplicate${skipped === 1 ? "" : "s"}; no new gaps created`, "info");
-      clearImportSession();
+      if (clearSessionOnClose) clearImportSession();
       close(true, { force: true });
       return;
     }
@@ -859,7 +918,9 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         } else {
           if (saveSession) saveSession({ phase: "saving", drafts: draftState, jobId: "", result: null, error: "" });
         }
-        await handleImportPersistResult(root, r, payload, skipped, close, saveSession);
+        await handleImportPersistResult(root, r, payload, skipped, close, saveSession, {
+          clearSession: clearSessionOnClose,
+        });
       } catch (e) {
         if (e.code === "job_cancelled" || e.name === "AbortError") return;
         await showActionError(e, "Import failed");
@@ -966,7 +1027,7 @@ async function waitForImportJobCancellation(jobId, root, close, saveSession = nu
   }
 }
 
-async function handleImportPersistResult(root, r, payload, skipped, close, saveSession = null) {
+async function handleImportPersistResult(root, r, payload, skipped, close, saveSession = null, options = {}) {
   await refreshReportersAfterImport();
   const failures = r.failures || [];
   const createdCount = r.count || 0;
@@ -998,14 +1059,18 @@ async function handleImportPersistResult(root, r, payload, skipped, close, saveS
       "error",
     );
     if (root.isConnected) {
-      drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession });
+      drawImportDrafts(root, failedDrafts, close, {
+        retry: true,
+        saveSession,
+        clearSession: options.clearSession !== false,
+      });
     }
   } else {
     const duplicateText = handledDuplicates
       ? `; handled ${handledDuplicates} duplicate${handledDuplicates === 1 ? "" : "s"}`
       : "";
     toast(`Created ${createdCount} gap(s)${duplicateText}`, "info");
-    clearImportSession();
+    if (options.clearSession !== false) clearImportSession();
     if (root.isConnected) close(true, { force: true });
   }
 }

@@ -18,7 +18,7 @@ const chatState = {
 function ensureStandaloneTab() {
   if (!chatState.tabs.standalone) {
     chatState.tabs.standalone = {
-      gapId: null, label: "Standalone",
+      gapId: null, label: "Standalone", mode: "standalone",
       sessionId: null, output: "", closedReason: null,
     };
   }
@@ -52,11 +52,12 @@ function saveChatStateToStorage() {
   // clear it.
   const tabs = {};
   for (const [id, t] of Object.entries(chatState.tabs)) {
-    tabs[id] = {
-      gapId: t.gapId, label: t.label,
-      sessionId: t.sessionId,
-      output: (t.output || "").slice(-50_000),
-      closedReason: t.closedReason,
+      tabs[id] = {
+        gapId: t.gapId, label: t.label,
+        mode: t.mode || (t.gapId ? "gap" : id === "plan" ? "plan" : "standalone"),
+        sessionId: t.sessionId,
+        output: (t.output || "").slice(-50_000),
+        closedReason: t.closedReason,
     };
   }
   try {
@@ -150,6 +151,7 @@ function openChatDock({ gapId = null } = {}) {
       chatState.tabs[gapId] = {
         gapId,
         label: `Gap ${gapId.slice(0, 8)}…`,
+        mode: "gap",
         sessionId: null, output: "", closedReason: null,
       };
     }
@@ -161,6 +163,52 @@ function openChatDock({ gapId = null } = {}) {
   if (gapId) {
     const t = chatState.tabs[gapId];
     if (t && !t.sessionId) startGapChatSession(t);
+  }
+}
+
+async function renderGapPlan() {
+  await renderGapsList();
+  openPlanChatDock();
+}
+
+function ensurePlanTab() {
+  ensureStandaloneTab();
+  if (!chatState.tabs.plan) {
+    chatState.tabs.plan = {
+      gapId: null,
+      label: "Plan",
+      mode: "plan",
+      sessionId: null,
+      output: "",
+      closedReason: null,
+    };
+  }
+}
+
+function openPlanChatDock() {
+  ensurePlanTab();
+  chatState.activeTabId = "plan";
+  chatState.open = true;
+  saveChatStateToStorage();
+  drawChatDock();
+  const t = chatState.tabs.plan;
+  if (featureEnabled("chat") && t && !t.sessionId) {
+    startPlanChatSession(t);
+  }
+}
+
+async function startPlanChatSession(tab) {
+  try {
+    const r = await api("POST", "/api/chat/start", { purpose: "plan" });
+    tab.sessionId = r.session_id;
+    tab.closedReason = null;
+    tab.mode = "plan";
+    saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
+    drawChatDock();
+    $("#chat-input")?.focus();
+  } catch (e) {
+    toast("Could not start plan: " + e.message, "error");
   }
 }
 
@@ -243,9 +291,11 @@ function drawChatDock() {
 
   const startLabel = active.gapId
     ? `Start attached to Gap ${active.gapId.slice(0, 10)}…`
+    : active.mode === "plan"
+      ? "Start plan"
     : "Start standalone";
   const toggleLabel = hasSession
-    ? (active.gapId ? "Stop session" : "Stop standalone")
+    ? (active.gapId ? "Stop session" : active.mode === "plan" ? "Stop plan" : "Stop standalone")
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
@@ -290,6 +340,11 @@ function drawChatDock() {
          style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
+        ${active.mode === "plan" ? `
+          <button id="btn-plan-draft" class="secondary"
+                  ${planTranscriptText(active).trim() && !active.pending ? "" : "disabled"}>
+            Draft Gaps
+          </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
                 ${(active.output || active.sessionId) ? "" : "disabled"}>
           Clear history
@@ -347,6 +402,7 @@ function drawChatDock() {
   $("#btn-dock-toggle")?.addEventListener("click", toggleChatDock);
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleChatFullscreen);
   $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
+  $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
   $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
   $("#chat-input")?.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -483,7 +539,7 @@ async function toggleActiveChat() {
   await withButtonBusy(btn, "Starting…", async () => {
     try {
       const r = await api("POST", "/api/chat/start",
-                          t.gapId ? { gap_id: t.gapId } : {});
+                          t.gapId ? { gap_id: t.gapId } : t.mode === "plan" ? { purpose: "plan" } : {});
       t.sessionId = r.session_id;
       t.closedReason = null;
       t.output = "";
@@ -495,6 +551,29 @@ async function toggleActiveChat() {
       toast("Could not start chat: " + e.message, "error");
     }
   });
+}
+
+function planTranscriptText(tab) {
+  return (tab?.output || "")
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith("[refine]"))
+    .join("\n")
+    .trim();
+}
+
+async function draftGapsFromPlan() {
+  const t = chatState.tabs.plan;
+  if (!t || t.pending) return;
+  const transcript = planTranscriptText(t);
+  if (!transcript) {
+    toast("Discuss the plan before drafting Gaps.", "error");
+    return;
+  }
+  if (typeof openPlanDraftModalFromText !== "function") {
+    toast("Plan drafting is unavailable.", "error");
+    return;
+  }
+  openPlanDraftModalFromText(transcript);
 }
 
 async function pollChat() {

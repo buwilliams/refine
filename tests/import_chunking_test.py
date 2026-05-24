@@ -113,7 +113,8 @@ def main() -> int:
     assert "lines ${chunk.startLine}-${chunk.endLine}" in import_js
     assert 'withButtonBusy(btn, "Saving…"' in import_js
     assert "Failed drafts (${reviewDrafts.length})" in import_js
-    assert "drawImportDrafts(root, failedDrafts, close, { retry: true, saveSession })" in import_js
+    assert "clearSession: options.clearSession !== false" in import_js
+    assert "drawImportDrafts(root, failedDrafts, close, {" in import_js
     assert "Yes, ignore" in new_gap_js
     assert "No, import" in new_gap_js
     assert "Yes, move original to backlog" in new_gap_js

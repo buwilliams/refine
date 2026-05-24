@@ -157,7 +157,7 @@ function renderAgentProcessRow(proc, anchorMs) {
     ? `<span class="js-idle-tick" data-base="${Number(proc.idle_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.idle_seconds || 0)}</span>`
     : `<span class="muted small">-</span>`;
   const label = kind === "chat"
-    ? `${htmlEscape(proc.mode === "gap" ? "Gap chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
+    ? `${htmlEscape(proc.mode === "gap" ? "Gap chat" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
     : proc.gap_id
     ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
     : htmlEscape(proc.label || "Agent");

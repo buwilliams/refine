@@ -1683,8 +1683,10 @@ class Runner:
                 ),
             }
         gap_id = params.get("gap_id")
+        purpose = str(params.get("purpose") or "").strip().lower()
         priming_prompt: str | None = None
         priming_intro: str | None = None
+        chat_mode = "standalone"
         if gap_id:
             # Prefer the Gap's worktree when it exists (in-progress / todo
             # / review / failed Gaps with a registered worktree). For
@@ -1695,9 +1697,15 @@ class Runner:
             worktree_present = worktree.exists()
             root = worktree if worktree_present else git_ops.client_repo_path()
             is_standalone = False
+            chat_mode = "gap"
             priming_prompt, priming_intro = _build_gap_chat_preamble(
                 self._conn, gap_id, worktree_present=worktree_present,
             )
+        elif purpose == "plan":
+            root = git_ops.client_repo_path()
+            is_standalone = True
+            chat_mode = "plan"
+            priming_prompt, priming_intro = _build_plan_chat_preamble()
         else:
             root = git_ops.client_repo_path()
             is_standalone = True
@@ -1718,6 +1726,7 @@ class Runner:
             cwd, is_standalone=is_standalone,
             provider=db.get_setting(self._conn, "agent_cli"),
             gap_id=gap_id,
+            mode=chat_mode,
             priming_prompt=priming_prompt,
             priming_intro=priming_intro,
             show_priming_output=bool(gap_id),
@@ -2240,6 +2249,27 @@ def _chunks(values: list[str], size: int = 500) -> list[list[str]]:
 
 
 # ---- chat priming -----------------------------------------------------------
+
+def _build_plan_chat_preamble() -> tuple[str, str]:
+    prompt = """\
+You are helping a user plan future software work for Refine.
+
+Discuss the user's idea, ask clarifying questions, and help shape it into
+one or more implementation-ready Gaps. A Gap is a single actionable software
+change with:
+- a short name,
+- actual/current behavior,
+- target/desired behavior.
+
+Do not create Gaps yourself. When the user is ready, they will use Refine's
+Draft Gaps action to review and save proposed Gaps.
+"""
+    intro = (
+        "[refine] Plan mode loaded. Discuss the idea here, then use "
+        "Draft Gaps to review proposed Gaps before saving."
+    )
+    return prompt, intro
+
 
 def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
                               *, worktree_present: bool = True,

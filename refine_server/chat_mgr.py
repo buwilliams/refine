@@ -173,6 +173,7 @@ class ChatSession:
     last_activity_ts: float        # monotonic timestamp of last user activity
     provider: str = "claude"
     gap_id: str | None = None
+    mode: str = "standalone"
     started_ts: float = field(default_factory=time.monotonic)
     # Discovered from provider structured output after the first send;
     # reused by provider-specific resume args to thread context.
@@ -252,7 +253,7 @@ class ChatManager:
                     "pid": pid,
                     "status": "running" if running else "idle",
                     "provider": s.provider,
-                    "mode": "standalone" if s.is_standalone else "gap",
+                    "mode": s.mode,
                     "gap_id": s.gap_id,
                     "elapsed_seconds": int(now - s.started_ts),
                     "idle_seconds": int(now - idle_base),
@@ -262,16 +263,19 @@ class ChatManager:
     def start(self, cwd: Path, *, is_standalone: bool = True,
               provider: str | None = None,
               gap_id: str | None = None,
+              mode: str | None = None,
               priming_prompt: str | None = None,
               priming_intro: str | None = None,
               show_priming_output: bool = False) -> str:
         sid = uuid.uuid4().hex[:12]
+        chat_mode = (mode or ("standalone" if is_standalone else "gap")).strip() or "standalone"
         session = ChatSession(
             session_id=sid,
             cwd=cwd,
             is_standalone=is_standalone,
             provider=agent_cli.get_spec(provider).name,
             gap_id=gap_id,
+            mode=chat_mode,
             last_activity_ts=time.monotonic(),
             pending_priming_text=priming_prompt or None,
             show_priming_output=show_priming_output,
@@ -311,9 +315,10 @@ class ChatManager:
                     bufsize=1,
                 )
             except (OSError, FileNotFoundError) as e:
+                context_label = "Plan" if s.mode == "plan" else "Gap"
                 with s.out_lock:
                     s.out_lines.append(
-                        f"[refine] could not load Gap context: {e}"
+                        f"[refine] could not load {context_label} context: {e}"
                     )
                 return
             with s.proc_lock:
@@ -346,26 +351,31 @@ class ChatManager:
                         s.proc = None
                     s.watchdog_armed_pids.discard(proc.pid)
             if timed_out:
+                context_label = "plan" if s.mode == "plan" else "context"
                 with s.out_lock:
                     s.out_lines.append(
-                        "[refine] Eager context injection timed out; your "
-                        "first message will include the context inline."
+                        f"[refine] Eager {context_label} injection timed out; "
+                        "your first message will include the context inline."
                     )
                 return
             if s.provider_session_id:
                 # Context is now resident in the provider's session; the lazy
                 # fallback in send() is no longer needed.
                 s.pending_priming_text = None
+                ready = (
+                    "[refine] Plan context injected — ready."
+                    if s.mode == "plan"
+                    else "[refine] Gap context injected — ready."
+                )
                 with s.out_lock:
-                    s.out_lines.append(
-                        "[refine] Gap context injected — ready."
-                    )
+                    s.out_lines.append(ready)
             else:
                 # Eager injection failed; keep the priming text around so
                 # send() can prepend it to the user's first message instead.
+                context_label = "plan" if s.mode == "plan" else "context"
                 with s.out_lock:
                     s.out_lines.append(
-                        "[refine] Eager context injection didn't return a "
+                        f"[refine] Eager {context_label} injection didn't return a "
                         "session id; your first message will include the "
                         "context inline."
                     )

@@ -4361,7 +4361,10 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
 
 def chat_start(body: dict) -> tuple[int, dict]:
     try:
-        result = get_client().call(M_CHAT_START, {"gap_id": body.get("gap_id")})
+        result = get_client().call(M_CHAT_START, {
+            "gap_id": body.get("gap_id"),
+            "purpose": body.get("purpose"),
+        })
     except BackendError as e:
         return _backend_err(e)
     if result.get("ok") is False and result.get("code") == "feature_disabled":

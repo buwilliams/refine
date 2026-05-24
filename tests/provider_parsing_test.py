@@ -225,6 +225,20 @@ def main() -> int:
     # --- Chat stream parsing ------------------------------------------------
     manager = ChatManager(get_standalone_idle_timeout=lambda: 0)
     snapshot_manager = ChatManager(get_standalone_idle_timeout=lambda: 999)
+    plan_manager = ChatManager(get_standalone_idle_timeout=lambda: 999)
+    plan_sid = plan_manager.start(
+        Path.cwd(),
+        is_standalone=True,
+        provider="codex",
+        mode="plan",
+        priming_intro="[refine] Plan mode loaded.",
+    )
+    plan_snap = plan_manager.snapshot()
+    assert plan_snap[0]["session_id"] == plan_sid
+    assert plan_snap[0]["mode"] == "plan"
+    assert plan_snap[0]["gap_id"] is None
+    plan_manager.shutdown()
+
     sid = snapshot_manager.start(Path.cwd(), is_standalone=True, provider="codex")
     snapshot = snapshot_manager.snapshot()
     assert len(snapshot) == 1, snapshot

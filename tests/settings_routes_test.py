@@ -37,6 +37,12 @@ def main() -> int:
     common_js = (root / "refine_ui/static/js/common.js").read_text(
         encoding="utf-8",
     )
+    chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(
+        encoding="utf-8",
+    )
+    import_js = (root / "refine_ui/static/js/features/gaps-import.js").read_text(
+        encoding="utf-8",
+    )
     dashboard_js = (root / "refine_ui/static/js/features/dashboard.js").read_text(
         encoding="utf-8",
     )
@@ -86,6 +92,8 @@ def main() -> int:
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
+    assert 'gaps_plan: renderGapPlan' in router_js
+    assert 'if (parts[1] === "plan") return { route: "gaps_plan" };' in router_js
     assert 'prevRoute === "settings" && r.route === "settings"' in router_js
     assert "refreshSettingsTab(slug).catch(showActionError);" in router_js
     assert 'parsed.route === "settings" && !parsed.tab' in settings_js
@@ -231,7 +239,9 @@ def main() -> int:
     assert 'class="nav-create-group"' in index_html
     assert 'id="btn-new-gap">+ New Gap</a>' in index_html
     assert 'class="nav-menu nav-create-menu" id="nav-create-menu"' in index_html
+    assert 'id="btn-plan">Plan</a>' in index_html
     assert 'id="btn-import">Import gaps</a>' in index_html
+    assert index_html.index('id="btn-plan"') < index_html.index('id="btn-import"')
     assert 'id="target-app-indicator" class="target-app-indicator nav-context-status"' in index_html
     assert 'id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"' in index_html
     assert '<span class="agent-status-label">0</span>' in index_html
@@ -251,6 +261,14 @@ def main() -> int:
     assert "function updateNavReporterContext()" in common_js
     assert "function updateNavAppContextLabel(label)" in common_js
     assert "function closeTopbarMenus(target = null)" in common_js
+    assert 'e.target.closest("#btn-plan")' in common_js
+    assert "openPlanChatDock();" in common_js
+    assert "function openPlanChatDock()" in chat_js
+    assert "{ purpose: \"plan\" }" in chat_js
+    assert "Draft Gaps" in chat_js
+    assert "function planTranscriptText(tab)" in chat_js
+    assert "function openPlanDraftModalFromText(text)" in import_js
+    assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
     assert 'const createMenu = document.getElementById("nav-create-menu");' in common_js
     assert ".nav-context-summary" in base_css
     assert ".nav-create-group" in base_css
@@ -338,7 +356,8 @@ def main() -> int:
     assert '.filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")' in processes_body
     assert "No active agent subprocesses or chat sessions." in processes_body
     assert "No active runner work." not in processes_body
-    assert "refreshProcessesTabForChatChange" in (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
+    assert "refreshProcessesTabForChatChange" in chat_js
+    assert 'proc.mode === "plan" ? "Plan chat"' in processes_body
     assert 'idle: "idle"' in processes_body
     assert 'data-full-details="${htmlEscape(details)}"' in processes_body
     assert "function bindProcessDetailCells" in processes_body

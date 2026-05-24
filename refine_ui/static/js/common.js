@@ -853,8 +853,8 @@ function closeTopbarMenus(target = null) {
   }
 }
 
-// "+ New Gap" and "Import gaps" in the topbar open modals in place rather than
-// navigating to dedicated screens. The hrefs are kept for deep-linking /
+// "+ New Gap", "Plan", and "Import gaps" in the topbar open in place rather
+// than navigating to dedicated screens. The hrefs are kept for deep-linking /
 // accessibility; click handlers intercept so the user's current view stays
 // underneath.
 document.addEventListener("click", (e) => {
@@ -866,6 +866,10 @@ document.addEventListener("click", (e) => {
     e.preventDefault();
     closeTopbarMenus();
     openNewGapModal();
+  } else if (e.target.closest("#btn-plan")) {
+    e.preventDefault();
+    closeTopbarMenus();
+    openPlanChatDock();
   } else if (e.target.closest("#btn-import")) {
     e.preventDefault();
     closeTopbarMenus();
