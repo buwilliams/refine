@@ -392,6 +392,10 @@ function openAddAppModal(options = {}) {
 }
 
 function showProjectAttachToast(result) {
+  if (result.restart_pending) {
+    toast("Refine is restarting for the selected app", "info");
+    return;
+  }
   if (result.runner && result.runner.started === false && result.runner.message) {
     toast(result.runner.message, "warn");
   } else {
@@ -407,6 +411,10 @@ async function applyProjectAttachResult(result) {
   state.underlayHash = "#/system/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
   showProjectAttachToast(result);
+  if (result.restart_pending) {
+    setTimeout(() => window.location.reload(), 2500);
+    return;
+  }
   resetChatForProjectSwitch();
   initSSE();
   await syncProjectUpdates({ silent: true });

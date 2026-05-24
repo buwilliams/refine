@@ -77,8 +77,8 @@ def test_client_switch_path(root: Path) -> None:
     assert "active_instance_id: result.active_instance_id" in settings_js
     assert "updateActiveInstanceLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
-    assert "Switching apps requires restarting the supervised Refine process." in api_py
-    assert "processes use the same .refine config" in api_py
+    assert "restart_pending" in api_py
+    assert "Refine is restarting for the selected app" in common_js
 
 
 def test_runtime_switch_resets_services() -> None:
@@ -270,6 +270,101 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
             os.environ["REFINE_CONFIG_PATH"] = old_cfg
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> None:
+    tmp, client1 = make_client_repo("refine-supervised-switch-")
+    conn = init_refine(client1)
+    conn.close()
+    original_cwd = Path.cwd()
+    binding = root / ".refine-binding"
+    prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    try:
+        os.chdir(root)
+        from refine_server import config
+        from refine_ui import api, runtime
+
+        config.write_binding(root, client1)
+        config.get(reload=True)
+        runtime.load_configured(
+            client1 / ".refine" / "refine.toml",
+            start_runner=False,
+            start_poller=False,
+        )
+
+        client2 = tmp / "client-two"
+        client2.mkdir()
+        git(client2, "init", "-q")
+        git(client2, "config", "user.email", "t@x")
+        git(client2, "config", "user.name", "t")
+        (client2 / "app.txt").write_text("base\n", encoding="utf-8")
+        git(client2, "add", "app.txt")
+        git(client2, "commit", "-m", "init")
+
+        old_backend_info = runtime.backend_info
+        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
+        old_commit_refine_state = api._commit_refine_state  # type: ignore[attr-defined]
+        old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
+        restarts: list[tuple[Path, Path]] = []
+        try:
+            runtime.backend_info = lambda: {  # type: ignore[assignment]
+                "process_model": "supervisor",
+                "ui_controls_runner_lifecycle": False,
+            }
+            api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
+            api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
+            api._schedule_supervisor_restart = (  # type: ignore[assignment]
+                lambda clone_arg, cfg_arg: restarts.append(
+                    (clone_arg, cfg_arg.config_path)
+                ) or {"scheduled": True, "port": 18181, "log_path": "restart.log"}
+            )
+            os.environ["REFINE_UI_PORT"] = "18181"
+
+            status, body = api.project_attach({
+                "path": str(client2),
+                "install_unit": False,
+                "start_runner": False,
+                "start_poller": False,
+            })
+        finally:
+            runtime.backend_info = old_backend_info  # type: ignore[assignment]
+            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
+            api._commit_refine_state = old_commit_refine_state  # type: ignore[assignment]
+            api._git_stdout = old_git_stdout  # type: ignore[assignment]
+
+        assert status == 200, body
+        assert body["restart_pending"] is True
+        assert body["client_repo"] == str(client2.resolve())
+        assert restarts == [
+            (root.resolve(), client2.resolve() / ".refine" / "refine.toml")
+        ]
+        assert config.read_binding(binding) == client2.resolve()
+        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        if prior_binding is None:
+            try:
+                binding.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            binding.write_text(prior_binding, encoding="utf-8")
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 

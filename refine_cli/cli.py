@@ -470,7 +470,6 @@ def _write_and_enable_ui_unit(
         f"Environment=REFINE_UI_HOST={host}\n"
         f"Environment=REFINE_UI_PORT={port}\n"
         f"Environment=REFINE_UI_SCOPE={port}\n"
-        f"Environment=REFINE_CONFIG_PATH={client_repo / '.refine' / config.CONFIG_FILENAME}\n"
         f"ExecStart={uv} run refine supervisor\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
@@ -1472,7 +1471,46 @@ def _pause_agents_for_clean_shutdown(cfg: "config.Config", port: int) -> bool:
         return True
 
 
+def _refresh_installed_ui_unit_if_stale(
+    clone: Path,
+    unit: str,
+    cfg: "config.Config",
+    port: int,
+) -> int:
+    ui_unit = _ui_unit_name(unit, port)
+    unit_path = SYSTEMD_SYSTEM_DIR / f"{ui_unit}.service"
+    text = _read_unit_text(unit_path)
+    if text is None:
+        return 0
+    stale = (
+        f"Environment={config.ENV_CONFIG_PATH}=" in text
+        or f"Environment=\"{config.ENV_CONFIG_PATH}=" in text
+        or _grep_first(text, "WorkingDirectory=") != str(clone)
+    )
+    if not stale:
+        return 0
+    try:
+        _write_and_enable_ui_unit(
+            clone,
+            cfg.client_repo,
+            force=True,
+            runner_unit_name=unit,
+            host=cfg.web_host,
+            port=port,
+        )
+    except _InitError as e:
+        print(
+            f"refine start: could not refresh installed systemd unit {ui_unit}: {e}",
+            file=sys.stderr,
+        )
+        return 1
+    return 0
+
+
 def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
+    refresh = _refresh_installed_ui_unit_if_stale(clone, unit, cfg, port)
+    if refresh != 0:
+        return refresh
     ui_unit = _ui_unit_name(unit, port)
     print(f"Starting persistent UI backend (systemctl start {ui_unit})...")
     rc, out = _systemctl("start", ui_unit)
@@ -1506,6 +1544,9 @@ def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) ->
 
 
 def _restart_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
+    refresh = _refresh_installed_ui_unit_if_stale(clone, unit, cfg, port)
+    if refresh != 0:
+        return refresh
     ui_unit = _ui_unit_name(unit, port)
     print(f"Restarting persistent UI backend (systemctl restart {ui_unit})...")
     rc, out = _systemctl("restart", ui_unit)
@@ -1855,8 +1896,19 @@ def _systemd_environment_lines(env: dict[str, str]) -> str:
     return "".join(
         _systemd_environment_line(name, value)
         for name, value in sorted(env.items())
-        if _valid_environment_name(name)
+        if _valid_environment_name(name) and name not in _SYSTEMD_ENV_BLOCKLIST
     )
+
+
+_SYSTEMD_ENV_BLOCKLIST = {
+    config.ENV_CONFIG_PATH,
+    "REFINE_NO_INPROCESS_RUNNER",
+    "REFINE_RUNNER_SOCKET",
+    "REFINE_SUPERVISOR_PID",
+    "REFINE_UI_HOST",
+    "REFINE_UI_PORT",
+    "REFINE_UI_SCOPE",
+}
 
 
 def _valid_environment_name(name: str) -> bool:

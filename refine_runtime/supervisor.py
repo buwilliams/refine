@@ -17,9 +17,12 @@ from refine_server import config, db
 def main() -> int:
     host = os.environ.get("REFINE_UI_HOST", "0.0.0.0")
     port = int(os.environ.get("REFINE_UI_PORT", "8080"))
-    cfg_path = os.environ.get(config.ENV_CONFIG_PATH)
+    cfg_path = _supervisor_config_path()
     sock = ipc.runner_socket_path(port=port, config_path=cfg_path)
     env = os.environ.copy()
+    if cfg_path:
+        os.environ[config.ENV_CONFIG_PATH] = cfg_path
+        env[config.ENV_CONFIG_PATH] = cfg_path
     env["REFINE_SUPERVISOR_PID"] = str(os.getpid())
     env["REFINE_RUNNER_SOCKET"] = str(sock)
     env["REFINE_NO_INPROCESS_RUNNER"] = "1"
@@ -141,6 +144,20 @@ def _load_resource_settings(cfg_path: str | None) -> ResourceSettings:
             f"[refine-supervisor] using default resource settings: {e}\n"
         )
         return ResourceSettings()
+
+
+def _supervisor_config_path() -> str | None:
+    raw = os.environ.get(config.ENV_CONFIG_PATH)
+    try:
+        if raw:
+            return str(config.Config.load(raw).config_path)
+        found = config.find_config()
+        if found is None:
+            return None
+        return str(config.Config.load(found).config_path)
+    except config.ConfigError as e:
+        sys.stderr.write(f"[refine-supervisor] no usable config: {e}\n")
+        return None
 
 
 if __name__ == "__main__":

@@ -402,6 +402,7 @@ def main() -> int:
     assert 'Environment="CLAUDE_CODE_USE_FOUNDRY=1"' in unit_text
     assert 'Environment="ANTHROPIC_FOUNDRY_RESOURCE=refine-foundry"' in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
+    assert "Environment=REFINE_CONFIG_PATH=" not in unit_text
     assert "User=installing-user" in unit_text
     assert f"ExecStart={fake_uv} run refine supervisor" in unit_text
     assert "Restart=on-failure" in unit_text

@@ -12,6 +12,7 @@ import os
 import re
 import sqlite3
 import subprocess
+import sys
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -820,7 +821,12 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         current_before = _current_client_repo()
         switching = current_before is not None and current_before != client_repo.resolve()
         _validate_target_schema_before_switch(client_repo.resolve(), body)
-        prep = _prepare_current_project_for_switch(clone_dir) if switching else {"warnings": []}
+        backend = runtime.backend_info()
+        supervised_switch = switching and backend.get("process_model") == "supervisor"
+        prep = (
+            _prepare_current_project_for_switch(clone_dir)
+            if switching else {"warnings": []}
+        )
 
         install_unit = body.get("install_unit") is True
         result = bootstrap_client_repo(
@@ -832,6 +838,33 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
             reuse_existing_config=True,
             install_unit=install_unit,
         )
+        if supervised_switch:
+            cfg = config.Config.load(result["config_path"])
+            restart = _schedule_supervisor_restart(clone_dir, cfg)
+            return 200, {
+                "attached": True,
+                "client_repo": str(cfg.client_repo),
+                "volume_root": str(cfg.volume_root),
+                "config_path": str(cfg.config_path),
+                "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
+                "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
+                "ui_unit_path": str(result["ui_unit_path"]) if result.get("ui_unit_path") else "",
+                "git_initialized": bool(result.get("git_initialized")),
+                "config_created": bool(result.get("config_created")),
+                "apps": project_registry.list_apps(clone_dir),
+                "registry_enabled": True,
+                "schema": project_state.schema_status(cfg.volume_root),
+                "active_instance_id": "",
+                "active_instance": None,
+                "instances": [],
+                "switch_warnings": prep.get("warnings", []),
+                "restart_pending": True,
+                "restart": restart,
+                "runner": {
+                    "started": False,
+                    "message": "Refine is restarting for the selected app.",
+                },
+            }
         cfg = runtime.load_configured(
             result["config_path"],
             start_poller=body.get("start_poller") is not False,
@@ -947,15 +980,11 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     warnings: list[str] = []
     cfg = config.get(reload=True)
     if runtime.backend_info().get("process_model") == "supervisor":
-        raise _SwitchBlocked(
-            "Switching apps requires restarting the supervised Refine process.",
-            (
-                "The supervisor starts the UI and runner worker with one config "
-                "path. Stop Refine, then start it for the selected app so both "
-                "processes use the same .refine config."
-            ),
+        warnings.append(
+            "Refine will restart so the UI and runner worker use the selected app."
         )
-    runtime.stop_runner()
+    else:
+        runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)
     dirty = _git_stdout(cfg.client_repo, ["status", "--porcelain"])
@@ -968,6 +997,57 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
             ),
         )
     return {"warnings": warnings}
+
+
+def _schedule_supervisor_restart(clone_dir: Path, cfg: config.Config) -> dict[str, Any]:
+    try:
+        port = int(os.environ.get("REFINE_UI_PORT") or cfg.web_port)
+    except ValueError:
+        port = cfg.web_port
+    run_dir = config.local_run_dir(clone_dir)
+    run_dir.mkdir(parents=True, exist_ok=True)
+    log_path = run_dir / f"restart-{port}.log"
+    command = [
+        sys.executable,
+        "-m",
+        "refine_cli",
+        "--config",
+        str(cfg.config_path),
+        "restart",
+        str(port),
+    ]
+    launcher = [
+        sys.executable,
+        "-c",
+        (
+            "import os, sys, time; "
+            "time.sleep(0.5); "
+            "os.execvpe(sys.argv[1], sys.argv[1:], os.environ)"
+        ),
+        *command,
+    ]
+    env = os.environ.copy()
+    env.pop("REFINE_RUNNER_SOCKET", None)
+    env.pop("REFINE_NO_INPROCESS_RUNNER", None)
+    env.pop("REFINE_SUPERVISOR_PID", None)
+    env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
+    env["REFINE_UI_PORT"] = str(port)
+    with log_path.open("ab") as log:
+        proc = subprocess.Popen(
+            launcher,
+            cwd=str(clone_dir),
+            stdin=subprocess.DEVNULL,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            env=env,
+            start_new_session=True,
+        )
+    return {
+        "scheduled": True,
+        "pid": proc.pid,
+        "port": port,
+        "log_path": str(log_path),
+    }
 
 
 def _commit_refine_state(repo: Path) -> None:
