@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -343,6 +344,120 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
             (root.resolve(), client2.resolve() / ".refine" / "refine.toml")
         ]
         assert config.read_binding(binding) == client2.resolve()
+        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        if prior_binding is None:
+            try:
+                binding.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            binding.write_text(prior_binding, encoding="utf-8")
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
+    tmp, client1 = make_client_repo("refine-supervised-migrate-")
+    conn = init_refine(client1)
+    conn.close()
+    original_cwd = Path.cwd()
+    binding = root / ".refine-binding"
+    prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    try:
+        os.chdir(root)
+        from refine_server import config, db, project_state
+        from refine_ui import api, runtime
+
+        config.write_binding(root, client1)
+        config.get(reload=True)
+        runtime.load_configured(
+            client1 / ".refine" / "refine.toml",
+            start_runner=False,
+            start_poller=False,
+        )
+
+        legacy = tmp / "legacy-client"
+        legacy.mkdir()
+        git(legacy, "init", "-q")
+        git(legacy, "config", "user.email", "t@x")
+        git(legacy, "config", "user.name", "t")
+        (legacy / "app.txt").write_text("base\n", encoding="utf-8")
+        git(legacy, "add", "app.txt")
+        git(legacy, "commit", "-m", "init")
+        config.write_defaults(legacy / ".refine")
+        legacy_db = legacy / ".refine" / "index.sqlite"
+        db.init_db(legacy_db)
+        legacy_conn = sqlite3.connect(str(legacy_db))
+        try:
+            legacy_conn.execute(
+                "INSERT OR REPLACE INTO settings(key, value) VALUES (?, ?)",
+                ("governance_product", "Legacy app"),
+            )
+            legacy_conn.commit()
+        finally:
+            legacy_conn.close()
+        assert project_state.schema_status(legacy / ".refine")["migration_required"] is True
+
+        old_backend_info = runtime.backend_info
+        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
+        old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
+        restarts: list[tuple[Path, Path]] = []
+        try:
+            runtime.backend_info = lambda: {  # type: ignore[assignment]
+                "process_model": "supervisor",
+                "ui_controls_runner_lifecycle": False,
+            }
+            api._git_stdout = (  # type: ignore[assignment]
+                lambda repo, args: ""
+                if repo.resolve() == client1.resolve()
+                else old_git_stdout(repo, args)
+            )
+            api._schedule_supervisor_restart = (  # type: ignore[assignment]
+                lambda clone_arg, cfg_arg: restarts.append(
+                    (clone_arg, cfg_arg.config_path)
+                ) or {"scheduled": True, "port": 18182, "log_path": "restart.log"}
+            )
+            os.environ["REFINE_UI_PORT"] = "18182"
+
+            status, body = api.project_attach({
+                "path": str(legacy),
+                "migrate": True,
+                "install_unit": False,
+                "start_runner": False,
+                "start_poller": False,
+            })
+        finally:
+            runtime.backend_info = old_backend_info  # type: ignore[assignment]
+            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
+            api._git_stdout = old_git_stdout  # type: ignore[assignment]
+
+        assert status == 200, body
+        assert body["restart_pending"] is True
+        assert body["schema"]["compatible"] is True
+        assert (legacy / ".refine" / "config.json").is_file()
+        migrated = json.loads((legacy / ".refine" / "config.json").read_text(encoding="utf-8"))
+        assert migrated["settings"]["governance_product"] == "Legacy app"
+        assert git(legacy, "status", "--porcelain").stdout.strip() == ""
+        assert restarts == [
+            (root.resolve(), legacy.resolve() / ".refine" / "refine.toml")
+        ]
+        assert config.read_binding(binding) == legacy.resolve()
         assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
@@ -725,6 +840,8 @@ def main() -> int:
     test_client_switch_path(root)
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
+    test_supervised_switch_schedules_restart_without_hot_loading(root)
+    test_supervised_switch_migrates_target_before_restart(root)
     test_active_instance_is_per_application()
     test_active_instance_is_checkout_local_for_same_application()
     test_active_instance_is_port_scoped_for_same_checkout()

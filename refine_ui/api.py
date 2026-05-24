@@ -840,6 +840,12 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         )
         if supervised_switch:
             cfg = config.Config.load(result["config_path"])
+            schema = _prepare_supervised_switch_target(
+                cfg,
+                migrate=bool(body.get("migrate")),
+            )
+            if body.get("migrate"):
+                _commit_refine_state(cfg.client_repo)
             restart = _schedule_supervisor_restart(clone_dir, cfg)
             return 200, {
                 "attached": True,
@@ -853,7 +859,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 "config_created": bool(result.get("config_created")),
                 "apps": project_registry.list_apps(clone_dir),
                 "registry_enabled": True,
-                "schema": project_state.schema_status(cfg.volume_root),
+                "schema": schema,
                 "active_instance_id": "",
                 "active_instance": None,
                 "instances": [],
@@ -999,6 +1005,38 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     return {"warnings": warnings}
 
 
+def _prepare_supervised_switch_target(
+    cfg: config.Config,
+    *,
+    migrate: bool,
+) -> dict[str, Any]:
+    """Prepare target .refine state without hot-loading it in this UI process."""
+    schema = project_state.schema_status(cfg.volume_root)
+    if schema.get("compatible"):
+        return project_state.ensure_initialized(
+            migrate=False,
+            root=cfg.volume_root,
+        )
+    if not schema.get("migration_required"):
+        return schema
+
+    conn: sqlite3.Connection | None = None
+    try:
+        if project_state.empty_refine_state(cfg.volume_root):
+            db.init_db(cfg.sqlite_path)
+            conn = db.connect(cfg.sqlite_path)
+        elif not migrate:
+            return schema
+        return project_state.ensure_initialized(
+            conn,
+            migrate=True,
+            root=cfg.volume_root,
+        )
+    finally:
+        if conn is not None:
+            conn.close()
+
+
 def _schedule_supervisor_restart(clone_dir: Path, cfg: config.Config) -> dict[str, Any]:
     try:
         port = int(os.environ.get("REFINE_UI_PORT") or cfg.web_port)
@@ -1057,7 +1095,7 @@ def _commit_refine_state(repo: Path) -> None:
     dirty_refine = _git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
     if not dirty_refine.strip():
         return
-    paths = git_ops.dirty_paths_under(".refine")
+    paths = git_ops.dirty_paths_under(".refine", cwd=repo)
     result = git_ops.commit_refine_sync_state(
         paths,
         state_message="refine: sync project state before switch",
@@ -1066,7 +1104,9 @@ def _commit_refine_state(repo: Path) -> None:
     if result.ok and result.stderr == "(nothing to commit)":
         return
     if result.ok:
-        conn = _conn()
+        repo_cfg = config.Config.load(repo / ".refine" / config.CONFIG_FILENAME)
+        db.init_db(repo_cfg.sqlite_path)
+        conn = db.connect(repo_cfg.sqlite_path)
         try:
             push = push_ops.push_current_after_pull(
                 conn,

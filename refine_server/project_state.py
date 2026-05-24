@@ -193,9 +193,10 @@ def empty_refine_state(root: Path | None = None) -> bool:
 
 
 def ensure_initialized(conn: sqlite3.Connection | None = None, *,
-                       migrate: bool = True) -> dict[str, Any]:
+                       migrate: bool = True,
+                       root: Path | None = None) -> dict[str, Any]:
     """Ensure canonical JSON exists and is compatible for the active app."""
-    root = volume_root()
+    root = root or volume_root()
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
     instances_dir(root).mkdir(exist_ok=True)

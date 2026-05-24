@@ -361,11 +361,11 @@ def _git_dir(root: Path) -> Path | None:
     return (root / r.stdout.strip()).resolve()
 
 
-def dirty_paths_under(prefix: str) -> list[str]:
+def dirty_paths_under(prefix: str, *, cwd: Path | None = None) -> list[str]:
     """Return repo-relative paths reported by `git status --porcelain` that
     sit under `prefix`. `prefix` is matched as a path segment.
     """
-    r = _run(["status", "--porcelain", "--", prefix])
+    r = _run(["status", "--porcelain", "--", prefix], cwd=cwd or client_repo_path())
     if not r.ok:
         return []
     paths: list[str] = []
