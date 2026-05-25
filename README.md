@@ -25,13 +25,6 @@ The installer checks the host, installs or repairs missing tools when you approv
 asks which AI provider to use, optionally clones or attaches the target
 application, and starts Refine.
 
-If your security policy blocks piped scripts, download and inspect it first:
-
-```bash
-curl -fsSLO https://raw.githubusercontent.com/buwilliams/refine/main/install.sh
-bash install.sh
-```
-
 ### Windows Users
 
 Open PowerShell as Administrator:
@@ -45,8 +38,6 @@ After Ubuntu opens, run the same Refine installer:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/install.sh | bash
 ```
-
-Use `uv run refine install [port]` for a persistent system service that runs as the installing user and may prompt for sudo; `start [port]` runs a non-installed background process.
 
 ## License
 
