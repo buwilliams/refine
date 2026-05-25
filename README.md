@@ -48,26 +48,6 @@ curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/install.sh |
 
 Use `uv run refine install [port]` for a persistent system service that runs as the installing user and may prompt for sudo; `start [port]` runs a non-installed background process.
 
-## Workflow
-
-1. A person adds a Gap; it starts in the Backlog.
-2. A person or automation moves the Gap to the Todo list when it is ready for work.
-3. Guidance adds matched instructions; Governance validates the request.
-4. AI agents work Todo Gaps in parallel.
-5. People review the result; if it misses the target, they submit another Round.
-6. Approval closes the Gap.
-
-## Mental Model
-
-- refine is a development tool installed on a dev or QA machine.
-- Use it as a solo contributor or open it up to a group.
-- Each machine has its own instance, configured manually.
-- refine supports multiple layers: processes on one host at different ports, targeted applications as data boundaries, and device instances on the same targeted application.
-- All data is owned by an instance and synced through git.
-- Governance and Guidance are global across all instances.
-
-![refine architecture](refine_ui/static/images/refine-architecture.svg)
-
 ## License
 
 [MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No
