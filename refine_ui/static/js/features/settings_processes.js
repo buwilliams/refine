@@ -273,7 +273,7 @@ function renderProcessActions(proc) {
         <button id="s-target-run-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !snap.has_start_command ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
         <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
       </span>
-      <button class="secondary" id="s-target-run-rebuild" ${inFlight || !snap.has_rebuild_command ? "disabled" : ""}>Rebuild</button>
+      <button class="secondary" id="s-target-run-rebuild" ${inFlight ? "disabled" : ""}>Rebuild</button>
       <button class="secondary" id="s-target-sync-now">Sync</button>
       <button class="secondary" id="s-target-health-now">Check</button>`;
   }
@@ -511,7 +511,7 @@ function drawTargetAppStatusBlock(snap) {
     setTargetAppActionVisible(startBtn, !showStop);
     setTargetAppActionVisible(stopBtn, showStop);
     startBtn.disabled = showStop || isRunning || inFlight || !snap.has_start_command;
-    rebuildBtn.disabled = inFlight || !snap.has_rebuild_command;
+    rebuildBtn.disabled = inFlight;
     stopBtn.disabled  = !showStop || isStopped || inFlight || !snap.has_stop_command;
     if (!snap.has_start_command) {
       startBtn.title = "Configure a start command above first.";
@@ -531,10 +531,10 @@ function drawTargetAppStatusBlock(snap) {
     } else {
       stopBtn.title = "";
     }
-    if (!snap.has_rebuild_command) {
-      rebuildBtn.title = "Configure a rebuild command above first.";
-    } else if (inFlight) {
+    if (inFlight) {
       rebuildBtn.title = "Application state is changing.";
+    } else if (!snap.has_rebuild_command) {
+      rebuildBtn.title = "No rebuild command configured; rebuild is a no-op.";
     } else {
       rebuildBtn.title = "";
     }
@@ -566,37 +566,8 @@ function drawTargetAppStatusBlock(snap) {
 
 function bindSettingsProcessesTab(s) {
   bindProcessDetailCells();
-  $("#btn-pause")?.addEventListener("click", async () => {
-    const paused = s.paused === "1";
-    await withButtonBusy($("#btn-pause"), paused ? "Resuming…" : "Pausing…", async () => {
-      try {
-        await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
-        await refreshProcessesSettingsTab({ force: true });
-        if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
-        if (paused) scheduleProcessesTabRefreshes();
-      } catch (e) { await showActionError(e); }
-    });
-  });
-  $("[data-hard-reset-worktree]")?.addEventListener("click", async () => {
-    const btn = $("[data-hard-reset-worktree]");
-    const ok = await modalConfirm(
-      "Hard reset the target worktree to its upstream branch and delete untracked files? This discards local target-app changes and cannot be undone.",
-      {
-        title: "Hard reset worktree",
-        okLabel: "Hard reset",
-        danger: true,
-        cancelLabel: "Cancel",
-      },
-    );
-    if (!ok) return;
-    await withButtonBusy(btn, "Resetting…", async () => {
-      try {
-        const r = await api("POST", "/api/runner-workers/merger/hard-reset-worktree");
-        toast(r.message || "Target worktree reset", "info");
-        await refreshProcessesSettingsTab({ force: true });
-      } catch (e) { await showActionError(e, "Hard reset failed"); }
-    });
-  });
+  bindCommand("#btn-pause", "system.agents.pause_toggle", { context: { settings: s } });
+  bindCommand("[data-hard-reset-worktree]", "system.worktree.hard_reset");
   $$("[data-cancel-agent]").forEach((b) => {
     b.addEventListener("click", async () => {
       const id = b.dataset.cancelAgent;
@@ -643,119 +614,31 @@ function bindSettingsProcessesTab(s) {
   });
   $$("[data-runner-target-app-generate]").forEach((b) => {
     b.addEventListener("click", async () => {
-      const ok = await modalConfirm(
-        "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the fields on the Application tab.",
-        { title: "Generate target-app config", okLabel: "Generate" },
-      );
-      if (!ok) return;
-      await withButtonBusy(b, "Generating…", async () => {
-        try {
-          const r = await api("POST", "/api/target-app/generate-instructions",
-                              { kind: "all" });
-          if (r.ok && r.config) {
-            setSettingsTab("application");
-            applyGeneratedTargetAppConfig(r.config);
-            toast("Generated — review the saved Application settings", "info");
-          } else {
-            toast("Generation produced no configuration", "error");
-          }
-        } catch (e) { await showActionError(e); }
+      await runCommand("target_app.generate", {
+        context: { button: b },
       });
     });
   });
   $$("[data-runner-cache-rebuild]").forEach((b) => {
     b.addEventListener("click", async () => {
-      const ok = await modalConfirm(
-        "Rebuild the SQLite cache from canonical .refine JSON? If the existing database is corrupted, Refine will replace it and SQLite-only runtime history may be lost.",
-        { title: "Rebuild SQLite cache", okLabel: "Rebuild" },
-      );
-      if (!ok) return;
-      await withButtonBusy(b, "Rebuilding…", async () => {
-        try {
-          let result = await api("POST", "/api/cache/rebuild", { background: true });
-          if (result.job) {
-            drawSqliteCacheProgress(result.job.progress || {});
-            result = await waitForBackgroundJob(result.job, {
-              onProgress: drawSqliteCacheProgress,
-            });
-            if (result.http_status && result.http_status >= 400) {
-              const raw = result.error || {};
-              const err = new Error(raw.message || "SQLite cache rebuild failed");
-              err.details = raw.details;
-              err.code = raw.code;
-              throw err;
-            }
-          }
-          toast("SQLite cache rebuilt", "info");
-          await refreshProcessesSettingsTab({ force: true });
-        } catch (e) { await showActionError(e, "SQLite cache rebuild failed"); }
-      });
+      await runCommand("system.cache.rebuild", { context: { button: b } });
     });
   });
   $$("[data-runner-log-cleanup]").forEach((b) => {
     b.addEventListener("click", async () => {
       const select = b.parentElement?.querySelector("[data-runner-log-cleanup-days]");
       const days = parseInt(select?.value || "7", 10);
-      const human = days === 0
-        ? "Delete ALL activity log entries? This cannot be undone."
-        : `Delete activity log entries older than ${days} day${days === 1 ? "" : "s"}? This cannot be undone.`;
-      const ok = await modalConfirm(human, {
-        title: "Clean up old logs",
-        okLabel: days === 0 ? "Delete all" : "Delete",
-        danger: true,
-      });
-      if (!ok) return;
-      await withButtonBusy(b, "Cleaning…", async () => {
-        try {
-          const r = await api("POST", "/api/activity/cleanup", { days });
-          toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
-          await refreshProcessesSettingsTab({ force: true });
-        } catch (e) { await showActionError(e); }
+      await runCommand("system.logs.cleanup", {
+        context: { button: b },
+        params: { days },
       });
     });
   });
-  $("#s-target-run-start")?.addEventListener("click", async () => {
-    const btn = $("#s-target-run-start");
-    await withButtonBusy(btn, "Starting…", async () => {
-      await runTargetAppAction("start");
-      await refreshProcessesSettingsTab({ force: true });
-    });
-  });
-  $("#s-target-run-stop")?.addEventListener("click", async () => {
-    const btn = $("#s-target-run-stop");
-    await withButtonBusy(btn, "Stopping…", async () => {
-      await runTargetAppAction("stop");
-      await refreshProcessesSettingsTab({ force: true });
-    });
-  });
-  $("#s-target-run-rebuild")?.addEventListener("click", async () => {
-    const btn = $("#s-target-run-rebuild");
-    await withButtonBusy(btn, "Rebuilding…", async () => {
-      await runTargetAppAction("rebuild");
-      await refreshProcessesSettingsTab({ force: true });
-    });
-  });
-  $("#s-target-sync-now")?.addEventListener("click", async () => {
-    const btn = $("#s-target-sync-now");
-    await withButtonBusy(btn, "Syncing…", async () => {
-      await syncProjectUpdates();
-      await refreshReporters({ selectFallback: true });
-      await refreshProcessesSettingsTab({ force: true });
-    });
-  });
-  $("#s-target-health-now")?.addEventListener("click", async () => {
-    const btn = $("#s-target-health-now");
-    await withButtonBusy(btn, "Probing…", async () => {
-      try {
-        const r = await api("POST", "/api/target-app/health");
-        const ok = "last_check_ok" in r ? r.last_check_ok : r.last_health_ok;
-        toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"),
-              ok ? "info" : "error");
-        drawTargetAppStatusBlock(r);
-        await refreshProcessesSettingsTab({ force: true });
-      } catch (e) { await showActionError(e); }
-    });
-  });
+  bindCommand("#s-target-run-start", "target_app.start");
+  bindCommand("#s-target-run-stop", "target_app.stop");
+  bindCommand("#s-target-run-rebuild", "target_app.rebuild");
+  bindCommand("#s-target-sync-now", "target_app.sync");
+  bindCommand("#s-target-health-now", "target_app.health");
   // Kick off the initial status load (and let SSE refresh later).
   refreshTargetAppStatus();
 }

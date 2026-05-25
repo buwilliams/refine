@@ -4645,6 +4645,24 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
         cfg = _target_app_config(settings)
         command = (cfg.get(f"{kind}_command") or "").strip()
         if not command:
+            if kind == "rebuild":
+                msg = "No rebuild command configured; rebuild is a no-op."
+                db.set_setting(conn, "target_app_last_error", "")
+                activity.append(
+                    conn,
+                    message="target-app: rebuild skipped; no rebuild command configured",
+                    severity="info", category="target_app", actor="refine",
+                )
+                snap = _target_app_snapshot(conn)
+                snap.update({
+                    "ok": True,
+                    "noop": True,
+                    "state": snap.get("state") or "unknown",
+                    "message": msg,
+                    "details": "",
+                    "promoted_gaps": 0,
+                })
+                return 200, snap
             return err(400,
                 f"No {kind} command configured. "
                 f"Generate or enter target-app configuration in Settings first.")

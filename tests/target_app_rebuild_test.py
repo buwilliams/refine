@@ -90,6 +90,35 @@ def main() -> int:
             api.get_client = old_get_client  # type: ignore[assignment]
         assert M_TARGET_APP_REBUILD_PENDING in calls, calls
         assert M_TARGET_APP_REBUILD_QUEUE in calls, calls
+
+        class RebuildNoopClient:
+            def call(self, method: str, params: dict | None = None, *, timeout: float = 30.0) -> dict:  # noqa: ARG002
+                raise AssertionError("empty rebuild command should not call runner")
+
+        db.set_setting(conn, "target_app_rebuild_command", "")
+        db.set_setting(conn, "target_app_state", "running")
+        db.set_setting(conn, "target_app_last_error", "old failure")
+        try:
+            api.get_client = lambda: RebuildNoopClient()  # type: ignore[assignment]
+            status, body = api.target_app_rebuild({})
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+        assert status == 200, body
+        assert body["ok"] is True, body
+        assert body["noop"] is True, body
+        assert body["state"] == "running", body
+        assert body["promoted_gaps"] == 0, body
+        assert "no-op" in body["message"], body
+        assert db.get_setting(conn, "target_app_last_error") == ""
+        noop_row = conn.execute(
+            "SELECT message, severity FROM activity "
+            "WHERE category = 'target_app' "
+            "AND message LIKE 'target-app: rebuild skipped%' "
+            "ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        assert noop_row is not None, body
+        assert noop_row["severity"] == "info", dict(noop_row)
+
         conn.execute(
             "UPDATE gaps_index SET status = 'review' WHERE id = ?",
             (gid_pending,),

@@ -832,15 +832,15 @@ document.addEventListener("click", (e) => {
   if (e.target.closest("#btn-new-gap")) {
     e.preventDefault();
     closeTopbarMenus();
-    openNewGapModal();
+    runCommand("gap.new");
   } else if (e.target.closest("#btn-plan")) {
     e.preventDefault();
     closeTopbarMenus();
-    openPlanChatDock();
+    runCommand("plan.open");
   } else if (e.target.closest("#btn-import")) {
     e.preventDefault();
     closeTopbarMenus();
-    openImportModal();
+    runCommand("gap.import");
   } else if (e.target.closest("#target-app-indicator")) {
     closeTopbarMenus();
   } else if (!e.target.closest(".nav-menu")) {

@@ -209,29 +209,8 @@ function applyGeneratedTargetAppConfig(cfg) {
 }
 
 function bindSettingsApplicationTab(currentProject) {
-  $("#s-application-copy-instance")?.addEventListener("click", async () => {
-    await copySettingsFromInstance("application", {
-      title: "Copy application settings",
-      refreshTab: "application",
-    });
-  });
-  $("#s-target-generate-ai")?.addEventListener("click", async () => {
-    const ok = await modalConfirm(
-      "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the saved target-app fields.",
-      { title: "Generate target-app config", okLabel: "Generate" },
-    );
-    if (!ok) return;
-    await withButtonBusy($("#s-target-generate-ai"), "Generating…", async () => {
-      try {
-        const r = await api("POST", "/api/target-app/generate-instructions", { kind: "all" });
-        if (r.ok && r.config) {
-          applyGeneratedTargetAppConfig(r.config);
-        } else {
-          toast("Generation produced no configuration", "error");
-        }
-      } catch (e) { await showActionError(e); }
-    });
-  });
+  bindCommand("#s-application-copy-instance", "settings.application.copy_instance");
+  bindCommand("#s-target-generate-ai", "target_app.generate");
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
   });

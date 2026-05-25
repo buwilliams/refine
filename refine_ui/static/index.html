@@ -55,6 +55,11 @@
         <span class="target-app-dot" aria-hidden="true"></span>
         <span class="agent-status-label">0</span>
       </a>
+      <button class="secondary nav-command-button" id="btn-command-palette"
+              aria-label="Open command palette">
+        <span class="nav-command-icon" aria-hidden="true"></span>
+        <span class="nav-command-shortcut" data-command-shortcut>Ctrl+K</span>
+      </button>
       <div class="nav-create-group">
         <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
         <details class="nav-menu nav-create-menu" id="nav-create-menu">
@@ -82,6 +87,7 @@
   </template>
 
   <script src="/static/js/common.js"></script>
+  <script src="/static/js/command-registry.js"></script>
   <script src="/static/js/features/dashboard.js"></script>
   <script src="/static/js/features/gaps-list.js"></script>
   <script src="/static/js/features/gaps-bulk.js"></script>
@@ -102,6 +108,8 @@
   <script src="/static/js/features/settings_reporters.js"></script>
   <script src="/static/js/features/settings.js"></script>
   <script src="/static/js/target-app.js"></script>
+  <script src="/static/js/commands.js"></script>
+  <script src="/static/js/command-palette.js"></script>
   <script src="/static/js/router.js"></script>
   <script src="/static/js/init.js"></script>
 </body>

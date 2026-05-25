@@ -492,34 +492,7 @@ function drawRuntimeRecovery(error) {
 }
 
 function bindRebuildCacheHandler() {
-  $("#s-rebuild-cache")?.addEventListener("click", async () => {
-    const ok = await modalConfirm(
-      "Rebuild the SQLite cache from canonical .refine JSON? If the existing database is corrupted, Refine will replace it and SQLite-only runtime history may be lost.",
-      { title: "Rebuild SQLite cache", okLabel: "Rebuild" },
-    );
-    if (!ok) return;
-    await withButtonBusy($("#s-rebuild-cache"), "Rebuilding…", async () => {
-      try {
-        let result = await api("POST", "/api/cache/rebuild", { background: true });
-        if (result.job) {
-          drawSqliteCacheProgress(result.job.progress || {});
-          result = await waitForBackgroundJob(result.job, {
-            onProgress: drawSqliteCacheProgress,
-          });
-          if (result.http_status && result.http_status >= 400) {
-            const raw = result.error || {};
-            const err = new Error(raw.message || "SQLite cache rebuild failed");
-            err.details = raw.details;
-            err.code = raw.code;
-            throw err;
-          }
-        }
-        const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
-        toast(`SQLite cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
-        await refreshSettings({ force: true });
-      } catch (e) { await showActionError(e, "SQLite cache rebuild failed"); }
-    });
-  });
+  bindCommand("#s-rebuild-cache", "system.cache.rebuild");
 }
 
 

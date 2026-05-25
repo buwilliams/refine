@@ -37,6 +37,9 @@ def main() -> int:
     common_js = (root / "refine_ui/static/js/common.js").read_text(
         encoding="utf-8",
     )
+    commands_js = (root / "refine_ui/static/js/commands.js").read_text(
+        encoding="utf-8",
+    )
     chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(
         encoding="utf-8",
     )
@@ -140,9 +143,9 @@ def main() -> int:
     assert 'id="s-resource-isolation"' in settings_js
     assert '["very_low", "Very low"]' in settings_js
     assert '["best_effort", "Best effort"]' in settings_js
-    assert 'api("POST", "/api/cache/rebuild", { background: true })' in settings_js
+    assert 'api("POST", "/api/cache/rebuild", { background: true })' in commands_js
     assert "function drawSqliteCacheProgress" in settings_js
-    assert "onProgress: drawSqliteCacheProgress" in settings_js
+    assert "onProgress: drawSqliteCacheProgress" in commands_js
     assert 'slug: "performance"' in settings_js
     assert 'api("GET", typeof performanceApiPath === "function"' in settings_js
     assert 'slug: "processes"' in settings_js
@@ -178,8 +181,9 @@ def main() -> int:
     assert "function drawRuntimeRecovery(error)" in settings_js
     assert '@route("POST", r"/api/cache/rebuild")' in server_py
     assert "def rebuild_sqlite_cache" in api_py
-    assert 'await showActionError(e, "SQLite cache rebuild failed");' in settings_js
+    assert 'errorTitle: "SQLite cache rebuild failed"' in commands_js
     assert 'await showActionError(e, "Target app action failed");' in target_app_js
+    assert 'toast("No rebuild command configured; rebuild is a no-op.", "info");' in target_app_js
     assert 'id="s-agent-limit-pause"' in settings_js
     assert "agent_limit_pause_seconds" in settings_js
     assert '"30",    "30 seconds"' in settings_js
@@ -292,8 +296,8 @@ def main() -> int:
     assert "function updateNavAppContextLabel(label)" in common_js
     assert "function closeTopbarMenus(target = null)" in common_js
     assert 'e.target.closest("#btn-plan")' in common_js
-    assert "openPlanChatDock();" in common_js
-    assert "function openPlanChatDock()" in chat_js
+    assert 'runCommand("plan.open")' in common_js
+    assert "async function openPlanChatDock(options = {})" in chat_js
     assert "{ purpose: \"plan\" }" in chat_js
     assert "Draft Gaps" in chat_js
     assert "function planTranscriptText(tab)" in chat_js
@@ -302,6 +306,9 @@ def main() -> int:
     assert ".nav-context-summary" in base_css
     assert ".nav-create-group" in base_css
     assert ".nav-menu-panel" in base_css
+    topbar_css = re.search(r"\.topbar \{(.*?)\}", base_css, re.S)
+    assert topbar_css and "position: relative" in topbar_css.group(1)
+    assert topbar_css and "z-index: 120" in topbar_css.group(1)
     assert '.agent-status-indicator[data-state="running"] .target-app-dot' in base_css
     assert '.agent-status-indicator[data-state="paused"] .target-app-dot' in base_css
     assert '.agent-status-indicator[data-state="down"] .target-app-dot' in base_css
@@ -334,11 +341,13 @@ def main() -> int:
     assert 'id="s-target-health-now"' in processes_body
     assert processes_body.index('id="s-target-run-start"') < processes_body.index('id="s-target-run-stop"') < processes_body.index('id="s-target-run-rebuild"')
     assert 'class="target-app-action-slot"' in processes_body
-    assert 'refreshAgentStatusIndicator === "function"' in processes_body
+    assert 'rebuildBtn.disabled = inFlight;' in processes_body
+    assert 'No rebuild command configured; rebuild is a no-op.' in processes_body
+    assert 'refreshAgentStatusIndicator === "function"' in commands_js
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body
     assert 'id="btn-pause"' in processes_body
-    assert "scheduleProcessesTabRefreshes()" in processes_body
+    assert "scheduleProcessesTabRefreshes()" in commands_js
     assert "function scheduleProcessesTabRefreshes()" in processes_body
     assert '[data-tab-pane="processes"].active' in processes_body
     assert "refreshCurrentSettingsSurface()" in common_js
@@ -373,9 +382,9 @@ def main() -> int:
     assert 'data-runner-log-cleanup-days' in processes_body
     assert 'data-hard-reset-worktree' in processes_body
     assert 'api("POST", "/api/runner-workers/target-app-rebuilder/rebuild")' in settings_js
-    assert 'api("POST", "/api/runner-workers/merger/hard-reset-worktree")' in settings_js
-    assert 'api("POST", "/api/target-app/generate-instructions"' in settings_js
-    assert 'api("POST", "/api/activity/cleanup"' in settings_js
+    assert 'api("POST", "/api/runner-workers/merger/hard-reset-worktree")' in commands_js
+    assert 'api("POST", "/api/target-app/generate-instructions"' in commands_js
+    assert 'api("POST", "/api/activity/cleanup"' in commands_js
     assert '@route("POST", r"/api/runner-workers/target-app-rebuilder/rebuild")' in server_py
     assert '@route("POST", r"/api/runner-workers/merger/hard-reset-worktree")' in server_py
     assert "<th>CPU priority</th>" in agents_table
@@ -414,9 +423,9 @@ def main() -> int:
     assert 'data-cancel-agent="' not in runtime_body
     assert 'id="s-target-run-start"' not in application_body
     assert 'id="s-project-sync-now"' not in processes_body
-    assert "await withButtonBusy(btn, \"Syncing…\", async () => {" in processes_body
-    assert "await syncProjectUpdates();" in processes_body
-    assert "await refreshProcessesSettingsTab({ force: true });" in processes_body
+    assert 'await withButtonBusy(button, "Syncing...", async () => {' in commands_js
+    assert "await syncProjectUpdates();" in commands_js
+    assert "await refreshProcessesSettingsTab({ force: true });" in commands_js
     assert ".process-table {" in common_css
     assert ".process-table .cpu-col { width: 86px; }" in common_css
     assert ".process-table .memory-col { width: 92px; }" in common_css
@@ -470,10 +479,10 @@ def main() -> int:
     assert "target_app_url" not in common_js
     assert 'id="s-application-copy-instance"' in application_body
     assert 'id="s-target-generate-ai"' in application_body
-    assert 'copySettingsFromInstance("application"' in application_body
-    assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in application_body
+    assert 'copySettingsFromInstance("application"' in commands_js
+    assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in commands_js
     assert 'id="s-runtime-copy-instance"' in runtime_body
-    assert 'copySettingsFromInstance("runtime"' in runtime_body
+    assert 'copySettingsFromInstance("runtime"' in commands_js
     assert 'api("POST", "/api/instances/copy-settings"' in settings_js
     assert '@route("POST", r"/api/instances/copy-settings")' in server_py
     assert 'id="s-target-auto-rebuild"' in settings_js

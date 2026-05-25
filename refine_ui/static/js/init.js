@@ -24,6 +24,7 @@ async function init() {
     // not fatal — likely fresh install with no reporters yet
   }
   initChatDock();
+  if (typeof initCommandPalette === "function") initCommandPalette();
   initSSE();
   initTargetAppToggle();
   setInterval(tickRunningCells, 1000);

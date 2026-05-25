@@ -128,12 +128,7 @@ async function autosaveSettingsRuntime(options = {}) {
 }
 
 function bindSettingsRuntimeTab() {
-  $("#s-runtime-copy-instance")?.addEventListener("click", async () => {
-    await copySettingsFromInstance("runtime", {
-      title: "Copy runtime settings",
-      refreshTab: "runtime",
-    });
-  });
+  bindCommand("#s-runtime-copy-instance", "settings.runtime.copy_instance");
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
@@ -144,12 +139,5 @@ function bindSettingsRuntimeTab() {
     () => autosaveSettingsRuntime({ refresh: true }),
   );
   $("#s-cli")?.addEventListener("change", autosaveRuntimeAndRefresh);
-  $("#s-recheck").addEventListener("click", async () => {
-    await withButtonBusy($("#s-recheck"), "Re-checking…", async () => {
-      try {
-        const r = await api("POST", "/api/settings/recheck-auth");
-        toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
-      } catch (e) { await showActionError(e); }
-    });
-  });
+  bindCommand("#s-recheck", "runtime.recheck_auth");
 }

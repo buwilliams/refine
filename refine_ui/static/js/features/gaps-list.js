@@ -129,12 +129,12 @@ async function renderGapsList() {
   });
   // The bulk-action buttons read the current filter from the hash at click
   // time, so they always reflect what the user can see.
-  $("#bulk-set-priority").addEventListener("click", () => openBulkModal("priority"));
-  $("#bulk-set-status").addEventListener("click", () => openBulkModal("status"));
-  $("#bulk-set-reporter").addEventListener("click", () => openBulkModal("reporter"));
-  $("#bulk-transfer-instance").addEventListener("click", () => openBulkTransferInstanceModal());
-  $("#bulk-delete").addEventListener("click", () => confirmBulkDelete());
-  $("#gap-select-page").addEventListener("click", selectCurrentGapsPage);
+  bindCommand("#bulk-set-priority", "gaps.bulk.priority");
+  bindCommand("#bulk-set-status", "gaps.bulk.status");
+  bindCommand("#bulk-set-reporter", "gaps.bulk.reporter");
+  bindCommand("#bulk-transfer-instance", "gaps.bulk.transfer_instance");
+  bindCommand("#bulk-delete", "gaps.bulk.delete");
+  bindCommand("#gap-select-page", "gaps.select_page");
 
   // Expanding / collapsing the filter shell shows / hides the per-row
   // checkbox column. Redraw from the cached results so we don't re-fetch.

@@ -150,6 +150,10 @@ async function runTargetAppAction(action) {
       ? snap.has_stop_command
       : snap.has_rebuild_command;
   if (!hasPrompt) {
+    if (action === "rebuild") {
+      toast("No rebuild command configured; rebuild is a no-op.", "info");
+      return;
+    }
     toast(
       `No ${action} command configured. Set it above, then click Save.`,
       "error",

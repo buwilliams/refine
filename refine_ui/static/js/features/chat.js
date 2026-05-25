@@ -185,15 +185,23 @@ function ensurePlanTab() {
   }
 }
 
-function openPlanChatDock() {
+async function openPlanChatDock(options = {}) {
+  const initialPrompt = typeof options === "string"
+    ? options
+    : String(options.initialPrompt || "");
   ensurePlanTab();
   chatState.activeTabId = "plan";
   chatState.open = true;
   saveChatStateToStorage();
   drawChatDock();
   const t = chatState.tabs.plan;
+  let started = Promise.resolve();
   if (t && !t.sessionId) {
-    startPlanChatSession(t);
+    started = startPlanChatSession(t);
+  }
+  if (initialPrompt.trim()) {
+    await started;
+    await sendChatText(initialPrompt);
   }
 }
 
@@ -586,6 +594,14 @@ async function sendChatLine() {
   const text = input.value;
   if (!text.trim()) return;
   input.value = "";
+  await sendChatText(text);
+}
+
+async function sendChatText(text) {
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t || !t.sessionId || t.pending) return;
+  text = String(text || "");
+  if (!text.trim()) return;
   const echo = `\n> ${text}\n`;
   t.output = (t.output || "") + echo;
   const out = $("#chat-output");

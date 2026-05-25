@@ -98,6 +98,8 @@ pre {
 }
 
 .topbar {
+  position: relative;
+  z-index: 120;
   height: 56px;
   display: flex;
   align-items: center;
@@ -164,6 +166,40 @@ pre {
   filter: none;
 }
 .topbar-actions select { width: 100%; }
+
+.nav-command-button {
+  height: 30px;
+  padding: 0 8px;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+}
+.nav-command-icon {
+  width: 13px;
+  height: 13px;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  position: relative;
+  display: inline-block;
+}
+.nav-command-icon::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 2px;
+  right: -5px;
+  bottom: -3px;
+  background: currentColor;
+  transform: rotate(45deg);
+  border-radius: 999px;
+}
+.nav-command-shortcut {
+  color: var(--color-text-soft);
+  font-size: 11px;
+  font-weight: 650;
+}
+.nav-command-button:hover .nav-command-shortcut {
+  color: var(--color-text);
+}
 
 .nav-menu {
   position: relative;
