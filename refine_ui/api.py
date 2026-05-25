@@ -822,7 +822,10 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         switching = current_before is not None and current_before != client_repo.resolve()
         _validate_target_schema_before_switch(client_repo.resolve(), body)
         backend = runtime.backend_info()
-        supervised_switch = switching and backend.get("process_model") == "supervisor"
+        supervised_restart = (
+            backend.get("process_model") == "supervisor"
+            and (switching or current_before is None)
+        )
         prep = (
             _prepare_current_project_for_switch(clone_dir)
             if switching else {"warnings": []}
@@ -838,7 +841,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
             reuse_existing_config=True,
             install_unit=install_unit,
         )
-        if supervised_switch:
+        if supervised_restart:
             cfg = config.Config.load(result["config_path"])
             schema = _prepare_supervised_switch_target(
                 cfg,

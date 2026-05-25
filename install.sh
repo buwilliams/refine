@@ -15,6 +15,7 @@ REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
 REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
+REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   BOLD="$(printf '\033[1m')"
@@ -399,6 +400,64 @@ ensure_uv() {
   die "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
 }
 
+provider_binary() {
+  case "$1" in
+    claude) printf '%s\n' "claude" ;;
+    codex) printf '%s\n' "codex" ;;
+    gemini) printf '%s\n' "gemini" ;;
+    copilot) printf '%s\n' "copilot" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+provider_in_list() {
+  case " $2 " in
+    *" $1 "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+detect_installed_providers() {
+  local installed=""
+  local provider binary
+  for provider in $REFINE_PROVIDER_OPTIONS; do
+    binary="$(provider_binary "$provider")"
+    if have "$binary"; then
+      installed="${installed:+$installed }$provider"
+    fi
+  done
+  printf '%s\n' "$installed"
+}
+
+first_provider_or_default() {
+  local providers="$1"
+  local provider
+  for provider in $providers; do
+    printf '%s\n' "$provider"
+    return 0
+  done
+  printf '%s\n' "claude"
+}
+
+report_provider_detection() {
+  local installed="$1"
+  local missing=""
+  local provider
+  if [ -n "$installed" ]; then
+    ok "Installed provider CLIs: $installed"
+  else
+    warn "No supported provider CLIs found on PATH"
+  fi
+  for provider in $REFINE_PROVIDER_OPTIONS; do
+    if ! provider_in_list "$provider" "$installed"; then
+      missing="${missing:+$missing }$provider"
+    fi
+  done
+  if [ -n "$missing" ]; then
+    info "Missing provider CLIs: $missing"
+  fi
+}
+
 ensure_provider_cli() {
   local provider="$1"
   local binary="$provider"
@@ -540,7 +599,7 @@ target_from_remote() {
 
 choose_target_app() {
   section "Target application"
-  say "Refine works against your application repository. Use a local path or paste a Git remote."
+  say "Refine works against your application repository. Use a local path, paste a Git remote, or press Enter to attach one later in Refine."
   local input=""
   if [ -n "$REFINE_INSTALL_TARGET_APP" ]; then
     input="$REFINE_INSTALL_TARGET_APP"
@@ -548,7 +607,11 @@ choose_target_app() {
   else
     input="$(prompt "Target app path or Git remote" "")"
   fi
-  [ -n "$input" ] || die "A target app path or Git remote is required."
+  if [ -z "$input" ]; then
+    TARGET_APP_PATH=""
+    info "No target app attached. Refine will open in setup mode so you can choose one in the browser."
+    return 0
+  fi
   case "$input" in
     http://*|https://*|git@*|ssh://*)
       local name
@@ -622,8 +685,12 @@ configure_target_app_commands() {
 init_refine() {
   section "Refine project setup"
   [ -d "$REFINE_CHECKOUT" ] || die "Refine checkout missing: $REFINE_CHECKOUT"
-  [ -d "$TARGET_APP_PATH" ] || die "Target app missing: $TARGET_APP_PATH"
   run cd "$REFINE_CHECKOUT" || die "Could not enter $REFINE_CHECKOUT"
+  if [ -z "$TARGET_APP_PATH" ]; then
+    info "Skipping target-app initialization until you attach an app in Refine."
+    return 0
+  fi
+  [ -d "$TARGET_APP_PATH" ] || die "Target app missing: $TARGET_APP_PATH"
   run uv run refine init "$TARGET_APP_PATH" --force || die "refine init failed"
   configure_refine_setting "agent_cli" "$SELECTED_PROVIDER"
   configure_target_app_commands
@@ -672,6 +739,9 @@ preflight() {
 provider_flow() {
   section "AI provider"
   say "Choose the agent CLI Refine should drive."
+  local installed_providers
+  installed_providers="$(detect_installed_providers)"
+  report_provider_detection "$installed_providers"
   if [ -n "$REFINE_INSTALL_PROVIDER" ]; then
     SELECTED_PROVIDER="$(printf '%s' "$REFINE_INSTALL_PROVIDER" | tr '[:upper:]' '[:lower:]')"
     case "$SELECTED_PROVIDER" in
@@ -680,7 +750,7 @@ provider_flow() {
     esac
     info "Using provider from REFINE_INSTALL_PROVIDER: $SELECTED_PROVIDER"
   else
-    SELECTED_PROVIDER="$(choice "Provider" "claude" claude codex gemini copilot)"
+    SELECTED_PROVIDER="$(choice "Provider" "$(first_provider_or_default "$installed_providers")" claude codex gemini copilot)"
   fi
   ensure_provider_cli "$SELECTED_PROVIDER" || true
 }
@@ -708,7 +778,11 @@ main() {
 
   section "Done"
   say "Refine checkout: ${BOLD}$REFINE_CHECKOUT${RESET}"
-  say "Target app:       ${BOLD}$TARGET_APP_PATH${RESET}"
+  if [ -n "$TARGET_APP_PATH" ]; then
+    say "Target app:       ${BOLD}$TARGET_APP_PATH${RESET}"
+  else
+    say "Target app:       ${BOLD}not attached yet${RESET}"
+  fi
   say "Provider:         ${BOLD}$SELECTED_PROVIDER${RESET}"
   say
   say "Repair later with:"

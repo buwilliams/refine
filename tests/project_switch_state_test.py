@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo
+from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo, reset_refine_imports
 
 
 def test_client_switch_path(root: Path) -> None:
@@ -367,6 +367,76 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
         else:
             os.environ["REFINE_UI_PORT"] = old_port
         os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
+    tmp, client = make_client_repo("refine-supervised-initial-attach-")
+    clone = tmp / "refine-source"
+    (clone / "refine_cli").mkdir(parents=True)
+    (clone / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    original_cwd = Path.cwd()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    try:
+        os.chdir(clone)
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        os.environ["REFINE_UI_PORT"] = "18182"
+        reset_refine_imports()
+        from refine_ui import api, runtime
+
+        old_backend_info = runtime.backend_info
+        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
+        old_load_configured = runtime.load_configured
+        restarts: list[tuple[Path, Path]] = []
+        try:
+            runtime.backend_info = lambda: {  # type: ignore[assignment]
+                "process_model": "supervisor",
+                "ui_controls_runner_lifecycle": False,
+            }
+            runtime.load_configured = (  # type: ignore[assignment]
+                lambda *args, **kwargs: (_ for _ in ()).throw(
+                    AssertionError("initial supervised attach must restart")
+                )
+            )
+            api._schedule_supervisor_restart = (  # type: ignore[assignment]
+                lambda clone_arg, cfg_arg: restarts.append(
+                    (clone_arg, cfg_arg.config_path)
+                ) or {"scheduled": True, "port": 18182, "log_path": "restart.log"}
+            )
+
+            status, body = api.project_attach({
+                "path": str(client),
+                "install_unit": False,
+                "start_runner": False,
+                "start_poller": False,
+            })
+        finally:
+            runtime.backend_info = old_backend_info  # type: ignore[assignment]
+            runtime.load_configured = old_load_configured  # type: ignore[assignment]
+            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
+
+        assert status == 200, body
+        assert body["restart_pending"] is True
+        assert body["client_repo"] == str(client.resolve())
+        assert restarts == [
+            (clone.resolve(), client.resolve() / ".refine" / "refine.toml")
+        ]
+        assert (clone / ".refine-binding").is_file()
+    finally:
+        os.chdir(original_cwd)
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
         cleanup_tmp(tmp)
 
 
@@ -841,6 +911,7 @@ def main() -> int:
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
     test_supervised_switch_schedules_restart_without_hot_loading(root)
+    test_supervised_initial_attach_schedules_restart(root)
     test_supervised_switch_migrates_target_before_restart(root)
     test_active_instance_is_per_application()
     test_active_instance_is_checkout_local_for_same_application()

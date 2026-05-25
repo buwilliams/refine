@@ -289,6 +289,88 @@ def main() -> int:
     assert boot["config_created"] is True
     print("[ok] UI project bootstrap creates git repo + host-native refine binding")
 
+    setup_install_clone = tmp / "setup-install-clone"
+    (setup_install_clone / "refine_cli").mkdir(parents=True)
+    (setup_install_clone / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (setup_install_clone / "refine_cli" / "cli.py").write_text(
+        "# marker\n",
+        encoding="utf-8",
+    )
+    setup_uv_bin = tmp / "setup-install-bin"
+    setup_uv_bin.mkdir()
+    setup_uv = setup_uv_bin / "uv"
+    setup_uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    setup_uv.chmod(0o755)
+    old_cwd = Path.cwd()
+    old_systemd_dir = refine_cli.SYSTEMD_SYSTEM_DIR
+    old_user_systemd_dir = refine_cli.SYSTEMD_USER_DIR
+    old_systemctl = refine_cli._systemctl
+    old_which = refine_cli.shutil.which
+    old_login_path = refine_cli._user_login_path
+    old_wait_for_port = refine_cli._wait_for_port
+    setup_systemctl_calls: list[tuple[str, ...]] = []
+    setup_unit_text = ""
+
+    def fake_setup_systemctl(*args: str) -> tuple[int, str]:
+        setup_systemctl_calls.append(args)
+        return 0, ""
+
+    def fake_setup_which(name: str, path: str | None = None) -> str | None:
+        if name == "uv":
+            return str(setup_uv)
+        return old_which(name, path=path)
+
+    try:
+        os.chdir(setup_install_clone)
+        refine_cli.SYSTEMD_SYSTEM_DIR = tmp / "setup-systemd-system"
+        refine_cli.SYSTEMD_USER_DIR = tmp / "setup-systemd-user"
+        refine_cli._systemctl = fake_setup_systemctl
+        refine_cli.shutil.which = fake_setup_which
+        refine_cli._user_login_path = lambda: str(setup_uv_bin)
+        refine_cli._wait_for_port = lambda host, port, *, timeout: True
+        install_rc = refine_cli.cmd_install(
+            type("Args", (), {"port": 19010, "config": None})()
+        )
+        start_rc = refine_cli.cmd_start(type("Args", (), {"port": 19010})())
+        restart_rc = refine_cli.cmd_restart(type("Args", (), {"port": 19010})())
+        status_rc = refine_cli.cmd_status(
+            type("Args", (), {"port": 19010, "config": None})()
+        )
+        setup_unit = (
+            tmp / "setup-systemd-system"
+            / "refine-setup-install-clone-19010-ui.service"
+        )
+        setup_unit_text = setup_unit.read_text(encoding="utf-8")
+        stop_rc = refine_cli.cmd_stop(type("Args", (), {"port": 19010})())
+        uninstall_rc = refine_cli.cmd_uninstall(
+            type("Args", (), {"port": 19010, "config": None})()
+        )
+    finally:
+        os.chdir(old_cwd)
+        refine_cli.SYSTEMD_SYSTEM_DIR = old_systemd_dir
+        refine_cli.SYSTEMD_USER_DIR = old_user_systemd_dir
+        refine_cli._systemctl = old_systemctl
+        refine_cli.shutil.which = old_which
+        refine_cli._user_login_path = old_login_path
+        refine_cli._wait_for_port = old_wait_for_port
+    assert install_rc == 0
+    assert start_rc == 0
+    assert restart_rc == 0
+    assert status_rc == 0
+    assert stop_rc == 0
+    assert uninstall_rc == 0
+    assert "setup mode" in setup_unit_text
+    assert "REFINE_CONFIG_PATH" not in setup_unit_text
+    assert ("start", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
+    assert ("restart", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
+    assert ("stop", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
+    assert not setup_unit.exists()
+    assert not (setup_install_clone / ".refine-binding").exists()
+    print("[ok] persistent setup UI works before a target app is attached")
+
     unit_clone = tmp / "refine-unit-clone"
     (unit_clone / "refine_cli").mkdir(parents=True)
     (unit_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
@@ -726,8 +808,8 @@ def main() -> int:
         refine_cli._stop_background_ui = lambda clone_arg, cfg_arg, port_arg: (
             setup_calls.append(("stop", clone_arg, cfg_arg, port_arg)) or True
         )
-        refine_cli._print_setup_status_block = lambda clone_arg, *, port: (
-            setup_calls.append(("status", clone_arg, port))
+        refine_cli._print_setup_status_block = lambda clone_arg, *, port, unit=None: (
+            setup_calls.append(("status", clone_arg, port, unit))
         )
         refine_cli._port_open = lambda host, port: False
         refine_cli._wait_for_port = lambda host, port, timeout: (
@@ -751,9 +833,9 @@ def main() -> int:
         ("start", setup_clone.resolve(), None, "0.0.0.0", 19000),
         ("wait", "0.0.0.0", 19000),
         ("stop", setup_clone.resolve(), None, 19001),
-        ("status", setup_clone.resolve(), 19002),
-        ("status", setup_clone.resolve(), 19003),
-        ("status", setup_clone.resolve(), 19004),
+        ("status", setup_clone.resolve(), 19002, "refine-setup-refine-clone"),
+        ("status", setup_clone.resolve(), 19003, "refine-setup-refine-clone"),
+        ("status", setup_clone.resolve(), 19004, "refine-setup-refine-clone"),
     ]
     print("[ok] setup-mode start/stop/status honor supplied ports before project attach")
 

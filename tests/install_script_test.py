@@ -141,6 +141,46 @@ def main() -> int:
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
+    tmp = Path(tempfile.mkdtemp(prefix="refine-install-no-target-test-"))
+    try:
+        checkout = tmp / "refine"
+        checkout.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+
+        fake_bin = tmp / "bin"
+        fake_bin.mkdir()
+        for name in ("uv", "codex"):
+            executable = fake_bin / name
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+
+        env = os.environ.copy()
+        env.update({
+            "NO_COLOR": "1",
+            "REFINE_INSTALL_ASSUME_DEFAULTS": "1",
+            "REFINE_INSTALL_DRY_RUN": "1",
+            "REFINE_INSTALL_BASE_DEFAULT": str(tmp),
+            "REFINE_INSTALL_PROVIDER": "codex",
+            "PATH": f"{fake_bin}{os.pathsep}{env.get('PATH', '')}",
+        })
+        result = subprocess.run(
+            ["bash", str(install_sh)],
+            cwd=root,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        output = result.stdout + result.stderr
+        assert "A target app path or Git remote is required" not in output
+        assert "No target app attached" in output
+        assert "Skipping target-app initialization" in output
+        assert "uv run refine init" not in output
+        assert "Target app:       not attached yet" in output
+        print("[ok] install.sh can complete without an initial target app")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
     tmp = Path(tempfile.mkdtemp(prefix="refine-install-pty-test-"))
     try:
         default_workspace = tmp / "default-workspace"
@@ -154,6 +194,10 @@ def main() -> int:
 
         fake_bin = tmp / "bin"
         fake_bin.mkdir()
+        for name in ("bash", "cat", "curl", "git", "python3", "uname", "grep", "tr"):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
         for name in ("codex", "docker", "uv"):
             executable = fake_bin / name
             executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
@@ -161,10 +205,11 @@ def main() -> int:
 
         env = os.environ.copy()
         env.update({
+            "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
             "REFINE_INSTALL_BASE_DEFAULT": str(default_workspace),
-            "PATH": f"{fake_bin}{os.pathsep}{env.get('PATH', '')}",
+            "PATH": str(fake_bin),
         })
         code, output = _run_piped_installer_with_pty(
             install_sh,
@@ -183,7 +228,9 @@ def main() -> int:
         )
         assert code == 0, output
         assert "Install workspace" in output
-        assert "Provider (claude codex gemini copilot)" in output
+        assert "Installed provider CLIs: codex" in output
+        assert "Missing provider CLIs: claude gemini copilot" in output
+        assert "Provider (claude codex gemini copilot) [codex]" in output
         assert "Target app path or Git remote" in output
         assert f"Refine checkout: {checkout}" in output
         assert "Provider:         codex" in output

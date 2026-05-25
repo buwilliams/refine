@@ -1,0 +1,9 @@
+services:
+  installer-shell:
+    image: ubuntu:24.04
+    stdin_open: true
+    tty: true
+    working_dir: /workspace/refine
+    volumes:
+      - .:/workspace/refine:ro
+    command: /bin/bash
