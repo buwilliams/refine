@@ -1,9 +1,14 @@
 """Focused checks for the Typer CLI dispatch layer."""
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
 import sys
+import tempfile
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
+from pathlib import Path
 
 
 def _run_cli(args: list[str]) -> tuple[int, str, str]:
@@ -22,6 +27,8 @@ def main() -> int:
     rc, out, err = _run_cli(["--help"])
     assert rc == 0, err
     assert "Manage refine" in out
+    assert "target" in out
+    assert "init" not in out
     assert "install" in out
     assert "runner" not in out
     assert "web" not in out
@@ -32,6 +39,46 @@ def main() -> int:
     assert "Usage: refine runner" in out
 
     calls: list[object] = []
+    old_target = cli.cmd_target
+    try:
+        cli.cmd_target = lambda args: calls.append(args) or 13
+        rc, _out, err = _run_cli(["target", "/tmp/app", "--force"])
+    finally:
+        cli.cmd_target = old_target
+    assert rc == 13, err
+    assert len(calls) == 1
+    assert getattr(calls[0], "path") == "/tmp/app"
+    assert getattr(calls[0], "force") is True
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-target-cli-"))
+    try:
+        clone = tmp / "refine-source"
+        client = tmp / "target-app"
+        (clone / "refine_cli").mkdir(parents=True)
+        client.mkdir()
+        (clone / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=client, check=True)
+        old_cwd = Path.cwd()
+        os.chdir(clone)
+        try:
+            rc, _out, err = _run_cli(["target", str(client), "--force"])
+        finally:
+            os.chdir(old_cwd)
+        assert rc == 0, err
+        assert (clone / ".refine-binding").exists()
+        assert (client / ".refine" / "refine.toml").exists()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    rc, _out, err = _run_cli(["init", "/tmp/app"])
+    assert rc == 2
+    assert "No such command 'init'" in err
+
+    calls.clear()
     old_start = cli.cmd_start
     try:
         cli.cmd_start = lambda args: calls.append(args) or 17

@@ -1,6 +1,6 @@
 """refine CLI entry point.
 
-Provides the Typer-backed `refine` command suite, including `init`, `install`,
+Provides the Typer-backed `refine` command suite, including `target`, `install`,
 `uninstall`, `start`, `restart`, `stop`, `status`, `ps`, `server`, `ui`, and
 `doctor` — launchable via `uv run refine <subcommand>`.
 

@@ -91,6 +91,7 @@ def main() -> int:
     assert "https://gh.io/copilot-install" in script
     assert "REFINE_INSTALL_DRY_RUN" in script
     assert "--yes" in script
+    assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
     assert "uv run refine install $port" in script
     print("[ok] install.sh keeps expected install sources and dry-run hook")
 
@@ -137,6 +138,7 @@ def main() -> int:
         )
         output = result.stdout + result.stderr
         assert "Dry run mode" in output
+        assert "uv run refine target" in output
         assert "set Refine setting agent_cli=codex" in output
         assert "Provider:         codex" in output
         print("[ok] install.sh dry-run completes without mutating checkout state")
@@ -184,9 +186,10 @@ def main() -> int:
         output = result.stdout + result.stderr
         assert "A target app path or Git remote is required" not in output
         assert "No target app attached" in output
-        assert "Skipping target-app initialization" in output
+        assert "Skipping target-app attachment" in output
         assert "link" in output and "uv is available in this shell" in output
         assert "uv run refine init" not in output
+        assert "uv run refine target" not in output
         assert "Target app:       not attached yet" in output
         print("[ok] install.sh can complete without an initial target app")
     finally:

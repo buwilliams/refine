@@ -779,16 +779,16 @@ configure_target_app_commands() {
   [ -n "$app_url" ] && configure_refine_setting "target_app_url" "$app_url"
 }
 
-init_refine() {
-  section "Refine project setup"
+target_refine() {
+  section "Refine target app"
   [ -d "$REFINE_CHECKOUT" ] || die "Refine checkout missing: $REFINE_CHECKOUT"
   run cd "$REFINE_CHECKOUT" || die "Could not enter $REFINE_CHECKOUT"
   if [ -z "$TARGET_APP_PATH" ]; then
-    info "Skipping target-app initialization until you attach an app in Refine."
+    info "Skipping target-app attachment until you attach an app in Refine."
     return 0
   fi
   [ -d "$TARGET_APP_PATH" ] || die "Target app missing: $TARGET_APP_PATH"
-  run uv run refine init "$TARGET_APP_PATH" --force || die "refine init failed"
+  run uv run refine target "$TARGET_APP_PATH" --force || die "refine target failed"
   configure_refine_setting "agent_cli" "$SELECTED_PROVIDER"
   configure_target_app_commands
 }
@@ -874,7 +874,7 @@ main() {
   provider_flow
   choose_target_app
   ensure_rootless_docker
-  init_refine
+  target_refine
   start_refine
 
   section "Done"

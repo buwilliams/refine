@@ -1,7 +1,7 @@
 """End-to-end smoke test (no real agent CLI / git remote required).
 
 Validates:
-- `refine init`-equivalent config bootstrap
+- `refine target`-equivalent config bootstrap
 - DB init + schema is creatable
 - ULID generation
 - Reporter add/list
@@ -28,7 +28,7 @@ from pathlib import Path
 def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="refine-smoke-"))
     print(f"using tmp dir: {tmp}")
-    # Make a fake "client repo" and `refine init` a volume root inside it.
+    # Make a fake "client repo" and `refine target` a volume root inside it.
     client = tmp / "client"
     client.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=client, check=True)
@@ -45,7 +45,7 @@ def main() -> int:
 
     from refine_server import config
 
-    # Equivalent of `refine init`
+    # Equivalent of `refine target`
     cfg_path = config.write_defaults(client / ".refine")
     print(f"wrote config: {cfg_path}")
     cfg = config.get()

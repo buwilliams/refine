@@ -36,7 +36,7 @@ def main() -> int:
 
     from refine_server import config
 
-    # Write the config (equivalent to `refine init`). Override the web port
+    # Write the config (equivalent to `refine target`). Override the web port
     # so we don't collide with any local 8080.
     cfg_path = config.write_defaults(client / ".refine")
     cfg_path.write_text(

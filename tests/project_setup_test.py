@@ -1,4 +1,4 @@
-"""Validate first-run project setup without a pre-existing refine init."""
+"""Validate first-run project setup without a pre-attached target."""
 from __future__ import annotations
 
 import json
@@ -107,7 +107,7 @@ def main() -> int:
         assert (client / ".refine" / "refine.toml").is_file()
         assert (clone / ".refine-binding").is_file()
         assert not (clone / ".refine-current").exists()
-        print("[ok] project attach creates repo + refine init artifacts")
+        print("[ok] project attach creates repo + refine target artifacts")
 
         status, snap = get_json("/api/project/status")
         assert status == 200, snap

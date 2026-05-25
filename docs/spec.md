@@ -430,7 +430,7 @@ Application settings live in `.refine/config.json` for project-wide policy and `
 
 **Reporters list:** the set of known reporter names that backs the round-submission dropdown. Managed from the System → Reporters page. See **Reporters** for the full semantics.
 
-**Deploy-time configuration** (set by `refine init`, `refine start <port>`, and `refine install <port>`, not in SQLite):
+**Deploy-time configuration** (set by `refine target`, `refine start <port>`, and `refine install <port>`, not in SQLite):
 
 - Active app binding — checkout-local `.refine-binding` points to the active target app.
 - Active instance selection — checkout-local `run/active-instances.json` records each target app's selected instance for this Refine checkout.
