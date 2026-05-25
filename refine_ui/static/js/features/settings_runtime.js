@@ -113,6 +113,7 @@ function renderRuntimeUpgradeBanner(upgrade) {
   const current = upgrade.current_version || "unknown";
   const latest = upgrade.latest_version || "";
   if (upgrade.upgrade_available) {
+    const command = upgrade.command || "";
     return `
       <div class="runtime-version-status runtime-version-status-upgrade">
         <h3>Upgrade available</h3>
@@ -120,9 +121,20 @@ function renderRuntimeUpgradeBanner(upgrade) {
           Refine ${htmlEscape(latest)} is available.
           Current version: ${htmlEscape(current)}.
         </p>
-        <p class="muted small" style="margin-bottom:0">
-          <code>${htmlEscape(upgrade.command || "")}</code>
-        </p>
+        <div class="runtime-upgrade-command muted small">
+          <code>${htmlEscape(command)}</code>
+          <button
+            class="secondary runtime-copy-upgrade-command"
+            type="button"
+            title="Copy upgrade command"
+            aria-label="Copy upgrade command"
+            data-runtime-copy-upgrade="${htmlEscape(command)}">
+            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+              <path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
+            </svg>
+          </button>
+        </div>
       </div>`;
   }
   if (upgrade.local_development) {
@@ -162,6 +174,37 @@ function renderRuntimeUpgradeBanner(upgrade) {
     </div>`;
 }
 
+function fallbackCopyText(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  textarea.style.left = "-1000px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  try {
+    document.execCommand("copy");
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
+async function copyRuntimeUpgradeCommand(command) {
+  if (!command) return;
+  try {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(command);
+    } else {
+      fallbackCopyText(command);
+    }
+    toast("Upgrade command copied", "info");
+  } catch (_e) {
+    toast("Could not copy upgrade command", "error");
+  }
+}
+
 async function refreshRuntimeUpgradeBanner() {
   const root = document.getElementById("runtime-upgrade-banner");
   if (!root) return;
@@ -196,6 +239,11 @@ async function autosaveSettingsRuntime(options = {}) {
 function bindSettingsRuntimeTab() {
   bindCommand("#s-runtime-copy-instance", "settings.runtime.copy_instance");
   const root = document.querySelector('[data-tab-pane="runtime"]');
+  root?.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-runtime-copy-upgrade]");
+    if (!button) return;
+    copyRuntimeUpgradeCommand(button.getAttribute("data-runtime-copy-upgrade") || "");
+  });
   const autosaveRuntime = bindSettingsAutosave(
     root,
     "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse",

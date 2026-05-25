@@ -200,8 +200,13 @@ def main() -> int:
     assert "Running latest published release" in settings_js
     assert "Local development checkout" in settings_js
     assert "Version status unavailable" in settings_js
+    assert "data-runtime-copy-upgrade" in settings_js
+    assert "function copyRuntimeUpgradeCommand" in settings_js
+    assert "navigator.clipboard.writeText" in settings_js
     assert ".runtime-version-status" in common_css
     assert ".runtime-version-status-upgrade" in common_css
+    assert ".runtime-upgrade-command" in common_css
+    assert ".runtime-copy-upgrade-command" in common_css
     assert '@route("GET", r"/api/upgrade")' in server_py
     assert "def upgrade_status" in api_py
     runtime_save_body = settings_js.split("async function autosaveSettingsRuntime", 1)[1]
