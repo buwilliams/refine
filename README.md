@@ -33,11 +33,7 @@ Open PowerShell as Administrator:
 wsl --install
 ```
 
-After Ubuntu opens, run the same Refine installer:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
-```
+After Ubuntu opens, use the Quick Start one-liner above.
 
 ## License
 
