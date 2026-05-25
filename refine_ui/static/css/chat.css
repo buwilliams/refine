@@ -6,8 +6,8 @@
   bottom: 0;
   z-index: 100;             /* below modals (200), above page content */
   background: var(--card);
-  border-top: 1px solid var(--border);
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+  border-top: 1px solid var(--color-border-subtle);
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.08);
   display: flex;
   flex-direction: column;
 }
@@ -21,13 +21,13 @@
   overflow: hidden;
 }
 .chat-dock-label {
-  font-weight: 600;
+  font-weight: 750;
   font-size: 12px;
   color: var(--muted);
   padding: 2px 8px 2px 0;
   margin-right: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0;
 }
 .chat-dock-bar .chat-tabs {
   flex: 1;
@@ -81,7 +81,7 @@
   display: none;
   flex-direction: column;
   padding: 10px 12px 12px;
-  background: var(--bg);
+  background: var(--color-bg);
   overflow: hidden;
   /* Height is set inline by JS (user-resizable); fall back to ~20vh. */
   height: 20vh;
@@ -111,32 +111,36 @@ body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for 
 /* --- Chat tabs -------------------------------------------------------- */
 .chat-tabs {
   display: flex;
-  gap: 4px;
-  margin-bottom: -1px;     /* overlap the card border below */
+  gap: 2px;
+  padding: 3px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 .chat-tab {
-  height: auto;
-  padding: 6px 12px;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  border-radius: var(--radius) var(--radius) 0 0;
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 0;
+  border-radius: 7px;
   font: inherit;
   font-size: 13px;
+  font-weight: 550;
   line-height: 1.2;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   cursor: pointer;
 }
-.chat-tab:hover { background: var(--code-bg); }
+.chat-tab:hover { background: transparent; color: var(--color-text); }
 .chat-tab.active {
   background: var(--card);
   color: var(--fg);
-  border-bottom-color: var(--card);  /* "merges" with the card top */
-  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+  font-weight: 700;
 }
 .chat-tab-close {
   display: inline-flex;
@@ -162,8 +166,9 @@ body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for 
    so "Agent is thinking…" sits inside the same box as the transcript. */
 .chat-output-box {
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 .chat-output {

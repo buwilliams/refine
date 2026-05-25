@@ -38,7 +38,7 @@ async function renderDashboard() {
     $("#main").innerHTML = `
       <div class="dashboard-title-row">
         <h2>Dashboard</h2>
-        <div class="dashboard-scope-switch" role="group" aria-label="Dashboard instance scope">
+        <div class="segmented-control dashboard-scope-switch" role="group" aria-label="Dashboard instance scope">
           <button type="button" data-dashboard-scope="current">Current</button>
           <button type="button" data-dashboard-scope="all">All</button>
         </div>
@@ -165,11 +165,11 @@ function drawDashboard(d, opts = {}) {
       ${orderedStatuses.map((s) => {
         const agentManaged = AGENT_MANAGED_DASHBOARD_STATUSES.has(s);
         return `
-        <a class="card dashboard-status-card${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, instance: scope })}" style="text-decoration:none;color:inherit"
-           title="${counts[s] || 0} ${s} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
+        <a class="card dashboard-status-card ${s}${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, instance: scope })}" style="text-decoration:none;color:inherit"
+           title="${counts[s] || 0} ${workflowStatusLabel(s)} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
           <div class="dashboard-status-head">
             ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="Agent-managed automation">Auto</span>` : ""}
-            <div class="muted small dashboard-status-label">${s}</div>
+            <div class="dashboard-status-label">${workflowStatusLabel(s)}</div>
           </div>
           <div class="dashboard-status-count">${fmtCount(counts[s] || 0)}</div>
         </a>`;
@@ -202,7 +202,10 @@ function drawDashboard(d, opts = {}) {
       ${!reviewReporter
         ? ""
         : reviewsForReporter.length === 0
-        ? `<p class="muted">Nothing in <code>review</code> assigned to you right now.</p>`
+        ? `<div class="empty-state">
+             <div class="empty-state-title">You're clear.</div>
+             <div>No review items are assigned to you right now.</div>
+           </div>`
         : `<table class="table">
             <thead><tr>
               <th class="gap-select-col">
@@ -236,7 +239,7 @@ function drawDashboard(d, opts = {}) {
 
     <details class="filter-shell dashboard-collapsible-shell" id="dashboard-reporter-stats-shell"${reporterStatsShellOpen ? " open" : ""}>
       <summary>
-        <span class="filter-shell-title">Reporter stats</span>
+        <span class="filter-shell-title">Reporter throughput</span>
         <span class="filter-pill">${fmtCount(reporterStats.length)}</span>
       </summary>
       <div class="filter-shell-body">
@@ -259,7 +262,7 @@ function drawDashboard(d, opts = {}) {
                     <td>${fmtCount(s.active)}</td>
                     <td>${fmtCount(s.done)}</td>
                     <td>${fmtCount(s.reported)}</td>
-                    <td>${s.completion_rate.toFixed(1)}%</td>
+                    <td><span class="metric-good">${s.completion_rate.toFixed(1)}%</span></td>
                   </tr>`).join("")}
               </tbody>
             </table>`}

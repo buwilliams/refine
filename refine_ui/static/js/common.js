@@ -35,6 +35,22 @@ const WORKFLOW_STATUSES = [
   "cancelled",
 ];
 const STATUS_FILTER_OPTIONS = ["", ...WORKFLOW_STATUSES];
+const WORKFLOW_STATUS_LABELS = {
+  "backlog": "Backlog",
+  "todo": "To do",
+  "in-progress": "In progress",
+  "qa": "QA",
+  "ready-merge": "Ready to merge",
+  "awaiting-rebuild": "Awaiting rebuild",
+  "review": "Review",
+  "done": "Done",
+  "failed": "Failed",
+  "cancelled": "Cancelled",
+};
+
+function workflowStatusLabel(status) {
+  return WORKFLOW_STATUS_LABELS[status] || status || "";
+}
 
 function updateActiveInstanceLabel() {
   const el = document.getElementById("active-instance-label");

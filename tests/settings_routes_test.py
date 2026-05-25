@@ -221,10 +221,12 @@ def main() -> int:
         common_css,
         re.S,
     )
+    assert settings_tabs_css and "border: 1px solid var(--color-border)" in settings_tabs_css.group(1)
     assert settings_tabs_css and "border-bottom" not in settings_tabs_css.group(1)
-    assert settings_tab_css and "border: 1px solid var(--border)" in settings_tab_css.group(1)
+    assert settings_tab_css and "background: transparent" in settings_tab_css.group(1)
+    assert "border: 0" in settings_tab_css.group(1)
     assert "text-decoration: none" in settings_tab_css.group(1)
-    assert settings_tab_active_css and "border-bottom-color: var(--card)" in settings_tab_active_css.group(1)
+    assert settings_tab_active_css and "box-shadow: var(--shadow-sm)" in settings_tab_active_css.group(1)
     assert settings_section_css and "border-top: 1px solid var(--border)" in settings_section_css.group(1)
 
     for slug in slugs:
@@ -527,12 +529,12 @@ def main() -> int:
         < dashboard_js.index("Awaiting your review")
         < dashboard_js.index("Needs attention")
     )
-    assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter stats")
-    assert "repeat(10, minmax(0, 1fr))" in dashboard_css
+    assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter throughput")
+    assert "repeat(10, minmax(88px, 1fr))" in dashboard_css
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
     assert "dashboard-status-label" in dashboard_css
     assert ".dashboard-status-head" in dashboard_css
-    assert "white-space: nowrap" in dashboard_css
+    assert "white-space: normal" in dashboard_css
     assert "position: absolute" in dashboard_css
     assert "z-index: 1" in dashboard_css
     assert ".dashboard-status-card-agent" in dashboard_css

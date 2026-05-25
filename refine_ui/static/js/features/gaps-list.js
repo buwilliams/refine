@@ -51,7 +51,7 @@ async function renderGapsList() {
       <div class="filter-row filter-row-activity">
         <select id="filter-status">
           ${STATUS_FILTER_OPTIONS
-            .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
+            .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s ? workflowStatusLabel(s) : "all statuses"}</option>`).join("")}
         </select>
         <select id="filter-reporter">
           <option value="" ${f.reporter === "" ? "selected" : ""}>all reporters</option>
@@ -353,7 +353,7 @@ function drawGapsTable(gaps, state) {
           return `<tr data-id="${g.id}">
             ${cell}
             <td class="gaps-name-cell">${htmlEscape(g.name)}</td>
-            <td class="gaps-status-cell"><span class="status-pill ${g.status}">${g.status}</span></td>
+            <td class="gaps-status-cell"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
             <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
             <td class="muted small">${htmlEscape(g.instance_display_name || g.instance_id || "Unknown")}</td>

@@ -57,7 +57,7 @@ async function renderChanges() {
           <div class="filter-row filter-row-filters">
             <select id="changes-status">
               ${STATUS_FILTER_OPTIONS
-                .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s || "all statuses"}</option>`).join("")}
+                .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s ? workflowStatusLabel(s) : "all statuses"}</option>`).join("")}
             </select>
             <select id="changes-priority">
               <option value="" ${f.priority === "" ? "selected" : ""}>all priorities</option>

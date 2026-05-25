@@ -206,7 +206,7 @@ function drawGapDetail(gap) {
     <div class="gap-detail">
       <div class="row" style="align-items:center;margin-bottom:8px">
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
-        <span class="status-pill ${gap.status}">${gap.status}</span>
+        <span class="status-pill ${gap.status}">${workflowStatusLabel(gap.status)}</span>
         <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
       </div>
       <div class="actions" style="margin-bottom:10px">
