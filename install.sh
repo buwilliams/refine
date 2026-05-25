@@ -16,6 +16,7 @@ REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
 REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
+ORIGINAL_PATH="${PATH:-}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   BOLD="$(printf '\033[1m')"
@@ -40,6 +41,38 @@ fi
 REFINE_CHECKOUT=""
 TARGET_APP_PATH=""
 SELECTED_PROVIDER=""
+
+usage() {
+  cat <<'EOF'
+Usage: install.sh [--yes|-y]
+
+Options:
+  -y, --yes     Accept default answers without prompting.
+  -h, --help    Show this help.
+
+Environment:
+  REFINE_INSTALL_ASSUME_DEFAULTS=1  Same behavior as --yes.
+  REFINE_INSTALL_DRY_RUN=1          Print commands instead of running them.
+EOF
+}
+
+parse_args() {
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -y|--yes)
+        REFINE_INSTALL_ASSUME_DEFAULTS=1
+        ;;
+      -h|--help)
+        usage
+        exit 0
+        ;;
+      *)
+        die "Unknown option: $1"
+        ;;
+    esac
+    shift
+  done
+}
 
 say() {
   printf '%b\n' "$*"
@@ -190,6 +223,61 @@ append_path_now() {
     *":$1:"*) ;;
     *) export PATH="$1:$PATH" ;;
   esac
+}
+
+path_command() {
+  PATH="$1" command -v "$2" 2>/dev/null || true
+}
+
+ensure_command_on_original_path() {
+  local name="$1"
+  local target existing candidates old_ifs dir link
+  target="$(command -v "$name" 2>/dev/null || true)"
+  [ -n "$target" ] || return 0
+  existing="$(path_command "$ORIGINAL_PATH" "$name")"
+  if [ -n "$existing" ]; then
+    return 0
+  fi
+
+  candidates=""
+  case ":$ORIGINAL_PATH:" in
+    *":/usr/local/bin:"*) candidates="/usr/local/bin" ;;
+  esac
+  old_ifs="$IFS"
+  IFS=":"
+  for dir in $ORIGINAL_PATH; do
+    [ -n "$dir" ] || continue
+    case " $candidates " in
+      *" $dir "*) ;;
+      *) candidates="${candidates:+$candidates }$dir" ;;
+    esac
+  done
+  IFS="$old_ifs"
+
+  for dir in $candidates; do
+    [ -d "$dir" ] || continue
+    link="$dir/$name"
+    if [ -e "$link" ] && [ ! -L "$link" ]; then
+      continue
+    fi
+    if dry_run; then
+      say "${DIM}+ link $link -> $target so $name is available in this shell${RESET}"
+      return 0
+    fi
+    if [ -w "$dir" ]; then
+      ln -sf "$target" "$link" && {
+        ok "Made $name available at $link"
+        return 0
+      }
+    elif [ "$(id -u)" != "0" ] && have sudo; then
+      sudo ln -sf "$target" "$link" && {
+        ok "Made $name available at $link"
+        return 0
+      }
+    fi
+  done
+
+  warn "$name is installed at $target, but it is not on this shell's PATH. Open a new shell or run: export PATH=\"$(dirname "$target"):\$PATH\""
 }
 
 profile_file() {
@@ -383,7 +471,13 @@ ensure_uv() {
   append_path_now "$HOME/.local/bin"
   append_path_now "$HOME/.cargo/bin"
   if have uv; then
-    ok "uv found: $(command -v uv)"
+    local uv_path
+    uv_path="$(command -v uv)"
+    ok "uv found: $uv_path"
+    if [ -z "$(path_command "$ORIGINAL_PATH" uv)" ]; then
+      ensure_profile_path "$(dirname "$uv_path")"
+    fi
+    ensure_command_on_original_path uv
     return 0
   fi
   warn "uv is not installed"
@@ -393,8 +487,11 @@ ensure_uv() {
     append_path_now "$HOME/.cargo/bin"
   fi
   if have uv; then
-    ok "uv installed: $(command -v uv)"
-    ensure_profile_path "$HOME/.local/bin"
+    local uv_path_after
+    uv_path_after="$(command -v uv)"
+    ok "uv installed: $uv_path_after"
+    ensure_profile_path "$(dirname "$uv_path_after")"
+    ensure_command_on_original_path uv
     return 0
   fi
   die "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
@@ -525,7 +622,7 @@ ensure_rootless_docker() {
     warn "Rootless Docker's installer is Linux-only. Install Docker Desktop if this target app needs containers."
     return 0
   fi
-  if ! confirm "Install or repair rootless Docker for app workflows that need containers" "y"; then
+  if ! confirm "Install or repair rootless Docker for app workflows that need containers" "n"; then
     warn "Skipped Docker. Refine can run, but container-based target apps may fail."
     return 0
   fi
@@ -605,7 +702,7 @@ choose_target_app() {
     input="$REFINE_INSTALL_TARGET_APP"
     info "Using target app from REFINE_INSTALL_TARGET_APP"
   else
-    input="$(prompt "Target app path or Git remote" "")"
+    input="$(prompt "Target app path or Git remote (blank to skip)" "")"
   fi
   if [ -z "$input" ]; then
     TARGET_APP_PATH=""
@@ -700,7 +797,7 @@ start_refine() {
   section "Start Refine"
   local port
   port="$(prompt "Refine port" "$REFINE_DEFAULT_PORT")"
-  if has_systemd && confirm "Install Refine as a persistent system service on port $port" "y"; then
+  if has_systemd && confirm "Install Refine as a persistent service with: uv run refine install $port" "y"; then
     if run uv run refine install "$port"; then
       ok "Refine installed as a persistent service"
     else
@@ -708,6 +805,9 @@ start_refine() {
       run uv run refine start "$port" || warn "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
     fi
   else
+    if ! has_systemd; then
+      info "Persistent service install requires systemd. Starting with: uv run refine start $port"
+    fi
     run uv run refine start "$port" || warn "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
   fi
   run uv run refine status "$port" || true
@@ -756,6 +856,7 @@ provider_flow() {
 }
 
 main() {
+  parse_args "$@"
   say "${BOLD}Refine installer${RESET}"
   say "${DIM}First-run setup and non-destructive repair for Linux, macOS, and Windows via WSL.${RESET}"
   if dry_run; then

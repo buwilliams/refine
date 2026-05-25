@@ -90,6 +90,8 @@ def main() -> int:
     assert "https://get.docker.com/rootless" in script
     assert "https://gh.io/copilot-install" in script
     assert "REFINE_INSTALL_DRY_RUN" in script
+    assert "--yes" in script
+    assert "uv run refine install $port" in script
     print("[ok] install.sh keeps expected install sources and dry-run hook")
 
     readme_text = readme.read_text(encoding="utf-8")
@@ -149,22 +151,30 @@ def main() -> int:
 
         fake_bin = tmp / "bin"
         fake_bin.mkdir()
-        for name in ("uv", "codex"):
-            executable = fake_bin / name
-            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-            executable.chmod(0o755)
+        for name in ("bash", "cat", "curl", "git", "python3", "uname", "grep", "tr"):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
+        codex = fake_bin / "codex"
+        codex.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        codex.chmod(0o755)
+        home_bin = tmp / ".local" / "bin"
+        home_bin.mkdir(parents=True)
+        uv = home_bin / "uv"
+        uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        uv.chmod(0o755)
 
         env = os.environ.copy()
         env.update({
+            "HOME": str(tmp),
             "NO_COLOR": "1",
-            "REFINE_INSTALL_ASSUME_DEFAULTS": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
             "REFINE_INSTALL_BASE_DEFAULT": str(tmp),
             "REFINE_INSTALL_PROVIDER": "codex",
-            "PATH": f"{fake_bin}{os.pathsep}{env.get('PATH', '')}",
+            "PATH": str(fake_bin),
         })
         result = subprocess.run(
-            ["bash", str(install_sh)],
+            ["bash", str(install_sh), "--yes"],
             cwd=root,
             env=env,
             text=True,
@@ -175,6 +185,7 @@ def main() -> int:
         assert "A target app path or Git remote is required" not in output
         assert "No target app attached" in output
         assert "Skipping target-app initialization" in output
+        assert "link" in output and "uv is available in this shell" in output
         assert "uv run refine init" not in output
         assert "Target app:       not attached yet" in output
         print("[ok] install.sh can complete without an initial target app")
