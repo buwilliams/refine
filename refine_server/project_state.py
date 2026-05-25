@@ -512,8 +512,14 @@ def list_settings() -> dict[str, str]:
     settings = dict(db.DEFAULT_SETTINGS)
     cfg = read_project_config(root=root)
     settings.update(_string_map(cfg.get("settings") or {}))
-    settings.update(_string_map(_read_json(instance_dir(active, root) / "application.json", {})))
-    settings.update(_string_map(_read_json(instance_dir(active, root) / "runtime.json", {})))
+    settings.update(_string_map(
+        _read_json(instance_dir(active, root) / "application.json", {}),
+        allowed=APPLICATION_SETTING_KEYS,
+    ))
+    settings.update(_string_map(
+        _read_json(instance_dir(active, root) / "runtime.json", {}),
+        allowed=RUNTIME_SETTING_KEYS,
+    ))
     settings.update(_string_map(
         _read_json(instance_dir(active, root) / "target-app.json", {}),
         allowed=TARGET_APP_CONFIG_SETTING_KEYS,
@@ -526,7 +532,6 @@ def set_setting(key: str, value: str) -> None:
         key in PROJECT_SETTING_KEYS
         or key in APPLICATION_SETTING_KEYS
         or key in RUNTIME_SETTING_KEYS
-        or key.startswith("feature_")
         or key in TARGET_APP_CONFIG_SETTING_KEYS
     ):
         return
@@ -539,7 +544,7 @@ def set_setting(key: str, value: str) -> None:
         write_project_config(cfg, root=root)
     elif key in APPLICATION_SETTING_KEYS:
         _update_instance_file("application.json", {key: value}, root=root)
-    elif key in RUNTIME_SETTING_KEYS or key.startswith("feature_"):
+    elif key in RUNTIME_SETTING_KEYS:
         _update_instance_file("runtime.json", {key: value}, root=root)
     elif key in TARGET_APP_CONFIG_SETTING_KEYS:
         _update_instance_file("target-app.json", {key: value}, root=root)
@@ -1089,8 +1094,9 @@ def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
         p = d / name
         if not p.exists():
             _write_json(p, {k: defaults[k] for k in keys if k in defaults})
-        elif name == "target-app.json":
+        else:
             _prune_instance_file(p, keys)
+        if name == "target-app.json":
             _cleanup_legacy_target_app_config(p)
     reps = d / "reporters.json"
     if not reps.exists():

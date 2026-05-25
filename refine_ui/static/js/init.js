@@ -26,7 +26,6 @@ async function init() {
   initChatDock();
   initSSE();
   initTargetAppToggle();
-  refreshFeatures();
   setInterval(tickRunningCells, 1000);
   if (typeof recoverImportSessionOnLoad === "function") {
     recoverImportSessionOnLoad();

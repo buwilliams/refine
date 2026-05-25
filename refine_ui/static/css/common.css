@@ -130,20 +130,6 @@
   text-underline-offset: 2px;
 }
 
-/* Feature-flag matrix on System. Inline toggle + override badge,
-   rendered inside table cells; .feature-current-col highlights the
-   active provider's column so the operator can spot at a glance
-   what's on/off for their setup. */
-.feature-toggle {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 2px 8px; border-radius: 999px;
-  font-size: 12px; cursor: pointer;
-}
-.feature-toggle.on { background: var(--color-success-soft); color: var(--color-success); }
-.feature-toggle.off { background: var(--color-neutral-soft); color: var(--color-text-muted); }
-.feature-toggle input { margin: 0; }
-.feature-toggle-state { user-select: none; }
-.feature-current-col { background: #f7f9ff; }
 .link-button {
   background: none; border: 0; padding: 0; margin-left: 8px;
   color: var(--muted); font-size: 11px; text-decoration: underline;

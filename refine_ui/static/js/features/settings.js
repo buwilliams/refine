@@ -23,13 +23,12 @@ async function refreshSettings(options = {}) {
   }
   try {
     const [
-      s, diag, reps, feats, project, gov, quality, dash, instances, guidance,
+      s, diag, reps, project, gov, quality, dash, instances, guidance,
       performance, processes,
     ] = await Promise.all([
       api("GET", "/api/settings"),
       api("GET", "/api/diagnostics"),
       api("GET", "/api/reporters"),
-      api("GET", "/api/features"),
       api("GET", "/api/project/status"),
       api("GET", "/api/governance"),
       api("GET", "/api/quality"),
@@ -41,12 +40,10 @@ async function refreshSettings(options = {}) {
         : "/api/performance"),
       api("GET", "/api/processes"),
     ]);
-    // Keep the cached matrix fresh so gates elsewhere react too.
-    state.features = feats;
     state.project = project;
     updateActiveInstanceLabel();
     drawSettings(
-      s.settings || {}, diag, reps.reporters || [], feats,
+      s.settings || {}, diag, reps.reporters || [],
       gov || {}, quality || {}, dash || {}, instances || {}, guidance || {},
       performance || {}, processes || {},
     );
@@ -180,20 +177,17 @@ async function refreshSettingsTab(slug, options = {}) {
         () => bindSettingsApplicationTab(currentProject),
       );
     } else if (activeSlug === "runtime") {
-      const [s, feats, project] = await Promise.all([
+      const [s, project] = await Promise.all([
         api("GET", "/api/settings"),
-        api("GET", "/api/features"),
         api("GET", "/api/project/status"),
       ]);
-      state.features = feats;
       state.project = project;
       updateActiveInstanceLabel();
-      applyFeatureGates();
       const settings = s.settings || {};
       const cli = (settings.agent_cli || "claude").toLowerCase();
       updateSettingsTabContent(
         "runtime",
-        renderSettingsRuntimeTab(settings, feats, settingsActiveInstanceLabel(project), cli),
+        renderSettingsRuntimeTab(settings, settingsActiveInstanceLabel(project), cli),
         bindSettingsRuntimeTab,
       );
     } else {
@@ -489,7 +483,7 @@ function bindRebuildCacheHandler() {
 
 
 function drawSettings(
-  s, diag, reps, feats, gov = {}, quality = {}, dash = {}, instanceData = {},
+  s, diag, reps, gov = {}, quality = {}, dash = {}, instanceData = {},
   guidanceData = {}, performanceData = {}, processData = {},
 ) {
   const cli = (s.agent_cli || "claude").toLowerCase();
@@ -523,7 +517,7 @@ function drawSettings(
     }))}
     ${pane("processes", renderProcessesTab(processData, s, diag, dash))}
     ${pane("guidance", renderSettingsGuidanceTab(guidanceItems))}
-    ${pane("runtime", renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli))}
+    ${pane("runtime", renderSettingsRuntimeTab(s, activeInstanceLabel, cli))}
     ${pane("performance", renderSettingsPerformanceTab(performance, performanceBackend))}
     ${pane("governance", renderSettingsGovernanceTab(gov))}
     ${pane("quality", renderSettingsQualityTab(quality))}
@@ -537,7 +531,7 @@ function drawSettings(
   bindSettingsProcessesTab(s);
   bindSettingsGuidanceTab(guidanceItems);
   bindSettingsRuntimeTab();
-  bindSettingsPerformanceTab(s, diag, reps, feats, gov, dash, instanceData, guidanceData);
+  bindSettingsPerformanceTab(s, diag, reps, null, gov, dash, instanceData, guidanceData);
   bindSettingsGovernanceTab();
   bindSettingsQualityTab();
   bindSettingsApplicationTab(currentProject);

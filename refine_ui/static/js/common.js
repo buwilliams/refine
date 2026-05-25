@@ -16,10 +16,6 @@ const state = {
   // the URL when the modal is dismissed so the page the user came from
   // is what they land back on.
   underlayHash: "#/",
-  // Provider-scoped feature flag matrix from `/api/features`. Refreshed
-  // on app start and after any System save. UI helpers below read
-  // `state.features` to gate Chat / Import affordances.
-  features: null,
 };
 
 const WORKFLOW_STATUSES = [
@@ -77,64 +73,12 @@ function updateNavAppContextLabel(label) {
   el.title = el.textContent;
 }
 
-async function refreshFeatures(options = {}) {
-  try {
-    state.features = await api("GET", "/api/features");
-  } catch { /* keep prior value; gates default to permissive */ }
-  // Re-render whatever surfaces depend on the matrix.
-  applyFeatureGates();
-  // Chat dock is always in the DOM — its body content branches on
-  // featureEnabled("chat"), so a redraw is needed when the matrix
-  // (or the active provider) changes.
-  if (typeof drawChatDock === "function") drawChatDock();
-  if (state.currentRoute === "settings" && !options.skipSettingsRefresh) {
-    refreshCurrentSettingsSurface();
-  }
-  if (state.currentRoute === "gaps_detail" && state.currentGap) {
-    loadGapDetail(state.currentGap);
-  }
-}
-
 function refreshCurrentSettingsSurface(options = {}) {
   if (typeof refreshActiveSettingsTab === "function") {
     return refreshActiveSettingsTab(options);
   }
   if (typeof refreshSettings === "function") {
     return refreshSettings(options);
-  }
-}
-
-function featureEnabled(featureKey) {
-  // Default-permissive: if we haven't loaded the matrix yet (first
-  // paint racing against /api/features), don't block UI interactions
-  // — the server is still the source of truth and will reject any
-  // gated action with a clear error.
-  const f = state.features;
-  if (!f) return true;
-  const cell = f.matrix?.[`${f.current_provider}.${featureKey}`];
-  return cell ? !!cell.enabled : true;
-}
-
-function applyFeatureGates() {
-  // Top-bar Import action: hide entirely when LLM extraction isn't
-  // supported for this provider. Hiding vs. graying-out is
-  // intentional — the action has no fallback, so the affordance
-  // shouldn't tease the user.
-  const importBtn = document.getElementById("btn-import");
-  const createMenu = document.getElementById("nav-create-menu");
-  const importEnabled = featureEnabled("import_gaps");
-  if (importBtn) {
-    importBtn.style.display = importEnabled ? "" : "none";
-  }
-  if (createMenu) {
-    createMenu.style.display = importEnabled ? "" : "none";
-  }
-  // Chat dock toggle: keep visible (the dock is part of the layout)
-  // but mark disabled when chat isn't supported. The dock itself
-  // shows an inline "disabled" notice when expanded.
-  const chatDock = document.getElementById("chat-dock");
-  if (chatDock) {
-    chatDock.dataset.disabled = featureEnabled("chat") ? "0" : "1";
   }
 }
 
@@ -434,7 +378,6 @@ async function applyProjectAttachResult(result) {
   resetChatForProjectSwitch();
   initSSE();
   await syncProjectUpdates({ silent: true });
-  await refreshFeatures();
   await refreshInstanceScopedState({ selectReporterFallback: true });
   await refreshTargetAppToggle();
   if (location.hash !== "#/system/application") {
@@ -985,7 +928,6 @@ function initSSE() {
   });
   sseSource.addEventListener("project_updated", async () => {
     await refreshProjectStatus();
-    await refreshFeatures({ skipSettingsRefresh: true });
     await refreshReporters();
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
     if (state.currentRoute === "dashboard") refreshDashboard();

@@ -72,6 +72,10 @@ def main() -> int:
     )
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
     server_py = (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    runner_py = (root / "refine_server/runner.py").read_text(encoding="utf-8")
+    project_state_py = (root / "refine_server/project_state.py").read_text(
+        encoding="utf-8",
+    )
     dashboard_css = (root / "refine_ui/static/css/dashboard.css").read_text(
         encoding="utf-8",
     )
@@ -122,7 +126,6 @@ def main() -> int:
         settings_js,
     )
     assert save_button_ids == [], save_button_ids
-    assert "Feature flag changes are saved automatically." in settings_js
     assert "function createSettingsAutosave" in settings_js
     assert "function bindSettingsAutosave" in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
@@ -190,15 +193,22 @@ def main() -> int:
     runtime_save_body = runtime_save_body.split("\nfunction bindSettingsRuntimeTab", 1)[0]
     application_save_body = settings_js.split("async function autosaveSettingsApplication", 1)[1]
     application_save_body = application_save_body.split("\nfunction applyGeneratedTargetAppConfig", 1)[0]
-    feature_toggle_body = settings_js.split('$$("[data-feature-cell]").forEach', 1)[1]
-    feature_toggle_body = feature_toggle_body.split('$$("[data-feature-clear]").forEach', 1)[0]
-    assert 'api("POST", "/api/features/override"' in runtime_save_body
     assert 'worker_memory_limit_mb: $("#s-worker-memory").value' in runtime_save_body
     assert 'ui_memory_limit_mb: $("#s-ui-memory").value' in runtime_save_body
     assert 'worker_cpu_priority: $("#s-worker-cpu-priority").value' in runtime_save_body
     assert 'resource_isolation_mode: $("#s-resource-isolation").value' in runtime_save_body
     assert 'agent_limit_pause_seconds: $("#s-agent-limit-pause").value' in runtime_save_body
-    assert 'api("POST", "/api/features/override"' not in feature_toggle_body
+    assert "/api/features" not in settings_js
+    assert "Feature flags" not in settings_js
+    assert "data-feature-cell" not in settings_js
+    assert "featureEnabled(" not in common_js
+    assert "refreshFeatures" not in common_js
+    assert '@route("GET", r"/api/features")' not in server_py
+    assert "def list_features" not in api_py
+    assert "features.is_enabled" not in runner_py
+    assert "feature_disabled" not in runner_py
+    assert 'key.startswith("feature_")' not in project_state_py
+    assert not (root / "refine_server/features.py").exists()
     assert 'await api("PATCH", "/api/settings", collectSettingsApplicationPayload())' in application_save_body
     assert "_targetAppDraftDirty = false;" in application_save_body
     assert 'await refreshSettingsTab("application", { force: true });' in application_save_body
@@ -280,7 +290,6 @@ def main() -> int:
     assert "function planTranscriptText(tab)" in chat_js
     assert "function openPlanDraftModalFromText(text)" in import_js
     assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
-    assert 'const createMenu = document.getElementById("nav-create-menu");' in common_js
     assert ".nav-context-summary" in base_css
     assert ".nav-create-group" in base_css
     assert ".nav-menu-panel" in base_css

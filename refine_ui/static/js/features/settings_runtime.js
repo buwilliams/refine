@@ -1,85 +1,6 @@
 // ---- System / Runtime -------------------------------------------------------
 
-function renderFeatureFlagsCard(feats) {
-  if (!feats || !feats.features?.length) return "";
-  const providers = feats.providers || [];
-  const current = feats.current_provider;
-  const cell = (provider, featureKey) => {
-    const slot = feats.matrix?.[`${provider}.${featureKey}`] || {};
-    const enabled = !!slot.enabled;
-    const overridden = !!slot.override;
-    const isCurrent = provider === current;
-    return `
-      <td class="${isCurrent ? "feature-current-col" : ""}">
-        <label class="feature-toggle ${enabled ? "on" : "off"}"
-               title="${overridden ? "Operator override" : "Default"}">
-          <input type="checkbox"
-                 data-feature-cell="${provider}.${featureKey}"
-                 data-provider="${htmlEscape(provider)}"
-                 data-feature="${htmlEscape(featureKey)}"
-                 data-feature-default="${slot.default ? "1" : "0"}"
-                 data-feature-original-enabled="${enabled ? "1" : "0"}"
-                 data-feature-original-override="${overridden ? "1" : "0"}"
-                 ${enabled ? "checked" : ""}>
-          <span class="feature-toggle-state">${enabled ? "on" : "off"}</span>
-        </label>
-        ${overridden
-          ? `<button class="link-button"
-                     data-feature-clear="${provider}.${featureKey}"
-                     data-provider="${htmlEscape(provider)}"
-                     data-feature="${htmlEscape(featureKey)}"
-                     type="button"
-                     title="Clear override and use the code-defined default on save">
-              clear override
-            </button>`
-          : ""}
-      </td>`;
-  };
-  return `
-    <section class="settings-section">
-      <h3>Feature flags</h3>
-      <p class="muted small" style="margin-top:0">
-        Provider-scoped capability matrix. The current provider is
-        <strong>${htmlEscape(current)}</strong>. Defaults are the
-        code-defined set of features known to work; overriding a cell
-        is experimental and may produce errors at runtime.
-      </p>
-      <table class="table">
-        <thead><tr>
-          <th>Feature</th>
-          ${providers.map((p) => `
-            <th class="${p === current ? "feature-current-col" : ""}">
-              ${htmlEscape(p)}${p === current ? " (current)" : ""}
-            </th>`).join("")}
-        </tr></thead>
-        <tbody>
-          ${feats.features.map((f) => `
-            <tr>
-              <td>
-                <div><strong>${htmlEscape(f.label)}</strong></div>
-                <div class="muted small">${htmlEscape(f.description)}</div>
-              </td>
-              ${providers.map((p) => cell(p, f.key)).join("")}
-            </tr>`).join("")}
-        </tbody>
-      </table>
-      <p class="muted small" style="margin-top:8px">
-        Feature flag changes are saved automatically.
-      </p>
-    </section>`;
-}
-
-function updateFeatureToggleLabel(box) {
-  const label = box.closest(".feature-toggle");
-  const text = label?.querySelector(".feature-toggle-state");
-  if (!label || !text) return;
-  label.classList.toggle("on", box.checked);
-  label.classList.toggle("off", !box.checked);
-  text.textContent = box.checked ? "on" : "off";
-}
-
-
-function renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli) {
+function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   return `
@@ -165,7 +86,7 @@ function renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli) {
     <section class="settings-section">
       <h3>AI Provider</h3>
       <div class="form-row"><label>Which AI provider refine drives
-        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight. Chat and Import are supported for Claude Code, Codex, and Copilot.</span></label>
+        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.</span></label>
         <select id="s-cli">
           ${cliOption("claude", "Claude Code (default)")}
           ${cliOption("codex", "OpenAI Codex")}
@@ -180,10 +101,7 @@ function renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli) {
       </p>
       <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>).</p>
       <button id="s-recheck">Re-check auth</button>
-    </section>
-
-    ${renderFeatureFlagsCard(feats)
-      || `<section class="settings-section"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></section>`}`;
+    </section>`;
 }
 
 async function autosaveSettingsRuntime(options = {}) {
@@ -203,23 +121,7 @@ async function autosaveSettingsRuntime(options = {}) {
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     agent_cli: chosen,
   });
-  for (const box of $$("[data-feature-cell]")) {
-    const { provider, feature } = box.dataset;
-    const enabled = box.checked;
-    const wasEnabled = box.dataset.featureOriginalEnabled === "1";
-    const clearPending = box.dataset.featureClearPending === "1";
-    if (!clearPending && enabled === wasEnabled) continue;
-    await api("POST", "/api/features/override", {
-      provider, feature, enabled: clearPending ? null : enabled,
-    });
-    box.dataset.featureOriginalEnabled = enabled ? "1" : "0";
-    box.dataset.featureOriginalOverride = clearPending ? "0" : "1";
-    delete box.dataset.featureClearPending;
-  }
-  if (options.refreshFeatures) {
-    await refreshFeatures({ skipSettingsRefresh: true });
-    await refreshSettingsTab("runtime", { force: true });
-  }
+  if (options.refresh) await refreshSettingsTab("runtime", { force: true });
 }
 
 function bindSettingsRuntimeTab() {
@@ -229,30 +131,10 @@ function bindSettingsRuntimeTab() {
     "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse",
     autosaveSettingsRuntime,
   );
-  const autosaveRuntimeAndFeatures = createSettingsAutosave(
-    () => autosaveSettingsRuntime({ refreshFeatures: true }),
+  const autosaveRuntimeAndRefresh = createSettingsAutosave(
+    () => autosaveSettingsRuntime({ refresh: true }),
   );
-  $("#s-cli")?.addEventListener("change", autosaveRuntimeAndFeatures);
-  // Feature flag toggles.
-  $$("[data-feature-cell]").forEach((box) => {
-    box.addEventListener("change", async () => {
-      delete box.dataset.featureClearPending;
-      updateFeatureToggleLabel(box);
-      await autosaveRuntimeAndFeatures();
-    });
-  });
-  $$("[data-feature-clear]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const { provider, feature } = btn.dataset;
-      const box = $(`[data-feature-cell="${provider}.${feature}"]`);
-      if (!box) return;
-      box.checked = box.dataset.featureDefault === "1";
-      box.dataset.featureClearPending = "1";
-      updateFeatureToggleLabel(box);
-      btn.textContent = "clearing";
-      await autosaveRuntimeAndFeatures();
-    });
-  });
+  $("#s-cli")?.addEventListener("change", autosaveRuntimeAndRefresh);
   $("#s-recheck").addEventListener("click", async () => {
     await withButtonBusy($("#s-recheck"), "Re-checking…", async () => {
       try {

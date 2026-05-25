@@ -217,16 +217,6 @@ def _h_rebuild_cache(_h, _m, body, _q):
     return api.rebuild_sqlite_cache(body or {})
 
 
-@route("GET", r"/api/features")
-def _h_get_features(_h, _m, _b, _q):
-    return api.list_features()
-
-
-@route("POST", r"/api/features/override")
-def _h_set_feature_override(_h, _m, body, _q):
-    return api.set_feature_override(body or {})
-
-
 @route("GET", r"/api/diagnostics")
 def _h_diag(_h, _m, _b, _q):
     return api.backend_diagnostics()

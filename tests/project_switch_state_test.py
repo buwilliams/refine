@@ -55,7 +55,6 @@ def test_client_switch_path(root: Path) -> None:
         "resetChatForProjectSwitch()",
         "initSSE()",
         "await syncProjectUpdates({ silent: true })",
-        "await refreshFeatures()",
         "await refreshInstanceScopedState({ selectReporterFallback: true })",
         "await refreshTargetAppToggle()",
         'location.hash = "#/system/application"',

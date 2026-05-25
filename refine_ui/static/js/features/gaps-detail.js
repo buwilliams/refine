@@ -212,7 +212,7 @@ function drawGapDetail(gap) {
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}
         ${forwardBtn}
-        <button id="btn-chat" ${featureEnabled("chat") ? "" : "disabled title=\"Chat is disabled for the current AI provider — see System → Runtime\""}>Open Chat</button>
+        <button id="btn-chat">Open Chat</button>
         <button class="warn" id="btn-rename">Rename</button>
         <button class="warn" id="btn-priority">Change Priority</button>
         <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>

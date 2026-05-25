@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, changes_index, config, db, features, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
+from refine_server import activity, changes_index, config, db, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
@@ -1205,21 +1205,6 @@ class Runner:
     # ---- chat ----------------------------------------------------------------
 
     def _h_extract_gaps(self, params: dict) -> dict:
-        if not features.is_enabled(self._conn, "import_gaps"):
-            provider = features.current_provider(self._conn)
-            return {
-                "ok": False,
-                "code": "feature_disabled",
-                "feature": "import_gaps",
-                "provider": provider,
-                "message": (
-                    f"Import (LLM extraction) is disabled for the "
-                    f"`{provider}` provider. Pick a supported provider on "
-                    f"Settings -> AI Provider, or enable the override on "
-                    f"the same tab's Feature flags section (experimental)."
-                ),
-                "drafts": [],
-            }
         text = params.get("text") or ""
         drafts = llm.extract_gaps(
             text, provider=db.get_setting(self._conn, "agent_cli"),
@@ -1668,20 +1653,6 @@ class Runner:
                 "message": revert_message}
 
     def _h_chat_start(self, params: dict) -> dict:
-        if not features.is_enabled(self._conn, "chat"):
-            provider = features.current_provider(self._conn)
-            return {
-                "ok": False,
-                "code": "feature_disabled",
-                "feature": "chat",
-                "provider": provider,
-                "message": (
-                    f"Chat is disabled for the `{provider}` provider. "
-                    f"Pick a supported provider on Settings -> AI Provider, or "
-                    f"enable the override on the same tab's Feature "
-                    f"flags section (experimental)."
-                ),
-            }
         gap_id = params.get("gap_id")
         purpose = str(params.get("purpose") or "").strip().lower()
         priming_prompt: str | None = None

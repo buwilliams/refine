@@ -2515,50 +2515,6 @@ def list_settings() -> tuple[int, dict]:
         conn.close()
 
 
-def list_features() -> tuple[int, dict]:
-    """Provider-scoped feature flag matrix. Used by the Settings UI
-    to render the Feature flags card and by client-side gating of
-    Chat / Import affordances."""
-    from refine_server import features
-    conn = _conn()
-    try:
-        return 200, features.get_matrix(conn)
-    finally:
-        conn.close()
-
-
-def set_feature_override(body: dict) -> tuple[int, dict]:
-    """Operator override for a (provider, feature) cell. Body:
-        {"provider": "codex", "feature": "chat", "enabled": true|false|null}
-    `enabled=null` clears the override so the code-defined default
-    re-applies."""
-    from refine_server import features
-    if not isinstance(body, dict):
-        return err(400, "expected an object")
-    provider = (body.get("provider") or "").strip().lower()
-    feature = (body.get("feature") or "").strip()
-    if provider not in features.PROVIDERS:
-        return err(400, f"unknown provider: {provider}")
-    if feature not in features.FEATURES:
-        return err(400, f"unknown feature: {feature}")
-    enabled = body.get("enabled")
-    if enabled is not None and not isinstance(enabled, bool):
-        return err(400, "enabled must be true, false, or null")
-    conn = _conn()
-    try:
-        features.set_override(conn, provider, feature, enabled)
-        activity.append(
-            conn,
-            message=(f"Feature flag `{provider}.{feature}` "
-                     + (f"overridden to {enabled}"
-                        if enabled is not None else "override cleared")),
-            severity="info", category="user", actor="refine",
-        )
-    finally:
-        conn.close()
-    return 200, {"ok": True}
-
-
 @_exclusive_mutation("Update settings")
 def update_settings(body: dict) -> tuple[int, dict]:
     if not isinstance(body, dict) or not body:
@@ -3560,8 +3516,6 @@ def import_extract(body: dict) -> tuple[int, dict]:
             result = client.call(
                 M_EXTRACT_GAPS, {"text": chunk["text"]}, timeout=200.0,
             )
-            if result.get("ok") is False and result.get("code") == "feature_disabled":
-                return 409, result
             drafts.extend(result.get("drafts") or [])
     except BackendError as e:
         return _backend_err(e)
@@ -3933,8 +3887,8 @@ def _import_dedup_score(
     jaccard = _import_token_jaccard(draft, candidate)
     sequence = difflib.SequenceMatcher(None, draft, candidate).ratio()
     strict_score = (0.55 * trigram) + (0.30 * jaccard) + (0.15 * sequence)
-    feature_score = _import_feature_cosine(draft, candidate)
-    fuzzy_score = (0.45 * feature_score) + (0.35 * sequence) + (0.20 * trigram)
+    token_score = _import_token_cosine(draft, candidate)
+    fuzzy_score = (0.45 * token_score) + (0.35 * sequence) + (0.20 * trigram)
     score = max(strict_score, fuzzy_score)
     if draft_numbers and candidate_numbers and draft_numbers != candidate_numbers:
         score = min(score, 0.5)
@@ -3954,9 +3908,9 @@ def _import_token_jaccard(a: str, b: str) -> float:
     return len(aa & bb) / len(aa | bb)
 
 
-def _import_feature_cosine(a: str, b: str) -> float:
-    ca = _import_token_features(a)
-    cb = _import_token_features(b)
+def _import_token_cosine(a: str, b: str) -> float:
+    ca = _import_token_counts(a)
+    cb = _import_token_counts(b)
     if not ca or not cb:
         return 0.0
     dot = sum(ca[key] * cb.get(key, 0) for key in ca)
@@ -3967,7 +3921,7 @@ def _import_feature_cosine(a: str, b: str) -> float:
     return dot / (mag_a * mag_b)
 
 
-def _import_token_features(text: str) -> Counter[str]:
+def _import_token_counts(text: str) -> Counter[str]:
     tokens = [
         _import_stem_token(token)
         for token in text.split()
@@ -4490,8 +4444,6 @@ def chat_start(body: dict) -> tuple[int, dict]:
         })
     except BackendError as e:
         return _backend_err(e)
-    if result.get("ok") is False and result.get("code") == "feature_disabled":
-        return 409, result
     return 201, result
 
 

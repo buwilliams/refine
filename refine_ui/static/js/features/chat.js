@@ -192,7 +192,7 @@ function openPlanChatDock() {
   saveChatStateToStorage();
   drawChatDock();
   const t = chatState.tabs.plan;
-  if (featureEnabled("chat") && t && !t.sessionId) {
+  if (t && !t.sessionId) {
     startPlanChatSession(t);
   }
 }
@@ -245,45 +245,6 @@ function toggleChatFullscreen() {
 function drawChatDock() {
   const root = $("#chat-dock");
   if (!root) return;
-  // Provider-scoped feature gate. When chat is disabled for the
-  // current CLI we still keep the dock visible (it's part of the
-  // layout) and the tab strip clickable, but the body shows a
-  // single explanatory notice instead of the session UI so users
-  // can't try to start a chat that the server will reject.
-  if (!featureEnabled("chat")) {
-    root.classList.toggle("open", !!chatState.open);
-    const providerName = state.features?.current_provider || "the current provider";
-    root.innerHTML = `
-      <div class="chat-dock-bar" id="chat-dock-bar"
-           title="Chat is disabled for this provider">
-        <span class="chat-dock-label">Chat</span>
-        <span class="muted small" style="margin-left:8px">disabled</span>
-        <span class="spacer" style="flex:1"></span>
-        <button class="chat-dock-toggle chat-dock-collapse" id="btn-dock-toggle"
-                aria-label="${chatState.open ? "Collapse chat" : "Expand chat"}"
-                title="${chatState.open ? "Collapse" : "Expand"}">▾</button>
-      </div>
-      <div class="chat-dock-body" style="padding:14px">
-        <p class="muted">
-          Chat is disabled for the <code>${htmlEscape(providerName)}</code>
-          AI provider. It depends on provider session-resume support.
-          Switch the provider on
-          <a href="#/system">System → Runtime</a>, or enable the
-          override on the Runtime tab's <strong>Feature flags</strong> section
-          (experimental).
-        </p>
-      </div>
-    `;
-    $("#chat-dock-bar")?.addEventListener("click", (e) => {
-      if (!e.target.closest("#btn-dock-toggle") && !e.target.closest(".chat-tab")) return;
-      toggleChatDock();
-    });
-    $("#btn-dock-toggle")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleChatDock();
-    });
-    return;
-  }
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
   const active = tabs[activeId] || tabs.standalone;
