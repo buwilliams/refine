@@ -100,11 +100,12 @@ function buildManagedProcessRows(processes, paused, backend, runnerReachable, di
     kind: "agent_scheduler",
     label: "Agent scheduler",
     status: paused ? "paused" : "active",
+    runner_reachable: runnerReachable,
     pid: null,
     details: paused
       ? "New agent subprocesses wait; running subprocesses continue."
       : "New agent subprocesses launch on demand.",
-    actions: [paused ? "resume" : "pause"],
+    actions: [paused ? "resume" : "pause", "hard_reset_worktree"],
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
@@ -251,7 +252,9 @@ function processStatusLabel(status) {
 function renderProcessActions(proc) {
   if (proc.kind === "agent_scheduler") {
     const paused = proc.status === "paused";
-    return `<button id="btn-pause" class="${paused ? "" : "secondary"}">${paused ? "Resume" : "Pause"} agents</button>`;
+    return `
+      <button id="btn-pause" class="${paused ? "" : "secondary"}">${paused ? "Resume" : "Pause"} agents</button>
+      <button class="danger" data-hard-reset-worktree ${proc.runner_reachable ? "" : "disabled"}>Hard reset worktree</button>`;
   }
   if (proc.kind === "agent" && proc.gap_id) {
     return `<button class="danger" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
@@ -572,6 +575,26 @@ function bindSettingsProcessesTab(s) {
         if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
         if (paused) scheduleProcessesTabRefreshes();
       } catch (e) { await showActionError(e); }
+    });
+  });
+  $("[data-hard-reset-worktree]")?.addEventListener("click", async () => {
+    const btn = $("[data-hard-reset-worktree]");
+    const ok = await modalConfirm(
+      "Hard reset the target worktree to its upstream branch and delete untracked files? This discards local target-app changes and cannot be undone.",
+      {
+        title: "Hard reset worktree",
+        okLabel: "Hard reset",
+        danger: true,
+        cancelLabel: "Cancel",
+      },
+    );
+    if (!ok) return;
+    await withButtonBusy(btn, "Resetting…", async () => {
+      try {
+        const r = await api("POST", "/api/runner-workers/merger/hard-reset-worktree");
+        toast(r.message || "Target worktree reset", "info");
+        await refreshProcessesSettingsTab({ force: true });
+      } catch (e) { await showActionError(e, "Hard reset failed"); }
     });
   });
   $$("[data-cancel-agent]").forEach((b) => {

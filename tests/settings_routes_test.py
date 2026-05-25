@@ -371,10 +371,13 @@ def main() -> int:
     assert 'data-runner-cache-rebuild' in processes_body
     assert 'data-runner-log-cleanup' in processes_body
     assert 'data-runner-log-cleanup-days' in processes_body
+    assert 'data-hard-reset-worktree' in processes_body
     assert 'api("POST", "/api/runner-workers/target-app-rebuilder/rebuild")' in settings_js
+    assert 'api("POST", "/api/runner-workers/merger/hard-reset-worktree")' in settings_js
     assert 'api("POST", "/api/target-app/generate-instructions"' in settings_js
     assert 'api("POST", "/api/activity/cleanup"' in settings_js
     assert '@route("POST", r"/api/runner-workers/target-app-rebuilder/rebuild")' in server_py
+    assert '@route("POST", r"/api/runner-workers/merger/hard-reset-worktree")' in server_py
     assert "<th>CPU priority</th>" in agents_table
     assert "<th>Max memory</th>" in agents_table
     assert "<th>Elapsed</th>" in agents_table

@@ -92,6 +92,16 @@ def wait_until_running(sub_mgr: "SubprocessManager", gap_id: str, *,
     raise AssertionError(f"{gap_id} did not start running")
 
 
+def wait_for_wakeup(wakeups: list[str], gap_id: str, *,
+                    timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if gap_id in wakeups:
+            return
+        time.sleep(0.05)
+    raise AssertionError(f"{gap_id} did not wake the merger")
+
+
 def latest_run(conn, gap_id: str):
     return conn.execute(
         "SELECT status, failure_category FROM runs WHERE gap_id = ? "
@@ -177,7 +187,7 @@ def main() -> int:
 
         gid_success = "01SUBPROCESSSUCCESSRUNAA"
         assert run_gap(gid_success) == "ready-merge"
-        assert gid_success in merger_wakeups
+        wait_for_wakeup(merger_wakeups, gid_success)
         run = latest_run(conn, gid_success)
         assert run["status"] == "finished"
         assert run["failure_category"] is None

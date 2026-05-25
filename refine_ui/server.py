@@ -403,6 +403,11 @@ def _h_target_app_rebuild_queue(_h, _m, body, _q):
     return api.target_app_rebuild_queue(body or {})
 
 
+@route("POST", r"/api/runner-workers/merger/hard-reset-worktree")
+def _h_hard_reset_worktree(_h, _m, body, _q):
+    return api.hard_reset_worktree(body or {})
+
+
 @route("POST", r"/api/target-app/health")
 def _h_target_app_health(_h, _m, body, _q):
     return api.target_app_health(body or {})

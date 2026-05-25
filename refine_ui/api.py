@@ -27,7 +27,7 @@ from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
-    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_PROJECT_SYNC,
+    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_HARD_RESET_WORKTREE, M_PROJECT_SYNC,
     M_MERGE_REPORTER, M_RENAME_REPORTER, M_RETRY_MERGE, M_RETRY_QA, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -4598,6 +4598,15 @@ def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:
     except BackendError as e:
         return _backend_err(e)
     return 202, result
+
+
+def hard_reset_worktree(_body: dict | None = None) -> tuple[int, dict]:
+    """Destructively reset the host target worktree through the runner."""
+    try:
+        result = get_client().call(M_HARD_RESET_WORKTREE, {}, timeout=300.0)
+    except BackendError as e:
+        return _backend_err(e)
+    return (200 if result.get("ok") else 409), result
 
 
 def _target_app_run(kind: str) -> tuple[int, dict]:

@@ -20,7 +20,7 @@ from refine_server.backend_protocol import (
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_MERGE_REPORTER, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
     M_RETRY_MERGE, M_RETRY_QA, M_RUNNING,
-    M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
+    M_HARD_RESET_WORKTREE, M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 
@@ -215,6 +215,7 @@ class Runner:
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
             M_TARGET_APP_HEALTH: self._h_target_app_health,
             M_PROJECT_SYNC: self._h_project_sync,
+            M_HARD_RESET_WORKTREE: self._h_hard_reset_worktree,
         }
         h = handlers.get(method)
         if h is None:
@@ -235,6 +236,26 @@ class Runner:
             lambda: project_sync.sync_latest(self._conn, actor="runner"),
             label="project sync",
         )
+
+    def _h_hard_reset_worktree(self, _: dict) -> dict:
+        with mutation_guard.exclusive(
+            "Hard worktree reset",
+            kind="hard_worktree_reset",
+            blocking=True,
+        ):
+            result = self.merger.run_under_host_lock(
+                lambda: self._hard_reset_target_worktree(),
+                label="hard worktree reset",
+            )
+        if result.get("ok"):
+            try:
+                project_state.rebuild_sqlite_cache(self._conn)
+            except Exception as e:
+                result["cache_rebuild_error"] = repr(e)
+            self.dispatcher.enforce_now()
+            self.governance_agent.wake()
+            self.merger.wake()
+        return result
 
     def status_snapshot(self) -> dict:
         """Return live runner state without routing through `call()`.
@@ -469,6 +490,117 @@ class Runner:
             commit_and_stash,
             label="target-app start",
         )
+
+    def _hard_reset_target_worktree(self) -> dict:
+        """Destructively recover the host target worktree.
+
+        This is an operator escape hatch for a dedicated Refine checkout: abort
+        stale git state first via the merger's normal pre-cleanup, then make
+        the current branch match its upstream. If no upstream is configured,
+        reset to the current HEAD and only clean the worktree.
+        """
+        repo = config.get().client_repo
+        branch = git_ops.current_branch(cwd=repo)
+        upstream = git_ops.upstream_branch(branch, cwd=repo) if branch else None
+        before_head = git_ops.rev_parse("HEAD", cwd=repo) or ""
+        before_dirty = self._target_worktree_dirty_paths()
+        target_ref = upstream or "HEAD"
+
+        if upstream:
+            fetched = git_ops.fetch(cwd=repo)
+            if not fetched.ok:
+                return {
+                    "ok": False,
+                    "clean": False,
+                    "stage": "fetch",
+                    "branch": branch or "",
+                    "upstream": upstream,
+                    "message": "Could not fetch before hard worktree reset.",
+                    "details": fetched.stderr or fetched.stdout,
+                }
+
+        reset = git_ops.reset_hard(target_ref, cwd=repo)
+        if not reset.ok:
+            return {
+                "ok": False,
+                "clean": False,
+                "stage": "reset",
+                "branch": branch or "",
+                "upstream": upstream or "",
+                "target_ref": target_ref,
+                "message": "Could not hard reset the target worktree.",
+                "details": reset.stderr or reset.stdout,
+            }
+
+        clean = git_ops.clean_untracked(cwd=repo)
+        if not clean.ok:
+            return {
+                "ok": False,
+                "clean": False,
+                "stage": "clean",
+                "branch": branch or "",
+                "upstream": upstream or "",
+                "target_ref": target_ref,
+                "message": "Could not clean untracked files after hard reset.",
+                "details": clean.stderr or clean.stdout,
+            }
+
+        stuck = git_ops.in_progress_op(cwd=repo)
+        dirty_after = self._target_worktree_dirty_paths()
+        after_head = git_ops.rev_parse("HEAD", cwd=repo) or ""
+        if stuck or dirty_after:
+            op_name = stuck[0] if stuck else ""
+            return {
+                "ok": False,
+                "clean": False,
+                "stage": "verify",
+                "branch": branch or "",
+                "upstream": upstream or "",
+                "target_ref": target_ref,
+                "before_head": before_head,
+                "after_head": after_head,
+                "message": "Target worktree is still not clean after hard reset.",
+                "details": (
+                    (f"unfinished git operation: {op_name}\n" if op_name else "")
+                    + "\n".join(dirty_after[:200])
+                ).strip(),
+            }
+
+        activity.append(
+            self._get_conn(),
+            message=(
+                f"Hard reset target worktree to `{target_ref}`"
+                if upstream else "Hard reset target worktree to HEAD"
+            ),
+            severity="warn",
+            category="git",
+            actor="runner",
+            details=(
+                f"branch: {branch or '(detached)'}\n"
+                f"upstream: {upstream or ''}\n"
+                f"before: {before_head}\n"
+                f"after: {after_head}\n"
+                f"discarded paths:\n" + "\n".join(before_dirty[:200])
+            ).strip(),
+        )
+        return {
+            "ok": True,
+            "clean": True,
+            "stage": "reset",
+            "branch": branch or "",
+            "upstream": upstream or "",
+            "target_ref": target_ref,
+            "before_head": before_head,
+            "after_head": after_head,
+            "discarded_paths": before_dirty,
+            "reset_stdout": reset.stdout,
+            "clean_stdout": clean.stdout,
+            "message": (
+                f"Hard reset `{branch}` to `{upstream}` and cleaned the worktree."
+                if branch and upstream
+                else "Hard reset and cleaned the target worktree."
+            ),
+        }
 
     def _target_worktree_dirty_paths(self) -> list[str]:
         paths = git_ops.dirty_paths()

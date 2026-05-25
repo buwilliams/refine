@@ -675,6 +675,14 @@ def merge_abort(cwd: Path | None = None) -> GitResult:
     return _run(["merge", "--abort"], cwd=cwd or client_repo_path())
 
 
+def reset_hard(ref: str = "HEAD", cwd: Path | None = None) -> GitResult:
+    return _run(["reset", "--hard", ref], cwd=cwd or client_repo_path())
+
+
+def clean_untracked(cwd: Path | None = None) -> GitResult:
+    return _run(["clean", "-fd"], cwd=cwd or client_repo_path())
+
+
 def merge_branch(branch: str, *, cwd: Path | None = None,
                  message: str | None = None,
                  no_ff: bool = False) -> GitResult:
