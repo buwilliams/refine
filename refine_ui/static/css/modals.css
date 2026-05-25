@@ -172,6 +172,14 @@
   padding: 18px 8px 8px;
   color: var(--muted);
 }
+
+.refine-issue-modal {
+  max-width: 560px;
+}
+.refine-issue-modal textarea {
+  min-height: 150px;
+  resize: vertical;
+}
 @keyframes modal-fade {
   from { opacity: 0; }
   to   { opacity: 1; }

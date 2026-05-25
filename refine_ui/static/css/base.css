@@ -200,6 +200,24 @@ pre {
 .nav-command-button:hover .nav-command-shortcut {
   color: var(--color-text);
 }
+.nav-issue-button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+}
+.nav-issue-button:hover:not(:disabled) {
+  color: var(--color-text);
+}
+.nav-bug-icon {
+  width: 26px;
+  height: 26px;
+  display: block;
+  background: currentColor;
+  mask: url("/static/images/bug.svg") center / contain no-repeat;
+  -webkit-mask: url("/static/images/bug.svg") center / contain no-repeat;
+}
 
 .nav-menu {
   position: relative;

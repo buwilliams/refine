@@ -105,6 +105,96 @@ async function runFailedBackCommand({ button = null } = {}) {
   });
 }
 
+function githubIssueUrl({ title, description }) {
+  const url = new URL("https://github.com/buwilliams/refine/issues/new");
+  if (title) url.searchParams.set("title", title);
+  if (description) {
+    url.searchParams.set("body", description);
+  }
+  return url.toString();
+}
+
+function openRefineIssueRequestModal() {
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal refine-issue-modal" role="dialog" aria-modal="true"
+         aria-labelledby="refine-issue-title">
+      <div class="modal-title" id="refine-issue-title">Request refine feature/bugfix</div>
+      <div class="modal-body">
+        <p class="muted small" style="margin-top:0">
+          This opens GitHub in a new tab with your title and description pre-filled.
+          You can review and submit the issue there.
+        </p>
+        <form id="refine-issue-form">
+          <div class="form-row">
+            <label>Title</label>
+            <input type="text" id="refine-issue-input-title"
+                   placeholder="Short summary">
+          </div>
+          <div class="form-row">
+            <label>Description</label>
+            <textarea id="refine-issue-input-description"
+                      placeholder="What should change? Include what happened, what you expected, and any relevant context."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+        <button data-ok>Open GitHub</button>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+
+  let closed = false;
+  function close() {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+  }
+  function submit() {
+    const title = root.querySelector("#refine-issue-input-title")?.value.trim() || "";
+    const description = root.querySelector("#refine-issue-input-description")?.value.trim() || "";
+    if (!title && !description) {
+      toast("Provide a title or description first.", "error");
+      root.querySelector("#refine-issue-input-title")?.focus();
+      return;
+    }
+    const opened = window.open(
+      githubIssueUrl({ title, description }),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    if (!opened) {
+      toast("GitHub did not open. Allow popups for this site and try again.", "error");
+      return;
+    }
+    close();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    } else if (e.key === "Enter") {
+      if (e.target && e.target.tagName === "TEXTAREA") return;
+      e.preventDefault();
+      submit();
+    }
+  }
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close();
+  });
+  root.querySelector("[data-cancel]")?.addEventListener("click", close);
+  root.querySelector("[data-ok]")?.addEventListener("click", submit);
+  root.querySelector("#refine-issue-form")?.addEventListener("submit", (e) => {
+    e.preventDefault();
+    submit();
+  });
+  root.querySelector("#refine-issue-input-title")?.focus();
+}
+
 function navigateCommand(hash) {
   location.hash = hash;
 }
@@ -155,6 +245,15 @@ registerCommand({
     closeTopbarMenus();
     openImportModal();
   },
+});
+
+registerCommand({
+  id: "refine.issue.request",
+  title: "Request refine feature/bugfix",
+  group: "Support",
+  aliases: ["issue", "bug", "bugfix", "feature-request", "request-feature"],
+  keywords: ["github", "report", "support", "feedback"],
+  run: () => openRefineIssueRequestModal(),
 });
 
 registerCommand({

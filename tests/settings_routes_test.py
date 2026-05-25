@@ -271,16 +271,22 @@ def main() -> int:
     assert 'id="nav-context-reporter-summary">No reporter</span>' in index_html
     assert '<select id="global-reporter" aria-label="Reporter"></select>' in index_html
     assert 'class="nav-create-group"' in index_html
+    assert 'id="btn-command-palette"' in index_html
+    assert 'id="btn-refine-issue"' in index_html
+    assert 'class="nav-bug-icon"' in index_html
     assert 'id="btn-new-gap">+ New Gap</a>' in index_html
     assert 'class="nav-menu nav-create-menu" id="nav-create-menu"' in index_html
     assert 'id="btn-plan">Plan</a>' in index_html
     assert 'id="btn-import">Import gaps</a>' in index_html
+    assert 'id="btn-refine-issue-menu">Request refine feature/bugfix</a>' in index_html
     assert index_html.index('id="btn-plan"') < index_html.index('id="btn-import"')
     assert 'id="target-app-indicator" class="target-app-indicator nav-context-status"' in index_html
     assert 'id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"' in index_html
     assert '<span class="agent-status-label">0</span>' in index_html
     assert index_html.index('id="nav-context-menu"') < index_html.index('id="agent-status-indicator"')
-    assert index_html.index('id="agent-status-indicator"') < index_html.index('class="nav-create-group"')
+    assert index_html.index('id="agent-status-indicator"') < index_html.index('id="btn-command-palette"')
+    assert index_html.index('id="btn-command-palette"') < index_html.index('id="btn-refine-issue"')
+    assert index_html.index('id="btn-refine-issue"') < index_html.index('class="nav-create-group"')
     assert index_html.index('class="nav-create-group"') < index_html.index('id="btn-new-gap"')
     assert 'indicator.href = opensApp ? appUrl : "#/system/processes";' in target_app_js
     assert 'indicator.target = "_blank";' in target_app_js
@@ -304,6 +310,8 @@ def main() -> int:
     assert "function openPlanDraftModalFromText(text)" in import_js
     assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
     assert ".nav-context-summary" in base_css
+    assert ".nav-issue-button" in base_css
+    assert ".nav-bug-icon" in base_css
     assert ".nav-create-group" in base_css
     assert ".nav-menu-panel" in base_css
     topbar_css = re.search(r"\.topbar \{(.*?)\}", base_css, re.S)

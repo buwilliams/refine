@@ -820,10 +820,9 @@ function closeTopbarMenus(target = null) {
   }
 }
 
-// "+ New Gap", "Plan", and "Import gaps" in the topbar open in place rather
-// than navigating to dedicated screens. The hrefs are kept for deep-linking /
-// accessibility; click handlers intercept so the user's current view stays
-// underneath.
+// Topbar create/support actions open in place rather than navigating away.
+// The hrefs are kept for deep-linking / accessibility; click handlers
+// intercept so the user's current view stays underneath.
 document.addEventListener("click", (e) => {
   const menuSummary = e.target.closest(".nav-menu > summary");
   if (menuSummary) {
@@ -841,6 +840,10 @@ document.addEventListener("click", (e) => {
     e.preventDefault();
     closeTopbarMenus();
     runCommand("gap.import");
+  } else if (e.target.closest("#btn-refine-issue, #btn-refine-issue-menu")) {
+    e.preventDefault();
+    closeTopbarMenus();
+    runCommand("refine.issue.request");
   } else if (e.target.closest("#target-app-indicator")) {
     closeTopbarMenus();
   } else if (!e.target.closest(".nav-menu")) {
