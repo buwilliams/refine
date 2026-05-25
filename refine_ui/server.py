@@ -358,6 +358,11 @@ def _h_instances_patch(_h, m, body, _q):
     return api.update_instance(m.group(1), body or {})
 
 
+@route("POST", r"/api/instances/copy-settings")
+def _h_instances_copy_settings(_h, _m, body, _q):
+    return api.copy_instance_settings(body or {})
+
+
 @route("POST", r"/api/instances/activate")
 def _h_instances_activate(_h, _m, body, _q):
     return api.activate_instance(body or {})

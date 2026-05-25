@@ -7,6 +7,9 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
     <section class="settings-section">
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
+      <div class="actions settings-section-actions">
+        <button class="secondary" id="s-runtime-copy-instance">Copy from instance</button>
+      </div>
       <div class="form-row"><label>Parallel-run cap</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 10}"></div>
       <div class="form-row"><label>Branch name pattern</label>
@@ -125,6 +128,12 @@ async function autosaveSettingsRuntime(options = {}) {
 }
 
 function bindSettingsRuntimeTab() {
+  $("#s-runtime-copy-instance")?.addEventListener("click", async () => {
+    await copySettingsFromInstance("runtime", {
+      title: "Copy runtime settings",
+      refreshTab: "runtime",
+    });
+  });
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,

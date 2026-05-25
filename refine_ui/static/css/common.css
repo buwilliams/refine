@@ -515,6 +515,7 @@ select {
 .kv dd { margin: 0; }
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.settings-section-actions { margin: 10px 0 14px; }
 
 .search-bar {
   display: flex;

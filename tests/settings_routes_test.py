@@ -468,6 +468,14 @@ def main() -> int:
     assert 'api("GET", "/api/settings")' in application_refresh_body
     assert "renderSettingsApplicationTab({" in application_refresh_body
     assert "target_app_url" not in common_js
+    assert 'id="s-application-copy-instance"' in application_body
+    assert 'id="s-target-generate-ai"' in application_body
+    assert 'copySettingsFromInstance("application"' in application_body
+    assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in application_body
+    assert 'id="s-runtime-copy-instance"' in runtime_body
+    assert 'copySettingsFromInstance("runtime"' in runtime_body
+    assert 'api("POST", "/api/instances/copy-settings"' in settings_js
+    assert '@route("POST", r"/api/instances/copy-settings")' in server_py
     assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'id="s-quality-enabled"' not in application_body
     assert 'id="s-quality-enabled"' in settings_js

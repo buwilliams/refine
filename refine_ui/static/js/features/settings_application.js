@@ -19,7 +19,7 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
         <select id="s-project-select" ${projectApps.length ? "" : "disabled"}>
           ${appOptions || `<option value="">No apps yet</option>`}
         </select></div>
-      <div class="actions">
+      <div class="actions settings-section-actions">
         <button class="secondary" id="s-project-add" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
         <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
@@ -29,6 +29,10 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
     <section class="settings-section">
       <h3>Application</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
+      <div class="actions">
+        <button class="secondary" id="s-application-copy-instance">Copy from instance</button>
+        <button class="secondary" id="s-target-generate-ai">Generate with AI</button>
+      </div>
     </section>
 
     <section class="settings-section">
@@ -205,6 +209,29 @@ function applyGeneratedTargetAppConfig(cfg) {
 }
 
 function bindSettingsApplicationTab(currentProject) {
+  $("#s-application-copy-instance")?.addEventListener("click", async () => {
+    await copySettingsFromInstance("application", {
+      title: "Copy application settings",
+      refreshTab: "application",
+    });
+  });
+  $("#s-target-generate-ai")?.addEventListener("click", async () => {
+    const ok = await modalConfirm(
+      "Ask the agent to analyse the codebase and draft target-app configuration? This can take a minute or two and overwrites the saved target-app fields.",
+      { title: "Generate target-app config", okLabel: "Generate" },
+    );
+    if (!ok) return;
+    await withButtonBusy($("#s-target-generate-ai"), "Generating…", async () => {
+      try {
+        const r = await api("POST", "/api/target-app/generate-instructions", { kind: "all" });
+        if (r.ok && r.config) {
+          applyGeneratedTargetAppConfig(r.config);
+        } else {
+          toast("Generation produced no configuration", "error");
+        }
+      } catch (e) { await showActionError(e); }
+    });
+  });
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
   });

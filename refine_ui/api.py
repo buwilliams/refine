@@ -385,6 +385,35 @@ def update_instance(instance_id: str, body: dict[str, Any]) -> tuple[int, dict]:
     return 200, {"instance": entry, **_instance_summary()}
 
 
+@_exclusive_mutation("Copy instance settings")
+def copy_instance_settings(body: dict[str, Any]) -> tuple[int, dict]:
+    source = (body.get("source_instance_id") or body.get("instance_id") or "").strip()
+    section = (body.get("section") or "").strip()
+    if not source:
+        return err(400, "source_instance_id is required")
+    try:
+        result = project_state.copy_instance_settings(source, section)
+    except ValueError as e:
+        return err(400, str(e))
+    _rebuild_cache()
+    conn = _conn()
+    try:
+        settings = db.list_settings(conn)
+        activity.append(
+            conn,
+            message=(
+                f"Copied {section} settings from "
+                f"{project_state.gap_instance_display(source)}"
+            ),
+            severity="info",
+            category="settings",
+            actor="refine",
+        )
+    finally:
+        conn.close()
+    return 200, {"ok": True, "settings": settings, **result}
+
+
 @_exclusive_mutation("Activate instance")
 def activate_instance(body: dict[str, Any]) -> tuple[int, dict]:
     instance_id = (body.get("instance_id") or body.get("id") or "").strip()

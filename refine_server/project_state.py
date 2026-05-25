@@ -96,6 +96,11 @@ TARGET_APP_RUNTIME_SETTING_KEYS = {
 
 TARGET_APP_SETTING_KEYS = TARGET_APP_CONFIG_SETTING_KEYS | TARGET_APP_RUNTIME_SETTING_KEYS
 
+APPLICATION_COPY_SETTING_KEYS = (
+    APPLICATION_SETTING_KEYS - {"quality_enabled"}
+) | TARGET_APP_CONFIG_SETTING_KEYS
+RUNTIME_COPY_SETTING_KEYS = RUNTIME_SETTING_KEYS - {"agent_cli", "paused"}
+
 
 def volume_root() -> Path:
     return config.get().volume_root
@@ -509,22 +514,80 @@ def list_settings() -> dict[str, str]:
     root = volume_root()
     ensure_initialized(migrate=True)
     active = active_instance_id(root=root)
+    return instance_settings(active, root=root)
+
+
+def instance_settings(instance_id: str, *, root: Path | None = None) -> dict[str, str]:
+    from . import db
+
+    root = root or volume_root()
+    ensure_initialized(migrate=True)
     settings = dict(db.DEFAULT_SETTINGS)
     cfg = read_project_config(root=root)
     settings.update(_string_map(cfg.get("settings") or {}))
     settings.update(_string_map(
-        _read_json(instance_dir(active, root) / "application.json", {}),
+        _read_json(instance_dir(instance_id, root) / "application.json", {}),
         allowed=APPLICATION_SETTING_KEYS,
     ))
     settings.update(_string_map(
-        _read_json(instance_dir(active, root) / "runtime.json", {}),
+        _read_json(instance_dir(instance_id, root) / "runtime.json", {}),
         allowed=RUNTIME_SETTING_KEYS,
     ))
     settings.update(_string_map(
-        _read_json(instance_dir(active, root) / "target-app.json", {}),
+        _read_json(instance_dir(instance_id, root) / "target-app.json", {}),
         allowed=TARGET_APP_CONFIG_SETTING_KEYS,
     ))
     return settings
+
+
+def copy_instance_settings(source_instance_id: str, section: str,
+                           *, root: Path | None = None) -> dict[str, Any]:
+    root = root or volume_root()
+    ensure_initialized(migrate=True)
+    source = instance_by_id(source_instance_id, root=root)
+    if source is None:
+        raise ValueError(f"unknown source instance: {source_instance_id}")
+    target = active_instance_id(root=root)
+    if source_instance_id == target:
+        raise ValueError("source instance must be different from the active instance")
+
+    source_settings = instance_settings(source_instance_id, root=root)
+    if section == "application":
+        app_values = {
+            k: source_settings.get(k, "")
+            for k in APPLICATION_SETTING_KEYS
+            if k in APPLICATION_COPY_SETTING_KEYS
+        }
+        target_values = {
+            k: source_settings.get(k, "")
+            for k in TARGET_APP_CONFIG_SETTING_KEYS
+            if k in APPLICATION_COPY_SETTING_KEYS
+        }
+        _update_instance_file(
+            "application.json", app_values, instance_id=target, root=root,
+        )
+        _update_instance_file(
+            "target-app.json", target_values, instance_id=target, root=root,
+        )
+        copied = {**app_values, **target_values}
+    elif section == "runtime":
+        values = {
+            k: source_settings.get(k, "")
+            for k in RUNTIME_COPY_SETTING_KEYS
+        }
+        _update_instance_file(
+            "runtime.json", values, instance_id=target, root=root,
+        )
+        copied = values
+    else:
+        raise ValueError("section must be application or runtime")
+    return {
+        "source_instance_id": source_instance_id,
+        "target_instance_id": target,
+        "section": section,
+        "copied": copied,
+        "copied_count": len(copied),
+    }
 
 
 def set_setting(key: str, value: str) -> None:
@@ -1104,10 +1167,11 @@ def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
 
 
 def _update_instance_file(filename: str, updates: dict[str, str], *,
+                          instance_id: str | None = None,
                           root: Path | None = None) -> None:
     root = root or volume_root()
-    active = active_instance_id(root=root)
-    p = instance_dir(active, root) / filename
+    target = instance_id or active_instance_id(root=root)
+    p = instance_dir(target, root) / filename
     data = _read_json(p, {})
     normalized = {k: str(v) for k, v in updates.items()}
     if all(data.get(k) == v for k, v in normalized.items()):

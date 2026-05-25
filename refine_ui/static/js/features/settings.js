@@ -209,6 +209,47 @@ function updateSettingsTabContent(slug, body, bind) {
   if (typeof bind === "function") bind();
 }
 
+async function copySettingsFromInstance(section, {
+  title = "Copy settings",
+  refreshTab = readSettingsTab(),
+} = {}) {
+  const snap = await api("GET", "/api/instances");
+  const active = snap.active_instance_id || state.project?.active_instance_id || "";
+  const choices = (snap.instances || []).filter((inst) => inst.id && inst.id !== active);
+  if (!choices.length) {
+    toast("No other instances available.", "warn");
+    return;
+  }
+  const opts = choices.map((inst) => `
+    <option value="${htmlEscape(inst.id)}">
+      ${htmlEscape(inst.display_name || inst.id)}${inst.archived ? " (archived)" : ""}
+    </option>`).join("");
+  const body = () => `
+    <div class="modal-title">${htmlEscape(title)}</div>
+    <div class="modal-body">
+      <label>Source instance</label>
+      <select class="modal-input" style="width:100%">
+        ${opts}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>Cancel</button>
+      <button data-ok>Copy</button>
+    </div>`;
+  const source = await _openModal(
+    body, { cancel: null, ok: choices[0].id }, ".modal-input",
+  );
+  if (source === null) return;
+  try {
+    const r = await api("POST", "/api/instances/copy-settings", {
+      source_instance_id: source,
+      section,
+    });
+    toast(`Copied ${r.copied_count || 0} setting${r.copied_count === 1 ? "" : "s"}.`, "info");
+    await refreshSettingsTab(refreshTab, { force: true });
+  } catch (e) { await showActionError(e, "Copy failed"); }
+}
+
 function reconcileSettingsChildren(currentParent, nextParent) {
   const currentChildren = Array.from(currentParent.childNodes);
   const nextChildren = Array.from(nextParent.childNodes);
