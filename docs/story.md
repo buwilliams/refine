@@ -70,8 +70,32 @@ Performance and scale: metrics, lazy logs, append-only logs, search cache, index
 
 ## Day 10: 2026-05-22 (Friday)
 
-Effort: Extreme (38 commits, 1 milestone)
+Effort: Extreme (41 commits, 1 milestone)
 
 Milestones started: supervisor runtime and process observability.
 
 Supervisor runtime: supervised processes, resource caps, Processes UI, `refine ps`, runner workers, IPC backpressure tolerance, instance-scoped recovery/background workers, merge retry, cleanup hardening.
+
+## Day 11: 2026-05-23 (Saturday)
+
+Effort: Extreme (35 commits, 2 milestones)
+
+Milestones started: recoverable import/reporter workflows; pre-merge Quality gate.
+
+Workflow breadth: recoverable and paginated Gap imports, duplicate review, reporter merge, target-app sync, agent status in nav, pre-merge Quality, Copilot provider support, and performance event pagination.
+
+## Day 12: 2026-05-24 (Sunday)
+
+Effort: Low (4 commits, 1 milestone)
+
+Milestones started: guided installer and setup repair path.
+
+Installer day: guided Quick Start, setup mode, Plan chat, and supervised app-switch migration fixes.
+
+## Day 13: 2026-05-25 (Monday)
+
+Effort: Very High (28 commits, 3 milestones)
+
+Milestones started: installer polish and repo reorganization; Typer CLI; command palette and Playwright regressions.
+
+Product polish and UI platform work: installer defaults, docs/script reorganization, README simplification, Typer CLI migration, design-system refinements, mobile table fixes, System tab controls, command palette, GitHub issue shortcut, and managed Playwright regression checks.
