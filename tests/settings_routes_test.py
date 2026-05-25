@@ -78,6 +78,9 @@ def main() -> int:
     base_css = (root / "refine_ui/static/css/base.css").read_text(
         encoding="utf-8",
     )
+    chat_css = (root / "refine_ui/static/css/chat.css").read_text(
+        encoding="utf-8",
+    )
 
     settings_tab_block = re.search(
         r"const SETTINGS_TABS = \[(.*?)\];",
@@ -544,6 +547,7 @@ def main() -> int:
     assert ".dashboard-scope-switch button.active" in dashboard_css
     assert "#dash > .dashboard-collapsible-shell" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
+    assert "const filterShellOpen = filterShell ? filterShell.open : false;" in gaps_list_js
     assert "const GAPS_DEFAULT_LIMIT = 50;" in gaps_list_js
     assert 'renderPaginationControls("gaps"' in gaps_list_js
     assert 'bindPaginationControls(root, "gaps"' in gaps_list_js
@@ -558,6 +562,15 @@ def main() -> int:
     assert ".gaps-status-cell" in gaps_css
     assert "white-space: nowrap;" in gaps_css
     assert "${STATUS_FILTER_OPTIONS" in changes_js
+    assert "const filterShellOpen = filterShell ? filterShell.open : false;" in changes_js
+    assert "const logsFilterShellOpen = logsFilterShell ? logsFilterShell.open : false;" in logs_js
+    assert "flex: 0 0 auto;" in common_css
+    assert "button.warn, .btn.warn {" in common_css
+    assert "border-color: var(--warn);" in common_css
+    assert "button.danger, .btn.danger {" in common_css
+    assert "border-color: var(--error);" in common_css
+    assert "button.chat-tab:hover:not(:disabled)" in chat_css
+    assert "color: white;" in chat_css
     assert "const CHANGES_DEFAULT_LIMIT = 50;" in changes_js
     assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
     assert 'renderPaginationControls("changes"' in changes_js

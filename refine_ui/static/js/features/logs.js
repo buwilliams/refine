@@ -35,7 +35,8 @@ async function renderLogs() {
   renderBanners([]);
   const f = logsFiltersFromHash();
   // Preserve the filter shell's open/closed state across full re-renders.
-  const logsFilterShellOpen = !!document.getElementById("logs-filter-shell")?.open;
+  const logsFilterShell = document.getElementById("logs-filter-shell");
+  const logsFilterShellOpen = logsFilterShell ? logsFilterShell.open : false;
   $("#main").innerHTML = `
     <h2>Logs</h2>
     <details class="filter-shell" id="logs-filter-shell"${logsFilterShellOpen ? " open" : ""}>

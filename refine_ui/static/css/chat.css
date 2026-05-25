@@ -135,7 +135,12 @@ body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for 
   gap: 6px;
   cursor: pointer;
 }
-.chat-tab:hover { background: transparent; color: var(--color-text); }
+button.chat-tab:hover:not(:disabled),
+.chat-tab:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: white;
+}
 .chat-tab.active {
   background: var(--card);
   color: var(--fg);

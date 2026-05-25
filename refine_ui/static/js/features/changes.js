@@ -36,7 +36,8 @@ function changesHashFromFilters(f) {
 async function renderChanges() {
   renderBanners([]);
   const f = changesFiltersFromHash();
-  const filterShellOpen = !!document.getElementById("changes-filter-shell")?.open;
+  const filterShell = document.getElementById("changes-filter-shell");
+  const filterShellOpen = filterShell ? filterShell.open : false;
   $("#main").innerHTML = `
     <h2>Changes</h2>
     <details class="filter-shell" id="changes-filter-shell"${filterShellOpen ? " open" : ""}>

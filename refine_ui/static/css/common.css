@@ -228,8 +228,16 @@ button.secondary, .btn.secondary, .button-secondary {
   box-shadow: var(--shadow-sm);
   font-weight: 550;
 }
-button.warn, .btn.warn           { background: var(--warn); color: white; }
-button.danger, .btn.danger       { background: var(--error); color: white; }
+button.warn, .btn.warn {
+  background: var(--warn);
+  border-color: var(--warn);
+  color: white;
+}
+button.danger, .btn.danger {
+  background: var(--error);
+  border-color: var(--error);
+  color: white;
+}
 button.subtle, .btn.subtle       { background: transparent; color: var(--muted); border-color: transparent; box-shadow: none; }
 button:disabled, .btn:disabled   { opacity: 0.5; cursor: not-allowed; }
 button:hover:not(:disabled), .btn:hover, .button-primary:hover {
@@ -461,11 +469,9 @@ select {
 .search-bar input { width: 320px; }
 .search-bar select { width: auto; }
 
-/* Collapsible shell for the filter/bulk-action block on Gaps + Logs.
-   Defaults closed (no `open` attr in HTML) so the screen reads as a
-   results list with a single header strip; users expand to filter or
-   run bulk operations. */
+/* Collapsible shell for filter and bulk-action blocks. */
 .filter-shell {
+  flex: 0 0 auto;
   margin-bottom: 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);

@@ -29,9 +29,10 @@ async function renderGapsList() {
   renderBanners([]);
   const f = gapsFilterFromHash();
   // Preserve the filter shell's open/closed state across full re-renders
-  // (Clear filters, bulk-op completion, etc.). First-ever render has no
-  // prior element, so it falls through to the default (closed).
-  const filterShellOpen = !!document.getElementById("gaps-filter-shell")?.open;
+  // (Clear filters, bulk-op completion, etc.). First-ever render defaults
+  // closed, with the summary strip visible as the open control.
+  const filterShell = document.getElementById("gaps-filter-shell");
+  const filterShellOpen = filterShell ? filterShell.open : false;
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
