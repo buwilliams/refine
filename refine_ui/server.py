@@ -182,6 +182,11 @@ def _h_patch_settings(_h, _m, body, _q):
     return api.update_settings(body or {})
 
 
+@route("GET", r"/api/upgrade")
+def _h_upgrade_status(_h, _m, _b, _q):
+    return api.upgrade_status()
+
+
 @route("GET", r"/api/governance")
 def _h_governance_get(_h, _m, _b, _q):
     return api.governance_get()

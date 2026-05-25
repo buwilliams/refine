@@ -38,7 +38,7 @@ from typing import Annotated, Callable
 
 import click
 import typer
-from refine_server import config, project_registry
+from refine_server import config, project_registry, upgrade
 
 
 SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
@@ -778,6 +778,7 @@ def cmd_start(args: _Args) -> int:
         if _port_open(SETUP_UI_HOST, port):
             print("Setup UI is already reachable.")
             _print_setup_status_block(setup_clone, port=port, unit=unit)
+            _print_upgrade_notice(setup_clone)
             return 0
         try:
             pid = _start_background_ui(setup_clone, None, host=SETUP_UI_HOST, port=port)
@@ -792,6 +793,8 @@ def cmd_start(args: _Args) -> int:
             )
             return 1
         print(f"Started setup UI in background (pid {pid}).")
+        _print_setup_status_block(setup_clone, port=port, unit=unit)
+        _print_upgrade_notice(setup_clone)
         return 0
 
     clone, unit = _resolve_clone_and_unit_or_exit()
@@ -806,6 +809,7 @@ def cmd_start(args: _Args) -> int:
     if _port_open(cfg.web_host, port):
         print(f"UI backend is already reachable on port {port}.")
         _print_status_block(clone, unit, cfg, port=port)
+        _print_upgrade_notice(clone)
         return 0
     try:
         pid = _start_background_ui(clone, cfg, host=cfg.web_host, port=port)
@@ -825,6 +829,7 @@ def cmd_start(args: _Args) -> int:
         return 1
 
     _print_status_block(clone, unit, cfg, port=port)
+    _print_upgrade_notice(clone)
     return 0
 
 
@@ -1175,6 +1180,18 @@ def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None
     if ui_unit:
         print(f"  journal:  journalctl -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop {port}")
+    print()
+
+
+def _print_upgrade_notice(clone: Path) -> None:
+    info = upgrade.status(clone)
+    if not info.upgrade_available:
+        return
+    current = info.current_version or "unknown"
+    print(_section("Upgrade available"))
+    print(f"Refine {info.latest_version} is available (current {current}).")
+    print("Upgrade with:")
+    print(f"  {info.command}")
     print()
 
 
@@ -1680,6 +1697,7 @@ def _start_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
         )
         return 1
     _print_setup_status_block(clone, port=port, unit=unit)
+    _print_upgrade_notice(clone)
     return 0
 
 
@@ -1715,6 +1733,7 @@ def _restart_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
         )
         return 1
     _print_setup_status_block(clone, port=port, unit=unit)
+    _print_upgrade_notice(clone)
     return 0
 
 
@@ -1798,6 +1817,7 @@ def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -
         )
         return 1
     _print_status_block(clone, unit, cfg, port=port)
+    _print_upgrade_notice(clone)
     return 0
 
 
@@ -1836,6 +1856,7 @@ def _restart_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int)
         )
         return 1
     _print_status_block(clone, unit, cfg, port=port)
+    _print_upgrade_notice(clone)
     return 0
 
 

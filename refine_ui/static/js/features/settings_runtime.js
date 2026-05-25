@@ -5,6 +5,7 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   return `
     <section class="settings-section">
+      <div id="runtime-upgrade-banner"></div>
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
       <div class="actions settings-section-actions">
@@ -107,6 +108,32 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
     </section>`;
 }
 
+function renderRuntimeUpgradeBanner(upgrade) {
+  if (!upgrade || !upgrade.upgrade_available) return "";
+  return `
+    <div class="runtime-upgrade-banner">
+      <h3>Upgrade available</h3>
+      <p class="muted small" style="margin-top:0">
+        Refine ${htmlEscape(upgrade.latest_version || "")} is available.
+        Current version: ${htmlEscape(upgrade.current_version || "unknown")}.
+      </p>
+      <p class="muted small" style="margin-bottom:0">
+        <code>${htmlEscape(upgrade.command || "")}</code>
+      </p>
+    </div>`;
+}
+
+async function refreshRuntimeUpgradeBanner() {
+  const root = document.getElementById("runtime-upgrade-banner");
+  if (!root) return;
+  try {
+    const result = await api("GET", "/api/upgrade");
+    root.innerHTML = renderRuntimeUpgradeBanner(result.upgrade || {});
+  } catch (_e) {
+    root.innerHTML = "";
+  }
+}
+
 async function autosaveSettingsRuntime(options = {}) {
   const chosen = $("#s-cli").value;
   await api("PATCH", "/api/settings", {
@@ -140,4 +167,10 @@ function bindSettingsRuntimeTab() {
   );
   $("#s-cli")?.addEventListener("change", autosaveRuntimeAndRefresh);
   bindCommand("#s-recheck", "runtime.recheck_auth");
+  if (document.querySelector('[data-tab-pane="runtime"].active')) {
+    refreshRuntimeUpgradeBanner();
+  }
+  document.querySelector('[data-tab-target="runtime"]')?.addEventListener("click", () => {
+    setTimeout(refreshRuntimeUpgradeBanner, 0);
+  });
 }

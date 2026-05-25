@@ -832,6 +832,7 @@ def main() -> int:
     assert setup_calls == [
         ("start", setup_clone.resolve(), None, "0.0.0.0", 19000),
         ("wait", "0.0.0.0", 19000),
+        ("status", setup_clone.resolve(), 19000, "refine-setup-refine-clone"),
         ("stop", setup_clone.resolve(), None, 19001),
         ("status", setup_clone.resolve(), 19002, "refine-setup-refine-clone"),
         ("status", setup_clone.resolve(), 19003, "refine-setup-refine-clone"),

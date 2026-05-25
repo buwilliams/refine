@@ -193,6 +193,12 @@ def main() -> int:
     assert "project_update_pulse_interval_seconds" in api_py
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '"copilot": "copilot login"' in api_py
+    assert 'id="runtime-upgrade-banner"' in settings_js
+    assert 'api("GET", "/api/upgrade")' in settings_js
+    assert "function renderRuntimeUpgradeBanner" in settings_js
+    assert ".runtime-upgrade-banner" in common_css
+    assert '@route("GET", r"/api/upgrade")' in server_py
+    assert "def upgrade_status" in api_py
     runtime_save_body = settings_js.split("async function autosaveSettingsRuntime", 1)[1]
     runtime_save_body = runtime_save_body.split("\nfunction bindSettingsRuntimeTab", 1)[0]
     application_save_body = settings_js.split("async function autosaveSettingsApplication", 1)[1]

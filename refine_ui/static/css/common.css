@@ -533,6 +533,16 @@ select {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+.runtime-upgrade-banner {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  background: var(--warn-bg);
+}
+.runtime-upgrade-banner h3 {
+  margin-top: 0;
+}
 
 .search-bar {
   display: flex;

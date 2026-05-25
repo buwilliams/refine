@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, regressions, reporters, round_logs, search_index
+from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, regressions, reporters, round_logs, search_index, upgrade
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -2542,6 +2542,10 @@ def list_settings() -> tuple[int, dict]:
         return 200, {"settings": db.list_settings(conn)}
     finally:
         conn.close()
+
+
+def upgrade_status() -> tuple[int, dict]:
+    return 200, {"upgrade": upgrade.status(Path.cwd()).as_dict()}
 
 
 @_exclusive_mutation("Update settings")

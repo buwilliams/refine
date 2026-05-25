@@ -141,6 +141,25 @@ def main() -> int:
     assert rc == 2
     assert "mutually exclusive" in err
 
+    class UpgradeInfo:
+        current_version = "1.0.0"
+        latest_version = "1.2.0"
+        upgrade_available = True
+        command = "curl install.sh | bash -s -- --upgrade"
+
+    old_upgrade_status = cli.upgrade.status
+    try:
+        cli.upgrade.status = lambda _clone: UpgradeInfo()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            cli._print_upgrade_notice(Path("/tmp/refine"))
+    finally:
+        cli.upgrade.status = old_upgrade_status
+    upgrade_notice = stdout.getvalue()
+    assert "Upgrade available" in upgrade_notice
+    assert "Refine 1.2.0 is available (current 1.0.0)." in upgrade_notice
+    assert "--upgrade" in upgrade_notice
+
     print("[ok] Typer CLI dispatch preserves commands, aliases, and ps options")
     return 0
 

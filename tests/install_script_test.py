@@ -91,7 +91,12 @@ def main() -> int:
     assert "https://gh.io/copilot-install" in script
     assert "npx --yes playwright install --with-deps chromium" in script
     assert "REFINE_INSTALL_DRY_RUN" in script
+    assert "REFINE_INSTALL_UPGRADE" in script
     assert "--yes" in script
+    assert "--upgrade" in script
+    assert "latest_remote_semver_tag" in script
+    assert "upgrade_refine_checkout" in script
+    assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
     assert "uv run refine install $port" in script
     print("[ok] install.sh keeps expected install sources and dry-run hook")
@@ -154,7 +159,10 @@ def main() -> int:
 
         fake_bin = tmp / "bin"
         fake_bin.mkdir()
-        for name in ("bash", "cat", "curl", "git", "python3", "uname", "grep", "tr"):
+        for name in (
+            "awk", "bash", "cat", "curl", "git", "grep", "python3",
+            "sort", "tail", "tr", "uname",
+        ):
             source = shutil.which(name)
             assert source is not None, name
             (fake_bin / name).symlink_to(source)
@@ -209,7 +217,10 @@ def main() -> int:
 
         fake_bin = tmp / "bin"
         fake_bin.mkdir()
-        for name in ("bash", "cat", "curl", "git", "python3", "uname", "grep", "tr"):
+        for name in (
+            "awk", "bash", "cat", "curl", "git", "grep", "python3",
+            "sort", "tail", "tr", "uname",
+        ):
             source = shutil.which(name)
             assert source is not None, name
             (fake_bin / name).symlink_to(source)

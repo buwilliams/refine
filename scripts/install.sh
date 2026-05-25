@@ -15,6 +15,7 @@ REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
 REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
+REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-0}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -44,15 +45,17 @@ SELECTED_PROVIDER=""
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--yes|-y]
+Usage: install.sh [--yes|-y] [--upgrade]
 
 Options:
   -y, --yes     Accept default answers without prompting.
+  --upgrade     Move an existing Refine checkout to the latest semver tag.
   -h, --help    Show this help.
 
 Environment:
   REFINE_INSTALL_ASSUME_DEFAULTS=1  Same behavior as --yes.
   REFINE_INSTALL_DRY_RUN=1          Print commands instead of running them.
+  REFINE_INSTALL_UPGRADE=1          Same behavior as --upgrade.
 EOF
 }
 
@@ -61,6 +64,9 @@ parse_args() {
     case "$1" in
       -y|--yes)
         REFINE_INSTALL_ASSUME_DEFAULTS=1
+        ;;
+      --upgrade)
+        REFINE_INSTALL_UPGRADE=1
         ;;
       -h|--help)
         usage
@@ -672,23 +678,74 @@ ensure_rootless_docker() {
   fi
 }
 
+is_semver_tag() {
+  case "$1" in
+    ""|v*) return 1 ;;
+  esac
+  printf '%s\n' "$1" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'
+}
+
+latest_semver_from_lines() {
+  awk '/^[0-9]+\.[0-9]+\.[0-9]+$/ { print }' |
+    sort -t. -k1,1n -k2,2n -k3,3n |
+    tail -n 1
+}
+
+latest_remote_semver_tag() {
+  git ls-remote --tags --refs "$REFINE_REPO_URL" 2>/dev/null |
+    sed -E 's#.*refs/tags/##' |
+    latest_semver_from_lines
+}
+
+latest_local_semver_tag() {
+  git -C "$1" tag --list 2>/dev/null | latest_semver_from_lines
+}
+
+current_checkout_semver_tag() {
+  git -C "$1" tag --merged HEAD 2>/dev/null | latest_semver_from_lines
+}
+
+upgrade_refine_checkout() {
+  local checkout="$1"
+  local force="${2:-0}"
+  local latest current
+  if [ "$force" != "1" ] && ! confirm "Fetch release tags and upgrade Refine to the latest semver release" "y"; then
+    return 0
+  fi
+  run git -C "$checkout" fetch --tags origin || {
+    warn "Could not fetch Refine release tags. Keeping existing checkout."
+    return 0
+  }
+  latest="$(latest_local_semver_tag "$checkout")"
+  if [ -z "$latest" ]; then
+    warn "No semver release tags found. Keeping existing checkout."
+    return 0
+  fi
+  current="$(current_checkout_semver_tag "$checkout")"
+  if [ "$current" = "$latest" ] && git -C "$checkout" merge-base --is-ancestor HEAD "$latest" 2>/dev/null; then
+    ok "Refine already at latest release: $latest"
+    return 0
+  fi
+  if [ -n "$(git -C "$checkout" status --porcelain 2>/dev/null)" ]; then
+    warn "Refine checkout has local changes; not switching to release $latest."
+    warn "Commit or stash changes, then re-run this installer with --upgrade."
+    return 0
+  fi
+  run git -C "$checkout" checkout --detach "$latest" || {
+    warn "Could not switch Refine checkout to $latest. Keeping existing checkout."
+    return 0
+  }
+  ok "Refine upgraded to release $latest"
+}
+
 clone_or_update_refine() {
   local base="$1"
   local checkout="$base/$REFINE_CHECKOUT_NAME"
   REFINE_CHECKOUT="$checkout"
   if [ -d "$checkout/.git" ]; then
     ok "Refine checkout exists: $checkout"
-    if confirm "Fetch latest Refine changes in this checkout" "y"; then
-      run git -C "$checkout" fetch origin main || true
-      if run git -C "$checkout" rev-parse --abbrev-ref HEAD >/dev/null 2>&1; then
-        local branch
-        branch="$(git -C "$checkout" rev-parse --abbrev-ref HEAD 2>/dev/null || printf '')"
-        if [ "$branch" = "main" ]; then
-          run git -C "$checkout" pull --ff-only origin main || warn "Could not fast-forward Refine. Keeping existing checkout."
-        else
-          warn "Refine checkout is on branch $branch; fetched but did not switch branches."
-        fi
-      fi
+    if [ "$REFINE_INSTALL_UPGRADE" = "1" ] || confirm "Check for a Refine semver release upgrade" "y"; then
+      upgrade_refine_checkout "$checkout" "$REFINE_INSTALL_UPGRADE"
     fi
     return 0
   fi
@@ -696,8 +753,15 @@ clone_or_update_refine() {
     die "$checkout exists but is not a git checkout. Move it or set REFINE_CHECKOUT_NAME, then re-run."
   fi
   run mkdir -p "$base"
-  run git clone "$REFINE_REPO_URL" "$checkout" || die "Could not clone Refine from $REFINE_REPO_URL"
-  ok "Cloned Refine to $checkout"
+  local latest
+  latest="$(latest_remote_semver_tag)"
+  [ -n "$latest" ] || die "No semver release tags found in $REFINE_REPO_URL"
+  if dry_run; then
+    say "${DIM}+ git clone --branch '$latest' '$REFINE_REPO_URL' '$checkout'${RESET}"
+  else
+    git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout" || die "Could not clone Refine release $latest from $REFINE_REPO_URL"
+  fi
+  ok "Cloned Refine release $latest to $checkout"
 }
 
 target_from_remote() {
