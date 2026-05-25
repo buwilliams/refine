@@ -5,29 +5,18 @@ orchestrated AI agents and verified by ordinary people. QA, Product, support,
 customers — anyone who can articulate *what the app does today* vs
 *what it should do instead* — submits a Gap.
 
-## Why?
+## Why refine?
 
-refine is a decentralized agentic system that runs on your existing development machines, infrastructure, and processes. It creates economic advantage by shrinking the time and coordination cost between identifying a problem and shipping a verified change.
+refine turns software gaps into verified changes by coordinating people and
+agents across distributed machines, while keeping feedback cheap, local, and
+repeatable.
 
-Full-control engineering is expensive: reading every line, modeling every dependency, and organizing code as if the system can be made "perfect" still does not prevent outages or security breaches. Reliability often increases the cost of change, and many engineering cultures optimize for correctness at the expense of the businesses they serve.
-
-refine puts automation at the forefront, reduces feedback loops by orders of magnitude, and lets companies onboard without new infrastructure or new processes. The architecture is economics first and technical accuracy second: the same principles of high-quality software and rapid development, reordered so businesses can stay competitive. Instead of trying to make every decision correct up front, refine makes feedback cheap enough that software can become accurate over time as the business learns and changes.
-
-## Features
-
-- **Decentralized** - each instance owns its work locally and syncs through git.
-- **Existing Infrastructure** - works inside existing applications, repositories, branches, and development practices.
-- **Dashboard** - consolidated space for run status, reporter stats, and work needing attention.
-- **Gaps** - searchable, filterable backlog with sorting and bulk updates.
-- **Changes** - searchable history of merged Gap work with undo controls.
-- **Instances** - separate work contexts with their own Gap queues.
-- **Chat** - persistent dock for standalone questions and Gap-specific follow-up.
-- **Workflow** - move Gaps from report to agent work to human review.
-- **Guidance** - reusable instructions classified against each Gap before work starts.
-- **Governance** - Product, Constitution, and Rules checks before work starts.
-- **Quality (QA)** - pre-merge checks that verify completed work against requirements.
-- **Merge** - integrate completed Gap branches through a single serialized agent.
-- **Logs** - filtered audit trail for agent output, git events, and system activity.
+- **Local ownership** - each instance owns its queue and data locally, so teams can run refine on existing machines and sync through git instead of adopting central infrastructure.
+- **Cheap feedback loops** - Gaps move from report to agent work to human review, so the system improves through fast correction instead of perfect upfront specification.
+- **Planning and chat** - people can think with agents before execution, ask questions, and steer Gap-specific follow-up.
+- **Governed automation** - Guidance and Governance shape agent work before it starts, keeping automation aligned with product intent and local rules.
+- **Human verification** - QA and review close the loop before merge, preserving ordinary human judgment where it matters.
+- **Operational continuity** - refine works inside existing repositories, branches, processes, and development practices.
 
 ## Quick Start
 
@@ -38,8 +27,8 @@ curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/install.sh |
 ```
 
 The installer checks the host, installs or repairs missing tools when you approve,
-asks which AI provider to use, clones or attaches the target application, and
-starts Refine.
+asks which AI provider to use, optionally clones or attaches the target
+application, and starts Refine.
 
 If your security policy blocks piped scripts, download and inspect it first:
 
