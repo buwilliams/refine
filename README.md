@@ -1,10 +1,10 @@
 # refine
 
-refine turns software gaps: new apps, features, and bugs into verified changes
-by coordinating people and agents across distributed machines, while keeping
-feedback cheap, local, and repeatable. QA, Product, support, customers — anyone
-who can articulate *what the app does today* vs *what it should do instead* —
-submits a Gap.
+refine is an agentic software delivery system that builds new apps, implements
+features, and fixes bugs. It coordinates people and agents across distributed
+machines while keeping feedback cheap, local, and repeatable. QA, Product,
+support, customers — anyone who can articulate what the app does today vs
+what it should do instead.
 
 - **Local ownership** - each instance owns its queue and data locally, while git keeps people in sync across machines without central infrastructure.
 - **Cheap feedback loops** - Gaps move from report to agent work to human review, so the system improves through fast correction instead of perfect upfront specification.
@@ -18,7 +18,7 @@ submits a Gap.
 Linux, macOS, or Ubuntu/WSL:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
 ```
 
 The installer checks the host, installs or repairs missing tools when you approve,
@@ -36,7 +36,7 @@ wsl --install
 After Ubuntu opens, run the same Refine installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
 ```
 
 ## License

@@ -1,3 +1,5 @@
+name: refine
+
 services:
   installer-shell:
     image: ubuntu:24.04
@@ -5,5 +7,5 @@ services:
     tty: true
     working_dir: /workspace/refine
     volumes:
-      - .:/workspace/refine:ro
+      - ..:/workspace/refine:ro
     command: /bin/bash

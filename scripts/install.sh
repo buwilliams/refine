@@ -7,7 +7,7 @@
 set -uo pipefail
 
 REFINE_REPO_URL="${REFINE_REPO_URL:-https://github.com/buwilliams/refine.git}"
-REFINE_RAW_INSTALL_URL="${REFINE_RAW_INSTALL_URL:-https://raw.githubusercontent.com/buwilliams/refine/main/install.sh}"
+REFINE_RAW_INSTALL_URL="${REFINE_RAW_INSTALL_URL:-https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh}"
 REFINE_INSTALL_BASE_DEFAULT="${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine-work}"
 REFINE_CHECKOUT_NAME="${REFINE_CHECKOUT_NAME:-refine}"
 REFINE_DEFAULT_PORT="${REFINE_DEFAULT_PORT:-8080}"

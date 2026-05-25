@@ -78,14 +78,14 @@ def _run_piped_installer_with_pty(
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    install_sh = root / "install.sh"
+    install_sh = root / "scripts" / "install.sh"
     readme = root / "README.md"
 
     subprocess.run(["bash", "-n", str(install_sh)], cwd=root, check=True)
     print("[ok] install.sh syntax")
 
     script = install_sh.read_text(encoding="utf-8")
-    assert "https://raw.githubusercontent.com/buwilliams/refine/main/install.sh" in script
+    assert "https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh" in script
     assert "https://astral.sh/uv/install.sh" in script
     assert "https://get.docker.com/rootless" in script
     assert "https://gh.io/copilot-install" in script
@@ -98,7 +98,7 @@ def main() -> int:
     assert "## Quick Start" in readme_text
     assert "### Windows Users" in readme_text
     assert "wsl --install" in readme_text
-    assert "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/install.sh | bash" in readme_text
+    assert "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash" in readme_text
     print("[ok] README points users at install.sh, including Windows")
 
     tmp = Path(tempfile.mkdtemp(prefix="refine-install-test-"))

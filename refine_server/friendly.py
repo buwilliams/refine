@@ -1,6 +1,6 @@
 """Friendly summaries — stderr / outcome pattern → one-line actionable message.
 
-Canonical catalog from spec.md. Adding a new error class = new entry here +
+Canonical catalog from docs/spec.md. Adding a new error class = new entry here +
 new row in the per-failure recovery reference.
 """
 from __future__ import annotations

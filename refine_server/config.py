@@ -267,7 +267,7 @@ def write_binding(refine_source_dir: Path, client_repo: Path) -> Path:
     return binding
 
 DEFAULT_TOML = """# refine — per-project configuration. Commit this file alongside the
-# target app's source. See README + spec.md for the conceptual model.
+# target app's source. See README + docs/spec.md for the conceptual model.
 
 # Path to the target app repo, relative to this file (the volume root sits
 # inside the target app repo).
