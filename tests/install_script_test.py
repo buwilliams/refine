@@ -105,7 +105,11 @@ def main() -> int:
     assert "Using current Refine checkout" in script
     assert "bound_target_app" in script
     assert "Using existing target app binding" in script
+    assert "restart_refine_after_upgrade" in script
+    assert "Restart Refine now to run" in script
+    assert "uv run refine restart" in script
     assert "assuming local development and skipping release upgrade" in script
+    assert "not on a semver release tag" in script
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
     assert "uv run refine install $port" in script
@@ -340,6 +344,76 @@ def main() -> int:
         assert "Target app path or Git remote" not in output
         assert f"Target app:       {target}" in output
         print("[ok] install.sh skips checkout and target prompts from a bound Refine checkout")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-install-upgrade-restart-test-"))
+    try:
+        checkout = tmp / "refine"
+        target = tmp / "target-app"
+        (checkout / "refine_cli").mkdir(parents=True)
+        (checkout / "scripts").mkdir()
+        target.mkdir()
+        (checkout / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
+        (checkout / ".refine-binding").write_text(
+            f"# refine binding\n{target}\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+        subprocess.run(["git", "config", "user.name", "Refine Test"], cwd=checkout, check=True)
+        subprocess.run(["git", "config", "user.email", "refine@example.test"], cwd=checkout, check=True)
+        subprocess.run(["git", "add", "."], cwd=checkout, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "release"], cwd=checkout, check=True)
+        subprocess.run(["git", "tag", "0.9.0"], cwd=checkout, check=True)
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+
+        fake_bin = tmp / "bin"
+        fake_bin.mkdir()
+        for name in (
+            "awk", "bash", "cat", "curl", "dirname", "git", "grep", "python3",
+            "sort", "tail", "tr", "uname",
+        ):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
+        for name in ("codex", "docker", "uv"):
+            executable = fake_bin / name
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+
+        env = os.environ.copy()
+        env.update({
+            "HOME": str(tmp),
+            "NO_COLOR": "1",
+            "REFINE_INSTALL_DRY_RUN": "1",
+            "REFINE_INSTALL_DRY_RUN_RELEASE_TAG": "1.0.0",
+            "PATH": str(fake_bin),
+        })
+        code, output = _run_piped_installer_with_pty(
+            install_sh,
+            root,
+            env,
+            [
+                "codex",
+                "n",
+                "n",
+                "n",
+                "n",
+            ],
+            cwd=checkout,
+        )
+        assert code == 0, output
+        assert "Refine upgraded to release 1.0.0" in output
+        assert "Restart Refine now to run 1.0.0 [Y/n]" in output
+        assert "Refine was upgraded but not restarted" in output
+        assert "uv run refine restart" in output
+        assert "uv run refine start" not in output
+        print("[ok] install.sh prompts for restart after a release upgrade")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

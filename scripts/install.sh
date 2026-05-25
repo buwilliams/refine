@@ -41,6 +41,8 @@ fi
 REFINE_CHECKOUT=""
 TARGET_APP_PATH=""
 SELECTED_PROVIDER=""
+REFINE_UPGRADED="0"
+REFINE_UPGRADED_TO=""
 
 usage() {
   cat <<'EOF'
@@ -834,6 +836,10 @@ upgrade_refine_checkout() {
     return 0
   fi
   current="$(current_checkout_semver_tag "$checkout")"
+  if [ -z "$current" ]; then
+    warn "Current Refine checkout is not on a semver release tag. Skipping release upgrade."
+    return 0
+  fi
   if checkout_ahead_of_semver_tag "$checkout" "$current"; then
     ok "Refine checkout is ahead of release $current; assuming local development and skipping release upgrade."
     return 0
@@ -851,6 +857,8 @@ upgrade_refine_checkout() {
     warn "Could not switch Refine checkout to $latest. Keeping existing checkout."
     return 0
   }
+  REFINE_UPGRADED="1"
+  REFINE_UPGRADED_TO="$latest"
   ok "Refine upgraded to release $latest"
 }
 
@@ -1021,6 +1029,18 @@ start_refine() {
   ok "Open Refine: http://localhost:$port"
 }
 
+restart_refine_after_upgrade() {
+  section "Restart Refine"
+  local release="$REFINE_UPGRADED_TO"
+  [ -n "$release" ] || release="the new release"
+  if ! confirm "Restart Refine now to run $release" "y"; then
+    info "Refine was upgraded but not restarted. Restart later with: cd $REFINE_CHECKOUT && uv run refine restart"
+    return 0
+  fi
+  run cd "$REFINE_CHECKOUT" || die "Could not enter $REFINE_CHECKOUT"
+  run uv run refine restart || warn "Could not restart Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine restart"
+}
+
 preflight() {
   section "System check"
   local python_package="python3"
@@ -1087,7 +1107,11 @@ main() {
   choose_target_app
   ensure_rootless_docker
   target_refine
-  start_refine
+  if [ "$REFINE_UPGRADED" = "1" ]; then
+    restart_refine_after_upgrade
+  else
+    start_refine
+  fi
 
   section "Done"
   say "Refine checkout: ${BOLD}$REFINE_CHECKOUT${RESET}"
