@@ -109,16 +109,55 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
 }
 
 function renderRuntimeUpgradeBanner(upgrade) {
-  if (!upgrade || !upgrade.upgrade_available) return "";
+  if (!upgrade) return "";
+  const current = upgrade.current_version || "unknown";
+  const latest = upgrade.latest_version || "";
+  if (upgrade.upgrade_available) {
+    return `
+      <div class="runtime-version-status runtime-version-status-upgrade">
+        <h3>Upgrade available</h3>
+        <p class="muted small" style="margin-top:0">
+          Refine ${htmlEscape(latest)} is available.
+          Current version: ${htmlEscape(current)}.
+        </p>
+        <p class="muted small" style="margin-bottom:0">
+          <code>${htmlEscape(upgrade.command || "")}</code>
+        </p>
+      </div>`;
+  }
+  if (upgrade.local_development) {
+    return `
+      <div class="runtime-version-status">
+        <h3>Local development checkout</h3>
+        <p class="muted small" style="margin:0">
+          This checkout is ahead of release ${htmlEscape(current)}.
+          ${latest ? `Latest published release: ${htmlEscape(latest)}.` : ""}
+        </p>
+      </div>`;
+  }
+  if (current && latest && current === latest) {
+    return `
+      <div class="runtime-version-status">
+        <h3>Refine is up to date</h3>
+        <p class="muted small" style="margin:0">
+          Running latest published release: ${htmlEscape(current)}.
+        </p>
+      </div>`;
+  }
+  if (upgrade.error) {
+    return `
+      <div class="runtime-version-status runtime-version-status-unknown">
+        <h3>Version status unavailable</h3>
+        <p class="muted small" style="margin:0">
+          ${htmlEscape(upgrade.error)}
+        </p>
+      </div>`;
+  }
   return `
-    <div class="runtime-upgrade-banner">
-      <h3>Upgrade available</h3>
-      <p class="muted small" style="margin-top:0">
-        Refine ${htmlEscape(upgrade.latest_version || "")} is available.
-        Current version: ${htmlEscape(upgrade.current_version || "unknown")}.
-      </p>
-      <p class="muted small" style="margin-bottom:0">
-        <code>${htmlEscape(upgrade.command || "")}</code>
+    <div class="runtime-version-status runtime-version-status-unknown">
+      <h3>Version status unavailable</h3>
+      <p class="muted small" style="margin:0">
+        Refine could not determine the latest published release.
       </p>
     </div>`;
 }

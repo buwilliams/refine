@@ -196,7 +196,12 @@ def main() -> int:
     assert 'id="runtime-upgrade-banner"' in settings_js
     assert 'api("GET", "/api/upgrade")' in settings_js
     assert "function renderRuntimeUpgradeBanner" in settings_js
-    assert ".runtime-upgrade-banner" in common_css
+    assert "Refine is up to date" in settings_js
+    assert "Running latest published release" in settings_js
+    assert "Local development checkout" in settings_js
+    assert "Version status unavailable" in settings_js
+    assert ".runtime-version-status" in common_css
+    assert ".runtime-version-status-upgrade" in common_css
     assert '@route("GET", r"/api/upgrade")' in server_py
     assert "def upgrade_status" in api_py
     runtime_save_body = settings_js.split("async function autosaveSettingsRuntime", 1)[1]

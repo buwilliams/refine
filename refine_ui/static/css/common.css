@@ -533,14 +533,21 @@ select {
   border: 1px solid var(--border);
   border-radius: 6px;
 }
-.runtime-upgrade-banner {
+.runtime-version-status {
   margin-bottom: 14px;
   padding: 10px 12px;
-  border: 1px solid var(--warn);
+  border: 1px solid var(--border);
   border-radius: 6px;
+  background: var(--surface);
+}
+.runtime-version-status-upgrade {
+  border: 1px solid var(--warn);
   background: var(--warn-bg);
 }
-.runtime-upgrade-banner h3 {
+.runtime-version-status-unknown {
+  background: var(--bg);
+}
+.runtime-version-status h3 {
   margin-top: 0;
 }
 
