@@ -286,6 +286,7 @@ REFINE_GITIGNORE_LINES = [
     "app.log",
     "app.pid",
     "logs/",
+    "regressions/runs/",
     "gaps/**/logs.jsonl",
 ]
 

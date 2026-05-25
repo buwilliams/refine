@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from refine_server import db
+from refine_server import db, regressions
 
 
 DEFAULT_INSTRUCTIONS = (
@@ -58,9 +58,19 @@ def enabled(conn) -> bool:
     return (db.get_setting(conn, "quality_enabled", "0") or "0") == "1"
 
 
-def format_prompt(gap: dict[str, Any], *, settings: dict[str, Any]) -> str:
+def format_prompt(
+    gap: dict[str, Any],
+    *,
+    settings: dict[str, Any],
+    regression_result: dict[str, Any] | None = None,
+) -> str:
     rounds = gap.get("rounds") or []
     latest = rounds[-1] if rounds else {}
+    regression_block = (
+        regressions.summarize_for_prompt(regression_result)
+        if regression_result is not None
+        else "Managed Playwright regression checks were not run."
+    )
     return (
         "You are running the pre-merge Quality gate for a software change.\n\n"
         f"Gap name:\n{str(gap.get('name') or '').strip()}\n\n"
@@ -70,11 +80,15 @@ def format_prompt(gap: dict[str, Any], *, settings: dict[str, Any]) -> str:
         f"{str(settings.get('business_requirements') or '').strip()}\n\n"
         "Quality instructions:\n"
         f"{str(settings.get('instructions') or '').strip()}\n\n"
+        "Managed regression checks:\n"
+        f"{regression_block}\n\n"
         "Run the minimum meaningful test set needed to validate this Gap. "
         "Prefer behavior-level tests over implementation-coupled tests. Avoid "
         "tests that only validate mocks, stubs, or assumptions. If the current "
         "test suite does not cover the Gap, add focused tests. If you add or "
-        "update tests and they pass, commit those changes on this branch. If "
-        "you find a true product or test failure, explain it clearly and exit "
-        "with failure. When quality passes, exit successfully."
+        "update tests or managed regression specs and they pass, commit those "
+        "changes on this branch. If a managed regression spec is stale or "
+        "broken, repair `.refine/regressions/` and rerun the relevant check. "
+        "If you find a true product or test failure, explain it clearly and "
+        "exit with failure. When quality passes, exit successfully."
     )

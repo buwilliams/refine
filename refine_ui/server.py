@@ -202,6 +202,26 @@ def _h_quality_save(_h, _m, body, _q):
     return api.quality_save(body or {})
 
 
+@route("POST", r"/api/quality/regressions")
+def _h_quality_regression_create(_h, _m, body, _q):
+    return api.quality_regression_create(body or {})
+
+
+@route("PATCH", r"/api/quality/regressions/([a-z0-9][a-z0-9_-]{1,63})")
+def _h_quality_regression_update(_h, m, body, _q):
+    return api.quality_regression_update(m.group(1), body or {})
+
+
+@route("DELETE", r"/api/quality/regressions/([a-z0-9][a-z0-9_-]{1,63})")
+def _h_quality_regression_delete(_h, m, _body, _q):
+    return api.quality_regression_delete(m.group(1))
+
+
+@route("POST", r"/api/quality/regressions/run")
+def _h_quality_regression_run(_h, _m, body, _q):
+    return api.quality_regression_run(body or {})
+
+
 @route("POST", r"/api/governance/generate-rules")
 def _h_governance_generate_rules(_h, _m, body, _q):
     return api.governance_generate_rules(body or {})

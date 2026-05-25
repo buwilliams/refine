@@ -20,12 +20,12 @@ from refine_server.backend_protocol import (
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_MERGE_REPORTER, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
     M_RETRY_MERGE, M_RETRY_QA, M_RUNNING,
-    M_HARD_RESET_WORKTREE, M_PROJECT_SYNC, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
+    M_HARD_RESET_WORKTREE, M_PROJECT_SYNC, M_REGRESSION_RUN, M_SET_NOTES, M_TARGET_APP_GENERATE, M_TARGET_APP_HEALTH,
     M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
 
 from . import dispatcher as _dispatcher
-from . import gap_writer, git_ops, llm, merger as _merger, mutation_guard, preflight, project_sync, push_ops, recovery, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
+from . import gap_writer, git_ops, llm, merger as _merger, mutation_guard, preflight, project_sync, push_ops, recovery, regressions, state_committer, subprocess_mgr, target_app, target_app_rebuilder, verify_op
 from .chat_mgr import ChatManager
 from .governance_agent import GovernanceAgent
 
@@ -88,6 +88,7 @@ class Runner:
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
             on_run_finished=lambda _gid: self.merger.wake(),
             launch_blocked=self._automation_blocked,
+            target_app_lock=self._target_app_lock,
         )
         self.governance_agent = GovernanceAgent(
             get_conn=self._get_governance_conn,
@@ -214,6 +215,7 @@ class Runner:
             M_TARGET_APP_REBUILD_PENDING: self._h_target_app_rebuild_pending,
             M_TARGET_APP_GENERATE: self._h_target_app_generate,
             M_TARGET_APP_HEALTH: self._h_target_app_health,
+            M_REGRESSION_RUN: self._h_regression_run,
             M_PROJECT_SYNC: self._h_project_sync,
             M_HARD_RESET_WORKTREE: self._h_hard_reset_worktree,
         }
@@ -1911,6 +1913,23 @@ class Runner:
                     details=details,
                 )
             return result
+        finally:
+            self._target_app_lock.release()
+
+    def _h_regression_run(self, params: dict) -> dict:
+        """Run managed regressions against the configured target app."""
+        if not self._target_app_lock.acquire(blocking=False):
+            return {
+                "ok": False,
+                "busy": True,
+                "message": "another target-app operation is already running",
+                "runs": [],
+            }
+        try:
+            return regressions.run_all(
+                self._conn,
+                only_enabled=bool(params.get("only_enabled", True)),
+            )
         finally:
             self._target_app_lock.release()
 

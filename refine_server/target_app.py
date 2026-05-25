@@ -100,6 +100,7 @@ def config_from_settings(settings: dict[str, str]) -> dict[str, Any]:
         "process_check_command": (settings.get("target_app_process_check_command") or "").strip(),
         "legacy_start_instructions": (settings.get("target_app_start_instructions") or "").strip(),
         "legacy_stop_instructions": (settings.get("target_app_stop_instructions") or "").strip(),
+        "root": "",
     }
 
 
@@ -265,7 +266,7 @@ def state_after_lifecycle(kind: str, checks: dict[str, Any]) -> str:
 
 def run_command(command: str, *, config: dict[str, Any],
                 timeout: int) -> dict[str, Any]:
-    cwd = resolve_cwd(config.get("cwd") or "")
+    cwd = resolve_cwd_for(config, config.get("cwd") or "")
     env = _command_env(config.get("env") if isinstance(config.get("env"), dict) else {})
     try:
         out = subprocess.run(
@@ -309,7 +310,12 @@ def run_command(command: str, *, config: dict[str, Any],
 
 
 def resolve_cwd(cwd_setting: str) -> Path:
-    root = git_ops.client_repo_path()
+    return resolve_cwd_for({}, cwd_setting)
+
+
+def resolve_cwd_for(config: dict[str, Any], cwd_setting: str) -> Path:
+    root_raw = str(config.get("root") or "").strip()
+    root = Path(root_raw) if root_raw else git_ops.client_repo_path()
     cwd = (cwd_setting or "").strip()
     if not cwd:
         return root

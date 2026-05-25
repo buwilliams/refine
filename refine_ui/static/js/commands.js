@@ -547,6 +547,34 @@ registerCommand({
 });
 
 registerCommand({
+  id: "quality.regression.new",
+  title: "Quality: create regression",
+  group: "Quality",
+  aliases: ["regression_new", "new-regression", "create-regression"],
+  keywords: ["playwright screenshot qa"],
+  parse: (input) => ({
+    prompt: commandTailFor(input, ["regression_new", "new-regression", "create-regression"]),
+  }),
+  run: async ({ prompt } = {}) => {
+    if (state.currentRoute !== "settings") {
+      location.hash = "#/system/quality";
+    } else {
+      setSettingsTab("quality");
+    }
+    return openRegressionCreateModal(prompt || "");
+  },
+});
+
+registerCommand({
+  id: "quality.regression.run",
+  title: "Quality: run regressions",
+  group: "Quality",
+  aliases: ["run-regressions", "regression-run"],
+  keywords: ["playwright screenshot qa"],
+  run: ({ button } = {}) => runQualityRegressions(button),
+});
+
+registerCommand({
   id: "system.cache.rebuild",
   title: "Rebuild SQLite cache",
   group: "System",

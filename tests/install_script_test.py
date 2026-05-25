@@ -89,6 +89,7 @@ def main() -> int:
     assert "https://astral.sh/uv/install.sh" in script
     assert "https://get.docker.com/rootless" in script
     assert "https://gh.io/copilot-install" in script
+    assert "npx --yes playwright install --with-deps chromium" in script
     assert "REFINE_INSTALL_DRY_RUN" in script
     assert "--yes" in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
@@ -233,6 +234,7 @@ def main() -> int:
                 str(chosen_workspace),
                 "n",
                 "codex",
+                "n",
                 "n",
                 str(target),
                 "n",

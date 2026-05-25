@@ -20,14 +20,14 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, reporters, round_logs, search_index
+from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, regressions, reporters, round_logs, search_index
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
-    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_HARD_RESET_WORKTREE, M_PROJECT_SYNC,
+    M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_HARD_RESET_WORKTREE, M_PROJECT_SYNC, M_REGRESSION_RUN,
     M_MERGE_REPORTER, M_RENAME_REPORTER, M_RETRY_MERGE, M_RETRY_QA, M_SET_NOTES, M_TARGET_APP_GENERATE,
     M_TARGET_APP_HEALTH, M_TARGET_APP_REBUILD_PENDING, M_TARGET_APP_REBUILD_QUEUE, M_TARGET_APP_RUN, M_UNDO_GAP, M_VERIFY,
 )
@@ -2559,6 +2559,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "project_update_pulse_interval_seconds",
         "agent_subpath", "merge_target_branch",
         "quality_enabled",
+        "quality_regressions_enabled",
         "agent_cli",
         "paused",
         # Target-app configuration. The state fields
@@ -2622,7 +2623,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
                     f"agent_cli must be one of {', '.join(valid_agent_clis)}",
                 )
             normalized[k] = choice
-        elif k == "quality_enabled":
+        elif k in {"quality_enabled", "quality_regressions_enabled"}:
             normalized[k] = (
                 "1"
                 if str(v).strip().lower() in {"1", "true", "yes", "on"}
@@ -2841,6 +2842,10 @@ def quality_get() -> tuple[int, dict]:
     try:
         result = quality.load_settings(conn)
         result["enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"
+        result["regressions_enabled"] = (
+            db.get_setting(conn, "quality_regressions_enabled", "0") or "0"
+        )
+        result["regressions"] = regressions.list_regressions()
         result["configured"] = quality.is_configured(conn)
         return 200, result
     finally:
@@ -2860,12 +2865,18 @@ def quality_save(body: dict) -> tuple[int, dict]:
             )
             enabled_changed = enabled != (db.get_setting(conn, "quality_enabled", "0") or "0")
             db.set_setting(conn, "quality_enabled", enabled)
+        if "regressions_enabled" in body:
+            regressions.set_enabled(conn, body.get("regressions_enabled"))
         result = quality.save_settings(
             conn,
             business_requirements=body.get("business_requirements"),
             instructions=body.get("instructions"),
         )
         result["enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"
+        result["regressions_enabled"] = (
+            db.get_setting(conn, "quality_regressions_enabled", "0") or "0"
+        )
+        result["regressions"] = regressions.list_regressions()
         result["configured"] = quality.is_configured(conn)
         activity.append(
             conn,
@@ -2881,6 +2892,56 @@ def quality_save(body: dict) -> tuple[int, dict]:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:
             pass
+    return 200, result
+
+
+def quality_regression_create(body: dict) -> tuple[int, dict]:
+    title = str(body.get("title") or "").strip()
+    prompt = str(body.get("prompt") or "").strip()
+    description = str(body.get("description") or "").strip()
+    if not title:
+        title = prompt[:80].strip() or "Untitled regression"
+    reg = regressions.create_regression(
+        title=title,
+        description=description,
+        prompt=prompt,
+    )
+    conn = _conn()
+    try:
+        activity.append(
+            conn,
+            message=f"Regression created: {reg['title']}",
+            severity="info",
+            category="quality",
+            actor="refine",
+        )
+    finally:
+        conn.close()
+    return 201, {"ok": True, "regression": reg}
+
+
+def quality_regression_update(regression_id: str, body: dict) -> tuple[int, dict]:
+    reg = regressions.update_regression(regression_id, body or {})
+    if not reg:
+        return err(404, "Regression not found")
+    return 200, {"ok": True, "regression": reg}
+
+
+def quality_regression_delete(regression_id: str) -> tuple[int, dict]:
+    if not regressions.delete_regression(regression_id):
+        return err(404, "Regression not found")
+    return 200, {"ok": True}
+
+
+def quality_regression_run(_body: dict | None = None) -> tuple[int, dict]:
+    try:
+        result = get_client().call(
+            M_REGRESSION_RUN,
+            {"only_enabled": True},
+            timeout=900.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
     return 200, result
 
 

@@ -496,7 +496,11 @@ def main() -> int:
     assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'id="s-quality-enabled"' not in application_body
     assert 'id="s-quality-enabled"' in settings_js
+    assert 'id="s-quality-regressions-enabled"' in settings_js
+    assert 'id="s-quality-regression-new"' in settings_js
+    assert 'id="s-quality-regression-run"' in settings_js
     assert 'const qualityEnabled = String(quality.enabled || "0") === "1";' in settings_js
+    assert 'const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";' in settings_js
     assert 'aria-pressed="${qualityEnabled ? "true" : "false"}"' in settings_js
     assert 'class="${qualityEnabled ? "" : "warn"}"' in settings_js
     assert 'QA ${qualityEnabled ? "enabled" : "disabled"}' in settings_js
@@ -505,10 +509,17 @@ def main() -> int:
     assert 'btn.textContent = enabled ? "QA enabled" : "QA disabled";' in settings_js
     assert ".toggle-button.on" not in common_css
     assert '"enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"' in api_py
+    assert '"regressions_enabled"] = (' in api_py
+    assert "quality_regression_create" in api_py
+    assert 'M_REGRESSION_RUN' in api_py
     assert 'api("GET", "/api/quality")' in settings_js
     assert 'api("PATCH", "/api/quality"' in settings_js
+    assert 'api("POST", "/api/quality/regressions"' in settings_js
+    assert 'api("POST", "/api/quality/regressions/run"' in settings_js
     assert '@route("GET", r"/api/quality")' in server_py
     assert '@route("PATCH", r"/api/quality")' in server_py
+    assert '@route("POST", r"/api/quality/regressions")' in server_py
+    assert '@route("POST", r"/api/quality/regressions/run")' in server_py
     assert "def quality_get" in api_py
     assert "def quality_save" in api_py
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js

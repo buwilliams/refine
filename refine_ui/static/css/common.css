@@ -516,6 +516,23 @@ select {
 
 .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .settings-section-actions { margin: 10px 0 14px; }
+.settings-list { display: flex; flex-direction: column; gap: 10px; }
+.settings-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.quality-regression-thumb {
+  display: block;
+  max-width: 260px;
+  max-height: 160px;
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
 
 .search-bar {
   display: flex;

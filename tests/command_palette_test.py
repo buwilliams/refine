@@ -68,6 +68,8 @@ def main() -> int:
         "gaps.bulk.failed_back",
         "system.cache.rebuild",
         "target_app.generate",
+        "quality.regression.new",
+        "quality.regression.run",
         "runtime.recheck_auth",
     ):
         assert f'id: "{command_id}"' in commands_js
@@ -80,6 +82,8 @@ def main() -> int:
     assert 'window.open(' in commands_js
     assert 'update: { status: "__last_workflow_state" }' in commands_js
     assert 'await openPlanChatDock({ initialPrompt: prompt || "" });' in commands_js
+    assert 'aliases: ["regression_new", "new-regression", "create-regression"]' in commands_js
+    assert 'openRegressionCreateModal(prompt || "")' in commands_js
 
     assert 'if (typeof initCommandPalette === "function") initCommandPalette();' in init_js
     assert 'runCommand("gap.new")' in common_js

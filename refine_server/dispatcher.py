@@ -14,7 +14,7 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from refine_server import activity, changes_index, db, governance, project_state, quality
+from refine_server import activity, changes_index, db, governance, project_state, quality, regressions
 from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
@@ -41,6 +41,7 @@ class Dispatcher:
     # instantiate a Dispatcher without one.
     on_run_finished: callable | None = None  # type: ignore[type-arg]
     launch_blocked: callable | None = None  # type: ignore[type-arg]
+    target_app_lock: threading.Lock | None = None
     poll_interval: float = 2.0
 
     _stop: threading.Event = None  # type: ignore[assignment]
@@ -613,7 +614,60 @@ class Dispatcher:
             )
             return
         base_commit = rev.stdout.strip()
-        prompt = quality.format_prompt(gap, settings=quality.load_settings(conn))
+        regression_result = None
+        if regressions.enabled(conn):
+            if self.target_app_lock is not None:
+                acquired = self.target_app_lock.acquire(blocking=False)
+            else:
+                acquired = True
+            if not acquired:
+                regression_result = {
+                    "enabled": True,
+                    "ok": False,
+                    "infra": True,
+                    "runs": [],
+                    "message": "another target-app operation is already running",
+                }
+            else:
+                try:
+                    regression_result = regressions.run_all(
+                        conn,
+                        target_root=worktree_root,
+                    )
+                finally:
+                    if self.target_app_lock is not None:
+                        self.target_app_lock.release()
+            try:
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="info" if regression_result.get("ok") else "warn",
+                    category="quality",
+                    actor="runner",
+                    message=(
+                        "Managed regression checks completed: "
+                        f"{regression_result.get('message') or 'complete'}"
+                    ),
+                    details=regressions.summarize_for_prompt(regression_result),
+                )
+            except Exception:
+                pass
+            activity.append(
+                conn,
+                message=(
+                    "Managed regression checks completed: "
+                    f"{regression_result.get('message') or 'complete'}"
+                ),
+                severity="info" if regression_result.get("ok") else "warn",
+                category="quality",
+                gap_id=gap_id,
+                actor="runner",
+                details=regressions.summarize_for_prompt(regression_result),
+            )
+        prompt = quality.format_prompt(
+            gap,
+            settings=quality.load_settings(conn),
+            regression_result=regression_result,
+        )
         try:
             gap_writer.set_latest_round_quality(
                 gap_id,

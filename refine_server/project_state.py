@@ -36,6 +36,7 @@ APPLICATION_SETTING_KEYS = {
     "agent_subpath",
     "merge_target_branch",
     "quality_enabled",
+    "quality_regressions_enabled",
 }
 
 RUNTIME_SETTING_KEYS = {
