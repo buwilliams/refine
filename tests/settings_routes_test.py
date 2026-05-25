@@ -323,6 +323,9 @@ def main() -> int:
     assert "{ purpose: \"plan\" }" in chat_js
     assert "Draft Gaps" in chat_js
     assert "function planTranscriptText(tab)" in chat_js
+    assert "function planHasAgentResponse(tab)" in chat_js
+    assert "function syncPlanDraftButton(tab)" in chat_js
+    assert "btn.disabled = !planHasAgentResponse(tab);" in chat_js
     assert "function openPlanDraftModalFromText(text)" in import_js
     assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
     assert ".nav-context-summary" in base_css

@@ -82,6 +82,8 @@ def main() -> int:
     assert 'window.open(' in commands_js
     assert 'update: { status: "__last_workflow_state" }' in commands_js
     assert 'await openPlanChatDock({ initialPrompt: prompt || "" });' in commands_js
+    assert "enabled: () => planHasAgentResponse(chatState.tabs.plan)" in commands_js
+    assert "Wait for the agent to respond before drafting Gaps." in commands_js
     assert 'aliases: ["regression_new", "new-regression", "create-regression"]' in commands_js
     assert 'openRegressionCreateModal(prompt || "")' in commands_js
     assert 'title: "Quality: run regressions on current checkout"' in commands_js
@@ -94,6 +96,7 @@ def main() -> int:
     assert 'bindCommand("#bulk-set-status", "gaps.bulk.status")' in gaps_list_js
     assert "async function openPlanChatDock(options = {})" in chat_js
     assert "async function sendChatText(text)" in chat_js
+    assert "function planHasAgentResponse(tab)" in chat_js
 
     assert ".nav-command-button" in base_css
     assert ".nav-issue-button" in base_css

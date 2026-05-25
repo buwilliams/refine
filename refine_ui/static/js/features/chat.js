@@ -20,6 +20,7 @@ function ensureStandaloneTab() {
     chatState.tabs.standalone = {
       gapId: null, label: "Standalone", mode: "standalone",
       sessionId: null, output: "", closedReason: null,
+      agentResponded: false,
     };
   }
 }
@@ -58,6 +59,7 @@ function saveChatStateToStorage() {
         sessionId: t.sessionId,
         output: (t.output || "").slice(-50_000),
         closedReason: t.closedReason,
+        agentResponded: !!t.agentResponded,
     };
   }
   try {
@@ -152,7 +154,7 @@ function openChatDock({ gapId = null } = {}) {
         gapId,
         label: `Gap ${gapId.slice(0, 8)}…`,
         mode: "gap",
-        sessionId: null, output: "", closedReason: null,
+        sessionId: null, output: "", closedReason: null, agentResponded: false,
       };
     }
     chatState.activeTabId = gapId;
@@ -181,6 +183,7 @@ function ensurePlanTab() {
       sessionId: null,
       output: "",
       closedReason: null,
+      agentResponded: false,
     };
   }
 }
@@ -311,7 +314,7 @@ function drawChatDock() {
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
         ${active.mode === "plan" ? `
           <button id="btn-plan-draft" class="secondary"
-                  ${planTranscriptText(active).trim() && !active.pending ? "" : "disabled"}>
+                  ${planHasAgentResponse(active) ? "" : "disabled"}>
             Draft Gaps
           </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
@@ -429,6 +432,13 @@ function applyPendingIndicator(tab) {
   const input = $("#chat-input");
   if (ind) ind.hidden = !tab || !tab.pending;
   if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
+  syncPlanDraftButton(tab);
+}
+
+function syncPlanDraftButton(tab) {
+  const btn = $("#btn-plan-draft");
+  if (!btn || !tab || tab.mode !== "plan") return;
+  btn.disabled = !planHasAgentResponse(tab);
 }
 
 function restartPollForActiveTab() {
@@ -485,6 +495,7 @@ async function clearActiveChat() {
     t.output = "";
     t.closedReason = null;
     t.pending = false;
+    t.agentResponded = false;
     saveChatStateToStorage();
     drawChat();
   });
@@ -512,6 +523,7 @@ async function toggleActiveChat() {
       t.sessionId = r.session_id;
       t.closedReason = null;
       t.output = "";
+      t.agentResponded = false;
       saveChatStateToStorage();
       refreshProcessesTabForChatChange();
       drawChat();
@@ -530,12 +542,30 @@ function planTranscriptText(tab) {
     .trim();
 }
 
+function chatLinesIncludeAgentResponse(lines) {
+  return (lines || []).some((line) => {
+    const text = String(line || "").trim();
+    return text && !text.startsWith("[refine]");
+  });
+}
+
+function planHasAgentResponse(tab) {
+  if (!tab) return false;
+  if (tab.agentResponded) return true;
+  return (tab.output || "")
+    .split(/\r?\n/)
+    .some((line) => {
+      const text = line.trim();
+      return text && !text.startsWith("[refine]") && !text.startsWith(">");
+    });
+}
+
 async function draftGapsFromPlan() {
   const t = chatState.tabs.plan;
-  if (!t || t.pending) return;
+  if (!t) return;
   const transcript = planTranscriptText(t);
-  if (!transcript) {
-    toast("Discuss the plan before drafting Gaps.", "error");
+  if (!planHasAgentResponse(t) || !transcript) {
+    toast("Wait for the agent to respond before drafting Gaps.", "error");
     return;
   }
   if (typeof openPlanDraftModalFromText !== "function") {
@@ -552,6 +582,9 @@ async function pollChat() {
   try {
     const r = await api("GET", `/api/chat/${sid}/read`);
     if (r.lines && r.lines.length) {
+      if (chatLinesIncludeAgentResponse(r.lines)) {
+        t.agentResponded = true;
+      }
       t.output = (t.output || "") + r.lines.join("\n") + "\n";
       // Only update the DOM if this tab is still active.
       if (chatState.activeTabId in chatState.tabs &&
@@ -573,6 +606,7 @@ async function pollChat() {
     const wasPending = !!t.pending;
     t.pending = !!r.in_flight;
     if (wasPending !== t.pending) applyPendingIndicator(t);
+    syncPlanDraftButton(t);
     if (wasPending !== t.pending) refreshProcessesTabForChatChange();
     if (r.alive === false) {
       t.closedReason = r.closed_reason || "session ended";

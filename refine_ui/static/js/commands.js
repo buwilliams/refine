@@ -277,8 +277,8 @@ registerCommand({
   group: "AI",
   aliases: ["draft-plan", "draft-gaps"],
   visible: () => !!chatState?.tabs?.plan,
-  enabled: () => !!planTranscriptText(chatState.tabs.plan).trim(),
-  disabledMessage: "Discuss a plan before drafting Gaps.",
+  enabled: () => planHasAgentResponse(chatState.tabs.plan),
+  disabledMessage: "Wait for the agent to respond before drafting Gaps.",
   run: () => draftGapsFromPlan(),
 });
 
