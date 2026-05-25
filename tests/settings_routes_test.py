@@ -121,13 +121,10 @@ def main() -> int:
         r'<button id="([^"]+)">Save[^<]*</button>',
         settings_js,
     )
-    assert save_button_ids == [
-        "s-save-application",
-        "s-save-runtime",
-        "s-governance-save",
-        "s-quality-save",
-    ], save_button_ids
-    assert "Feature flag changes are saved with Save runtime." in settings_js
+    assert save_button_ids == [], save_button_ids
+    assert "Feature flag changes are saved automatically." in settings_js
+    assert "function createSettingsAutosave" in settings_js
+    assert "function bindSettingsAutosave" in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
     assert 'id="s-worker-memory"' in settings_js
@@ -189,10 +186,10 @@ def main() -> int:
     assert "project_update_pulse_interval_seconds" in api_py
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '"copilot": "copilot login"' in api_py
-    runtime_save_body = settings_js.split('$("#s-save-runtime")?.addEventListener', 1)[1]
-    runtime_save_body = runtime_save_body.split("\n  });", 1)[0]
-    application_save_body = settings_js.split('$("#s-save-application")?.addEventListener', 1)[1]
-    application_save_body = application_save_body.split("\n  });", 1)[0]
+    runtime_save_body = settings_js.split("async function autosaveSettingsRuntime", 1)[1]
+    runtime_save_body = runtime_save_body.split("\nfunction bindSettingsRuntimeTab", 1)[0]
+    application_save_body = settings_js.split("async function autosaveSettingsApplication", 1)[1]
+    application_save_body = application_save_body.split("\nfunction applyGeneratedTargetAppConfig", 1)[0]
     feature_toggle_body = settings_js.split('$$("[data-feature-cell]").forEach', 1)[1]
     feature_toggle_body = feature_toggle_body.split('$$("[data-feature-clear]").forEach', 1)[0]
     assert 'api("POST", "/api/features/override"' in runtime_save_body
@@ -202,16 +199,25 @@ def main() -> int:
     assert 'resource_isolation_mode: $("#s-resource-isolation").value' in runtime_save_body
     assert 'agent_limit_pause_seconds: $("#s-agent-limit-pause").value' in runtime_save_body
     assert 'api("POST", "/api/features/override"' not in feature_toggle_body
-    assert 'await api("PATCH", "/api/settings", {' in application_save_body
+    assert 'await api("PATCH", "/api/settings", collectSettingsApplicationPayload())' in application_save_body
     assert "_targetAppDraftDirty = false;" in application_save_body
     assert 'await refreshSettingsTab("application", { force: true });' in application_save_body
+    assert "autosaveSettingsGovernance" in settings_js
+    assert "autosaveSettingsQuality" in settings_js
+    assert "autosaveSettingsApplication" in settings_js
+    assert "autosaveSettingsRuntime" in settings_js
     for old_save_id in (
         'id="s-save"',
         'id="s-save-cli"',
         'id="s-save-scope"',
         'id="s-save-target"',
+        'id="s-save-application"',
+        'id="s-save-runtime"',
+        'id="s-governance-save"',
+        'id="s-quality-save"',
     ):
         assert old_save_id not in settings_js
+    assert "settings-save-section" not in settings_js
     settings_tabs_css = re.search(r"\.settings-tabs \{(.*?)\}", common_css, re.S)
     settings_tab_css = re.search(r"\.settings-tab \{(.*?)\}", common_css, re.S)
     settings_tab_active_css = re.search(

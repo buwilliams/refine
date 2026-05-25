@@ -289,6 +289,39 @@ function settingsActiveInstanceLabel(project = state.project) {
   return active?.display_name || active?.name || activeId || "Default";
 }
 
+function createSettingsAutosave(save, options = {}) {
+  let inFlight = false;
+  let pending = false;
+  return async function autosave() {
+    if (inFlight) {
+      pending = true;
+      return;
+    }
+    inFlight = true;
+    try {
+      await save();
+      if (typeof options.afterSave === "function") await options.afterSave();
+    } catch (e) {
+      await showActionError(e, options.errorPrefix || "Autosave failed");
+    } finally {
+      inFlight = false;
+      if (pending) {
+        pending = false;
+        autosave();
+      }
+    }
+  };
+}
+
+function bindSettingsAutosave(root, selector, save, options = {}) {
+  const autosave = createSettingsAutosave(save, options);
+  if (!root) return autosave;
+  $$(selector, root).forEach((el) => {
+    el.addEventListener(options.event || "change", autosave);
+  });
+  return autosave;
+}
+
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
   { slug: "processes",    label: "Processes" },

@@ -29,6 +29,11 @@ function collectGovernanceRules() {
   })).filter((rule) => rule.text);
 }
 
+function scheduleAutosaveSettingsGovernance() {
+  autosaveSettingsGovernance().catch((e) =>
+    showActionError(e, "Governance autosave failed"));
+}
+
 function bindGovernanceRuleButtons() {
   $$("[data-governance-remove-rule]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -36,6 +41,7 @@ function bindGovernanceRuleButtons() {
       if (!$(".governance-rule-input")) {
         $("#governance-rules-list").innerHTML = `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
       }
+      scheduleAutosaveSettingsGovernance();
     });
   });
 }
@@ -58,7 +64,9 @@ function addGovernanceRuleRow(text = "") {
     if (!$(".governance-rule-input")) {
       list.innerHTML = `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
     }
+    scheduleAutosaveSettingsGovernance();
   });
+  row.querySelector("input")?.addEventListener("change", scheduleAutosaveSettingsGovernance);
   row.querySelector("input")?.focus();
 }
 
@@ -96,28 +104,27 @@ function renderSettingsGovernanceTab(gov) {
       <div class="actions" style="margin-top:10px">
         <button class="secondary" id="s-governance-add-rule">Add rule</button>
         <button class="secondary" id="s-governance-generate">Generate rules</button>
-        <span class="spacer"></span>
-        <button id="s-governance-save">Save governance</button>
       </div>
     </section>`;
 }
 
+async function autosaveSettingsGovernance() {
+  await api("PATCH", "/api/governance", {
+    product: $("#s-governance-product").value,
+    constitution: $("#s-governance-constitution").value,
+    rules: collectGovernanceRules(),
+  });
+}
+
 function bindSettingsGovernanceTab() {
   bindGovernanceRuleButtons();
+  const root = document.querySelector('[data-tab-pane="governance"]');
+  bindSettingsAutosave(
+    root,
+    "#s-governance-product, #s-governance-constitution, .governance-rule-input",
+    autosaveSettingsGovernance,
+  );
   $("#s-governance-add-rule")?.addEventListener("click", () => addGovernanceRuleRow());
-  $("#s-governance-save")?.addEventListener("click", async () => {
-    await withButtonBusy($("#s-governance-save"), "Saving…", async () => {
-      try {
-        await api("PATCH", "/api/governance", {
-          product: $("#s-governance-product").value,
-          constitution: $("#s-governance-constitution").value,
-          rules: collectGovernanceRules(),
-        });
-        toast("Governance saved", "info");
-        await refreshSettingsTab("governance", { force: true });
-      } catch (e) { await showActionError(e); }
-    });
-  });
   $("#s-governance-generate")?.addEventListener("click", async () => {
     const product = ($("#s-governance-product")?.value || "").trim();
     const constitution = ($("#s-governance-constitution")?.value || "").trim();
@@ -132,7 +139,8 @@ function bindSettingsGovernanceTab() {
         });
         $("#governance-rules-list").innerHTML = renderGovernanceRuleRows(r.rules || []);
         bindGovernanceRuleButtons();
-        toast("Rules generated — review and save", "info");
+        await autosaveSettingsGovernance();
+        toast("Rules generated and saved", "info");
       } catch (e) { await showActionError(e); }
     });
   });

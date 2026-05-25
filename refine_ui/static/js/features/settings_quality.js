@@ -37,26 +37,24 @@ function renderSettingsQualityTab(quality) {
         <p class="muted small" style="color:var(--warn)">
           Quality can run once business requirements and instructions are both filled in.
         </p>`}
-      <div class="actions" style="margin-top:10px">
-        <button id="s-quality-save">Save quality</button>
-      </div>
     </section>`;
 }
 
-function bindSettingsQualityTab() {
-  $("#s-quality-save")?.addEventListener("click", async () => {
-    await withButtonBusy($("#s-quality-save"), "Saving…", async () => {
-      try {
-        await api("PATCH", "/api/quality", {
-          enabled: $("#s-quality-enabled").dataset.enabled === "1" ? "1" : "0",
-          business_requirements: $("#s-quality-business-requirements").value,
-          instructions: $("#s-quality-instructions").value,
-        });
-        toast("Quality saved", "info");
-        await refreshSettingsTab("quality", { force: true });
-      } catch (e) { await showActionError(e); }
-    });
+async function autosaveSettingsQuality() {
+  await api("PATCH", "/api/quality", {
+    enabled: $("#s-quality-enabled").dataset.enabled === "1" ? "1" : "0",
+    business_requirements: $("#s-quality-business-requirements").value,
+    instructions: $("#s-quality-instructions").value,
   });
+}
+
+function bindSettingsQualityTab() {
+  const root = document.querySelector('[data-tab-pane="quality"]');
+  const autosaveQuality = bindSettingsAutosave(
+    root,
+    "#s-quality-business-requirements, #s-quality-instructions",
+    autosaveSettingsQuality,
+  );
   $("#s-quality-enabled")?.addEventListener("click", () => {
     const btn = $("#s-quality-enabled");
     const enabled = btn.dataset.enabled !== "1";
@@ -64,5 +62,6 @@ function bindSettingsQualityTab() {
     btn.setAttribute("aria-pressed", enabled ? "true" : "false");
     btn.classList.toggle("warn", !enabled);
     btn.textContent = enabled ? "QA enabled" : "QA disabled";
+    autosaveQuality();
   });
 }

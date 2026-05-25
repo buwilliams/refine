@@ -632,7 +632,7 @@ function bindSettingsProcessesTab(s) {
           if (r.ok && r.config) {
             setSettingsTab("application");
             applyGeneratedTargetAppConfig(r.config);
-            toast("Generated — review and click Save application to persist", "info");
+            toast("Generated — review the saved Application settings", "info");
           } else {
             toast("Generation produced no configuration", "error");
           }

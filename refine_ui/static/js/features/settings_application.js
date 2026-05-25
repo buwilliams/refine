@@ -61,7 +61,7 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
         <p class="muted small" style="color:var(--warn)">
           Legacy prose target-app settings are present. Use Processes → Runner
           workers → target-app config generator to convert them into structured
-          commands, then Save.
+          commands.
         </p>` : ""}
       <div class="form-row"><label>App URL
         <span class="muted small">— opened from the status indicator when the app is running.</span></label>
@@ -136,11 +136,40 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
                value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
         <p class="muted small" id="s-target-notes"></p></div>
-    </section>
-
-    <section class="settings-section settings-save-section">
-      <div class="actions"><button id="s-save-application">Save application</button></div>
     </section>`;
+}
+
+function collectSettingsApplicationPayload() {
+  return {
+    agent_subpath: $("#s-subpath").value,
+    merge_target_branch: $("#s-merge-target").value,
+    target_app_url: $("#s-target-app-url").value,
+    target_app_start_command: $("#s-target-start-command").value,
+    target_app_stop_command: $("#s-target-stop-command").value,
+    target_app_rebuild_command: $("#s-target-rebuild-command").value,
+    target_app_auto_rebuild: $("#s-target-auto-rebuild").value,
+    target_app_status_command: $("#s-target-status-command").value,
+    target_app_cwd: $("#s-target-cwd").value,
+    target_app_env_json: $("#s-target-env").value,
+    target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
+    target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
+    target_app_rebuild_timeout_seconds: $("#s-target-rebuild-timeout").value,
+    target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
+    target_app_log_path: $("#s-target-log-path").value,
+    target_app_http_check_url: $("#s-target-http-url").value,
+    target_app_tcp_check_host: $("#s-target-tcp-host").value,
+    target_app_tcp_check_port: $("#s-target-tcp-port").value,
+    target_app_process_check_command: $("#s-target-process-command").value,
+  };
+}
+
+async function autosaveSettingsApplication(options = {}) {
+  await api("PATCH", "/api/settings", collectSettingsApplicationPayload());
+  _targetAppDraftDirty = false;
+  refreshTargetAppStatus();
+  if (options.refresh) {
+    await refreshSettingsTab("application", { force: true });
+  }
 }
 
 function applyGeneratedTargetAppConfig(cfg) {
@@ -170,6 +199,9 @@ function applyGeneratedTargetAppConfig(cfg) {
     notes.textContent = cfg.notes || "";
     notesRow.style.display = cfg.notes ? "" : "none";
   }
+  autosaveSettingsApplication({ refresh: true })
+    .then(() => toast("Generated target-app config saved", "info"))
+    .catch((e) => showActionError(e, "Target-app config autosave failed"));
 }
 
 function bindSettingsApplicationTab(currentProject) {
@@ -220,35 +252,10 @@ function bindSettingsApplicationTab(currentProject) {
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });
-  $("#s-save-application")?.addEventListener("click", async () => {
-    await withButtonBusy($("#s-save-application"), "Saving…", async () => {
-      try {
-        await api("PATCH", "/api/settings", {
-          agent_subpath: $("#s-subpath").value,
-          merge_target_branch: $("#s-merge-target").value,
-          target_app_url: $("#s-target-app-url").value,
-          target_app_start_command: $("#s-target-start-command").value,
-          target_app_stop_command: $("#s-target-stop-command").value,
-          target_app_rebuild_command: $("#s-target-rebuild-command").value,
-          target_app_auto_rebuild: $("#s-target-auto-rebuild").value,
-          target_app_status_command: $("#s-target-status-command").value,
-          target_app_cwd: $("#s-target-cwd").value,
-          target_app_env_json: $("#s-target-env").value,
-          target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
-          target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
-          target_app_rebuild_timeout_seconds: $("#s-target-rebuild-timeout").value,
-          target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
-          target_app_log_path: $("#s-target-log-path").value,
-          target_app_http_check_url: $("#s-target-http-url").value,
-          target_app_tcp_check_host: $("#s-target-tcp-host").value,
-          target_app_tcp_check_port: $("#s-target-tcp-port").value,
-          target_app_process_check_command: $("#s-target-process-command").value,
-        });
-        _targetAppDraftDirty = false;
-        toast("Saved", "info");
-        await refreshSettingsTab("application", { force: true });
-        refreshTargetAppStatus();
-      } catch (e) { await showActionError(e); }
-    });
-  });
+  const root = document.querySelector('[data-tab-pane="application"]');
+  bindSettingsAutosave(
+    root,
+    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-rebuild-command, #s-target-auto-rebuild, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-rebuild-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
+    autosaveSettingsApplication,
+  );
 }

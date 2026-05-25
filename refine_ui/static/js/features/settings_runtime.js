@@ -64,7 +64,7 @@ function renderFeatureFlagsCard(feats) {
         </tbody>
       </table>
       <p class="muted small" style="margin-top:8px">
-        Feature flag changes are saved with Save runtime.
+        Feature flag changes are saved automatically.
       </p>
     </section>`;
 }
@@ -183,79 +183,74 @@ function renderSettingsRuntimeTab(s, feats, activeInstanceLabel, cli) {
     </section>
 
     ${renderFeatureFlagsCard(feats)
-      || `<section class="settings-section"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></section>`}
+      || `<section class="settings-section"><p class="muted">Feature flag matrix unavailable — backend runner unavailable.</p></section>`}`;
+}
 
-    <section class="settings-section settings-save-section">
-      <div class="actions"><button id="s-save-runtime">Save runtime</button></div>
-    </section>`;
+async function autosaveSettingsRuntime(options = {}) {
+  const chosen = $("#s-cli").value;
+  await api("PATCH", "/api/settings", {
+    parallel_run_cap: $("#s-cap").value,
+    branch_name_pattern: $("#s-pattern").value,
+    agent_idle_timeout_seconds: $("#s-idle").value,
+    agent_hard_cap_seconds: $("#s-hard").value,
+    worker_memory_limit_mb: $("#s-worker-memory").value,
+    ui_memory_limit_mb: $("#s-ui-memory").value,
+    worker_cpu_priority: $("#s-worker-cpu-priority").value,
+    resource_isolation_mode: $("#s-resource-isolation").value,
+    agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
+    chat_idle_timeout_seconds: $("#s-chat-idle").value,
+    backlog_promote_after_seconds: $("#s-backlog-promote").value,
+    project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
+    agent_cli: chosen,
+  });
+  for (const box of $$("[data-feature-cell]")) {
+    const { provider, feature } = box.dataset;
+    const enabled = box.checked;
+    const wasEnabled = box.dataset.featureOriginalEnabled === "1";
+    const clearPending = box.dataset.featureClearPending === "1";
+    if (!clearPending && enabled === wasEnabled) continue;
+    await api("POST", "/api/features/override", {
+      provider, feature, enabled: clearPending ? null : enabled,
+    });
+    box.dataset.featureOriginalEnabled = enabled ? "1" : "0";
+    box.dataset.featureOriginalOverride = clearPending ? "0" : "1";
+    delete box.dataset.featureClearPending;
+  }
+  if (options.refreshFeatures) {
+    await refreshFeatures({ skipSettingsRefresh: true });
+    await refreshSettingsTab("runtime", { force: true });
+  }
 }
 
 function bindSettingsRuntimeTab() {
-  $("#s-save-runtime")?.addEventListener("click", async () => {
-    await withButtonBusy($("#s-save-runtime"), "Saving…", async () => {
-      try {
-        const chosen = $("#s-cli").value;
-        await api("PATCH", "/api/settings", {
-          parallel_run_cap: $("#s-cap").value,
-          branch_name_pattern: $("#s-pattern").value,
-          agent_idle_timeout_seconds: $("#s-idle").value,
-          agent_hard_cap_seconds: $("#s-hard").value,
-          worker_memory_limit_mb: $("#s-worker-memory").value,
-          ui_memory_limit_mb: $("#s-ui-memory").value,
-          worker_cpu_priority: $("#s-worker-cpu-priority").value,
-          resource_isolation_mode: $("#s-resource-isolation").value,
-          agent_limit_pause_seconds: $("#s-agent-limit-pause").value,
-          chat_idle_timeout_seconds: $("#s-chat-idle").value,
-          backlog_promote_after_seconds: $("#s-backlog-promote").value,
-          project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
-          agent_cli: chosen,
-        });
-        for (const box of $$("[data-feature-cell]")) {
-          const { provider, feature } = box.dataset;
-          const enabled = box.checked;
-          const wasEnabled = box.dataset.featureOriginalEnabled === "1";
-          const clearPending = box.dataset.featureClearPending === "1";
-          if (!clearPending && enabled === wasEnabled) continue;
-          await api("POST", "/api/features/override", {
-            provider, feature, enabled: clearPending ? null : enabled,
-          });
-        }
-        // Pull the matrix for the new provider and surface what
-        // changed. Chat / Import will be hidden or labeled disabled
-        // immediately by the gates.
-        await refreshFeatures();
-        const matrix = state.features?.matrix || {};
-        const disabled = (state.features?.features || [])
-          .filter((f) => !(matrix[`${chosen}.${f.key}`] || {}).enabled)
-          .map((f) => f.label);
-        if (disabled.length) {
-          toast(
-            `Saved. Disabled for ${chosen}: ${disabled.join(", ")}. ` +
-            "See Feature flags on this tab.",
-            "info",
-          );
-        } else {
-          toast("Saved — re-check auth to confirm the new CLI is reachable", "info");
-        }
-      } catch (e) { await showActionError(e); }
-    });
-  });
+  const root = document.querySelector('[data-tab-pane="runtime"]');
+  const autosaveRuntime = bindSettingsAutosave(
+    root,
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse",
+    autosaveSettingsRuntime,
+  );
+  const autosaveRuntimeAndFeatures = createSettingsAutosave(
+    () => autosaveSettingsRuntime({ refreshFeatures: true }),
+  );
+  $("#s-cli")?.addEventListener("change", autosaveRuntimeAndFeatures);
   // Feature flag toggles.
   $$("[data-feature-cell]").forEach((box) => {
-    box.addEventListener("change", () => {
+    box.addEventListener("change", async () => {
       delete box.dataset.featureClearPending;
       updateFeatureToggleLabel(box);
+      await autosaveRuntimeAndFeatures();
     });
   });
   $$("[data-feature-clear]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       const { provider, feature } = btn.dataset;
       const box = $(`[data-feature-cell="${provider}.${feature}"]`);
       if (!box) return;
       box.checked = box.dataset.featureDefault === "1";
       box.dataset.featureClearPending = "1";
       updateFeatureToggleLabel(box);
-      btn.textContent = "clear on save";
+      btn.textContent = "clearing";
+      await autosaveRuntimeAndFeatures();
     });
   });
   $("#s-recheck").addEventListener("click", async () => {
