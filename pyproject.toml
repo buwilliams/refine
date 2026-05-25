@@ -10,7 +10,9 @@ requires-python = ">=3.10"
 license = "MIT"
 readme = "README.md"
 authors = [{name = "buwilliams"}]
-# Stdlib-only at runtime. No dependencies declared on purpose.
+dependencies = [
+    "typer>=0.16,<1.0",
+]
 
 [project.scripts]
 refine = "refine_cli.cli:main"

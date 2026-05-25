@@ -1,4 +1,4 @@
-"""argparse-based CLI for refine.
+"""Typer-based CLI for refine.
 
 Subcommands:
 - init    — write refine.toml + gaps/ in a chosen volume root,
@@ -20,7 +20,6 @@ Subcommands:
 """
 from __future__ import annotations
 
-import argparse
 import getpass
 import json
 import os
@@ -35,7 +34,11 @@ import urllib.request
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Annotated, Callable
 
+import click
+import typer
 from refine_server import config, project_registry
 
 
@@ -44,208 +47,344 @@ SYSTEMD_USER_DIR = Path.home() / ".config" / "systemd" / "user"
 SETUP_UI_HOST = "0.0.0.0"
 _LOGIN_PATH_CACHE: str | None = None
 _LOGIN_PATH_RESOLVED = False
+_Args = SimpleNamespace
+_Command = Callable[[_Args], int]
+_CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+
+
+app = typer.Typer(
+    name="refine",
+    help="Manage refine.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="refine", description="Manage refine.")
-    parser.add_argument(
-        "--config", "-c",
-        help="Path to refine.toml (defaults to walking up from cwd).",
-    )
-    sub = parser.add_subparsers(
-        dest="command",
-        required=True,
-        metavar="{init,install,uninstall,reset,start,restart,stop,status,ps,test,server,ui,doctor}",
-    )
+    raw_args = list(argv) if argv is not None else sys.argv[1:]
+    normalized = _normalize_argv(raw_args)
+    try:
+        result = app(args=normalized, prog_name="refine", standalone_mode=False)
+    except click.ClickException as e:
+        e.show()
+        return e.exit_code
+    except click.Abort:
+        typer.echo("Aborted!", err=True)
+        return 1
+    except click.exceptions.Exit as e:
+        return int(e.exit_code or 0)
+    return result if isinstance(result, int) else 0
 
-    p_init = sub.add_parser(
-        "init",
-        help="Initialize/add a target app and make it active.",
-        description=(
-            "Bootstraps a target app: creates <app>/.refine/refine.toml + "
-            "gaps/, writes the active-app binding, records the app in "
-            "the known-apps list, and prepares the checkout for `refine start` "
-            "or `refine install`."
+
+def _normalize_argv(argv: list[str] | None) -> list[str] | None:
+    """Preserve argparse-era `refine ps --watch` shorthand under Click/Typer."""
+    if argv is None:
+        return None
+    ps_index = _command_index(argv)
+    if ps_index is None or argv[ps_index] != "ps":
+        return argv
+    normalized: list[str] = []
+    idx = 0
+    while idx < len(argv):
+        token = argv[idx]
+        normalized.append(token)
+        if idx > ps_index and token == "--watch":
+            next_token = argv[idx + 1] if idx + 1 < len(argv) else None
+            if next_token is None or next_token.startswith("-"):
+                normalized.append("2.0")
+        idx += 1
+    return normalized
+
+
+def _command_index(argv: list[str]) -> int | None:
+    idx = 0
+    while idx < len(argv):
+        token = argv[idx]
+        if token in {"--config", "-c"}:
+            idx += 2
+            continue
+        if token.startswith("--config="):
+            idx += 1
+            continue
+        if token.startswith("-"):
+            idx += 1
+            continue
+        return idx
+    return None
+
+
+@app.callback()
+def _cli(
+    ctx: typer.Context,
+    config_path: Annotated[
+        str | None,
+        typer.Option(
+            "--config",
+            "-c",
+            help="Path to refine.toml (defaults to walking up from cwd).",
         ),
-    )
-    p_init.add_argument(
-        "path", nargs="?", default=None,
-        help="Path to the target app repo. Defaults to cwd (back-compat).",
-    )
-    p_init.add_argument("--force", action="store_true",
-                        help="Overwrite an existing refine.toml / .refine-binding.")
-    p_init.set_defaults(fn=cmd_init)
+    ] = None,
+) -> None:
+    ctx.obj = {"config": config_path}
 
-    p_install = sub.add_parser(
-        "install",
-        help="Install and start a persistent UI backend.",
-        description=(
-            "Writes, enables, and starts a system-level systemd unit for this "
-            "checkout. The service runs as the installing user, restarts on "
-            "failure, survives terminal close, and starts at boot. Pass a port "
-            "to run multiple Refine instances on one host."
+
+def _ctx_config(ctx: typer.Context) -> str | None:
+    obj = ctx.obj if isinstance(ctx.obj, dict) else {}
+    value = obj.get("config")
+    return value if isinstance(value, str) else None
+
+
+def _run_command(command: _Command, ctx: typer.Context, **kwargs: object) -> int:
+    return command(_Args(config=_ctx_config(ctx), **kwargs))
+
+
+@app.command(
+    "init",
+    help="Initialize/add a target app and make it active.",
+    epilog=(
+        "Bootstraps a target app: creates <app>/.refine/refine.toml + gaps/, "
+        "writes the active-app binding, records the app in the known-apps "
+        "list, and prepares the checkout for `refine start` or `refine install`."
+    ),
+)
+def init_command(
+    ctx: typer.Context,
+    path: Annotated[
+        str | None,
+        typer.Argument(
+            help="Path to the target app repo. Defaults to cwd (back-compat).",
         ),
-    )
-    p_install.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_install.set_defaults(fn=cmd_install)
-
-    p_uninstall = sub.add_parser(
-        "uninstall",
-        help="Stop and remove a persistent UI backend.",
-    )
-    p_uninstall.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_uninstall.set_defaults(fn=cmd_uninstall)
-
-    p_reset = sub.add_parser(
-        "reset",
-        help="Undo `refine init` in this checkout so it can attach a different app.",
-        description=(
-            "Removes the .refine-binding and .refine-apps.json files from "
-            "this checkout, disables + removes persistent systemd UI "
-            "units, and (with --purge) wipes the active app's .refine/ "
-            "directory. The app source tree is never touched."
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            help="Overwrite an existing refine.toml / .refine-binding.",
         ),
-    )
-    p_reset.add_argument(
-        "--purge", action="store_true",
-        help="Also delete the active target app's .refine/ directory "
-             "(gap.json files, sqlite index, .gitignore). DATA LOSS.",
-    )
-    p_reset.add_argument(
-        "-y", "--yes", action="store_true",
-        help="Skip the confirmation prompt for --purge.",
-    )
-    p_reset.set_defaults(fn=cmd_reset)
+    ] = False,
+) -> int:
+    return _run_command(cmd_init, ctx, path=path, force=force)
 
-    p_start = sub.add_parser(
-        "start",
-        help="Start the UI backend.",
-        description=(
-            "Starts the host-native UI backend, then prints a status block. "
-            "If this checkout has an installed systemd service, the command "
-            "starts that service; otherwise it starts a detached background "
-            "supervisor. The supervisor keeps the UI/control process separate "
-            "from the work runner. Pass a port to run multiple Refine "
-            "instances on one host."
+
+@app.command(
+    "install",
+    help="Install and start a persistent UI backend.",
+    epilog=(
+        "Writes, enables, and starts a system-level systemd unit for this "
+        "checkout. The service runs as the installing user, restarts on "
+        "failure, survives terminal close, and starts at boot. Pass a port "
+        "to run multiple Refine instances on one host."
+    ),
+)
+def install_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_install, ctx, port=port)
+
+
+@app.command("uninstall", help="Stop and remove a persistent UI backend.")
+def uninstall_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_uninstall, ctx, port=port)
+
+
+@app.command(
+    "reset",
+    help="Undo `refine init` in this checkout so it can attach a different app.",
+    epilog=(
+        "Removes the .refine-binding and .refine-apps.json files from this "
+        "checkout, disables + removes persistent systemd UI units, and "
+        "(with --purge) wipes the active app's .refine/ directory. The app "
+        "source tree is never touched."
+    ),
+)
+def reset_command(
+    ctx: typer.Context,
+    purge: Annotated[
+        bool,
+        typer.Option(
+            "--purge",
+            help=(
+                "Also delete the active target app's .refine/ directory "
+                "(gap.json files, sqlite index, .gitignore). DATA LOSS."
+            ),
         ),
-    )
-    p_start.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_start.set_defaults(fn=cmd_start)
+    ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("-y", "--yes", help="Skip the confirmation prompt for --purge."),
+    ] = False,
+) -> int:
+    return _run_command(cmd_reset, ctx, purge=purge, yes=yes)
 
-    p_restart = sub.add_parser(
-        "restart",
-        help="Stop the UI backend, then start it again.",
-        description=(
-            "Equivalent to `refine stop && refine start`."
+
+@app.command(
+    "start",
+    help="Start the UI backend.",
+    epilog=(
+        "Starts the host-native UI backend, then prints a status block. If "
+        "this checkout has an installed systemd service, the command starts "
+        "that service; otherwise it starts a detached background supervisor. "
+        "The supervisor keeps the UI/control process separate from the work "
+        "runner. Pass a port to run multiple Refine instances on one host."
+    ),
+)
+def start_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_start, ctx, port=port)
+
+
+@app.command(
+    "restart",
+    help="Stop the UI backend, then start it again.",
+    epilog="Equivalent to `refine stop && refine start`.",
+)
+def restart_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_restart, ctx, port=port)
+
+
+@app.command("stop", help="Stop the UI backend.")
+def stop_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_stop, ctx, port=port)
+
+
+@app.command("status", help="Show what's running (read-only).")
+def status_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_status, ctx, port=port)
+
+
+@app.command(
+    "ps",
+    help="Show CPU and memory usage for refine processes.",
+    epilog=(
+        "Samples host process stats for the Refine UI/supervisor process "
+        "and its children, including agent CLI subprocesses."
+    ),
+)
+def ps_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Web server port. Defaults to the configured port."),
+    ] = None,
+    sample: Annotated[
+        float,
+        typer.Option(
+            "--sample",
+            help="Seconds to sample CPU usage before printing. Default: 0.5.",
         ),
-    )
-    p_restart.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_restart.set_defaults(fn=cmd_restart)
-
-    p_stop = sub.add_parser(
-        "stop",
-        help="Stop the UI backend.",
-    )
-    p_stop.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_stop.set_defaults(fn=cmd_stop)
-
-    p_status = sub.add_parser(
-        "status",
-        help="Show what's running (read-only).",
-    )
-    p_status.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_status.set_defaults(fn=cmd_status)
-
-    p_ps = sub.add_parser(
-        "ps",
-        help="Show CPU and memory usage for refine processes.",
-        description=(
-            "Samples host process stats for the Refine UI/supervisor process "
-            "and its children, including agent CLI subprocesses."
+    ] = 0.5,
+    watch: Annotated[
+        float | None,
+        typer.Option(
+            "--watch",
+            help="Repeat every N seconds. Default when supplied without N: 2.",
         ),
-    )
-    p_ps.add_argument(
-        "port", nargs="?", type=int, default=None,
-        help="Web server port. Defaults to the configured port.",
-    )
-    p_ps.add_argument(
-        "--sample", type=float, default=0.5,
-        help="Seconds to sample CPU usage before printing. Default: 0.5.",
-    )
-    watch_group = p_ps.add_mutually_exclusive_group()
-    watch_group.add_argument(
-        "--watch", nargs="?", const=2.0, type=float, default=None,
-        help="Repeat every N seconds. Default when supplied without N: 2.",
-    )
-    watch_group.add_argument(
-        "--once", action="store_true",
-        help="Print one snapshot. This is the default.",
-    )
-    p_ps.add_argument(
-        "--limit", type=int, default=30,
-        help="Maximum process rows to print per port. Default: 30.",
-    )
-    p_ps.set_defaults(fn=cmd_ps)
-
-    p_test = sub.add_parser(
-        "test",
-        help="Run the full test suite.",
-        description=(
-            "Runs every top-level tests/*_test.py script sequentially with "
-            "the current Python interpreter. Returns non-zero if any test "
-            "script fails."
+    ] = None,
+    once: Annotated[
+        bool,
+        typer.Option("--once", help="Print one snapshot. This is the default."),
+    ] = False,
+    limit: Annotated[
+        int,
+        typer.Option(
+            "--limit",
+            help="Maximum process rows to print per port. Default: 30.",
         ),
+    ] = 30,
+) -> int:
+    if watch is not None and once:
+        typer.echo("refine ps: --watch and --once are mutually exclusive", err=True)
+        return 2
+    return _run_command(
+        cmd_ps,
+        ctx,
+        port=port,
+        sample=sample,
+        watch=watch,
+        once=once,
+        limit=limit,
     )
-    p_test.set_defaults(fn=cmd_test)
 
-    # Useful interactively when you want server logs in the foreground.
-    p_server = sub.add_parser(
-        "server",
-        help="Run the server component in the foreground for debugging.",
-    )
-    p_server.set_defaults(fn=cmd_server_foreground)
 
-    p_ui = sub.add_parser("ui", help="Start the UI backend in the foreground.")
-    p_ui.set_defaults(fn=cmd_ui)
+@app.command(
+    "test",
+    help="Run the full test suite.",
+    epilog=(
+        "Runs every top-level tests/*_test.py script sequentially with the "
+        "current Python interpreter. Returns non-zero if any test script fails."
+    ),
+)
+def test_command(ctx: typer.Context) -> int:
+    return _run_command(cmd_test, ctx)
 
-    p_supervisor = sub.add_parser(
-        "supervisor",
-        help=argparse.SUPPRESS,
-    )
-    p_supervisor.set_defaults(fn=cmd_supervisor)
 
-    # Backwards-compatible aliases without advertising the old names in help.
-    sub._name_parser_map["runner"] = p_server  # noqa: SLF001
-    sub._name_parser_map["web"] = p_ui  # noqa: SLF001
+@app.command("server", help="Run the server component in the foreground for debugging.")
+def server_command(ctx: typer.Context) -> int:
+    return _run_command(cmd_server_foreground, ctx)
 
-    p_doctor = sub.add_parser("doctor", help="Print a diagnostic snapshot.")
-    p_doctor.set_defaults(fn=cmd_doctor)
 
-    args = parser.parse_args(argv)
-    return args.fn(args)
+@app.command("runner", hidden=True)
+def runner_command(ctx: typer.Context) -> int:
+    return server_command(ctx)
+
+
+@app.command("ui", help="Start the UI backend in the foreground.")
+def ui_command(ctx: typer.Context) -> int:
+    return _run_command(cmd_ui, ctx)
+
+
+@app.command("web", hidden=True)
+def web_command(ctx: typer.Context) -> int:
+    return ui_command(ctx)
+
+
+@app.command("supervisor", hidden=True)
+def supervisor_command(ctx: typer.Context) -> int:
+    return _run_command(cmd_supervisor, ctx)
+
+
+@app.command("doctor", help="Print a diagnostic snapshot.")
+def doctor_command(ctx: typer.Context) -> int:
+    return _run_command(cmd_doctor, ctx)
 
 
 # ----- init -------------------------------------------------------------------
 
-def cmd_init(args: argparse.Namespace) -> int:
+def cmd_init(args: _Args) -> int:
     cwd = Path.cwd().resolve()
     client_repo = Path(args.path).expanduser().resolve() if args.path else cwd
 
@@ -289,7 +428,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_test(_args: argparse.Namespace) -> int:
+def cmd_test(_args: _Args) -> int:
     root = Path(__file__).resolve().parents[1]
     tests_dir = root / "tests"
     tests = sorted(tests_dir.glob("*_test.py"))
@@ -500,7 +639,7 @@ def _grep_first(text: str, prefix: str) -> str | None:
 
 # ----- start / stop / status -------------------------------------------------
 
-def cmd_install(args: argparse.Namespace) -> int:
+def cmd_install(args: _Args) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
         unit = config.unit_name_for(setup_clone)
@@ -571,7 +710,7 @@ def cmd_install(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_uninstall(args: argparse.Namespace) -> int:
+def cmd_uninstall(args: _Args) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
         unit = config.unit_name_for(setup_clone)
@@ -624,7 +763,7 @@ def cmd_uninstall(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_start(args: argparse.Namespace) -> int:
+def cmd_start(args: _Args) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
         unit = config.unit_name_for(setup_clone)
@@ -690,7 +829,7 @@ def cmd_start(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_stop(args: argparse.Namespace) -> int:
+def cmd_stop(args: _Args) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
         unit = config.unit_name_for(setup_clone)
@@ -721,7 +860,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_restart(args: argparse.Namespace) -> int:
+def cmd_restart(args: _Args) -> int:
     """`refine stop && refine start` — picks up source changes the
     running host processes haven't loaded yet without forcing the operator
     to run two commands."""
@@ -731,7 +870,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
         port = _runtime_action_port(args, setup_clone, None, unit)
         if _installed_ui_unit(unit, port) is not None:
             return _restart_setup_systemd_ui(setup_clone, unit, port)
-        restart_args = argparse.Namespace(**vars(args))
+        restart_args = _Args(**vars(args))
         restart_args.port = port
         rc = cmd_stop(restart_args)
         if rc != 0:
@@ -748,7 +887,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
     if ui_unit is not None:
         _pause_agents_for_clean_shutdown(cfg, port)
         return _restart_systemd_ui(clone, unit, cfg, port)
-    restart_args = argparse.Namespace(**vars(args))
+    restart_args = _Args(**vars(args))
     restart_args.port = port
     rc = cmd_stop(restart_args)
     if rc != 0:
@@ -757,7 +896,7 @@ def cmd_restart(args: argparse.Namespace) -> int:
     return cmd_start(restart_args)
 
 
-def cmd_reset(args: argparse.Namespace) -> int:
+def cmd_reset(args: _Args) -> int:
     """Undo `refine init` in this checkout.
 
     The reverse of init: remove persistent systemd UI units, delete
@@ -853,7 +992,7 @@ def cmd_reset(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_status(args: argparse.Namespace) -> int:
+def cmd_status(args: _Args) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
         unit = config.unit_name_for(setup_clone)
@@ -873,7 +1012,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_ps(args: argparse.Namespace) -> int:
+def cmd_ps(args: _Args) -> int:
     if args.sample < 0:
         print("refine ps: --sample must be 0 or greater", file=sys.stderr)
         return 1
@@ -913,7 +1052,7 @@ def cmd_ps(args: argparse.Namespace) -> int:
         return 130
 
 
-def _print_performance_snapshot(args: argparse.Namespace) -> int:
+def _print_performance_snapshot(args: _Args) -> int:
     setup_clone = _setup_source_dir()
     if setup_clone is not None:
         unit = config.unit_name_for(setup_clone)
@@ -948,7 +1087,7 @@ class _PerformanceCapture(StringIO):
         return self._is_tty
 
 
-def _render_performance_watch_frame(args: argparse.Namespace, *, is_tty: bool) -> tuple[int, str]:
+def _render_performance_watch_frame(args: _Args, *, is_tty: bool) -> tuple[int, str]:
     buf = _PerformanceCapture(is_tty=is_tty)
     with redirect_stdout(buf):
         print(f"refine ps sampled at {time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -956,7 +1095,7 @@ def _render_performance_watch_frame(args: argparse.Namespace, *, is_tty: bool) -
     return rc, buf.getvalue()
 
 
-def _render_performance_snapshot_frame(args: argparse.Namespace) -> tuple[int, str]:
+def _render_performance_snapshot_frame(args: _Args) -> tuple[int, str]:
     buf = _PerformanceCapture(is_tty=False)
     with redirect_stdout(buf):
         rc = _print_performance_snapshot(args)
@@ -1342,7 +1481,7 @@ def _running_config(pid: int | None) -> "config.Config | None":
 
 # ----- server / ui ------------------------------------------------------------
 
-def cmd_server_foreground(args: argparse.Namespace) -> int:
+def cmd_server_foreground(args: _Args) -> int:
     """Run the server component in the foreground for debugging.
 
     The production path is `refine supervisor`, which keeps the UI/control
@@ -1353,14 +1492,14 @@ def cmd_server_foreground(args: argparse.Namespace) -> int:
     return server_main()
 
 
-def cmd_ui(args: argparse.Namespace) -> int:
+def cmd_ui(args: _Args) -> int:
     from refine_ui.__main__ import main as ui_main
     return ui_main()
 
 
 # ----- doctor -----------------------------------------------------------------
 
-def cmd_doctor(args: argparse.Namespace) -> int:
+def cmd_doctor(args: _Args) -> int:
     cfg_path = args.config
     try:
         cfg = config.get(path=cfg_path) if cfg_path else config.get()
@@ -1428,7 +1567,7 @@ def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
         pass
 
 
-def _effective_port(args: argparse.Namespace, cfg: "config.Config | None") -> int:
+def _effective_port(args: _Args, cfg: "config.Config | None") -> int:
     default_port = cfg.web_port if cfg is not None else 8080
     raw_port = getattr(args, "port", None)
     port = int(raw_port if raw_port is not None else default_port)
@@ -1481,7 +1620,7 @@ def _start_background_ui(
     return proc.pid
 
 
-def cmd_supervisor(args: argparse.Namespace) -> int:  # noqa: ARG001
+def cmd_supervisor(args: _Args) -> int:  # noqa: ARG001
     from refine_runtime.supervisor import main as supervisor_main
 
     return supervisor_main()
@@ -1814,7 +1953,7 @@ def _owned_refine_ui_ports(clone: Path) -> list[int]:
     return sorted(ports)
 
 
-def _status_ports(args: argparse.Namespace, clone: Path,
+def _status_ports(args: _Args, clone: Path,
                   cfg: "config.Config | None",
                   unit: str | None = None) -> list[int]:
     if getattr(args, "port", None) is not None:
@@ -1893,7 +2032,7 @@ def _listener_port_pids() -> list[tuple[int, int]]:
     return pairs
 
 
-def _runtime_action_port(args: argparse.Namespace, clone: Path,
+def _runtime_action_port(args: _Args, clone: Path,
                          cfg: "config.Config | None",
                          unit: str | None = None) -> int:
     configured = _effective_port(args, cfg)
@@ -2264,7 +2403,7 @@ def _remove_legacy_docker_artifacts(clone: Path, *, verbose: bool = False) -> No
         if verbose:
             print(f"Removed legacy {current_link}")
 
-def _load_config_or_exit(args: argparse.Namespace) -> None:
+def _load_config_or_exit(args: _Args) -> None:
     try:
         if args.config:
             config.get(path=args.config)
