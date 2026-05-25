@@ -42,10 +42,10 @@
 .dashboard-scope-switch button:last-child {
   border-right: 0;
 }
-.dashboard-scope-switch button:hover {
-  background: transparent;
-  border-color: transparent;
-  color: var(--color-text);
+.dashboard-scope-switch button:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: white;
 }
 .dashboard-scope-switch button.active {
   background: var(--color-surface);
@@ -151,10 +151,6 @@
 }
 #dash > .dashboard-status-grid .dashboard-status-card.cancelled .dashboard-status-count {
   color: var(--color-text-soft);
-}
-#dash > .dashboard-status-grid .dashboard-status-card.in-progress .dashboard-status-count,
-#dash > .dashboard-status-grid .dashboard-status-card.awaiting-rebuild .dashboard-status-count {
-  color: var(--color-warning);
 }
 #dash > .dashboard-status-grid .dashboard-status-card.review .dashboard-status-count {
   color: var(--color-primary);

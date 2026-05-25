@@ -158,7 +158,11 @@ pre {
   flex: 0 0 auto;
 }
 .topbar-actions .nav-action { color: white; }
-.topbar-actions .nav-action:hover { background: var(--color-primary-hover); filter: none; }
+.topbar-actions .nav-action:hover {
+  background: var(--color-primary-hover);
+  color: white;
+  filter: none;
+}
 .topbar-actions select { width: 100%; }
 
 .nav-menu {

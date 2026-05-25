@@ -243,6 +243,15 @@ def main() -> int:
     assert settings_tabs_css and "border: 1px solid var(--color-border)" in settings_tabs_css.group(1)
     assert settings_tabs_css and "border-bottom" not in settings_tabs_css.group(1)
     assert settings_tab_css and "background: transparent" in settings_tab_css.group(1)
+    assert "button.settings-tab:hover:not(:disabled)" in common_css
+    assert ".settings-tab.active:hover" in common_css
+    settings_hover_css = re.search(
+        r"\.settings-tab:hover,\s*\.settings-tab\.active:hover,\s*button\.settings-tab:hover:not\(:disabled\) \{(.*?)\}",
+        common_css,
+        re.S,
+    )
+    assert settings_hover_css and "background: var(--color-primary-hover)" in settings_hover_css.group(1)
+    assert settings_hover_css and "color: white" in settings_hover_css.group(1)
     assert "border: 0" in settings_tab_css.group(1)
     assert "text-decoration: none" in settings_tab_css.group(1)
     assert settings_tab_active_css and "box-shadow: var(--shadow-sm)" in settings_tab_active_css.group(1)
@@ -511,7 +520,10 @@ def main() -> int:
     assert "dashboard-status-card-agent" in dashboard_js
     assert "dashboard-agent-indicator" in dashboard_js
     assert "dashboard-status-head" in dashboard_js
-    assert "Agent-managed automation" in dashboard_js
+    assert "Agent-managed automation" not in dashboard_js
+    assert "AI-managed automation" in dashboard_js
+    assert ">Auto<" not in dashboard_js
+    assert ">AI<" in dashboard_js
     assert "dashboard-collapsible-shell" in dashboard_js
     assert "dashboardRefreshInFlight" in dashboard_js
     assert "dashboardRefreshQueued" in dashboard_js
@@ -557,8 +569,17 @@ def main() -> int:
     assert "z-index: 1" in dashboard_css
     assert ".dashboard-status-card-agent" in dashboard_css
     assert ".dashboard-agent-indicator" in dashboard_css
+    assert ".dashboard-status-card.in-progress .dashboard-status-count" not in dashboard_css
+    assert ".dashboard-status-card.awaiting-rebuild .dashboard-status-count" not in dashboard_css
     assert ".dashboard-title-row" in dashboard_css
     assert ".dashboard-scope-switch" in dashboard_css
+    dashboard_scope_hover_css = re.search(
+        r"\.dashboard-scope-switch button:hover:not\(:disabled\) \{(.*?)\}",
+        dashboard_css,
+        re.S,
+    )
+    assert dashboard_scope_hover_css and "background: var(--color-primary-hover)" in dashboard_scope_hover_css.group(1)
+    assert dashboard_scope_hover_css and "color: white" in dashboard_scope_hover_css.group(1)
     assert ".dashboard-scope-switch button.active" in dashboard_css
     assert "#dash > .dashboard-collapsible-shell" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
@@ -586,6 +607,20 @@ def main() -> int:
     assert "border-color: var(--warn);" in common_css
     assert "button.danger, .btn.danger {" in common_css
     assert "border-color: var(--error);" in common_css
+    primary_button_hover_css = re.search(
+        r"button:hover:not\(:disabled\), \.btn:hover, \.button-primary:hover \{(.*?)\}",
+        common_css,
+        re.S,
+    )
+    assert primary_button_hover_css and "background: var(--color-primary-hover)" in primary_button_hover_css.group(1)
+    assert primary_button_hover_css and "color: white" in primary_button_hover_css.group(1)
+    nav_action_hover_css = re.search(
+        r"\.topbar-actions \.nav-action:hover \{(.*?)\}",
+        base_css,
+        re.S,
+    )
+    assert nav_action_hover_css and "background: var(--color-primary-hover)" in nav_action_hover_css.group(1)
+    assert nav_action_hover_css and "color: white" in nav_action_hover_css.group(1)
     assert "button.chat-tab:hover:not(:disabled)" in chat_css
     assert ".chat-dock .chat-dock-toggle:hover:not(:disabled)" in chat_css
     assert "color: white;" in chat_css

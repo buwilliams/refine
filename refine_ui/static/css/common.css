@@ -69,9 +69,12 @@
   cursor: pointer;
   white-space: nowrap;
 }
-.settings-tab:hover {
-  background: transparent;
-  color: var(--fg);
+.settings-tab:hover,
+.settings-tab.active:hover,
+button.settings-tab:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: white;
   text-decoration: none;
 }
 .settings-tab.active {
@@ -230,6 +233,7 @@ button:hover:not(:disabled), .btn:hover, .button-primary:hover {
   filter: none;
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
+  color: white;
 }
 button.secondary:hover:not(:disabled), .btn.secondary:hover, .button-secondary:hover {
   background: #fbfcfe;
