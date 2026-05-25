@@ -94,6 +94,8 @@ def main() -> int:
     assert "REFINE_INSTALL_UPGRADE" in script
     assert "--yes" in script
     assert "--upgrade" in script
+    assert "--no-upgrade" in script
+    assert 'REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"' in script
     assert "latest_remote_semver_release_tag" in script
     assert "api.github.com/repos/$slug/releases" in script
     assert "upgrade_refine_checkout" in script
@@ -246,7 +248,6 @@ def main() -> int:
             env,
             [
                 str(chosen_workspace),
-                "n",
                 "codex",
                 "n",
                 "n",

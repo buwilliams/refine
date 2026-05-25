@@ -15,7 +15,7 @@ REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
 REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
-REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-0}"
+REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -45,17 +45,18 @@ SELECTED_PROVIDER=""
 
 usage() {
   cat <<'EOF'
-Usage: install.sh [--yes|-y] [--upgrade]
+Usage: install.sh [--yes|-y] [--upgrade] [--no-upgrade]
 
 Options:
   -y, --yes     Accept default answers without prompting.
-  --upgrade     Move an existing Refine checkout to the latest semver tag.
+  --upgrade     Accepted for compatibility; release upgrades are automatic.
+  --no-upgrade  Skip release upgrade checks for an existing Refine checkout.
   -h, --help    Show this help.
 
 Environment:
   REFINE_INSTALL_ASSUME_DEFAULTS=1  Same behavior as --yes.
   REFINE_INSTALL_DRY_RUN=1          Print commands instead of running them.
-  REFINE_INSTALL_UPGRADE=1          Same behavior as --upgrade.
+  REFINE_INSTALL_UPGRADE=0          Same behavior as --no-upgrade.
 EOF
 }
 
@@ -67,6 +68,9 @@ parse_args() {
         ;;
       --upgrade)
         REFINE_INSTALL_UPGRADE=1
+        ;;
+      --no-upgrade)
+        REFINE_INSTALL_UPGRADE=0
         ;;
       -h|--help)
         usage
@@ -774,9 +778,9 @@ checkout_ahead_of_semver_tag() {
 
 upgrade_refine_checkout() {
   local checkout="$1"
-  local force="${2:-0}"
+  local force="${2:-1}"
   local latest current
-  if [ "$force" != "1" ] && ! confirm "Fetch published releases and upgrade Refine to the latest semver release" "y"; then
+  if [ "$force" = "0" ]; then
     return 0
   fi
   run git -C "$checkout" fetch --tags origin || {
@@ -799,7 +803,7 @@ upgrade_refine_checkout() {
   fi
   if [ -n "$(git -C "$checkout" status --porcelain 2>/dev/null)" ]; then
     warn "Refine checkout has local changes; not switching to release $latest."
-    warn "Commit or stash changes, then re-run this installer with --upgrade."
+    warn "Commit or stash changes, then re-run this installer."
     return 0
   fi
   run git -C "$checkout" checkout --detach "$latest" || {
@@ -815,9 +819,7 @@ clone_or_update_refine() {
   REFINE_CHECKOUT="$checkout"
   if [ -d "$checkout/.git" ]; then
     ok "Refine checkout exists: $checkout"
-    if [ "$REFINE_INSTALL_UPGRADE" = "1" ] || confirm "Check for a Refine semver release upgrade" "y"; then
-      upgrade_refine_checkout "$checkout" "$REFINE_INSTALL_UPGRADE"
-    fi
+    upgrade_refine_checkout "$checkout" "$REFINE_INSTALL_UPGRADE"
     return 0
   fi
   if [ -e "$checkout" ]; then
