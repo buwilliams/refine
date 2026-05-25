@@ -94,8 +94,8 @@ Installer day: guided Quick Start, setup mode, Plan chat, and supervised app-swi
 
 ## Day 13: 2026-05-25 (Monday)
 
-Effort: Very High (28 commits, 3 milestones)
+Effort: Very High (32 commits, 4 milestones)
 
-Milestones started: installer polish and repo reorganization; Typer CLI; command palette and Playwright regressions.
+Milestones started: installer polish and repo reorganization; Typer CLI; command palette and Playwright regressions; semver release and upgrade path.
 
-Product polish and UI platform work: installer defaults, docs/script reorganization, README simplification, Typer CLI migration, design-system refinements, mobile table fixes, System tab controls, command palette, GitHub issue shortcut, and managed Playwright regression checks.
+Product polish and UI platform work: installer defaults, docs/script reorganization, README simplification, Typer CLI migration, design-system refinements, mobile table fixes, System tab controls, command palette, GitHub issue shortcut, managed Playwright regression checks, hype-video planning, and published-release upgrade detection with local-development safeguards.

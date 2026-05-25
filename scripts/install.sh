@@ -691,14 +691,74 @@ latest_semver_from_lines() {
     tail -n 1
 }
 
-latest_remote_semver_tag() {
-  git ls-remote --tags --refs "$REFINE_REPO_URL" 2>/dev/null |
-    sed -E 's#.*refs/tags/##' |
-    latest_semver_from_lines
+github_repo_slug_from_url() {
+  local url="$1"
+  case "$url" in
+    https://github.com/*)
+      url="${url#https://github.com/}"
+      ;;
+    git@github.com:*)
+      url="${url#git@github.com:}"
+      ;;
+    ssh://git@github.com/*)
+      url="${url#ssh://git@github.com/}"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+  url="${url%.git}"
+  url="${url%/}"
+  case "$url" in
+    */*) printf '%s\n' "$url" ;;
+    *) return 1 ;;
+  esac
 }
 
-latest_local_semver_tag() {
-  git -C "$1" tag --list 2>/dev/null | latest_semver_from_lines
+github_api_get() {
+  if [ -n "${GITHUB_TOKEN:-}" ]; then
+    curl -fsSL \
+      -H "Accept: application/vnd.github+json" \
+      -H "Authorization: Bearer $GITHUB_TOKEN" \
+      "$1"
+  else
+    curl -fsSL \
+      -H "Accept: application/vnd.github+json" \
+      "$1"
+  fi
+}
+
+latest_remote_semver_release_tag() {
+  local slug api
+  if dry_run; then
+    printf '%s\n' "${REFINE_INSTALL_DRY_RUN_RELEASE_TAG:-1.0.0}"
+    return 0
+  fi
+  slug="$(github_repo_slug_from_url "$REFINE_REPO_URL")" || return 1
+  api="https://api.github.com/repos/$slug/releases?per_page=100"
+  github_api_get "$api" | python3 -c '
+import json
+import re
+import sys
+
+release_re = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
+try:
+    releases = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+versions = []
+for release in releases if isinstance(releases, list) else []:
+    if not isinstance(release, dict):
+        continue
+    if release.get("draft") or release.get("prerelease"):
+        continue
+    tag = release.get("tag_name")
+    if isinstance(tag, str) and release_re.match(tag):
+        versions.append(tag)
+versions.sort(key=lambda v: tuple(int(part) for part in v.split(".")))
+if versions:
+    print(versions[-1])
+'
 }
 
 current_checkout_semver_tag() {
@@ -716,16 +776,16 @@ upgrade_refine_checkout() {
   local checkout="$1"
   local force="${2:-0}"
   local latest current
-  if [ "$force" != "1" ] && ! confirm "Fetch release tags and upgrade Refine to the latest semver release" "y"; then
+  if [ "$force" != "1" ] && ! confirm "Fetch published releases and upgrade Refine to the latest semver release" "y"; then
     return 0
   fi
   run git -C "$checkout" fetch --tags origin || {
     warn "Could not fetch Refine release tags. Keeping existing checkout."
     return 0
   }
-  latest="$(latest_local_semver_tag "$checkout")"
+  latest="$(latest_remote_semver_release_tag)"
   if [ -z "$latest" ]; then
-    warn "No semver release tags found. Keeping existing checkout."
+    warn "No published semver releases found. Keeping existing checkout."
     return 0
   fi
   current="$(current_checkout_semver_tag "$checkout")"
@@ -765,8 +825,8 @@ clone_or_update_refine() {
   fi
   run mkdir -p "$base"
   local latest
-  latest="$(latest_remote_semver_tag)"
-  [ -n "$latest" ] || die "No semver release tags found in $REFINE_REPO_URL"
+  latest="$(latest_remote_semver_release_tag)"
+  [ -n "$latest" ] || die "No published semver releases found for $REFINE_REPO_URL"
   if dry_run; then
     say "${DIM}+ git clone --branch '$latest' '$REFINE_REPO_URL' '$checkout'${RESET}"
   else

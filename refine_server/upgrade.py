@@ -1,8 +1,12 @@
 """Release tag discovery for Refine upgrades."""
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,7 +55,12 @@ def status(repo: Path | None = None) -> UpgradeInfo:
             error=str(e),
         )
     current = current_version(repo)
-    latest = latest_version(repo)
+    error = ""
+    try:
+        latest = latest_version(repo)
+    except RuntimeError as e:
+        latest = ""
+        error = str(e)
     local_dev = local_development(repo, current)
     return UpgradeInfo(
         current_version=current,
@@ -63,6 +72,7 @@ def status(repo: Path | None = None) -> UpgradeInfo:
             and _semver_tuple(latest) > _semver_tuple(current)
         ),
         command=INSTALL_COMMAND,
+        error=error,
         local_development=local_dev,
     )
 
@@ -73,8 +83,8 @@ def current_version(repo: Path) -> str:
 
 
 def latest_version(repo: Path) -> str:
-    tags = _git(repo, "tag").splitlines()
-    return _latest_semver(tags)
+    remote = _git(repo, "config", "--get", "remote.origin.url")
+    return _latest_semver(_release_tags(remote))
 
 
 def local_development(repo: Path, version: str | None = None) -> bool:
@@ -92,6 +102,54 @@ def _latest_semver(tags: list[str]) -> str:
         return ""
     versions.sort(key=_semver_tuple)
     return versions[-1]
+
+
+def _release_tags(remote_url: str) -> list[str]:
+    slug = _github_repo_slug(remote_url)
+    if not slug:
+        raise RuntimeError("Refine release checks require a GitHub origin remote")
+    headers = {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "refine-upgrade-check",
+    }
+    token = os.environ.get("GITHUB_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{slug}/releases?per_page=100",
+        headers=headers,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as response:
+            releases = json.loads(response.read().decode("utf-8"))
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as e:
+        raise RuntimeError(f"Could not fetch Refine releases: {e}") from e
+    if not isinstance(releases, list):
+        raise RuntimeError("Could not fetch Refine releases: unexpected response")
+    tags = []
+    for release in releases:
+        if not isinstance(release, dict):
+            continue
+        if release.get("draft") or release.get("prerelease"):
+            continue
+        tag = release.get("tag_name")
+        if isinstance(tag, str):
+            tags.append(tag)
+    return tags
+
+
+def _github_repo_slug(remote_url: str) -> str:
+    remote_url = remote_url.strip()
+    patterns = (
+        r"^https://github\.com/([^/]+/[^/.]+)(?:\.git)?/?$",
+        r"^git@github\.com:([^/]+/[^/.]+)(?:\.git)?$",
+        r"^ssh://git@github\.com/([^/]+/[^/.]+)(?:\.git)?$",
+    )
+    for pattern in patterns:
+        match = re.match(pattern, remote_url)
+        if match:
+            return match.group(1)
+    return ""
 
 
 def _semver_tuple(version: str) -> tuple[int, int, int]:

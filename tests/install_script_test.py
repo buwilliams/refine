@@ -94,7 +94,8 @@ def main() -> int:
     assert "REFINE_INSTALL_UPGRADE" in script
     assert "--yes" in script
     assert "--upgrade" in script
-    assert "latest_remote_semver_tag" in script
+    assert "latest_remote_semver_release_tag" in script
+    assert "api.github.com/repos/$slug/releases" in script
     assert "upgrade_refine_checkout" in script
     assert "checkout_ahead_of_semver_tag" in script
     assert "assuming local development and skipping release upgrade" in script
