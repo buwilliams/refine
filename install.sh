@@ -77,6 +77,28 @@ dry_run() {
   [ "$REFINE_INSTALL_DRY_RUN" = "1" ]
 }
 
+terminal_available() {
+  [ -r /dev/tty ] && [ -w /dev/tty ]
+}
+
+write_prompt() {
+  if terminal_available; then
+    printf '%b' "$*" >/dev/tty
+  else
+    printf '%b' "$*" >&2
+  fi
+}
+
+read_answer() {
+  if terminal_available; then
+    IFS= read -r "$1" </dev/tty
+  elif [ -t 0 ]; then
+    IFS= read -r "$1"
+  else
+    return 1
+  fi
+}
+
 run() {
   if dry_run; then
     say "${DIM}+ $*${RESET}"
@@ -97,16 +119,19 @@ prompt() {
   local message="$1"
   local default_value="${2:-}"
   local answer=""
-  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ] || ! [ -t 0 ]; then
+  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
     printf '%s\n' "$default_value"
     return 0
   fi
   if [ -n "$default_value" ]; then
-    printf '%b' "${BOLD}${message}${RESET} ${DIM}[${default_value}]${RESET}: "
+    write_prompt "${BOLD}${message}${RESET} ${DIM}[${default_value}]${RESET}: "
   else
-    printf '%b' "${BOLD}${message}${RESET}: "
+    write_prompt "${BOLD}${message}${RESET}: "
   fi
-  read -r answer || answer=""
+  if ! read_answer answer; then
+    warn "No interactive terminal available; using default for: $message"
+    answer="$default_value"
+  fi
   if [ -z "$answer" ]; then
     answer="$default_value"
   fi
@@ -121,12 +146,15 @@ confirm() {
   if [ "$default_answer" = "n" ]; then
     prompt_suffix="[y/N]"
   fi
-  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ] || ! [ -t 0 ]; then
+  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
     [ "$default_answer" = "y" ]
     return $?
   fi
-  printf '%b' "${BOLD}${message}${RESET} ${DIM}${prompt_suffix}${RESET}: "
-  read -r answer || answer=""
+  write_prompt "${BOLD}${message}${RESET} ${DIM}${prompt_suffix}${RESET}: "
+  if ! read_answer answer; then
+    warn "No interactive terminal available; using default answer '$default_answer' for: $message"
+    answer="$default_answer"
+  fi
   answer="$(printf '%s' "$answer" | tr '[:upper:]' '[:lower:]')"
   if [ -z "$answer" ]; then
     answer="$default_answer"
