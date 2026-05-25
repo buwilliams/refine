@@ -17,9 +17,13 @@ Linux, macOS, or Ubuntu/WSL:
 curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
 ```
 
-The installer checks the host, installs or repairs missing tools when you approve,
-asks which AI provider to use, optionally clones or attaches the target
-application, and starts Refine.
+The installer checks the host, installs or repairs missing tools when you approve, asks which AI provider to use, optionally clones or attaches the target application, and starts Refine.
+
+refine has a robust CLI:
+
+```bash
+uv run refine --help
+```
 
 ### Windows Users
 
@@ -33,6 +37,4 @@ After Ubuntu opens, use the Quick Start one-liner above.
 
 ## License
 
-[MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No
-warranty, no support obligations on my end. If you build something useful
-on top, a heads-up is appreciated but not required.
+[MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No warranty, no support obligations on my end. If you build something useful on top, a heads-up is appreciated but not required.
