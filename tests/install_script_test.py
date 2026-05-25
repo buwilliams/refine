@@ -134,7 +134,7 @@ def main() -> int:
             "NO_COLOR": "1",
             "REFINE_INSTALL_ASSUME_DEFAULTS": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
-            "REFINE_INSTALL_BASE_DEFAULT": str(tmp),
+            "REFINE_INSTALL_BASE_DEFAULT": str(checkout),
             "REFINE_INSTALL_TARGET_APP": str(target),
             "REFINE_INSTALL_PROVIDER": "codex",
             "PATH": f"{fake_bin}{os.pathsep}{env.get('PATH', '')}",
@@ -185,7 +185,7 @@ def main() -> int:
             "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
-            "REFINE_INSTALL_BASE_DEFAULT": str(tmp),
+            "REFINE_INSTALL_BASE_DEFAULT": str(checkout),
             "REFINE_INSTALL_PROVIDER": "codex",
             "PATH": str(fake_bin),
         })
@@ -211,9 +211,9 @@ def main() -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="refine-install-pty-test-"))
     try:
-        default_workspace = tmp / "default-workspace"
-        chosen_workspace = tmp / "chosen-workspace"
-        checkout = chosen_workspace / "refine"
+        default_checkout = tmp / "default-checkout"
+        chosen_checkout = tmp / "chosen-checkout"
+        checkout = chosen_checkout
         target = tmp / "target-app"
         checkout.mkdir(parents=True)
         target.mkdir()
@@ -239,7 +239,7 @@ def main() -> int:
             "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
-            "REFINE_INSTALL_BASE_DEFAULT": str(default_workspace),
+            "REFINE_INSTALL_BASE_DEFAULT": str(default_checkout),
             "PATH": str(fake_bin),
         })
         code, output = _run_piped_installer_with_pty(
@@ -247,7 +247,7 @@ def main() -> int:
             root,
             env,
             [
-                str(chosen_workspace),
+                str(chosen_checkout),
                 "codex",
                 "n",
                 "n",
@@ -258,14 +258,15 @@ def main() -> int:
             ],
         )
         assert code == 0, output
-        assert "Install workspace" in output
+        assert "Refine checkout path" in output
         assert "Installed provider CLIs: codex" in output
         assert "Missing provider CLIs: claude gemini copilot" in output
         assert "Provider (claude codex gemini copilot) [codex]" in output
         assert "Target app path or Git remote" in output
         assert f"Refine checkout: {checkout}" in output
         assert "Provider:         codex" in output
-        assert f"Cloned Refine to {default_workspace / 'refine'}" not in output
+        assert f"Cloned Refine to {default_checkout / 'refine'}" not in output
+        assert f"Refine checkout: {chosen_checkout / 'refine'}" not in output
         print("[ok] install.sh prompts through /dev/tty when piped to bash")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

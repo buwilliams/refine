@@ -8,8 +8,7 @@ set -uo pipefail
 
 REFINE_REPO_URL="${REFINE_REPO_URL:-https://github.com/buwilliams/refine.git}"
 REFINE_RAW_INSTALL_URL="${REFINE_RAW_INSTALL_URL:-https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh}"
-REFINE_INSTALL_BASE_DEFAULT="${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine-work}"
-REFINE_CHECKOUT_NAME="${REFINE_CHECKOUT_NAME:-refine}"
+REFINE_INSTALL_CHECKOUT_DEFAULT="${REFINE_INSTALL_CHECKOUT_DEFAULT:-${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine-work/refine}}"
 REFINE_DEFAULT_PORT="${REFINE_DEFAULT_PORT:-8080}"
 REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
@@ -55,6 +54,7 @@ Options:
 
 Environment:
   REFINE_INSTALL_ASSUME_DEFAULTS=1  Same behavior as --yes.
+  REFINE_INSTALL_CHECKOUT_DEFAULT   Default Refine checkout path.
   REFINE_INSTALL_DRY_RUN=1          Print commands instead of running them.
   REFINE_INSTALL_UPGRADE=0          Same behavior as --no-upgrade.
 EOF
@@ -814,8 +814,7 @@ upgrade_refine_checkout() {
 }
 
 clone_or_update_refine() {
-  local base="$1"
-  local checkout="$base/$REFINE_CHECKOUT_NAME"
+  local checkout="$1"
   REFINE_CHECKOUT="$checkout"
   if [ -d "$checkout/.git" ]; then
     ok "Refine checkout exists: $checkout"
@@ -823,9 +822,9 @@ clone_or_update_refine() {
     return 0
   fi
   if [ -e "$checkout" ]; then
-    die "$checkout exists but is not a git checkout. Move it or set REFINE_CHECKOUT_NAME, then re-run."
+    die "$checkout exists but is not a git checkout. Choose another checkout path, then re-run."
   fi
-  run mkdir -p "$base"
+  run mkdir -p "$(dirname "$checkout")"
   local latest
   latest="$(latest_remote_semver_release_tag)"
   [ -n "$latest" ] || die "No published semver releases found for $REFINE_REPO_URL"
@@ -1025,10 +1024,10 @@ main() {
   preflight
 
   section "Workspace"
-  local base
-  base="$(prompt "Install workspace" "$REFINE_INSTALL_BASE_DEFAULT")"
-  base="${base/#\~/$HOME}"
-  clone_or_update_refine "$base"
+  local checkout
+  checkout="$(prompt "Refine checkout path" "$REFINE_INSTALL_CHECKOUT_DEFAULT")"
+  checkout="${checkout/#\~/$HOME}"
+  clone_or_update_refine "$checkout"
 
   provider_flow
   ensure_playwright_headless
