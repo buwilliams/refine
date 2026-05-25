@@ -1,10 +1,6 @@
 # refine
 
-refine is an agentic software delivery system that builds new apps, implements
-features, and fixes bugs. It coordinates people and agents across distributed
-machines while keeping feedback cheap, local, and repeatable. QA, Product,
-support, customers — anyone who can articulate what the app does today vs
-what it should do instead.
+refine is an agentic software delivery system that builds new apps, implements features, and fixes bugs. It coordinates people and agents across distributed machines while keeping feedback cheap, local, and repeatable. Product, support, and customers — anyone who can articulate what the app does today vs what it should do instead - can make meaningful contributions to your software.
 
 - **Local ownership** - each instance owns its queue and data locally, while git keeps people in sync across machines without central infrastructure.
 - **Cheap feedback loops** - Gaps move from report to agent work to human review, so the system improves through fast correction instead of perfect upfront specification.
