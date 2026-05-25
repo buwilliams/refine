@@ -25,6 +25,7 @@ refine puts automation at the forefront, reduces feedback loops by orders of mag
 - **Workflow** - move Gaps from report to agent work to human review.
 - **Guidance** - reusable instructions classified against each Gap before work starts.
 - **Governance** - Product, Constitution, and Rules checks before work starts.
+- **Quality (QA)** - pre-merge checks that verify completed work against requirements.
 - **Merge** - integrate completed Gap branches through a single serialized agent.
 - **Logs** - filtered audit trail for agent output, git events, and system activity.
 
