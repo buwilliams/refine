@@ -18,10 +18,11 @@ def _run_piped_installer_with_pty(
     root: Path,
     env: dict[str, str],
     answers: list[str],
+    cwd: Path | None = None,
 ) -> tuple[int, str]:
     pid, fd = pty.fork()
     if pid == 0:
-        os.chdir(root)
+        os.chdir(cwd or root)
         os.execvpe(
             "bash",
             ["bash", "-c", f"cat {shlex.quote(str(install_sh))} | bash"],
@@ -100,6 +101,10 @@ def main() -> int:
     assert "api.github.com/repos/$slug/releases" in script
     assert "upgrade_refine_checkout" in script
     assert "checkout_ahead_of_semver_tag" in script
+    assert "current_refine_checkout" in script
+    assert "Using current Refine checkout" in script
+    assert "bound_target_app" in script
+    assert "Using existing target app binding" in script
     assert "assuming local development and skipping release upgrade" in script
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
@@ -141,7 +146,7 @@ def main() -> int:
         })
         result = subprocess.run(
             ["bash", str(install_sh)],
-            cwd=root,
+            cwd=tmp,
             env=env,
             text=True,
             capture_output=True,
@@ -165,7 +170,7 @@ def main() -> int:
         fake_bin = tmp / "bin"
         fake_bin.mkdir()
         for name in (
-            "awk", "bash", "cat", "curl", "git", "grep", "python3",
+            "awk", "bash", "cat", "curl", "dirname", "git", "grep", "python3",
             "sort", "tail", "tr", "uname",
         ):
             source = shutil.which(name)
@@ -191,7 +196,7 @@ def main() -> int:
         })
         result = subprocess.run(
             ["bash", str(install_sh), "--yes"],
-            cwd=root,
+            cwd=tmp,
             env=env,
             text=True,
             capture_output=True,
@@ -223,7 +228,7 @@ def main() -> int:
         fake_bin = tmp / "bin"
         fake_bin.mkdir()
         for name in (
-            "awk", "bash", "cat", "curl", "git", "grep", "python3",
+            "awk", "bash", "cat", "curl", "dirname", "git", "grep", "python3",
             "sort", "tail", "tr", "uname",
         ):
             source = shutil.which(name)
@@ -256,6 +261,7 @@ def main() -> int:
                 "18080",
                 "n",
             ],
+            cwd=tmp,
         )
         assert code == 0, output
         assert "Refine checkout path" in output
@@ -268,6 +274,72 @@ def main() -> int:
         assert f"Cloned Refine to {default_checkout / 'refine'}" not in output
         assert f"Refine checkout: {chosen_checkout / 'refine'}" not in output
         print("[ok] install.sh prompts through /dev/tty when piped to bash")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-install-current-checkout-test-"))
+    try:
+        checkout = tmp / "refine"
+        target = tmp / "target-app"
+        (checkout / "refine_cli").mkdir(parents=True)
+        (checkout / "scripts").mkdir()
+        target.mkdir()
+        (checkout / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
+        (checkout / ".refine-binding").write_text(
+            f"# refine binding\n{target}\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+        subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+
+        fake_bin = tmp / "bin"
+        fake_bin.mkdir()
+        for name in (
+            "awk", "bash", "cat", "curl", "dirname", "git", "grep", "python3",
+            "sort", "tail", "tr", "uname",
+        ):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
+        for name in ("codex", "docker", "uv"):
+            executable = fake_bin / name
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+
+        env = os.environ.copy()
+        env.update({
+            "HOME": str(tmp),
+            "NO_COLOR": "1",
+            "REFINE_INSTALL_DRY_RUN": "1",
+            "PATH": str(fake_bin),
+        })
+        code, output = _run_piped_installer_with_pty(
+            install_sh,
+            root,
+            env,
+            [
+                "codex",
+                "n",
+                "n",
+                "n",
+                "18080",
+                "n",
+            ],
+            cwd=checkout,
+        )
+        assert code == 0, output
+        assert "Using current Refine checkout" in output
+        assert f"Refine checkout: {checkout}" in output
+        assert "Refine checkout path" not in output
+        assert "Using existing target app binding" in output
+        assert "Target app path or Git remote" not in output
+        assert f"Target app:       {target}" in output
+        print("[ok] install.sh skips checkout and target prompts from a bound Refine checkout")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

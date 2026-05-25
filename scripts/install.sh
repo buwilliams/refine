@@ -121,6 +121,47 @@ dry_run() {
   [ "$REFINE_INSTALL_DRY_RUN" = "1" ]
 }
 
+is_refine_checkout() {
+  [ -f "$1/pyproject.toml" ] &&
+    [ -f "$1/refine_cli/cli.py" ] &&
+    [ -f "$1/scripts/install.sh" ]
+}
+
+current_refine_checkout() {
+  local dir
+  dir="$(pwd -P 2>/dev/null || pwd)"
+  while [ -n "$dir" ] && [ "$dir" != "/" ]; do
+    if is_refine_checkout "$dir"; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir="$(dirname "$dir")"
+  done
+  return 1
+}
+
+bound_target_app() {
+  local binding="$REFINE_CHECKOUT/.refine-binding"
+  local line path
+  [ -f "$binding" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ""|\#*) continue ;;
+    esac
+    path="${line/#\~/$HOME}"
+    case "$path" in
+      /*) ;;
+      *) path="$REFINE_CHECKOUT/$path" ;;
+    esac
+    if [ -d "$path" ]; then
+      cd "$path" 2>/dev/null && pwd -P || printf '%s\n' "$path"
+      return 0
+    fi
+    return 1
+  done < "$binding"
+  return 1
+}
+
 terminal_available() {
   [ -r /dev/tty ] && [ -w /dev/tty ]
 }
@@ -854,12 +895,19 @@ target_from_remote() {
 
 choose_target_app() {
   section "Target application"
-  say "Refine works against your application repository. Use a local path, paste a Git remote, or press Enter to attach one later in Refine."
   local input=""
   if [ -n "$REFINE_INSTALL_TARGET_APP" ]; then
     input="$REFINE_INSTALL_TARGET_APP"
     info "Using target app from REFINE_INSTALL_TARGET_APP"
   else
+    local existing_target
+    existing_target="$(bound_target_app || true)"
+    if [ -n "$existing_target" ]; then
+      TARGET_APP_PATH="$existing_target"
+      ok "Using existing target app binding: $TARGET_APP_PATH"
+      return 0
+    fi
+    say "Refine works against your application repository. Use a local path, paste a Git remote, or press Enter to attach one later in Refine."
     input="$(prompt "Target app path or Git remote (blank to skip)" "")"
   fi
   if [ -z "$input" ]; then
@@ -1025,8 +1073,13 @@ main() {
 
   section "Workspace"
   local checkout
-  checkout="$(prompt "Refine checkout path" "$REFINE_INSTALL_CHECKOUT_DEFAULT")"
-  checkout="${checkout/#\~/$HOME}"
+  checkout="$(current_refine_checkout || true)"
+  if [ -n "$checkout" ]; then
+    ok "Using current Refine checkout: $checkout"
+  else
+    checkout="$(prompt "Refine checkout path" "$REFINE_INSTALL_CHECKOUT_DEFAULT")"
+    checkout="${checkout/#\~/$HOME}"
+  fi
   clone_or_update_refine "$checkout"
 
   provider_flow
