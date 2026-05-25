@@ -94,8 +94,8 @@ def main() -> int:
     assert settings_tab_block, "Settings tabs must be declared centrally"
     slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
     assert slugs == [
-        "processes", "instances", "performance", "reporters",
-        "guidance", "governance", "quality", "application", "runtime",
+        "processes", "instances", "reporters", "quality",
+        "governance", "guidance", "performance", "application", "runtime",
     ], slugs
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js

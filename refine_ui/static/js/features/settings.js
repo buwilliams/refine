@@ -361,11 +361,11 @@ const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
   { slug: "processes",    label: "Processes" },
   { slug: "instances",    label: "Instances" },
-  { slug: "performance",  label: "Performance" },
   { slug: "reporters",    label: "Reporters" },
-  { slug: "guidance",     label: "Guidance" },
-  { slug: "governance",   label: "Governance" },
   { slug: "quality",      label: "Quality" },
+  { slug: "governance",   label: "Governance" },
+  { slug: "guidance",     label: "Guidance" },
+  { slug: "performance",  label: "Performance" },
   { slug: "application",  label: "Application" },
   { slug: "runtime",      label: "Runtime" },
 ];
