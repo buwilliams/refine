@@ -1,6 +1,5 @@
 // ---- Gaps: import -----------------------------------------------------------
 
-const IMPORT_CHUNK_LINE_COUNT = 20;
 const IMPORT_SESSION_KEY = "refine_import_session_v1";
 const IMPORT_CSV_REQUIRED_FIELDS = [
   "actual (text)",
@@ -306,11 +305,8 @@ function openImportModal() {
       saveSession({ phase: "extracting", mode: activeMode, sourceText: text, drafts: [], error: "" });
       if (draftsRoot) {
         drawImportProgress(draftsRoot, {
-          current: 0,
-          total: 1,
-          chunkSize: IMPORT_CHUNK_LINE_COUNT,
+          phase: "starting",
           lineCount: countImportLines(text),
-          draftCount: 0,
         });
       }
       await withButtonBusy(btn, "Extracting…", async () => {
@@ -423,95 +419,41 @@ function countImportLines(text) {
   return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
 }
 
-function importTextChunks(text) {
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length <= IMPORT_CHUNK_LINE_COUNT) {
-    return [{
-      text: text.trim(),
-      startLine: lines.length ? 1 : 0,
-      endLine: lines.length,
-      lineCount: lines.length,
-    }];
-  }
-  const chunks = [];
-  for (let i = 0; i < lines.length; i += IMPORT_CHUNK_LINE_COUNT) {
-    const chunkLines = lines.slice(i, i + IMPORT_CHUNK_LINE_COUNT);
-    chunks.push({
-      text: chunkLines.join("\n"),
-      startLine: i + 1,
-      endLine: i + chunkLines.length,
-      lineCount: chunkLines.length,
-    });
-  }
-  return chunks;
-}
-
 async function extractImportDrafts(text, draftsRoot, signal = null) {
-  const chunks = importTextChunks(text);
   const lineCount = countImportLines(text);
-  const drafts = [];
   if (draftsRoot) {
     drawImportProgress(draftsRoot, {
-      current: 0,
-      total: chunks.length,
-      chunkSize: IMPORT_CHUNK_LINE_COUNT,
+      phase: "running",
       lineCount,
-      draftCount: 0,
     });
   }
-  for (let i = 0; i < chunks.length; i += 1) {
-    const chunk = chunks[i];
-    if (draftsRoot) {
-      drawImportProgress(draftsRoot, {
-        current: i + 1,
-        total: chunks.length,
-        chunk,
-        chunkSize: IMPORT_CHUNK_LINE_COUNT,
-        lineCount,
-        draftCount: drafts.length,
-      });
-    }
-    let r = null;
-    try {
-      r = await api("POST", "/api/import/extract", { text: chunk.text }, { signal });
-    } catch (e) {
-      if (e.name === "AbortError") throw e;
-      const range = `lines ${chunk.startLine}-${chunk.endLine}`;
-      throw new Error(
-        `AI request ${i + 1} of ${chunks.length} failed (${range}): ${e.message}`,
-      );
-    }
-    drafts.push(...(r.drafts || []));
-    if (draftsRoot) {
-      drawImportProgress(draftsRoot, {
-        current: i + 1,
-        total: chunks.length,
-        chunk,
-        chunkSize: IMPORT_CHUNK_LINE_COUNT,
-        lineCount,
-        draftCount: drafts.length,
-        completed: i + 1 === chunks.length,
-      });
-    }
+  let r = null;
+  try {
+    r = await api("POST", "/api/import/extract", { text }, { signal });
+  } catch (e) {
+    if (e.name === "AbortError") throw e;
+    throw new Error(`AI extraction failed: ${e.message}`);
+  }
+  const drafts = r.drafts || [];
+  if (draftsRoot) {
+    drawImportProgress(draftsRoot, {
+      phase: "complete",
+      lineCount,
+      draftCount: drafts.length,
+    });
   }
   return drafts;
 }
 
 function drawImportProgress(root, state) {
-  const chunked = state.total > 1;
-  const chunkLabel = state.chunk
-    ? ` lines ${state.chunk.startLine}-${state.chunk.endLine}`
-    : "";
-  const status = state.completed
-    ? `Processed ${state.total} AI request${state.total === 1 ? "" : "s"}.`
-    : state.current
-      ? `Processing AI request ${state.current} of ${state.total}${chunkLabel}.`
-      : chunked
-        ? `Preparing ${state.total} AI requests of up to ${state.chunkSize} lines each.`
-        : "Asking the selected AI provider to extract Gaps.";
-  const detail = chunked
-    ? `${state.lineCount} lines will be processed in chunks of ${state.chunkSize}; ${state.draftCount} draft${state.draftCount === 1 ? "" : "s"} extracted so far.`
-    : "This may take up to a minute.";
+  const lineCount = Number(state.lineCount || 0);
+  const draftCount = Number(state.draftCount || 0);
+  const status = state.phase === "complete"
+    ? `AI extracted ${draftCount} draft${draftCount === 1 ? "" : "s"}.`
+    : "Asking the selected AI provider to extract Gaps.";
+  const detail = lineCount
+    ? `The full ${lineCount}-line input is being sent as one request so the agent can use the whole context.`
+    : "The full input is being sent as one request so the agent can use the whole context.";
   root.innerHTML = `
     <div class="loading-row">
       <span class="loading-spinner"></span>

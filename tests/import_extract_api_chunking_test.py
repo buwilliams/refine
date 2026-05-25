@@ -1,4 +1,4 @@
-"""Focused tests for server-side import extraction chunking."""
+"""Focused tests for server-side whole-context import extraction."""
 from __future__ import annotations
 
 
@@ -25,19 +25,19 @@ def main() -> int:
     original_get_client = api.get_client
     try:
         api.get_client = lambda: FakeClient()
-        text = "\n".join(f"line {idx}" for idx in range(1, 46))
+        text = "\n".join(
+            [f"line {idx}" for idx in range(1, 24)]
+            + [""]
+            + [f"line {idx}" for idx in range(24, 46)]
+        )
         status, body = api.import_extract({"text": text})
     finally:
         api.get_client = original_get_client
 
     assert status == 200, body
-    assert len(calls) == 3, calls
-    assert [len(call["text"].splitlines()) for call in calls] == [20, 20, 5]
-    assert [draft["name"] for draft in body["drafts"]] == [
-        "Chunk 1",
-        "Chunk 2",
-        "Chunk 3",
-    ]
+    assert len(calls) == 1, calls
+    assert calls[0]["text"] == text
+    assert body["drafts"][0]["name"] == "Chunk 1"
 
     calls.clear()
     try:
@@ -50,7 +50,7 @@ def main() -> int:
     assert len(calls) == 1, calls
     assert calls[0]["text"] == "short\ntext"
 
-    print("import extract API chunking tests OK")
+    print("import extract API whole-context tests OK")
     return 0
 
 

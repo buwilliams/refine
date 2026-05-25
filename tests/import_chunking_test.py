@@ -1,4 +1,4 @@
-"""Static checks for the Gap import chunking UI."""
+"""Static checks for the Gap import UI."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -18,7 +18,6 @@ def main() -> int:
         root / "refine_ui/static/css/common.css"
     ).read_text(encoding="utf-8")
 
-    assert "const IMPORT_CHUNK_LINE_COUNT = 20;" in import_js
     assert '"AI Import"' in import_js
     assert '"CSV Import"' in import_js
     assert '"CSV Upload"' in import_js
@@ -100,17 +99,16 @@ def main() -> int:
     assert 'api("POST", "/api/import/dedup", { drafts })' in import_js
     assert "duplicate: duplicate.match" in import_js
     assert 'duplicateDecision: draft.duplicateDecision || ""' in import_js
-    assert "function importTextChunks(text)" in import_js
-    assert "i += IMPORT_CHUNK_LINE_COUNT" in import_js
-    assert "chunkLines = lines.slice(i, i + IMPORT_CHUNK_LINE_COUNT)" in import_js
+    assert "function importTextChunks(text)" not in import_js
+    assert "IMPORT_CHUNK_LINE_COUNT" not in import_js
     assert "async function extractImportDrafts(text, draftsRoot, signal = null)" in import_js
-    assert "for (let i = 0; i < chunks.length; i += 1)" in import_js
-    assert 'api("POST", "/api/import/extract", { text: chunk.text }, { signal })' in import_js
-    assert 'api("POST", "/api/import/extract", { text });' not in import_js
-    assert "Processing AI request ${state.current} of ${state.total}" in import_js
-    assert "chunks of ${state.chunkSize}" in import_js
-    assert "AI request ${i + 1} of ${chunks.length} failed" in import_js
-    assert "lines ${chunk.startLine}-${chunk.endLine}" in import_js
+    assert 'api("POST", "/api/import/extract", { text }, { signal })' in import_js
+    assert "AI extraction failed: ${e.message}" in import_js
+    assert "The full ${lineCount}-line input is being sent as one request" in import_js
+    assert "so the agent can use the whole context." in import_js
+    assert "chunk.text" not in import_js
+    assert "Processing AI request ${state.current} of ${state.total}" not in import_js
+    assert "chunks of ${state.chunkSize}" not in import_js
     assert 'withButtonBusy(btn, "Saving…"' in import_js
     assert "Failed drafts (${reviewDrafts.length})" in import_js
     assert "clearSession: options.clearSession !== false" in import_js
@@ -177,7 +175,7 @@ def main() -> int:
     assert "def cancel_background_job(job_id: str)" in api_py
     assert 'await showActionError(e, "Import failed");' in import_js
 
-    print("import chunking tests OK")
+    print("import UI tests OK")
     return 0
 
 

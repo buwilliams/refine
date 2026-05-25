@@ -55,7 +55,6 @@ def err(
     return code, body
 
 
-IMPORT_EXTRACT_CHUNK_LINE_COUNT = 20
 IMPORT_BACKGROUND_THRESHOLD = 100
 BULK_UPDATE_BACKGROUND_THRESHOLD = 100
 
@@ -3602,33 +3601,12 @@ def import_extract(body: dict) -> tuple[int, dict]:
     raw = (body.get("text") or "").strip()
     if not raw:
         return err(400, "text is required")
-    chunks = _import_extract_chunks(raw)
-    drafts: list[dict[str, Any]] = []
     client = get_client()
     try:
-        for chunk in chunks:
-            result = client.call(
-                M_EXTRACT_GAPS, {"text": chunk["text"]}, timeout=200.0,
-            )
-            drafts.extend(result.get("drafts") or [])
+        result = client.call(M_EXTRACT_GAPS, {"text": raw}, timeout=200.0)
     except BackendError as e:
         return _backend_err(e)
-    return 200, {"drafts": drafts}
-
-
-def _import_extract_chunks(text: str) -> list[dict[str, Any]]:
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    if len(lines) <= IMPORT_EXTRACT_CHUNK_LINE_COUNT:
-        return [{"text": text.strip(), "start_line": 1, "end_line": len(lines)}]
-    chunks: list[dict[str, Any]] = []
-    for idx in range(0, len(lines), IMPORT_EXTRACT_CHUNK_LINE_COUNT):
-        chunk_lines = lines[idx:idx + IMPORT_EXTRACT_CHUNK_LINE_COUNT]
-        chunks.append({
-            "text": "\n".join(chunk_lines),
-            "start_line": idx + 1,
-            "end_line": idx + len(chunk_lines),
-        })
-    return chunks
+    return 200, {"drafts": result.get("drafts") or []}
 
 
 def import_parse_csv(body: dict) -> tuple[int, dict]:
