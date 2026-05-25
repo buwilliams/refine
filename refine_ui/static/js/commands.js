@@ -567,7 +567,7 @@ registerCommand({
 
 registerCommand({
   id: "quality.regression.run",
-  title: "Quality: run regressions",
+  title: "Quality: run regressions on current checkout",
   group: "Quality",
   aliases: ["run-regressions", "regression-run"],
   keywords: ["playwright screenshot qa"],

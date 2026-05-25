@@ -84,6 +84,7 @@ def main() -> int:
     assert 'await openPlanChatDock({ initialPrompt: prompt || "" });' in commands_js
     assert 'aliases: ["regression_new", "new-regression", "create-regression"]' in commands_js
     assert 'openRegressionCreateModal(prompt || "")' in commands_js
+    assert 'title: "Quality: run regressions on current checkout"' in commands_js
 
     assert 'if (typeof initCommandPalette === "function") initCommandPalette();' in init_js
     assert 'runCommand("gap.new")' in common_js
@@ -109,6 +110,7 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     assert ".command-palette-backdrop" in modals_css
     assert ".refine-issue-modal" in modals_css
+    assert ".regression-create-modal" in modals_css
     assert ".command-palette-row.selected" in modals_css
     assert ".command-palette-row:hover:not(:disabled)" in modals_css
     assert "color: var(--color-primary)" in modals_css

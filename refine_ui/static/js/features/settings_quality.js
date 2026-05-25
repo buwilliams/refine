@@ -24,7 +24,8 @@ function renderSettingsQualityTab(quality) {
       <h3>Regression checks</h3>
       <p class="scope-label muted small">Instance-scoped</p>
       <p class="muted small" style="margin-top:0">
-        Runs managed Playwright checks against the targeted application during QA.
+        Workflow QA runs these checks against each Gap worktree. Manual runs
+        use the current targeted application checkout.
       </p>
       <div class="actions settings-section-actions">
         <button type="button"
@@ -35,7 +36,7 @@ function renderSettingsQualityTab(quality) {
           Regressions ${regressionsEnabled ? "enabled" : "disabled"}
         </button>
         <button type="button" class="secondary" id="s-quality-regression-new">New regression</button>
-        <button type="button" class="secondary" id="s-quality-regression-run" ${regressions.length ? "" : "disabled"}>Run regressions</button>
+        <button type="button" class="secondary" id="s-quality-regression-run" ${regressions.length ? "" : "disabled"}>Run current checkout</button>
       </div>
       <div class="settings-list" id="quality-regression-list">
         ${renderQualityRegressionList(regressions)}
@@ -150,16 +151,77 @@ function bindSettingsQualityTab() {
 }
 
 async function openRegressionCreateModal(initialPrompt = "") {
-  const title = await modalPrompt("Regression title", "", {
-    title: "New regression",
-    okLabel: "Continue",
+  const values = await new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop";
+    root.innerHTML = `
+      <div class="modal regression-create-modal" role="dialog" aria-modal="true"
+           aria-labelledby="regression-create-title">
+        <div class="modal-title" id="regression-create-title">New regression</div>
+        <div class="modal-body">
+          <form id="regression-create-form">
+            <div class="form-row">
+              <label>Title</label>
+              <input type="text" id="regression-create-input-title"
+                     placeholder="Dashboard smoke">
+            </div>
+            <div class="form-row">
+              <label>Scenario</label>
+              <textarea id="regression-create-input-prompt" rows="7"
+                        placeholder="Navigate to the page, set up the state, wait for the key selector, then capture a screenshot.">${htmlEscape(initialPrompt || "")}</textarea>
+            </div>
+          </form>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" data-cancel>Cancel</button>
+          <button data-ok>Create</button>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    let closed = false;
+    function close(value) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    }
+    function submit() {
+      const title = root.querySelector("#regression-create-input-title")?.value.trim() || "";
+      const prompt = root.querySelector("#regression-create-input-prompt")?.value.trim() || "";
+      if (!title && !prompt) {
+        toast("Provide a title or scenario first.", "error");
+        root.querySelector("#regression-create-input-title")?.focus();
+        return;
+      }
+      close({ title, prompt });
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(null);
+      } else if (e.key === "Enter") {
+        if (e.target && e.target.tagName === "TEXTAREA") return;
+        e.preventDefault();
+        submit();
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    root.addEventListener("click", (e) => {
+      if (e.target === root) close(null);
+    });
+    root.querySelector("[data-cancel]")?.addEventListener("click", () => close(null));
+    root.querySelector("[data-ok]")?.addEventListener("click", submit);
+    root.querySelector("#regression-create-form")?.addEventListener("submit", (e) => {
+      e.preventDefault();
+      submit();
+    });
+    root.querySelector("#regression-create-input-title")?.focus();
   });
-  if (title == null) return null;
-  const prompt = await modalPrompt("Describe the navigation and screenshot state", initialPrompt || "", {
-    title: "Regression scenario",
-    okLabel: "Create",
-  });
-  if (prompt == null) return null;
+  if (!values) return null;
+  const title = values.title;
+  const prompt = values.prompt;
   const result = await api("POST", "/api/quality/regressions", {
     title,
     prompt,
@@ -173,7 +235,7 @@ async function openRegressionCreateModal(initialPrompt = "") {
 async function runQualityRegressions(button = null) {
   await withButtonBusy(button, "Running...", async () => {
     const result = await api("POST", "/api/quality/regressions/run", {});
-    toast(result.message || "Regression checks complete", result.ok ? "info" : "warn");
+    toast(result.message || "Current-checkout regression run complete", result.ok ? "info" : "warn");
     if (state.currentRoute === "settings") await refreshSettingsTab("quality", { force: true });
   });
 }

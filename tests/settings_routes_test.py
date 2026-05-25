@@ -499,6 +499,11 @@ def main() -> int:
     assert 'id="s-quality-regressions-enabled"' in settings_js
     assert 'id="s-quality-regression-new"' in settings_js
     assert 'id="s-quality-regression-run"' in settings_js
+    assert "Workflow QA runs these checks against each Gap worktree." in settings_js
+    assert "Run current checkout" in settings_js
+    assert 'id="regression-create-input-title"' in settings_js
+    assert 'id="regression-create-input-prompt"' in settings_js
+    assert 'modalPrompt("Regression title"' not in settings_js
     assert 'const qualityEnabled = String(quality.enabled || "0") === "1";' in settings_js
     assert 'const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";' in settings_js
     assert 'aria-pressed="${qualityEnabled ? "true" : "false"}"' in settings_js
