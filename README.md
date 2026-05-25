@@ -6,11 +6,11 @@ feedback cheap, local, and repeatable. QA, Product, support, customers — anyon
 who can articulate *what the app does today* vs *what it should do instead* —
 submits a Gap.
 
-- **Local ownership** - each instance owns its queue and data locally, so teams can run refine on existing machines and sync through git instead of adopting central infrastructure.
+- **Local ownership** - each instance owns its queue and data locally, while git keeps people in sync across machines without central infrastructure.
 - **Cheap feedback loops** - Gaps move from report to agent work to human review, so the system improves through fast correction instead of perfect upfront specification.
 - **Planning and chat** - people can think with agents before execution, ask questions, and steer Gap-specific follow-up.
-- **Governed automation** - Guidance and Governance shape agent work before it starts, keeping automation aligned with product intent and local rules.
-- **Human verification** - QA and review close the loop before merge, preserving ordinary human judgment where it matters.
+- **Quality automation** - Guidance, Governance, and QA shape agent work from planning through merge, keeping automation aligned with product intent, local rules, and requirements.
+- **Human verification** - people review the result before merge, preserving ordinary human judgment where it matters.
 - **Operational continuity** - refine works inside existing repositories, branches, processes, and development practices.
 
 ## Quick Start
