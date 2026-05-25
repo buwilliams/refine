@@ -22,7 +22,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     <section class="settings-section">
       <h3>Managed processes</h3>
       ${rows ? `
-        <table class="table process-table managed-process-table">
+        <table class="table process-table managed-process-table mobile-card-table">
           <colgroup>
             <col class="process-col">
             <col class="status-col">
@@ -43,7 +43,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     <section class="settings-section">
       <h3>Agents</h3>
       ${agentRows ? `
-        <table class="table process-table agents-process-table">
+        <table class="table process-table agents-process-table mobile-card-table">
           <colgroup>
             <col class="agent-col">
             <col class="status-col">
@@ -65,7 +65,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
 
     <section class="settings-section">
       <h3>Runner workers</h3>
-      <table class="table process-table runner-workers-table">
+      <table class="table process-table runner-workers-table mobile-card-table">
         <colgroup>
           <col class="worker-col">
           <col class="status-col">
@@ -137,13 +137,13 @@ function renderManagedProcessRow(proc) {
     : "";
   return `
     <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
-      <td>${label}</td>
-      <td data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
-      <td>${pid}</td>
-      <td>${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
-      <td>${htmlEscape(processResourceLabel(proc.max_memory))}</td>
-      <td data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
-      <td class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
+      <td data-label="Process">${label}</td>
+      <td data-label="Status" data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+      <td data-label="PID">${pid}</td>
+      <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
+      <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
+      <td data-label="Details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
     </tr>`;
 }
 
@@ -170,15 +170,15 @@ function renderAgentProcessRow(proc, anchorMs) {
     : "";
   return `
     <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
-      <td>${label}</td>
-      <td>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
-      <td>${pid}</td>
-      <td>${context ? context : `<span class="muted small">-</span>`}</td>
-      <td>${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
-      <td>${htmlEscape(processResourceLabel(proc.max_memory))}</td>
-      <td>${elapsed}</td>
-      <td>${idle}</td>
-      <td class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
+      <td data-label="Agent">${label}</td>
+      <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+      <td data-label="PID">${pid}</td>
+      <td data-label="Context">${context ? context : `<span class="muted small">-</span>`}</td>
+      <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
+      <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
+      <td data-label="Elapsed">${elapsed}</td>
+      <td data-label="Idle">${idle}</td>
+      <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
     </tr>`;
 }
 
@@ -306,13 +306,13 @@ function renderRunnerWorkRow(work, anchorMs) {
     : ` class="runner-work-details"`;
   return `
     <tr>
-      <td>${htmlEscape(runnerWorkKindLabel(work.kind))}</td>
-      <td>${htmlEscape(processStatusLabel(work.status || ""))}</td>
-      <td>${gap}</td>
-      <td>${elapsed}</td>
-      <td>${queued ? fmtCount(queued) : `<span class="muted small">-</span>`}</td>
-      <td${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
-      <td class="process-actions"><div class="actions">${renderRunnerWorkActions(work)}</div></td>
+      <td data-label="Worker">${htmlEscape(runnerWorkKindLabel(work.kind))}</td>
+      <td data-label="Status">${htmlEscape(processStatusLabel(work.status || ""))}</td>
+      <td data-label="Gap">${gap}</td>
+      <td data-label="Elapsed">${elapsed}</td>
+      <td data-label="Queue">${queued ? fmtCount(queued) : `<span class="muted small">-</span>`}</td>
+      <td data-label="Details"${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td data-label="Actions" class="process-actions"><div class="actions">${renderRunnerWorkActions(work)}</div></td>
     </tr>`;
 }
 

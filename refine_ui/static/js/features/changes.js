@@ -170,7 +170,7 @@ function drawChanges(data, f) {
       Each row maps to a Gap via the <code>Refine Gap:</code> trailer in
       the commit message.
     </p>
-    <table class="table">
+    <table class="table changes-table mobile-card-table">
       <thead><tr>
         <th>When</th>
         <th>Gap</th>
@@ -182,16 +182,16 @@ function drawChanges(data, f) {
       <tbody>
         ${changes.map((c) => `
           <tr data-commit="${htmlEscape(c.commit)}" data-gap-id="${htmlEscape(c.gap_id)}">
-            <td class="muted small">${fmtTime(c.committed)}</td>
-            <td>${c.name
+            <td class="muted small" data-label="When">${fmtTime(c.committed)}</td>
+            <td data-label="Gap">${c.name
               ? `<a href="#/gaps/${htmlEscape(c.gap_id)}">${htmlEscape(c.name)}</a>`
               : `<a href="#/gaps/${htmlEscape(c.gap_id)}" class="muted">(deleted)</a>`}</td>
-            <td>${c.status ? `<span class="status-pill ${c.status}">${c.status}</span>` : `<span class="muted small">-</span>`}</td>
-            <td>${c.priority
+            <td data-label="Status">${c.status ? `<span class="status-pill ${c.status}">${c.status}</span>` : `<span class="muted small">-</span>`}</td>
+            <td data-label="Priority">${c.priority
               ? `<span class="priority-pill priority-${c.priority}">${c.priority}</span>`
               : `<span class="muted small">-</span>`}</td>
-            <td class="muted small"><code>${c.commit.slice(0, 10)}...</code></td>
-            <td><button class="secondary" data-undo-commit="${htmlEscape(c.commit)}"
+            <td class="muted small" data-label="Merge commit"><code>${c.commit.slice(0, 10)}...</code></td>
+            <td data-label="Actions"><button class="secondary" data-undo-commit="${htmlEscape(c.commit)}"
                        ${c.status === "cancelled" ? "disabled" : ""}>
               Undo
             </button></td>

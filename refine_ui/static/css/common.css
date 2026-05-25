@@ -311,6 +311,57 @@ select {
 .table td { color: var(--color-text); font-size: 14px; }
 .table tbody tr:hover td { background: #fafcff; }
 .table tr:hover { cursor: pointer; }
+@media (max-width: 760px) {
+  .mobile-card-table,
+  .mobile-card-table thead,
+  .mobile-card-table tbody,
+  .mobile-card-table tr,
+  .mobile-card-table td {
+    display: block;
+    width: 100%;
+  }
+  .mobile-card-table {
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .mobile-card-table colgroup,
+  .mobile-card-table thead {
+    display: none;
+  }
+  .mobile-card-table tbody tr {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .mobile-card-table tbody tr:hover td {
+    background: transparent;
+  }
+  .mobile-card-table td {
+    display: grid;
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+    min-width: 0;
+    padding: 6px 2px;
+    border-bottom: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .mobile-card-table td::before {
+    content: attr(data-label);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .mobile-card-table td > * {
+    min-width: 0;
+  }
+  .mobile-card-table code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
 .panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
@@ -389,6 +440,22 @@ select {
 .process-table .process-actions button {
   padding-left: 9px;
   padding-right: 9px;
+}
+@media (max-width: 760px) {
+  .process-table td[data-process-details],
+  .process-table .runner-work-details {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .process-table .process-actions {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+  .process-table .process-actions .actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 .target-app-action-slot {
   display: inline-grid;

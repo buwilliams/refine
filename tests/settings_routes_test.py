@@ -335,13 +335,13 @@ def main() -> int:
     assert "setTargetAppActionVisible(stopBtn, showStop);" in settings_js
     assert "startBtn.disabled = showStop || isRunning || inFlight || !snap.has_start_command;" in settings_js
     assert "stopBtn.disabled  = !showStop || isStopped || inFlight || !snap.has_stop_command;" in settings_js
-    assert 'class="table process-table managed-process-table"' in processes_body
-    assert 'class="table process-table agents-process-table"' in processes_body
-    assert 'class="table process-table runner-workers-table"' in processes_body
+    assert 'class="table process-table managed-process-table mobile-card-table"' in processes_body
+    assert 'class="table process-table agents-process-table mobile-card-table"' in processes_body
+    assert 'class="table process-table runner-workers-table mobile-card-table"' in processes_body
     assert processes_body.index("<h3>Managed processes</h3>") < processes_body.index("<h3>Agents</h3>") < processes_body.index("<h3>Runner workers</h3>")
-    managed_table = processes_body.split('class="table process-table managed-process-table"', 1)[1].split("</table>", 1)[0]
-    runner_table = processes_body.split('class="table process-table runner-workers-table"', 1)[1].split("</table>", 1)[0]
-    agents_table = processes_body.split('class="table process-table agents-process-table"', 1)[1].split("</table>", 1)[0]
+    managed_table = processes_body.split('class="table process-table managed-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
+    runner_table = processes_body.split('class="table process-table runner-workers-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
+    agents_table = processes_body.split('class="table process-table agents-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     assert "<th>CPU priority</th>" in managed_table
     assert "<th>Max memory</th>" in managed_table
     assert "<th>Elapsed</th>" not in managed_table
@@ -557,9 +557,11 @@ def main() -> int:
     assert "const GAPS_DEFAULT_LIMIT = 50;" in gaps_list_js
     assert 'renderPaginationControls("gaps"' in gaps_list_js
     assert 'bindPaginationControls(root, "gaps"' in gaps_list_js
-    assert '<table class="table gaps-table">' in gaps_list_js
+    assert '<table class="table gaps-table mobile-card-table">' in gaps_list_js
     assert '<col class="gaps-col-name">' in gaps_list_js
     assert '<col class="gaps-col-status">' in gaps_list_js
+    assert 'data-label="Name"' in gaps_list_js
+    assert 'data-label="Updated"' in gaps_list_js
     assert 'class="gaps-status-cell"' in gaps_list_js
     assert ".gaps-table" in gaps_css
     assert "table-layout: fixed;" in gaps_css
@@ -576,9 +578,19 @@ def main() -> int:
     assert "button.danger, .btn.danger {" in common_css
     assert "border-color: var(--error);" in common_css
     assert "button.chat-tab:hover:not(:disabled)" in chat_css
+    assert ".chat-dock .chat-dock-toggle:hover:not(:disabled)" in chat_css
     assert "color: white;" in chat_css
     assert "const CHANGES_DEFAULT_LIMIT = 50;" in changes_js
     assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
+    assert '<table class="table changes-table mobile-card-table">' in changes_js
+    assert 'data-label="Merge commit"' in changes_js
+    assert 'managed-process-table mobile-card-table' in settings_js
+    assert 'runner-workers-table mobile-card-table' in settings_js
+    assert 'data-label="Details"' in settings_js
+    assert 'performance-events-table mobile-card-table' in settings_js
+    assert 'data-label="Resource"' in settings_js
+    assert ".mobile-card-table td::before" in common_css
+    assert "grid-template-columns: minmax(92px, 34%) minmax(0, 1fr)" in common_css
     assert 'renderPaginationControls("changes"' in changes_js
     assert 'bindPaginationControls(root, "changes"' in changes_js
     assert "const LOGS_DEFAULT_LIMIT = 50;" in logs_js

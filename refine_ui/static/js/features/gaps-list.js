@@ -329,7 +329,7 @@ function drawGapsTable(gaps, state) {
        </th>`
     : "";
   root.innerHTML = `
-    <table class="table gaps-table">
+    <table class="table gaps-table mobile-card-table">
       <colgroup>
         ${showSelection ? '<col class="gaps-col-select">' : ""}
         <col class="gaps-col-name">
@@ -344,7 +344,7 @@ function drawGapsTable(gaps, state) {
         ${gaps.map((g) => {
           const selected = _isGapSelected(g.id);
           const cell = showSelection
-            ? `<td class="gap-select-col">
+            ? `<td class="gap-select-col" data-label="Select">
                  <input type="checkbox" class="gap-select"
                         data-id="${g.id}"
                         ${selected ? "checked" : ""}
@@ -353,12 +353,12 @@ function drawGapsTable(gaps, state) {
             : "";
           return `<tr data-id="${g.id}">
             ${cell}
-            <td class="gaps-name-cell">${htmlEscape(g.name)}</td>
-            <td class="gaps-status-cell"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
-            <td><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
-            <td class="muted small">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
-            <td class="muted small">${htmlEscape(g.instance_display_name || g.instance_id || "Unknown")}</td>
-            <td class="muted small">${fmtTime(g.updated)}</td>
+            <td class="gaps-name-cell" data-label="Name">${htmlEscape(g.name)}</td>
+            <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
+            <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
+            <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
+            <td class="muted small" data-label="Instance">${htmlEscape(g.instance_display_name || g.instance_id || "Unknown")}</td>
+            <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
           </tr>`;
         }).join("")}
       </tbody>

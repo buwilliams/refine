@@ -44,7 +44,7 @@ function renderPerformanceSummary(perf = {}) {
   const summary = perf.summary || [];
   if (!summary.length) return `<p class="muted">No performance metrics recorded yet.</p>`;
   return `
-    <table class="table">
+    <table class="table performance-summary-table mobile-card-table">
       <thead><tr>
         <th>Operation</th><th>Count</th><th>Failures</th>
         <th>Avg</th><th>P95</th><th>Max</th><th>Last seen</th>
@@ -52,13 +52,13 @@ function renderPerformanceSummary(perf = {}) {
       <tbody>
         ${summary.map((row) => `
           <tr>
-            <td><code>${htmlEscape(row.operation || "")}</code></td>
-            <td>${fmtCount(row.count || 0)}</td>
-            <td>${fmtCount(row.failures || 0)}</td>
-            <td>${fmtPerfMs(row.avg_ms)}</td>
-            <td>${fmtPerfMs(row.p95_ms)}</td>
-            <td>${fmtPerfMs(row.max_ms)}</td>
-            <td class="muted small">${fmtTime(row.last_seen)}</td>
+            <td data-label="Operation"><code>${htmlEscape(row.operation || "")}</code></td>
+            <td data-label="Count">${fmtCount(row.count || 0)}</td>
+            <td data-label="Failures">${fmtCount(row.failures || 0)}</td>
+            <td data-label="Avg">${fmtPerfMs(row.avg_ms)}</td>
+            <td data-label="P95">${fmtPerfMs(row.p95_ms)}</td>
+            <td data-label="Max">${fmtPerfMs(row.max_ms)}</td>
+            <td class="muted small" data-label="Last seen">${fmtTime(row.last_seen)}</td>
           </tr>`).join("")}
       </tbody>
     </table>`;
@@ -109,7 +109,7 @@ function renderPerformanceEvents(perf = {}) {
       </div>
     </details>
     ${events.length ? `
-      <table class="table">
+      <table class="table performance-events-table mobile-card-table">
         <thead><tr>
           <th>When</th><th>Operation</th><th>Elapsed</th><th>Outcome</th>
           <th>Gap</th><th>Provider</th><th>Mode</th><th>Resource</th><th>Rows</th>
@@ -117,15 +117,15 @@ function renderPerformanceEvents(perf = {}) {
         <tbody>
           ${events.map((event) => `
             <tr>
-              <td class="muted small">${fmtTime(event.occurred_at)}</td>
-              <td><code>${htmlEscape(event.operation || "")}</code></td>
-              <td>${fmtPerfMs(event.elapsed_ms)}</td>
-              <td><span class="status-pill ${event.success ? "done" : "failed"}">${event.success ? "success" : "failed"}</span></td>
-              <td>${event.gap_id ? `<a href="#/gaps/${htmlEscape(event.gap_id)}">${htmlEscape(event.gap_id.slice(0, 10))}...</a>` : ""}</td>
-              <td>${htmlEscape(event.provider || "")}</td>
-              <td>${htmlEscape(event.query_mode || "")}</td>
-              <td class="muted small">${htmlEscape(performanceResourceLabel(event))}</td>
-              <td class="muted small">${event.rows_returned ?? ""}${event.rows_scanned != null ? ` / ${event.rows_scanned}` : ""}</td>
+              <td class="muted small" data-label="When">${fmtTime(event.occurred_at)}</td>
+              <td data-label="Operation"><code>${htmlEscape(event.operation || "")}</code></td>
+              <td data-label="Elapsed">${fmtPerfMs(event.elapsed_ms)}</td>
+              <td data-label="Outcome"><span class="status-pill ${event.success ? "done" : "failed"}">${event.success ? "success" : "failed"}</span></td>
+              <td data-label="Gap">${event.gap_id ? `<a href="#/gaps/${htmlEscape(event.gap_id)}">${htmlEscape(event.gap_id.slice(0, 10))}...</a>` : ""}</td>
+              <td data-label="Provider">${htmlEscape(event.provider || "")}</td>
+              <td data-label="Mode">${htmlEscape(event.query_mode || "")}</td>
+              <td class="muted small" data-label="Resource">${htmlEscape(performanceResourceLabel(event))}</td>
+              <td class="muted small" data-label="Rows">${event.rows_returned ?? ""}${event.rows_scanned != null ? ` / ${event.rows_scanned}` : ""}</td>
             </tr>`).join("")}
         </tbody>
       </table>` : `<p class="muted">No recent events match the current filters.</p>`}

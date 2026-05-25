@@ -69,9 +69,10 @@
   cursor: pointer;
   border-radius: var(--radius);
 }
-.chat-dock-toggle:hover {
-  background: var(--code-bg);
-  color: var(--fg);
+.chat-dock .chat-dock-toggle:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: white;
 }
 .chat-dock-fullscreen-btn.active {
   background: var(--accent-bg);
