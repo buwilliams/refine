@@ -38,6 +38,8 @@ def main() -> int:
 
         subprocess.run(["git", "clone", "-q", str(origin), str(installed)], check=True)
         _git(installed, "checkout", "-q", "--detach", "1.0.0")
+        _git(installed, "config", "user.name", "Refine Test")
+        _git(installed, "config", "user.email", "refine@example.test")
 
         assert upgrade.current_version(installed) == "1.0.0"
         assert upgrade.latest_version(installed) == "1.2.0"
@@ -45,8 +47,17 @@ def main() -> int:
         assert info.current_version == "1.0.0"
         assert info.latest_version == "1.2.0"
         assert info.upgrade_available is True
+        assert info.local_development is False
         assert "--upgrade" in info.command
-        print("[ok] upgrade status compares semver tags and ignores v-prefixed tags")
+
+        (installed / "marker.txt").write_text("local dev\n", encoding="utf-8")
+        _git(installed, "commit", "-q", "-am", "local dev")
+        dev_info = upgrade.status(installed)
+        assert dev_info.current_version == "1.0.0"
+        assert dev_info.latest_version == "1.2.0"
+        assert dev_info.local_development is True
+        assert dev_info.upgrade_available is False
+        print("[ok] upgrade status handles semver tags and local development commits")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     return 0

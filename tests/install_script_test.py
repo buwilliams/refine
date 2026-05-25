@@ -96,6 +96,8 @@ def main() -> int:
     assert "--upgrade" in script
     assert "latest_remote_semver_tag" in script
     assert "upgrade_refine_checkout" in script
+    assert "checkout_ahead_of_semver_tag" in script
+    assert "assuming local development and skipping release upgrade" in script
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
     assert "uv run refine install $port" in script

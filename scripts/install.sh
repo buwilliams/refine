@@ -705,6 +705,13 @@ current_checkout_semver_tag() {
   git -C "$1" tag --merged HEAD 2>/dev/null | latest_semver_from_lines
 }
 
+checkout_ahead_of_semver_tag() {
+  local checkout="$1"
+  local version="$2"
+  [ -n "$version" ] || return 1
+  [ "$(git -C "$checkout" rev-parse HEAD 2>/dev/null)" != "$(git -C "$checkout" rev-parse "$version^{}" 2>/dev/null)" ]
+}
+
 upgrade_refine_checkout() {
   local checkout="$1"
   local force="${2:-0}"
@@ -722,6 +729,10 @@ upgrade_refine_checkout() {
     return 0
   fi
   current="$(current_checkout_semver_tag "$checkout")"
+  if checkout_ahead_of_semver_tag "$checkout" "$current"; then
+    ok "Refine checkout is ahead of release $current; assuming local development and skipping release upgrade."
+    return 0
+  fi
   if [ "$current" = "$latest" ] && git -C "$checkout" merge-base --is-ancestor HEAD "$latest" 2>/dev/null; then
     ok "Refine already at latest release: $latest"
     return 0

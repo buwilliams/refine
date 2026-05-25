@@ -21,6 +21,7 @@ class UpgradeInfo:
     upgrade_available: bool
     command: str
     error: str = ""
+    local_development: bool = False
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -29,6 +30,7 @@ class UpgradeInfo:
             "upgrade_available": self.upgrade_available,
             "command": self.command,
             "error": self.error,
+            "local_development": self.local_development,
         }
 
 
@@ -50,15 +52,18 @@ def status(repo: Path | None = None) -> UpgradeInfo:
         )
     current = current_version(repo)
     latest = latest_version(repo)
+    local_dev = local_development(repo, current)
     return UpgradeInfo(
         current_version=current,
         latest_version=latest,
         upgrade_available=bool(
             current
             and latest
+            and not local_dev
             and _semver_tuple(latest) > _semver_tuple(current)
         ),
         command=INSTALL_COMMAND,
+        local_development=local_dev,
     )
 
 
@@ -70,6 +75,15 @@ def current_version(repo: Path) -> str:
 def latest_version(repo: Path) -> str:
     tags = _git(repo, "tag").splitlines()
     return _latest_semver(tags)
+
+
+def local_development(repo: Path, version: str | None = None) -> bool:
+    version = version if version is not None else current_version(repo)
+    return bool(
+        version
+        and _git(repo, "rev-parse", "HEAD")
+        != _git(repo, "rev-parse", f"{version}^{{commit}}")
+    )
 
 
 def _latest_semver(tags: list[str]) -> str:
