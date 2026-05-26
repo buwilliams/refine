@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -28,6 +29,7 @@ class TargetAppRebuilder:
         self._stop = threading.Event()
         self._state_lock = threading.Lock()
         self._thread: threading.Thread | None = None
+        self._cancel_requested = threading.Event()
         self._queued = False
         self._running = False
         self._last_reason = ""
@@ -67,6 +69,27 @@ class TargetAppRebuilder:
             if not self._running:
                 self._last_mode = None
         return had_pending
+
+    def stop_background_work(self, *, timeout: float = 8.0) -> dict:
+        cleared_queue = self.clear_queue()
+        with self._state_lock:
+            was_running = self._running
+        if was_running:
+            self._cancel_requested.set()
+            self._wake.set()
+            deadline = time.monotonic() + max(0.0, timeout)
+            while time.monotonic() < deadline:
+                with self._state_lock:
+                    if not self._running:
+                        break
+                time.sleep(0.05)
+        with self._state_lock:
+            running = self._running
+        return {
+            "cleared_queue": cleared_queue,
+            "cancelled_running": was_running,
+            "running": running,
+        }
 
     def queue_for_worktree_merge(self, gap_id: str) -> bool:
         if self._mode() != "on_worktree_merge":
@@ -129,9 +152,10 @@ class TargetAppRebuilder:
                 self._running = True
                 reason = self._last_reason or "automatic rebuild"
                 queued_mode = self._last_mode
+                self._cancel_requested.clear()
             try:
                 if queued_mode is None or self._mode() == queued_mode:
-                    self._run_rebuild(reason)
+                    self._run_rebuild(reason, self._cancel_requested)
             finally:
                 with self._state_lock:
                     self._running = False

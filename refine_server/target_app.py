@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import socket
 import subprocess
 import time
@@ -112,14 +113,19 @@ def _int_setting(settings: dict[str, str], key: str, default: int) -> int:
     return max(1, min(n, 3600))
 
 
-def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
+def run_operation(
+    kind: str,
+    config: dict[str, Any],
+    *,
+    cancel_event: Any | None = None,
+) -> dict[str, Any]:
     """Run start/stop/status and any configured verification checks."""
     started_at = _now_iso()
     if kind not in ("start", "stop", "rebuild", "status"):
         return {"ok": False, "message": f"unknown operation: {kind}"}
     command = (config.get(f"{kind}_command") or "").strip()
     if kind == "status":
-        checks = run_checks(config)
+        checks = run_checks(config, cancel_event=cancel_event)
         state = state_from_checks(checks)
         return {
             "ok": checks["configured"] and state == "running",
@@ -137,7 +143,9 @@ def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
                 "message": f"No {kind} command configured."}
 
     timeout = int(config.get(f"{kind}_timeout_seconds") or 60)
-    cmd_result = run_command(command, config=config, timeout=timeout)
+    cmd_result = run_command(
+        command, config=config, timeout=timeout, cancel_event=cancel_event,
+    )
     if not cmd_result["ok"]:
         return {
             **cmd_result, "kind": kind, "state": "failed",
@@ -146,7 +154,22 @@ def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
             "checks": [],
         }
 
-    checks = wait_for_lifecycle_checks(kind, config, timeout=timeout)
+    checks = wait_for_lifecycle_checks(
+        kind, config, timeout=timeout, cancel_event=cancel_event,
+    )
+    if checks.get("cancelled"):
+        return {
+            **cmd_result,
+            "kind": kind,
+            "state": "failed",
+            "ok": False,
+            "message": checks["message"],
+            "started_at": started_at,
+            "finished_at": _now_iso(),
+            "checks_configured": False,
+            "checks": [],
+            "cancelled": True,
+        }
     state = state_after_lifecycle(kind, checks)
     ok = state in ("running", "stopped", "unknown")
     msg = checks["message"] if checks["configured"] else f"{kind} command completed"
@@ -165,11 +188,18 @@ def run_operation(kind: str, config: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def wait_for_lifecycle_checks(kind: str, config: dict[str, Any],
-                              timeout: int) -> dict[str, Any]:
+def wait_for_lifecycle_checks(
+    kind: str,
+    config: dict[str, Any],
+    timeout: int,
+    *,
+    cancel_event: Any | None = None,
+) -> dict[str, Any]:
     """Poll checks after start/stop until the requested lifecycle state settles."""
     deadline = time.monotonic() + max(1, timeout)
-    last = run_checks(config)
+    if _cancel_requested(cancel_event):
+        return _cancelled_checks()
+    last = run_checks(config, cancel_event=cancel_event)
     if not last["configured"]:
         return last
     if kind not in ("start", "stop"):
@@ -183,16 +213,21 @@ def wait_for_lifecycle_checks(kind: str, config: dict[str, Any],
         if time.monotonic() >= deadline:
             return last
         time.sleep(0.5)
-        last = run_checks(config)
+        if _cancel_requested(cancel_event):
+            return _cancelled_checks()
+        last = run_checks(config, cancel_event=cancel_event)
 
 
-def run_checks(config: dict[str, Any]) -> dict[str, Any]:
+def run_checks(config: dict[str, Any], *, cancel_event: Any | None = None) -> dict[str, Any]:
+    if _cancel_requested(cancel_event):
+        return _cancelled_checks()
     checks: list[dict[str, Any]] = []
     status_command = (config.get("status_command") or "").strip()
     if status_command:
         res = run_command(
             status_command, config=config,
             timeout=int(config.get("status_timeout_seconds") or 10),
+            cancel_event=cancel_event,
         )
         checks.append({
             "type": "command", "label": "Status command",
@@ -218,6 +253,7 @@ def run_checks(config: dict[str, Any]) -> dict[str, Any]:
         res = run_command(
             proc_command, config=config,
             timeout=int(config.get("status_timeout_seconds") or 10),
+            cancel_event=cancel_event,
         )
         checks.append({
             "type": "process", "label": "Process check",
@@ -265,19 +301,49 @@ def state_after_lifecycle(kind: str, checks: dict[str, Any]) -> str:
 
 
 def run_command(command: str, *, config: dict[str, Any],
-                timeout: int) -> dict[str, Any]:
+                timeout: int, cancel_event: Any | None = None) -> dict[str, Any]:
     cwd = resolve_cwd_for(config, config.get("cwd") or "")
     env = _command_env(config.get("env") if isinstance(config.get("env"), dict) else {})
+    if _cancel_requested(cancel_event):
+        return _cancelled_command(command, str(cwd))
     try:
-        out = subprocess.run(
+        proc = subprocess.Popen(
             ["bash", "-lc", command],
             cwd=str(cwd),
             env=env,
             stdin=subprocess.DEVNULL,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            timeout=timeout,
+            start_new_session=True,
         )
+        deadline = time.monotonic() + max(1, timeout)
+        while True:
+            if _cancel_requested(cancel_event):
+                stdout, stderr = _terminate_command(proc)
+                return {
+                    "ok": False, "command": command, "cwd": str(cwd),
+                    "exit_code": None,
+                    "stdout_tail": _tail(stdout or ""),
+                    "stderr_tail": _tail(stderr or ""),
+                    "message": "command cancelled",
+                    "cancelled": True,
+                }
+            wait_for = max(0.0, min(0.2, deadline - time.monotonic()))
+            if wait_for <= 0:
+                stdout, stderr = _terminate_command(proc)
+                return {
+                    "ok": False, "command": command, "cwd": str(cwd),
+                    "exit_code": None,
+                    "stdout_tail": _tail(stdout or ""),
+                    "stderr_tail": _tail(stderr or ""),
+                    "message": f"command timed out after {timeout}s",
+                }
+            try:
+                stdout, stderr = proc.communicate(timeout=wait_for)
+                break
+            except subprocess.TimeoutExpired:
+                continue
     except subprocess.TimeoutExpired as e:
         return {
             "ok": False, "command": command, "cwd": str(cwd),
@@ -292,21 +358,73 @@ def run_command(command: str, *, config: dict[str, Any],
             "exit_code": None, "stdout_tail": "", "stderr_tail": str(e),
             "message": f"could not launch command: {e}",
         }
-    stderr = out.stderr or ""
-    stdout = out.stdout or ""
-    msg = "completed" if out.returncode == 0 else (
+    stderr = stderr or ""
+    stdout = stdout or ""
+    msg = "completed" if proc.returncode == 0 else (
         stderr.strip().splitlines()[-1] if stderr.strip()
-        else f"command exited {out.returncode}"
+        else f"command exited {proc.returncode}"
     )
     return {
-        "ok": out.returncode == 0,
+        "ok": proc.returncode == 0,
         "command": command,
         "cwd": str(cwd),
-        "exit_code": out.returncode,
+        "exit_code": proc.returncode,
         "stdout_tail": _tail(stdout),
         "stderr_tail": _tail(stderr),
         "message": msg,
     }
+
+
+def _cancel_requested(cancel_event: Any | None) -> bool:
+    return bool(cancel_event is not None and cancel_event.is_set())
+
+
+def _cancelled_checks() -> dict[str, Any]:
+    return {
+        "configured": False,
+        "ok": False,
+        "checks": [],
+        "message": "operation cancelled",
+        "cancelled": True,
+    }
+
+
+def _cancelled_command(command: str, cwd: str) -> dict[str, Any]:
+    return {
+        "ok": False,
+        "command": command,
+        "cwd": cwd,
+        "exit_code": None,
+        "stdout_tail": "",
+        "stderr_tail": "",
+        "message": "command cancelled",
+        "cancelled": True,
+    }
+
+
+def _terminate_command(proc: subprocess.Popen) -> tuple[str, str]:
+    try:
+        if proc.poll() is None:
+            try:
+                os.killpg(proc.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                proc.terminate()
+        try:
+            stdout, stderr = proc.communicate(timeout=3.0)
+        except subprocess.TimeoutExpired:
+            if proc.poll() is None:
+                try:
+                    os.killpg(proc.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                except OSError:
+                    proc.kill()
+            stdout, stderr = proc.communicate(timeout=1.0)
+        return stdout or "", stderr or ""
+    except Exception:
+        return "", ""
 
 
 def resolve_cwd(cwd_setting: str) -> Path:

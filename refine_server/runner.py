@@ -679,14 +679,15 @@ class Runner:
         if stopped:
             killed = self.sub_mgr.cancel_all("background_processes_stopped")
             stopped_chats = self.chat.stop_all(reason="background processes stopped")
-            cleared_rebuild = self.target_app_rebuilder.clear_queue()
+            rebuild_stop = self.target_app_rebuilder.stop_background_work(timeout=8.0)
             self.governance_agent.wake()
             self.merger.wake()
             return {
                 "stopped": True,
                 "killed_subprocesses": killed,
                 "stopped_chats": stopped_chats,
-                "cleared_target_app_rebuild_queue": cleared_rebuild,
+                "cleared_target_app_rebuild_queue": rebuild_stop.get("cleared_queue"),
+                "target_app_rebuild": rebuild_stop,
             }
         self.dispatcher.enforce_now()
         self.governance_agent.wake()
@@ -1985,7 +1986,11 @@ class Runner:
         )
         return {"queued": queued}
 
-    def _run_automatic_target_app_rebuild(self, reason: str) -> dict:
+    def _run_automatic_target_app_rebuild(
+        self,
+        reason: str,
+        cancel_event=None,  # noqa: ANN001
+    ) -> dict:
         """Run one queued automatic stop/rebuild/start cycle.
 
         Automatic rebuilds need the clean host worktree, so they run after
@@ -1998,9 +2003,24 @@ class Runner:
             kind="target_app_rebuild",
             blocking=True,
         ):
-            return self._run_automatic_target_app_rebuild_locked(reason)
+            if cancel_event is not None and cancel_event.is_set():
+                return {
+                    "ok": False,
+                    "state": "failed",
+                    "message": "automatic target-app rebuild cancelled",
+                    "cancelled": True,
+                }
+            return self._run_automatic_target_app_rebuild_locked(
+                reason,
+                cancel_event=cancel_event,
+            )
 
-    def _run_automatic_target_app_rebuild_locked(self, reason: str) -> dict:
+    def _run_automatic_target_app_rebuild_locked(
+        self,
+        reason: str,
+        *,
+        cancel_event=None,  # noqa: ANN001
+    ) -> dict:
         with self._target_app_lock:
             conn = self._get_conn()
             settings = db.list_settings(conn)
@@ -2043,7 +2063,18 @@ class Runner:
                 message=f"target-app: automatic rebuild started ({reason})",
                 severity="info", category="target_app", actor="runner",
             )
-            result = self._run_target_app_rebuild_sequence(conn, cfg)
+            if cancel_event is not None and cancel_event.is_set():
+                result = {
+                    "ok": False,
+                    "state": "failed",
+                    "message": "automatic target-app rebuild cancelled",
+                    "cancelled": True,
+                    "steps": [],
+                }
+            else:
+                result = self._run_target_app_rebuild_sequence(
+                    conn, cfg, cancel_event=cancel_event,
+                )
             ok = bool(result.get("ok"))
             final_state = result.get("state") if result.get("state") in {
                 "unknown", "running", "degraded", "stopped", "failed",
@@ -2089,10 +2120,32 @@ class Runner:
         self,
         conn: sqlite3.Connection,
         cfg: dict[str, Any],
+        *,
+        cancel_event=None,  # noqa: ANN001
     ) -> dict:
         steps: list[dict[str, Any]] = []
 
         def run_step(kind: str) -> dict[str, Any]:
+            if cancel_event is not None and cancel_event.is_set():
+                result = {
+                    "ok": False,
+                    "kind": kind,
+                    "state": "failed",
+                    "command": "",
+                    "cwd": "",
+                    "exit_code": None,
+                    "stdout_tail": "",
+                    "stderr_tail": "",
+                    "message": "automatic target-app rebuild cancelled",
+                    "started_at": now_iso(),
+                    "finished_at": now_iso(),
+                    "checks_configured": False,
+                    "checks": [],
+                    "cancelled": True,
+                }
+                steps.append(result)
+                self._log_target_app_rebuild_step(conn, result)
+                return result
             if kind == "start":
                 cleanup = self._clean_target_worktree_for_app_start()
                 if not cleanup.get("ok"):
@@ -2116,7 +2169,7 @@ class Runner:
                     steps.append(result)
                     self._log_target_app_rebuild_step(conn, result)
                     return result
-            result = target_app.run_operation(kind, cfg)
+            result = target_app.run_operation(kind, cfg, cancel_event=cancel_event)
             steps.append(result)
             self._log_target_app_rebuild_step(conn, result)
             return result

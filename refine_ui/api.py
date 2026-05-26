@@ -2320,7 +2320,10 @@ def _enrich_gap_row(row: dict[str, Any]) -> dict[str, Any]:
 _VALID_REPORTER = re.compile(r"^[^\x00-\x1f]{1,80}$")
 
 
-@_exclusive_mutation("Create Gap")
+@_exclusive_mutation(
+    "Create Gap",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
 def create_gap(body: dict) -> tuple[int, dict]:
     reporter = (body.get("reporter") or "").strip()
     actual = (body.get("actual") or "").strip()
@@ -2384,7 +2387,10 @@ def _autoname(actual: str, target: str) -> str:
     return short or "Untitled Gap"
 
 
-@_exclusive_mutation("Update Gap")
+@_exclusive_mutation(
+    "Update Gap",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
 def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     """PATCH handler: accepts `name`, `priority`, and/or `notes`.
 
@@ -2498,7 +2504,10 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
     return 200, {"ok": True}
 
 
-@_exclusive_mutation("Delete Gap")
+@_exclusive_mutation(
+    "Delete Gap",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
 def delete_gap(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
@@ -2776,7 +2785,10 @@ def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     }
 
 
-@_exclusive_mutation("Append Gap round")
+@_exclusive_mutation(
+    "Append Gap round",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
 def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     reporter = (body.get("reporter") or "").strip()
     actual = (body.get("actual") or "").strip()
@@ -2812,7 +2824,10 @@ def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     return 201, result
 
 
-@_exclusive_mutation("Edit Gap round")
+@_exclusive_mutation(
+    "Edit Gap round",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
 def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
     conn = _conn()
     try:

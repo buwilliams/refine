@@ -77,7 +77,7 @@ def main() -> int:
         rebuild_runs: list[str] = []
         rebuilder = target_app_rebuilder.TargetAppRebuilder(
             get_conn=lambda: conn,
-            run_rebuild=lambda reason: rebuild_runs.append(reason) or {"ok": True},
+            run_rebuild=lambda reason, _cancel_event=None: rebuild_runs.append(reason) or {"ok": True},
         )
         db.set_setting(conn, "target_app_auto_rebuild", "never")
         merger = Merger(

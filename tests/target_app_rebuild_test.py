@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import sys
+import threading
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -28,7 +30,7 @@ def main() -> int:
 
         runs: list[str] = []
 
-        def run_rebuild(reason: str) -> dict:
+        def run_rebuild(reason: str, _cancel_event=None) -> dict:  # noqa: ANN001
             runs.append(reason)
             if len(runs) == 1:
                 rebuilder.queue_rebuild("queued while running")
@@ -76,6 +78,39 @@ def main() -> int:
         assert rebuilder.queue_pending_awaiting_rebuild() is False
         rebuilder._drain_queue()  # noqa: SLF001
         assert runs[-1] == "1 Gap awaiting target-app rebuild", runs
+
+        entered_rebuild = threading.Event()
+        cancelled_rebuild = threading.Event()
+
+        def cancellable_rebuild(reason: str, cancel_event) -> dict:  # noqa: ANN001
+            entered_rebuild.set()
+            deadline = time.time() + 5.0
+            while time.time() < deadline and not cancel_event.is_set():
+                time.sleep(0.01)
+            if cancel_event.is_set():
+                cancelled_rebuild.set()
+                return {"ok": False, "cancelled": True, "reason": reason}
+            return {"ok": True, "reason": reason}
+
+        cancellable = target_app_rebuilder.TargetAppRebuilder(
+            get_conn=db.connect,
+            run_rebuild=cancellable_rebuild,
+            interval=0.05,
+        )
+        cancellable.start()
+        try:
+            assert cancellable.queue_rebuild("manual stop test") is True
+            assert entered_rebuild.wait(timeout=2.0)
+            db.set_setting(conn, "paused", "1")
+            stop_result = cancellable.stop_background_work(timeout=2.0)
+            assert stop_result["cancelled_running"] is True, stop_result
+            assert stop_result["running"] is False, stop_result
+            assert cancelled_rebuild.wait(timeout=1.0)
+            db.set_setting(conn, "paused", "0")
+        finally:
+            db.set_setting(conn, "paused", "0")
+            cancellable.stop()
+
         calls: list[str] = []
 
         class FakeClient:
@@ -189,7 +224,7 @@ def main() -> int:
         old_run_operation = target_app.run_operation
         fail_rebuild = False
 
-        def fake_run_operation(kind: str, cfg: dict) -> dict:
+        def fake_run_operation(kind: str, cfg: dict, **_kwargs) -> dict:  # noqa: ANN003
             operations.append(kind)
             if kind == "rebuild" and fail_rebuild:
                 return {

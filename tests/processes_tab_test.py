@@ -125,6 +125,12 @@ def main() -> int:
             settings_update_status, settings_update_body = api.update_settings({
                 "target_app_url": "http://localhost:3000",
             })
+            create_status, create_body = api.create_gap({
+                "reporter": "Operator",
+                "actual": "Background is stopped.",
+                "target": "Creating a Gap still works.",
+                "priority": "low",
+            })
             release.set()
             deadline = time.time() + 5.0
             while time.time() < deadline:
@@ -166,9 +172,11 @@ def main() -> int:
             for _, b in paused_action_results
         ), paused_action_results
         assert settings_update_status == 200, settings_update_body
+        assert create_status == 201, create_body
         assert start_status == 200, start_body
         assert start_body["stopped"] is False, start_body
-        assert calls == [
+        background_calls = [call for call in calls if call[0] == M_BACKGROUND_PROCESSES_SET]
+        assert background_calls == [
             (M_BACKGROUND_PROCESSES_SET, {"stopped": True}),
             (M_BACKGROUND_PROCESSES_SET, {"stopped": False}),
         ], calls
