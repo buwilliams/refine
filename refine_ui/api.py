@@ -260,9 +260,7 @@ def _repo_rel_path(root: Path, path: Path) -> str | None:
         return None
 
 
-def _is_ignored_file_browser_dir(root: Path, path: Path, patterns: list[str]) -> bool:
-    if not path.is_dir():
-        return False
+def _is_ignored_file_browser_entry(root: Path, path: Path, patterns: list[str]) -> bool:
     rel = _repo_rel_path(root, path)
     if rel is None:
         return False
@@ -281,7 +279,7 @@ def _list_file_entries(
     truncated = False
     try:
         for child in target.iterdir():
-            if apply_ignore and _is_ignored_file_browser_dir(root, child, ignore_patterns):
+            if apply_ignore and _is_ignored_file_browser_entry(root, child, ignore_patterns):
                 continue
             if len(entries) >= max_entries:
                 truncated = True
@@ -483,6 +481,19 @@ def _count_lines_before(path: Path, offset: int) -> int:
     return count
 
 
+def _looks_binary_data(data: bytes) -> bool:
+    if b"\0" in data:
+        return True
+    if not data:
+        return False
+    control = sum(
+        1
+        for byte in data
+        if byte < 32 and byte not in (9, 10, 12, 13)
+    )
+    return control / len(data) > 0.30
+
+
 def files_read(
     path: str | None = None,
     *,
@@ -544,16 +555,13 @@ def files_read(
     try:
         with target.open("rb") as f:
             head = f.read(4096)
-            if b"\0" in head:
+            if _looks_binary_data(head):
                 return 200, {**base, "kind": "binary", "reason": "Binary data"}
             f.seek(offset)
             data = f.read(limit)
     except OSError as e:
         return err(403, "file cannot be read", str(e))
-    try:
-        text = data.decode("utf-8")
-    except UnicodeDecodeError:
-        return 200, {**base, "kind": "binary", "reason": "Binary data"}
+    text = data.decode("utf-8", errors="replace")
     next_offset = offset + len(data)
     has_more = next_offset < stat.st_size
     try:

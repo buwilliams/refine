@@ -52,6 +52,9 @@ def main() -> int:
                 encoding="utf-8",
             )
         (client / ".hidden").write_text("visible\n", encoding="utf-8")
+        (client / ".env").write_text("SECRET=visible-when-opened\n", encoding="utf-8")
+        (client / "src" / ".env").write_text("SECRET=nested\n", encoding="utf-8")
+        (client / "README.md").write_bytes(b"Project notes\xff\n")
         (client / ".git" / "refine-hidden-search.txt").write_text(
             "must stay hidden\n",
             encoding="utf-8",
@@ -85,7 +88,7 @@ def main() -> int:
         status, body = api.files_tree("src")
         assert status == 200, body
         assert body["path"] == "src", body
-        assert body["entries"][0]["path"] == "src/app.py", body
+        assert "src/app.py" in [entry["path"] for entry in body["entries"]], body
         assert body["max_depth"] == api.FILES_TREE_MAX_DEPTH, body
         assert body["max_entries"] == api.FILES_TREE_MAX_ENTRIES, body
 
@@ -146,6 +149,31 @@ def main() -> int:
         status, body = api.files_search("cached")
         assert status == 200, body
         assert body["entries"] == [], body
+
+        status, body = api.update_settings({
+            "file_browser_ignore_patterns": ".env",
+        })
+        assert status == 200, body
+        status, body = api.files_tree("")
+        assert status == 200, body
+        assert ".env" not in [entry["name"] for entry in body["entries"]], body
+        status, body = api.files_tree("src")
+        assert status == 200, body
+        assert ".env" not in [entry["name"] for entry in body["entries"]], body
+        status, body = api.files_tree(".env")
+        assert status == 400, body
+        status, body = api.files_read(".env")
+        assert status == 200, body
+        assert body["content"] == "SECRET=visible-when-opened\n", body
+        status, body = api.files_search(".env")
+        assert status == 200, body
+        assert body["entries"] == [], body
+
+        status, body = api.files_read("README.md")
+        assert status == 200, body
+        assert body["previewable"] is True, body
+        assert body["kind"] == "text", body
+        assert "Project notes" in body["content"], body
 
         status, body = api.files_search("txt", max_entries=3)
         assert status == 200, body

@@ -86,7 +86,7 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.project_update_pulse_interval_seconds ?? "60") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
       <div class="form-row"><label>File browser ignore patterns
-        <span class="muted small">— comma-delimited directory patterns hidden during normal browsing.</span></label>
+        <span class="muted small">— comma-delimited file or directory patterns hidden during normal browsing.</span></label>
         <input type="text" id="s-file-browser-ignore"
                value="${htmlEscape(s.file_browser_ignore_patterns || "node_modules, .git, .refine")}"></div>
     </section>
