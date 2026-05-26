@@ -417,8 +417,6 @@ def main() -> int:
     assert 'refreshAgentStatusIndicator === "function"' in commands_js
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body
-    assert 'id="btn-pause"' in processes_body
-    assert 'id="btn-pause" class="${paused ? "" : "secondary"}" ${paused ? "disabled" : ""}' in processes_body
     assert 'proc.runner_reachable && !paused ? "" : "disabled"' in processes_body
     assert 'data-toggle-background-processes' in processes_body
     assert '${stopped ? "Start" : "Stop"} Background</button>' in processes_body
@@ -442,7 +440,7 @@ def main() -> int:
     assert 'class="table process-table managed-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table agents-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table runner-workers-table mobile-card-table"' in processes_body
-    assert processes_body.index("<h3>Managed processes</h3>") < processes_body.index("<h3>Agents</h3>") < processes_body.index("<h3>Runner workers</h3>")
+    assert processes_body.index("<h3>Supervisor process management</h3>") < processes_body.index("<h3>Agent processes</h3>") < processes_body.index("<h3>Runner processes</h3>")
     managed_table = processes_body.split('class="table process-table managed-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     runner_table = processes_body.split('class="table process-table runner-workers-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
@@ -486,12 +484,12 @@ def main() -> int:
     assert '<span class="role-pill ${kind === "agent"' not in processes_body
     assert '<span class="role-pill merger"' not in processes_body
     assert 'class="process-actions"><div class="actions">' in processes_body
-    assert "<h3>Managed processes</h3>" in processes_body
-    assert "<h3>Agents</h3>" in processes_body
-    assert "<h3>Runner workers</h3>" in processes_body
+    assert "<h3>Supervisor process management</h3>" in processes_body
+    assert "<h3>Agent processes</h3>" in processes_body
+    assert "<h3>Runner processes</h3>" in processes_body
     assert 'data-process-id="${htmlEscape(proc.id || "")}"' in processes_body
     assert '[data-process-id="target-app"]' in settings_js
-    assert "Agent scheduler" in processes_body
+    assert "Background processes" in processes_body
     assert "function orderManagedProcessRows" in processes_body
     assert "supervisor_child_hidden: !supervisorProcessExpanded" in processes_body
     assert 'data-supervisor-toggle' in processes_body
@@ -507,7 +505,7 @@ def main() -> int:
     assert 'id="target-app-status-block"' not in processes_body
     assert "<dt>Process model</dt>" not in processes_body
     assert "<dt>Runner transport</dt>" not in processes_body
-    assert '<h3>Agents</h3>' not in runtime_body
+    assert '<h3>Agent processes</h3>' not in runtime_body
     assert 'id="btn-pause"' not in runtime_body
     assert 'data-cancel-agent="' not in runtime_body
     assert 'id="s-target-run-start"' not in application_body

@@ -446,14 +446,14 @@ registerCommand({
 
 registerCommand({
   id: "system.agents.pause_toggle",
-  title: "Pause or resume agents",
+  title: "Start or stop background processes",
   group: "System",
   aliases: ["pause-agents", "resume-agents"],
   run: async ({ button, settings } = {}) => {
     const s = settings || (await api("GET", "/api/settings")).settings || {};
     const paused = s.paused === "1";
-    await withButtonBusy(button, paused ? "Resuming..." : "Pausing...", async () => {
-      await api("PATCH", "/api/settings", { paused: paused ? "0" : "1" });
+    await withButtonBusy(button, paused ? "Starting..." : "Stopping...", async () => {
+      await api("POST", "/api/processes/background", { stopped: !paused });
       if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
       if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
       if (paused) scheduleProcessesTabRefreshes();

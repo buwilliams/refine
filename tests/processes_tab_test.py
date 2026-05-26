@@ -107,6 +107,23 @@ def main() -> int:
                 api.target_app_generate({"kind": "all"}),
                 api.rebuild_sqlite_cache({"background": True}),
                 api.cleanup_logs({"days": 7}),
+                api.import_extract({"text": "one thing"}),
+                api.import_parse_csv({
+                    "text": "name,actual,target\nA,B,C",
+                    "background": True,
+                }),
+                api.import_persist({
+                    "reporter": "Operator",
+                    "drafts": [
+                        {"name": f"Gap {idx}", "actual": "A", "target": "B"}
+                        for idx in range(api.IMPORT_BACKGROUND_THRESHOLD)
+                    ],
+                }),
+                api.quality_regression_run({}),
+                api.governance_generate_rules({
+                    "product": "Product",
+                    "constitution": "Rules",
+                }),
             ]
             started = threading.Event()
             release = threading.Event()
@@ -166,7 +183,7 @@ def main() -> int:
         assert supervisor["actions"] == ["start_background_processes"], supervisor
         assert stop_status == 200, stop_body
         assert stop_body["stopped"] is True, stop_body
-        assert [s for s, _ in paused_action_results] == [409, 409, 409, 409, 409], paused_action_results
+        assert [s for s, _ in paused_action_results] == [409] * 10, paused_action_results
         assert all(
             b["error"]["code"] == "background_processes_stopped"
             for _, b in paused_action_results

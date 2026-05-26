@@ -105,7 +105,10 @@ def _schema_block_response() -> tuple[int, dict] | None:
 
 
 def _background_processes_stopped() -> bool:
-    conn = _conn()
+    try:
+        conn = _conn()
+    except sqlite3.Error:
+        return False
     try:
         return (db.get_setting(conn, "paused") or "0") == "1"
     finally:
@@ -118,7 +121,7 @@ def _background_processes_stopped_response() -> tuple[int, dict] | None:
     return err(
         409,
         "Background processes are stopped.",
-        "Start Background from the Supervisor row before running worker actions.",
+        "Start Background before running worker actions.",
         error_code="background_processes_stopped",
     )
 
@@ -2107,11 +2110,16 @@ def _filter_bulk_candidate_rows(
 ) -> tuple[int, dict]:
     skipped: list[dict[str, str]] = []
     if skip_automated:
+        status_order = {status: idx for idx, status in enumerate(_VALID_STATUSES)}
         skipped = [
             {"id": r["id"], "reason": f"status:{r.get('status')}"}
             for r in rows
             if str(r.get("status") or "") in _BULK_STATUS_AUTOMATED_VALUES
         ]
+        skipped.sort(key=lambda item: (
+            status_order.get(item["reason"].split(":", 1)[1], 999),
+            item["id"],
+        ))
         rows = [
             r for r in rows
             if str(r.get("status") or "") in _BULK_STATUS_SOURCE_VALUES
@@ -2618,6 +2626,9 @@ def _bulk_update_gaps_impl(body: dict) -> tuple[int, dict]:
         len(gap_ids) >= BULK_UPDATE_BACKGROUND_THRESHOLD
         and body.get("background") is not False
     ):
+        stopped = _background_processes_stopped_response()
+        if stopped is not None:
+            return stopped
         job_data = json.loads(json.dumps({
             "field": field,
             "value": value,
@@ -3362,22 +3373,25 @@ def update_settings(body: dict) -> tuple[int, dict]:
     finally:
         conn.close()
     if "paused" in normalized:
+        stopped = normalized.get("paused") == "1"
+        if stopped:
+            _cancel_active_background_jobs()
         try:
             result = get_client().call(
-                M_ENFORCE_SCHEDULING,
-                {"settle_timeout_seconds": 8.0}
-                if normalized.get("paused") == "1"
-                else {},
-                timeout=30.0 if normalized.get("paused") == "1" else 10.0,
+                M_BACKGROUND_PROCESSES_SET,
+                {"stopped": stopped, "settle_timeout_seconds": 8.0},
+                timeout=30.0 if stopped else 10.0,
             )
         except BackendError as e:
             return _backend_err(e)
-        if normalized.get("paused") == "1" and not result.get("ok", True):
+        if stopped and not result.get("ok", True):
             cleanup = result.get("cleanup") or {}
             return err(
                 409,
-                cleanup.get("message")
-                or "agents paused but target worktree cleanup did not complete",
+                cleanup.get("message") or (
+                    "background processes stopped but target worktree "
+                    "cleanup did not complete"
+                ),
             )
     if "quality_enabled" in normalized:
         try:
@@ -3531,6 +3545,9 @@ def quality_regression_delete(regression_id: str) -> tuple[int, dict]:
 
 
 def quality_regression_run(_body: dict | None = None) -> tuple[int, dict]:
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     try:
         result = get_client().call(
             M_REGRESSION_RUN,
@@ -3543,6 +3560,9 @@ def quality_regression_run(_body: dict | None = None) -> tuple[int, dict]:
 
 
 def governance_generate_rules(body: dict) -> tuple[int, dict]:
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     product = str(body.get("product") or "").strip()
     constitution = str(body.get("constitution") or "").strip()
     if not product or not constitution:
@@ -3981,6 +4001,15 @@ def set_background_processes(body: dict | None = None) -> tuple[int, dict]:
         )
     except BackendError as e:
         return _backend_err(e)
+    if stopped and not runner_result.get("ok", True):
+        cleanup = runner_result.get("cleanup") or {}
+        return err(
+            409,
+            cleanup.get("message") or (
+                "background processes stopped but target worktree cleanup "
+                "did not complete"
+            ),
+        )
 
     status, summary = process_summary()
     if status != 200:
@@ -4305,6 +4334,9 @@ def import_extract(body: dict) -> tuple[int, dict]:
     for the user to review before persisting. Times out generously since
     the model call can take 30–90s for longer pastes.
     """
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     raw = (body.get("text") or "").strip()
     if not raw:
         return err(400, "text is required")
@@ -4321,6 +4353,9 @@ def import_parse_csv(body: dict) -> tuple[int, dict]:
     if not raw.strip():
         return err(400, "CSV text is required")
     if body.get("background") is True:
+        stopped = _background_processes_stopped_response()
+        if stopped is not None:
+            return stopped
         job_body = {"text": raw, "background": False, "dedup": bool(body.get("dedup"))}
 
         def run_job() -> dict[str, Any]:
@@ -4755,6 +4790,9 @@ def import_persist(body: dict) -> tuple[int, dict]:
             )
         )
     ):
+        stopped = _background_processes_stopped_response()
+        if stopped is not None:
+            return stopped
         job_body = json.loads(json.dumps({
             "reporter": (body.get("reporter") or "").strip(),
             "drafts": drafts,

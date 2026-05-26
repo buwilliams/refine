@@ -22,7 +22,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
   const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
   return `
     <section class="settings-section">
-      <h3>Managed processes</h3>
+      <h3>Supervisor process management</h3>
       ${rows ? `
         <table class="table process-table managed-process-table mobile-card-table">
           <colgroup>
@@ -43,7 +43,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>Agents</h3>
+      <h3>Agent processes</h3>
       ${agentRows ? `
         <table class="table process-table agents-process-table mobile-card-table">
           <colgroup>
@@ -66,7 +66,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>Runner workers</h3>
+      <h3>Runner processes</h3>
       <table class="table process-table runner-workers-table mobile-card-table">
         <colgroup>
           <col class="worker-col">
@@ -97,32 +97,33 @@ function buildManagedProcessRows(processes, paused, backend, runnerReachable, di
         details: runnerProcessDetails(backend, runnerReachable, diag),
       };
     });
-  const scheduler = {
-    id: "agent-scheduler",
-    kind: "agent_scheduler",
-    label: "Agent scheduler",
+  const background = {
+    id: "background-processes",
+    kind: "background_processes",
+    label: "Background processes",
     status: paused ? "paused" : "active",
     runner_reachable: runnerReachable,
     pid: null,
     details: paused
-      ? "New agent subprocesses wait; running subprocesses continue."
-      : "New agent subprocesses launch on demand.",
-    actions: [paused ? "resume" : "pause", "hard_reset_worktree"],
+      ? "Automatic runner work, agent launches, chats, and UI background jobs are stopped."
+      : "Automatic runner work, agent launches, chats, and UI background jobs can run.",
+    background_processes_stopped: paused,
+    actions: [paused ? "start_background_processes" : "stop_background_processes", "hard_reset_worktree"],
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
   return orderManagedProcessRows(
-    rows, scheduler, backend.process_model === "supervisor",
+    rows, background, backend.process_model === "supervisor",
   );
 }
 
-function orderManagedProcessRows(rows, scheduler, supervised) {
+function orderManagedProcessRows(rows, background, supervised) {
   const targetApp = rows.find((proc) => proc.kind === "target_app");
   const targetAppId = targetApp ? targetApp.id : null;
   if (!supervised) {
     return [
       ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
-      scheduler,
+      background,
       ...(targetApp ? [targetApp] : []),
     ];
   }
@@ -137,7 +138,7 @@ function orderManagedProcessRows(rows, scheduler, supervised) {
   const childKinds = new Set(["ui", "runner"]);
   const children = [
     ...rows.filter((proc) => childKinds.has(proc.kind)),
-    scheduler,
+    background,
   ].map((proc) => ({
     ...proc,
     supervisor_child: true,
@@ -336,10 +337,11 @@ function renderProcessActions(proc) {
     const stopped = !!proc.background_processes_stopped;
     return `<button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
   }
-  if (proc.kind === "agent_scheduler") {
+  if (proc.kind === "background_processes") {
     const paused = proc.status === "paused";
+    const stopped = !!proc.background_processes_stopped;
     return `
-      <button id="btn-pause" class="${paused ? "" : "secondary"}" ${paused ? "disabled" : ""}>${paused ? "Resume" : "Pause"} agents</button>
+      <button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>
       <button class="danger" data-hard-reset-worktree ${proc.runner_reachable && !paused ? "" : "disabled"}>Hard reset worktree</button>`;
   }
   if (proc.kind === "agent" && proc.gap_id) {
@@ -701,7 +703,6 @@ function bindSettingsProcessesTab(s) {
       });
     });
   });
-  bindCommand("#btn-pause", "system.agents.pause_toggle", { context: { settings: s } });
   bindCommand("[data-hard-reset-worktree]", "system.worktree.hard_reset");
   $$("[data-cancel-agent]").forEach((b) => {
     b.addEventListener("click", async () => {

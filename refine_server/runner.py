@@ -247,8 +247,8 @@ class Runner:
             "ok": False,
             "code": "background_processes_stopped",
             "message": (
-                "Background processes are stopped. Start Background from "
-                "the Supervisor row before running worker actions."
+                "Background processes are stopped. Start Background before "
+                "running worker actions."
             ),
         }
 
@@ -331,6 +331,9 @@ class Runner:
     def _h_launch(self, params: dict) -> dict:
         # The dispatcher launches automatically; this method exists mostly so
         # the webapp can nudge scheduling after a status change.
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return {"queued": False, **stopped}
         self.dispatcher.enforce_now()
         self.governance_agent.wake()
         return {"queued": True}
@@ -677,14 +680,22 @@ class Runner:
     def _h_background_processes_set(self, params: dict) -> dict:
         stopped = bool(params.get("stopped"))
         if stopped:
-            killed = self.sub_mgr.cancel_all("background_processes_stopped")
+            killed, still_running = self.sub_mgr.cancel_all_and_wait(
+                "background_processes_stopped",
+                timeout=float(params.get("settle_timeout_seconds") or 8.0),
+            )
+            cleanup = self._clean_target_worktree_for_pause()
             stopped_chats = self.chat.stop_all(reason="background processes stopped")
             rebuild_stop = self.target_app_rebuilder.stop_background_work(timeout=8.0)
             self.governance_agent.wake()
             self.merger.wake()
             return {
+                "ok": bool(cleanup.get("ok")),
                 "stopped": True,
                 "killed_subprocesses": killed,
+                "still_running": still_running,
+                "target_worktree_clean": bool(cleanup.get("clean")),
+                "cleanup": cleanup,
                 "stopped_chats": stopped_chats,
                 "cleared_target_app_rebuild_queue": rebuild_stop.get("cleared_queue"),
                 "target_app_rebuild": rebuild_stop,
@@ -1376,6 +1387,9 @@ class Runner:
     # ---- chat ----------------------------------------------------------------
 
     def _h_extract_gaps(self, params: dict) -> dict:
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return stopped
         text = params.get("text") or ""
         drafts = llm.extract_gaps(
             text, provider=db.get_setting(self._conn, "agent_cli"),
@@ -1592,6 +1606,9 @@ class Runner:
         return {**settings, "configured": governance.is_configured(self._conn)}
 
     def _h_governance_generate_rules(self, params: dict) -> dict:
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return stopped
         product = str(params.get("product") or "").strip()
         constitution = str(params.get("constitution") or "").strip()
         if not product or not constitution:
@@ -1955,6 +1972,9 @@ class Runner:
 
     def _h_regression_run(self, params: dict) -> dict:
         """Run managed regressions against the configured target app."""
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return stopped
         if not self._target_app_lock.acquire(blocking=False):
             return {
                 "ok": False,

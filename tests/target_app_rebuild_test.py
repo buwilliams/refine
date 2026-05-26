@@ -215,10 +215,21 @@ def main() -> int:
         paused_queue = auto_runner._h_target_app_rebuild_queue({})  # noqa: SLF001
         paused_generate = auto_runner._h_target_app_generate({"kind": "all"})  # noqa: SLF001
         paused_reset = auto_runner._h_hard_reset_worktree({})  # noqa: SLF001
+        paused_launch = auto_runner._h_launch({})  # noqa: SLF001
+        paused_extract = auto_runner._h_extract_gaps({"text": "gap"})  # noqa: SLF001
+        paused_regression = auto_runner._h_regression_run({})  # noqa: SLF001
+        paused_governance = auto_runner._h_governance_generate_rules({  # noqa: SLF001
+            "product": "Product",
+            "constitution": "Rules",
+        })
         assert paused_queue["ok"] is False, paused_queue
         assert paused_queue["code"] == "background_processes_stopped", paused_queue
         assert paused_generate["ok"] is False, paused_generate
         assert paused_reset["ok"] is False, paused_reset
+        assert paused_launch["ok"] is False, paused_launch
+        assert paused_extract["ok"] is False, paused_extract
+        assert paused_regression["ok"] is False, paused_regression
+        assert paused_governance["ok"] is False, paused_governance
         db.set_setting(conn, "paused", "0")
         operations: list[str] = []
         old_run_operation = target_app.run_operation
