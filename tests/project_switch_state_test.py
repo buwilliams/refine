@@ -808,6 +808,7 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
             "agent_subpath": "frontend",
             "project_update_pulse_interval_seconds": "300",
             "agent_limit_pause_seconds": "3600",
+            "file_browser_ignore_patterns": "node_modules, .git, .refine",
             "target_app_auto_rebuild": "hourly",
         })
         assert status == 200, body
@@ -820,12 +821,14 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         assert settings["agent_subpath"] != "frontend"
         assert settings["project_update_pulse_interval_seconds"] != "300"
         assert settings["agent_limit_pause_seconds"] != "3600"
+        assert settings["file_browser_ignore_patterns"] == "node_modules, .git, .refine"
         assert settings["target_app_auto_rebuild"] != "hourly"
 
         status, body = api.update_settings({
             "agent_subpath": "backend",
             "project_update_pulse_interval_seconds": "900",
             "agent_limit_pause_seconds": "10800",
+            "file_browser_ignore_patterns": "vendor_cache",
             "target_app_auto_rebuild": "nightly",
             "target_app_url": "http://localhost:3001",
             "target_app_start_command": "npm run dev",
@@ -856,6 +859,7 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         assert settings["agent_subpath"] == "frontend"
         assert settings["project_update_pulse_interval_seconds"] == "300"
         assert settings["agent_limit_pause_seconds"] == "3600"
+        assert settings["file_browser_ignore_patterns"] == "node_modules, .git, .refine"
         assert settings["target_app_auto_rebuild"] == "hourly"
         assert settings["target_app_url"] != "http://localhost:3001"
         assert settings["target_app_start_command"] != "npm run dev"
@@ -886,10 +890,12 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         assert default_app["agent_subpath"] == "frontend"
         assert default_runtime["project_update_pulse_interval_seconds"] == "300"
         assert default_runtime["agent_limit_pause_seconds"] == "3600"
+        assert default_runtime["file_browser_ignore_patterns"] == "node_modules, .git, .refine"
         assert default_target["target_app_auto_rebuild"] == "hourly"
         assert other_app["agent_subpath"] == "backend"
         assert other_runtime["project_update_pulse_interval_seconds"] == "900"
         assert other_runtime["agent_limit_pause_seconds"] == "10800"
+        assert other_runtime["file_browser_ignore_patterns"] == "vendor_cache"
         assert other_target["target_app_auto_rebuild"] == "nightly"
         assert other_target["target_app_url"] == "http://localhost:3001"
         assert other_target["target_app_start_command"] == "npm run dev"

@@ -52,6 +52,7 @@ RUNTIME_SETTING_KEYS = {
     "chat_idle_timeout_seconds",
     "backlog_promote_after_seconds",
     "project_update_pulse_interval_seconds",
+    "file_browser_ignore_patterns",
     "paused",
     "agent_cli",
 }

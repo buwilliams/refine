@@ -258,6 +258,7 @@ DEFAULT_SETTINGS = {
     # How often this instance checks the target repo for local HEAD changes or
     # upstream commits and refreshes projected state. -1 = never.
     "project_update_pulse_interval_seconds": "60",
+    "file_browser_ignore_patterns": "node_modules, .git, .refine",
     "paused": "0",
     # Which agent CLI refine drives for Gap runs, conflict resolution,
     # chat, import extraction, target-app actions, and pre-flight.

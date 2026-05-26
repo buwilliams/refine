@@ -85,6 +85,10 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
             ["3600", "1 hour"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.project_update_pulse_interval_seconds ?? "60") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
+      <div class="form-row"><label>File browser ignore patterns
+        <span class="muted small">— comma-delimited directory patterns hidden during normal browsing.</span></label>
+        <input type="text" id="s-file-browser-ignore"
+               value="${htmlEscape(s.file_browser_ignore_patterns || "node_modules, .git, .refine")}"></div>
     </section>
 
     <section class="settings-section">
@@ -231,6 +235,7 @@ async function autosaveSettingsRuntime(options = {}) {
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
     backlog_promote_after_seconds: $("#s-backlog-promote").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
+    file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
     agent_cli: chosen,
   });
   if (options.refresh) await refreshSettingsTab("runtime", { force: true });
@@ -246,7 +251,7 @@ function bindSettingsRuntimeTab() {
   });
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse, #s-file-browser-ignore",
     autosaveSettingsRuntime,
   );
   const autosaveRuntimeAndRefresh = createSettingsAutosave(

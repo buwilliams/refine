@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import csv
 import difflib
+import fnmatch
 import io
 import json
 import os
@@ -64,6 +65,7 @@ IMAGE_PREVIEW_MAX_BYTES = 5_000_000
 FILES_TREE_MAX_DEPTH = 3
 FILES_TREE_MAX_ENTRIES = 200
 FILES_SEARCH_MAX_SCAN = 20_000
+FILE_BROWSER_IGNORE_DEFAULT = "node_modules, .git, .refine"
 IMAGE_MIME_BY_EXT = {
     ".gif": "image/gif",
     ".jpg": "image/jpeg",
@@ -219,8 +221,52 @@ def _fuzzy_path_score(query: str, rel_path: str, name: str) -> tuple[int, int, i
     return (score, len(rel_path), rel_path.count("/"), rel_path)
 
 
-def _is_ignored_file_browser_dir(path: Path) -> bool:
-    return path.name == ".git" and path.is_dir()
+def _file_browser_ignore_patterns() -> list[str]:
+    raw = db.DEFAULT_SETTINGS.get("file_browser_ignore_patterns", FILE_BROWSER_IGNORE_DEFAULT)
+    try:
+        conn = db.connect()
+        try:
+            raw = db.get_setting(conn, "file_browser_ignore_patterns", raw) or raw
+        finally:
+            conn.close()
+    except Exception:
+        pass
+    return [
+        item.strip().replace("\\", "/").strip("/")
+        for item in str(raw or "").split(",")
+        if item.strip().strip("/")
+    ]
+
+
+def _rel_matches_file_browser_ignore(rel_path: str, patterns: list[str]) -> bool:
+    rel = rel_path.strip("/")
+    if not rel:
+        return False
+    parts = rel.split("/")
+    for pattern in patterns:
+        if "/" in pattern:
+            if fnmatch.fnmatchcase(rel, pattern):
+                return True
+            continue
+        if any(fnmatch.fnmatchcase(part, pattern) for part in parts):
+            return True
+    return False
+
+
+def _repo_rel_path(root: Path, path: Path) -> str | None:
+    try:
+        return path.resolve().relative_to(root).as_posix()
+    except (OSError, ValueError):
+        return None
+
+
+def _is_ignored_file_browser_dir(root: Path, path: Path, patterns: list[str]) -> bool:
+    if not path.is_dir():
+        return False
+    rel = _repo_rel_path(root, path)
+    if rel is None:
+        return False
+    return _rel_matches_file_browser_ignore(rel, patterns)
 
 
 def _list_file_entries(
@@ -228,12 +274,14 @@ def _list_file_entries(
     target: Path,
     *,
     max_entries: int,
+    ignore_patterns: list[str],
+    apply_ignore: bool = True,
 ) -> tuple[list[dict], bool]:
     entries = []
     truncated = False
     try:
         for child in target.iterdir():
-            if _is_ignored_file_browser_dir(child):
+            if apply_ignore and _is_ignored_file_browser_dir(root, child, ignore_patterns):
                 continue
             if len(entries) >= max_entries:
                 truncated = True
@@ -265,11 +313,15 @@ def files_tree(
         return err(400, "path is not a directory")
     max_depth = max(0, min(FILES_TREE_MAX_DEPTH, int(max_depth)))
     max_entries = max(1, min(FILES_TREE_MAX_ENTRIES, int(max_entries)))
+    ignore_patterns = _file_browser_ignore_patterns()
+    apply_ignore = not _rel_matches_file_browser_ignore(rel, ignore_patterns)
     try:
         entries, truncated = _list_file_entries(
             root,
             target,
             max_entries=max_entries,
+            ignore_patterns=ignore_patterns,
+            apply_ignore=apply_ignore,
         )
     except PermissionError as e:
         return err(403, "directory cannot be read", str(e))
@@ -313,6 +365,8 @@ def files_tree(
                     root,
                     child,
                     max_entries=remaining,
+                    ignore_patterns=ignore_patterns,
+                    apply_ignore=apply_ignore,
                 )
             except PermissionError:
                 entries_by_path[entry["path"]] = []
@@ -361,11 +415,15 @@ def files_search(
     matches = []
     scanned = 0
     truncated = False
+    ignore_patterns = _file_browser_ignore_patterns()
     try:
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = [
                 name for name in dirnames
-                if name != ".git"
+                if not _rel_matches_file_browser_ignore(
+                    _repo_rel_path(root, Path(dirpath) / name) or "",
+                    ignore_patterns,
+                )
             ]
             current = Path(dirpath)
             for name in [*dirnames, *filenames]:
@@ -379,7 +437,7 @@ def files_search(
                     rel = resolved.relative_to(root).as_posix()
                 except (OSError, ValueError):
                     continue
-                if ".git" in rel.split("/"):
+                if _rel_matches_file_browser_ignore(rel, ignore_patterns):
                     continue
                 score = _fuzzy_path_score(q, rel, path.name)
                 if score is None:
@@ -2955,6 +3013,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
         "project_update_pulse_interval_seconds",
+        "file_browser_ignore_patterns",
         "agent_subpath", "merge_target_branch",
         "quality_enabled",
         "quality_regressions_enabled",
@@ -3137,6 +3196,16 @@ def update_settings(body: dict) -> tuple[int, dict]:
                     "-1 (never), 30, 60, 300, 900, 1800, 3600",
                 )
             normalized[k] = str(n)
+        elif k == "file_browser_ignore_patterns":
+            raw = str(v or "")
+            if "\0" in raw:
+                return err(400, "file_browser_ignore_patterns contains an invalid character")
+            patterns = [
+                item.strip().replace("\\", "/").strip("/")
+                for item in raw.split(",")
+                if item.strip().strip("/")
+            ]
+            normalized[k] = ", ".join(patterns)
         elif k == "agent_limit_pause_seconds":
             try:
                 n = int(v)

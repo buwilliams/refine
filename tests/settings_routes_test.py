@@ -133,6 +133,9 @@ def main() -> int:
     assert "function bindSettingsAutosave" in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
+    assert 'id="s-file-browser-ignore"' in settings_js
+    assert "file_browser_ignore_patterns" in settings_js
+    assert "node_modules, .git, .refine" in settings_js
     assert 'id="s-worker-memory"' in settings_js
     assert 'id="s-ui-memory"' in settings_js
     assert 'id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 2000}"' in settings_js
@@ -191,6 +194,7 @@ def main() -> int:
     assert '"3600",  "1 hour"' in settings_js
     assert '"10800", "3 hours"' in settings_js
     assert "project_update_pulse_interval_seconds" in api_py
+    assert "file_browser_ignore_patterns" in api_py
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '"copilot": "copilot login"' in api_py
     assert 'id="runtime-upgrade-banner"' in settings_js

@@ -30,6 +30,16 @@ def main() -> int:
             "export const panel = true;\n",
             encoding="utf-8",
         )
+        (client / "node_modules" / "pkg").mkdir(parents=True)
+        (client / "node_modules" / "pkg" / "index.js").write_text(
+            "module.exports = true;\n",
+            encoding="utf-8",
+        )
+        (client / "vendor_cache").mkdir()
+        (client / "vendor_cache" / "cached.txt").write_text(
+            "custom ignore target\n",
+            encoding="utf-8",
+        )
         (client / "depth" / "a" / "b" / "c" / "d").mkdir(parents=True)
         (client / "depth" / "a" / "b" / "c" / "d" / "too-deep.txt").write_text(
             "hidden by tree depth\n",
@@ -56,6 +66,14 @@ def main() -> int:
         assert "src" in names, names
         assert ".hidden" in names, names
         assert ".git" not in names, names
+        assert ".refine" not in names, names
+        assert "node_modules" not in names, names
+        assert "vendor_cache" in names, names
+
+        status, body = api.files_tree(".git")
+        assert status == 200, body
+        assert body["path"] == ".git", body
+        assert "refine-hidden-search.txt" in [entry["name"] for entry in body["entries"]], body
 
         status, body = api.files_tree("src")
         assert status == 200, body
@@ -79,6 +97,8 @@ def main() -> int:
         status, body = api.files_tree("", recursive=True)
         assert status == 200, body
         assert ".git" not in body["entries_by_path"], body
+        assert ".refine" not in body["entries_by_path"], body
+        assert "node_modules" not in body["entries_by_path"], body
 
         status, body = api.files_search("helper")
         assert status == 200, body
@@ -94,6 +114,29 @@ def main() -> int:
         assert body["entries"][0]["path"] == "features/file_search/panel.js", body
 
         status, body = api.files_search("refine-hidden-search")
+        assert status == 200, body
+        assert body["entries"] == [], body
+
+        status, body = api.files_search("node_modules")
+        assert status == 200, body
+        assert body["entries"] == [], body
+
+        status, body = api.files_read(".git/refine-hidden-search.txt")
+        assert status == 200, body
+        assert body["content"] == "must stay hidden\n", body
+
+        status, body = api.update_settings({
+            "file_browser_ignore_patterns": "vendor_cache",
+        })
+        assert status == 200, body
+        status, body = api.files_tree("")
+        assert status == 200, body
+        names = [entry["name"] for entry in body["entries"]]
+        assert ".git" in names, names
+        assert ".refine" in names, names
+        assert "node_modules" in names, names
+        assert "vendor_cache" not in names, names
+        status, body = api.files_search("cached")
         assert status == 200, body
         assert body["entries"] == [], body
 
