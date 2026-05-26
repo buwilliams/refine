@@ -726,6 +726,8 @@ def main() -> int:
     assert "button.toolbar-tab:hover:not(:disabled)" in toolbar_css
     assert ".toolbar-dock .toolbar-dock-toggle:hover:not(:disabled)" in toolbar_css
     assert ".files-pathbar" in toolbar_css
+    assert ".files-path-label" in toolbar_css
+    assert "grid-template-columns: auto minmax(0, 1fr) repeat(4, 34px);" in toolbar_css
     assert ".files-browser" in toolbar_css
     assert ".files-tree-panel" in toolbar_css
     assert ".files-tree-actions" in toolbar_css

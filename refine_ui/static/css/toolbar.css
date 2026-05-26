@@ -277,9 +277,14 @@ button.toolbar-tab:hover:not(:disabled),
 }
 .files-pathbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) repeat(3, 34px);
+  grid-template-columns: auto minmax(0, 1fr) repeat(4, 34px);
   gap: 6px;
   align-items: center;
+}
+.files-path-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #4b5563;
 }
 .files-icon-btn {
   width: 34px;

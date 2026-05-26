@@ -74,6 +74,13 @@ def main() -> int:
         assert status == 200, body
         assert body["path"] == ".git", body
         assert "refine-hidden-search.txt" in [entry["name"] for entry in body["entries"]], body
+        for raw_git_path in ("./.git", ".git/"):
+            status, body = api.files_tree(raw_git_path)
+            assert status == 200, (raw_git_path, body)
+            assert body["path"] == ".git", (raw_git_path, body)
+            assert "refine-hidden-search.txt" in [
+                entry["name"] for entry in body["entries"]
+            ], (raw_git_path, body)
 
         status, body = api.files_tree("src")
         assert status == 200, body

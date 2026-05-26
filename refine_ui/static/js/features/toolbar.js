@@ -23,6 +23,8 @@ const chatState = {
 };
 const filesState = {
   path: "",
+  treeRootPath: "",
+  pathInputValue: "",
   selectedPath: "",
   entriesByPath: {},
   treeMetaByPath: {},
@@ -147,6 +149,8 @@ function resetChatForProjectSwitch() {
 function resetFilesState() {
   filesState.path = "";
   filesState.selectedPath = "";
+  filesState.treeRootPath = "";
+  filesState.pathInputValue = "";
   filesState.entriesByPath = {};
   filesState.treeMetaByPath = {};
   filesState.expanded = new Set([""]);
@@ -474,18 +478,19 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
 
 function toolbarIcon(name) {
   const icons = {
+    clear: '<path d="M18 6 6 18"></path><path d="m6 6 12 12"></path>',
     collapse: '<path d="m18 15-6-6-6 6"></path>',
     copy: '<rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M5 15V7a2 2 0 0 1 2-2h8"></path>',
     expand: '<path d="m6 9 6 6 6-6"></path>',
     go: '<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>',
-    refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2"></path><path d="M3 12A9 9 0 0 1 18.5 5.8"></path><path d="M3 18v-6h6"></path><path d="M21 6v6h-6"></path>',
+    refresh: '<path d="M20 11a8 8 0 0 0-13.7-4.6L4 8"></path><path d="M4 4v4h4"></path><path d="M4 13a8 8 0 0 0 13.7 4.6L20 16"></path><path d="M20 20v-4h-4"></path>',
     search: '<path d="m21 21-4.3-4.3"></path><circle cx="11" cy="11" r="7"></circle>',
   };
   return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
 }
 
 function renderFilesPanel() {
-  const inputPath = filesState.selectedPath || filesState.path || "";
+  const inputPath = filesState.pathInputValue || "";
   const status = filesState.loading
     ? "Loading..."
     : filesState.error
@@ -496,6 +501,7 @@ function renderFilesPanel() {
   return `
     <div class="files-panel">
       <div class="files-pathbar">
+        <label for="files-path-input" class="files-path-label">Path</label>
         <input type="text" id="files-path-input"
                autocomplete="off" spellcheck="false"
                placeholder="Repo-relative path"
@@ -503,6 +509,10 @@ function renderFilesPanel() {
         <button type="button" class="secondary files-icon-btn"
                 data-files-copy title="Copy path" aria-label="Copy path">
           ${toolbarIcon("copy")}
+        </button>
+        <button type="button" class="secondary files-icon-btn"
+                data-files-clear title="Clear path" aria-label="Clear path">
+          ${toolbarIcon("clear")}
         </button>
         <button type="button" class="secondary files-icon-btn"
                 data-files-go title="Go to path" aria-label="Go to path">
@@ -521,6 +531,10 @@ function renderFilesPanel() {
               <button type="button" class="secondary files-icon-btn"
                       data-files-expand-all title="Expand all" aria-label="Expand all">
                 ${toolbarIcon("expand")}
+              </button>
+              <button type="button" class="secondary files-icon-btn"
+                      data-files-clear-tree title="Clear tree" aria-label="Clear tree">
+                ${toolbarIcon("clear")}
               </button>
               <button type="button" class="secondary files-icon-btn"
                       data-files-collapse-all title="Collapse all" aria-label="Collapse all">
@@ -559,7 +573,7 @@ function renderFilesPanel() {
 function renderFilesTreePanel() {
   const query = (filesState.searchQuery || "").trim();
   if (query) return renderFilesSearchResults();
-  return renderFilesTree();
+  return renderFilesTree(filesState.treeRootPath || "");
 }
 
 function renderFilesSearchResults() {
@@ -745,6 +759,9 @@ function highlightFileLine(line, lang) {
 }
 
 function bindFilesPanel(root) {
+  root.querySelector("#files-path-input")?.addEventListener("input", (e) => {
+    filesState.pathInputValue = e.target.value || "";
+  });
   root.querySelector("#files-path-input")?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -774,8 +791,10 @@ function bindFilesPanel(root) {
   root.querySelector("[data-files-go]")?.addEventListener("click", () => {
     navigateFilesPath(root.querySelector("#files-path-input")?.value || "");
   });
+  root.querySelector("[data-files-clear]")?.addEventListener("click", () => clearFilesPathInput());
   root.querySelector("[data-files-refresh]")?.addEventListener("click", () => refreshFilesPanel());
   root.querySelector("[data-files-expand-all]")?.addEventListener("click", () => expandAllFilesTree());
+  root.querySelector("[data-files-clear-tree]")?.addEventListener("click", () => clearFilesTreeView());
   root.querySelector("[data-files-collapse-all]")?.addEventListener("click", () => collapseAllFilesTree());
   root.querySelector("[data-files-copy]")?.addEventListener("click", async () => {
     try {
@@ -917,6 +936,7 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
     filesState.searchResults = null;
     filesState.searchSelectedIndex = -1;
     drawToolbar();
+    if (refocus) focusFilesSearchInput();
     return;
   }
   filesState.searchLoading = true;
@@ -958,12 +978,13 @@ function focusFilesSearchInput() {
 }
 
 async function expandAllFilesTree() {
+  const treeRoot = filesState.treeRootPath || "";
   filesState.loading = true;
   filesState.error = "";
   drawToolbar();
   try {
     const query = [
-      "path=",
+      `path=${encodeURIComponent(treeRoot)}`,
       "recursive=1",
       `max_depth=${FILES_TREE_MAX_DEPTH}`,
       `max_entries=${FILES_TREE_MAX_ENTRIES}`,
@@ -971,8 +992,9 @@ async function expandAllFilesTree() {
     const result = await api("GET", `/api/files/tree?${query}`);
     mergeFilesTreeResult(result);
     filesState.expanded = new Set(Object.keys(result.entries_by_path || { "": [] }));
-    filesState.expanded.add("");
+    filesState.expanded.add(result.path || "");
     filesState.path = result.path || "";
+    filesState.treeRootPath = result.path || "";
     filesState.selectedPath = filesState.selectedPath || result.path || "";
     filesState.loading = false;
     drawToolbar();
@@ -987,8 +1009,29 @@ async function expandAllFilesTree() {
 }
 
 function collapseAllFilesTree() {
-  filesState.expanded = new Set([""]);
+  filesState.expanded = new Set([filesState.treeRootPath || ""]);
   drawToolbar();
+}
+
+async function clearFilesTreeView() {
+  if (filesSearchTimer) {
+    clearTimeout(filesSearchTimer);
+    filesSearchTimer = null;
+  }
+  const treeRoot = filesState.treeRootPath || "";
+  filesState.searchQuery = "";
+  filesState.searchResults = null;
+  filesState.searchSelectedIndex = -1;
+  filesState.searchLoading = false;
+  filesState.searchError = "";
+  filesState.path = treeRoot;
+  filesState.selectedPath = treeRoot;
+  filesState.file = null;
+  filesState.fileChunkLoading = false;
+  filesState.error = "";
+  filesState.expanded = new Set([treeRoot]);
+  delete filesState.entriesByPath[treeRoot];
+  await loadFilesDirectory(treeRoot, { expand: true, redraw: true });
 }
 
 async function openFilesToolbar(options = {}) {
@@ -1020,20 +1063,33 @@ async function openFilesToolbar(options = {}) {
 }
 
 async function navigateFilesPath(rawPath) {
+  filesState.pathInputValue = String(rawPath || "");
   const path = normalizeFilesPath(rawPath);
   filesState.selectedPath = path;
   filesState.path = path;
   filesState.error = "";
   try {
-    await loadFilesDirectory(path, { expand: true, redraw: false });
+    const result = await loadFilesDirectory(path, { expand: true, redraw: false });
+    filesState.treeRootPath = result.path || "";
     drawToolbar();
   } catch (e) {
     await loadFile(path);
   }
 }
 
+async function clearFilesPathInput() {
+  filesState.pathInputValue = "";
+  filesState.path = "";
+  filesState.treeRootPath = "";
+  filesState.selectedPath = "";
+  filesState.error = "";
+  filesState.expanded = new Set([""]);
+  delete filesState.entriesByPath[""];
+  await loadFilesDirectory("", { expand: true, redraw: true });
+}
+
 async function refreshFilesPanel() {
-  const dir = filesState.path || "";
+  const dir = filesState.treeRootPath || "";
   delete filesState.entriesByPath[dir];
   await loadFilesDirectory(dir, { expand: true, redraw: false }).catch(() => {});
   if (filesState.selectedPath) {
@@ -1146,11 +1202,15 @@ function restoreFilesSourceScroll(scrollTop) {
 }
 
 function normalizeFilesPath(path) {
-  return String(path || "")
+  const normalized = String(path || "")
     .replace(/\\/g, "/")
     .replace(/^\/+/, "")
     .replace(/\/+/g, "/")
     .replace(/\/$/, "");
+  return normalized
+    .split("/")
+    .filter((part) => part && part !== ".")
+    .join("/");
 }
 
 function parentPath(path) {

@@ -138,19 +138,24 @@ def main() -> int:
     assert "async function openPlanChatDock(options = {})" in toolbar_js
     assert 'label: "Files", mode: "files"' in toolbar_js
     assert '<span class="toolbar-dock-label">TOOLBAR</span>' in toolbar_js
+    assert 'for="files-path-input" class="files-path-label">Path</label>' in toolbar_js
     assert 'id="files-path-input"' in toolbar_js
     assert 'data-files-copy' in toolbar_js
+    assert 'data-files-clear' in toolbar_js
     assert 'data-files-paste' not in toolbar_js
     assert 'id="files-search-input"' in toolbar_js
     assert 'data-files-go' in toolbar_js
     assert 'data-files-refresh' in toolbar_js
     assert 'data-files-expand-all' in toolbar_js
+    assert 'data-files-clear-tree' in toolbar_js
     assert 'data-files-collapse-all' in toolbar_js
     assert 'expand: \'<path d="m6 9 6 6 6-6"></path>\'' in toolbar_js
     assert 'collapse: \'<path d="m18 15-6-6-6 6"></path>\'' in toolbar_js
     assert "const FILES_TREE_MAX_DEPTH = 3;" in toolbar_js
     assert "const FILES_TREE_MAX_ENTRIES = 200;" in toolbar_js
     assert "const FILES_SEARCH_MAX_RESULTS = 20;" in toolbar_js
+    assert 'treeRootPath: ""' in toolbar_js
+    assert 'pathInputValue: ""' in toolbar_js
     assert 'class="files-tree"' in toolbar_js
     assert 'class="files-content"' in toolbar_js
     assert 'class="files-line-number"' in toolbar_js
@@ -161,7 +166,58 @@ def main() -> int:
     assert "function normalizedFilesSearchSelectedIndex(" in toolbar_js
     assert "function moveFilesSearchSelection(delta)" in toolbar_js
     assert "function openSelectedFilesSearchResult()" in toolbar_js
+    render_panel_body = toolbar_js.split("function renderFilesPanel()", 1)[1].split("function renderFilesTreePanel()", 1)[0]
+    assert 'const inputPath = filesState.pathInputValue || "";' in render_panel_body
+    assert "filesState.selectedPath || filesState.path" not in render_panel_body
+    bind_panel_body = toolbar_js.split("function bindFilesPanel(root)", 1)[1].split("function scheduleFilesSearch", 1)[0]
+    assert 'filesState.pathInputValue = e.target.value || "";' in bind_panel_body
+    assert "clearFilesPathInput()" in bind_panel_body
+    assert "clearFilesTreeView()" in bind_panel_body
+    empty_search_block = toolbar_js.split("if (!query) {", 1)[1].split("return;", 1)[0]
+    assert "drawToolbar();" in empty_search_block
+    assert "if (refocus) focusFilesSearchInput();" in empty_search_block
     assert "function highlightFileLine" in toolbar_js
+    tree_panel_body = toolbar_js.split("function renderFilesTreePanel()", 1)[1].split("function renderFilesSearchResults()", 1)[0]
+    assert 'renderFilesTree(filesState.treeRootPath || "")' in tree_panel_body
+    navigate_body = toolbar_js.split("async function navigateFilesPath(rawPath)", 1)[1].split("async function refreshFilesPanel()", 1)[0]
+    assert 'filesState.pathInputValue = String(rawPath || "");' in navigate_body
+    assert "await loadFilesDirectory(path, { expand: true, redraw: false });" in navigate_body
+    assert 'filesState.treeRootPath = result.path || "";' in navigate_body
+    assert "await loadFile(path);" in navigate_body
+    assert navigate_body.index("await loadFilesDirectory") < navigate_body.index("await loadFile(path);")
+    refresh_body = toolbar_js.split("async function refreshFilesPanel()", 1)[1].split("async function loadFilesDirectory", 1)[0]
+    assert 'const dir = filesState.treeRootPath || "";' in refresh_body
+    assert 'delete filesState.entriesByPath[dir];' in refresh_body
+    assert 'await loadFilesDirectory(dir, { expand: true, redraw: false }).catch(() => {});' in refresh_body
+    assert 'await loadFile(filesState.selectedPath, { redraw: false }).catch(() => {});' in refresh_body
+    assert refresh_body.index("await loadFilesDirectory") < refresh_body.index("await loadFile(")
+    clear_body = toolbar_js.split("async function clearFilesPathInput()", 1)[1].split("async function refreshFilesPanel()", 1)[0]
+    assert 'filesState.pathInputValue = "";' in clear_body
+    assert 'filesState.treeRootPath = "";' in clear_body
+    assert 'filesState.expanded = new Set([""]);' in clear_body
+    assert 'delete filesState.entriesByPath[""];' in clear_body
+    assert 'await loadFilesDirectory("", { expand: true, redraw: true });' in clear_body
+    expand_body = toolbar_js.split("async function expandAllFilesTree()", 1)[1].split("function collapseAllFilesTree()", 1)[0]
+    assert 'const treeRoot = filesState.treeRootPath || "";' in expand_body
+    assert '`path=${encodeURIComponent(treeRoot)}`' in expand_body
+    assert 'filesState.treeRootPath = result.path || "";' in expand_body
+    collapse_body = toolbar_js.split("function collapseAllFilesTree()", 1)[1].split("async function openFilesToolbar", 1)[0]
+    assert 'filesState.expanded = new Set([filesState.treeRootPath || ""]);' in collapse_body
+    clear_tree_body = toolbar_js.split("async function clearFilesTreeView()", 1)[1].split("async function openFilesToolbar", 1)[0]
+    assert "clearTimeout(filesSearchTimer);" in clear_tree_body
+    assert 'const treeRoot = filesState.treeRootPath || "";' in clear_tree_body
+    assert 'filesState.searchQuery = "";' in clear_tree_body
+    assert "filesState.searchResults = null;" in clear_tree_body
+    assert "filesState.searchSelectedIndex = -1;" in clear_tree_body
+    assert "filesState.searchLoading = false;" in clear_tree_body
+    assert 'filesState.path = treeRoot;' in clear_tree_body
+    assert 'filesState.selectedPath = treeRoot;' in clear_tree_body
+    assert "filesState.file = null;" in clear_tree_body
+    assert "filesState.expanded = new Set([treeRoot]);" in clear_tree_body
+    assert "delete filesState.entriesByPath[treeRoot];" in clear_tree_body
+    assert "await loadFilesDirectory(treeRoot, { expand: true, redraw: true });" in clear_tree_body
+    normalize_body = toolbar_js.split("function normalizeFilesPath(path)", 1)[1].split("function parentPath(path)", 1)[0]
+    assert '.filter((part) => part && part !== ".")' in normalize_body
     assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert '"recursive=1"' in toolbar_js
     assert "/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_SEARCH_MAX_RESULTS}" in toolbar_js
