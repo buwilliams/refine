@@ -58,6 +58,8 @@ def err(
 IMPORT_BACKGROUND_THRESHOLD = 100
 BULK_UPDATE_BACKGROUND_THRESHOLD = 100
 FILE_PREVIEW_MAX_BYTES = 1_000_000
+FILES_TREE_MAX_DEPTH = 3
+FILES_TREE_MAX_ENTRIES = 200
 
 
 def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
@@ -165,7 +167,36 @@ def _file_entry(root: Path, path: Path) -> dict:
     }
 
 
-def files_tree(path: str | None = None) -> tuple[int, dict]:
+def _list_file_entries(
+    root: Path,
+    target: Path,
+    *,
+    max_entries: int,
+) -> tuple[list[dict], bool]:
+    entries = []
+    truncated = False
+    try:
+        for child in target.iterdir():
+            if len(entries) >= max_entries:
+                truncated = True
+                break
+            entries.append(_file_entry(root, child))
+    except OSError as e:
+        raise PermissionError(str(e)) from e
+    entries.sort(key=lambda item: (
+        0 if item["type"] == "directory" else 1,
+        item["name"].lower(),
+    ))
+    return entries, truncated
+
+
+def files_tree(
+    path: str | None = None,
+    *,
+    recursive: bool = False,
+    max_depth: int = FILES_TREE_MAX_DEPTH,
+    max_entries: int = FILES_TREE_MAX_ENTRIES,
+) -> tuple[int, dict]:
     resolved = _resolve_repo_path(path)
     if resolved[0] is None:
         return resolved[2]
@@ -174,21 +205,83 @@ def files_tree(path: str | None = None) -> tuple[int, dict]:
         return err(404, "path not found")
     if not target.is_dir():
         return err(400, "path is not a directory")
-    entries = []
+    max_depth = max(0, min(FILES_TREE_MAX_DEPTH, int(max_depth)))
+    max_entries = max(1, min(FILES_TREE_MAX_ENTRIES, int(max_entries)))
     try:
-        for child in target.iterdir():
-            entries.append(_file_entry(root, child))
-    except OSError as e:
+        entries, truncated = _list_file_entries(
+            root,
+            target,
+            max_entries=max_entries,
+        )
+    except PermissionError as e:
         return err(403, "directory cannot be read", str(e))
-    entries.sort(key=lambda item: (
-        0 if item["type"] == "directory" else 1,
-        item["name"].lower(),
-    ))
-    return 200, {
+    body = {
         "root": str(root),
         "path": rel,
         "entries": entries,
+        "truncated": truncated,
+        "max_depth": max_depth,
+        "max_entries": max_entries,
     }
+    if not recursive:
+        return 200, body
+
+    entries_by_path: dict[str, list[dict]] = {rel: entries}
+    meta_by_path: dict[str, dict] = {
+        rel: {"truncated": truncated, "depth": 0},
+    }
+    total = len(entries)
+    global_truncated = truncated
+
+    def walk(dir_path: Path, dir_rel: str, depth: int) -> None:
+        nonlocal total, global_truncated
+        if depth >= max_depth or total >= max_entries:
+            return
+        current = entries_by_path.get(dir_rel, [])
+        for entry in current:
+            if total >= max_entries:
+                global_truncated = True
+                return
+            if entry.get("type") != "directory":
+                continue
+            child = dir_path / entry["name"]
+            try:
+                child.resolve().relative_to(root)
+            except ValueError:
+                continue
+            remaining = max_entries - total
+            try:
+                child_entries, child_truncated = _list_file_entries(
+                    root,
+                    child,
+                    max_entries=remaining,
+                )
+            except PermissionError:
+                entries_by_path[entry["path"]] = []
+                meta_by_path[entry["path"]] = {
+                    "truncated": False,
+                    "depth": depth + 1,
+                    "error": "directory cannot be read",
+                }
+                continue
+            entries_by_path[entry["path"]] = child_entries
+            meta_by_path[entry["path"]] = {
+                "truncated": child_truncated,
+                "depth": depth + 1,
+            }
+            total += len(child_entries)
+            if child_truncated or total >= max_entries:
+                global_truncated = True
+            walk(child, entry["path"], depth + 1)
+
+    walk(target, rel, 0)
+    body.update({
+        "entries_by_path": entries_by_path,
+        "meta_by_path": meta_by_path,
+        "total_entries": total,
+        "truncated": global_truncated,
+    })
+    return 200, body
 
 
 def files_read(path: str | None = None) -> tuple[int, dict]:

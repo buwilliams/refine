@@ -7,6 +7,8 @@
 // per-session deque until the user switches to that tab.
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
+const FILES_TREE_MAX_DEPTH = 3;
+const FILES_TREE_MAX_ENTRIES = 200;
 const chatState = {
   tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
@@ -19,6 +21,7 @@ const filesState = {
   path: "",
   selectedPath: "",
   entriesByPath: {},
+  treeMetaByPath: {},
   expanded: new Set([""]),
   file: null,
   loading: false,
@@ -135,6 +138,7 @@ function resetFilesState() {
   filesState.path = "";
   filesState.selectedPath = "";
   filesState.entriesByPath = {};
+  filesState.treeMetaByPath = {};
   filesState.expanded = new Set([""]);
   filesState.file = null;
   filesState.loading = false;
@@ -454,7 +458,9 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
 
 function toolbarIcon(name) {
   const icons = {
+    collapse: '<path d="m7 15 5-5 5 5"></path><path d="M7 9h10"></path><path d="M7 19h10"></path>',
     copy: '<rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M5 15V7a2 2 0 0 1 2-2h8"></path>',
+    expand: '<path d="m7 9 5 5 5-5"></path><path d="M7 5h10"></path><path d="M7 19h10"></path>',
     paste: '<path d="M8 4h8v4H8z"></path><path d="M16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path>',
     go: '<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>',
     refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2"></path><path d="M3 12A9 9 0 0 1 18.5 5.8"></path><path d="M3 18v-6h6"></path><path d="M21 6v6h-6"></path>',
@@ -496,8 +502,23 @@ function renderFilesPanel() {
         </button>
       </div>
       <div class="files-browser">
-        <div class="files-tree" role="tree" aria-label="Directories and files">
-          ${renderFilesTree()}
+        <div class="files-tree-panel">
+          <div class="files-tree-header">
+            <span>Files</span>
+            <div class="files-tree-actions">
+              <button type="button" class="secondary files-icon-btn"
+                      data-files-expand-all title="Expand all" aria-label="Expand all">
+                ${toolbarIcon("expand")}
+              </button>
+              <button type="button" class="secondary files-icon-btn"
+                      data-files-collapse-all title="Collapse all" aria-label="Collapse all">
+                ${toolbarIcon("collapse")}
+              </button>
+            </div>
+          </div>
+          <div class="files-tree" role="tree" aria-label="Directories and files">
+            ${renderFilesTree()}
+          </div>
         </div>
         <div class="files-content">
           <div class="files-content-header">
@@ -511,6 +532,7 @@ function renderFilesPanel() {
 
 function renderFilesTree(path = "", depth = 0) {
   const entries = filesState.entriesByPath[path];
+  const meta = filesState.treeMetaByPath[path] || {};
   if (!entries) {
     return depth === 0
       ? `<p class="muted small files-empty">Loading repository...</p>`
@@ -519,22 +541,31 @@ function renderFilesTree(path = "", depth = 0) {
   if (!entries.length && depth === 0) {
     return `<p class="muted small files-empty">No files.</p>`;
   }
-  return entries.map((entry) => {
+  const rows = entries.map((entry) => {
     const isDir = entry.type === "directory";
-    const expanded = isDir && filesState.expanded.has(entry.path);
+    const expandable = isDir && depth < FILES_TREE_MAX_DEPTH;
+    const expanded = expandable && filesState.expanded.has(entry.path);
     const selected = entry.path === filesState.selectedPath;
     return `
       <div class="files-tree-item ${selected ? "selected" : ""}"
            role="treeitem"
-           aria-expanded="${isDir ? expanded ? "true" : "false" : ""}"
+           aria-expanded="${expandable ? expanded ? "true" : "false" : ""}"
            style="--depth:${depth}"
            data-files-path="${htmlEscape(entry.path)}"
-           data-files-type="${htmlEscape(entry.type)}">
-        <span class="files-tree-caret" aria-hidden="true">${isDir ? expanded ? "▾" : "▸" : ""}</span>
+           data-files-type="${htmlEscape(entry.type)}"
+           data-files-depth="${depth}">
+        <span class="files-tree-caret" aria-hidden="true">${expandable ? expanded ? "▾" : "▸" : ""}</span>
         <span class="files-tree-name">${htmlEscape(entry.name || entry.path || ".")}</span>
       </div>
-      ${isDir && expanded ? renderFilesTree(entry.path, depth + 1) : ""}`;
+      ${expandable && expanded ? renderFilesTree(entry.path, depth + 1) : ""}`;
   }).join("");
+  const limit = meta.truncated
+    ? `<p class="muted small files-empty">Showing first ${FILES_TREE_MAX_ENTRIES} entries.</p>`
+    : "";
+  const depthLimit = depth === FILES_TREE_MAX_DEPTH && entries.some((entry) => entry.type === "directory")
+    ? `<p class="muted small files-empty">Tree depth limit reached.</p>`
+    : "";
+  return rows + limit + depthLimit;
 }
 
 function renderFilesContent() {
@@ -634,6 +665,8 @@ function bindFilesPanel(root) {
     navigateFilesPath(root.querySelector("#files-path-input")?.value || "");
   });
   root.querySelector("[data-files-refresh]")?.addEventListener("click", () => refreshFilesPanel());
+  root.querySelector("[data-files-expand-all]")?.addEventListener("click", () => expandAllFilesTree());
+  root.querySelector("[data-files-collapse-all]")?.addEventListener("click", () => collapseAllFilesTree());
   root.querySelector("[data-files-copy]")?.addEventListener("click", async () => {
     try {
       await navigator.clipboard.writeText(root.querySelector("#files-path-input")?.value || "");
@@ -658,7 +691,14 @@ function bindFilesPanel(root) {
     row.addEventListener("click", () => {
       const path = row.dataset.filesPath || "";
       const type = row.dataset.filesType || "";
+      const depth = Number.parseInt(row.dataset.filesDepth || "0", 10);
       if (type === "directory") {
+        if (depth >= FILES_TREE_MAX_DEPTH) {
+          filesState.path = path;
+          filesState.selectedPath = path;
+          drawToolbar();
+          return;
+        }
         if (filesState.expanded.has(path)) {
           filesState.expanded.delete(path);
           filesState.path = path;
@@ -676,6 +716,40 @@ function bindFilesPanel(root) {
       }
     });
   });
+}
+
+async function expandAllFilesTree() {
+  filesState.loading = true;
+  filesState.error = "";
+  drawToolbar();
+  try {
+    const query = [
+      "path=",
+      "recursive=1",
+      `max_depth=${FILES_TREE_MAX_DEPTH}`,
+      `max_entries=${FILES_TREE_MAX_ENTRIES}`,
+    ].join("&");
+    const result = await api("GET", `/api/files/tree?${query}`);
+    mergeFilesTreeResult(result);
+    filesState.expanded = new Set(Object.keys(result.entries_by_path || { "": [] }));
+    filesState.expanded.add("");
+    filesState.path = result.path || "";
+    filesState.selectedPath = filesState.selectedPath || result.path || "";
+    filesState.loading = false;
+    drawToolbar();
+    if (result.truncated) {
+      toast(`File tree limited to ${FILES_TREE_MAX_ENTRIES} entries.`, "warn");
+    }
+  } catch (e) {
+    filesState.loading = false;
+    filesState.error = e.message || String(e);
+    drawToolbar();
+  }
+}
+
+function collapseAllFilesTree() {
+  filesState.expanded = new Set([""]);
+  drawToolbar();
 }
 
 async function openFilesToolbar(options = {}) {
@@ -724,7 +798,7 @@ async function loadFilesDirectory(path, { expand = false, redraw = true } = {}) 
   if (redraw) drawToolbar();
   try {
     const result = await api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`);
-    filesState.entriesByPath[result.path || ""] = result.entries || [];
+    mergeFilesTreeResult(result);
     filesState.path = result.path || "";
     filesState.selectedPath = result.path || "";
     if (expand) filesState.expanded.add(result.path || "");
@@ -736,6 +810,25 @@ async function loadFilesDirectory(path, { expand = false, redraw = true } = {}) 
     filesState.error = e.message || String(e);
     if (redraw) drawToolbar();
     throw e;
+  }
+}
+
+function mergeFilesTreeResult(result) {
+  if (!result) return;
+  const entriesByPath = result.entries_by_path || {
+    [result.path || ""]: result.entries || [],
+  };
+  for (const [path, entries] of Object.entries(entriesByPath)) {
+    filesState.entriesByPath[path] = entries || [];
+  }
+  const metaByPath = result.meta_by_path || {
+    [result.path || ""]: {
+      truncated: !!result.truncated,
+      depth: 0,
+    },
+  };
+  for (const [path, meta] of Object.entries(metaByPath)) {
+    filesState.treeMetaByPath[path] = meta || {};
   }
 }
 

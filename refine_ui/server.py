@@ -342,7 +342,13 @@ def _h_chat_stop(_h, m, _b, _q):
 
 @route("GET", r"/api/files/tree")
 def _h_files_tree(_h, _m, _b, q):
-    return api.files_tree(_get_one(q, "path", ""))
+    recursive = _get_one(q, "recursive", "0") not in ("", "0", "false", "False")
+    return api.files_tree(
+        _get_one(q, "path", ""),
+        recursive=recursive,
+        max_depth=int(_get_one(q, "max_depth", str(api.FILES_TREE_MAX_DEPTH))),
+        max_entries=int(_get_one(q, "max_entries", str(api.FILES_TREE_MAX_ENTRIES))),
+    )
 
 
 @route("GET", r"/api/files/read")

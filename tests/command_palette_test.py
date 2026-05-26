@@ -109,11 +109,18 @@ def main() -> int:
     assert 'data-files-paste' in toolbar_js
     assert 'data-files-go' in toolbar_js
     assert 'data-files-refresh' in toolbar_js
+    assert 'data-files-expand-all' in toolbar_js
+    assert 'data-files-collapse-all' in toolbar_js
+    assert "const FILES_TREE_MAX_DEPTH = 3;" in toolbar_js
+    assert "const FILES_TREE_MAX_ENTRIES = 200;" in toolbar_js
     assert 'class="files-tree"' in toolbar_js
     assert 'class="files-content"' in toolbar_js
     assert 'class="files-line-number"' in toolbar_js
+    assert "async function expandAllFilesTree()" in toolbar_js
+    assert "function collapseAllFilesTree()" in toolbar_js
     assert "function highlightFileLine" in toolbar_js
     assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
+    assert '"recursive=1"' in toolbar_js
     assert 'api("GET", `/api/files/read?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js

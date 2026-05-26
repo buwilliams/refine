@@ -272,6 +272,8 @@ button.toolbar-tab:hover:not(:disabled),
   display: flex;
   flex-direction: column;
   gap: 10px;
+  color-scheme: light;
+  color: #111827;
 }
 .files-pathbar {
   display: grid;
@@ -303,16 +305,45 @@ button.toolbar-tab:hover:not(:disabled),
   grid-template-columns: minmax(180px, 28%) minmax(0, 1fr);
   gap: 10px;
 }
-.files-tree,
+.files-tree-panel,
 .files-content {
   min-height: 0;
-  background: var(--card);
-  border: 1px solid var(--color-border-subtle);
+  background: #ffffff;
+  border: 1px solid #d1d5db;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   overflow: auto;
 }
+.files-tree-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.files-tree-header {
+  flex: 0 0 auto;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 10px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 700;
+}
+.files-tree-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 4px;
+}
+.files-tree-actions .files-icon-btn {
+  width: 28px;
+  height: 26px;
+}
 .files-tree {
+  min-height: 0;
+  overflow: auto;
   padding: 6px;
 }
 .files-tree-item {
@@ -325,13 +356,14 @@ button.toolbar-tab:hover:not(:disabled),
   border-radius: var(--radius);
   cursor: pointer;
   font-size: 13px;
+  color: #1f2937;
 }
 .files-tree-item:hover,
 .files-tree-item.selected {
-  background: var(--color-surface-muted);
+  background: #eef2ff;
 }
 .files-tree-caret {
-  color: var(--muted);
+  color: #6b7280;
   text-align: center;
 }
 .files-tree-name {
@@ -352,12 +384,13 @@ button.toolbar-tab:hover:not(:disabled),
   display: flex;
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border);
-  background: var(--color-surface-muted);
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #374151;
 }
 .files-message {
   padding: 16px;
-  color: var(--muted);
+  color: #4b5563;
   font-size: 13px;
 }
 .files-source {
@@ -367,8 +400,8 @@ button.toolbar-tab:hover:not(:disabled),
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 12.5px;
   line-height: 1.45;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #ffffff;
+  color: #111827;
 }
 .files-source-line {
   display: grid;
@@ -376,24 +409,25 @@ button.toolbar-tab:hover:not(:disabled),
   min-height: 20px;
 }
 .files-source-line:hover {
-  background: rgba(148, 163, 184, 0.12);
+  background: #f3f4f6;
 }
 .files-line-number {
   padding: 0 10px;
-  color: #94a3b8;
+  color: #6b7280;
   text-align: right;
   user-select: none;
-  border-right: 1px solid rgba(148, 163, 184, 0.25);
+  border-right: 1px solid #e5e7eb;
+  background: #f9fafb;
 }
 .files-line-code {
   padding: 0 12px;
   white-space: pre;
 }
-.tok-keyword { color: #93c5fd; }
-.tok-string { color: #86efac; }
-.tok-comment { color: #94a3b8; font-style: italic; }
-.tok-number { color: #fca5a5; }
-.tok-attr { color: #fcd34d; }
+.tok-keyword { color: #1d4ed8; }
+.tok-string { color: #047857; }
+.tok-comment { color: #64748b; font-style: italic; }
+.tok-number { color: #b45309; }
+.tok-attr { color: #7c3aed; }
 
 @media (max-width: 760px) {
   .files-browser {

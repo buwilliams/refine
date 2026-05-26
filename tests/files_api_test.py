@@ -21,6 +21,17 @@ def main() -> int:
             "def hello():\n    return 'world'\n",
             encoding="utf-8",
         )
+        (client / "depth" / "a" / "b" / "c" / "d").mkdir(parents=True)
+        (client / "depth" / "a" / "b" / "c" / "d" / "too-deep.txt").write_text(
+            "hidden by tree depth\n",
+            encoding="utf-8",
+        )
+        (client / "many").mkdir()
+        for idx in range(api.FILES_TREE_MAX_ENTRIES + 5):
+            (client / "many" / f"{idx:03d}.txt").write_text(
+                f"{idx}\n",
+                encoding="utf-8",
+            )
         (client / ".hidden").write_text("visible\n", encoding="utf-8")
         (client / "blob.bin").write_bytes(b"abc\x00def")
         (client / "large.txt").write_bytes(b"x" * (api.FILE_PREVIEW_MAX_BYTES + 1))
@@ -35,6 +46,20 @@ def main() -> int:
         assert status == 200, body
         assert body["path"] == "src", body
         assert body["entries"][0]["path"] == "src/app.py", body
+        assert body["max_depth"] == api.FILES_TREE_MAX_DEPTH, body
+        assert body["max_entries"] == api.FILES_TREE_MAX_ENTRIES, body
+
+        status, body = api.files_tree("many")
+        assert status == 200, body
+        assert len(body["entries"]) == api.FILES_TREE_MAX_ENTRIES, body
+        assert body["truncated"] is True, body
+
+        status, body = api.files_tree("depth", recursive=True)
+        assert status == 200, body
+        assert "depth" in body["entries_by_path"], body
+        assert "depth/a/b/c" in body["entries_by_path"], body
+        assert "depth/a/b/c/d" not in body["entries_by_path"], body
+        assert body["meta_by_path"]["depth/a/b/c"]["depth"] == api.FILES_TREE_MAX_DEPTH, body
 
         status, body = api.files_read("src/app.py")
         assert status == 200, body
