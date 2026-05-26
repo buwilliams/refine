@@ -9,6 +9,7 @@ const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
+const FILE_TEXT_CHUNK_BYTES = 128_000;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 const chatState = {
@@ -26,6 +27,7 @@ const filesState = {
   treeMetaByPath: {},
   expanded: new Set([""]),
   file: null,
+  fileChunkLoading: false,
   searchQuery: "",
   searchResults: null,
   searchLoading: false,
@@ -147,6 +149,7 @@ function resetFilesState() {
   filesState.treeMetaByPath = {};
   filesState.expanded = new Set([""]);
   filesState.file = null;
+  filesState.fileChunkLoading = false;
   filesState.searchQuery = "";
   filesState.searchResults = null;
   filesState.searchLoading = false;
@@ -630,6 +633,9 @@ function renderFilesTree(path = "", depth = 0) {
 
 function renderFilesContent() {
   const file = filesState.file;
+  if (filesState.loading && !file) {
+    return `<div class="files-message">Loading...</div>`;
+  }
   if (filesState.error && !file) {
     return `<div class="files-message">${htmlEscape(filesState.error)}</div>`;
   }
@@ -639,20 +645,30 @@ function renderFilesContent() {
   if (!file.previewable) {
     return `<div class="files-message">${htmlEscape(file.reason || "Preview is not available.")}</div>`;
   }
+  if (file.kind === "image") {
+    return `
+      <div class="files-image-preview">
+        <img src="${htmlEscape(file.data_url || "")}" alt="${htmlEscape(file.name || file.path || "Image preview")}">
+      </div>`;
+  }
   return `
     <div class="files-source" data-language="${htmlEscape(languageForPath(file.path))}">
-      ${renderSourceLines(file.content || "", file.path)}
+      ${renderSourceLines(file.content || "", file.path, file.start_line || 1)}
+      ${file.has_more ? `
+        <div class="files-load-more" data-files-load-more>
+          ${filesState.fileChunkLoading ? "Loading..." : "Scroll to load more"}
+        </div>` : ""}
     </div>`;
 }
 
-function renderSourceLines(content, path) {
+function renderSourceLines(content, path, startLine = 1) {
   const lang = languageForPath(path);
   const lines = String(content ?? "").replace(/\r\n/g, "\n").split("\n");
   if (lines.length && lines[lines.length - 1] === "") lines.pop();
   const shown = lines.length ? lines : [""];
   return shown.map((line, idx) => `
     <div class="files-source-line">
-      <span class="files-line-number">${idx + 1}</span>
+      <span class="files-line-number">${startLine + idx}</span>
       <code class="files-line-code">${highlightFileLine(line, lang)}</code>
     </div>`).join("");
 }
@@ -751,6 +767,12 @@ function bindFilesPanel(root) {
       toast("Clipboard copy is unavailable.", "error");
     }
   });
+  const source = root.querySelector(".files-source");
+  source?.addEventListener("scroll", () => {
+    if (!filesState.file?.has_more || filesState.fileChunkLoading) return;
+    const remaining = source.scrollHeight - source.scrollTop - source.clientHeight;
+    if (remaining < 240) loadNextFileChunk();
+  });
   $$(".files-tree-item", root).forEach((row) => {
     row.addEventListener("click", () => {
       const path = row.dataset.filesPath || "";
@@ -815,6 +837,8 @@ async function runFilesSearch(query, { refocus = false } = {}) {
     return;
   }
   filesState.searchLoading = true;
+  drawToolbar();
+  if (refocus) focusFilesSearchInput();
   try {
     const result = await api(
       "GET",
@@ -963,8 +987,12 @@ async function loadFile(path, { redraw = true } = {}) {
   filesState.error = "";
   if (redraw) drawToolbar();
   try {
-    const file = await api("GET", `/api/files/read?path=${encodeURIComponent(path)}`);
+    const file = await api(
+      "GET",
+      `/api/files/read?path=${encodeURIComponent(path)}&offset=0&limit=${FILE_TEXT_CHUNK_BYTES}`,
+    );
     filesState.file = file;
+    filesState.fileChunkLoading = false;
     filesState.selectedPath = file.path || path;
     filesState.path = parentPath(file.path || path);
     filesState.loading = false;
@@ -972,11 +1000,47 @@ async function loadFile(path, { redraw = true } = {}) {
     return file;
   } catch (e) {
     filesState.file = null;
+    filesState.fileChunkLoading = false;
     filesState.loading = false;
     filesState.error = e.message || String(e);
     if (redraw) drawToolbar();
     throw e;
   }
+}
+
+async function loadNextFileChunk() {
+  const file = filesState.file;
+  if (!file || !file.has_more || file.next_offset == null) return;
+  const scrollTop = $(".files-source")?.scrollTop || 0;
+  filesState.fileChunkLoading = true;
+  drawToolbar();
+  restoreFilesSourceScroll(scrollTop);
+  try {
+    const next = await api(
+      "GET",
+      `/api/files/read?path=${encodeURIComponent(file.path)}&offset=${encodeURIComponent(file.next_offset)}&limit=${FILE_TEXT_CHUNK_BYTES}`,
+    );
+    if (!filesState.file || filesState.file.path !== file.path) return;
+    filesState.file.content = `${filesState.file.content || ""}${next.content || ""}`;
+    filesState.file.has_more = !!next.has_more;
+    filesState.file.next_offset = next.next_offset;
+    filesState.file.large = !!next.large;
+    filesState.fileChunkLoading = false;
+    drawToolbar();
+    restoreFilesSourceScroll(scrollTop);
+  } catch (e) {
+    filesState.fileChunkLoading = false;
+    filesState.error = e.message || String(e);
+    drawToolbar();
+    restoreFilesSourceScroll(scrollTop);
+  }
+}
+
+function restoreFilesSourceScroll(scrollTop) {
+  requestAnimationFrame(() => {
+    const source = $(".files-source");
+    if (source) source.scrollTop = scrollTop;
+  });
 }
 
 function normalizeFilesPath(path) {

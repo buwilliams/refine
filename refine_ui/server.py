@@ -360,7 +360,11 @@ def _h_files_tree(_h, _m, _b, q):
 
 @route("GET", r"/api/files/read")
 def _h_files_read(_h, _m, _b, q):
-    return api.files_read(_get_one(q, "path", ""))
+    return api.files_read(
+        _get_one(q, "path", ""),
+        offset=int(_get_one(q, "offset", "0")),
+        limit=int(_get_one(q, "limit", str(api.FILE_TEXT_CHUNK_BYTES))),
+    )
 
 
 @route("GET", r"/api/files/search")

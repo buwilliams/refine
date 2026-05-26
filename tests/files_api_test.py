@@ -41,6 +41,7 @@ def main() -> int:
             "must stay hidden\n",
             encoding="utf-8",
         )
+        (client / "image.png").write_bytes(b"\x89PNG\r\n\x1a\npreview")
         (client / "blob.bin").write_bytes(b"abc\x00def")
         (client / "large.txt").write_bytes(b"x" * (api.FILE_PREVIEW_MAX_BYTES + 1))
 
@@ -101,12 +102,24 @@ def main() -> int:
         status, body = api.files_read("blob.bin")
         assert status == 200, body
         assert body["previewable"] is False, body
-        assert "Binary" in body["reason"], body
+        assert body["reason"] == "Binary data", body
+
+        status, body = api.files_read("image.png")
+        assert status == 200, body
+        assert body["previewable"] is True, body
+        assert body["kind"] == "image", body
+        assert body["data_url"].startswith("data:image/png;base64,"), body
 
         status, body = api.files_read("large.txt")
         assert status == 200, body
-        assert body["previewable"] is False, body
-        assert "larger" in body["reason"], body
+        assert body["previewable"] is True, body
+        assert body["large"] is True, body
+        assert body["has_more"] is True, body
+        assert len(body["content"]) == api.FILE_TEXT_CHUNK_BYTES, body
+        status, next_body = api.files_read("large.txt", offset=body["next_offset"])
+        assert status == 200, next_body
+        assert next_body["offset"] == body["next_offset"], next_body
+        assert next_body["content"], next_body
 
         status, body = api.files_read("../outside.txt")
         assert status == 403, body

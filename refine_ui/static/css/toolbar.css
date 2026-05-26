@@ -467,6 +467,14 @@ button.toolbar-tab:hover:not(:disabled),
 .files-source-line:hover {
   background: #f3f4f6;
 }
+.files-load-more {
+  padding: 8px 12px 8px 64px;
+  color: #6b7280;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 12px;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+}
 .files-line-number {
   padding: 0 10px;
   color: #6b7280;
@@ -484,6 +492,20 @@ button.toolbar-tab:hover:not(:disabled),
 .tok-comment { color: #64748b; font-style: italic; }
 .tok-number { color: #b45309; }
 .tok-attr { color: #7c3aed; }
+.files-image-preview {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 16px;
+  background: #ffffff;
+}
+.files-image-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
 
 @media (max-width: 760px) {
   .files-browser {

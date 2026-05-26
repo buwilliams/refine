@@ -727,8 +727,16 @@ def main() -> int:
     assert ".files-tree-actions" in toolbar_css
     assert ".files-tree-search" in toolbar_css
     assert ".files-source-line" in toolbar_css
+    assert ".files-load-more" in toolbar_css
+    assert ".files-image-preview" in toolbar_css
     assert ".files-content-header .files-icon-btn" in toolbar_css
     assert "data-files-copy-content" in toolbar_js
+    assert "const FILE_TEXT_CHUNK_BYTES = 128_000;" in toolbar_js
+    assert "async function loadNextFileChunk()" in toolbar_js
+    assert "data-files-load-more" in toolbar_js
+    assert "filesState.fileChunkLoading ? \"Loading...\" : \"Scroll to load more\"" in toolbar_js
+    assert "file.kind === \"image\"" in toolbar_js
+    assert "<img src=" in toolbar_js
     assert 'navigator.clipboard.writeText(filesState.file?.content || "")' in toolbar_js
     assert 'toast("File contents copied", "info")' in toolbar_js
     assert "background: #ffffff;" in toolbar_css
@@ -739,7 +747,10 @@ def main() -> int:
     assert '@route("GET", r"/api/files/tree")' in server_py
     assert '@route("GET", r"/api/files/read")' in server_py
     assert '@route("GET", r"/api/files/search")' in server_py
+    assert "offset=int(_get_one(q, \"offset\", \"0\"))" in server_py
     assert "recursive = _get_one(q, \"recursive\", \"0\")" in server_py
+    assert "FILE_TEXT_CHUNK_BYTES = 128_000" in api_py
+    assert "IMAGE_MIME_BY_EXT" in api_py
     assert "FILES_TREE_MAX_DEPTH = 3" in api_py
     assert "FILES_TREE_MAX_ENTRIES = 200" in api_py
     assert "def files_tree(" in api_py

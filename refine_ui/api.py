@@ -4,6 +4,7 @@ Returns (status_code, body_dict) tuples. The server module wraps these.
 """
 from __future__ import annotations
 
+import base64
 import csv
 import difflib
 import io
@@ -58,9 +59,19 @@ def err(
 IMPORT_BACKGROUND_THRESHOLD = 100
 BULK_UPDATE_BACKGROUND_THRESHOLD = 100
 FILE_PREVIEW_MAX_BYTES = 1_000_000
+FILE_TEXT_CHUNK_BYTES = 128_000
+IMAGE_PREVIEW_MAX_BYTES = 5_000_000
 FILES_TREE_MAX_DEPTH = 3
 FILES_TREE_MAX_ENTRIES = 200
 FILES_SEARCH_MAX_SCAN = 20_000
+IMAGE_MIME_BY_EXT = {
+    ".gif": "image/gif",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".webp": "image/webp",
+}
 
 
 def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
@@ -354,7 +365,27 @@ def files_search(
     }
 
 
-def files_read(path: str | None = None) -> tuple[int, dict]:
+def _count_lines_before(path: Path, offset: int) -> int:
+    if offset <= 0:
+        return 1
+    count = 1
+    remaining = offset
+    with path.open("rb") as f:
+        while remaining > 0:
+            data = f.read(min(64 * 1024, remaining))
+            if not data:
+                break
+            count += data.count(b"\n")
+            remaining -= len(data)
+    return count
+
+
+def files_read(
+    path: str | None = None,
+    *,
+    offset: int = 0,
+    limit: int = FILE_TEXT_CHUNK_BYTES,
+) -> tuple[int, dict]:
     resolved = _resolve_repo_path(path)
     if resolved[0] is None:
         return resolved[2]
@@ -367,6 +398,9 @@ def files_read(path: str | None = None) -> tuple[int, dict]:
         stat = target.stat()
     except OSError as e:
         return err(403, "file cannot be read", str(e))
+    offset = max(0, int(offset))
+    limit = max(1, min(FILE_PREVIEW_MAX_BYTES, int(limit)))
+    image_mime = IMAGE_MIME_BY_EXT.get(target.suffix.lower())
     base = {
         "root": str(root),
         "path": rel,
@@ -375,28 +409,63 @@ def files_read(path: str | None = None) -> tuple[int, dict]:
         "modified": datetime.fromtimestamp(
             stat.st_mtime, timezone.utc,
         ).isoformat(),
+        "kind": "text",
+        "offset": offset,
+        "limit": limit,
+        "next_offset": None,
+        "has_more": False,
+        "start_line": 1,
+        "large": stat.st_size > limit,
         "previewable": False,
         "content": "",
     }
-    if stat.st_size > FILE_PREVIEW_MAX_BYTES:
+    if image_mime:
+        if stat.st_size > IMAGE_PREVIEW_MAX_BYTES:
+            return 200, {
+                **base,
+                "kind": "image",
+                "reason": "Image is too large to preview.",
+            }
+        try:
+            data = target.read_bytes()
+        except OSError as e:
+            return err(403, "file cannot be read", str(e))
+        encoded = base64.b64encode(data).decode("ascii")
         return 200, {
             **base,
-            "reason": f"File is larger than {FILE_PREVIEW_MAX_BYTES} bytes.",
+            "kind": "image",
+            "mime": image_mime,
+            "previewable": True,
+            "data_url": f"data:{image_mime};base64,{encoded}",
         }
     try:
-        data = target.read_bytes()
+        with target.open("rb") as f:
+            head = f.read(4096)
+            if b"\0" in head:
+                return 200, {**base, "kind": "binary", "reason": "Binary data"}
+            f.seek(offset)
+            data = f.read(limit)
     except OSError as e:
         return err(403, "file cannot be read", str(e))
-    if b"\0" in data[:4096]:
-        return 200, {**base, "reason": "Binary file preview is not available."}
     try:
         text = data.decode("utf-8")
     except UnicodeDecodeError:
-        return 200, {**base, "reason": "File is not valid UTF-8 text."}
+        return 200, {**base, "kind": "binary", "reason": "Binary data"}
+    next_offset = offset + len(data)
+    has_more = next_offset < stat.st_size
+    try:
+        start_line = _count_lines_before(target, offset)
+    except OSError:
+        start_line = 1
     return 200, {
         **base,
         "previewable": True,
         "content": text,
+        "offset": offset,
+        "next_offset": next_offset if has_more else None,
+        "has_more": has_more,
+        "start_line": start_line,
+        "large": stat.st_size > len(data),
     }
 
 
