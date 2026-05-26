@@ -14,7 +14,7 @@ from pathlib import Path
 SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
 INSTALL_COMMAND = (
     "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/"
-    "scripts/install.sh | bash"
+    "scripts/install.sh | bash -s -- --yes"
 )
 
 

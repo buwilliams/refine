@@ -51,7 +51,8 @@ def main() -> int:
             assert info.latest_version == "1.2.0"
             assert info.upgrade_available is True
             assert info.local_development is False
-            assert info.command.endswith("scripts/install.sh | bash")
+            assert info.command.endswith("scripts/install.sh | bash -s -- --yes")
+            assert "--yes" in info.command
             assert "--upgrade" not in info.command
 
             (installed / "marker.txt").write_text("local dev\n", encoding="utf-8")

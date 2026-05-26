@@ -145,7 +145,7 @@ def main() -> int:
         current_version = "1.0.0"
         latest_version = "1.2.0"
         upgrade_available = True
-        command = "curl install.sh | bash"
+        command = "curl install.sh | bash -s -- --yes"
 
     old_upgrade_status = cli.upgrade.status
     try:
@@ -158,8 +158,23 @@ def main() -> int:
     upgrade_notice = stdout.getvalue()
     assert "Upgrade available" in upgrade_notice
     assert "Refine 1.2.0 is available (current 1.0.0)." in upgrade_notice
-    assert "curl install.sh | bash" in upgrade_notice
+    assert "curl install.sh | bash -s -- --yes" in upgrade_notice
+    assert "--yes" in upgrade_notice
     assert "--upgrade" not in upgrade_notice
+
+    cli_source = Path(cli.__file__).read_text(encoding="utf-8")
+
+    def function_source(name: str) -> str:
+        start = cli_source.index(f"def {name}(")
+        end = cli_source.find("\ndef ", start + 1)
+        return cli_source[start:] if end == -1 else cli_source[start:end]
+
+    start_source = function_source("cmd_start")
+    assert "_print_upgrade_notice(setup_clone)" in start_source
+    assert "_print_upgrade_notice(clone)" in start_source
+    assert "_print_upgrade_notice(clone)" in function_source("_start_systemd_ui")
+    assert "_print_upgrade_notice(clone)" in function_source("_restart_systemd_ui")
+    assert "_print_upgrade_notice(clone)" in function_source("_restart_setup_systemd_ui")
 
     print("[ok] Typer CLI dispatch preserves commands, aliases, and ps options")
     return 0
