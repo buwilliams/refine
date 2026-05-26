@@ -368,6 +368,7 @@ function renderSettingsMarkdownField({
   const htmlId = htmlEscape(id);
   const describedById = `${htmlId}-description`;
   const trimmed = String(value || "").trim();
+  const emptyPreview = `No ${htmlEscape(title.toLowerCase())} yet.`;
   return `
     <section class="settings-section settings-markdown-field" data-settings-markdown-field>
       <div class="settings-section-heading">
@@ -376,17 +377,16 @@ function renderSettingsMarkdownField({
                 class="secondary settings-markdown-edit"
                 title="Edit ${htmlEscape(title)}"
                 aria-label="Edit ${htmlEscape(title)}"
+                data-settings-markdown-title="${htmlEscape(title)}"
+                data-settings-markdown-empty="${emptyPreview}"
                 data-settings-markdown-edit>
-          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
-          </svg>
+          ${settingsMarkdownIcon("edit")}
         </button>
       </div>
       ${scope ? `<p class="scope-label muted small">${htmlEscape(scope)}</p>` : ""}
       ${description ? `<p class="muted small" id="${describedById}" style="margin-top:0">${htmlEscape(description)}</p>` : ""}
       <div class="settings-markdown-preview" data-settings-markdown-preview>
-        ${trimmed ? mdToHtml(value) : `<p class="muted small">No ${htmlEscape(title.toLowerCase())} yet.</p>`}
+        ${trimmed ? mdToHtml(value) : `<p class="muted small">${emptyPreview}</p>`}
       </div>
       <textarea id="${htmlId}" rows="${rows}" data-settings-markdown-editor
                 ${description ? `aria-describedby="${describedById}"` : ""}
@@ -394,19 +394,83 @@ function renderSettingsMarkdownField({
     </section>`;
 }
 
+function settingsMarkdownIcon(name) {
+  if (name === "save") {
+    return `
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <path d="M15.2 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8.8Z"></path>
+        <path d="M17 21v-8H7v8"></path>
+        <path d="M7 3v5h8"></path>
+      </svg>`;
+  }
+  return `
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path d="M12 20h9"></path>
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+    </svg>`;
+}
+
+function setSettingsMarkdownButtonState(btn, editing) {
+  if (!btn) return;
+  const title = btn.dataset.settingsMarkdownTitle || "field";
+  const action = editing ? "Save" : "Edit";
+  btn.dataset.settingsMarkdownEditing = editing ? "1" : "0";
+  btn.title = `${action} ${title}`;
+  btn.setAttribute("aria-label", `${action} ${title}`);
+  btn.innerHTML = settingsMarkdownIcon(editing ? "save" : "edit");
+}
+
+function commitSettingsMarkdownField(field) {
+  if (!field) return;
+  const preview = field.querySelector("[data-settings-markdown-preview]");
+  const editor = field.querySelector("[data-settings-markdown-editor]");
+  const btn = field.querySelector("[data-settings-markdown-edit]");
+  if (!preview || !editor) return;
+  const value = editor.value || "";
+  const trimmed = value.trim();
+  const empty = btn?.dataset.settingsMarkdownEmpty || "No content yet.";
+  preview.innerHTML = trimmed ? mdToHtml(value) : `<p class="muted small">${htmlEscape(empty)}</p>`;
+  editor.hidden = true;
+  preview.hidden = false;
+  setSettingsMarkdownButtonState(btn, false);
+  editor.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+function editSettingsMarkdownField(field) {
+  if (!field) return;
+  const preview = field.querySelector("[data-settings-markdown-preview]");
+  const editor = field.querySelector("[data-settings-markdown-editor]");
+  const btn = field.querySelector("[data-settings-markdown-edit]");
+  if (!editor) return;
+  preview?.setAttribute("hidden", "");
+  editor.hidden = false;
+  setSettingsMarkdownButtonState(btn, true);
+  editor.focus();
+}
+
 function bindSettingsMarkdownFields(root) {
   if (!root) return;
   $$("[data-settings-markdown-edit]", root).forEach((btn) => {
+    btn.addEventListener("mousedown", (e) => {
+      const editor = btn.closest("[data-settings-markdown-field]")
+        ?.querySelector("[data-settings-markdown-editor]");
+      if (editor && !editor.hidden) e.preventDefault();
+    });
     btn.addEventListener("click", () => {
       const field = btn.closest("[data-settings-markdown-field]");
       if (!field) return;
-      field.querySelector("[data-settings-markdown-preview]")?.setAttribute("hidden", "");
       const editor = field.querySelector("[data-settings-markdown-editor]");
-      if (editor) {
-        editor.hidden = false;
-        editor.focus();
+      if (editor && !editor.hidden) {
+        commitSettingsMarkdownField(field);
+      } else {
+        editSettingsMarkdownField(field);
       }
-      btn.hidden = true;
+    });
+  });
+  $$("[data-settings-markdown-editor]", root).forEach((editor) => {
+    editor.addEventListener("blur", () => {
+      if (editor.hidden) return;
+      commitSettingsMarkdownField(editor.closest("[data-settings-markdown-field]"));
     });
   });
 }

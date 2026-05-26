@@ -241,10 +241,22 @@ def main() -> int:
     assert "data-settings-markdown-preview" in settings_js
     assert "data-settings-markdown-editor" in settings_js
     assert "data-settings-markdown-edit" in settings_js
+    assert "function settingsMarkdownIcon(name)" in settings_js
+    assert 'settingsMarkdownIcon("edit")' in settings_js
+    assert 'settingsMarkdownIcon(editing ? "save" : "edit")' in settings_js
+    assert "function commitSettingsMarkdownField(field)" in settings_js
+    assert "function editSettingsMarkdownField(field)" in settings_js
+    assert 'preview.innerHTML = trimmed ? mdToHtml(value)' in settings_js
+    assert 'editor.dispatchEvent(new Event("change", { bubbles: true }));' in settings_js
+    assert 'btn.addEventListener("mousedown"' in settings_js
+    assert 'if (editor && !editor.hidden) e.preventDefault();' in settings_js
+    assert 'editor.addEventListener("blur"' in settings_js
+    assert 'commitSettingsMarkdownField(editor.closest("[data-settings-markdown-field]"));' in settings_js
     assert "mdToHtml(value)" in settings_js
-    assert 'field.querySelector("[data-settings-markdown-preview]")?.setAttribute("hidden", "")' in settings_js
+    assert 'preview?.setAttribute("hidden", "")' in settings_js
     assert 'editor.hidden = false;' in settings_js
-    assert 'btn.hidden = true;' in settings_js
+    assert 'editor.hidden = true;' in settings_js
+    assert "btn.hidden = true;" not in settings_js
     for old_save_id in (
         'id="s-save"',
         'id="s-save-cli"',
