@@ -157,7 +157,7 @@ def main() -> int:
     assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert '"recursive=1"' in toolbar_js
     assert "/api/files/search?q=${encodeURIComponent(query)}" in toolbar_js
-    assert 'api("GET", `/api/files/read?path=${encodeURIComponent(path)}`)' in toolbar_js
+    assert "/api/files/read?path=${encodeURIComponent(path)}&offset=0&limit=${FILE_TEXT_CHUNK_BYTES}" in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
 
