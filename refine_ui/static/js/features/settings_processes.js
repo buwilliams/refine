@@ -22,7 +22,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
   const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
   return `
     <section class="settings-section">
-      <h3>Supervisor process management</h3>
+      <h3>Process management</h3>
       ${rows ? `
         <table class="table process-table managed-process-table mobile-card-table">
           <colgroup>

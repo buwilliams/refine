@@ -440,7 +440,7 @@ def main() -> int:
     assert 'class="table process-table managed-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table agents-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table runner-workers-table mobile-card-table"' in processes_body
-    assert processes_body.index("<h3>Supervisor process management</h3>") < processes_body.index("<h3>Agent processes</h3>") < processes_body.index("<h3>Runner processes</h3>")
+    assert processes_body.index("<h3>Process management</h3>") < processes_body.index("<h3>Agent processes</h3>") < processes_body.index("<h3>Runner processes</h3>")
     managed_table = processes_body.split('class="table process-table managed-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     runner_table = processes_body.split('class="table process-table runner-workers-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
@@ -484,7 +484,7 @@ def main() -> int:
     assert '<span class="role-pill ${kind === "agent"' not in processes_body
     assert '<span class="role-pill merger"' not in processes_body
     assert 'class="process-actions"><div class="actions">' in processes_body
-    assert "<h3>Supervisor process management</h3>" in processes_body
+    assert "<h3>Process management</h3>" in processes_body
     assert "<h3>Agent processes</h3>" in processes_body
     assert "<h3>Runner processes</h3>" in processes_body
     assert 'data-process-id="${htmlEscape(proc.id || "")}"' in processes_body
