@@ -2,12 +2,11 @@
 
 refine is an agentic software delivery system that builds new apps, implements features, and fixes bugs. It coordinates people and agents across distributed machines while keeping feedback cheap, local, and repeatable. Product, support, and customers — anyone who can articulate what the app does today vs what it should do instead - can make meaningful contributions to your software.
 
-- **Decentralized** - each instance owns its queue and data locally, while git keeps people in sync across machines.
+- **Decentralized** - refine runs locally against existing repositories, branches, processes, and infrastructure, while git keeps people in sync across machines.
 - **Cheap feedback loops** - Gaps move from report to agent work to human review, so the system improves through fast correction instead of perfect upfront specification.
 - **Planning and chat** - people can think with agents before execution, ask questions, and steer Gap-specific follow-up.
 - **Quality automation** - Guidance, Governance, and QA shape agent work from planning through merge, keeping automation aligned with product intent, local rules, and requirements.
 - **Human verification** - people review the result before merge, preserving ordinary human judgment where it matters.
-- **Works with you** - refine fits existing repositories, branches, processes, and infrastructure, so teams can use it alongside current development practices.
 
 ## Quick Start
 

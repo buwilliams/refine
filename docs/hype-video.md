@@ -5,28 +5,21 @@
 Create a value-led hype video for Refine that feels impressive immediately. Do
 not lead with the problem. Open with a sharp question, introduce Refine, then
 move through real product capabilities with hype music, clean voiceover, and fast
-UI proof. The footage should show capability; the voiceover and captions should
-translate that capability into value for the user.
+UI proof. Keep captions short. Make the product feel obvious.
 
-Target length: 90-110 seconds. Hard cap: 120 seconds.
+Target length: 75-95 seconds. Hard cap: 110 seconds.
 
 Primary audience: Product and QA buyers who should understand the value by
 watching the workflow, not by being told which pain points they have.
 
 Value proposition:
 
-- **Decentralized:** Refine runs against the user's repo, git, provider, and
-  machine, while git keeps people in sync across machines.
-- **Cheap feedback loops:** Gaps move from report to agent work to human review.
-- **Planning and chat:** People can think with agents before execution and steer
-  follow-up work.
-- **Quality automation:** Guidance, Governance, and Quality keep automation
-  aligned with product intent and requirements.
-- **Human verification:** People explicitly review the result before it becomes
-  done.
-- **Works with you:** Refine fits existing repositories, branches, processes,
-  and infrastructure, so teams can use it alongside current development
-  practices.
+- **Decentralized:** Local repo, git, provider, machine, existing processes, and
+  infrastructure.
+- **Cheap feedback loops:** Gaps turn feedback into reviewable agent work.
+- **Planning and chat:** People can think, steer, and follow up in context.
+- **Quality automation:** Guidance, Governance, and Quality align the work.
+- **Human verification:** People review before anything is done.
 
 ## Opening
 
@@ -35,8 +28,7 @@ Use this opening structure:
 1. Fast dashboard montage.
 2. On-screen question:
 
-   > What should your software delivery process look like when agents are part
-   > of the team?
+   > Agentic software delivery?
 
 3. Cut to Refine UI.
 4. On-screen title:
@@ -77,49 +69,43 @@ data visible.
 
 ## Voiceover Script
 
-Use this as the base narration, paced around 100 seconds:
+Use this as the base narration, paced around 80 seconds:
 
-> What should your software delivery process look like when agents are part of
-> the team?
+> Agentic software delivery?
 >
 > Introducing Refine.
 >
-> Refine is an agentic software delivery system that helps teams build, fix, and
-> verify software without giving up local ownership or human control.
+> Refine helps teams build, fix, and verify software with agents, without giving
+> up local ownership or human control.
 >
 > Start with a Gap: what the app does now, what it should do instead, and who
-> reported it. Product, QA, support, and customers can turn real observations
-> into useful software work.
+> reported it.
 >
 > Create one manually, or paste a bug report, customer note, or meeting
-> transcript. Refine extracts the work into reviewable Gaps, so feedback becomes
-> clear, actionable, and ready to run.
+> transcript. Refine turns real feedback into reviewable work.
 >
 > Each Gap gets its own agent run, its own branch, and its own worktree, so
 > multiple changes can move at once while git keeps the work isolated and
 > traceable.
 >
-> The dashboard keeps the feedback loop visible: what is running, what needs
-> review, what failed, and what is ready for human attention.
+> The dashboard shows what is running, what needs review, what failed, and what
+> is ready for attention.
 >
 > Guidance and Governance shape agent work before it starts. Quality checks and
-> regression evidence keep automation aligned with product intent, local rules,
-> and requirements.
+> regression evidence keep it aligned with product intent and requirements.
 >
-> When an agent finishes, Refine does not just call it done. It moves the change
-> through merge flow, logs, review, and explicit human verification, preserving
-> human judgment where it matters.
+> When an agent finishes, Refine moves the change through logs, review, merge,
+> and explicit human verification.
 >
-> Need judgment? Open Chat on the Gap, inspect files, resolve issues, or send
-> the agent another round. People can steer the system instead of starting over.
+> Need judgment? Open Chat, inspect files, resolve issues, or send the agent
+> another round.
 >
 > The runtime is visible too: processes, workers, active agents, target app
-> controls, pause and resume, all running locally against your repo, your git,
-> your provider, and your machine. Refine works inside the development practices
-> you already use.
+> controls, pause, and resume. It runs locally against your repo, your git, your
+> provider, and your machine.
 >
 > Refine turns agent work into a local, repeatable delivery workflow people can
-> actually operate.
+> operate inside the practices they already use.
 >
 > Install Refine, connect it to an app, and start shipping verified changes.
 
@@ -130,16 +116,15 @@ state user value, not just name UI features.
 
 | Time | Scene | Footage | Callout |
 | --- | --- | --- | --- |
-| 0-5s | Opening question | Fast dashboard montage | What should software delivery look like with agents? |
-| 5-10s | Reveal | Refine title, dashboard, top nav | Introducing Refine |
-| 10-22s | Capture work | `+ New Gap`, actual/target fields, reporter | Product intent becomes executable work |
-| 22-34s | Import | Paste messy feedback, extracted draft Gaps | Turn real feedback into reviewable Gaps |
-| 34-48s | Agents running | Status changes, activity feed, running indicator | Move fast without branch collisions |
-| 48-62s | Review | Gap detail, logs, merge/review state, `Verify` | Humans approve what ships |
-| 62-76s | Quality/control | Quality, Guidance, Governance | Automation follows product rules |
-| 76-90s | Operations | Processes, workers, pause/resume, target app controls | Keep the runtime visible and controllable |
-| 90-102s | Chat/files | Attached Chat and Files/Changes | Inspect, steer, and recover in context |
-| 102-112s | CTA | Install command and polished dashboard final frame | Start shipping verified changes |
+| 0-4s | Opening question | Fast dashboard montage | Agentic software delivery? |
+| 4-8s | Reveal | Refine title, dashboard, top nav | Introducing Refine |
+| 8-18s | Capture work | `+ New Gap`, actual/target fields, reporter | Product intent becomes work |
+| 18-28s | Import | Paste messy feedback, extracted draft Gaps | Feedback becomes Gaps |
+| 28-42s | Agents running | Status changes, activity feed, running indicator | Parallel work, clean git |
+| 42-58s | Review and steer | Gap detail, logs, Chat, Files/Changes, `Verify` | Humans approve what ships |
+| 58-70s | Quality/control | Quality, Guidance, Governance | Automation follows intent |
+| 70-84s | Operations | Processes, workers, pause/resume, target app controls | Runtime you can operate |
+| 84-94s | CTA | Install command and polished dashboard final frame | Start shipping verified changes |
 
 ## CapCut Edit Notes
 
@@ -148,7 +133,7 @@ state user value, not just name UI features.
 - Use quick zooms on meaningful states: created Gap, extracted drafts, running
   agent, review, verify, Quality result, and process table.
 - Keep hype music energetic but low enough for narration to stay clear.
-- Use captions as punchy value propositions tied to the visible capability.
+- Use captions as short value statements tied to the visible capability.
 - Do not use generated b-roll unless it supports a transition; real product
   footage should carry the proof.
 - Blur or crop private paths, repo URLs, customer names, tokens, secrets, and
@@ -160,19 +145,12 @@ state user value, not just name UI features.
 
 Prioritize these ideas in the final edit:
 
-- Refine is a full delivery workflow that people can operate, not just a code
-  generation prompt.
-- Gaps make product intent executable while keeping feedback cheap to submit and
-  review.
-- Isolated branches and worktrees let teams move multiple changes without
-  losing git clarity.
-- Review, Chat, Files, and explicit Verify keep humans in control.
-- Guidance, Governance, and Quality make agent work better aligned with product
-  intent and requirements.
-- Processes and runtime controls make the system visible, recoverable, and
-  operationally trustworthy.
-- Local execution preserves ownership of the repo, credentials, provider, and
-  development workflow.
+- More than prompting: a delivery workflow people can operate.
+- Feedback becomes executable work.
+- Parallel agent runs stay clean in git.
+- Humans review, steer, and verify.
+- Quality controls keep automation aligned.
+- Local runtime, visible processes, existing practices.
 
 ## Avoid
 
