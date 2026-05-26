@@ -110,6 +110,8 @@ def main() -> int:
     assert "uv run refine restart" in script
     assert "assuming local development and skipping release upgrade" in script
     assert "not on a semver release tag" in script
+    assert 'if [ "$REFINE_UPGRADED" = "1" ]; then' in script
+    assert 'confirm "Install or repair Playwright Chromium for regression screenshots" "$default_answer"' in script
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
     assert "uv run refine install $port" in script
@@ -409,10 +411,25 @@ def main() -> int:
         )
         assert code == 0, output
         assert "Refine upgraded to release 1.0.0" in output
+        assert "Install or repair Playwright Chromium for regression screenshots [y/N]" in output
         assert "Restart Refine now to run 1.0.0 [Y/n]" in output
         assert "Refine was upgraded but not restarted" in output
         assert "uv run refine restart" in output
         assert "uv run refine start" not in output
+
+        result = subprocess.run(
+            ["bash", str(install_sh), "--yes"],
+            cwd=checkout,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        output = result.stdout + result.stderr
+        assert "Refine upgraded to release 1.0.0" in output
+        assert "Skipped Playwright. Managed regression screenshots may fail" in output
+        assert "+ npx --yes playwright install --with-deps chromium" not in output
+        assert "Refine was upgraded but not restarted" not in output
         print("[ok] install.sh prompts for restart after a release upgrade")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

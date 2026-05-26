@@ -668,7 +668,11 @@ ensure_provider_cli() {
 
 ensure_playwright_headless() {
   section "Playwright"
-  if ! confirm "Install or repair Playwright Chromium for regression screenshots" "y"; then
+  local default_answer="y"
+  if [ "$REFINE_UPGRADED" = "1" ]; then
+    default_answer="n"
+  fi
+  if ! confirm "Install or repair Playwright Chromium for regression screenshots" "$default_answer"; then
     warn "Skipped Playwright. Managed regression screenshots may fail until Playwright is installed."
     return 0
   fi
