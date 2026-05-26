@@ -9,6 +9,8 @@ const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
+let filesSearchTimer = null;
+let filesSearchRequestSeq = 0;
 const chatState = {
   tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
@@ -24,6 +26,10 @@ const filesState = {
   treeMetaByPath: {},
   expanded: new Set([""]),
   file: null,
+  searchQuery: "",
+  searchResults: null,
+  searchLoading: false,
+  searchError: "",
   loading: false,
   error: "",
 };
@@ -141,6 +147,10 @@ function resetFilesState() {
   filesState.treeMetaByPath = {};
   filesState.expanded = new Set([""]);
   filesState.file = null;
+  filesState.searchQuery = "";
+  filesState.searchResults = null;
+  filesState.searchLoading = false;
+  filesState.searchError = "";
   filesState.loading = false;
   filesState.error = "";
 }
@@ -461,9 +471,9 @@ function toolbarIcon(name) {
     collapse: '<path d="m7 15 5-5 5 5"></path><path d="M7 9h10"></path><path d="M7 19h10"></path>',
     copy: '<rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M5 15V7a2 2 0 0 1 2-2h8"></path>',
     expand: '<path d="m7 9 5 5 5-5"></path><path d="M7 5h10"></path><path d="M7 19h10"></path>',
-    paste: '<path d="M8 4h8v4H8z"></path><path d="M16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2"></path>',
     go: '<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>',
     refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2"></path><path d="M3 12A9 9 0 0 1 18.5 5.8"></path><path d="M3 18v-6h6"></path><path d="M21 6v6h-6"></path>',
+    search: '<path d="m21 21-4.3-4.3"></path><circle cx="11" cy="11" r="7"></circle>',
   };
   return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
 }
@@ -489,10 +499,6 @@ function renderFilesPanel() {
           ${toolbarIcon("copy")}
         </button>
         <button type="button" class="secondary files-icon-btn"
-                data-files-paste title="Paste path" aria-label="Paste path">
-          ${toolbarIcon("paste")}
-        </button>
-        <button type="button" class="secondary files-icon-btn"
                 data-files-go title="Go to path" aria-label="Go to path">
           ${toolbarIcon("go")}
         </button>
@@ -516,8 +522,15 @@ function renderFilesPanel() {
               </button>
             </div>
           </div>
+          <div class="files-tree-search">
+            <span class="files-tree-search-icon">${toolbarIcon("search")}</span>
+            <input type="search" id="files-search-input"
+                   autocomplete="off" spellcheck="false"
+                   placeholder="Search files"
+                   value="${htmlEscape(filesState.searchQuery || "")}">
+          </div>
           <div class="files-tree" role="tree" aria-label="Directories and files">
-            ${renderFilesTree()}
+            ${renderFilesTreePanel()}
           </div>
         </div>
         <div class="files-content">
@@ -528,6 +541,46 @@ function renderFilesPanel() {
         </div>
       </div>
     </div>`;
+}
+
+function renderFilesTreePanel() {
+  const query = (filesState.searchQuery || "").trim();
+  if (query) return renderFilesSearchResults();
+  return renderFilesTree();
+}
+
+function renderFilesSearchResults() {
+  if (filesState.searchLoading) {
+    return `<p class="muted small files-empty">Searching...</p>`;
+  }
+  if (filesState.searchError) {
+    return `<p class="muted small files-empty">${htmlEscape(filesState.searchError)}</p>`;
+  }
+  const results = filesState.searchResults;
+  if (!results) {
+    return `<p class="muted small files-empty">Type to search the target repo.</p>`;
+  }
+  const entries = results.entries || [];
+  if (!entries.length) {
+    return `<p class="muted small files-empty">No matches for "${htmlEscape(results.query || filesState.searchQuery)}".</p>`;
+  }
+  const rows = entries.map((entry) => `
+    <div class="files-tree-item files-search-result"
+         role="treeitem"
+         style="--depth:0"
+         data-files-path="${htmlEscape(entry.path)}"
+         data-files-type="${htmlEscape(entry.type)}"
+         data-files-search-result="1">
+      <span class="files-tree-caret" aria-hidden="true">${entry.type === "directory" ? "▸" : ""}</span>
+      <span class="files-tree-name">
+        <span>${htmlEscape(entry.name || entry.path || ".")}</span>
+        <small>${htmlEscape(entry.path || entry.name || "")}</small>
+      </span>
+    </div>`).join("");
+  const limit = results.truncated
+    ? `<p class="muted small files-empty">Showing first ${FILES_TREE_MAX_ENTRIES} matches.</p>`
+    : "";
+  return rows + limit;
 }
 
 function renderFilesTree(path = "", depth = 0) {
@@ -661,6 +714,14 @@ function bindFilesPanel(root) {
     e.preventDefault();
     navigateFilesPath(e.target.value);
   });
+  root.querySelector("#files-search-input")?.addEventListener("input", (e) => {
+    scheduleFilesSearch(e.target.value);
+  });
+  root.querySelector("#files-search-input")?.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    runFilesSearch(e.target.value, { refocus: true });
+  });
   root.querySelector("[data-files-go]")?.addEventListener("click", () => {
     navigateFilesPath(root.querySelector("#files-path-input")?.value || "");
   });
@@ -675,24 +736,19 @@ function bindFilesPanel(root) {
       toast("Clipboard copy is unavailable.", "error");
     }
   });
-  root.querySelector("[data-files-paste]")?.addEventListener("click", async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      const input = root.querySelector("#files-path-input");
-      if (input) {
-        input.value = text;
-        input.focus();
-      }
-    } catch {
-      toast("Clipboard paste is unavailable.", "error");
-    }
-  });
   $$(".files-tree-item", root).forEach((row) => {
     row.addEventListener("click", () => {
       const path = row.dataset.filesPath || "";
       const type = row.dataset.filesType || "";
       const depth = Number.parseInt(row.dataset.filesDepth || "0", 10);
       if (type === "directory") {
+        if (row.dataset.filesSearchResult === "1") {
+          filesState.searchQuery = "";
+          filesState.searchResults = null;
+          filesState.searchError = "";
+          loadFilesDirectory(path, { expand: true, redraw: true });
+          return;
+        }
         if (depth >= FILES_TREE_MAX_DEPTH) {
           filesState.path = path;
           filesState.selectedPath = path;
@@ -716,6 +772,60 @@ function bindFilesPanel(root) {
       }
     });
   });
+}
+
+function scheduleFilesSearch(query) {
+  filesState.searchQuery = String(query || "");
+  filesState.searchError = "";
+  if (filesSearchTimer) clearTimeout(filesSearchTimer);
+  filesSearchTimer = setTimeout(() => {
+    runFilesSearch(filesState.searchQuery, { refocus: true });
+  }, 250);
+}
+
+async function runFilesSearch(query, { refocus = false } = {}) {
+  if (filesSearchTimer) {
+    clearTimeout(filesSearchTimer);
+    filesSearchTimer = null;
+  }
+  query = String(query || "").trim();
+  filesSearchRequestSeq += 1;
+  const requestSeq = filesSearchRequestSeq;
+  filesState.searchQuery = query;
+  filesState.searchError = "";
+  if (!query) {
+    filesState.searchLoading = false;
+    filesState.searchResults = null;
+    drawToolbar();
+    return;
+  }
+  filesState.searchLoading = true;
+  try {
+    const result = await api(
+      "GET",
+      `/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_TREE_MAX_ENTRIES}`,
+    );
+    if (requestSeq !== filesSearchRequestSeq) return;
+    filesState.searchResults = result;
+    filesState.searchLoading = false;
+    drawToolbar();
+    if (refocus) focusFilesSearchInput();
+  } catch (e) {
+    if (requestSeq !== filesSearchRequestSeq) return;
+    filesState.searchLoading = false;
+    filesState.searchResults = null;
+    filesState.searchError = e.message || String(e);
+    drawToolbar();
+    if (refocus) focusFilesSearchInput();
+  }
+}
+
+function focusFilesSearchInput() {
+  const input = $("#files-search-input");
+  if (!input) return;
+  input.focus();
+  const end = input.value.length;
+  try { input.setSelectionRange(end, end); } catch {}
 }
 
 async function expandAllFilesTree() {

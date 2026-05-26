@@ -60,6 +60,7 @@ BULK_UPDATE_BACKGROUND_THRESHOLD = 100
 FILE_PREVIEW_MAX_BYTES = 1_000_000
 FILES_TREE_MAX_DEPTH = 3
 FILES_TREE_MAX_ENTRIES = 200
+FILES_SEARCH_MAX_SCAN = 20_000
 
 
 def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
@@ -282,6 +283,59 @@ def files_tree(
         "truncated": global_truncated,
     })
     return 200, body
+
+
+def files_search(
+    query: str | None = None,
+    *,
+    max_entries: int = FILES_TREE_MAX_ENTRIES,
+) -> tuple[int, dict]:
+    root = _target_repo_root()
+    q = str(query or "").strip().lower()
+    max_entries = max(1, min(FILES_TREE_MAX_ENTRIES, int(max_entries)))
+    if not q:
+        return 200, {
+            "root": str(root),
+            "query": "",
+            "entries": [],
+            "truncated": False,
+            "max_entries": max_entries,
+        }
+    entries = []
+    scanned = 0
+    truncated = False
+    try:
+        iterator = root.rglob("*")
+        for path in iterator:
+            scanned += 1
+            if scanned > FILES_SEARCH_MAX_SCAN:
+                truncated = True
+                break
+            try:
+                resolved = path.resolve()
+                rel = resolved.relative_to(root).as_posix()
+            except (OSError, ValueError):
+                continue
+            if q not in rel.lower() and q not in path.name.lower():
+                continue
+            entries.append(_file_entry(root, path))
+            if len(entries) >= max_entries:
+                truncated = True
+                break
+    except OSError as e:
+        return err(403, "file search cannot be completed", str(e))
+    entries.sort(key=lambda item: (
+        0 if item["type"] == "directory" else 1,
+        item["path"].lower(),
+    ))
+    return 200, {
+        "root": str(root),
+        "query": q,
+        "entries": entries,
+        "truncated": truncated,
+        "max_entries": max_entries,
+        "scanned": scanned,
+    }
 
 
 def files_read(path: str | None = None) -> tuple[int, dict]:

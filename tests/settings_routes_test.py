@@ -725,6 +725,7 @@ def main() -> int:
     assert ".files-browser" in toolbar_css
     assert ".files-tree-panel" in toolbar_css
     assert ".files-tree-actions" in toolbar_css
+    assert ".files-tree-search" in toolbar_css
     assert ".files-source-line" in toolbar_css
     assert "background: #ffffff;" in toolbar_css
     assert "color: #111827;" in toolbar_css
@@ -733,11 +734,13 @@ def main() -> int:
     assert "color: white;" in toolbar_css
     assert '@route("GET", r"/api/files/tree")' in server_py
     assert '@route("GET", r"/api/files/read")' in server_py
+    assert '@route("GET", r"/api/files/search")' in server_py
     assert "recursive = _get_one(q, \"recursive\", \"0\")" in server_py
     assert "FILES_TREE_MAX_DEPTH = 3" in api_py
     assert "FILES_TREE_MAX_ENTRIES = 200" in api_py
     assert "def files_tree(" in api_py
     assert "def files_read(" in api_py
+    assert "def files_search(" in api_py
     assert "const CHANGES_DEFAULT_LIMIT = 50;" in changes_js
     assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
     assert '<table class="table changes-table mobile-card-table">' in changes_js

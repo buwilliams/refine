@@ -21,6 +21,10 @@ def main() -> int:
             "def hello():\n    return 'world'\n",
             encoding="utf-8",
         )
+        (client / "src" / "helpers.py").write_text(
+            "def helper():\n    return 'ok'\n",
+            encoding="utf-8",
+        )
         (client / "depth" / "a" / "b" / "c" / "d").mkdir(parents=True)
         (client / "depth" / "a" / "b" / "c" / "d" / "too-deep.txt").write_text(
             "hidden by tree depth\n",
@@ -60,6 +64,21 @@ def main() -> int:
         assert "depth/a/b/c" in body["entries_by_path"], body
         assert "depth/a/b/c/d" not in body["entries_by_path"], body
         assert body["meta_by_path"]["depth/a/b/c"]["depth"] == api.FILES_TREE_MAX_DEPTH, body
+
+        status, body = api.files_search("helper")
+        assert status == 200, body
+        assert body["query"] == "helper", body
+        assert body["entries"][0]["path"] == "src/helpers.py", body
+
+        status, body = api.files_search("txt", max_entries=3)
+        assert status == 200, body
+        assert len(body["entries"]) == 3, body
+        assert body["truncated"] is True, body
+        assert body["max_entries"] == 3, body
+
+        status, body = api.files_search("")
+        assert status == 200, body
+        assert body["entries"] == [], body
 
         status, body = api.files_read("src/app.py")
         assert status == 200, body

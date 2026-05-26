@@ -106,7 +106,8 @@ def main() -> int:
     assert '<span class="toolbar-dock-label">TOOLBAR</span>' in toolbar_js
     assert 'id="files-path-input"' in toolbar_js
     assert 'data-files-copy' in toolbar_js
-    assert 'data-files-paste' in toolbar_js
+    assert 'data-files-paste' not in toolbar_js
+    assert 'id="files-search-input"' in toolbar_js
     assert 'data-files-go' in toolbar_js
     assert 'data-files-refresh' in toolbar_js
     assert 'data-files-expand-all' in toolbar_js
@@ -118,9 +119,12 @@ def main() -> int:
     assert 'class="files-line-number"' in toolbar_js
     assert "async function expandAllFilesTree()" in toolbar_js
     assert "function collapseAllFilesTree()" in toolbar_js
+    assert "async function runFilesSearch(query" in toolbar_js
+    assert "function scheduleFilesSearch(query)" in toolbar_js
     assert "function highlightFileLine" in toolbar_js
     assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert '"recursive=1"' in toolbar_js
+    assert "/api/files/search?q=${encodeURIComponent(query)}" in toolbar_js
     assert 'api("GET", `/api/files/read?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js

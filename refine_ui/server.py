@@ -356,6 +356,14 @@ def _h_files_read(_h, _m, _b, q):
     return api.files_read(_get_one(q, "path", ""))
 
 
+@route("GET", r"/api/files/search")
+def _h_files_search(_h, _m, _b, q):
+    return api.files_search(
+        _get_one(q, "q", ""),
+        max_entries=int(_get_one(q, "max_entries", str(api.FILES_TREE_MAX_ENTRIES))),
+    )
+
+
 # ---- Target application ------------------------------------------------------
 
 
