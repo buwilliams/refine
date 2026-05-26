@@ -23,7 +23,7 @@ async function init() {
   } catch (e) {
     // not fatal — likely fresh install with no reporters yet
   }
-  initChatDock();
+  initToolbar();
   if (typeof initCommandPalette === "function") initCommandPalette();
   initSSE();
   initTargetAppToggle();

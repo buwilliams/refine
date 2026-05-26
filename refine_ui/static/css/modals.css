@@ -214,12 +214,12 @@
 .collapsed { display: none; }
 
 /* --- Gap detail modal -------------------------------------------------- */
-/* Leave the chat dock peeking out at the bottom — the dock publishes its
-   height via `--chat-dock-height`, so the modal's backdrop stops above it
+/* Leave the Toolbar peeking out at the bottom — the dock publishes its
+   height via `--toolbar-dock-height`, so the modal's backdrop stops above it
    instead of covering it. The user can keep chatting while the modal sits
    on top of the underlying screen. */
 .gap-detail-backdrop {
-  bottom: var(--chat-dock-height, 0);
+  bottom: var(--toolbar-dock-height, 0);
 }
 .gap-detail-modal {
   position: relative;
@@ -228,7 +228,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - var(--chat-dock-height, 0px) - 60px);
+  max-height: calc(100vh - var(--toolbar-dock-height, 0px) - 60px);
   overflow: hidden;
 }
 .gap-detail-modal-body {

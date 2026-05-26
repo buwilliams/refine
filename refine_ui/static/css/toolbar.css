@@ -1,5 +1,5 @@
-/* --- Chat dock -------------------------------------------------------- */
-.chat-dock {
+/* --- Toolbar dock -------------------------------------------------------- */
+.toolbar-dock {
   position: fixed;
   left: 0;
   right: 0;
@@ -11,7 +11,7 @@
   display: flex;
   flex-direction: column;
 }
-.chat-dock-bar {
+.toolbar-dock-bar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -20,7 +20,7 @@
   flex-wrap: nowrap;
   overflow: hidden;
 }
-.chat-dock-label {
+.toolbar-dock-label {
   font-weight: 750;
   font-size: 12px;
   color: var(--muted);
@@ -29,14 +29,14 @@
   text-transform: uppercase;
   letter-spacing: 0;
 }
-.chat-dock-bar .chat-tabs {
+.toolbar-dock-bar .toolbar-tabs {
   flex: 1;
   min-width: 0;
   overflow-x: auto;
   flex-wrap: nowrap;
   margin-bottom: 0;
 }
-.chat-dock-resize {
+.toolbar-dock-resize {
   height: 6px;
   cursor: ns-resize;
   background: transparent;
@@ -44,7 +44,7 @@
   position: relative;
   display: none;
 }
-.chat-dock-resize::after {
+.toolbar-dock-resize::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -55,11 +55,11 @@
   border-radius: 2px;
   background: var(--border);
 }
-.chat-dock-resize:hover::after { background: var(--muted); }
-.chat-dock.open .chat-dock-resize { display: block; }
-.chat-dock.resizing { user-select: none; }
-.chat-dock.resizing .chat-dock-resize::after { background: var(--accent); }
-.chat-dock-toggle {
+.toolbar-dock-resize:hover::after { background: var(--muted); }
+.toolbar-dock.open .toolbar-dock-resize { display: block; }
+.toolbar-dock.resizing { user-select: none; }
+.toolbar-dock.resizing .toolbar-dock-resize::after { background: var(--accent); }
+.toolbar-dock-toggle {
   background: transparent;
   color: var(--muted);
   border: 1px solid transparent;
@@ -69,16 +69,16 @@
   cursor: pointer;
   border-radius: var(--radius);
 }
-.chat-dock .chat-dock-toggle:hover:not(:disabled) {
+.toolbar-dock .toolbar-dock-toggle:hover:not(:disabled) {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
   color: white;
 }
-.chat-dock-fullscreen-btn.active {
+.toolbar-dock-fullscreen-btn.active {
   background: var(--accent-bg);
   color: var(--accent);
 }
-.chat-dock-body {
+.toolbar-dock-body {
   display: none;
   flex-direction: column;
   padding: 10px 12px 12px;
@@ -89,28 +89,28 @@
   min-height: 120px;
   max-height: 85vh;
 }
-.chat-dock.open .chat-dock-body { display: flex; }
-.chat-dock.open .chat-dock-collapse { transform: rotate(180deg); }
-.chat-dock-body .chat-output-box { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-.chat-dock-body .chat-output-box .chat-output { flex: 1; min-height: 0; }
+.toolbar-dock.open .toolbar-dock-body { display: flex; }
+.toolbar-dock.open .toolbar-dock-collapse { transform: rotate(180deg); }
+.toolbar-dock-body .chat-output-box { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.toolbar-dock-body .chat-output-box .chat-output { flex: 1; min-height: 0; }
 
 /* Fullscreen mode: dock fills the area from just below the topbar to the
    bottom edge. The user-resizable height is overridden and the resize
    grip is hidden — viewport size dictates the body height. */
-.chat-dock.fullscreen {
+.toolbar-dock.fullscreen {
   top: var(--topbar-height, 56px);
 }
-.chat-dock.fullscreen .chat-dock-body {
+.toolbar-dock.fullscreen .toolbar-dock-body {
   height: auto;
   flex: 1;
   max-height: none;
   min-height: 0;
 }
-.chat-dock.fullscreen .chat-dock-resize { display: none; }
-body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for whatever height the dock currently occupies */
+.toolbar-dock.fullscreen .toolbar-dock-resize { display: none; }
+body { padding-bottom: var(--toolbar-dock-height, 44px); }     /* reserve room for whatever height the dock currently occupies */
 
-/* --- Chat tabs -------------------------------------------------------- */
-.chat-tabs {
+/* --- Toolbar tabs -------------------------------------------------------- */
+.toolbar-tabs {
   display: flex;
   gap: 2px;
   padding: 3px;
@@ -120,7 +120,7 @@ body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for 
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
 }
-.chat-tab {
+.toolbar-tab {
   height: 28px;
   padding: 0 10px;
   background: transparent;
@@ -136,19 +136,19 @@ body { padding-bottom: var(--chat-dock-height, 44px); }     /* reserve room for 
   gap: 6px;
   cursor: pointer;
 }
-button.chat-tab:hover:not(:disabled),
-.chat-tab:hover {
+button.toolbar-tab:hover:not(:disabled),
+.toolbar-tab:hover {
   background: var(--color-primary-hover);
   border-color: var(--color-primary-hover);
   color: white;
 }
-.chat-tab.active {
+.toolbar-tab.active {
   background: var(--card);
   color: var(--fg);
   box-shadow: var(--shadow-sm);
   font-weight: 700;
 }
-.chat-tab-close {
+.toolbar-tab-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -159,8 +159,8 @@ button.chat-tab:hover:not(:disabled),
   color: var(--muted);
   border-radius: 50%;
 }
-.chat-tab-close:hover { background: var(--border); color: var(--fg); }
-.chat-tab-dot {
+.toolbar-tab-close:hover { background: var(--border); color: var(--fg); }
+.toolbar-tab-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
@@ -263,4 +263,143 @@ button.chat-tab:hover:not(:disabled),
 @keyframes chat-dot-bounce {
   0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
   40%           { transform: scale(1);   opacity: 1; }
+}
+
+/* --- Files tab -------------------------------------------------------- */
+.files-panel {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.files-pathbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) repeat(4, 34px);
+  gap: 6px;
+  align-items: center;
+}
+.files-icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.files-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.files-browser {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 28%) minmax(0, 1fr);
+  gap: 10px;
+}
+.files-tree,
+.files-content {
+  min-height: 0;
+  background: var(--card);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: auto;
+}
+.files-tree {
+  padding: 6px;
+}
+.files-tree-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 4px;
+  align-items: center;
+  min-height: 26px;
+  padding: 2px 6px 2px calc(6px + var(--depth, 0) * 14px);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 13px;
+}
+.files-tree-item:hover,
+.files-tree-item.selected {
+  background: var(--color-surface-muted);
+}
+.files-tree-caret {
+  color: var(--muted);
+  text-align: center;
+}
+.files-tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.files-empty {
+  margin: 6px;
+}
+.files-content {
+  display: flex;
+  flex-direction: column;
+}
+.files-content-header {
+  flex: 0 0 auto;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--color-surface-muted);
+}
+.files-message {
+  padding: 16px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.files-source {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  background: #0f172a;
+  color: #e2e8f0;
+}
+.files-source-line {
+  display: grid;
+  grid-template-columns: 52px minmax(max-content, 1fr);
+  min-height: 20px;
+}
+.files-source-line:hover {
+  background: rgba(148, 163, 184, 0.12);
+}
+.files-line-number {
+  padding: 0 10px;
+  color: #94a3b8;
+  text-align: right;
+  user-select: none;
+  border-right: 1px solid rgba(148, 163, 184, 0.25);
+}
+.files-line-code {
+  padding: 0 12px;
+  white-space: pre;
+}
+.tok-keyword { color: #93c5fd; }
+.tok-string { color: #86efac; }
+.tok-comment { color: #94a3b8; font-style: italic; }
+.tok-number { color: #fca5a5; }
+.tok-attr { color: #fcd34d; }
+
+@media (max-width: 760px) {
+  .files-browser {
+    grid-template-columns: 1fr;
+  }
+  .files-tree {
+    max-height: 32vh;
+  }
 }

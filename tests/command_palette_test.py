@@ -25,7 +25,7 @@ def main() -> int:
     gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(
         encoding="utf-8",
     )
-    chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(
+    toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
 
@@ -64,6 +64,9 @@ def main() -> int:
         "gap.import",
         "refine.issue.request",
         "plan.open",
+        "toolbar.toggle",
+        "toolbar.fullscreen",
+        "files.open",
         "gaps.bulk.move",
         "gaps.bulk.failed_back",
         "system.cache.rebuild",
@@ -82,6 +85,10 @@ def main() -> int:
     assert 'window.open(' in commands_js
     assert 'update: { status: "__last_workflow_state" }' in commands_js
     assert 'await openPlanChatDock({ initialPrompt: prompt || "" });' in commands_js
+    assert 'id: "files.open"' in commands_js
+    assert 'group: "Toolbar"' in commands_js
+    assert 'aliases: ["files", "open-files", "file-browser"]' in commands_js
+    assert 'openFilesToolbar({ path: path || "" })' in commands_js
     assert "enabled: () => planHasAgentResponse(chatState.tabs.plan)" in commands_js
     assert "Wait for the agent to respond before drafting Gaps." in commands_js
     assert 'aliases: ["regression_new", "new-regression", "create-regression"]' in commands_js
@@ -94,9 +101,22 @@ def main() -> int:
     assert 'runCommand("gap.import")' in common_js
     assert 'runCommand("refine.issue.request")' in common_js
     assert 'bindCommand("#bulk-set-status", "gaps.bulk.status")' in gaps_list_js
-    assert "async function openPlanChatDock(options = {})" in chat_js
-    assert "async function sendChatText(text)" in chat_js
-    assert "function planHasAgentResponse(tab)" in chat_js
+    assert "async function openPlanChatDock(options = {})" in toolbar_js
+    assert 'label: "Files", mode: "files"' in toolbar_js
+    assert '<span class="toolbar-dock-label">TOOLBAR</span>' in toolbar_js
+    assert 'id="files-path-input"' in toolbar_js
+    assert 'data-files-copy' in toolbar_js
+    assert 'data-files-paste' in toolbar_js
+    assert 'data-files-go' in toolbar_js
+    assert 'data-files-refresh' in toolbar_js
+    assert 'class="files-tree"' in toolbar_js
+    assert 'class="files-content"' in toolbar_js
+    assert 'class="files-line-number"' in toolbar_js
+    assert "function highlightFileLine" in toolbar_js
+    assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
+    assert 'api("GET", `/api/files/read?path=${encodeURIComponent(path)}`)' in toolbar_js
+    assert "async function sendChatText(text)" in toolbar_js
+    assert "function planHasAgentResponse(tab)" in toolbar_js
 
     assert ".nav-command-button" in base_css
     assert ".nav-issue-button" in base_css

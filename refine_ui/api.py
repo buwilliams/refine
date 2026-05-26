@@ -57,6 +57,7 @@ def err(
 
 IMPORT_BACKGROUND_THRESHOLD = 100
 BULK_UPDATE_BACKGROUND_THRESHOLD = 100
+FILE_PREVIEW_MAX_BYTES = 1_000_000
 
 
 def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
@@ -117,6 +118,123 @@ def _exclusive_mutation(
                 return _background_job_conflict_response(e)
         return wrapped
     return decorator
+
+
+# --- Files --------------------------------------------------------------------
+
+def _target_repo_root() -> Path:
+    return config.get(reload=True).client_repo.resolve()
+
+
+def _resolve_repo_path(raw_path: str | None) -> tuple[Path, Path, str] | tuple[None, None, tuple[int, dict]]:
+    root = _target_repo_root()
+    raw = str(raw_path or "").replace("\\", "/").strip()
+    while raw.startswith("/"):
+        raw = raw[1:]
+    parts = [part for part in raw.split("/") if part]
+    if any(part == ".." for part in parts):
+        return None, None, err(403, "path must stay inside the target repo")
+    target = (root / "/".join(parts)).resolve()
+    try:
+        rel = target.relative_to(root)
+    except ValueError:
+        return None, None, err(403, "path must stay inside the target repo")
+    return root, target, rel.as_posix() if rel.as_posix() != "." else ""
+
+
+def _file_entry(root: Path, path: Path) -> dict:
+    try:
+        stat = path.stat()
+    except OSError:
+        stat = path.lstat()
+    try:
+        rel = path.resolve().relative_to(root).as_posix()
+    except ValueError:
+        rel = path.relative_to(root).as_posix()
+    is_dir = path.is_dir()
+    is_file = path.is_file()
+    return {
+        "name": path.name,
+        "path": "" if rel == "." else rel,
+        "type": "directory" if is_dir else "file" if is_file else "other",
+        "size": stat.st_size,
+        "modified": datetime.fromtimestamp(
+            stat.st_mtime, timezone.utc,
+        ).isoformat(),
+        "symlink": path.is_symlink(),
+    }
+
+
+def files_tree(path: str | None = None) -> tuple[int, dict]:
+    resolved = _resolve_repo_path(path)
+    if resolved[0] is None:
+        return resolved[2]
+    root, target, rel = resolved
+    if not target.exists():
+        return err(404, "path not found")
+    if not target.is_dir():
+        return err(400, "path is not a directory")
+    entries = []
+    try:
+        for child in target.iterdir():
+            entries.append(_file_entry(root, child))
+    except OSError as e:
+        return err(403, "directory cannot be read", str(e))
+    entries.sort(key=lambda item: (
+        0 if item["type"] == "directory" else 1,
+        item["name"].lower(),
+    ))
+    return 200, {
+        "root": str(root),
+        "path": rel,
+        "entries": entries,
+    }
+
+
+def files_read(path: str | None = None) -> tuple[int, dict]:
+    resolved = _resolve_repo_path(path)
+    if resolved[0] is None:
+        return resolved[2]
+    root, target, rel = resolved
+    if not target.exists():
+        return err(404, "path not found")
+    if not target.is_file():
+        return err(400, "path is not a file")
+    try:
+        stat = target.stat()
+    except OSError as e:
+        return err(403, "file cannot be read", str(e))
+    base = {
+        "root": str(root),
+        "path": rel,
+        "name": target.name,
+        "size": stat.st_size,
+        "modified": datetime.fromtimestamp(
+            stat.st_mtime, timezone.utc,
+        ).isoformat(),
+        "previewable": False,
+        "content": "",
+    }
+    if stat.st_size > FILE_PREVIEW_MAX_BYTES:
+        return 200, {
+            **base,
+            "reason": f"File is larger than {FILE_PREVIEW_MAX_BYTES} bytes.",
+        }
+    try:
+        data = target.read_bytes()
+    except OSError as e:
+        return err(403, "file cannot be read", str(e))
+    if b"\0" in data[:4096]:
+        return 200, {**base, "reason": "Binary file preview is not available."}
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError:
+        return 200, {**base, "reason": "File is not valid UTF-8 text."}
+    return 200, {
+        **base,
+        "previewable": True,
+        "content": text,
+    }
 
 
 def _instance_owner(instance_id: str | None) -> str:

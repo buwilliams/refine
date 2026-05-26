@@ -340,6 +340,16 @@ def _h_chat_stop(_h, m, _b, _q):
     return api.chat_stop(m.group(1))
 
 
+@route("GET", r"/api/files/tree")
+def _h_files_tree(_h, _m, _b, q):
+    return api.files_tree(_get_one(q, "path", ""))
+
+
+@route("GET", r"/api/files/read")
+def _h_files_read(_h, _m, _b, q):
+    return api.files_read(_get_one(q, "path", ""))
+
+
 # ---- Target application ------------------------------------------------------
 
 

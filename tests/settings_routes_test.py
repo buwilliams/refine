@@ -40,7 +40,7 @@ def main() -> int:
     commands_js = (root / "refine_ui/static/js/commands.js").read_text(
         encoding="utf-8",
     )
-    chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(
+    toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
     import_js = (root / "refine_ui/static/js/features/gaps-import.js").read_text(
@@ -85,7 +85,7 @@ def main() -> int:
     base_css = (root / "refine_ui/static/css/base.css").read_text(
         encoding="utf-8",
     )
-    chat_css = (root / "refine_ui/static/css/chat.css").read_text(
+    toolbar_css = (root / "refine_ui/static/css/toolbar.css").read_text(
         encoding="utf-8",
     )
 
@@ -342,13 +342,13 @@ def main() -> int:
     assert "function closeTopbarMenus(target = null)" in common_js
     assert 'e.target.closest("#btn-plan")' in common_js
     assert 'runCommand("plan.open")' in common_js
-    assert "async function openPlanChatDock(options = {})" in chat_js
-    assert "{ purpose: \"plan\" }" in chat_js
-    assert "Draft Gaps" in chat_js
-    assert "function planTranscriptText(tab)" in chat_js
-    assert "function planHasAgentResponse(tab)" in chat_js
-    assert "function syncPlanDraftButton(tab)" in chat_js
-    assert "btn.disabled = !planHasAgentResponse(tab);" in chat_js
+    assert "async function openPlanChatDock(options = {})" in toolbar_js
+    assert "{ purpose: \"plan\" }" in toolbar_js
+    assert "Draft Gaps" in toolbar_js
+    assert "function planTranscriptText(tab)" in toolbar_js
+    assert "function planHasAgentResponse(tab)" in toolbar_js
+    assert "function syncPlanDraftButton(tab)" in toolbar_js
+    assert "btn.disabled = !planHasAgentResponse(tab);" in toolbar_js
     assert "function openPlanDraftModalFromText(text)" in import_js
     assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
     assert ".nav-context-summary" in base_css
@@ -447,7 +447,7 @@ def main() -> int:
     assert '.filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")' in processes_body
     assert "No active agent subprocesses or chat sessions." in processes_body
     assert "No active runner work." not in processes_body
-    assert "refreshProcessesTabForChatChange" in chat_js
+    assert "refreshProcessesTabForChatChange" in toolbar_js
     assert 'proc.mode === "plan" ? "Plan chat"' in processes_body
     assert 'idle: "idle"' in processes_body
     assert 'data-full-details="${htmlEscape(details)}"' in processes_body
@@ -707,9 +707,16 @@ def main() -> int:
     )
     assert nav_action_hover_css and "background: var(--color-primary-hover)" in nav_action_hover_css.group(1)
     assert nav_action_hover_css and "color: white" in nav_action_hover_css.group(1)
-    assert "button.chat-tab:hover:not(:disabled)" in chat_css
-    assert ".chat-dock .chat-dock-toggle:hover:not(:disabled)" in chat_css
-    assert "color: white;" in chat_css
+    assert "button.toolbar-tab:hover:not(:disabled)" in toolbar_css
+    assert ".toolbar-dock .toolbar-dock-toggle:hover:not(:disabled)" in toolbar_css
+    assert ".files-pathbar" in toolbar_css
+    assert ".files-browser" in toolbar_css
+    assert ".files-source-line" in toolbar_css
+    assert "color: white;" in toolbar_css
+    assert '@route("GET", r"/api/files/tree")' in server_py
+    assert '@route("GET", r"/api/files/read")' in server_py
+    assert "def files_tree(" in api_py
+    assert "def files_read(" in api_py
     assert "const CHANGES_DEFAULT_LIMIT = 50;" in changes_js
     assert "const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];" in changes_js
     assert '<table class="table changes-table mobile-card-table">' in changes_js

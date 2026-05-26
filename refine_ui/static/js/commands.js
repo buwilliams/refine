@@ -283,19 +283,32 @@ registerCommand({
 });
 
 registerCommand({
-  id: "chat.toggle",
-  title: "Toggle chat dock",
-  group: "Chat",
-  aliases: ["chat", "toggle-chat"],
-  run: () => toggleChatDock(),
+  id: "toolbar.toggle",
+  title: "Toggle Toolbar",
+  group: "Toolbar",
+  aliases: ["toolbar", "toggle-toolbar", "chat", "toggle-chat"],
+  run: () => toggleToolbar(),
 });
 
 registerCommand({
-  id: "chat.fullscreen",
-  title: "Maximize chat window",
-  group: "Chat",
-  aliases: ["fullscreen-chat", "maximize-chat"],
-  run: () => toggleChatFullscreen(),
+  id: "toolbar.fullscreen",
+  title: "Maximize Toolbar",
+  group: "Toolbar",
+  aliases: ["fullscreen-toolbar", "maximize-toolbar", "fullscreen-chat", "maximize-chat"],
+  run: () => toggleToolbarFullscreen(),
+});
+
+registerCommand({
+  id: "files.open",
+  title: "Files: open file browser",
+  group: "Toolbar",
+  aliases: ["files", "open-files", "file-browser"],
+  keywords: ["source tree file browser"],
+  parse: (input) => {
+    const path = commandTailFor(input, ["files", "open-files", "file-browser"]);
+    return path ? { path } : {};
+  },
+  run: ({ path } = {}) => openFilesToolbar({ path: path || "" }),
 });
 
 registerCommand({

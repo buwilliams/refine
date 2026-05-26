@@ -381,9 +381,10 @@ Single landing view summarizing:
 - Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. A configured app start or restart clears the pause flag so agents come back on by default.
 - Cancel an in-flight agent Gap — kills the CLI subprocess, releases the lock, and moves the Gap to `cancelled` (worktree and branch are cleaned up).
 
-### Chat
+### Toolbar
 
-Two modes, both backed by Claude Code CLI:
+The bottom Toolbar contains Chat and Files. Chat has two modes, both backed by
+the configured agent CLI:
 
 1. **Standalone, codebase-scoped.** Ad-hoc chat against the client repo. No Gap context. Useful for exploration or manual fixes outside the Gap workflow.
 2. **Attached to a Gap.** Opens a fresh CLI chat session in the Gap's worktree, so the chat sees that Gap's branch. Useful for exploring on top of the agent's work, running it locally, making manual tweaks, or resolving environment issues like a stuck merge or push. Available when the Gap's worktree exists — typically status `review` or `failed`, or briefly in `todo` between rounds — and no agent subprocess is currently running for the Gap. An **Open Chat** affordance appears among the recovery actions on every failed Gap and every Gap stuck in `review` with a known recovery condition (see **Feedback & recovery**).
@@ -391,6 +392,10 @@ Two modes, both backed by Claude Code CLI:
 Chat sessions are human-driven, not rounds: they do **not** count toward the parallel-run cap.
 
 Both modes share the same chat UI; entry points differ (top nav vs Gap detail page).
+
+Files is a read-only browser for the active target application repo. It
+provides repo-relative path navigation, a directory tree, and a line-numbered
+source viewer with lightweight syntax highlighting for common code formats.
 
 ### System
 

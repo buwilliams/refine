@@ -39,7 +39,7 @@
 .status-pill.ready-merge { background: #fff0d7; color: #9a5b00; }
 .status-pill.awaiting-rebuild { background: var(--color-warning-soft); color: var(--color-warning); }
 
-/* System screen tab strip. Mirrors the Chat dock tabs so Settings
+/* System screen tab strip. Mirrors the Toolbar dock tabs so Settings
    sections read as tabs instead of plain text links. */
 .settings-tabs {
   display: flex;
@@ -916,19 +916,19 @@ select {
 
 .toast {
   position: fixed;
-  /* Sit above the chat dock — `--chat-dock-height` is published by the
+  /* Sit above the Toolbar — `--toolbar-dock-height` is published by the
      dock's ResizeObserver and tracks its actual height (collapsed bar,
      expanded panel, or fullscreen). The `min(...)` cap keeps the toast
      inside the viewport when the dock is in fullscreen mode. */
   bottom: min(
-    calc(var(--chat-dock-height, 44px) + 20px),
+    calc(var(--toolbar-dock-height, 44px) + 20px),
     calc(100vh - 80px)
   );
   right: 20px;
   background: var(--fg); color: white;
   padding: 10px 16px; border-radius: var(--radius);
   box-shadow: var(--shadow);
-  z-index: 150;   /* above chat dock (100), below modals (200) */
+  z-index: 150;   /* above Toolbar (100), below modals (200) */
 }
 .toast.success { background: var(--ok); }
 .toast.warn { background: var(--warn); }

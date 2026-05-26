@@ -23,7 +23,7 @@ def test_client_switch_path(root: Path) -> None:
     ).read_text(encoding="utf-8") + (
         root / "refine_ui/static/js/features/settings_instances.js"
     ).read_text(encoding="utf-8")
-    chat_js = (root / "refine_ui/static/js/features/chat.js").read_text(encoding="utf-8")
+    toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
 
     assert 'id="active-instance-label"' in index_html
@@ -70,7 +70,7 @@ def test_client_switch_path(root: Path) -> None:
     assert "Migrate and open" in common_js
     assert 'api("POST", "/api/project/attach", {' in common_js
     assert "migrate: true" in common_js
-    assert "function resetChatForProjectSwitch()" in chat_js
+    assert "function resetChatForProjectSwitch()" in toolbar_js
     assert "await openAddAppModal()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
     assert "await refreshInstanceScopedState()" in settings_js
