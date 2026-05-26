@@ -168,6 +168,10 @@ def _file_entry(root: Path, path: Path) -> dict:
     }
 
 
+def _is_ignored_file_browser_dir(path: Path) -> bool:
+    return path.name == ".git" and path.is_dir()
+
+
 def _list_file_entries(
     root: Path,
     target: Path,
@@ -178,6 +182,8 @@ def _list_file_entries(
     truncated = False
     try:
         for child in target.iterdir():
+            if _is_ignored_file_browser_dir(child):
+                continue
             if len(entries) >= max_entries:
                 truncated = True
                 break
@@ -305,22 +311,32 @@ def files_search(
     scanned = 0
     truncated = False
     try:
-        iterator = root.rglob("*")
-        for path in iterator:
-            scanned += 1
-            if scanned > FILES_SEARCH_MAX_SCAN:
-                truncated = True
-                break
-            try:
-                resolved = path.resolve()
-                rel = resolved.relative_to(root).as_posix()
-            except (OSError, ValueError):
-                continue
-            if q not in rel.lower() and q not in path.name.lower():
-                continue
-            entries.append(_file_entry(root, path))
-            if len(entries) >= max_entries:
-                truncated = True
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [
+                name for name in dirnames
+                if name != ".git"
+            ]
+            current = Path(dirpath)
+            for name in [*dirnames, *filenames]:
+                path = current / name
+                scanned += 1
+                if scanned > FILES_SEARCH_MAX_SCAN:
+                    truncated = True
+                    break
+                try:
+                    resolved = path.resolve()
+                    rel = resolved.relative_to(root).as_posix()
+                except (OSError, ValueError):
+                    continue
+                if ".git" in rel.split("/"):
+                    continue
+                if q not in rel.lower() and q not in path.name.lower():
+                    continue
+                entries.append(_file_entry(root, path))
+                if len(entries) >= max_entries:
+                    truncated = True
+                    break
+            if truncated:
                 break
     except OSError as e:
         return err(403, "file search cannot be completed", str(e))

@@ -37,6 +37,10 @@ def main() -> int:
                 encoding="utf-8",
             )
         (client / ".hidden").write_text("visible\n", encoding="utf-8")
+        (client / ".git" / "refine-hidden-search.txt").write_text(
+            "must stay hidden\n",
+            encoding="utf-8",
+        )
         (client / "blob.bin").write_bytes(b"abc\x00def")
         (client / "large.txt").write_bytes(b"x" * (api.FILE_PREVIEW_MAX_BYTES + 1))
 
@@ -45,6 +49,7 @@ def main() -> int:
         names = [entry["name"] for entry in body["entries"]]
         assert "src" in names, names
         assert ".hidden" in names, names
+        assert ".git" not in names, names
 
         status, body = api.files_tree("src")
         assert status == 200, body
@@ -65,10 +70,18 @@ def main() -> int:
         assert "depth/a/b/c/d" not in body["entries_by_path"], body
         assert body["meta_by_path"]["depth/a/b/c"]["depth"] == api.FILES_TREE_MAX_DEPTH, body
 
+        status, body = api.files_tree("", recursive=True)
+        assert status == 200, body
+        assert ".git" not in body["entries_by_path"], body
+
         status, body = api.files_search("helper")
         assert status == 200, body
         assert body["query"] == "helper", body
         assert body["entries"][0]["path"] == "src/helpers.py", body
+
+        status, body = api.files_search("refine-hidden-search")
+        assert status == 200, body
+        assert body["entries"] == [], body
 
         status, body = api.files_search("txt", max_entries=3)
         assert status == 200, body
