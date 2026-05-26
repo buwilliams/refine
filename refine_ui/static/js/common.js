@@ -106,6 +106,15 @@ async function api(method, path, body, options = {}) {
     err.details = details;
     err.code = code;
     err.error = data?.error || null;
+    err.__uiLogged = true;
+    state.lastApiErrorLog = { message: msg, at: Date.now() };
+    recordUiError(msg, {
+      source: "api",
+      path,
+      status: res.status,
+      code,
+      details,
+    });
     throw err;
   }
   return data;
@@ -167,6 +176,32 @@ function toast(message, kind = "info") {
   el.textContent = message;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 4000);
+  if (kind === "error" && !isDuplicateApiErrorToast(message)) {
+    recordUiError(message, { source: "toast" });
+  }
+}
+
+function isDuplicateApiErrorToast(message) {
+  const last = state.lastApiErrorLog;
+  if (!last || Date.now() - last.at > 5000) return false;
+  const current = String(message || "");
+  return current === last.message
+    || current.includes(last.message)
+    || last.message.includes(current);
+}
+
+function recordUiError(message, details = {}) {
+  if (!message) return;
+  const payload = {
+    message: String(message),
+    route: location.hash || location.pathname,
+    ...details,
+  };
+  fetch("/api/activity/ui-error", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
 }
 
 // ---- Project attach/setup ---------------------------------------------------

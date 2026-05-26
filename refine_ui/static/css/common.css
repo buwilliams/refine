@@ -574,6 +574,35 @@ select {
 .log-entry.info  { border-color: var(--info); }
 .log-entry .meta { color: var(--muted); font-size: 11px; }
 .log-entry pre { font-size: 11px; }
+.logs-table {
+  table-layout: fixed;
+}
+.logs-message-cell {
+  overflow-wrap: anywhere;
+}
+.log-severity {
+  display: inline-block;
+  min-width: 48px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--color-neutral-soft);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+.log-severity.error {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.log-severity.warn {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.log-severity.info {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
 
 .kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; }
 .kv dt { color: var(--muted); }

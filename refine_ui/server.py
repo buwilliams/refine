@@ -291,8 +291,15 @@ def _h_activity(_h, _m, _b, q):
         actor=_get_one(q, "actor"),
         q=_get_one(q, "q"),
         offset=int(_get_one(q, "offset", "0")),
+        sort=_get_one(q, "sort"),
+        direction=_get_one(q, "dir"),
         include_facets=bool(facets and facets != "0"),
     )
+
+
+@route("POST", r"/api/activity/ui-error")
+def _h_activity_ui_error(_h, _m, body, _q):
+    return api.record_ui_error(body or {})
 
 
 @route("POST", r"/api/activity/cleanup")

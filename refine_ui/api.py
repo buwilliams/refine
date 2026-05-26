@@ -3277,6 +3277,8 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
                   actor: str | None = None,
                   q: str | None = None,
                   offset: int = 0,
+                  sort: str | None = None,
+                  direction: str | None = None,
                   include_facets: bool = False) -> tuple[int, dict]:
     metric_start = perf_metrics.now()
     page_limit, page_offset = _page_bounds(limit, offset)
@@ -3286,6 +3288,11 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
             conn, limit=page_limit + 1, offset=page_offset,
             gap_id=gap_id, since_id=since_id,
             severity=severity, category=category, actor=actor, q=q,
+            sort=sort, direction=direction,
+        )
+        total = activity.count(
+            conn, gap_id=gap_id, since_id=since_id,
+            severity=severity, category=category, actor=actor, q=q,
         )
         has_more = len(entries) > page_limit
         body: dict = {
@@ -3294,6 +3301,7 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
                 "limit": page_limit,
                 "offset": page_offset,
                 "has_more": has_more,
+                "total": total,
             },
         }
         if include_facets:
@@ -3317,11 +3325,44 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
                 "category": category or "",
                 "actor": actor or "",
                 "q": bool(q),
+                "sort": sort or "",
+                "direction": direction or "",
             },
         )
     finally:
         conn.close()
     return 200, body
+
+
+def record_ui_error(body: dict) -> tuple[int, dict]:
+    message = str(body.get("message") or "UI error").strip()[:1000]
+    details = body.get("details")
+    detail_lines = []
+    if details:
+        detail_lines.append(str(details)[:4000])
+    meta = {
+        key: body.get(key)
+        for key in ("route", "path", "status", "code", "source")
+        if body.get(key) not in (None, "")
+    }
+    if meta:
+        detail_lines.append(json.dumps(meta, sort_keys=True))
+    try:
+        conn = _conn(ensure_cache=False)
+        try:
+            activity.append(
+                conn,
+                message=message,
+                severity="error",
+                category="ui",
+                actor="browser",
+                details="\n\n".join(detail_lines) if detail_lines else None,
+            )
+        finally:
+            conn.close()
+    except Exception:
+        return 200, {"ok": False}
+    return 200, {"ok": True}
 
 
 _LOG_RETENTION_OPTIONS = (0, 7, 30, 60, 90, 365)

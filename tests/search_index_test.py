@@ -84,6 +84,37 @@ def main() -> int:
         assert code == 200, body
         assert len(body["activity"]) == 1, body
         assert body["activity"][0]["message"].startswith("Dispatcher noticed"), body
+        assert body["page"]["total"] == 1, body
+
+        code, body = api.list_activity(limit=1, sort="category", direction="asc")
+        assert code == 200, body
+        assert body["page"]["total"] >= 2, body
+        assert body["page"]["has_more"] is True, body
+        assert body["activity"][0]["category"] == "runner", body
+
+        code, body = api.record_ui_error({
+            "message": "Visible UI failure",
+            "details": "stack trace",
+            "route": "#/logs",
+            "path": "/api/example",
+            "status": 500,
+            "code": "example_failed",
+            "source": "api",
+        })
+        assert code == 200, body
+        code, body = api.list_activity(
+            q="Visible UI failure",
+            severity="error",
+            category="ui",
+            actor="browser",
+            limit=5,
+        )
+        assert code == 200, body
+        assert body["page"]["total"] == 1, body
+        ui_entry = body["activity"][0]
+        assert ui_entry["message"] == "Visible UI failure", ui_entry
+        assert "stack trace" in ui_entry["details"], ui_entry
+        assert '"/api/example"' in ui_entry["details"], ui_entry
 
         repo_root = Path(__file__).resolve().parents[1]
         api_py = repo_root / "refine_ui" / "api.py"

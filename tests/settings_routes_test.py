@@ -761,6 +761,18 @@ def main() -> int:
     assert "const LOGS_DEFAULT_LIMIT = 50;" in logs_js
     assert 'renderPaginationControls("logs"' in logs_js
     assert 'bindPaginationControls(root, "logs"' in logs_js
+    assert "const LOGS_DEFAULT_DIR = {" in logs_js
+    assert '<table class="table logs-table mobile-card-table">' in logs_js
+    assert 'data-label="Message"' in logs_js
+    assert "$$(\".table th.sortable\", root)" in logs_js
+    assert 'renderPaginationControls("logs", pageMeta, entries.length, "entry", { boundaries: true })' in logs_js
+    assert "params.set(\"sort\", f.sort);" in logs_js
+    assert "params.set(\"dir\", f.dir);" in logs_js
+    assert "recordUiError(msg, {" in common_js
+    assert "function recordUiError(message, details = {})" in common_js
+    assert 'fetch("/api/activity/ui-error"' in common_js
+    assert "if (kind === \"error\" && !isDuplicateApiErrorToast(message))" in common_js
+    assert '@route("POST", r"/api/activity/ui-error")' in server_py
     assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
     assert '"__last_workflow_state"' in gaps_bulk_js
     assert "(Last workflow state)" in gaps_bulk_js

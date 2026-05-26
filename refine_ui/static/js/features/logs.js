@@ -2,9 +2,17 @@
 
 const LOGS_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const LOGS_DEFAULT_LIMIT = 50;
+const LOGS_DEFAULT_DIR = {
+  datetime: "desc", severity: "asc", category: "asc",
+  actor: "asc", gap_id: "asc", message: "asc", id: "desc",
+};
 
 function logsFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
+  const sort = (hashQs.get("sort") || "").toLowerCase();
+  const dir = (hashQs.get("dir") || "").toLowerCase();
+  const effectiveSort = sort || "datetime";
+  const effectiveDir = dir || (LOGS_DEFAULT_DIR[effectiveSort] || "desc");
   return {
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
@@ -14,6 +22,8 @@ function logsFiltersFromHash() {
     limit: parseInt(hashQs.get("limit") || String(LOGS_DEFAULT_LIMIT), 10)
            || LOGS_DEFAULT_LIMIT,
     page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
+    sort, dir,
+    effectiveSort, effectiveDir,
   };
 }
 
@@ -28,6 +38,8 @@ function logsHashFromFilters(f) {
     next.set("limit", String(f.limit));
   }
   if (f.page && f.page > 1) next.set("page", String(f.page));
+  if (f.sort) next.set("sort", f.sort);
+  if (f.dir) next.set("dir", f.dir);
   return "#/logs" + (next.toString() ? "?" + next : "");
 }
 
@@ -80,33 +92,50 @@ async function renderLogs() {
     <div id="logs-list"><p class="muted">Loading…</p></div>
   `;
 
-  $("#logs-q").addEventListener("input", debounce(() => navigateLogs(), 300));
-  $("#logs-severity").addEventListener("change", () => navigateLogs());
-  $("#logs-category").addEventListener("change", () => navigateLogs());
-  $("#logs-actor").addEventListener("change", () => navigateLogs());
-  $("#logs-gap-id").addEventListener("input", debounce(() => navigateLogs(), 300));
-  $("#logs-limit").addEventListener("change", () => navigateLogs());
-  $("#logs-clear").addEventListener("click", () => { location.hash = "#/logs"; });
+  $("#logs-q").addEventListener("input", debounce(() => {
+    updateLogsFilter({ q: $("#logs-q").value, page: 1 });
+  }, 300));
+  $("#logs-severity").addEventListener("change", (e) =>
+    updateLogsFilter({ severity: e.target.value, page: 1 }));
+  $("#logs-category").addEventListener("change", (e) =>
+    updateLogsFilter({ category: e.target.value, page: 1 }));
+  $("#logs-actor").addEventListener("change", (e) =>
+    updateLogsFilter({ actor: e.target.value, page: 1 }));
+  $("#logs-gap-id").addEventListener("input", debounce(() => {
+    updateLogsFilter({ gap_id: $("#logs-gap-id").value.trim(), page: 1 });
+  }, 300));
+  $("#logs-limit").addEventListener("change", (e) =>
+    updateLogsFilter({
+      limit: parseInt(e.target.value, 10) || LOGS_DEFAULT_LIMIT,
+      page: 1,
+    }));
+  $("#logs-clear").addEventListener("click", () => {
+    history.replaceState(null, "", "#/logs");
+    renderLogs();
+  });
 
   await loadLogs();
 }
 
-function navigateLogs() {
+function updateLogsFilter(patch) {
+  const current = logsFiltersFromHash();
   const next = {
-    severity: $("#logs-severity").value,
-    category: $("#logs-category").value,
-    actor: $("#logs-actor").value,
-    gap_id: $("#logs-gap-id").value.trim(),
-    q: $("#logs-q").value,
-    limit: parseInt($("#logs-limit").value, 10) || LOGS_DEFAULT_LIMIT,
-    page: 1,
+    severity: "severity" in patch ? patch.severity : current.severity,
+    category: "category" in patch ? patch.category : current.category,
+    actor: "actor" in patch ? patch.actor : current.actor,
+    gap_id: "gap_id" in patch ? patch.gap_id : current.gap_id,
+    q: "q" in patch ? patch.q : current.q,
+    limit: "limit" in patch ? patch.limit : current.limit,
+    page: "page" in patch ? patch.page : current.page,
+    sort: "sort" in patch ? patch.sort : current.sort,
+    dir: "dir" in patch ? patch.dir : current.dir,
   };
-  location.hash = logsHashFromFilters(next);
+  history.replaceState(null, "", logsHashFromFilters(next));
+  loadLogs();
 }
 
 function navigateLogsPage(page) {
-  const f = logsFiltersFromHash();
-  location.hash = logsHashFromFilters({ ...f, page });
+  updateLogsFilter({ page });
 }
 
 async function loadLogs() {
@@ -120,6 +149,8 @@ async function loadLogs() {
   if (f.q) params.set("q", f.q);
   params.set("limit", String(f.limit));
   params.set("offset", String((f.page - 1) * f.limit));
+  if (f.sort) params.set("sort", f.sort);
+  if (f.dir) params.set("dir", f.dir);
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/activity?" + params);
@@ -159,15 +190,60 @@ function drawLogsList(data, f) {
   if (!entries.length) {
     root.innerHTML = `
       <p class="muted">No log entries match the current filters.</p>
-      ${renderPaginationControls("logs", pageMeta, 0, "entry")}`;
+      ${renderPaginationControls("logs", pageMeta, 0, "entry", { boundaries: true })}`;
     bindPaginationControls(root, "logs", navigateLogsPage);
     return;
   }
+  const columns = [
+    { key: "datetime", label: "When" },
+    { key: "severity", label: "Severity" },
+    { key: "category", label: "Category" },
+    { key: "actor", label: "Actor" },
+    { key: "gap_id", label: "Gap" },
+    { key: "message", label: "Message" },
+  ];
+  const sortHeads = columns.map((c) => {
+    const isActive = c.key === f.effectiveSort;
+    const arrow = isActive
+      ? (f.effectiveDir === "asc" ? "↑" : "↓")
+      : `<span class="sort-arrow-placeholder">↕</span>`;
+    return `<th class="sortable ${isActive ? "active" : ""}"
+                data-sort-key="${c.key}">
+              ${c.label} <span class="sort-arrow">${arrow}</span>
+            </th>`;
+  }).join("");
   root.innerHTML = `
-    ${renderActivityList(entries)}
-    ${renderPaginationControls("logs", pageMeta, entries.length, "entry")}
+    <table class="table logs-table mobile-card-table">
+      <thead><tr>${sortHeads}</tr></thead>
+      <tbody>
+        ${entries.map((e) => `
+          <tr>
+            <td class="muted small" data-label="When">${fmtTime(e.datetime)}</td>
+            <td data-label="Severity"><span class="log-severity ${htmlEscape(e.severity || "info")}">${htmlEscape(e.severity || "info")}</span></td>
+            <td class="muted small" data-label="Category">${htmlEscape(e.category || "")}</td>
+            <td class="muted small" data-label="Actor">${htmlEscape(e.actor || "")}</td>
+            <td class="muted small" data-label="Gap">${e.gap_id
+              ? `<a href="#/gaps/${htmlEscape(e.gap_id)}">Gap ${htmlEscape(e.gap_id.slice(0, 8))}...</a>`
+              : "-"}</td>
+            <td class="logs-message-cell" data-label="Message">
+              <div>${htmlEscape(e.message)}</div>
+              ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(e.details)}</pre></details>` : ""}
+            </td>
+          </tr>`).join("")}
+      </tbody>
+    </table>
+    ${renderPaginationControls("logs", pageMeta, entries.length, "entry", { boundaries: true })}
   `;
   bindPaginationControls(root, "logs", navigateLogsPage);
+  $$(".table th.sortable", root).forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sortKey;
+      const nextDir = key === f.effectiveSort
+        ? (f.effectiveDir === "asc" ? "desc" : "asc")
+        : (LOGS_DEFAULT_DIR[key] || "desc");
+      updateLogsFilter({ sort: key, dir: nextDir, page: 1 });
+    });
+  });
 }
 
 // Mirror of applyGapsFilterIndicator for the Logs screen.

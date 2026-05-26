@@ -13,6 +13,26 @@ from .db import transaction
 from .gaps import now_iso
 
 
+_SORT_EXPRESSIONS: dict[str, str] = {
+    "id": "id",
+    "datetime": "datetime",
+    "severity": "severity COLLATE NOCASE",
+    "category": "category COLLATE NOCASE",
+    "actor": "actor COLLATE NOCASE",
+    "gap_id": "gap_id COLLATE NOCASE",
+    "message": "message COLLATE NOCASE",
+}
+_DEFAULT_DIR: dict[str, str] = {
+    "id": "DESC",
+    "datetime": "DESC",
+    "severity": "ASC",
+    "category": "ASC",
+    "actor": "ASC",
+    "gap_id": "ASC",
+    "message": "ASC",
+}
+
+
 def append(
     conn: sqlite3.Connection,
     *,
@@ -54,11 +74,61 @@ def recent(
     category: str | None = None,
     actor: str | None = None,
     q: str | None = None,
+    sort: str | None = None,
+    direction: str | None = None,
 ) -> list[dict[str, Any]]:
     sql = [
         "SELECT id, datetime, severity, category, gap_id, actor, message, "
         "       details, actions_json FROM activity"
     ]
+    where, args = _where_args(
+        gap_id=gap_id, since_id=since_id, severity=severity,
+        category=category, actor=actor, q=q,
+    )
+    if where is None:
+        return []
+    if where:
+        sql.append("WHERE " + " AND ".join(where))
+    sql.append("ORDER BY " + _order_clause(sort, direction))
+    sql.append("LIMIT ? OFFSET ?")
+    args.extend([limit, max(0, int(offset))])
+    out = []
+    for r in conn.execute(" ".join(sql), args):
+        out.append(_row_to_entry(r))
+    return out
+
+
+def count(
+    conn: sqlite3.Connection,
+    *,
+    gap_id: str | None = None,
+    since_id: int | None = None,
+    severity: str | None = None,
+    category: str | None = None,
+    actor: str | None = None,
+    q: str | None = None,
+) -> int:
+    sql = ["SELECT COUNT(*) FROM activity"]
+    where, args = _where_args(
+        gap_id=gap_id, since_id=since_id, severity=severity,
+        category=category, actor=actor, q=q,
+    )
+    if where is None:
+        return 0
+    if where:
+        sql.append("WHERE " + " AND ".join(where))
+    return int(conn.execute(" ".join(sql), args).fetchone()[0])
+
+
+def _where_args(
+    *,
+    gap_id: str | None,
+    since_id: int | None,
+    severity: str | None,
+    category: str | None,
+    actor: str | None,
+    q: str | None,
+) -> tuple[list[str], list[Any]] | tuple[None, list[Any]]:
     args: list[Any] = []
     where: list[str] = []
     if gap_id:
@@ -79,20 +149,25 @@ def recent(
     if q:
         match = search_index.fts_query(q)
         if match is None:
-            return []
+            return None, []
         where.append(
             "id IN (SELECT rowid FROM activity_search_fts "
             "WHERE activity_search_fts MATCH ?)"
         )
         args.append(match)
-    if where:
-        sql.append("WHERE " + " AND ".join(where))
-    sql.append("ORDER BY id DESC LIMIT ? OFFSET ?")
-    args.extend([limit, max(0, int(offset))])
-    out = []
-    for r in conn.execute(" ".join(sql), args):
-        out.append(_row_to_entry(r))
-    return out
+    return where, args
+
+
+def _order_clause(sort: str | None, direction: str | None) -> str:
+    key = (sort or "datetime").lower()
+    if key not in _SORT_EXPRESSIONS:
+        key = "id"
+    expr = _SORT_EXPRESSIONS[key]
+    d = (direction or "").upper()
+    if d not in ("ASC", "DESC"):
+        d = _DEFAULT_DIR[key]
+    tiebreaker = "" if key == "id" else ", id DESC"
+    return f"{expr} {d}{tiebreaker}"
 
 
 def distinct_categories(conn: sqlite3.Connection) -> list[str]:
