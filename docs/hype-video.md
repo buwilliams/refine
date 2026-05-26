@@ -15,8 +15,8 @@ watching the workflow, not by being told which pain points they have.
 
 Value proposition:
 
-- **Local ownership:** Refine runs against the user's repo, git, provider, and
-  machine.
+- **Decentralized:** Refine runs against the user's repo, git, provider, and
+  machine, while git keeps people in sync across machines.
 - **Cheap feedback loops:** Gaps move from report to agent work to human review.
 - **Planning and chat:** People can think with agents before execution and steer
   follow-up work.
@@ -24,8 +24,9 @@ Value proposition:
   aligned with product intent and requirements.
 - **Human verification:** People explicitly review the result before it becomes
   done.
-- **Operational continuity:** Refine fits existing repositories, branches,
-  processes, and development practices.
+- **Works with you:** Refine fits existing repositories, branches, processes,
+  and infrastructure, so teams can use it alongside current development
+  practices.
 
 ## Opening
 
