@@ -1,5 +1,7 @@
 // ---- System / Processes -----------------------------------------------------
 
+let supervisorProcessExpanded = false;
+
 function renderProcessesTab(processData, settings, diag, dash) {
   const paused = typeof processData.paused === "boolean"
     ? processData.paused
@@ -109,8 +111,55 @@ function buildManagedProcessRows(processes, paused, backend, runnerReachable, di
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
-  rows.push(scheduler);
-  return rows;
+  return orderManagedProcessRows(
+    rows, scheduler, backend.process_model === "supervisor",
+  );
+}
+
+function orderManagedProcessRows(rows, scheduler, supervised) {
+  const targetApp = rows.find((proc) => proc.kind === "target_app");
+  const targetAppId = targetApp ? targetApp.id : null;
+  if (!supervised) {
+    return [
+      ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
+      scheduler,
+      ...(targetApp ? [targetApp] : []),
+    ];
+  }
+  const supervisor = rows.find((proc) => proc.kind === "supervisor");
+  if (!supervisor) {
+    return [
+      ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
+      scheduler,
+      ...(targetApp ? [targetApp] : []),
+    ];
+  }
+  const childKinds = new Set(["ui", "runner"]);
+  const children = [
+    ...rows.filter((proc) => childKinds.has(proc.kind)),
+    scheduler,
+  ].map((proc) => ({
+    ...proc,
+    supervisor_child: true,
+    supervisor_child_hidden: !supervisorProcessExpanded,
+  }));
+  const childIds = new Set(children.map((proc) => proc.id));
+  const remaining = rows.filter((proc) => (
+    proc.id !== supervisor.id
+    && (!targetApp || proc.id !== targetAppId)
+    && !childIds.has(proc.id)
+  ));
+  return [
+    {
+      ...supervisor,
+      supervisor_parent: true,
+      supervisor_expanded: supervisorProcessExpanded,
+      supervisor_child_count: children.length,
+    },
+    ...children,
+    ...remaining,
+    ...(targetApp ? [targetApp] : []),
+  ];
 }
 
 function runnerProcessDetails(backend = {}, runnerReachable, diag = {}) {
@@ -129,15 +178,24 @@ function runnerProcessDetails(backend = {}, runnerReachable, diag = {}) {
 function renderManagedProcessRow(proc) {
   const kind = proc.kind || "process";
   const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
-  const label = proc.session_id
+  const rawLabel = proc.session_id
     ? `<code>${htmlEscape(proc.session_id)}</code>`
     : htmlEscape(proc.label || processKindLabel(kind));
+  const label = renderManagedProcessLabel(proc, rawLabel);
   const details = managedProcessDetails(proc);
   const detailsAttrs = details
     ? ` class="process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Process details" title="${htmlEscape(details)}"`
     : "";
+  const rowClasses = [
+    proc.supervisor_parent ? "supervisor-parent" : "",
+    proc.supervisor_child ? "supervisor-child" : "",
+    proc.supervisor_child_hidden ? "supervisor-child-hidden" : "",
+  ].filter(Boolean).join(" ");
+  const rowClassAttr = rowClasses ? ` class="${htmlEscape(rowClasses)}"` : "";
+  const supervisorChildAttr = proc.supervisor_child ? ` data-supervisor-child="1"` : "";
+  const hiddenAttr = proc.supervisor_child_hidden ? " hidden" : "";
   return `
-    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+    <tr${rowClassAttr} data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}"${supervisorChildAttr}${hiddenAttr}>
       <td data-label="Process">${label}</td>
       <td data-label="Status" data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td data-label="PID">${pid}</td>
@@ -146,6 +204,30 @@ function renderManagedProcessRow(proc) {
       <td data-label="Details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
       <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
     </tr>`;
+}
+
+function renderManagedProcessLabel(proc, rawLabel) {
+  if (proc.supervisor_parent && Number(proc.supervisor_child_count || 0) > 0) {
+    const expanded = !!proc.supervisor_expanded;
+    return `
+      <span class="process-tree-label">
+        <button type="button" class="process-tree-toggle" data-supervisor-toggle
+                aria-expanded="${expanded ? "true" : "false"}"
+                aria-label="${expanded ? "Collapse supervisor processes" : "Expand supervisor processes"}"
+                title="${expanded ? "Collapse supervisor processes" : "Expand supervisor processes"}">
+          <span aria-hidden="true">${expanded ? "▾" : "▸"}</span>
+        </button>
+        <span>${rawLabel}</span>
+      </span>`;
+  }
+  if (proc.supervisor_child) {
+    return `
+      <span class="process-tree-label supervisor-child-label">
+        <span class="process-tree-spacer" aria-hidden="true"></span>
+        <span>${rawLabel}</span>
+      </span>`;
+  }
+  return rawLabel;
 }
 
 function renderAgentProcessRow(proc, anchorMs) {
@@ -297,6 +379,33 @@ function setTargetAppActionVisible(button, visible) {
     button.setAttribute("aria-hidden", "true");
     button.tabIndex = -1;
   }
+}
+
+function setSupervisorProcessExpanded(expanded) {
+  supervisorProcessExpanded = !!expanded;
+  const button = document.querySelector("[data-supervisor-toggle]");
+  if (button) {
+    button.setAttribute("aria-expanded", supervisorProcessExpanded ? "true" : "false");
+    button.setAttribute(
+      "aria-label",
+      supervisorProcessExpanded ? "Collapse supervisor processes" : "Expand supervisor processes",
+    );
+    button.title = supervisorProcessExpanded
+      ? "Collapse supervisor processes"
+      : "Expand supervisor processes";
+    const icon = button.querySelector("span");
+    if (icon) icon.textContent = supervisorProcessExpanded ? "▾" : "▸";
+  }
+  $$("[data-supervisor-child]").forEach((row) => {
+    row.hidden = !supervisorProcessExpanded;
+    row.classList.toggle("supervisor-child-hidden", !supervisorProcessExpanded);
+  });
+}
+
+function bindSupervisorProcessToggle() {
+  document.querySelector("[data-supervisor-toggle]")?.addEventListener("click", () => {
+    setSupervisorProcessExpanded(!supervisorProcessExpanded);
+  });
 }
 
 function renderRunnerWorkRow(work, anchorMs) {
@@ -570,6 +679,7 @@ function drawTargetAppStatusBlock(snap) {
 
 function bindSettingsProcessesTab(s) {
   bindProcessDetailCells();
+  bindSupervisorProcessToggle();
   $$("[data-toggle-background-processes]").forEach((b) => {
     b.addEventListener("click", async () => {
       const shouldStop = b.dataset.toggleBackgroundProcesses === "stop";

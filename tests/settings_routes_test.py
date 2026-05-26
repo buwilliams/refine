@@ -484,6 +484,16 @@ def main() -> int:
     assert 'data-process-id="${htmlEscape(proc.id || "")}"' in processes_body
     assert '[data-process-id="target-app"]' in settings_js
     assert "Agent scheduler" in processes_body
+    assert "function orderManagedProcessRows" in processes_body
+    assert "supervisor_child_hidden: !supervisorProcessExpanded" in processes_body
+    assert 'data-supervisor-toggle' in processes_body
+    assert 'data-supervisor-child="1"' in processes_body
+    assert "function bindSupervisorProcessToggle" in processes_body
+    order_body = processes_body.split(
+        "function orderManagedProcessRows", 1,
+    )[1].split("function runnerProcessDetails", 1)[0]
+    assert 'proc.kind === "target_app"' in order_body
+    assert order_body.rfind("...(targetApp ? [targetApp] : [])") > order_body.find("scheduler")
     assert "runnerProcessDetails" in processes_body
     assert "<h3>Backend</h3>" not in processes_body
     assert 'id="target-app-status-block"' not in processes_body
@@ -511,6 +521,9 @@ def main() -> int:
     assert ".process-table .process-actions .actions" in common_css
     assert ".process-table .process-details-cell.is-overflowing" in common_css
     assert ".process-table .process-details-cell:focus-visible" in common_css
+    assert ".process-tree-toggle" in common_css
+    assert ".supervisor-child-label" in common_css
+    assert ".managed-process-table tr.supervisor-child[hidden]" in common_css
     assert ".target-app-action-slot" in common_css
     assert ".target-app-action-hidden" in common_css
     instances_body = settings_tab_files["settings_instances"].split('<h3>Transfer Gaps</h3>', 1)[0]
