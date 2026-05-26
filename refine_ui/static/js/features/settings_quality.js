@@ -108,23 +108,31 @@ function bindSettingsQualityTab() {
     "#s-quality-business-requirements, #s-quality-instructions",
     autosaveSettingsQuality,
   );
-  $("#s-quality-enabled")?.addEventListener("click", () => {
-    const btn = $("#s-quality-enabled");
+  $("#s-quality-enabled")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const enabled = btn.dataset.enabled !== "1";
     btn.dataset.enabled = enabled ? "1" : "0";
     btn.setAttribute("aria-pressed", enabled ? "true" : "false");
     btn.classList.toggle("warn", !enabled);
     btn.textContent = enabled ? "QA enabled" : "QA disabled";
-    autosaveQuality();
+    await withButtonBusy(btn, "Saving...", async () => {
+      try {
+        await autosaveQuality();
+      } catch (err) { await showActionError(err); }
+    });
   });
-  $("#s-quality-regressions-enabled")?.addEventListener("click", () => {
-    const btn = $("#s-quality-regressions-enabled");
+  $("#s-quality-regressions-enabled")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const enabled = btn.dataset.enabled !== "1";
     btn.dataset.enabled = enabled ? "1" : "0";
     btn.setAttribute("aria-pressed", enabled ? "true" : "false");
     btn.classList.toggle("warn", !enabled);
     btn.textContent = enabled ? "Regressions enabled" : "Regressions disabled";
-    autosaveQuality();
+    await withButtonBusy(btn, "Saving...", async () => {
+      try {
+        await autosaveQuality();
+      } catch (err) { await showActionError(err); }
+    });
   });
   bindCommand("#s-quality-regression-new", "quality.regression.new");
   bindCommand("#s-quality-regression-run", "quality.regression.run");
@@ -133,8 +141,12 @@ function bindSettingsQualityTab() {
       const row = btn.closest("[data-regression-id]");
       const id = row?.dataset.regressionId || "";
       const enabled = btn.textContent.trim() !== "Disable";
-      await api("PATCH", `/api/quality/regressions/${id}`, { enabled });
-      await refreshSettingsTab("quality", { force: true });
+      await withButtonBusy(btn, enabled ? "Enabling..." : "Disabling...", async () => {
+        try {
+          await api("PATCH", `/api/quality/regressions/${id}`, { enabled });
+          await refreshSettingsTab("quality", { force: true });
+        } catch (e) { await showActionError(e); }
+      });
     });
   });
   $$("[data-regression-delete]", root).forEach((btn) => {
@@ -147,13 +159,17 @@ function bindSettingsQualityTab() {
         danger: true,
       });
       if (!ok) return;
-      await api("DELETE", `/api/quality/regressions/${id}`);
-      await refreshSettingsTab("quality", { force: true });
+      await withButtonBusy(btn, "Deleting...", async () => {
+        try {
+          await api("DELETE", `/api/quality/regressions/${id}`);
+          await refreshSettingsTab("quality", { force: true });
+        } catch (e) { await showActionError(e); }
+      });
     });
   });
 }
 
-async function openRegressionCreateModal(initialPrompt = "") {
+async function openRegressionCreateModal(initialPrompt = "", button = null) {
   const values = await new Promise((resolve) => {
     const root = document.createElement("div");
     root.className = "modal-backdrop";
@@ -225,14 +241,16 @@ async function openRegressionCreateModal(initialPrompt = "") {
   if (!values) return null;
   const title = values.title;
   const prompt = values.prompt;
-  const result = await api("POST", "/api/quality/regressions", {
-    title,
-    prompt,
-    description: prompt,
+  return await withButtonBusy(button, "Creating...", async () => {
+    const result = await api("POST", "/api/quality/regressions", {
+      title,
+      prompt,
+      description: prompt,
+    });
+    toast("Regression created", "info");
+    if (state.currentRoute === "settings") await refreshSettingsTab("quality", { force: true });
+    return result.regression;
   });
-  toast("Regression created", "info");
-  if (state.currentRoute === "settings") await refreshSettingsTab("quality", { force: true });
-  return result.regression;
 }
 
 async function runQualityRegressions(button = null) {

@@ -53,40 +53,47 @@ function renderSettingsInstancesTab(instances, instanceCounts, activeInstanceId,
 }
 
 function bindSettingsInstancesTab() {
-  $("#instance-add")?.addEventListener("click", async () => {
+  $("#instance-add")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const name = await modalPrompt("Instance name", "",
                                    { title: "Create instance" });
     if (!name || !name.trim()) return;
-    try {
-      await api("POST", "/api/instances", { display_name: name.trim() });
-      await refreshSettingsTab("instances", { force: true });
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(btn, "Creating...", async () => {
+      try {
+        await api("POST", "/api/instances", { display_name: name.trim() });
+        await refreshSettingsTab("instances", { force: true });
+      } catch (e) { await showActionError(e); }
+    });
   });
   $$("[data-instance-activate]").forEach((b) => b.addEventListener("click", async () => {
-    try {
-      const result = await api("POST", "/api/instances/activate", { instance_id: b.dataset.instanceActivate });
-      state.project = {
-        ...(state.project || {}),
-        instances: result.instances || state.project?.instances || [],
-        active_instance_id: result.active_instance_id || "",
-        active_instance: result.active_instance || null,
-      };
-      updateActiveInstanceLabel();
-      await refreshInstanceScopedState();
-      toast("Instance activated", "info");
-      await refreshSettingsTab("instances", { force: true });
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(b, "Activating...", async () => {
+      try {
+        const result = await api("POST", "/api/instances/activate", { instance_id: b.dataset.instanceActivate });
+        state.project = {
+          ...(state.project || {}),
+          instances: result.instances || state.project?.instances || [],
+          active_instance_id: result.active_instance_id || "",
+          active_instance: result.active_instance || null,
+        };
+        updateActiveInstanceLabel();
+        await refreshInstanceScopedState();
+        toast("Instance activated", "info");
+        await refreshSettingsTab("instances", { force: true });
+      } catch (e) { await showActionError(e); }
+    });
   }));
   $$("[data-instance-rename]").forEach((b) => b.addEventListener("click", async () => {
     const name = await modalPrompt("Instance name", b.dataset.name || "",
                                    { title: "Rename instance" });
     if (!name || !name.trim()) return;
-    try {
-      await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceRename), {
-        display_name: name.trim(),
-      });
-      await refreshSettingsTab("instances", { force: true });
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(b, "Renaming...", async () => {
+      try {
+        await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceRename), {
+          display_name: name.trim(),
+        });
+        await refreshSettingsTab("instances", { force: true });
+      } catch (e) { await showActionError(e); }
+    });
   }));
   $$("[data-instance-archive]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(
@@ -94,14 +101,17 @@ function bindSettingsInstancesTab() {
       { title: "Archive instance", okLabel: "Archive", danger: true },
     );
     if (!ok) return;
-    try {
-      await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceArchive), {
-        archived: true,
-      });
-      await refreshSettingsTab("instances", { force: true });
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(b, "Archiving...", async () => {
+      try {
+        await api("PATCH", "/api/instances/" + encodeURIComponent(b.dataset.instanceArchive), {
+          archived: true,
+        });
+        await refreshSettingsTab("instances", { force: true });
+      } catch (e) { await showActionError(e); }
+    });
   }));
-  $("#instance-transfer")?.addEventListener("click", async () => {
+  $("#instance-transfer")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const source = $("#instance-transfer-source")?.value || "";
     const target = $("#instance-transfer-target")?.value || "";
     if (!target) return;
@@ -117,22 +127,24 @@ function bindSettingsInstancesTab() {
       },
     );
     if (!ok) return;
-    try {
-      const r = await api("POST", "/api/instances/transfer-gaps", {
-        source_instance_id: source,
-        target_instance_id: target,
-        cancel_active: true,
-      });
-      toast(
-        `Transferred ${r.updated}; cancelled ${r.cancelled || 0}; ` +
-        `stopped ${r.stopped_processes || 0} processes; skipped ${r.skipped}.`,
-        "info",
-      );
-      await refreshSettingsTab("instances", { force: true });
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(btn, "Transferring...", async () => {
+      try {
+        const r = await api("POST", "/api/instances/transfer-gaps", {
+          source_instance_id: source,
+          target_instance_id: target,
+          cancel_active: true,
+        });
+        toast(
+          `Transferred ${r.updated}; cancelled ${r.cancelled || 0}; ` +
+          `stopped ${r.stopped_processes || 0} processes; skipped ${r.skipped}.`,
+          "info",
+        );
+        await refreshSettingsTab("instances", { force: true });
+      } catch (e) { await showActionError(e); }
+    });
   });
-  $("#s-project-sync-now")?.addEventListener("click", async () => {
-    const btn = $("#s-project-sync-now");
+  $("#s-project-sync-now")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     await withButtonBusy(btn, "Syncing…", async () => {
       try {
         await syncProjectUpdates();

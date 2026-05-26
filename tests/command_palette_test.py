@@ -28,6 +28,20 @@ def main() -> int:
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
+    system_tab_js = {
+        name: (root / f"refine_ui/static/js/features/{name}.js").read_text(
+            encoding="utf-8",
+        )
+        for name in (
+            "settings",
+            "settings_application",
+            "settings_reporters",
+            "settings_instances",
+            "settings_quality",
+            "settings_governance",
+            "settings_performance",
+        )
+    }
 
     assert '<script src="/static/js/command-registry.js"></script>' in index_html
     assert '<script src="/static/js/commands.js"></script>' in index_html
@@ -46,6 +60,8 @@ def main() -> int:
     assert "function bindCommand(target, id, options = {})" in registry_js
     assert "function searchCommands(query = \"\"" in registry_js
     assert "window.RefineCommands" in registry_js
+    assert "const runParams = { ...ctx, ...params };" in registry_js
+    assert "return await command.run(runParams, ctx);" in registry_js
 
     assert "function initCommandPalette()" in palette_js
     assert 'String(e.key || "").toLowerCase() === "k"' in palette_js
@@ -92,8 +108,10 @@ def main() -> int:
     assert "enabled: () => planHasAgentResponse(chatState.tabs.plan)" in commands_js
     assert "Wait for the agent to respond before drafting Gaps." in commands_js
     assert 'aliases: ["regression_new", "new-regression", "create-regression"]' in commands_js
-    assert 'openRegressionCreateModal(prompt || "")' in commands_js
+    assert 'openRegressionCreateModal(prompt || "", button)' in commands_js
     assert 'title: "Quality: run regressions on current checkout"' in commands_js
+    assert 'button = null' in system_tab_js["settings"]
+    assert 'await withButtonBusy(button, "Copying...", async () => {' in system_tab_js["settings"]
 
     assert 'if (typeof initCommandPalette === "function") initCommandPalette();' in init_js
     assert 'runCommand("gap.new")' in common_js
@@ -101,6 +119,18 @@ def main() -> int:
     assert 'runCommand("gap.import")' in common_js
     assert 'runCommand("refine.issue.request")' in common_js
     assert 'bindCommand("#bulk-set-status", "gaps.bulk.status")' in gaps_list_js
+    assert 'bindCommand("#s-target-generate-ai", "target_app.generate");' in system_tab_js["settings_application"]
+    assert 'await withButtonBusy(button, "Generating...", async () => {' in commands_js
+    assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in commands_js
+    assert 'await withButtonBusy(b, "Merging...", async () => {' in system_tab_js["settings_reporters"]
+    assert 'await withButtonBusy(btn, "Adding...", async () => {' in system_tab_js["settings_reporters"]
+    assert 'await withButtonBusy(b, "Activating...", async () => {' in system_tab_js["settings_instances"]
+    assert 'await withButtonBusy(btn, "Transferring...", async () => {' in system_tab_js["settings_instances"]
+    assert 'await withButtonBusy(btn, "Saving...", async () => {' in system_tab_js["settings_quality"]
+    assert 'return await withButtonBusy(button, "Creating...", async () => {' in system_tab_js["settings_quality"]
+    assert 'await withButtonBusy(btn, "Generating…", async () => {' in system_tab_js["settings_governance"]
+    assert 'await withButtonBusy(e.currentTarget, "Refreshing…", async () => {' in system_tab_js["settings_performance"]
+    assert 'withButtonBusy($("#' not in "\n".join(system_tab_js.values())
     assert "async function openPlanChatDock(options = {})" in toolbar_js
     assert 'label: "Files", mode: "files"' in toolbar_js
     assert '<span class="toolbar-dock-label">TOOLBAR</span>' in toolbar_js

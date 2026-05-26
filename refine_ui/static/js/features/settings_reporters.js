@@ -40,16 +40,18 @@ function bindSettingsReportersTab() {
     });
     if (!targetId) return;
     const target = (state.reporters || []).find((r) => String(r.id) === String(targetId));
-    try {
-      const r = await api("POST", `/api/reporters/${b.dataset.rmerge}/merge`, {
-        target_id: Number(targetId),
-      });
-      const newName = r.new || target?.name || "";
-      if (state.lastReporter === oldName && newName) setLastReporter(newName);
-      await refreshReporters();
-      await renderSettings();
-      toast(`Merged ${oldName} into ${newName || "selected reporter"}`, "info");
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(b, "Merging...", async () => {
+      try {
+        const r = await api("POST", `/api/reporters/${b.dataset.rmerge}/merge`, {
+          target_id: Number(targetId),
+        });
+        const newName = r.new || target?.name || "";
+        if (state.lastReporter === oldName && newName) setLastReporter(newName);
+        await refreshReporters();
+        await renderSettings();
+        toast(`Merged ${oldName} into ${newName || "selected reporter"}`, "info");
+      } catch (e) { await showActionError(e); }
+    });
   }));
   $$("[data-rdel]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(
@@ -57,8 +59,10 @@ function bindSettingsReportersTab() {
       { title: "Remove reporter", okLabel: "Remove", danger: true },
     );
     if (!ok) return;
-    try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await renderSettings(); }
-    catch (e) { await showActionError(e); }
+    await withButtonBusy(b, "Removing...", async () => {
+      try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await renderSettings(); }
+      catch (e) { await showActionError(e); }
+    });
   }));
   $$("[data-rename]").forEach((b) => b.addEventListener("click", async () => {
     const oldName = b.dataset.name;
@@ -66,19 +70,24 @@ function bindSettingsReportersTab() {
                                    { title: "Rename reporter" });
     if (!name || !name.trim()) return;
     const newName = name.trim();
-    try {
-      await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: newName });
-      if (state.lastReporter === oldName) setLastReporter(newName);
-      await refreshReporters();
-      await renderSettings();
-    } catch (e) { await showActionError(e); }
+    await withButtonBusy(b, "Renaming...", async () => {
+      try {
+        await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: newName });
+        if (state.lastReporter === oldName) setLastReporter(newName);
+        await refreshReporters();
+        await renderSettings();
+      } catch (e) { await showActionError(e); }
+    });
   }));
-  $("#r-add").addEventListener("click", async () => {
+  $("#r-add").addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const name = await modalPrompt("Reporter name", "",
                                    { title: "Add reporter" });
     if (!name || !name.trim()) return;
-    try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
-    catch (e) { await showActionError(e); }
+    await withButtonBusy(btn, "Adding...", async () => {
+      try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
+      catch (e) { await showActionError(e); }
+    });
   });
 }
 

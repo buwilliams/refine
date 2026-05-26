@@ -568,13 +568,13 @@ registerCommand({
   parse: (input) => ({
     prompt: commandTailFor(input, ["regression_new", "new-regression", "create-regression"]),
   }),
-  run: async ({ prompt } = {}) => {
+  run: async ({ button, prompt } = {}) => {
     if (state.currentRoute !== "settings") {
       location.hash = "#/system/quality";
     } else {
       setSettingsTab("quality");
     }
-    return openRegressionCreateModal(prompt || "");
+    return openRegressionCreateModal(prompt || "", button);
   },
 });
 
@@ -659,9 +659,10 @@ registerCommand({
   title: "Application: copy settings from instance",
   group: "System",
   aliases: ["copy-application-settings"],
-  run: () => copySettingsFromInstance("application", {
+  run: ({ button } = {}) => copySettingsFromInstance("application", {
     title: "Copy application settings",
     refreshTab: "application",
+    button,
   }),
 });
 
@@ -670,8 +671,9 @@ registerCommand({
   title: "Runtime: copy settings from instance",
   group: "System",
   aliases: ["copy-runtime-settings"],
-  run: () => copySettingsFromInstance("runtime", {
+  run: ({ button } = {}) => copySettingsFromInstance("runtime", {
     title: "Copy runtime settings",
     refreshTab: "runtime",
+    button,
   }),
 });

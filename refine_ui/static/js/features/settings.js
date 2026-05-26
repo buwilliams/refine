@@ -212,6 +212,7 @@ function updateSettingsTabContent(slug, body, bind) {
 async function copySettingsFromInstance(section, {
   title = "Copy settings",
   refreshTab = readSettingsTab(),
+  button = null,
 } = {}) {
   const snap = await api("GET", "/api/instances");
   const active = snap.active_instance_id || state.project?.active_instance_id || "";
@@ -240,14 +241,16 @@ async function copySettingsFromInstance(section, {
     body, { cancel: null, ok: choices[0].id }, ".modal-input",
   );
   if (source === null) return;
-  try {
-    const r = await api("POST", "/api/instances/copy-settings", {
-      source_instance_id: source,
-      section,
-    });
-    toast(`Copied ${r.copied_count || 0} setting${r.copied_count === 1 ? "" : "s"}.`, "info");
-    await refreshSettingsTab(refreshTab, { force: true });
-  } catch (e) { await showActionError(e, "Copy failed"); }
+  await withButtonBusy(button, "Copying...", async () => {
+    try {
+      const r = await api("POST", "/api/instances/copy-settings", {
+        source_instance_id: source,
+        section,
+      });
+      toast(`Copied ${r.copied_count || 0} setting${r.copied_count === 1 ? "" : "s"}.`, "info");
+      await refreshSettingsTab(refreshTab, { force: true });
+    } catch (e) { await showActionError(e, "Copy failed"); }
+  });
 }
 
 function reconcileSettingsChildren(currentParent, nextParent) {

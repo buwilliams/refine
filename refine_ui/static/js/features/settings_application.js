@@ -214,7 +214,8 @@ function bindSettingsApplicationTab(currentProject) {
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
   });
-  $("#s-project-switch")?.addEventListener("click", async () => {
+  $("#s-project-switch")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const path = ($("#s-project-select")?.value || "").trim();
     if (!path || path === currentProject) return;
     const ok = await modalConfirm(
@@ -222,7 +223,7 @@ function bindSettingsApplicationTab(currentProject) {
       { title: "Switch app", okLabel: "Switch" },
     );
     if (!ok) return;
-    await withButtonBusy($("#s-project-switch"), "Switching…", async () => {
+    await withButtonBusy(btn, "Switching…", async () => {
       try {
         const result = await api("POST", "/api/project/attach", { path });
         await applyProjectAttachResult(result);
@@ -241,7 +242,8 @@ function bindSettingsApplicationTab(currentProject) {
       }
     });
   });
-  $("#s-project-remove")?.addEventListener("click", async () => {
+  $("#s-project-remove")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const path = ($("#s-project-select")?.value || "").trim();
     if (!path) return;
     const ok = await modalConfirm(
@@ -249,7 +251,7 @@ function bindSettingsApplicationTab(currentProject) {
       { title: "Remove app", okLabel: "Remove", danger: true },
     );
     if (!ok) return;
-    await withButtonBusy($("#s-project-remove"), "Removing…", async () => {
+    await withButtonBusy(btn, "Removing…", async () => {
       try {
         const result = await api("DELETE", "/api/projects", { path });
         state.project = { ...(state.project || {}), apps: result.apps || [] };

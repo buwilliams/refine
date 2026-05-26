@@ -125,14 +125,15 @@ function bindSettingsGovernanceTab() {
     autosaveSettingsGovernance,
   );
   $("#s-governance-add-rule")?.addEventListener("click", () => addGovernanceRuleRow());
-  $("#s-governance-generate")?.addEventListener("click", async () => {
+  $("#s-governance-generate")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const product = ($("#s-governance-product")?.value || "").trim();
     const constitution = ($("#s-governance-constitution")?.value || "").trim();
     if (!product || !constitution) {
       toast("Product and Constitution are required to generate rules", "error");
       return;
     }
-    await withButtonBusy($("#s-governance-generate"), "Generating…", async () => {
+    await withButtonBusy(btn, "Generating…", async () => {
       try {
         const r = await api("POST", "/api/governance/generate-rules", {
           product, constitution,

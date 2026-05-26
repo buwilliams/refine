@@ -175,13 +175,13 @@ function renderSettingsPerformanceTab(performance, performanceBackend) {
 function bindSettingsPerformanceTab(
   s, diag, reps, feats, gov, dash, instanceData, guidanceData, performanceBackend = null,
 ) {
-  $("#performance-refresh")?.addEventListener("click", async () => {
-    await withButtonBusy($("#performance-refresh"), "Refreshing…", async () => {
+  $("#performance-refresh")?.addEventListener("click", async (e) => {
+    await withButtonBusy(e.currentTarget, "Refreshing…", async () => {
       await refreshSettingsTab("performance", { force: true });
     });
   });
-  $("#performance-prune")?.addEventListener("click", async () => {
-    await withButtonBusy($("#performance-prune"), "Pruning…", async () => {
+  $("#performance-prune")?.addEventListener("click", async (e) => {
+    await withButtonBusy(e.currentTarget, "Pruning…", async () => {
       try {
         const r = await api("POST", "/api/performance/cleanup", {});
         toast(`Deleted ${r.deleted} old metric event${r.deleted === 1 ? "" : "s"}.`, "info");
@@ -189,13 +189,14 @@ function bindSettingsPerformanceTab(
       } catch (e) { await showActionError(e); }
     });
   });
-  $("#performance-clear")?.addEventListener("click", async () => {
+  $("#performance-clear")?.addEventListener("click", async (e) => {
+    const btn = e.currentTarget;
     const ok = await modalConfirm(
       "Delete all local performance metrics? This cannot be undone.",
       { title: "Clear metrics", okLabel: "Clear", danger: true },
     );
     if (!ok) return;
-    await withButtonBusy($("#performance-clear"), "Clearing…", async () => {
+    await withButtonBusy(btn, "Clearing…", async () => {
       try {
         const r = await api("POST", "/api/performance/cleanup", { clear: true });
         toast(`Deleted ${r.deleted} metric event${r.deleted === 1 ? "" : "s"}.`, "info");

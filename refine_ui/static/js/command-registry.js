@@ -155,7 +155,8 @@ async function runCommand(id, options = {}) {
     if (!ok) return null;
   }
   try {
-    return await command.run(params, ctx);
+    const runParams = { ...ctx, ...params };
+    return await command.run(runParams, ctx);
   } catch (e) {
     await showActionError(e, command.errorTitle || "Command failed");
     return null;
