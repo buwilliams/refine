@@ -179,6 +179,46 @@ def _file_entry(root: Path, path: Path) -> dict:
     }
 
 
+def _fuzzy_path_score(query: str, rel_path: str, name: str) -> tuple[int, int, int, str] | None:
+    haystack = rel_path.lower()
+    basename = name.lower()
+    compact_haystack = re.sub(r"[^a-z0-9]+", "", haystack)
+    compact_query = re.sub(r"[^a-z0-9]+", "", query.lower())
+    if not compact_query:
+        return None
+
+    score = 0
+    if basename == query:
+        score += 2500
+    if haystack == query:
+        score += 2400
+    if basename.startswith(query):
+        score += 1800
+    if haystack.startswith(query):
+        score += 1500
+    if query in basename:
+        score += 1300 - basename.index(query)
+    if query in haystack:
+        score += 1000 - haystack.index(query)
+    if compact_query in compact_haystack:
+        score += 650 - compact_haystack.index(compact_query)
+
+    pos = -1
+    gap_penalty = 0
+    boundary_bonus = 0
+    for ch in compact_query:
+        next_pos = compact_haystack.find(ch, pos + 1)
+        if next_pos < 0:
+            return (score, len(rel_path), rel_path.count("/"), rel_path) if score > 0 else None
+        gap_penalty += max(0, next_pos - pos - 1)
+        if next_pos == 0 or compact_haystack[next_pos - 1] in "/_-.":
+            boundary_bonus += 25
+        pos = next_pos
+    score += 500 + boundary_bonus - gap_penalty
+    score -= min(len(rel_path), 240)
+    return (score, len(rel_path), rel_path.count("/"), rel_path)
+
+
 def _is_ignored_file_browser_dir(path: Path) -> bool:
     return path.name == ".git" and path.is_dir()
 
@@ -318,7 +358,7 @@ def files_search(
             "truncated": False,
             "max_entries": max_entries,
         }
-    entries = []
+    matches = []
     scanned = 0
     truncated = False
     try:
@@ -341,20 +381,25 @@ def files_search(
                     continue
                 if ".git" in rel.split("/"):
                     continue
-                if q not in rel.lower() and q not in path.name.lower():
+                score = _fuzzy_path_score(q, rel, path.name)
+                if score is None:
                     continue
-                entries.append(_file_entry(root, path))
-                if len(entries) >= max_entries:
-                    truncated = True
-                    break
+                entry = _file_entry(root, path)
+                matches.append((score, entry))
             if truncated:
                 break
     except OSError as e:
         return err(403, "file search cannot be completed", str(e))
-    entries.sort(key=lambda item: (
-        0 if item["type"] == "directory" else 1,
-        item["path"].lower(),
+    matches.sort(key=lambda item: (
+        -item[0][0],
+        0 if item[1]["type"] == "file" else 1,
+        item[0][1],
+        item[0][2],
+        item[0][3],
     ))
+    if len(matches) > max_entries:
+        truncated = True
+    entries = [entry for _score, entry in matches[:max_entries]]
     return 200, {
         "root": str(root),
         "query": q,

@@ -743,7 +743,7 @@ function bindFilesPanel(root) {
   root.querySelector("#files-search-input")?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    runFilesSearch(e.target.value, { refocus: true });
+    runFilesSearch(e.target.value, { refocus: true, openTopFile: true });
   });
   root.querySelector("[data-files-go]")?.addEventListener("click", () => {
     navigateFilesPath(root.querySelector("#files-path-input")?.value || "");
@@ -820,7 +820,11 @@ function scheduleFilesSearch(query) {
   }, 250);
 }
 
-async function runFilesSearch(query, { refocus = false } = {}) {
+function topFilesSearchFile(results) {
+  return (results?.entries || []).find((entry) => entry.type === "file") || null;
+}
+
+async function runFilesSearch(query, { refocus = false, openTopFile = false } = {}) {
   if (filesSearchTimer) {
     clearTimeout(filesSearchTimer);
     filesSearchTimer = null;
@@ -849,6 +853,10 @@ async function runFilesSearch(query, { refocus = false } = {}) {
     filesState.searchLoading = false;
     drawToolbar();
     if (refocus) focusFilesSearchInput();
+    if (openTopFile) {
+      const entry = topFilesSearchFile(result);
+      if (entry) await loadFile(entry.path);
+    }
   } catch (e) {
     if (requestSeq !== filesSearchRequestSeq) return;
     filesState.searchLoading = false;

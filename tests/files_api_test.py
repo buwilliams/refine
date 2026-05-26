@@ -25,6 +25,11 @@ def main() -> int:
             "def helper():\n    return 'ok'\n",
             encoding="utf-8",
         )
+        (client / "features" / "file_search").mkdir(parents=True)
+        (client / "features" / "file_search" / "panel.js").write_text(
+            "export const panel = true;\n",
+            encoding="utf-8",
+        )
         (client / "depth" / "a" / "b" / "c" / "d").mkdir(parents=True)
         (client / "depth" / "a" / "b" / "c" / "d" / "too-deep.txt").write_text(
             "hidden by tree depth\n",
@@ -79,6 +84,14 @@ def main() -> int:
         assert status == 200, body
         assert body["query"] == "helper", body
         assert body["entries"][0]["path"] == "src/helpers.py", body
+
+        status, body = api.files_search("srcapp")
+        assert status == 200, body
+        assert body["entries"][0]["path"] == "src/app.py", body
+
+        status, body = api.files_search("fs panel")
+        assert status == 200, body
+        assert body["entries"][0]["path"] == "features/file_search/panel.js", body
 
         status, body = api.files_search("refine-hidden-search")
         assert status == 200, body

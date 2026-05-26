@@ -733,6 +733,9 @@ def main() -> int:
     assert "data-files-copy-content" in toolbar_js
     assert "const FILE_TEXT_CHUNK_BYTES = 128_000;" in toolbar_js
     assert "async function loadNextFileChunk()" in toolbar_js
+    assert "function topFilesSearchFile(results)" in toolbar_js
+    assert "openTopFile = false" in toolbar_js
+    assert "openTopFile: true" in toolbar_js
     assert "data-files-load-more" in toolbar_js
     assert "filesState.fileChunkLoading ? \"Loading...\" : \"Scroll to load more\"" in toolbar_js
     assert "file.kind === \"image\"" in toolbar_js
@@ -751,6 +754,8 @@ def main() -> int:
     assert "recursive = _get_one(q, \"recursive\", \"0\")" in server_py
     assert "FILE_TEXT_CHUNK_BYTES = 128_000" in api_py
     assert "IMAGE_MIME_BY_EXT" in api_py
+    assert "def _fuzzy_path_score(" in api_py
+    assert "matches.sort(key=lambda item:" in api_py
     assert "FILES_TREE_MAX_DEPTH = 3" in api_py
     assert "FILES_TREE_MAX_ENTRIES = 200" in api_py
     assert "def files_tree(" in api_py
