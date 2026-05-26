@@ -112,6 +112,8 @@ def main() -> int:
     assert 'data-files-refresh' in toolbar_js
     assert 'data-files-expand-all' in toolbar_js
     assert 'data-files-collapse-all' in toolbar_js
+    assert 'expand: \'<path d="m6 9 6 6 6-6"></path>\'' in toolbar_js
+    assert 'collapse: \'<path d="m18 15-6-6-6 6"></path>\'' in toolbar_js
     assert "const FILES_TREE_MAX_DEPTH = 3;" in toolbar_js
     assert "const FILES_TREE_MAX_ENTRIES = 200;" in toolbar_js
     assert 'class="files-tree"' in toolbar_js

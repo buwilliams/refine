@@ -468,9 +468,9 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
 
 function toolbarIcon(name) {
   const icons = {
-    collapse: '<path d="m7 15 5-5 5 5"></path><path d="M7 9h10"></path><path d="M7 19h10"></path>',
+    collapse: '<path d="m18 15-6-6-6 6"></path>',
     copy: '<rect x="9" y="9" width="10" height="10" rx="2"></rect><path d="M5 15V7a2 2 0 0 1 2-2h8"></path>',
-    expand: '<path d="m7 9 5 5 5-5"></path><path d="M7 5h10"></path><path d="M7 19h10"></path>',
+    expand: '<path d="m6 9 6 6 6-6"></path>',
     go: '<path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>',
     refresh: '<path d="M21 12a9 9 0 0 1-15.5 6.2"></path><path d="M3 12A9 9 0 0 1 18.5 5.8"></path><path d="M3 18v-6h6"></path><path d="M21 6v6h-6"></path>',
     search: '<path d="m21 21-4.3-4.3"></path><circle cx="11" cy="11" r="7"></circle>',
