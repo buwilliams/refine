@@ -46,6 +46,12 @@ def main() -> int:
 
         assert rebuilder.queue_for_worktree_merge("01GAP") is False
         db.set_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
+        db.set_setting(conn, "paused", "1")
+        assert rebuilder.queue_rebuild("blocked while paused") is False
+        assert rebuilder.queue_for_worktree_merge("01PAUSED") is False
+        assert rebuilder.queue_pending_awaiting_rebuild() is False
+        assert rebuilder.snapshot()["queued"] is False
+        db.set_setting(conn, "paused", "0")
         assert rebuilder.queue_for_worktree_merge("01GAP") is True
         rebuilder._drain_queue()  # noqa: SLF001
         assert len(runs) == 3, runs

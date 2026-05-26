@@ -250,6 +250,10 @@ function processStatusLabel(status) {
 }
 
 function renderProcessActions(proc) {
+  if (proc.kind === "supervisor") {
+    const stopped = !!proc.background_processes_stopped;
+    return `<button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background Processes</button>`;
+  }
   if (proc.kind === "agent_scheduler") {
     const paused = proc.status === "paused";
     return `
@@ -566,6 +570,26 @@ function drawTargetAppStatusBlock(snap) {
 
 function bindSettingsProcessesTab(s) {
   bindProcessDetailCells();
+  $$("[data-toggle-background-processes]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const shouldStop = b.dataset.toggleBackgroundProcesses === "stop";
+      const ok = shouldStop
+        ? await modalConfirm(
+            "Stop background processes? Refine will keep the UI and backend running, pause scheduling, stop chats and agents, clear queued rebuilds, and cancel active background jobs.",
+            { title: "Stop background processes", okLabel: "Stop background processes", danger: true },
+          )
+        : true;
+      if (!ok) return;
+      await withButtonBusy(b, shouldStop ? "Stopping…" : "Starting…", async () => {
+        try {
+          await api("POST", "/api/processes/background", { stopped: shouldStop });
+          await refreshProcessesSettingsTab({ force: true });
+          if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
+          if (!shouldStop) scheduleProcessesTabRefreshes();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
   bindCommand("#btn-pause", "system.agents.pause_toggle", { context: { settings: s } });
   bindCommand("[data-hard-reset-worktree]", "system.worktree.hard_reset");
   $$("[data-cancel-agent]").forEach((b) => {

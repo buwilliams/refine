@@ -15,6 +15,7 @@ def main() -> int:
     conn = init_refine(client)
     try:
         from refine_server import db
+        from refine_server.backend_protocol import M_BACKGROUND_PROCESSES_SET
         from refine_ui import api, runtime
 
         db.set_setting(conn, "paused", "1")
@@ -30,7 +31,14 @@ def main() -> int:
 
         original_snapshot = runtime.runner_status_snapshot
         original_active_background_job = api._active_background_job  # type: ignore[attr-defined]
+        original_get_client = api.get_client  # type: ignore[attr-defined]
         original_supervisor_pid = os.environ.get("REFINE_SUPERVISOR_PID")
+        calls: list[tuple[str, dict]] = []
+
+        class FakeClient:
+            def call(self, method: str, params: dict, timeout: float | None = None) -> dict:
+                calls.append((method, params))
+                return {"ok": True, "stopped": bool(params.get("stopped"))}
 
         def fake_snapshot() -> dict:
             return {
@@ -79,6 +87,7 @@ def main() -> int:
         try:
             os.environ["REFINE_SUPERVISOR_PID"] = "3030"
             runtime.runner_status_snapshot = fake_snapshot  # type: ignore[assignment]
+            api.get_client = lambda: FakeClient()  # type: ignore[assignment]
             api._active_background_job = (  # type: ignore[attr-defined]
                 lambda kind: {
                     "id": "job-import",
@@ -89,9 +98,12 @@ def main() -> int:
                 } if kind == "import_persist" else None
             )
             status, body = api.process_summary()
+            stop_status, stop_body = api.set_background_processes({"stopped": True})
+            start_status, start_body = api.set_background_processes({"stopped": False})
         finally:
             runtime.runner_status_snapshot = original_snapshot  # type: ignore[assignment]
             api._active_background_job = original_active_background_job  # type: ignore[attr-defined]
+            api.get_client = original_get_client  # type: ignore[assignment]
             if original_supervisor_pid is None:
                 os.environ.pop("REFINE_SUPERVISOR_PID", None)
             else:
@@ -111,6 +123,16 @@ def main() -> int:
         supervisor = next(p for p in body["processes"] if p["kind"] == "supervisor")
         assert supervisor["pid"] == 3030, supervisor
         assert "Supervises the UI and runner worker processes" in supervisor["details"], supervisor
+        assert supervisor["background_processes_stopped"] is True, supervisor
+        assert supervisor["actions"] == ["start_background_processes"], supervisor
+        assert stop_status == 200, stop_body
+        assert stop_body["stopped"] is True, stop_body
+        assert start_status == 200, start_body
+        assert start_body["stopped"] is False, start_body
+        assert calls == [
+            (M_BACKGROUND_PROCESSES_SET, {"stopped": True}),
+            (M_BACKGROUND_PROCESSES_SET, {"stopped": False}),
+        ], calls
         runner = next(p for p in body["processes"] if p["kind"] == "runner")
         assert runner["pid"] == 3131, runner
         assert runner["max_memory"]["label"] == "4096 MB", runner

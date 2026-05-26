@@ -50,6 +50,8 @@ class TargetAppRebuilder:
             self._thread.join(timeout=5.0)
 
     def queue_rebuild(self, reason: str, *, mode: str | None = None) -> bool:
+        if self._paused():
+            return False
         with self._state_lock:
             already_pending = self._queued
             self._queued = True
@@ -57,6 +59,14 @@ class TargetAppRebuilder:
             self._last_mode = mode
         self._wake.set()
         return not already_pending
+
+    def clear_queue(self) -> bool:
+        with self._state_lock:
+            had_pending = self._queued
+            self._queued = False
+            if not self._running:
+                self._last_mode = None
+        return had_pending
 
     def queue_for_worktree_merge(self, gap_id: str) -> bool:
         if self._mode() != "on_worktree_merge":
@@ -67,6 +77,8 @@ class TargetAppRebuilder:
         )
 
     def queue_pending_awaiting_rebuild(self) -> bool:
+        if self._paused():
+            return False
         if self._mode() != "on_worktree_merge":
             return False
         with self._state_lock:
@@ -109,6 +121,10 @@ class TargetAppRebuilder:
             with self._state_lock:
                 if not self._queued:
                     return
+                if self._paused():
+                    self._queued = False
+                    self._last_mode = None
+                    return
                 self._queued = False
                 self._running = True
                 reason = self._last_reason or "automatic rebuild"
@@ -123,6 +139,8 @@ class TargetAppRebuilder:
                         self._last_mode = None
 
     def _queue_scheduled_rebuild_if_due(self, now: datetime | None = None) -> None:
+        if self._paused():
+            return
         mode = self._mode()
         if mode == "on_worktree_merge":
             self.queue_pending_awaiting_rebuild()
@@ -155,6 +173,9 @@ class TargetAppRebuilder:
             self._get_conn(), "target_app_auto_rebuild", DEFAULT_AUTO_REBUILD_MODE,
         ) or DEFAULT_AUTO_REBUILD_MODE).strip()
         return mode if mode in AUTO_REBUILD_MODES else DEFAULT_AUTO_REBUILD_MODE
+
+    def _paused(self) -> bool:
+        return bool(db.get_setting_int(self._get_conn(), "paused", 0))
 
 
 def _parse_iso(value: str) -> datetime | None:

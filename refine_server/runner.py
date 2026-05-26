@@ -14,7 +14,7 @@ from typing import Any
 from refine_server import activity, changes_index, config, db, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
-    M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
+    M_APPEND_ROUND, M_BACKGROUND_PROCESSES_SET, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
     M_CHAT_RESET_ALL, M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
@@ -184,6 +184,7 @@ class Runner:
             M_ENFORCE_SCHEDULING: self._h_enforce_scheduling,
             M_CANCEL: self._h_cancel,
             M_CANCEL_ALL: self._h_cancel_all,
+            M_BACKGROUND_PROCESSES_SET: self._h_background_processes_set,
             M_VERIFY: self._h_verify,
             M_RETRY_MERGE: self._h_retry_merge,
             M_RETRY_QA: self._h_retry_qa,
@@ -657,6 +658,26 @@ class Runner:
         reason = params.get("reason") or "paused"
         killed = self.sub_mgr.cancel_all(str(reason))
         return {"killed_subprocesses": killed}
+
+    def _h_background_processes_set(self, params: dict) -> dict:
+        stopped = bool(params.get("stopped"))
+        if stopped:
+            killed = self.sub_mgr.cancel_all("background_processes_stopped")
+            stopped_chats = self.chat.stop_all(reason="background processes stopped")
+            cleared_rebuild = self.target_app_rebuilder.clear_queue()
+            self.governance_agent.wake()
+            self.merger.wake()
+            return {
+                "stopped": True,
+                "killed_subprocesses": killed,
+                "stopped_chats": stopped_chats,
+                "cleared_target_app_rebuild_queue": cleared_rebuild,
+            }
+        self.dispatcher.enforce_now()
+        self.governance_agent.wake()
+        self.merger.wake()
+        self.target_app_rebuilder.queue_pending_awaiting_rebuild()
+        return {"stopped": False, "started": True}
 
     def _h_verify(self, params: dict) -> dict:
         # Verify is user approval for a Gap already parked in `review`.

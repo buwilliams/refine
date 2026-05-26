@@ -154,7 +154,9 @@ def main() -> int:
     assert 'slug: "processes"' in settings_js
     assert 'api("GET", "/api/processes")' in settings_js
     assert '@route("GET", r"/api/processes")' in server_py
+    assert '@route("POST", r"/api/processes/background")' in server_py
     assert "def process_summary" in api_py
+    assert "def set_background_processes" in api_py
     assert "function renderProcessesTab" in settings_js
     assert "function renderRunnerWorkRow" in settings_js
     assert "function renderRuntimeAgentCards" not in settings_js
@@ -413,6 +415,9 @@ def main() -> int:
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body
     assert 'id="btn-pause"' in processes_body
+    assert 'data-toggle-background-processes' in processes_body
+    assert '${stopped ? "Start" : "Stop"} Background Processes' in processes_body
+    assert 'api("POST", "/api/processes/background", { stopped: shouldStop })' in processes_body
     assert "scheduleProcessesTabRefreshes()" in commands_js
     assert "function scheduleProcessesTabRefreshes()" in processes_body
     assert '[data-tab-pane="processes"].active' in processes_body

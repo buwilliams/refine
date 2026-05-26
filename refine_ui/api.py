@@ -26,7 +26,7 @@ from refine_server import activity, config, db, gap_writer, gaps as shared_gaps,
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
-    M_APPEND_ROUND, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
+    M_APPEND_ROUND, M_BACKGROUND_PROCESSES_SET, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START,
     M_CHAT_RESET_ALL, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
     M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PREFLIGHT,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_WAKE, M_HARD_RESET_WORKTREE, M_PROJECT_SYNC, M_REGRESSION_RUN,
@@ -481,10 +481,60 @@ def _count_lines_before(path: Path, offset: int) -> int:
     return count
 
 
-def _looks_binary_data(data: bytes) -> bool:
+def _decoded_text_looks_textual(text: str) -> bool:
+    if not text:
+        return True
+    control = sum(
+        1
+        for ch in text
+        if ord(ch) < 32 and ch not in "\t\n\f\r"
+    )
+    return control / len(text) <= 0.05
+
+
+def _null_pattern_text_encoding(data: bytes) -> str | None:
+    sample = data[:4096]
+    if len(sample) < 4:
+        return None
+    odd = sample[1::2]
+    even = sample[0::2]
+    if odd and odd.count(0) / len(odd) > 0.45:
+        return "utf-16-le"
+    if even and even.count(0) / len(even) > 0.45:
+        return "utf-16-be"
+    return None
+
+
+def _text_encoding_for_data(data: bytes) -> str | None:
+    if not data:
+        return "utf-8"
+    if data.startswith(b"\xff\xfe\x00\x00"):
+        return "utf-32-le"
+    if data.startswith(b"\x00\x00\xfe\xff"):
+        return "utf-32-be"
+    if data.startswith(b"\xff\xfe"):
+        return "utf-16-le"
+    if data.startswith(b"\xfe\xff"):
+        return "utf-16-be"
     if b"\0" in data:
+        encoding = _null_pattern_text_encoding(data)
+        if not encoding:
+            return None
+        try:
+            text = data.decode(encoding)
+        except UnicodeDecodeError:
+            return None
+        return encoding if _decoded_text_looks_textual(text) else None
+    return "utf-8"
+
+
+def _looks_binary_data(data: bytes) -> bool:
+    encoding = _text_encoding_for_data(data)
+    if encoding is None:
         return True
     if not data:
+        return False
+    if encoding != "utf-8":
         return False
     control = sum(
         1
@@ -561,7 +611,10 @@ def files_read(
             data = f.read(limit)
     except OSError as e:
         return err(403, "file cannot be read", str(e))
-    text = data.decode("utf-8", errors="replace")
+    encoding = _text_encoding_for_data(head) or "utf-8"
+    text = data.decode(encoding, errors="replace")
+    if offset == 0 and text.startswith("\ufeff"):
+        text = text[1:]
     next_offset = offset + len(data)
     has_more = next_offset < stat.st_size
     try:
@@ -1126,6 +1179,32 @@ def cancel_background_job(job_id: str) -> tuple[int, dict]:
     if job is None:
         return err(404, "Background job not found")
     return 200, {"job": job}
+
+
+def _cancel_active_background_jobs() -> list[dict[str, Any]]:
+    try:
+        conn = _conn()
+        try:
+            rows = conn.execute(
+                "SELECT id FROM background_jobs "
+                "WHERE status IN ('queued', 'running') "
+                "ORDER BY started_at DESC LIMIT 100",
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        rows = []
+    cancelled: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        job_id = str(row["id"])
+        if job_id in seen:
+            continue
+        seen.add(job_id)
+        job = background_jobs.cancel(job_id)
+        if job:
+            cancelled.append(job)
+    return cancelled
 
 
 def performance_summary(*, operation: str | None = None,
@@ -3719,7 +3798,8 @@ def process_summary() -> tuple[int, dict]:
                 "Supervises the UI and runner worker processes; shuts Refine "
                 "down if either exits."
             ),
-            "actions": [],
+            "background_processes_stopped": paused,
+            "actions": ["start_background_processes" if paused else "stop_background_processes"],
             **no_caps,
         })
     processes.extend([
@@ -3812,6 +3892,59 @@ def process_summary() -> tuple[int, dict]:
         "target_app_rebuild": target_app_rebuild,
         "target_app": target_app,
         "resource_caps": resource_caps,
+    }
+
+
+def set_background_processes(body: dict | None = None) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    body = body or {}
+    conn = _conn()
+    try:
+        current_stopped = (db.get_setting(conn, "paused") or "0") == "1"
+        stopped = (
+            not current_stopped
+            if "stopped" not in body
+            else str(body.get("stopped")).strip().lower() in {"1", "true", "yes", "on"}
+        )
+        db.set_setting(conn, "paused", "1" if stopped else "0")
+        project_state.set_setting("paused", "1" if stopped else "0")
+        activity.append(
+            conn,
+            message=(
+                "Background processes stopped"
+                if stopped
+                else "Background processes started"
+            ),
+            severity="warn" if stopped else "info",
+            category="state",
+            actor="refine",
+        )
+    finally:
+        conn.close()
+
+    cancelled_jobs = _cancel_active_background_jobs() if stopped else []
+    try:
+        runner_result = get_client().call(
+            M_BACKGROUND_PROCESSES_SET,
+            {"stopped": stopped},
+            timeout=30.0 if stopped else 10.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
+
+    status, summary = process_summary()
+    if status != 200:
+        summary = {}
+    return 200, {
+        "stopped": stopped,
+        "paused": stopped,
+        "runner": runner_result,
+        "cancelled_background_jobs": len(cancelled_jobs),
+        "processes": summary.get("processes") or [],
+        "runner_work": summary.get("runner_work") or [],
+        "runner_reachable": summary.get("runner_reachable"),
     }
 
 

@@ -262,6 +262,11 @@ def _h_processes(_h, _m, _b, _q):
     return api.process_summary()
 
 
+@route("POST", r"/api/processes/background")
+def _h_processes_background(_h, _m, body, _q):
+    return api.set_background_processes(body or {})
+
+
 @route("POST", r"/api/performance/cleanup")
 def _h_performance_cleanup(_h, _m, body, _q):
     return api.performance_cleanup(body or {})

@@ -55,6 +55,10 @@ def main() -> int:
         (client / ".env").write_text("SECRET=visible-when-opened\n", encoding="utf-8")
         (client / "src" / ".env").write_text("SECRET=nested\n", encoding="utf-8")
         (client / "README.md").write_bytes(b"Project notes\xff\n")
+        (client / "UTF16-README.md").write_text(
+            "Project notes from UTF-16\n",
+            encoding="utf-16",
+        )
         (client / ".git" / "refine-hidden-search.txt").write_text(
             "must stay hidden\n",
             encoding="utf-8",
@@ -174,6 +178,12 @@ def main() -> int:
         assert body["previewable"] is True, body
         assert body["kind"] == "text", body
         assert "Project notes" in body["content"], body
+
+        status, body = api.files_read("UTF16-README.md")
+        assert status == 200, body
+        assert body["previewable"] is True, body
+        assert body["kind"] == "text", body
+        assert "Project notes from UTF-16" in body["content"], body
 
         status, body = api.files_search("txt", max_entries=3)
         assert status == 200, body
