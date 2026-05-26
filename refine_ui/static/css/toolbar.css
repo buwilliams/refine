@@ -351,6 +351,9 @@ button.toolbar-tab:hover:not(:disabled),
   width: 100%;
   height: 30px;
   padding-left: 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
   font-size: 13px;
   color: #111827;
   background: #ffffff;
@@ -410,12 +413,21 @@ button.toolbar-tab:hover:not(:disabled),
   gap: 1px;
   line-height: 1.2;
 }
+.files-search-result {
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+}
 .files-search-result .files-tree-name small {
   overflow: hidden;
   color: #6b7280;
   font-size: 11px;
   font-weight: 400;
   text-overflow: ellipsis;
+}
+.files-search-action {
+  color: #4f46e5;
+  font-size: 11px;
+  font-weight: 600;
+  justify-self: end;
 }
 .files-empty {
   margin: 6px;

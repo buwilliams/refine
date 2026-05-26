@@ -312,6 +312,19 @@ registerCommand({
 });
 
 registerCommand({
+  id: "files.search",
+  title: "Files: search for file",
+  group: "Toolbar",
+  aliases: ["search-files", "find-file", "file-search"],
+  keywords: ["source tree file browser"],
+  parse: (input) => {
+    const search = commandTailFor(input, ["search-files", "find-file", "file-search"]);
+    return search ? { search } : {};
+  },
+  run: ({ search } = {}) => openFilesToolbar({ search: search || "", focusSearch: true }),
+});
+
+registerCommand({
   id: "gaps.clear_filters",
   title: "Gaps: clear filters",
   group: "Gaps",

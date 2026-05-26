@@ -9,6 +9,7 @@ const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
+const FILES_SEARCH_MAX_RESULTS = 20;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
@@ -30,6 +31,7 @@ const filesState = {
   fileChunkLoading: false,
   searchQuery: "",
   searchResults: null,
+  searchSelectedIndex: -1,
   searchLoading: false,
   searchError: "",
   loading: false,
@@ -152,6 +154,7 @@ function resetFilesState() {
   filesState.fileChunkLoading = false;
   filesState.searchQuery = "";
   filesState.searchResults = null;
+  filesState.searchSelectedIndex = -1;
   filesState.searchLoading = false;
   filesState.searchError = "";
   filesState.loading = false;
@@ -560,7 +563,7 @@ function renderFilesTreePanel() {
 }
 
 function renderFilesSearchResults() {
-  if (filesState.searchLoading) {
+  if (filesState.searchLoading && !filesState.searchResults) {
     return `<p class="muted small files-empty">Searching...</p>`;
   }
   if (filesState.searchError) {
@@ -574,23 +577,33 @@ function renderFilesSearchResults() {
   if (!entries.length) {
     return `<p class="muted small files-empty">No matches for "${htmlEscape(results.query || filesState.searchQuery)}".</p>`;
   }
-  const rows = entries.map((entry) => `
-    <div class="files-tree-item files-search-result"
+  const selectedIndex = normalizedFilesSearchSelectedIndex(results);
+  const rows = entries.map((entry, idx) => {
+    const selected = idx === selectedIndex;
+    return `
+    <div class="files-tree-item files-search-result ${selected ? "selected" : ""}"
          role="treeitem"
+         aria-selected="${selected ? "true" : "false"}"
          style="--depth:0"
          data-files-path="${htmlEscape(entry.path)}"
          data-files-type="${htmlEscape(entry.type)}"
+         data-files-search-index="${idx}"
          data-files-search-result="1">
       <span class="files-tree-caret" aria-hidden="true">${entry.type === "directory" ? "▸" : ""}</span>
       <span class="files-tree-name">
         <span>${htmlEscape(entry.name || entry.path || ".")}</span>
         <small>${htmlEscape(entry.path || entry.name || "")}</small>
       </span>
-    </div>`).join("");
+      ${selected && entry.type === "file" ? `<span class="files-search-action">Enter to open</span>` : ""}
+    </div>`;
+  }).join("");
   const limit = results.truncated
-    ? `<p class="muted small files-empty">Showing first ${FILES_TREE_MAX_ENTRIES} matches.</p>`
+    ? `<p class="muted small files-empty">Showing first ${FILES_SEARCH_MAX_RESULTS} matches.</p>`
     : "";
-  return rows + limit;
+  const loading = filesState.searchLoading
+    ? `<p class="muted small files-empty">Searching...</p>`
+    : "";
+  return loading + rows + limit;
 }
 
 function renderFilesTree(path = "", depth = 0) {
@@ -738,12 +751,25 @@ function bindFilesPanel(root) {
     navigateFilesPath(e.target.value);
   });
   root.querySelector("#files-search-input")?.addEventListener("input", (e) => {
+    filesState.searchSelectedIndex = -1;
     scheduleFilesSearch(e.target.value);
   });
   root.querySelector("#files-search-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      moveFilesSearchSelection(1);
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      moveFilesSearchSelection(-1);
+      return;
+    }
     if (e.key !== "Enter") return;
     e.preventDefault();
-    runFilesSearch(e.target.value, { refocus: true, openTopFile: true });
+    const currentQuery = String(e.target.value || "").trim();
+    if (!filesState.searchLoading && filesState.searchResults?.query === currentQuery && openSelectedFilesSearchResult()) return;
+    runFilesSearch(e.target.value, { refocus: true, openSelectedFile: true });
   });
   root.querySelector("[data-files-go]")?.addEventListener("click", () => {
     navigateFilesPath(root.querySelector("#files-path-input")?.value || "");
@@ -778,10 +804,14 @@ function bindFilesPanel(root) {
       const path = row.dataset.filesPath || "";
       const type = row.dataset.filesType || "";
       const depth = Number.parseInt(row.dataset.filesDepth || "0", 10);
+      if (row.dataset.filesSearchResult === "1") {
+        filesState.searchSelectedIndex = Number.parseInt(row.dataset.filesSearchIndex || "-1", 10);
+      }
       if (type === "directory") {
         if (row.dataset.filesSearchResult === "1") {
           filesState.searchQuery = "";
           filesState.searchResults = null;
+          filesState.searchSelectedIndex = -1;
           filesState.searchError = "";
           loadFilesDirectory(path, { expand: true, redraw: true });
           return;
@@ -824,7 +854,55 @@ function topFilesSearchFile(results) {
   return (results?.entries || []).find((entry) => entry.type === "file") || null;
 }
 
-async function runFilesSearch(query, { refocus = false, openTopFile = false } = {}) {
+function filesSearchFileIndexes(results = filesState.searchResults) {
+  return (results?.entries || [])
+    .map((entry, idx) => entry.type === "file" ? idx : -1)
+    .filter((idx) => idx >= 0);
+}
+
+function normalizedFilesSearchSelectedIndex(results = filesState.searchResults) {
+  const fileIndexes = filesSearchFileIndexes(results);
+  if (!fileIndexes.length) return -1;
+  if (fileIndexes.includes(filesState.searchSelectedIndex)) {
+    return filesState.searchSelectedIndex;
+  }
+  filesState.searchSelectedIndex = fileIndexes[0];
+  return filesState.searchSelectedIndex;
+}
+
+function selectedFilesSearchEntry() {
+  const selectedIndex = normalizedFilesSearchSelectedIndex();
+  if (selectedIndex < 0) return null;
+  return filesState.searchResults?.entries?.[selectedIndex] || null;
+}
+
+function moveFilesSearchSelection(delta) {
+  const fileIndexes = filesSearchFileIndexes();
+  if (!fileIndexes.length) return;
+  const selectedIndex = normalizedFilesSearchSelectedIndex();
+  const current = Math.max(0, fileIndexes.indexOf(selectedIndex));
+  const next = Math.min(fileIndexes.length - 1, Math.max(0, current + delta));
+  filesState.searchSelectedIndex = fileIndexes[next];
+  drawToolbar();
+  focusFilesSearchInput();
+  scrollSelectedFilesSearchResultIntoView();
+}
+
+function openSelectedFilesSearchResult() {
+  const entry = selectedFilesSearchEntry();
+  if (!entry || entry.type !== "file") return false;
+  loadFile(entry.path);
+  return true;
+}
+
+function scrollSelectedFilesSearchResultIntoView() {
+  requestAnimationFrame(() => {
+    const row = document.querySelector(".files-search-result.selected");
+    row?.scrollIntoView({ block: "nearest" });
+  });
+}
+
+async function runFilesSearch(query, { refocus = false, openSelectedFile = false } = {}) {
   if (filesSearchTimer) {
     clearTimeout(filesSearchTimer);
     filesSearchTimer = null;
@@ -837,6 +915,7 @@ async function runFilesSearch(query, { refocus = false, openTopFile = false } = 
   if (!query) {
     filesState.searchLoading = false;
     filesState.searchResults = null;
+    filesState.searchSelectedIndex = -1;
     drawToolbar();
     return;
   }
@@ -846,21 +925,24 @@ async function runFilesSearch(query, { refocus = false, openTopFile = false } = 
   try {
     const result = await api(
       "GET",
-      `/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_TREE_MAX_ENTRIES}`,
+      `/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_SEARCH_MAX_RESULTS}`,
     );
     if (requestSeq !== filesSearchRequestSeq) return;
     filesState.searchResults = result;
+    normalizedFilesSearchSelectedIndex(result);
     filesState.searchLoading = false;
     drawToolbar();
     if (refocus) focusFilesSearchInput();
-    if (openTopFile) {
-      const entry = topFilesSearchFile(result);
+    scrollSelectedFilesSearchResultIntoView();
+    if (openSelectedFile) {
+      const entry = selectedFilesSearchEntry() || topFilesSearchFile(result);
       if (entry) await loadFile(entry.path);
     }
   } catch (e) {
     if (requestSeq !== filesSearchRequestSeq) return;
     filesState.searchLoading = false;
     filesState.searchResults = null;
+    filesState.searchSelectedIndex = -1;
     filesState.searchError = e.message || String(e);
     drawToolbar();
     if (refocus) focusFilesSearchInput();
@@ -915,13 +997,25 @@ async function openFilesToolbar(options = {}) {
   chatState.open = true;
   saveChatStateToStorage();
   drawToolbar();
-  const path = typeof options === "string"
-    ? options
-    : String(options.path || "");
+  const opts = typeof options === "string" ? { path: options } : options;
+  const path = String(opts.path || "");
+  const search = String(opts.search || "").trim();
+  const focusSearch = !!opts.focusSearch || !!search;
+  if (search) {
+    filesState.searchQuery = search;
+    filesState.searchResults = null;
+    filesState.searchSelectedIndex = -1;
+    filesState.searchError = "";
+  }
   if (path.trim()) {
     await navigateFilesPath(path);
   } else if (!filesState.entriesByPath[""]) {
     await loadFilesDirectory("", { expand: true, redraw: true });
+  }
+  if (search) {
+    await runFilesSearch(search, { refocus: focusSearch });
+  } else if (focusSearch) {
+    focusFilesSearchInput();
   }
 }
 

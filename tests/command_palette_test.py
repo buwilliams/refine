@@ -83,6 +83,7 @@ def main() -> int:
         "toolbar.toggle",
         "toolbar.fullscreen",
         "files.open",
+        "files.search",
         "gaps.bulk.move",
         "gaps.bulk.failed_back",
         "system.cache.rebuild",
@@ -102,9 +103,12 @@ def main() -> int:
     assert 'update: { status: "__last_workflow_state" }' in commands_js
     assert 'await openPlanChatDock({ initialPrompt: prompt || "" });' in commands_js
     assert 'id: "files.open"' in commands_js
+    assert 'id: "files.search"' in commands_js
     assert 'group: "Toolbar"' in commands_js
     assert 'aliases: ["files", "open-files", "file-browser"]' in commands_js
+    assert 'aliases: ["search-files", "find-file", "file-search"]' in commands_js
     assert 'openFilesToolbar({ path: path || "" })' in commands_js
+    assert 'openFilesToolbar({ search: search || "", focusSearch: true })' in commands_js
     assert "enabled: () => planHasAgentResponse(chatState.tabs.plan)" in commands_js
     assert "Wait for the agent to respond before drafting Gaps." in commands_js
     assert 'aliases: ["regression_new", "new-regression", "create-regression"]' in commands_js
@@ -146,6 +150,7 @@ def main() -> int:
     assert 'collapse: \'<path d="m18 15-6-6-6 6"></path>\'' in toolbar_js
     assert "const FILES_TREE_MAX_DEPTH = 3;" in toolbar_js
     assert "const FILES_TREE_MAX_ENTRIES = 200;" in toolbar_js
+    assert "const FILES_SEARCH_MAX_RESULTS = 20;" in toolbar_js
     assert 'class="files-tree"' in toolbar_js
     assert 'class="files-content"' in toolbar_js
     assert 'class="files-line-number"' in toolbar_js
@@ -153,10 +158,13 @@ def main() -> int:
     assert "function collapseAllFilesTree()" in toolbar_js
     assert "async function runFilesSearch(query" in toolbar_js
     assert "function scheduleFilesSearch(query)" in toolbar_js
+    assert "function normalizedFilesSearchSelectedIndex(" in toolbar_js
+    assert "function moveFilesSearchSelection(delta)" in toolbar_js
+    assert "function openSelectedFilesSearchResult()" in toolbar_js
     assert "function highlightFileLine" in toolbar_js
     assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert '"recursive=1"' in toolbar_js
-    assert "/api/files/search?q=${encodeURIComponent(query)}" in toolbar_js
+    assert "/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_SEARCH_MAX_RESULTS}" in toolbar_js
     assert "/api/files/read?path=${encodeURIComponent(path)}&offset=0&limit=${FILE_TEXT_CHUNK_BYTES}" in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
