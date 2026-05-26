@@ -71,6 +71,7 @@ def load_configured(
     os.environ[config.ENV_CONFIG_PATH] = str(cfg.config_path)
     _loaded_config_path = cfg.config_path
     db.init_db()
+    project_state.resume_agents_for_startup()
     if start_poller:
         ensure_poller()
     if start_runner:

@@ -378,7 +378,7 @@ Single landing view summarizing:
 - View the agents table for active agent subprocesses and chat sessions, including elapsed and idle time. Chat rows show the same worker resource limits as agent rows and include a stop action.
 - Managed process and agent rows show CPU priority and max-memory labels. Worker memory limits are per process, UI memory limits apply to the UI process, and target-app commands are unmanaged. CPU values are priority weights, not hard CPU quotas.
 - Start / stop / rebuild / check the target application from the process list using saved host commands and configured health checks. The target application may not have a known PID.
-- Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. The pause flag is stored in SQLite, so it survives runner restarts.
+- Pause / resume agent spawning. While paused, `todo` Gaps wait; running subprocesses are not killed. A configured app start or restart clears the pause flag so agents come back on by default.
 - Cancel an in-flight agent Gap — kills the CLI subprocess, releases the lock, and moves the Gap to `cancelled` (worktree and branch are cleaned up).
 
 ### Chat

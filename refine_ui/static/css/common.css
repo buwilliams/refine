@@ -96,6 +96,71 @@ button.settings-tab:hover:not(:disabled) {
 .settings-section > h3:first-child {
   margin-top: 0;
 }
+.settings-section-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.settings-section-heading h3 {
+  margin: 0;
+}
+.settings-markdown-edit {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-markdown-edit svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.settings-markdown-preview {
+  min-height: 80px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.settings-markdown-preview > :first-child {
+  margin-top: 0;
+}
+.settings-markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+.settings-markdown-preview h1,
+.settings-markdown-preview h2,
+.settings-markdown-preview h3,
+.settings-markdown-preview h4,
+.settings-markdown-preview h5,
+.settings-markdown-preview h6 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.settings-markdown-preview p,
+.settings-markdown-preview ul,
+.settings-markdown-preview ol,
+.settings-markdown-preview blockquote,
+.settings-markdown-preview pre {
+  margin: 0 0 10px;
+}
+.settings-markdown-preview ul,
+.settings-markdown-preview ol {
+  padding-left: 22px;
+}
+.settings-markdown-preview blockquote {
+  padding-left: 10px;
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+}
 
 /* Worker role pill for runtime "Currently running" tables. */
 .role-pill {

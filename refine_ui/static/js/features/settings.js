@@ -357,6 +357,60 @@ function bindSettingsAutosave(root, selector, save, options = {}) {
   return autosave;
 }
 
+function renderSettingsMarkdownField({
+  id,
+  title,
+  value = "",
+  scope = "",
+  description = "",
+  rows = 7,
+}) {
+  const htmlId = htmlEscape(id);
+  const describedById = `${htmlId}-description`;
+  const trimmed = String(value || "").trim();
+  return `
+    <section class="settings-section settings-markdown-field" data-settings-markdown-field>
+      <div class="settings-section-heading">
+        <h3>${htmlEscape(title)}</h3>
+        <button type="button"
+                class="secondary settings-markdown-edit"
+                title="Edit ${htmlEscape(title)}"
+                aria-label="Edit ${htmlEscape(title)}"
+                data-settings-markdown-edit>
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+          </svg>
+        </button>
+      </div>
+      ${scope ? `<p class="scope-label muted small">${htmlEscape(scope)}</p>` : ""}
+      ${description ? `<p class="muted small" id="${describedById}" style="margin-top:0">${htmlEscape(description)}</p>` : ""}
+      <div class="settings-markdown-preview" data-settings-markdown-preview>
+        ${trimmed ? mdToHtml(value) : `<p class="muted small">No ${htmlEscape(title.toLowerCase())} yet.</p>`}
+      </div>
+      <textarea id="${htmlId}" rows="${rows}" data-settings-markdown-editor
+                ${description ? `aria-describedby="${describedById}"` : ""}
+                hidden>${htmlEscape(value)}</textarea>
+    </section>`;
+}
+
+function bindSettingsMarkdownFields(root) {
+  if (!root) return;
+  $$("[data-settings-markdown-edit]", root).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const field = btn.closest("[data-settings-markdown-field]");
+      if (!field) return;
+      field.querySelector("[data-settings-markdown-preview]")?.setAttribute("hidden", "");
+      const editor = field.querySelector("[data-settings-markdown-editor]");
+      if (editor) {
+        editor.hidden = false;
+        editor.focus();
+      }
+      btn.hidden = true;
+    });
+  });
+}
+
 const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
 const SETTINGS_TABS = [
   { slug: "processes",    label: "Processes" },

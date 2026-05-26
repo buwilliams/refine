@@ -236,6 +236,15 @@ def main() -> int:
     assert "autosaveSettingsQuality" in settings_js
     assert "autosaveSettingsApplication" in settings_js
     assert "autosaveSettingsRuntime" in settings_js
+    assert "function renderSettingsMarkdownField" in settings_js
+    assert "function bindSettingsMarkdownFields" in settings_js
+    assert "data-settings-markdown-preview" in settings_js
+    assert "data-settings-markdown-editor" in settings_js
+    assert "data-settings-markdown-edit" in settings_js
+    assert "mdToHtml(value)" in settings_js
+    assert 'field.querySelector("[data-settings-markdown-preview]")?.setAttribute("hidden", "")' in settings_js
+    assert 'editor.hidden = false;' in settings_js
+    assert 'btn.hidden = true;' in settings_js
     for old_save_id in (
         'id="s-save"',
         'id="s-save-cli"',
@@ -248,6 +257,20 @@ def main() -> int:
     ):
         assert old_save_id not in settings_js
     assert "settings-save-section" not in settings_js
+    governance_body = settings_tab_files["settings_governance"]
+    quality_body = settings_tab_files["settings_quality"]
+    assert 'id: "s-governance-product"' in governance_body
+    assert 'title: "Product"' in governance_body
+    assert 'id: "s-governance-constitution"' in governance_body
+    assert 'title: "Constitution"' in governance_body
+    assert 'bindSettingsMarkdownFields(root);' in governance_body
+    assert 'id: "s-quality-business-requirements"' in quality_body
+    assert 'title: "Business requirements"' in quality_body
+    assert 'id: "s-quality-instructions"' in quality_body
+    assert 'title: "Instructions"' in quality_body
+    assert 'bindSettingsMarkdownFields(root);' in quality_body
+    assert ".settings-markdown-preview" in common_css
+    assert ".settings-markdown-edit svg" in common_css
     settings_tabs_css = re.search(r"\.settings-tabs \{(.*?)\}", common_css, re.S)
     settings_tab_css = re.search(r"\.settings-tab \{(.*?)\}", common_css, re.S)
     settings_tab_active_css = re.search(

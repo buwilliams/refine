@@ -73,23 +73,22 @@ function addGovernanceRuleRow(text = "") {
 
 function renderSettingsGovernanceTab(gov) {
   return `
-    <section class="settings-section">
-      <h3>Product</h3>
-      <p class="scope-label muted small">Project-wide</p>
-      <p class="muted small" style="margin-top:0">
-        The what and why: who the product is for, what problems it solves,
-        and what success looks like.
-      </p>
-      <textarea id="s-governance-product" rows="7">${htmlEscape(gov.product || "")}</textarea>
-    </section>
+    ${renderSettingsMarkdownField({
+      id: "s-governance-product",
+      title: "Product",
+      value: gov.product || "",
+      scope: "Project-wide",
+      description: "The what and why: who the product is for, what problems it solves, and what success looks like.",
+      rows: 7,
+    })}
 
-    <section class="settings-section">
-      <h3>Constitution</h3>
-      <p class="muted small" style="margin-top:0">
-        Non-negotiable principles for the entire project.
-      </p>
-      <textarea id="s-governance-constitution" rows="7">${htmlEscape(gov.constitution || "")}</textarea>
-    </section>
+    ${renderSettingsMarkdownField({
+      id: "s-governance-constitution",
+      title: "Constitution",
+      value: gov.constitution || "",
+      description: "Non-negotiable principles for the entire project.",
+      rows: 7,
+    })}
 
     <section class="settings-section">
       <h3>Rules</h3>
@@ -119,6 +118,7 @@ async function autosaveSettingsGovernance() {
 function bindSettingsGovernanceTab() {
   bindGovernanceRuleButtons();
   const root = document.querySelector('[data-tab-pane="governance"]');
+  bindSettingsMarkdownFields(root);
   bindSettingsAutosave(
     root,
     "#s-governance-product, #s-governance-constitution, .governance-rule-input",

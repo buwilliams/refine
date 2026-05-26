@@ -614,6 +614,25 @@ def set_setting(key: str, value: str) -> None:
         _update_instance_file("target-app.json", {key: value}, root=root)
 
 
+def resume_agents_for_startup(conn: sqlite3.Connection | None = None) -> bool:
+    """Clear the pause flag when Refine starts a configured application."""
+    from . import db
+
+    close_conn = False
+    if conn is None:
+        conn = db.connect()
+        close_conn = True
+    try:
+        ensure_sqlite_cache_current(conn)
+        was_paused = (db.get_setting(conn, "paused") or "0") == "1"
+        if was_paused:
+            db.set_setting(conn, "paused", "0")
+        return was_paused
+    finally:
+        if close_conn:
+            conn.close()
+
+
 def list_reporters(*, root: Path | None = None) -> list[dict[str, Any]]:
     root = root or volume_root()
     active = active_instance_id(root=root)

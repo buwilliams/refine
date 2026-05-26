@@ -9,13 +9,14 @@ import signal
 import sys
 import threading
 
-from refine_server import config
+from refine_server import config, project_state
 
 from .runner import Runner
 
 
 def main() -> int:
     config.get()  # ensure refine.toml is found early; surfaces a clean error
+    project_state.resume_agents_for_startup()
     runner = Runner()
     stop_event = threading.Event()
 

@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 
 from refine_runtime.ipc import IpcServer
-from refine_server import config
+from refine_server import config, project_state
 from refine_server.runner import Runner
 
 
@@ -18,6 +18,7 @@ def main() -> int:
         print("REFINE_RUNNER_SOCKET is required", file=sys.stderr)
         return 2
     config.get()  # fail early with a clear config error
+    project_state.resume_agents_for_startup()
     runner = Runner()
     stop_event = threading.Event()
     server = IpcServer(Path(sock), runner.call)

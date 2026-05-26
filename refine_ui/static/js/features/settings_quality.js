@@ -43,26 +43,28 @@ function renderSettingsQualityTab(quality) {
       </div>
     </section>
 
-    <section class="settings-section">
-      <h3>Business requirements</h3>
-      <p class="scope-label muted small">Project-wide</p>
-      <p class="muted small" style="margin-top:0">
-        Product behavior and requirements the Quality agent checks against tests.
-      </p>
-      <textarea id="s-quality-business-requirements" rows="9">${htmlEscape(quality.business_requirements || "")}</textarea>
-    </section>
+    ${renderSettingsMarkdownField({
+      id: "s-quality-business-requirements",
+      title: "Business requirements",
+      value: quality.business_requirements || "",
+      scope: "Project-wide",
+      description: "Product behavior and requirements the Quality agent checks against tests.",
+      rows: 9,
+    })}
 
-    <section class="settings-section">
-      <h3>Instructions</h3>
-      <p class="muted small" style="margin-top:0">
-        How the Quality agent should choose and evaluate test coverage.
-      </p>
-      <textarea id="s-quality-instructions" rows="9">${htmlEscape(quality.instructions || "")}</textarea>
-      ${quality.configured ? "" : `
+    ${renderSettingsMarkdownField({
+      id: "s-quality-instructions",
+      title: "Instructions",
+      value: quality.instructions || "",
+      description: "How the Quality agent should choose and evaluate test coverage.",
+      rows: 9,
+    })}
+    ${quality.configured ? "" : `
+      <section class="settings-section settings-quality-configured-message">
         <p class="muted small" style="color:var(--warn)">
           Quality can run once business requirements and instructions are both filled in.
-        </p>`}
-    </section>`;
+        </p>
+      </section>`}`;
 }
 
 function renderQualityRegressionList(regressions) {
@@ -100,6 +102,7 @@ async function autosaveSettingsQuality() {
 
 function bindSettingsQualityTab() {
   const root = document.querySelector('[data-tab-pane="quality"]');
+  bindSettingsMarkdownFields(root);
   const autosaveQuality = bindSettingsAutosave(
     root,
     "#s-quality-business-requirements, #s-quality-instructions",
