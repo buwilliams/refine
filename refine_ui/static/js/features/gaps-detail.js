@@ -11,6 +11,7 @@ async function renderGapDetail(r) {
 }
 
 let _gapModalRoot = null;
+let _gapRoundFormDraft = null;
 const GAP_LOG_PAGE_SIZE = 10;
 const gapRoundLogState = new Map();
 
@@ -66,6 +67,7 @@ function closeGapDetailModal({ navigateAway = false } = {}) {
   _gapModalRoot._cleanup?.();
   _gapModalRoot.remove();
   _gapModalRoot = null;
+  _gapRoundFormDraft = null;
   state.currentGap = null;
   state.currentGapData = null;
   gapRoundLogState.clear();
@@ -153,6 +155,16 @@ function isMergeRetryGap(latest) {
 
 function drawGapDetail(gap) {
   if (!gap) return;
+  if (_gapRoundFormDraft && _gapRoundFormDraft.gapId !== gap.id) {
+    _gapRoundFormDraft = null;
+  }
+  const hadEditRoundForm = !!document.querySelector('#round-form[data-kind="edit"]');
+  const roundFormDraft = captureRoundFormDraft(gap.id);
+  if (roundFormDraft) {
+    _gapRoundFormDraft = roundFormDraft;
+  } else if (hadEditRoundForm && _gapRoundFormDraft?.gapId === gap.id) {
+    _gapRoundFormDraft = null;
+  }
   state.currentGapData = gap;
   renderBanners([]);
   for (const key of gapRoundLogState.keys()) {
@@ -182,6 +194,7 @@ function drawGapDetail(gap) {
   const isLatestEditable = (gap.status === "backlog" ||
                             gap.status === "todo" ||
                             gap.status === "failed");
+  const hasPreservedDraft = hasPreservedRoundFormDraft(gap.id);
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
   // Chat is always available — the value is the Gap context the runner
   // primes into the provider session. The chat runs in the Gap's worktree
@@ -246,10 +259,14 @@ function drawGapDetail(gap) {
           prevRoundOpen, prevLogsOpen, gap.id,
         )).join("")}
 
-      ${(gap.status === "backlog" || gap.status === "todo" || gap.status === "failed") ? `
+      ${(isLatestEditable || hasPreservedDraft) ? `
         <div class="card" style="margin-top:14px">
           <h3>Edit latest round</h3>
-          ${renderRoundForm("edit", latest)}
+          ${renderRoundForm("edit", latest, {
+            draft: _gapRoundFormDraft,
+            disabled: !isLatestEditable,
+            formId: isLatestEditable ? "round-form" : "round-form-draft",
+          })}
         </div>` : ""}
 
       ${gap.status === "review" ? `
@@ -452,6 +469,48 @@ function drawGapDetail(gap) {
   bindFailureBannerActions(gap);
   bindRoundLogLoading(gap);
   bindRoundFormSubmit(gap);
+  restoreRoundFormDraftFocus(gap.id);
+}
+
+function captureRoundFormDraft(gapId) {
+  const form = document.querySelector('#round-form[data-kind="edit"]');
+  if (!form || state.currentGapData?.id !== gapId) return null;
+  const actualEl = form.elements.actual;
+  const targetEl = form.elements.target;
+  if (!actualEl || !targetEl) return null;
+  const rounds = state.currentGapData.rounds || [];
+  const latest = rounds[rounds.length - 1] || {};
+  const actual = actualEl.value || "";
+  const target = targetEl.value || "";
+  const dirty = actual !== (latest.actual || "") || target !== (latest.target || "");
+  if (!dirty) return null;
+  const activeEl = form.contains(document.activeElement) ? document.activeElement : null;
+  const activeName = activeEl?.name || "";
+  return {
+    gapId,
+    actual,
+    target,
+    activeName,
+    selectionStart: typeof activeEl?.selectionStart === "number" ? activeEl.selectionStart : null,
+    selectionEnd: typeof activeEl?.selectionEnd === "number" ? activeEl.selectionEnd : null,
+  };
+}
+
+function hasPreservedRoundFormDraft(gapId) {
+  return !!(_gapRoundFormDraft && _gapRoundFormDraft.gapId === gapId);
+}
+
+function restoreRoundFormDraftFocus(gapId) {
+  const draft = _gapRoundFormDraft;
+  if (!draft || draft.gapId !== gapId || !draft.activeName) return;
+  const form = document.querySelector('#round-form[data-kind="edit"]');
+  const el = form?.elements?.[draft.activeName];
+  if (!el || el.readOnly || el.disabled) return;
+  el.focus();
+  if (typeof el.setSelectionRange === "function" &&
+      draft.selectionStart !== null && draft.selectionEnd !== null) {
+    el.setSelectionRange(draft.selectionStart, draft.selectionEnd);
+  }
 }
 
 function renderRound(gapId, rnd, idx, isLatest, editable,
@@ -719,28 +778,38 @@ function renderLogEntry(l) {
     </div>`;
 }
 
-function renderRoundForm(kind, prefill) {
-  const actual = prefill?.actual || "";
-  const target = prefill?.target || "";
+function renderRoundForm(
+  kind,
+  prefill,
+  { draft = null, disabled = false, formId = "round-form" } = {},
+) {
+  const actual = draft?.actual ?? prefill?.actual ?? "";
+  const target = draft?.target ?? prefill?.target ?? "";
   const reporter = state.lastReporter || "";
   if (!reporter) return renderPickReporterNotice();
   const submitLabel = kind === "submit" ? "Submit new round" : "Save changes";
+  const readonly = disabled ? "readonly" : "";
+  const buttonDisabled = disabled ? "disabled" : "";
   return `
-    <form id="round-form" data-kind="${kind}">
+    <form id="${htmlEscape(formId)}" data-kind="${kind}">
       <div class="muted small" style="margin-bottom:8px">
         Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
         — change in the top-right reporter selector.
       </div>
+      ${disabled ? `
+        <p class="muted small">
+          This Gap is no longer editable. Unsaved text is preserved here so you can copy it.
+        </p>` : ""}
       <div class="form-row">
         <label>Actual (current behavior)</label>
-        <textarea name="actual" placeholder="What's happening today?">${htmlEscape(actual)}</textarea>
+        <textarea name="actual" placeholder="What's happening today?" ${readonly}>${htmlEscape(actual)}</textarea>
       </div>
       <div class="form-row">
         <label>Target (desired behavior)</label>
-        <textarea name="target" placeholder="What should be happening?">${htmlEscape(target)}</textarea>
+        <textarea name="target" placeholder="What should be happening?" ${readonly}>${htmlEscape(target)}</textarea>
       </div>
       <div class="actions">
-        <button type="submit">${submitLabel}</button>
+        <button type="submit" ${buttonDisabled}>${submitLabel}</button>
       </div>
     </form>
   `;
@@ -774,6 +843,7 @@ function bindRoundFormSubmit(gap) {
         await api("PATCH", `/api/gaps/${gap.id}/rounds/latest`, { reporter, actual, target });
         toast("Round updated", "info");
       }
+      _gapRoundFormDraft = null;
       await loadGapDetail(gap.id);
     } catch (err) {
       await showActionError(err);
