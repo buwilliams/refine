@@ -104,6 +104,25 @@ def _schema_block_response() -> tuple[int, dict] | None:
     )
 
 
+def _background_processes_stopped() -> bool:
+    conn = _conn()
+    try:
+        return (db.get_setting(conn, "paused") or "0") == "1"
+    finally:
+        conn.close()
+
+
+def _background_processes_stopped_response() -> tuple[int, dict] | None:
+    if not _background_processes_stopped():
+        return None
+    return err(
+        409,
+        "Background processes are stopped.",
+        "Start Background from the Supervisor row before running worker actions.",
+        error_code="background_processes_stopped",
+    )
+
+
 def _background_job_conflict_response(
     conflict: background_jobs.BackgroundJobConflict,
 ) -> tuple[int, dict]:
@@ -120,6 +139,7 @@ def _exclusive_mutation(
     label: str,
     *,
     allow_active_kinds: set[str] | None = None,
+    allow_busy_when: Callable[[dict[str, Any]], bool] | None = None,
 ) -> Callable:
     def decorator(fn: Callable) -> Callable:
         @wraps(fn)
@@ -131,6 +151,8 @@ def _exclusive_mutation(
                 ):
                     return fn(*args, **kwargs)
             except background_jobs.BackgroundJobConflict as e:
+                if allow_busy_when is not None and allow_busy_when(e.job):
+                    return fn(*args, **kwargs)
                 return _background_job_conflict_response(e)
         return wrapped
     return decorator
@@ -1257,6 +1279,9 @@ def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
 
     body = body or {}
     if body.get("background"):
@@ -3087,7 +3112,10 @@ def upgrade_status() -> tuple[int, dict]:
     return 200, {"upgrade": upgrade.status(Path.cwd()).as_dict()}
 
 
-@_exclusive_mutation("Update settings")
+@_exclusive_mutation(
+    "Update settings",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
 def update_settings(body: dict) -> tuple[int, dict]:
     if not isinstance(body, dict) or not body:
         return err(400, "expected an object of {key: value}")
@@ -3645,6 +3673,9 @@ def cleanup_logs(body: dict) -> tuple[int, dict]:
     "don't keep any"). Anything else uses an ISO-timestamp cutoff
     computed against `now`. Returns the number of rows deleted.
     """
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     raw = body.get("days")
     try:
         days = int(raw)
@@ -3841,7 +3872,9 @@ def process_summary() -> tuple[int, dict]:
     merger = runner_snap.get("merger") or None
     governance = runner_snap.get("governance") or None
     target_app_rebuild = runner_snap.get("target_app_rebuild") or None
-    runner_work = _runner_work_summary(merger, governance, target_app_rebuild)
+    runner_work = _runner_work_summary(
+        merger, governance, target_app_rebuild, paused=paused,
+    )
 
     for chat in runner_snap.get("chat") or []:
         session_id = str(chat.get("session_id") or "")
@@ -3959,6 +3992,8 @@ def _runner_work_summary(
     merger: dict | None,
     governance_state: dict | None,
     target_app_rebuild: dict | None,
+    *,
+    paused: bool = False,
 ) -> list[dict[str, Any]]:
     merger = merger or {}
     governance_state = governance_state or {}
@@ -3968,7 +4003,7 @@ def _runner_work_summary(
         target_status = "running"
     elif target_app_rebuild.get("queued"):
         target_status = "queued"
-    return [
+    rows = [
         {
             "id": "merger",
             "kind": "merger",
@@ -4049,6 +4084,17 @@ def _runner_work_summary(
             "Deletes large selected Gap batches in the background.",
         ),
     ]
+    if paused:
+        rows = [_paused_runner_worker(row) for row in rows]
+    return rows
+
+
+def _paused_runner_worker(row: dict[str, Any]) -> dict[str, Any]:
+    paused = dict(row)
+    paused["status"] = "paused"
+    paused["queued"] = 0
+    paused["paused"] = True
+    return paused
 
 
 def _static_worker_row(
@@ -5311,6 +5357,9 @@ def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
 
 def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:
     """Queue the persistent target-app rebuilder worker."""
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     try:
         result = get_client().call(M_TARGET_APP_REBUILD_QUEUE, {}, timeout=10.0)
     except BackendError as e:
@@ -5320,6 +5369,9 @@ def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:
 
 def hard_reset_worktree(_body: dict | None = None) -> tuple[int, dict]:
     """Destructively reset the host target worktree through the runner."""
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     try:
         result = get_client().call(M_HARD_RESET_WORKTREE, {}, timeout=300.0)
     except BackendError as e:
@@ -5566,6 +5618,9 @@ def _target_app_record_failure(kind: str, message: str) -> None:
 
 def target_app_generate(body: dict) -> tuple[int, dict]:
     """Use the agent to draft structured target-app config for this codebase."""
+    stopped = _background_processes_stopped_response()
+    if stopped is not None:
+        return stopped
     kind = (body.get("kind") or "all").strip().lower()
     if kind not in ("all", "start", "stop", "rebuild", "status"):
         return err(400, "kind must be 'all', 'start', 'stop', 'rebuild', or 'status'")

@@ -176,6 +176,15 @@ def main() -> int:
         db.set_setting(conn, "target_app_rebuild_command", "build-app")
         db.set_setting(conn, "target_app_start_command", "start-app")
         auto_runner = runner_mod.Runner()
+        db.set_setting(conn, "paused", "1")
+        paused_queue = auto_runner._h_target_app_rebuild_queue({})  # noqa: SLF001
+        paused_generate = auto_runner._h_target_app_generate({"kind": "all"})  # noqa: SLF001
+        paused_reset = auto_runner._h_hard_reset_worktree({})  # noqa: SLF001
+        assert paused_queue["ok"] is False, paused_queue
+        assert paused_queue["code"] == "background_processes_stopped", paused_queue
+        assert paused_generate["ok"] is False, paused_generate
+        assert paused_reset["ok"] is False, paused_reset
+        db.set_setting(conn, "paused", "0")
         operations: list[str] = []
         old_run_operation = target_app.run_operation
         fail_rebuild = False

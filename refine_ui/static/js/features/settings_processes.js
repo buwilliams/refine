@@ -334,13 +334,13 @@ function processStatusLabel(status) {
 function renderProcessActions(proc) {
   if (proc.kind === "supervisor") {
     const stopped = !!proc.background_processes_stopped;
-    return `<button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background Processes</button>`;
+    return `<button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
   }
   if (proc.kind === "agent_scheduler") {
     const paused = proc.status === "paused";
     return `
-      <button id="btn-pause" class="${paused ? "" : "secondary"}">${paused ? "Resume" : "Pause"} agents</button>
-      <button class="danger" data-hard-reset-worktree ${proc.runner_reachable ? "" : "disabled"}>Hard reset worktree</button>`;
+      <button id="btn-pause" class="${paused ? "" : "secondary"}" ${paused ? "disabled" : ""}>${paused ? "Resume" : "Pause"} agents</button>
+      <button class="danger" data-hard-reset-worktree ${proc.runner_reachable && !paused ? "" : "disabled"}>Hard reset worktree</button>`;
   }
   if (proc.kind === "agent" && proc.gap_id) {
     return `<button class="danger" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
@@ -434,24 +434,25 @@ function renderRunnerWorkRow(work, anchorMs) {
 
 function renderRunnerWorkActions(work) {
   if (work.kind === "target_app_rebuilder") {
-    const busy = ["running", "queued", "unknown"].includes(work.status);
+    const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
     return `<button class="secondary" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
   }
   if (work.kind === "target_app_config_generator") {
-    const busy = ["running", "queued", "unknown"].includes(work.status);
+    const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
     return `<button class="secondary" data-runner-target-app-generate ${busy ? "disabled" : ""}>Generate</button>`;
   }
   if (work.kind === "sqlite_cache_rebuild") {
-    const busy = ["running", "queued", "unknown"].includes(work.status);
+    const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
     return `<button class="danger" data-runner-cache-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
   }
   if (work.kind === "activity_log_cleanup") {
+    const paused = work.status === "paused";
     return `
-      <select data-runner-log-cleanup-days aria-label="Activity log retention">
+      <select data-runner-log-cleanup-days aria-label="Activity log retention" ${paused ? "disabled" : ""}>
         ${[0, 7, 30, 60, 90, 365].map((n) =>
           `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 days" : `${n} days`}</option>`).join("")}
       </select>
-      <button class="danger" data-runner-log-cleanup>Clean up</button>`;
+      <button class="danger" data-runner-log-cleanup ${paused ? "disabled" : ""}>Clean up</button>`;
   }
   return `<span class="muted small">-</span>`;
 }

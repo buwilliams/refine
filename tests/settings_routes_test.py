@@ -157,6 +157,9 @@ def main() -> int:
     assert '@route("POST", r"/api/processes/background")' in server_py
     assert "def process_summary" in api_py
     assert "def set_background_processes" in api_py
+    assert "def _background_processes_stopped_response" in api_py
+    assert "background_processes_stopped" in api_py
+    assert 'allow_busy_when=lambda _owner: _background_processes_stopped()' in api_py
     assert "function renderProcessesTab" in settings_js
     assert "function renderRunnerWorkRow" in settings_js
     assert "function renderRuntimeAgentCards" not in settings_js
@@ -415,8 +418,11 @@ def main() -> int:
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body
     assert 'id="btn-pause"' in processes_body
+    assert 'id="btn-pause" class="${paused ? "" : "secondary"}" ${paused ? "disabled" : ""}' in processes_body
+    assert 'proc.runner_reachable && !paused ? "" : "disabled"' in processes_body
     assert 'data-toggle-background-processes' in processes_body
-    assert '${stopped ? "Start" : "Stop"} Background Processes' in processes_body
+    assert '${stopped ? "Start" : "Stop"} Background</button>' in processes_body
+    assert '${stopped ? "Start" : "Stop"} Background Processes' not in processes_body
     assert 'api("POST", "/api/processes/background", { stopped: shouldStop })' in processes_body
     assert "scheduleProcessesTabRefreshes()" in commands_js
     assert "function scheduleProcessesTabRefreshes()" in processes_body
@@ -447,6 +453,8 @@ def main() -> int:
     assert "<th>Worker</th>" in runner_table
     assert "<th>Queue</th>" in runner_table
     assert 'data-runner-target-app-rebuild' in processes_body
+    assert '["running", "queued", "unknown", "paused"].includes(work.status)' in processes_body
+    assert 'data-runner-log-cleanup-days aria-label="Activity log retention" ${paused ? "disabled" : ""}' in processes_body
     assert 'data-runner-target-app-generate' in processes_body
     assert 'data-runner-cache-rebuild' in processes_body
     assert 'data-runner-log-cleanup' in processes_body

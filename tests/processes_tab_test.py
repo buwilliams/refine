@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -16,7 +18,7 @@ def main() -> int:
     try:
         from refine_server import db
         from refine_server.backend_protocol import M_BACKGROUND_PROCESSES_SET
-        from refine_ui import api, runtime
+        from refine_ui import api, background_jobs, runtime
 
         db.set_setting(conn, "paused", "1")
         db.set_setting(conn, "target_app_state", "running")
@@ -78,7 +80,7 @@ def main() -> int:
                 },
                 "target_app_rebuild": {
                     "mode": "on_worktree_merge",
-                    "running": False,
+                    "running": True,
                     "queued": False,
                     "last_reason": "",
                 },
@@ -99,6 +101,37 @@ def main() -> int:
             )
             status, body = api.process_summary()
             stop_status, stop_body = api.set_background_processes({"stopped": True})
+            paused_action_results = [
+                api.target_app_rebuild_queue({}),
+                api.hard_reset_worktree({}),
+                api.target_app_generate({"kind": "all"}),
+                api.rebuild_sqlite_cache({"background": True}),
+                api.cleanup_logs({"days": 7}),
+            ]
+            started = threading.Event()
+            release = threading.Event()
+
+            def hold_exclusive_job(progress=None):  # noqa: ANN001
+                started.set()
+                release.wait(timeout=5.0)
+                return {"ok": True}
+
+            job = background_jobs.start(
+                "sqlite_cache_rebuild",
+                "Automatic target-app rebuild",
+                hold_exclusive_job,
+            )
+            assert started.wait(timeout=2.0), job
+            settings_update_status, settings_update_body = api.update_settings({
+                "target_app_url": "http://localhost:3000",
+            })
+            release.set()
+            deadline = time.time() + 5.0
+            while time.time() < deadline:
+                snap = background_jobs.snapshot(job["id"])
+                if snap and snap.get("status") in {"done", "failed", "cancelled"}:
+                    break
+                time.sleep(0.05)
             start_status, start_body = api.set_background_processes({"stopped": False})
         finally:
             runtime.runner_status_snapshot = original_snapshot  # type: ignore[assignment]
@@ -127,6 +160,12 @@ def main() -> int:
         assert supervisor["actions"] == ["start_background_processes"], supervisor
         assert stop_status == 200, stop_body
         assert stop_body["stopped"] is True, stop_body
+        assert [s for s, _ in paused_action_results] == [409, 409, 409, 409, 409], paused_action_results
+        assert all(
+            b["error"]["code"] == "background_processes_stopped"
+            for _, b in paused_action_results
+        ), paused_action_results
+        assert settings_update_status == 200, settings_update_body
         assert start_status == 200, start_body
         assert start_body["stopped"] is False, start_body
         assert calls == [
@@ -169,8 +208,10 @@ def main() -> int:
             "bulk_delete_gaps",
         ], work_kinds
         assert [w["status"] for w in body["runner_work"]] == [
-            "idle", "idle", "idle", "idle", "idle", "idle", "idle", "running", "idle", "idle",
+            "paused", "paused", "paused", "paused", "paused",
+            "paused", "paused", "paused", "paused", "paused",
         ], body["runner_work"]
+        assert all(w.get("paused") is True for w in body["runner_work"]), body["runner_work"]
         assert body["runner_work"][2]["details"] == "Rebuilds the target application after merged work.", body["runner_work"]
         import_worker = next(w for w in body["runner_work"] if w["kind"] == "import_persist")
         assert import_worker["details"] == "Persisting imports", import_worker

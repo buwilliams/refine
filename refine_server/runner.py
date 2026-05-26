@@ -240,7 +240,22 @@ class Runner:
             label="project sync",
         )
 
+    def _background_processes_stopped(self) -> dict | None:
+        if not db.get_setting_int(self._conn, "paused", 0):
+            return None
+        return {
+            "ok": False,
+            "code": "background_processes_stopped",
+            "message": (
+                "Background processes are stopped. Start Background from "
+                "the Supervisor row before running worker actions."
+            ),
+        }
+
     def _h_hard_reset_worktree(self, _: dict) -> dict:
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return stopped
         with mutation_guard.exclusive(
             "Hard worktree reset",
             kind="hard_worktree_reset",
@@ -1955,10 +1970,16 @@ class Runner:
             self._target_app_lock.release()
 
     def _h_target_app_rebuild_pending(self, params: dict) -> dict:
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return {"queued": False, **stopped}
         queued = self.target_app_rebuilder.queue_pending_awaiting_rebuild()
         return {"queued": queued}
 
     def _h_target_app_rebuild_queue(self, params: dict) -> dict:
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return {"queued": False, **stopped}
         queued = self.target_app_rebuilder.queue_rebuild(
             "manual runner-worker rebuild",
         )
@@ -2321,6 +2342,9 @@ class Runner:
         Returns `{ok, config, message}`. The webapp lets the operator
         review and save `config` if `ok` is True.
         """
+        stopped = self._background_processes_stopped()
+        if stopped is not None:
+            return stopped
         kind = (params.get("kind") or "all").strip().lower()
         if kind not in ("all", "start", "stop", "rebuild", "status"):
             raise ValueError("kind must be 'all', 'start', 'stop', 'rebuild', or 'status'")
