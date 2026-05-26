@@ -429,10 +429,20 @@ button.toolbar-tab:hover:not(:disabled),
   min-height: 32px;
   display: flex;
   align-items: center;
+  gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid #e5e7eb;
   background: #f9fafb;
   color: #374151;
+}
+.files-content-header > span {
+  flex: 1;
+  min-width: 0;
+}
+.files-content-header .files-icon-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 26px;
 }
 .files-message {
   padding: 16px;

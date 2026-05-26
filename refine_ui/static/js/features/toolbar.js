@@ -536,6 +536,13 @@ function renderFilesPanel() {
         <div class="files-content">
           <div class="files-content-header">
             <span class="muted small">${htmlEscape(status)}</span>
+            ${filesState.file?.previewable ? `
+              <button type="button" class="secondary files-icon-btn"
+                      data-files-copy-content
+                      title="Copy file contents"
+                      aria-label="Copy file contents">
+                ${toolbarIcon("copy")}
+              </button>` : ""}
           </div>
           ${renderFilesContent()}
         </div>
@@ -732,6 +739,14 @@ function bindFilesPanel(root) {
     try {
       await navigator.clipboard.writeText(root.querySelector("#files-path-input")?.value || "");
       toast("Path copied", "info");
+    } catch {
+      toast("Clipboard copy is unavailable.", "error");
+    }
+  });
+  root.querySelector("[data-files-copy-content]")?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(filesState.file?.content || "");
+      toast("File contents copied", "info");
     } catch {
       toast("Clipboard copy is unavailable.", "error");
     }

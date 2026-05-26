@@ -727,6 +727,10 @@ def main() -> int:
     assert ".files-tree-actions" in toolbar_css
     assert ".files-tree-search" in toolbar_css
     assert ".files-source-line" in toolbar_css
+    assert ".files-content-header .files-icon-btn" in toolbar_css
+    assert "data-files-copy-content" in toolbar_js
+    assert 'navigator.clipboard.writeText(filesState.file?.content || "")' in toolbar_js
+    assert 'toast("File contents copied", "info")' in toolbar_js
     assert "background: #ffffff;" in toolbar_css
     assert "color: #111827;" in toolbar_css
     assert "#0f172a" not in toolbar_css
