@@ -221,13 +221,13 @@ start_install_log() {
 }
 
 print_splash() {
-  say "${BOLD}${CYAN}          __ _            ${RESET}"
+  say "${BOLD}${CYAN}           ___            ${RESET}"
   say "${BOLD}${CYAN} _ __ ___ / _(_)_ __   ___ ${RESET}"
   say "${BOLD}${BLUE}| '__/ _ \\ |_| | '_ \\ / _ \\${RESET}"
   say "${BOLD}${MAGENTA}| | |  __/  _| | | | |  __/${RESET}"
   say "${BOLD}${GREEN}|_|  \\___|_| |_|_| |_|\\___|${RESET}"
   say
-  say "${BOLD}${CYAN}refine${RESET} ${MAGENTA}local AI workflow setup${RESET}"
+  say "${BOLD}${CYAN}refine${RESET} ${MAGENTA}install, repair, and upgrade script${RESET}"
   say "${DIM}Quiet terminal, detailed log, clear next steps.${RESET}"
 }
 

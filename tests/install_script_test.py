@@ -97,6 +97,10 @@ def main() -> int:
     assert 'INSTALL_LOG="/tmp/refine-install-$$.log"' in script
     assert "print_splash" in script
     assert "choose_install_mode" in script
+    assert "           ___            " in script
+    assert "          __ _            " not in script
+    assert "install, repair, and upgrade script" in script
+    assert "local AI workflow setup" not in script
     assert "${BOLD}${CYAN}refine${RESET}" in script
     assert "Continue with Refine install" not in script
     assert "Is this a new Refine install" in script
