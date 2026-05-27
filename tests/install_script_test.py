@@ -77,6 +77,20 @@ def _run_piped_installer_with_pty(
     return code, output.decode("utf-8", errors="replace")
 
 
+def _write_refine_checkout(checkout: Path, *, legacy: bool = False) -> None:
+    (checkout / "refine_cli").mkdir(parents=True, exist_ok=True)
+    (checkout / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    if legacy:
+        (checkout / "install.sh").write_text("# marker\n", encoding="utf-8")
+    else:
+        (checkout / "scripts").mkdir(exist_ok=True)
+        (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
+
+
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     install_sh = root / "scripts" / "install.sh"
@@ -94,6 +108,8 @@ def main() -> int:
     assert "REFINE_INSTALL_DRY_RUN" in script
     assert "REFINE_INSTALL_UPGRADE" in script
     assert "REFINE_INSTALL_LOG" in script
+    assert 'REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine}' in script
+    assert "refine-work/refine" not in script
     assert 'INSTALL_LOG="/tmp/refine-install-$$.log"' in script
     assert "print_splash" in script
     assert "choose_install_mode" in script
@@ -154,6 +170,7 @@ def main() -> int:
         target = tmp / "target-app"
         checkout.mkdir()
         target.mkdir()
+        _write_refine_checkout(checkout)
         subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
 
@@ -205,6 +222,7 @@ def main() -> int:
     try:
         checkout = tmp / "refine"
         checkout.mkdir()
+        _write_refine_checkout(checkout)
         subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
 
         fake_bin = tmp / "bin"
@@ -256,6 +274,61 @@ def main() -> int:
         assert "uv run refine target" not in output
         assert "Target app:       not attached yet" in output
         print("[ok] install.sh can complete without an initial target app")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-install-legacy-checkout-test-"))
+    try:
+        checkout = tmp / "refine"
+        checkout.mkdir()
+        _write_refine_checkout(checkout, legacy=True)
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+        subprocess.run(["git", "config", "user.name", "Refine Test"], cwd=checkout, check=True)
+        subprocess.run(["git", "config", "user.email", "refine@example.test"], cwd=checkout, check=True)
+        subprocess.run(["git", "add", "."], cwd=checkout, check=True)
+        subprocess.run(["git", "commit", "-q", "-m", "legacy install"], cwd=checkout, check=True)
+
+        fake_bin = tmp / "bin"
+        fake_bin.mkdir()
+        for name in (
+            "awk", "bash", "cat", "curl", "dirname", "git", "grep", "python3",
+            "sort", "tail", "tr", "uname",
+        ):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
+        for name in ("codex", "docker", "uv"):
+            executable = fake_bin / name
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+
+        env = os.environ.copy()
+        install_log = tmp / "install.log"
+        env.update({
+            "HOME": str(tmp),
+            "NO_COLOR": "1",
+            "REFINE_INSTALL_DRY_RUN": "1",
+            "REFINE_INSTALL_DRY_RUN_RELEASE_TAG": "1.0.0",
+            "REFINE_INSTALL_BASE_DEFAULT": str(checkout),
+            "REFINE_INSTALL_PROVIDER": "codex",
+            "REFINE_INSTALL_LOG": str(install_log),
+            "PATH": str(fake_bin),
+        })
+        result = subprocess.run(
+            ["bash", str(install_sh), "--yes"],
+            cwd=tmp,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        output = result.stdout + result.stderr
+        assert "No existing Refine checkout detected; assuming a fresh install." in output
+        assert f"Refine checkout exists: {checkout}" in output
+        assert "Current Refine checkout is not on a semver release tag." in output
+        assert "Skipping release upgrade" not in output
+        assert "Refine upgraded to release 1.0.0" in output
+        print("[ok] install.sh upgrades a clean legacy checkout from fresh mode")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -347,6 +420,7 @@ def main() -> int:
         target = tmp / "target-app"
         checkout.mkdir(parents=True)
         target.mkdir()
+        _write_refine_checkout(checkout)
         subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
         subprocess.run(["git", "init", "-q"], cwd=target, check=True)
 

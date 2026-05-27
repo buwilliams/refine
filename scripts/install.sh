@@ -8,7 +8,7 @@ set -uo pipefail
 
 REFINE_REPO_URL="${REFINE_REPO_URL:-https://github.com/buwilliams/refine.git}"
 REFINE_RAW_INSTALL_URL="${REFINE_RAW_INSTALL_URL:-https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh}"
-REFINE_INSTALL_CHECKOUT_DEFAULT="${REFINE_INSTALL_CHECKOUT_DEFAULT:-${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine-work/refine}}"
+REFINE_INSTALL_CHECKOUT_DEFAULT="${REFINE_INSTALL_CHECKOUT_DEFAULT:-${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine}}"
 REFINE_DEFAULT_PORT="${REFINE_DEFAULT_PORT:-8080}"
 REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
@@ -264,7 +264,7 @@ choose_install_mode() {
   while [ "$attempt" -le 2 ]; do
     path="$(prompt "Existing Refine checkout path" "$REFINE_INSTALL_CHECKOUT_DEFAULT")"
     path="${path/#\~/$HOME}"
-    if is_refine_checkout "$path"; then
+    if is_any_refine_checkout "$path"; then
       INSTALL_MODE="existing"
       INSTALL_CHECKOUT="$(canonical_path "$path")"
       ok "Using existing Refine checkout: $INSTALL_CHECKOUT"
@@ -295,11 +295,21 @@ is_refine_checkout() {
     [ -f "$1/scripts/install.sh" ]
 }
 
+is_legacy_refine_checkout() {
+  [ -f "$1/pyproject.toml" ] &&
+    [ -f "$1/refine_cli/cli.py" ] &&
+    [ -f "$1/install.sh" ]
+}
+
+is_any_refine_checkout() {
+  is_refine_checkout "$1" || is_legacy_refine_checkout "$1"
+}
+
 current_refine_checkout() {
   local dir
   dir="$(pwd -P 2>/dev/null || pwd)"
   while [ -n "$dir" ] && [ "$dir" != "/" ]; do
-    if is_refine_checkout "$dir"; then
+    if is_any_refine_checkout "$dir"; then
       printf '%s\n' "$dir"
       return 0
     fi
@@ -1037,14 +1047,13 @@ upgrade_refine_checkout() {
   fi
   current="$(current_checkout_semver_tag "$checkout")"
   if [ -z "$current" ]; then
-    warn "Current Refine checkout is not on a semver release tag. Skipping release upgrade."
-    return 0
+    warn "Current Refine checkout is not on a semver release tag."
   fi
-  if checkout_ahead_of_semver_tag "$checkout" "$current"; then
+  if [ -n "$current" ] && checkout_ahead_of_semver_tag "$checkout" "$current"; then
     ok "Refine checkout is ahead of release $current; assuming local development and skipping release upgrade."
     return 0
   fi
-  if [ "$current" = "$latest" ] && git -C "$checkout" merge-base --is-ancestor HEAD "$latest" 2>/dev/null; then
+  if [ -n "$current" ] && [ "$current" = "$latest" ] && git -C "$checkout" merge-base --is-ancestor HEAD "$latest" 2>/dev/null; then
     ok "Refine already at latest release: $latest"
     return 0
   fi
@@ -1066,6 +1075,13 @@ clone_or_update_refine() {
   local checkout="$1"
   REFINE_CHECKOUT="$checkout"
   if [ -d "$checkout/.git" ]; then
+    if ! is_any_refine_checkout "$checkout"; then
+      die_issue \
+        "Refine checkout setup" \
+        "Refine needs its own git checkout so install.sh can repair or upgrade it safely." \
+        "Choose an empty checkout path or an existing Refine git checkout, then re-run install.sh." \
+        "$checkout is a git checkout, but it does not look like Refine. Choose another checkout path, then re-run."
+    fi
     ok "Refine checkout exists: $checkout"
     upgrade_refine_checkout "$checkout" "$REFINE_INSTALL_UPGRADE"
     return 0
