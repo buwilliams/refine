@@ -10,7 +10,7 @@ from refine_server import db, project_state
 
 
 AUTO_REBUILD_MODES = ("never", "on_worktree_merge", "hourly", "nightly")
-DEFAULT_AUTO_REBUILD_MODE = "never"
+DEFAULT_AUTO_REBUILD_MODE = "on_worktree_merge"
 NIGHTLY_REBUILD_HOUR = 0
 
 

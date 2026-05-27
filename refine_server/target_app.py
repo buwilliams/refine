@@ -138,9 +138,7 @@ def run_operation(
             "checks": checks["checks"],
         }
     if not command:
-        return {"ok": False, "kind": kind, "state": "failed",
-                "started_at": started_at, "finished_at": _now_iso(),
-                "message": f"No {kind} command configured."}
+        return noop_operation(kind, started_at=started_at)
 
     timeout = int(config.get(f"{kind}_timeout_seconds") or 60)
     cmd_result = run_command(
@@ -185,6 +183,26 @@ def run_operation(
         "finished_at": _now_iso(),
         "checks_configured": checks["configured"],
         "checks": checks["checks"],
+    }
+
+
+def noop_operation(kind: str, *, started_at: str | None = None) -> dict[str, Any]:
+    started = started_at or _now_iso()
+    return {
+        "ok": True,
+        "noop": True,
+        "kind": kind,
+        "state": "unknown",
+        "command": "",
+        "cwd": "",
+        "exit_code": 0,
+        "stdout_tail": "",
+        "stderr_tail": "",
+        "started_at": started,
+        "finished_at": _now_iso(),
+        "checks_configured": False,
+        "checks": [],
+        "message": f"No {kind} command configured; {kind} treated as a no-op.",
     }
 
 

@@ -95,7 +95,7 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
             ["on_worktree_merge", "On worktree merge"],
             ["hourly", "Hourly"],
             ["nightly", "Nightly (midnight)"],
-          ].map(([v, lbl]) => `<option value="${v}" ${String(s.target_app_auto_rebuild || "never") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+          ].map(([v, lbl]) => `<option value="${v}" ${String(s.target_app_auto_rebuild || "on_worktree_merge") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
       <div class="form-row"><label>Status command
         <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>

@@ -233,7 +233,8 @@ class Merger:
         """
         conn = self._get_conn()
         mode = (
-            db.get_setting(conn, "target_app_auto_rebuild", "never") or "never"
+            db.get_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
+            or "on_worktree_merge"
         ).strip()
         if mode != "on_worktree_merge":
             return False

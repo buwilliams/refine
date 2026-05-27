@@ -191,7 +191,7 @@ def main() -> int:
     assert "def rebuild_sqlite_cache" in api_py
     assert 'errorTitle: "SQLite cache rebuild failed"' in commands_js
     assert 'await showActionError(e, "Target app action failed");' in target_app_js
-    assert 'toast("No rebuild command configured; rebuild is a no-op.", "info");' in target_app_js
+    assert 'No rebuild command is configured. Continue and mark awaiting-rebuild Gaps ready for review?' in target_app_js
     assert 'id="s-agent-limit-pause"' in settings_js
     assert "agent_limit_pause_seconds" in settings_js
     assert '"30",    "30 seconds"' in settings_js
@@ -612,6 +612,8 @@ def main() -> int:
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
     assert '"on_worktree_merge", "On worktree merge"' in settings_js
+    assert 's.target_app_auto_rebuild || "on_worktree_merge"' in settings_js
+    assert 's.parallel_run_cap || 5' in settings_js
     assert '"nightly", "Nightly (midnight)"' in settings_js
     assert "Nightly (12 PM)" not in settings_js
     api_source = (root / "refine_ui/api.py").read_text(encoding="utf-8")

@@ -149,25 +149,21 @@ async function runTargetAppAction(action) {
     : action === "stop"
       ? snap.has_stop_command
       : snap.has_rebuild_command;
-  if (!hasPrompt) {
-    if (action === "rebuild") {
-      toast("No rebuild command configured; rebuild is a no-op.", "info");
-      return;
-    }
-    toast(
-      `No ${action} command configured. Set it above, then click Save.`,
-      "error",
-    );
-    return;
-  }
   const isStop = action === "stop";
   const isRebuild = action === "rebuild";
+  const noCommand = !hasPrompt;
   const ok = await modalConfirm(
     isStop
-      ? "Stop the target application now?"
+      ? (noCommand
+          ? "No stop command is configured. Continue with a no-op?"
+          : "Stop the target application now?")
       : isRebuild
-        ? "Rebuild the target application now? Refine will run the saved rebuild command on the host."
-        : "Start the target application now? Refine will run the saved start command on the host.",
+        ? (noCommand
+            ? "No rebuild command is configured. Continue and mark awaiting-rebuild Gaps ready for review?"
+            : "Rebuild the target application now? Refine will run the saved rebuild command on the host.")
+        : (noCommand
+            ? "No start command is configured. Continue with a no-op?"
+            : "Start the target application now? Refine will run the saved start command on the host."),
     { title: isStop ? "Stop application" : (isRebuild ? "Rebuild application" : "Start application"),
       okLabel: isStop ? "Stop" : (isRebuild ? "Rebuild" : "Start"),
       danger: isStop },

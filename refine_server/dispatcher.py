@@ -116,7 +116,7 @@ class Dispatcher:
         self._launch_ready_lanes(conn, active_rank, cap - running)
 
     def _parallel_run_cap(self, conn: sqlite3.Connection) -> int:
-        return max(1, db.get_setting_int(conn, "parallel_run_cap", 10))
+        return max(1, db.get_setting_int(conn, "parallel_run_cap", 5))
 
     def _active_run_count(
         self,

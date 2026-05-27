@@ -61,7 +61,12 @@ def main() -> int:
     db.init_db()
     conn = db.connect()
     settings = db.list_settings(conn)
-    assert settings["parallel_run_cap"] == "10"
+    assert settings["parallel_run_cap"] == "5"
+    assert settings["target_app_start_command"] == ""
+    assert settings["target_app_stop_command"] == ""
+    assert settings["target_app_rebuild_command"] == ""
+    assert settings["target_app_auto_rebuild"] == "on_worktree_merge"
+    assert settings["target_app_status_command"] == ""
     assert settings["agent_idle_timeout_seconds"] == "900"
     assert settings["agent_hard_cap_seconds"] == "86400"
     assert settings["agent_limit_pause_seconds"] == "60"

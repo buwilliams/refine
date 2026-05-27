@@ -12,7 +12,7 @@ function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
         <button class="secondary" id="s-runtime-copy-instance">Copy from instance</button>
       </div>
       <div class="form-row"><label>Parallel-run cap</label>
-        <input type="number" id="s-cap" value="${s.parallel_run_cap || 10}"></div>
+        <input type="number" id="s-cap" value="${s.parallel_run_cap || 5}"></div>
       <div class="form-row"><label>Branch name pattern</label>
         <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
       <div class="form-row"><label>Agent idle timeout (seconds)</label>

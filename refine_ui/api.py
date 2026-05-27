@@ -5344,7 +5344,9 @@ def _target_app_snapshot(conn: sqlite3.Connection) -> dict:
         "last_error": settings.get("target_app_last_error") or "",
         "last_operation_id": settings.get("target_app_last_operation_id") or "",
         "last_operation": dict(last_op) if last_op else None,
-        "auto_rebuild": settings.get("target_app_auto_rebuild") or "never",
+        "auto_rebuild": (
+            settings.get("target_app_auto_rebuild") or "on_worktree_merge"
+        ),
         "auto_rebuild_last_started_at": settings.get("target_app_auto_rebuild_last_started_at") or "",
         "auto_rebuild_last_finished_at": settings.get("target_app_auto_rebuild_last_finished_at") or "",
         "auto_rebuild_last_ok": (settings.get("target_app_auto_rebuild_last_ok") or "0") == "1",
@@ -5439,27 +5441,24 @@ def _target_app_run(kind: str) -> tuple[int, dict]:
         cfg = _target_app_config(settings)
         command = (cfg.get(f"{kind}_command") or "").strip()
         if not command:
-            if kind == "rebuild":
-                msg = "No rebuild command configured; rebuild is a no-op."
-                db.set_setting(conn, "target_app_last_error", "")
-                activity.append(
-                    conn,
-                    message="target-app: rebuild skipped; no rebuild command configured",
-                    severity="info", category="target_app", actor="refine",
-                )
-                snap = _target_app_snapshot(conn)
-                snap.update({
-                    "ok": True,
-                    "noop": True,
-                    "state": snap.get("state") or "unknown",
-                    "message": msg,
-                    "details": "",
-                    "promoted_gaps": 0,
-                })
-                return 200, snap
-            return err(400,
-                f"No {kind} command configured. "
-                f"Generate or enter target-app configuration in Settings first.")
+            msg = f"No {kind} command configured; {kind} is a no-op."
+            db.set_setting(conn, "target_app_last_error", "")
+            promoted = _promote_rebuilt_gaps(conn) if kind == "rebuild" else 0
+            activity.append(
+                conn,
+                message=f"target-app: {kind} skipped; no {kind} command configured",
+                severity="info", category="target_app", actor="refine",
+            )
+            snap = _target_app_snapshot(conn)
+            snap.update({
+                "ok": True,
+                "noop": True,
+                "state": snap.get("state") or "unknown",
+                "message": msg,
+                "details": "",
+                "promoted_gaps": promoted,
+            })
+            return 200, snap
         # Optimistic transition. The command run is synchronous but may be long;
         # SSE listeners see the in-flight state via /api/target-app/status.
         next_pending = {

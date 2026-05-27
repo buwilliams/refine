@@ -46,6 +46,8 @@ def main() -> int:
         rebuilder._drain_queue()  # noqa: SLF001
         assert len(runs) == 2, runs
 
+        assert db.get_setting(conn, "target_app_auto_rebuild") == "on_worktree_merge"
+        db.set_setting(conn, "target_app_auto_rebuild", "never")
         assert rebuilder.queue_for_worktree_merge("01GAP") is False
         db.set_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
         db.set_setting(conn, "paused", "1")
@@ -148,8 +150,12 @@ def main() -> int:
         assert body["ok"] is True, body
         assert body["noop"] is True, body
         assert body["state"] == "running", body
-        assert body["promoted_gaps"] == 0, body
+        assert body["promoted_gaps"] == 1, body
         assert "no-op" in body["message"], body
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (gid_pending,),
+        ).fetchone()
+        assert row["status"] == "review", dict(row)
         assert db.get_setting(conn, "target_app_last_error") == ""
         noop_row = conn.execute(
             "SELECT message, severity FROM activity "
@@ -159,6 +165,23 @@ def main() -> int:
         ).fetchone()
         assert noop_row is not None, body
         assert noop_row["severity"] == "info", dict(noop_row)
+
+        db.set_setting(conn, "target_app_start_command", "")
+        db.set_setting(conn, "target_app_stop_command", "")
+        db.set_setting(conn, "target_app_state", "running")
+        db.set_setting(conn, "target_app_last_error", "old failure")
+        try:
+            api.get_client = lambda: RebuildNoopClient()  # type: ignore[assignment]
+            for endpoint in (api.target_app_start, api.target_app_stop):
+                status, body = endpoint({})
+                assert status == 200, body
+                assert body["ok"] is True, body
+                assert body["noop"] is True, body
+                assert body["promoted_gaps"] == 0, body
+                assert "no-op" in body["message"], body
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+        assert db.get_setting(conn, "target_app_last_error") == ""
 
         conn.execute(
             "UPDATE gaps_index SET status = 'review' WHERE id = ?",
@@ -358,8 +381,30 @@ def main() -> int:
             assert "no-op" in noop_activity["message"], dict(noop_activity)
 
             operations.clear()
+            db.set_setting(conn, "target_app_stop_command", "")
+            db.set_setting(conn, "target_app_rebuild_command", "")
+            db.set_setting(conn, "target_app_start_command", "")
+            gid_all_noop = "01TARGETAPPALLNOOPREBUIL"
+            create_indexed_gap(conn, gid_all_noop, status="awaiting-rebuild", branch=None)
+            gap_writer.update_fields(gid_all_noop, status="awaiting-rebuild")
+            result = auto_runner._run_automatic_target_app_rebuild("test all no-op")  # noqa: SLF001
+            assert result["ok"], result
+            assert operations == [], operations
+            assert [step["kind"] for step in result["steps"]] == [
+                "stop", "rebuild", "start",
+            ], result
+            assert all(step["noop"] for step in result["steps"]), result
+            row = conn.execute(
+                "SELECT status FROM gaps_index WHERE id = ?", (gid_all_noop,),
+            ).fetchone()
+            assert row["status"] == "review", dict(row)
+            assert db.get_setting(conn, "target_app_auto_rebuild_last_ok") == "1"
+
+            operations.clear()
+            db.set_setting(conn, "target_app_stop_command", "stop-app")
             fail_rebuild = True
             db.set_setting(conn, "target_app_rebuild_command", "build-app")
+            db.set_setting(conn, "target_app_start_command", "start-app")
             gid_failed = "01TARGETAPPFAILEDREBUILDA"
             create_indexed_gap(conn, gid_failed, status="awaiting-rebuild", branch=None)
             gap_writer.update_fields(gid_failed, status="awaiting-rebuild")

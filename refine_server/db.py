@@ -240,7 +240,7 @@ CREATE INDEX IF NOT EXISTS idx_guidance_decisions_gap
 """
 
 DEFAULT_SETTINGS = {
-    "parallel_run_cap": "10",
+    "parallel_run_cap": "5",
     "branch_name_pattern": "refine/{gap_id}",
     "agent_idle_timeout_seconds": "900",   # 15 min
     "agent_hard_cap_seconds": "86400",     # 24 h
@@ -309,7 +309,7 @@ DEFAULT_SETTINGS = {
     "target_app_tcp_check_host": "",
     "target_app_tcp_check_port": "",
     "target_app_process_check_command": "",
-    "target_app_auto_rebuild": "never",
+    "target_app_auto_rebuild": "on_worktree_merge",
     "target_app_auto_rebuild_last_started_at": "",
     "target_app_auto_rebuild_last_finished_at": "",
     "target_app_auto_rebuild_last_ok": "0",

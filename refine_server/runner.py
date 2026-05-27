@@ -2045,36 +2045,6 @@ class Runner:
             conn = self._get_conn()
             settings = db.list_settings(conn)
             cfg = target_app.config_from_settings(settings)
-            if not (cfg.get("stop_command") or "").strip():
-                msg = "No stop command configured for automatic target-app rebuild."
-                now = now_iso()
-                db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now)
-                db.set_setting(conn, "target_app_auto_rebuild_last_finished_at", now)
-                db.set_setting(conn, "target_app_auto_rebuild_last_ok", "0")
-                db.set_setting(conn, "target_app_auto_rebuild_last_message", msg)
-                activity.append(
-                    conn, message=msg, severity="warn",
-                    category="target_app", actor="runner",
-                )
-                self._log_automatic_rebuild_failure_to_pending_gaps(
-                    conn, msg, details=None,
-                )
-                return {"ok": False, "state": "failed", "message": msg}
-            if not (cfg.get("start_command") or "").strip():
-                msg = "No start command configured for automatic target-app rebuild."
-                now = now_iso()
-                db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now)
-                db.set_setting(conn, "target_app_auto_rebuild_last_finished_at", now)
-                db.set_setting(conn, "target_app_auto_rebuild_last_ok", "0")
-                db.set_setting(conn, "target_app_auto_rebuild_last_message", msg)
-                activity.append(
-                    conn, message=msg, severity="warn",
-                    category="target_app", actor="runner",
-                )
-                self._log_automatic_rebuild_failure_to_pending_gaps(
-                    conn, msg, details=None,
-                )
-                return {"ok": False, "state": "failed", "message": msg}
             db.set_setting(conn, "target_app_state", "rebuilding")
             db.set_setting(conn, "target_app_last_error", "")
             db.set_setting(conn, "target_app_auto_rebuild_last_started_at", now_iso())
@@ -2166,6 +2136,12 @@ class Runner:
                 steps.append(result)
                 self._log_target_app_rebuild_step(conn, result)
                 return result
+            command = (cfg.get(f"{kind}_command") or "").strip()
+            if kind in {"start", "stop", "rebuild"} and not command:
+                result = target_app.noop_operation(kind)
+                steps.append(result)
+                self._log_target_app_rebuild_step(conn, result)
+                return result
             if kind == "start":
                 cleanup = self._clean_target_worktree_for_app_start()
                 if not cleanup.get("ok"):
@@ -2198,26 +2174,7 @@ class Runner:
         if not stop_result.get("ok"):
             return self._automatic_rebuild_sequence_result(steps, failed_step="stop")
 
-        if (cfg.get("rebuild_command") or "").strip():
-            rebuild_result = run_step("rebuild")
-        else:
-            rebuild_result = {
-                "ok": True,
-                "kind": "rebuild",
-                "state": "stopped",
-                "command": "",
-                "cwd": "",
-                "exit_code": 0,
-                "stdout_tail": "",
-                "stderr_tail": "",
-                "message": "No rebuild command configured; rebuild treated as a no-op.",
-                "started_at": now_iso(),
-                "finished_at": now_iso(),
-                "checks_configured": False,
-                "checks": [],
-            }
-            steps.append(rebuild_result)
-            self._log_target_app_rebuild_step(conn, rebuild_result)
+        rebuild_result = run_step("rebuild")
         if not rebuild_result.get("ok"):
             return self._automatic_rebuild_sequence_result(steps, failed_step="rebuild")
 
@@ -2267,7 +2224,13 @@ class Runner:
         last = steps[-1] if steps else {}
         ok = failed_step is None
         if ok:
-            message = "Automatic rebuild completed: stopped app, rebuilt app, started app."
+            if any(step.get("noop") for step in steps):
+                message = (
+                    "Automatic rebuild completed; empty target-app commands "
+                    "were treated as no-ops."
+                )
+            else:
+                message = "Automatic rebuild completed: stopped app, rebuilt app, started app."
         else:
             message = (
                 f"Automatic rebuild failed during {failed_step}: "
@@ -2296,6 +2259,7 @@ class Runner:
                     "ok": bool(step.get("ok")),
                     "state": step.get("state"),
                     "message": step.get("message") or "",
+                    "noop": bool(step.get("noop")),
                 }
                 for step in steps
             ],
