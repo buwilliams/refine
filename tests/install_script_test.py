@@ -93,6 +93,21 @@ def main() -> int:
     assert "npx --yes playwright install --with-deps chromium" in script
     assert "REFINE_INSTALL_DRY_RUN" in script
     assert "REFINE_INSTALL_UPGRADE" in script
+    assert "REFINE_INSTALL_LOG" in script
+    assert 'INSTALL_LOG="/tmp/refine-install-$$.log"' in script
+    assert "print_splash" in script
+    assert "choose_install_mode" in script
+    assert "${BOLD}${CYAN}refine${RESET}" in script
+    assert "Continue with Refine install" not in script
+    assert "Is this a new Refine install" in script
+    assert "Existing Refine checkout path" in script
+    assert 'while [ "$attempt" -le 2 ]; do' in script
+    assert "Could not find Refine at the provided location." in script
+    assert "No existing Refine checkout detected; assuming a fresh install." in script
+    assert "[info]" in script
+    assert "[ready]" in script
+    assert "[warn]" in script
+    assert "[error]" in script
     assert "--yes" in script
     assert "--upgrade" in script
     assert "--no-upgrade" in script
@@ -115,6 +130,11 @@ def main() -> int:
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
     assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
     assert "uv run refine install $port" in script
+    assert "Some install steps did not complete" in script
+    assert "Why it is needed:" in script
+    assert "What to do:" in script
+    assert "The install.sh script can be used again to: repair or upgrade." in script
+    assert 'say "  curl -fsSL $REFINE_RAW_INSTALL_URL | bash"' not in script
     print("[ok] install.sh keeps expected install sources and dry-run hook")
 
     readme_text = readme.read_text(encoding="utf-8")
@@ -141,6 +161,7 @@ def main() -> int:
             uv.chmod(0o755)
 
         env = os.environ.copy()
+        install_log = tmp / "install.log"
         env.update({
             "NO_COLOR": "1",
             "REFINE_INSTALL_ASSUME_DEFAULTS": "1",
@@ -148,6 +169,7 @@ def main() -> int:
             "REFINE_INSTALL_BASE_DEFAULT": str(checkout),
             "REFINE_INSTALL_TARGET_APP": str(target),
             "REFINE_INSTALL_PROVIDER": "codex",
+            "REFINE_INSTALL_LOG": str(install_log),
             "PATH": f"{fake_bin}{os.pathsep}{env.get('PATH', '')}",
         })
         result = subprocess.run(
@@ -159,10 +181,18 @@ def main() -> int:
             check=True,
         )
         output = result.stdout + result.stderr
+        log_text = install_log.read_text(encoding="utf-8")
+        assert "refine" in output
+        assert "Quiet terminal, detailed log, clear next steps." in output
+        assert "Continue with Refine install" not in output
+        assert "Is this a new Refine install" not in output
         assert "Dry run mode" in output
-        assert "uv run refine target" in output
-        assert "set Refine setting agent_cli=codex" in output
+        assert "uv run refine target" not in output
+        assert "set Refine setting agent_cli=codex" not in output
+        assert "uv run refine target" in log_text
+        assert "set Refine setting agent_cli=codex" in log_text
         assert "Provider:         codex" in output
+        assert f"Install log: {install_log}" in output
         print("[ok] install.sh dry-run completes without mutating checkout state")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -192,12 +222,14 @@ def main() -> int:
         uv.chmod(0o755)
 
         env = os.environ.copy()
+        install_log = tmp / "install.log"
         env.update({
             "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
             "REFINE_INSTALL_BASE_DEFAULT": str(checkout),
             "REFINE_INSTALL_PROVIDER": "codex",
+            "REFINE_INSTALL_LOG": str(install_log),
             "PATH": str(fake_bin),
         })
         result = subprocess.run(
@@ -209,14 +241,97 @@ def main() -> int:
             check=True,
         )
         output = result.stdout + result.stderr
+        log_text = install_log.read_text(encoding="utf-8")
         assert "A target app path or Git remote is required" not in output
         assert "No target app attached" in output
         assert "Skipping target-app attachment" in output
-        assert "link" in output and "uv is available in this shell" in output
+        assert "link" not in output
+        assert "uv is available in this shell" not in output
+        assert "link" in log_text and "uv is available in this shell" in log_text
         assert "uv run refine init" not in output
         assert "uv run refine target" not in output
         assert "Target app:       not attached yet" in output
         print("[ok] install.sh can complete without an initial target app")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-install-failure-summary-test-"))
+    try:
+        checkout = tmp / "refine"
+        (checkout / "refine_cli").mkdir(parents=True)
+        (checkout / "scripts").mkdir()
+        (checkout / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+
+        fake_bin = tmp / "bin"
+        fake_bin.mkdir()
+        for name in (
+            "awk", "bash", "cat", "curl", "dirname", "git", "grep", "python3",
+            "sed", "sort", "tail", "tr", "uname",
+        ):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
+        codex = fake_bin / "codex"
+        codex.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        codex.chmod(0o755)
+        node = fake_bin / "node"
+        node.write_text("#!/bin/sh\nprintf 'v20.0.0\\n'\n", encoding="utf-8")
+        node.chmod(0o755)
+        for name in ("npm", "npx"):
+            executable = fake_bin / name
+            executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            executable.chmod(0o755)
+        uv = fake_bin / "uv"
+        uv.write_text(
+            "#!/bin/sh\n"
+            "echo hidden uv stdout\n"
+            "echo hidden uv stderr >&2\n"
+            "if [ \"$1\" = \"run\" ] && [ \"$2\" = \"refine\" ] && [ \"$3\" = \"start\" ]; then\n"
+            "  exit 1\n"
+            "fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        uv.chmod(0o755)
+
+        env = os.environ.copy()
+        install_log = tmp / "install.log"
+        env.update({
+            "HOME": str(tmp),
+            "NO_COLOR": "1",
+            "REFINE_INSTALL_PROVIDER": "codex",
+            "REFINE_INSTALL_UPGRADE": "0",
+            "REFINE_INSTALL_LOG": str(install_log),
+            "PATH": str(fake_bin),
+        })
+        result = subprocess.run(
+            ["bash", str(install_sh), "--yes"],
+            cwd=checkout,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        output = result.stdout + result.stderr
+        log_text = install_log.read_text(encoding="utf-8")
+        assert "Needs attention" in output
+        assert "Some install steps did not complete:" in output
+        assert "- Failed: Refine background start" in output
+        assert "Why it is needed: Refine must be running for the browser UI." in output
+        assert "What to do: Run manually:" in output
+        assert f"Log: {install_log}" in output
+        assert "hidden uv stdout" not in output
+        assert "hidden uv stderr" not in output
+        assert "hidden uv stdout" in log_text
+        assert "hidden uv stderr" in log_text
+        assert "The install.sh script can be used again to: repair or upgrade." in output
+        print("[ok] install.sh summarizes recoverable failures at the end")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -246,11 +361,13 @@ def main() -> int:
             executable.chmod(0o755)
 
         env = os.environ.copy()
+        install_log = tmp / "install.log"
         env.update({
             "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
             "REFINE_INSTALL_BASE_DEFAULT": str(default_checkout),
+            "REFINE_INSTALL_LOG": str(install_log),
             "PATH": str(fake_bin),
         })
         code, output = _run_piped_installer_with_pty(
@@ -258,6 +375,7 @@ def main() -> int:
             root,
             env,
             [
+                "",
                 str(chosen_checkout),
                 "codex",
                 "n",
@@ -318,10 +436,12 @@ def main() -> int:
             executable.chmod(0o755)
 
         env = os.environ.copy()
+        install_log = tmp / "install.log"
         env.update({
             "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
+            "REFINE_INSTALL_LOG": str(install_log),
             "PATH": str(fake_bin),
         })
         code, output = _run_piped_installer_with_pty(
@@ -389,11 +509,13 @@ def main() -> int:
             executable.chmod(0o755)
 
         env = os.environ.copy()
+        install_log = tmp / "install.log"
         env.update({
             "HOME": str(tmp),
             "NO_COLOR": "1",
             "REFINE_INSTALL_DRY_RUN": "1",
             "REFINE_INSTALL_DRY_RUN_RELEASE_TAG": "1.0.0",
+            "REFINE_INSTALL_LOG": str(install_log),
             "PATH": str(fake_bin),
         })
         code, output = _run_piped_installer_with_pty(

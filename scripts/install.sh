@@ -15,6 +15,7 @@ REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
 REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
 REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"
+REFINE_INSTALL_LOG="${REFINE_INSTALL_LOG:-}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -25,6 +26,7 @@ if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
   GREEN="$(printf '\033[32m')"
   YELLOW="$(printf '\033[33m')"
   BLUE="$(printf '\033[34m')"
+  MAGENTA="$(printf '\033[35m')"
   CYAN="$(printf '\033[36m')"
   RESET="$(printf '\033[0m')"
 else
@@ -34,6 +36,7 @@ else
   GREEN=""
   YELLOW=""
   BLUE=""
+  MAGENTA=""
   CYAN=""
   RESET=""
 fi
@@ -43,6 +46,12 @@ TARGET_APP_PATH=""
 SELECTED_PROVIDER=""
 REFINE_UPGRADED="0"
 REFINE_UPGRADED_TO=""
+INSTALL_ISSUE_COUNT=0
+INSTALL_ISSUES=""
+INSTALL_LOG=""
+INSTALL_LOG_READY=0
+INSTALL_MODE=""
+INSTALL_CHECKOUT=""
 
 usage() {
   cat <<'EOF'
@@ -59,6 +68,7 @@ Environment:
   REFINE_INSTALL_CHECKOUT_DEFAULT   Default Refine checkout path.
   REFINE_INSTALL_DRY_RUN=1          Print commands instead of running them.
   REFINE_INSTALL_UPGRADE=0          Same behavior as --no-upgrade.
+  REFINE_INSTALL_LOG                Install log path. Defaults to /tmp/refine-install-<pid>.log.
 EOF
 }
 
@@ -87,32 +97,188 @@ parse_args() {
 }
 
 say() {
+  if [ "$INSTALL_LOG_READY" = "1" ]; then
+    printf '%b\n' "$*" >&3
+    printf '%b\n' "$*"
+  else
+    printf '%b\n' "$*"
+  fi
+}
+
+log_detail() {
   printf '%b\n' "$*"
 }
 
 section() {
-  printf '\n%b\n' "${BOLD}${BLUE}==> $*${RESET}"
+  say
+  say "${BOLD}${BLUE}==> ${CYAN}$*${RESET}"
 }
 
 ok() {
-  say "${GREEN}OK${RESET}  $*"
+  say "${GREEN}[ready]${RESET} $*"
 }
 
 info() {
-  say "${CYAN}..${RESET}  $*"
+  say "${CYAN}[info]${RESET}  $*"
 }
 
 warn() {
-  say "${YELLOW}!!${RESET}  $*" >&2
+  if [ "$INSTALL_LOG_READY" = "1" ]; then
+    printf '%b\n' "${YELLOW}[warn]${RESET}  $*" >&3
+    printf '%b\n' "${YELLOW}[warn]${RESET}  $*" >&2
+  else
+    printf '%b\n' "${YELLOW}[warn]${RESET}  $*" >&2
+  fi
 }
 
 err() {
-  say "${RED}!!${RESET}  $*" >&2
+  if [ "$INSTALL_LOG_READY" = "1" ]; then
+    printf '%b\n' "${RED}[error]${RESET} $*" >&3
+    printf '%b\n' "${RED}[error]${RESET} $*" >&2
+  else
+    printf '%b\n' "${RED}[error]${RESET} $*" >&2
+  fi
 }
 
 die() {
   err "$*"
   exit 1
+}
+
+record_install_issue() {
+  local failed="$1"
+  local needed="$2"
+  local action="$3"
+  local detail="${4:-}"
+  local entry
+  INSTALL_ISSUE_COUNT=$((INSTALL_ISSUE_COUNT + 1))
+  entry="$(printf '\n- Failed: %s\n  Why it is needed: %s\n  What to do: %s' "$failed" "$needed" "$action")"
+  if [ -n "$detail" ]; then
+    entry="$(printf '%s\n  Detail: %s' "$entry" "$detail")"
+  fi
+  if [ -n "$INSTALL_LOG" ]; then
+    entry="$(printf '%s\n  Log: %s' "$entry" "$INSTALL_LOG")"
+  fi
+  INSTALL_ISSUES="${INSTALL_ISSUES}${entry}"
+}
+
+warn_issue() {
+  local failed="$1"
+  local needed="$2"
+  local action="$3"
+  local detail="${4:-}"
+  if [ -n "$detail" ]; then
+    warn "$detail"
+  else
+    warn "$failed"
+  fi
+  record_install_issue "$failed" "$needed" "$action" "$detail"
+}
+
+die_issue() {
+  local failed="$1"
+  local needed="$2"
+  local action="$3"
+  local detail="${4:-$failed}"
+  err "$detail"
+  record_install_issue "$failed" "$needed" "$action" "$detail"
+  print_install_issues
+  print_rerun_hint
+  exit 1
+}
+
+print_install_issues() {
+  [ "$INSTALL_ISSUE_COUNT" -gt 0 ] || return 0
+  section "Needs attention"
+  say "Some install steps did not complete:"
+  say "$INSTALL_ISSUES"
+  say
+}
+
+print_rerun_hint() {
+  if [ -n "$INSTALL_LOG" ]; then
+    say "Install log: $INSTALL_LOG"
+  fi
+  say "The install.sh script can be used again to: repair or upgrade."
+}
+
+start_install_log() {
+  [ "$INSTALL_LOG_READY" = "1" ] && return 0
+  if [ -n "$REFINE_INSTALL_LOG" ]; then
+    INSTALL_LOG="$REFINE_INSTALL_LOG"
+  else
+    INSTALL_LOG="/tmp/refine-install-$$.log"
+  fi
+  if ! : >"$INSTALL_LOG"; then
+    INSTALL_LOG=""
+    warn "Could not open install log in /tmp; command output will stay on the terminal."
+    return 0
+  fi
+  exec 3>&1
+  exec 4>&2
+  exec >>"$INSTALL_LOG" 2>&1
+  INSTALL_LOG_READY=1
+}
+
+print_splash() {
+  say "${BOLD}${CYAN}          __ _            ${RESET}"
+  say "${BOLD}${CYAN} _ __ ___ / _(_)_ __   ___ ${RESET}"
+  say "${BOLD}${BLUE}| '__/ _ \\ |_| | '_ \\ / _ \\${RESET}"
+  say "${BOLD}${MAGENTA}| | |  __/  _| | | | |  __/${RESET}"
+  say "${BOLD}${GREEN}|_|  \\___|_| |_|_| |_|\\___|${RESET}"
+  say
+  say "${BOLD}${CYAN}refine${RESET} ${MAGENTA}local AI workflow setup${RESET}"
+  say "${DIM}Quiet terminal, detailed log, clear next steps.${RESET}"
+}
+
+canonical_path() {
+  local path="$1"
+  cd "$path" 2>/dev/null && pwd -P || printf '%s\n' "$path"
+}
+
+choose_install_mode() {
+  local checkout path attempt
+  checkout="$(current_refine_checkout || true)"
+  if [ -n "$checkout" ]; then
+    INSTALL_MODE="existing"
+    INSTALL_CHECKOUT="$checkout"
+    info "Detected existing Refine checkout: $INSTALL_CHECKOUT"
+    return 0
+  fi
+
+  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
+    INSTALL_MODE="fresh"
+    info "No existing Refine checkout detected; assuming a fresh install."
+    return 0
+  fi
+
+  say
+  info "No existing Refine checkout was detected here."
+  info "Command output will be written to: $INSTALL_LOG"
+  if confirm "Is this a new Refine install" "y"; then
+    INSTALL_MODE="fresh"
+    return 0
+  fi
+
+  attempt=1
+  while [ "$attempt" -le 2 ]; do
+    path="$(prompt "Existing Refine checkout path" "$REFINE_INSTALL_CHECKOUT_DEFAULT")"
+    path="${path/#\~/$HOME}"
+    if is_refine_checkout "$path"; then
+      INSTALL_MODE="existing"
+      INSTALL_CHECKOUT="$(canonical_path "$path")"
+      ok "Using existing Refine checkout: $INSTALL_CHECKOUT"
+      return 0
+    fi
+    warn "Could not find a Refine checkout at: $path"
+    attempt=$((attempt + 1))
+  done
+
+  die_issue \
+    "Existing Refine checkout lookup" \
+    "Repair and upgrade need the existing Refine checkout so install.sh can update the right copy." \
+    "Re-run install.sh from the Refine checkout, or provide the correct checkout path." \
+    "Could not find Refine at the provided location."
 }
 
 have() {
@@ -171,6 +337,8 @@ terminal_available() {
 write_prompt() {
   if terminal_available; then
     printf '%b' "$*" >/dev/tty
+  elif [ "$INSTALL_LOG_READY" = "1" ]; then
+    printf '%b' "$*" >&4
   else
     printf '%b' "$*" >&2
   fi
@@ -188,7 +356,7 @@ read_answer() {
 
 run() {
   if dry_run; then
-    say "${DIM}+ $*${RESET}"
+    log_detail "${DIM}+ $*${RESET}"
     return 0
   fi
   "$@"
@@ -196,7 +364,7 @@ run() {
 
 run_shell() {
   if dry_run; then
-    say "${DIM}+ $*${RESET}"
+    log_detail "${DIM}+ $*${RESET}"
     return 0
   fi
   sh -c "$*"
@@ -314,7 +482,7 @@ ensure_command_on_original_path() {
       continue
     fi
     if dry_run; then
-      say "${DIM}+ link $link -> $target so $name is available in this shell${RESET}"
+      log_detail "${DIM}+ link $link -> $target so $name is available in this shell${RESET}"
       return 0
     fi
     if [ -w "$dir" ]; then
@@ -347,7 +515,7 @@ ensure_profile_path() {
   profile="$(profile_file)"
   append_path_now "$dir"
   if dry_run; then
-    say "${DIM}+ ensure '$dir' is on PATH in $profile${RESET}"
+    log_detail "${DIM}+ ensure '$dir' is on PATH in $profile${RESET}"
     return 0
   fi
   touch "$profile" 2>/dev/null || {
@@ -503,7 +671,7 @@ download_and_run() {
     return 1
   fi
   if dry_run; then
-    say "${DIM}+ curl -fsSL '$url' -o /tmp/refine-installer && $runner /tmp/refine-installer${RESET}"
+    log_detail "${DIM}+ curl -fsSL '$url' -o /tmp/refine-installer && $runner /tmp/refine-installer${RESET}"
     return 0
   fi
   tmp="$(mktemp)"
@@ -547,7 +715,11 @@ ensure_uv() {
     ensure_command_on_original_path uv
     return 0
   fi
-  die "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+  die_issue \
+    "uv install" \
+    "Refine uses uv to install dependencies and run the Refine CLI." \
+    "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh, then re-run install.sh." \
+    "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
 }
 
 provider_binary() {
@@ -655,14 +827,22 @@ ensure_provider_cli() {
   if have "$binary"; then
     ok "$binary ready"
     if confirm "Run provider login/check now: $login_cmd" "n"; then
-      run_shell "$login_cmd" || warn "Provider login/check failed. You can run it later: $login_cmd"
+      run_shell "$login_cmd" || warn_issue \
+        "$provider login/check" \
+        "Provider auth lets Refine start agent sessions with $provider." \
+        "Run $login_cmd, then re-run install.sh if Refine still cannot start agent work." \
+        "Provider login/check failed. You can run it later: $login_cmd"
     else
       info "Provider auth can be completed later with: $login_cmd"
     fi
     return 0
   fi
 
-  warn "Provider CLI still missing. Run this later, then re-run install.sh: $install_cmd"
+  warn_issue \
+    "$provider CLI install" \
+    "Refine uses the selected agent CLI to implement, review, and repair Gaps." \
+    "Run $install_cmd, complete provider auth if required, then re-run install.sh." \
+    "Provider CLI still missing. Run this later, then re-run install.sh: $install_cmd"
   return 1
 }
 
@@ -678,17 +858,25 @@ ensure_playwright_headless() {
   fi
   ensure_node_for_provider || true
   if ! have npx; then
-    warn "npx is missing. Install Node.js/npm 18+, then run: npx --yes playwright install --with-deps chromium"
+    warn_issue \
+      "Playwright Chromium install" \
+      "Managed regression screenshots use Playwright Chromium." \
+      "Install Node.js/npm 18+, then run: npx --yes playwright install --with-deps chromium" \
+      "npx is missing. Install Node.js/npm 18+, then run: npx --yes playwright install --with-deps chromium"
     return 0
   fi
   if dry_run; then
-    say "${DIM}+ npx --yes playwright install --with-deps chromium${RESET}"
+    log_detail "${DIM}+ npx --yes playwright install --with-deps chromium${RESET}"
     return 0
   fi
   if npx --yes playwright install --with-deps chromium; then
     ok "Playwright Chromium ready"
   else
-    warn "Playwright install failed. Run manually: npx --yes playwright install --with-deps chromium"
+    warn_issue \
+      "Playwright Chromium install" \
+      "Managed regression screenshots use Playwright Chromium." \
+      "Run manually: npx --yes playwright install --with-deps chromium" \
+      "Playwright install failed. Run manually: npx --yes playwright install --with-deps chromium"
   fi
 }
 
@@ -709,7 +897,11 @@ ensure_rootless_docker() {
     install_packages uidmap || true
   fi
   download_and_run "https://get.docker.com/rootless" sh "Docker rootless installer" || {
-    warn "Rootless Docker install could not complete. The installer above usually prints the exact missing prerequisite."
+    warn_issue \
+      "Rootless Docker install" \
+      "Container-based target app workflows use Docker." \
+      "Install Docker manually, confirm docker info works, then re-run install.sh." \
+      "Rootless Docker install could not complete. The installer above usually prints the exact missing prerequisite."
     return 0
   }
   ensure_profile_path "$HOME/bin"
@@ -725,7 +917,11 @@ ensure_rootless_docker() {
   if have docker && docker info >/dev/null 2>&1; then
     ok "Rootless Docker is reachable"
   else
-    warn "Docker is installed or repaired, but not reachable yet. Open a new shell and try: docker info"
+    warn_issue \
+      "Docker reachability check" \
+      "Container-based target app workflows need a reachable Docker daemon." \
+      "Open a new shell and try: docker info, then re-run install.sh if Docker is still unavailable." \
+      "Docker is installed or repaired, but not reachable yet. Open a new shell and try: docker info"
   fi
 }
 
@@ -875,16 +1071,28 @@ clone_or_update_refine() {
     return 0
   fi
   if [ -e "$checkout" ]; then
-    die "$checkout exists but is not a git checkout. Choose another checkout path, then re-run."
+    die_issue \
+      "Refine checkout setup" \
+      "Refine needs its own git checkout so install.sh can repair or upgrade it safely." \
+      "Choose an empty checkout path or an existing Refine git checkout, then re-run install.sh." \
+      "$checkout exists but is not a git checkout. Choose another checkout path, then re-run."
   fi
   run mkdir -p "$(dirname "$checkout")"
   local latest
   latest="$(latest_remote_semver_release_tag)"
-  [ -n "$latest" ] || die "No published semver releases found for $REFINE_REPO_URL"
+  [ -n "$latest" ] || die_issue \
+    "Refine release lookup" \
+    "The installer clones a published Refine release for stable installs and upgrades." \
+    "Check network or GitHub release access, then re-run install.sh." \
+    "No published semver releases found for $REFINE_REPO_URL"
   if dry_run; then
-    say "${DIM}+ git clone --branch '$latest' '$REFINE_REPO_URL' '$checkout'${RESET}"
+    log_detail "${DIM}+ git clone --branch '$latest' '$REFINE_REPO_URL' '$checkout'${RESET}"
   else
-    git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout" || die "Could not clone Refine release $latest from $REFINE_REPO_URL"
+    git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout" || die_issue \
+      "Refine clone" \
+      "The installer needs the Refine checkout before it can configure or start Refine." \
+      "Check git/network access to $REFINE_REPO_URL, then re-run install.sh." \
+      "Could not clone Refine release $latest from $REFINE_REPO_URL"
   fi
   ok "Cloned Refine release $latest to $checkout"
 }
@@ -898,9 +1106,17 @@ target_from_remote() {
   if [ -d "$path/.git" ]; then
     ok "Target app checkout already exists: $path"
   elif [ -e "$path" ] && [ "$(find "$path" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l | tr -d ' ')" != "0" ]; then
-    die "$path exists and is not empty. Choose another target app path."
+    die_issue \
+      "Target app clone" \
+      "Refine needs a target application repository to attach work to." \
+      "Choose an empty target app path or an existing git checkout, then re-run install.sh." \
+      "$path exists and is not empty. Choose another target app path."
   else
-    run git clone "$remote" "$path" || die "Could not clone target app from $remote"
+    run git clone "$remote" "$path" || die_issue \
+      "Target app clone" \
+      "Refine needs a target application repository to attach work to." \
+      "Check git/network access to $remote, then re-run install.sh." \
+      "Could not clone target app from $remote"
   fi
   TARGET_APP_PATH="$(cd "$path" 2>/dev/null && pwd -P || printf '%s\n' "$path")"
 }
@@ -940,16 +1156,32 @@ choose_target_app() {
       if [ ! -d "$input" ]; then
         if confirm "Create target app directory $input" "n"; then
           run mkdir -p "$input"
-          run git -C "$input" init -q || die "Could not initialize git in $input"
+          run git -C "$input" init -q || die_issue \
+            "Target app git init" \
+            "Refine target apps must be git repositories so changes can be tracked and merged." \
+            "Fix permissions for $input or choose another path, then re-run install.sh." \
+            "Could not initialize git in $input"
         else
-          die "Target app path does not exist: $input"
+          die_issue \
+            "Target app selection" \
+            "Refine needs a target application repository to attach work to." \
+            "Create $input or choose an existing git checkout, then re-run install.sh." \
+            "Target app path does not exist: $input"
         fi
       fi
       if [ ! -d "$input/.git" ]; then
         if confirm "$input is not a git repo. Initialize git there" "y"; then
-          run git -C "$input" init -q || die "Could not initialize git in $input"
+          run git -C "$input" init -q || die_issue \
+            "Target app git init" \
+            "Refine target apps must be git repositories so changes can be tracked and merged." \
+            "Fix permissions for $input or choose another path, then re-run install.sh." \
+            "Could not initialize git in $input"
         else
-          die "Refine target apps must be git repositories."
+          die_issue \
+            "Target app git repository" \
+            "Refine target apps must be git repositories so changes can be tracked and merged." \
+            "Initialize git in $input or choose another git checkout, then re-run install.sh." \
+            "Refine target apps must be git repositories."
         fi
       fi
       TARGET_APP_PATH="$(cd "$input" 2>/dev/null && pwd -P || printf '%s\n' "$input")"
@@ -962,7 +1194,7 @@ configure_refine_setting() {
   local key="$1"
   local value="$2"
   if dry_run; then
-    say "${DIM}+ set Refine setting $key=$value${RESET}"
+    log_detail "${DIM}+ set Refine setting $key=$value${RESET}"
     return 0
   fi
   REFINE_SETTING_KEY="$key" REFINE_SETTING_VALUE="$value" uv run python - <<'PY'
@@ -999,14 +1231,30 @@ configure_target_app_commands() {
 
 target_refine() {
   section "Refine target app"
-  [ -d "$REFINE_CHECKOUT" ] || die "Refine checkout missing: $REFINE_CHECKOUT"
-  run cd "$REFINE_CHECKOUT" || die "Could not enter $REFINE_CHECKOUT"
+  [ -d "$REFINE_CHECKOUT" ] || die_issue \
+    "Refine checkout setup" \
+    "The Refine checkout is needed to run the Refine CLI and write configuration." \
+    "Check $REFINE_CHECKOUT, then re-run install.sh." \
+    "Refine checkout missing: $REFINE_CHECKOUT"
+  run cd "$REFINE_CHECKOUT" || die_issue \
+    "Refine checkout access" \
+    "The installer needs to enter the Refine checkout to run setup commands." \
+    "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
+    "Could not enter $REFINE_CHECKOUT"
   if [ -z "$TARGET_APP_PATH" ]; then
     info "Skipping target-app attachment until you attach an app in Refine."
     return 0
   fi
-  [ -d "$TARGET_APP_PATH" ] || die "Target app missing: $TARGET_APP_PATH"
-  run uv run refine target "$TARGET_APP_PATH" --force || die "refine target failed"
+  [ -d "$TARGET_APP_PATH" ] || die_issue \
+    "Target app selection" \
+    "Refine needs the target application directory to attach work to it." \
+    "Check $TARGET_APP_PATH or choose another target app, then re-run install.sh." \
+    "Target app missing: $TARGET_APP_PATH"
+  run uv run refine target "$TARGET_APP_PATH" --force || die_issue \
+    "Refine target attachment" \
+    "Target attachment tells Refine which application repository it should manage." \
+    "Run manually: cd $REFINE_CHECKOUT && uv run refine target $TARGET_APP_PATH --force" \
+    "refine target failed"
   configure_refine_setting "agent_cli" "$SELECTED_PROVIDER"
   configure_target_app_commands
 }
@@ -1014,23 +1262,46 @@ target_refine() {
 start_refine() {
   section "Start Refine"
   local port
+  local refine_started="1"
   port="$(prompt "Refine port" "$REFINE_DEFAULT_PORT")"
   if has_systemd && confirm "Install Refine as a persistent service with: uv run refine install $port" "y"; then
     if run uv run refine install "$port"; then
       ok "Refine installed as a persistent service"
     else
-      warn "Persistent install failed. Trying non-installed background start."
-      run uv run refine start "$port" || warn "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
+      warn_issue \
+        "Persistent Refine service install" \
+        "The persistent service keeps Refine running after terminal close and host restarts." \
+        "Run manually: cd $REFINE_CHECKOUT && uv run refine install $port" \
+        "Persistent install failed. Trying non-installed background start."
+      if ! run uv run refine start "$port"; then
+        warn_issue \
+          "Refine background start" \
+          "Refine must be running for the browser UI." \
+          "Run manually: cd $REFINE_CHECKOUT && uv run refine start $port" \
+          "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
+        refine_started="0"
+      fi
     fi
   else
     if ! has_systemd; then
       info "Persistent service install requires systemd. Starting with: uv run refine start $port"
     fi
-    run uv run refine start "$port" || warn "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
+    if ! run uv run refine start "$port"; then
+      warn_issue \
+        "Refine background start" \
+        "Refine must be running for the browser UI." \
+        "Run manually: cd $REFINE_CHECKOUT && uv run refine start $port" \
+        "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
+      refine_started="0"
+    fi
   fi
   run uv run refine status "$port" || true
   say
-  ok "Open Refine: http://localhost:$port"
+  if [ "$refine_started" = "1" ]; then
+    ok "Open Refine: http://localhost:$port"
+  else
+    warn "Refine did not start cleanly; use the follow-up steps below before opening http://localhost:$port"
+  fi
 }
 
 restart_refine_after_upgrade() {
@@ -1041,8 +1312,16 @@ restart_refine_after_upgrade() {
     info "Refine was upgraded but not restarted. Restart later with: cd $REFINE_CHECKOUT && uv run refine restart"
     return 0
   fi
-  run cd "$REFINE_CHECKOUT" || die "Could not enter $REFINE_CHECKOUT"
-  run uv run refine restart || warn "Could not restart Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine restart"
+  run cd "$REFINE_CHECKOUT" || die_issue \
+    "Refine checkout access" \
+    "The installer needs to enter the Refine checkout before restarting Refine." \
+    "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
+    "Could not enter $REFINE_CHECKOUT"
+  run uv run refine restart || warn_issue \
+    "Refine restart after upgrade" \
+    "The running service must restart before it uses the upgraded Refine release." \
+    "Run manually: cd $REFINE_CHECKOUT && uv run refine restart" \
+    "Could not restart Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine restart"
 }
 
 preflight() {
@@ -1060,9 +1339,21 @@ preflight() {
   else
     warn "Unsupported OS: $(uname -s). Refine is tested on Linux/WSL and macOS."
   fi
-  ensure_command curl curl || die "curl is required"
-  ensure_command git git || die "git is required"
-  ensure_command python3 "$python_package" || die "Python 3 is required"
+  ensure_command curl curl || die_issue \
+    "curl install" \
+    "The installer uses curl to download setup helpers and check Refine releases." \
+    "Install curl with your OS package manager, then re-run install.sh." \
+    "curl is required"
+  ensure_command git git || die_issue \
+    "git install" \
+    "Refine uses git to clone, update, and manage the Refine and target app repositories." \
+    "Install git with your OS package manager, then re-run install.sh." \
+    "git is required"
+  ensure_command python3 "$python_package" || die_issue \
+    "Python 3 install" \
+    "Refine is a Python application and the installer uses Python helper checks." \
+    "Install Python 3 with your OS package manager, then re-run install.sh." \
+    "Python 3 is required"
   ensure_uv
 }
 
@@ -1087,18 +1378,19 @@ provider_flow() {
 
 main() {
   parse_args "$@"
-  say "${BOLD}Refine installer${RESET}"
-  say "${DIM}First-run setup and non-destructive repair for Linux, macOS, and Windows via WSL.${RESET}"
+  start_install_log
+  print_splash
+  choose_install_mode
   if dry_run; then
-    warn "Dry run mode: commands will be printed, not executed."
+    warn "Dry run mode: commands will be logged, not executed."
   fi
 
   preflight
 
   section "Workspace"
   local checkout
-  checkout="$(current_refine_checkout || true)"
-  if [ -n "$checkout" ]; then
+  if [ -n "$INSTALL_CHECKOUT" ]; then
+    checkout="$INSTALL_CHECKOUT"
     ok "Using current Refine checkout: $checkout"
   else
     checkout="$(prompt "Refine checkout path" "$REFINE_INSTALL_CHECKOUT_DEFAULT")"
@@ -1117,7 +1409,11 @@ main() {
     start_refine
   fi
 
-  section "Done"
+  if [ "$INSTALL_ISSUE_COUNT" -gt 0 ]; then
+    section "Done with follow-up"
+  else
+    section "Done"
+  fi
   say "Refine checkout: ${BOLD}$REFINE_CHECKOUT${RESET}"
   if [ -n "$TARGET_APP_PATH" ]; then
     say "Target app:       ${BOLD}$TARGET_APP_PATH${RESET}"
@@ -1126,8 +1422,8 @@ main() {
   fi
   say "Provider:         ${BOLD}$SELECTED_PROVIDER${RESET}"
   say
-  say "Repair later with:"
-  say "  curl -fsSL $REFINE_RAW_INSTALL_URL | bash"
+  print_install_issues
+  print_rerun_hint
 }
 
 main "$@"
