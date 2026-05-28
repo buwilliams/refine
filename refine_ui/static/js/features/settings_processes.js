@@ -689,7 +689,7 @@ function drawTargetAppStatusBlock(snap) {
     if (inFlight) {
       rebuildBtn.title = "Application state is changing.";
     } else if (!snap.has_rebuild_command) {
-      rebuildBtn.title = "No rebuild command configured; rebuild is a no-op.";
+      rebuildBtn.title = "No rebuild command configured; rebuild will still run the stop/start sequence.";
     } else {
       rebuildBtn.title = "";
     }

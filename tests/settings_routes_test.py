@@ -210,7 +210,9 @@ def main() -> int:
     assert "def rebuild_sqlite_cache" in api_py
     assert 'errorTitle: "SQLite cache rebuild failed"' in commands_js
     assert 'await showActionError(e, "Target app action failed");' in target_app_js
-    assert 'No rebuild command is configured. Continue and mark awaiting-rebuild Gaps ready for review?' in target_app_js
+    assert 'No rebuild command is configured. Queue the stop/start rebuild sequence anyway?' in target_app_js
+    assert 'Refine will stop, rebuild, and start the app on the host.' in target_app_js
+    assert 'Target application rebuild queued' in target_app_js
     assert 'id="s-agent-limit-pause"' in settings_js
     assert "agent_limit_pause_seconds" in settings_js
     assert '"30",    "30 seconds"' in settings_js
@@ -447,7 +449,7 @@ def main() -> int:
     assert processes_body.index('id="s-target-run-start"') < processes_body.index('id="s-target-run-stop"') < processes_body.index('id="s-target-run-rebuild"')
     assert 'class="target-app-action-slot"' in processes_body
     assert 'rebuildBtn.disabled = inFlight;' in processes_body
-    assert 'No rebuild command configured; rebuild is a no-op.' in processes_body
+    assert 'No rebuild command configured; rebuild will still run the stop/start sequence.' in processes_body
     assert 'refreshAgentStatusIndicator === "function"' in commands_js
     assert "function targetAppShowsStopAction" in processes_body
     assert "function setTargetAppActionVisible" in processes_body

@@ -5514,8 +5514,8 @@ def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
 
 @_exclusive_mutation("Rebuild target app")
 def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
-    """Run the configured rebuild command via the host runner."""
-    return _target_app_run("rebuild")
+    """Queue the standard stop/rebuild/start target-app rebuild sequence."""
+    return target_app_rebuild_queue(_body)
 
 
 def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:

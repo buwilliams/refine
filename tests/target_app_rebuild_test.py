@@ -134,44 +134,37 @@ def main() -> int:
         assert M_TARGET_APP_REBUILD_PENDING in calls, calls
         assert M_TARGET_APP_REBUILD_QUEUE in calls, calls
 
-        class RebuildNoopClient:
+        calls.clear()
+
+        class RebuildQueueClient:
             def call(self, method: str, params: dict | None = None, *, timeout: float = 30.0) -> dict:  # noqa: ARG002
-                raise AssertionError("empty rebuild command should not call runner")
+                calls.append(method)
+                assert method == M_TARGET_APP_REBUILD_QUEUE
+                return {"queued": True}
 
         db.set_setting(conn, "target_app_rebuild_command", "")
         db.set_setting(conn, "target_app_state", "running")
         db.set_setting(conn, "target_app_last_error", "old failure")
         try:
-            api.get_client = lambda: RebuildNoopClient()  # type: ignore[assignment]
+            api.get_client = lambda: RebuildQueueClient()  # type: ignore[assignment]
             status, body = api.target_app_rebuild({})
         finally:
             api.get_client = old_get_client  # type: ignore[assignment]
-        assert status == 200, body
-        assert body["ok"] is True, body
-        assert body["noop"] is True, body
-        assert body["state"] == "running", body
-        assert body["promoted_gaps"] == 1, body
-        assert "no-op" in body["message"], body
+        assert status == 202, body
+        assert body["queued"] is True, body
+        assert calls == [M_TARGET_APP_REBUILD_QUEUE], calls
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = ?", (gid_pending,),
         ).fetchone()
-        assert row["status"] == "review", dict(row)
-        assert db.get_setting(conn, "target_app_last_error") == ""
-        noop_row = conn.execute(
-            "SELECT message, severity FROM activity "
-            "WHERE category = 'target_app' "
-            "AND message LIKE 'target-app: rebuild skipped%' "
-            "ORDER BY id DESC LIMIT 1"
-        ).fetchone()
-        assert noop_row is not None, body
-        assert noop_row["severity"] == "info", dict(noop_row)
+        assert row["status"] == "awaiting-rebuild", dict(row)
+        assert db.get_setting(conn, "target_app_last_error") == "old failure"
 
         db.set_setting(conn, "target_app_start_command", "")
         db.set_setting(conn, "target_app_stop_command", "")
         db.set_setting(conn, "target_app_state", "running")
         db.set_setting(conn, "target_app_last_error", "old failure")
         try:
-            api.get_client = lambda: RebuildNoopClient()  # type: ignore[assignment]
+            api.get_client = lambda: RebuildQueueClient()  # type: ignore[assignment]
             for endpoint in (api.target_app_start, api.target_app_stop):
                 status, body = endpoint({})
                 assert status == 200, body
@@ -294,12 +287,20 @@ def main() -> int:
 
         try:
             target_app.run_operation = fake_run_operation  # type: ignore[assignment]
-            for kind in ("start", "stop", "rebuild"):
+            for kind in ("start", "stop", "status"):
                 result = auto_runner._h_target_app_run({  # noqa: SLF001
                     "kind": kind,
                     "config": {},
                 })
                 assert result["ok"], result
+            try:
+                auto_runner._h_target_app_run({  # noqa: SLF001
+                    "kind": "rebuild",
+                    "config": {},
+                })
+                raise AssertionError("direct runner rebuild should be rejected")
+            except ValueError as e:
+                assert "start', 'stop', or 'status" in str(e)
             manual_activity = [
                 r["message"]
                 for r in conn.execute(
@@ -308,7 +309,7 @@ def main() -> int:
                     "AND gap_id IS NULL ORDER BY id"
                 )
             ]
-            for kind in ("start", "stop", "rebuild"):
+            for kind in ("start", "stop", "status"):
                 assert any(
                     f"target-app: {kind} requested" in msg
                     for msg in manual_activity

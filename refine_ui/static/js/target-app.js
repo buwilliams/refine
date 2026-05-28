@@ -159,8 +159,8 @@ async function runTargetAppAction(action) {
           : "Stop the target application now?")
       : isRebuild
         ? (noCommand
-            ? "No rebuild command is configured. Continue and mark awaiting-rebuild Gaps ready for review?"
-            : "Rebuild the target application now? Refine will run the saved rebuild command on the host.")
+            ? "No rebuild command is configured. Queue the stop/start rebuild sequence anyway?"
+            : "Rebuild the target application now? Refine will stop, rebuild, and start the app on the host.")
         : (noCommand
             ? "No start command is configured. Continue with a no-op?"
             : "Start the target application now? Refine will run the saved start command on the host."),
@@ -176,6 +176,11 @@ async function runTargetAppAction(action) {
   });
   try {
     const r = await api("POST", `/api/target-app/${action}`);
+    if (isRebuild && r.queued !== undefined) {
+      toast(r.queued ? "Target application rebuild queued" : "Target application rebuild was not queued", r.queued ? "info" : "warn");
+      await refreshTargetAppToggle();
+      return;
+    }
     toast(r.message || `${action} completed`, r.ok ? "info" : "error");
     applyTargetAppSnapshot({
       ..._targetAppSnapshot,

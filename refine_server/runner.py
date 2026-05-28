@@ -2172,8 +2172,8 @@ class Runner:
     def _h_target_app_run(self, params: dict) -> dict:
         """Run a deterministic target-app start/stop/status operation."""
         kind = (params.get("kind") or "").strip().lower()
-        if kind not in ("start", "stop", "rebuild", "status"):
-            raise ValueError("kind must be 'start', 'stop', 'rebuild', or 'status'")
+        if kind not in ("start", "stop", "status"):
+            raise ValueError("kind must be 'start', 'stop', or 'status'")
         config = params.get("config") if isinstance(params.get("config"), dict) else {}
         quiet = bool(params.get("quiet"))
         if not self._target_app_lock.acquire(blocking=False):

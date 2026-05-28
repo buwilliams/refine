@@ -492,7 +492,7 @@ for (const action of ["start", "stop", "rebuild"]) {
   const busyLabel = {
     start: "Starting...",
     stop: "Stopping...",
-    rebuild: "Rebuilding...",
+    rebuild: "Queueing...",
   }[action];
   registerCommand({
     id: `target_app.${action}`,
