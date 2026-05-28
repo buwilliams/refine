@@ -216,6 +216,7 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
         ensure_active_instance(root=root)
         ensure_guidance_file(root=root)
         ensure_project_quality_settings(conn, root=root)
+        ensure_active_instance_runtime_settings(conn, root=root)
         return status
     if not migrate or not status.get("migration_required"):
         return status
@@ -417,6 +418,35 @@ def ensure_project_quality_settings(
                 break
     if changed:
         write_project_config(cfg, root=root)
+
+
+def ensure_active_instance_runtime_settings(
+    conn: sqlite3.Connection | None = None,
+    *,
+    root: Path | None = None,
+) -> None:
+    """Backfill runtime settings added after canonical JSON migration."""
+    from . import db
+
+    root = root or volume_root()
+    active = active_instance_id(root=root)
+    runtime_path = instance_dir(active, root) / "runtime.json"
+    data = _read_json(runtime_path, {})
+    changed = False
+    cached_active = _cached_active_instance_id(conn) if conn is not None else ""
+    for key in ("backlog_promote_after_seconds",):
+        if key in data:
+            continue
+        value = db.DEFAULT_SETTINGS.get(key, "")
+        if conn is not None and cached_active in {"", active}:
+            try:
+                value = db.get_setting(conn, key, value) or value
+            except sqlite3.Error:
+                pass
+        data[key] = str(value)
+        changed = True
+    if changed:
+        _write_json(runtime_path, data)
 
 
 def list_instances(*, root: Path | None = None) -> list[dict[str, Any]]:
@@ -898,23 +928,28 @@ def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
     a forced rebuild instead.
     """
     active = active_instance_id()
+    cached = _cached_active_instance_id(conn)
+    if cached != active:
+        rebuild_sqlite_cache(conn)
+    return active
+
+
+def _cached_active_instance_id(conn: sqlite3.Connection | None) -> str:
+    if conn is None:
+        return ""
     try:
         row = conn.execute(
             "SELECT value FROM settings WHERE key = ?",
             (CACHE_ACTIVE_INSTANCE_KEY,),
         ).fetchone()
         if row is None:
-            cached = ""
-        else:
-            try:
-                cached = str(row["value"])
-            except (IndexError, TypeError):
-                cached = str(row[0])
+            return ""
+        try:
+            return str(row["value"])
+        except (IndexError, TypeError):
+            return str(row[0])
     except sqlite3.Error:
-        cached = ""
-    if cached != active:
-        rebuild_sqlite_cache(conn)
-    return active
+        return ""
 
 
 def state_fingerprint(*, root: Path | None = None) -> str:

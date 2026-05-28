@@ -77,6 +77,25 @@ def main() -> int:
         project_state.rebuild_sqlite_cache(conn)
         assert db.get_setting(conn, "quality_timing") == "post_rebuild"
 
+        runtime_path = root / "instances" / active / "runtime.json"
+        runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+        runtime.pop("backlog_promote_after_seconds", None)
+        runtime_path.write_text(json.dumps(runtime), encoding="utf-8")
+        conn.execute(
+            "INSERT INTO settings(key, value) VALUES(?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            ("backlog_promote_after_seconds", "-1"),
+        )
+        conn.execute(
+            "DELETE FROM settings WHERE key = ?",
+            (project_state.CACHE_ACTIVE_INSTANCE_KEY,),
+        )
+        project_state.ensure_initialized(conn)
+        runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+        assert runtime["backlog_promote_after_seconds"] == "-1"
+        project_state.rebuild_sqlite_cache(conn)
+        assert db.get_setting(conn, "backlog_promote_after_seconds") == "-1"
+
         cfg = json.loads((root / "config.json").read_text(encoding="utf-8"))
         cfg["settings"].pop("quality_timing", None)
         (root / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
