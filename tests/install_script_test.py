@@ -102,6 +102,10 @@ def main() -> int:
     script = install_sh.read_text(encoding="utf-8")
     assert "https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh" in script
     assert "https://astral.sh/uv/install.sh" in script
+    assert "Install uv with pipx" in script
+    assert "install_packages pipx" in script
+    assert "pipx install uv" in script
+    assert "sudo apt install pipx && pipx install uv" in script
     assert "https://get.docker.com/rootless" in script
     assert "https://gh.io/copilot-install" in script
     assert "npx --yes playwright install --with-deps chromium" in script
@@ -215,6 +219,96 @@ def main() -> int:
         assert "Provider:         codex" in output
         assert f"Install log: {install_log}" in output
         print("[ok] install.sh dry-run completes without mutating checkout state")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-install-pipx-uv-test-"))
+    try:
+        checkout = tmp / "refine"
+        checkout.mkdir()
+        _write_refine_checkout(checkout)
+        subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
+
+        fake_bin = tmp / "bin"
+        fake_bin.mkdir()
+        for name in (
+            "awk", "bash", "cat", "chmod", "dirname", "git", "grep", "id",
+            "mkdir", "mktemp", "python3", "rm", "sed", "sort", "tail",
+            "touch", "tr", "uname",
+        ):
+            source = shutil.which(name)
+            assert source is not None, name
+            (fake_bin / name).symlink_to(source)
+        node = fake_bin / "node"
+        node.write_text("#!/bin/sh\nprintf 'v20.0.0\\n'\n", encoding="utf-8")
+        node.chmod(0o755)
+        npx = fake_bin / "npx"
+        npx.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        npx.chmod(0o755)
+        codex = fake_bin / "codex"
+        codex.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        codex.chmod(0o755)
+        curl = fake_bin / "curl"
+        curl.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+        curl.chmod(0o755)
+        sudo = fake_bin / "sudo"
+        sudo.write_text("#!/bin/sh\nexec \"$@\"\n", encoding="utf-8")
+        sudo.chmod(0o755)
+        apt_get = fake_bin / "apt-get"
+        apt_get.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$@\" >> {shlex.quote(str(tmp / 'apt-get.log'))}\n"
+            "if [ \"$1\" = \"install\" ] && [ \"$3\" = \"pipx\" ]; then\n"
+            f"  cat > {shlex.quote(str(fake_bin / 'pipx'))} <<'SH'\n"
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"$@\" >> {shlex.quote(str(tmp / 'pipx.log'))}\n"
+            "if [ \"$1\" = \"install\" ] && [ \"$2\" = \"uv\" ]; then\n"
+            f"  mkdir -p {shlex.quote(str(tmp / '.local' / 'bin'))}\n"
+            f"  cat > {shlex.quote(str(tmp / '.local' / 'bin' / 'uv'))} <<'UV'\n"
+            "#!/bin/sh\n"
+            "exit 0\n"
+            "UV\n"
+            f"  chmod +x {shlex.quote(str(tmp / '.local' / 'bin' / 'uv'))}\n"
+            "fi\n"
+            "SH\n"
+            f"  chmod +x {shlex.quote(str(fake_bin / 'pipx'))}\n"
+            "fi\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        apt_get.chmod(0o755)
+
+        env = os.environ.copy()
+        install_log = tmp / "install.log"
+        env.update({
+            "HOME": str(tmp),
+            "NO_COLOR": "1",
+            "REFINE_INSTALL_PROVIDER": "codex",
+            "REFINE_INSTALL_UPGRADE": "0",
+            "REFINE_INSTALL_LOG": str(install_log),
+            "PATH": str(fake_bin),
+        })
+        result = subprocess.run(
+            ["bash", str(install_sh), "--yes"],
+            cwd=checkout,
+            env=env,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        output = result.stdout + result.stderr
+        log_text = install_log.read_text(encoding="utf-8")
+        apt_log = (tmp / "apt-get.log").read_text(encoding="utf-8")
+        pipx_log = (tmp / "pipx.log").read_text(encoding="utf-8")
+        assert "Could not download uv installer from https://astral.sh/uv/install.sh" in output
+        assert "pipx is not installed" in output
+        assert "uv installed:" in output
+        assert "install\n-y\npipx\n" in apt_log
+        assert "install\nuv\n" in pipx_log
+        assert "uv is required." not in output
+        assert "Failed: uv install" not in output
+        assert "uv is required." not in log_text
+        print("[ok] install.sh falls back to pipx when Astral uv install is blocked")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

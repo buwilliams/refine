@@ -698,6 +698,23 @@ download_and_run() {
   rm -f "$tmp"
 }
 
+install_uv_with_pipx() {
+  if ! have pipx; then
+    warn "pipx is not installed"
+    install_packages pipx || true
+  fi
+  if ! have pipx; then
+    warn "Still missing pipx. Install it with: sudo apt install pipx"
+    return 1
+  fi
+  run pipx install uv || {
+    warn "pipx uv install failed"
+    return 1
+  }
+  append_path_now "$HOME/.local/bin"
+  append_path_now "$HOME/.cargo/bin"
+}
+
 ensure_uv() {
   append_path_now "$HOME/.local/bin"
   append_path_now "$HOME/.cargo/bin"
@@ -717,6 +734,9 @@ ensure_uv() {
     append_path_now "$HOME/.local/bin"
     append_path_now "$HOME/.cargo/bin"
   fi
+  if ! have uv && confirm "Install uv with pipx" "y"; then
+    install_uv_with_pipx || true
+  fi
   if have uv; then
     local uv_path_after
     uv_path_after="$(command -v uv)"
@@ -728,8 +748,8 @@ ensure_uv() {
   die_issue \
     "uv install" \
     "Refine uses uv to install dependencies and run the Refine CLI." \
-    "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh, then re-run install.sh." \
-    "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh, or sudo apt install pipx && pipx install uv, then re-run install.sh." \
+    "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh, or sudo apt install pipx && pipx install uv"
 }
 
 provider_binary() {
