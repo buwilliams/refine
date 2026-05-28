@@ -191,8 +191,11 @@ class SqlitePoller:
             interval = db.get_setting_int(
                 conn, "project_update_pulse_interval_seconds", 60,
             )
+            paused = (db.get_setting(conn, "paused") or "0") == "1"
         finally:
             conn.close()
+        if paused:
+            return
         if interval <= 0:
             return
         if now - self._last_project_update_pulse_at < interval:

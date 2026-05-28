@@ -10,9 +10,11 @@ const FILES_TAB_ID = "files";
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
+const FILES_SEARCH_DEBOUNCE_MS = 250;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
+let filesSearchAbortController = null;
 const chatState = {
   tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
@@ -863,10 +865,30 @@ function bindFilesPanel(root) {
 function scheduleFilesSearch(query) {
   filesState.searchQuery = String(query || "");
   filesState.searchError = "";
-  if (filesSearchTimer) clearTimeout(filesSearchTimer);
+  cancelFilesSearchRequest();
+  if (!filesState.searchQuery.trim()) {
+    filesState.searchLoading = false;
+    filesState.searchResults = null;
+    filesState.searchSelectedIndex = -1;
+    drawToolbar();
+    focusFilesSearchInput();
+    return;
+  }
   filesSearchTimer = setTimeout(() => {
     runFilesSearch(filesState.searchQuery, { refocus: true });
-  }, 250);
+  }, FILES_SEARCH_DEBOUNCE_MS);
+}
+
+function cancelFilesSearchRequest({ invalidate = true } = {}) {
+  if (filesSearchTimer) {
+    clearTimeout(filesSearchTimer);
+    filesSearchTimer = null;
+  }
+  if (filesSearchAbortController) {
+    filesSearchAbortController.abort();
+    filesSearchAbortController = null;
+  }
+  if (invalidate) filesSearchRequestSeq += 1;
 }
 
 function topFilesSearchFile(results) {
@@ -922,10 +944,7 @@ function scrollSelectedFilesSearchResultIntoView() {
 }
 
 async function runFilesSearch(query, { refocus = false, openSelectedFile = false } = {}) {
-  if (filesSearchTimer) {
-    clearTimeout(filesSearchTimer);
-    filesSearchTimer = null;
-  }
+  cancelFilesSearchRequest({ invalidate: false });
   query = String(query || "").trim();
   filesSearchRequestSeq += 1;
   const requestSeq = filesSearchRequestSeq;
@@ -942,10 +961,14 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
   filesState.searchLoading = true;
   drawToolbar();
   if (refocus) focusFilesSearchInput();
+  const controller = new AbortController();
+  filesSearchAbortController = controller;
   try {
     const result = await api(
       "GET",
       `/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_SEARCH_MAX_RESULTS}`,
+      undefined,
+      { signal: controller.signal },
     );
     if (requestSeq !== filesSearchRequestSeq) return;
     filesState.searchResults = result;
@@ -959,6 +982,7 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
       if (entry) await loadFile(entry.path);
     }
   } catch (e) {
+    if (e?.name === "AbortError") return;
     if (requestSeq !== filesSearchRequestSeq) return;
     filesState.searchLoading = false;
     filesState.searchResults = null;
@@ -966,6 +990,10 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
     filesState.searchError = e.message || String(e);
     drawToolbar();
     if (refocus) focusFilesSearchInput();
+  } finally {
+    if (filesSearchAbortController === controller) {
+      filesSearchAbortController = null;
+    }
   }
 }
 
@@ -1014,10 +1042,7 @@ function collapseAllFilesTree() {
 }
 
 async function clearFilesTreeView() {
-  if (filesSearchTimer) {
-    clearTimeout(filesSearchTimer);
-    filesSearchTimer = null;
-  }
+  cancelFilesSearchRequest();
   const treeRoot = filesState.treeRootPath || "";
   filesState.searchQuery = "";
   filesState.searchResults = null;

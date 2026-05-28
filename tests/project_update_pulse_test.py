@@ -61,11 +61,21 @@ def main() -> int:
             assert calls == ["runner"], calls
 
             db.set_setting(conn, "project_update_pulse_interval_seconds", "30")
+            db.set_setting(conn, "paused", "1")
+            paused_poller = SqlitePoller()
+            paused_poller._run_project_update_pulse(200.0)  # noqa: SLF001
+            assert calls == ["runner"], calls
+            assert paused_poller._last_project_update_pulse_at == 0.0  # noqa: SLF001
+
+            db.set_setting(conn, "paused", "0")
+            paused_poller._run_project_update_pulse(200.0)  # noqa: SLF001
+            assert calls == ["runner", "runner"], calls
+
             with mutation_guard.exclusive("Test mutation", kind="test"):
                 p._run_project_update_pulse(200.0)  # noqa: SLF001
-            assert calls == ["runner"], calls
-            p._run_project_update_pulse(200.0)  # noqa: SLF001
             assert calls == ["runner", "runner"], calls
+            p._run_project_update_pulse(200.0)  # noqa: SLF001
+            assert calls == ["runner", "runner", "runner"], calls
         finally:
             poller_mod.project_sync.pulse = original_pulse
             sse.publish = original_publish

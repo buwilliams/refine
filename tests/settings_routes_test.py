@@ -810,14 +810,19 @@ def main() -> int:
     assert ".files-content-header .files-icon-btn" in toolbar_css
     assert "data-files-copy-content" in toolbar_js
     assert "const FILES_SEARCH_MAX_RESULTS = 20;" in toolbar_js
+    assert "const FILES_SEARCH_DEBOUNCE_MS = 250;" in toolbar_js
+    assert "let filesSearchAbortController = null;" in toolbar_js
     assert "const FILE_TEXT_CHUNK_BYTES = 128_000;" in toolbar_js
     assert "async function loadNextFileChunk()" in toolbar_js
     assert "function topFilesSearchFile(results)" in toolbar_js
+    assert "function cancelFilesSearchRequest(" in toolbar_js
     assert "function normalizedFilesSearchSelectedIndex(" in toolbar_js
     assert "function moveFilesSearchSelection(delta)" in toolbar_js
     assert "function openSelectedFilesSearchResult()" in toolbar_js
     assert "openSelectedFile = false" in toolbar_js
     assert "openSelectedFile: true" in toolbar_js
+    assert "{ signal: controller.signal }" in toolbar_js
+    assert 'if (e?.name === "AbortError") return;' in toolbar_js
     assert "data-files-search-index" in toolbar_js
     assert "Enter to open" in toolbar_js
     assert "data-files-load-more" in toolbar_js

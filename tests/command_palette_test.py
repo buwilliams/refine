@@ -154,6 +154,8 @@ def main() -> int:
     assert "const FILES_TREE_MAX_DEPTH = 3;" in toolbar_js
     assert "const FILES_TREE_MAX_ENTRIES = 200;" in toolbar_js
     assert "const FILES_SEARCH_MAX_RESULTS = 20;" in toolbar_js
+    assert "const FILES_SEARCH_DEBOUNCE_MS = 250;" in toolbar_js
+    assert "let filesSearchAbortController = null;" in toolbar_js
     assert 'treeRootPath: ""' in toolbar_js
     assert 'pathInputValue: ""' in toolbar_js
     assert 'class="files-tree"' in toolbar_js
@@ -163,6 +165,7 @@ def main() -> int:
     assert "function collapseAllFilesTree()" in toolbar_js
     assert "async function runFilesSearch(query" in toolbar_js
     assert "function scheduleFilesSearch(query)" in toolbar_js
+    assert "function cancelFilesSearchRequest(" in toolbar_js
     assert "function normalizedFilesSearchSelectedIndex(" in toolbar_js
     assert "function moveFilesSearchSelection(delta)" in toolbar_js
     assert "function openSelectedFilesSearchResult()" in toolbar_js
@@ -204,7 +207,7 @@ def main() -> int:
     collapse_body = toolbar_js.split("function collapseAllFilesTree()", 1)[1].split("async function openFilesToolbar", 1)[0]
     assert 'filesState.expanded = new Set([filesState.treeRootPath || ""]);' in collapse_body
     clear_tree_body = toolbar_js.split("async function clearFilesTreeView()", 1)[1].split("async function openFilesToolbar", 1)[0]
-    assert "clearTimeout(filesSearchTimer);" in clear_tree_body
+    assert "cancelFilesSearchRequest();" in clear_tree_body
     assert 'const treeRoot = filesState.treeRootPath || "";' in clear_tree_body
     assert 'filesState.searchQuery = "";' in clear_tree_body
     assert "filesState.searchResults = null;" in clear_tree_body
@@ -221,6 +224,8 @@ def main() -> int:
     assert 'api("GET", `/api/files/tree?path=${encodeURIComponent(path)}`)' in toolbar_js
     assert '"recursive=1"' in toolbar_js
     assert "/api/files/search?q=${encodeURIComponent(query)}&max_entries=${FILES_SEARCH_MAX_RESULTS}" in toolbar_js
+    assert "{ signal: controller.signal }" in toolbar_js
+    assert 'if (e?.name === "AbortError") return;' in toolbar_js
     assert "/api/files/read?path=${encodeURIComponent(path)}&offset=0&limit=${FILE_TEXT_CHUNK_BYTES}" in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
