@@ -351,10 +351,12 @@ def main() -> int:
     assert 'data-route="project"' not in primary_nav
     assert 'class="nav-menu nav-context-menu" id="nav-context-menu"' in index_html
     context_panel = index_html.split('class="nav-menu-panel nav-context-panel"', 1)[1].split("</details>", 1)[0]
-    assert '<div class="nav-menu-label">Management</div>' in context_panel
-    assert '<a class="nav-menu-item" href="#/instance/instances" data-route="instance">Instance</a>' in context_panel
-    assert '<a class="nav-menu-item" href="#/project/application" data-route="project">Project</a>' in context_panel
-    assert '<a class="nav-menu-item" href="#/system/processes" data-route="settings">System</a>' in context_panel
+    assert '<label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>' in context_panel
+    assert '<div class="nav-menu-label nav-context-section-label">Management</div>' in context_panel
+    assert '<a class="nav-menu-item nav-management-item" href="#/instance/instances" data-route="instance">' in context_panel
+    assert '<a class="nav-menu-item nav-management-item" href="#/project/application" data-route="project">' in context_panel
+    assert '<a class="nav-menu-item nav-management-item" href="#/system/processes" data-route="settings">' in context_panel
+    assert context_panel.count('class="nav-menu-icon"') == 3
     assert 'id="nav-context-app-summary">Application</span>' in index_html
     assert 'id="nav-context-reporter-summary">No reporter</span>' in index_html
     assert '<select id="global-reporter" aria-label="Reporter"></select>' in index_html
@@ -401,6 +403,9 @@ def main() -> int:
     assert "function openPlanDraftModalFromText(text)" in import_js
     assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
     assert ".nav-context-summary" in base_css
+    assert ".nav-context-section-label" in base_css
+    assert "margin-top: 12px;" in base_css
+    assert ".nav-menu-icon" in base_css
     assert ".nav-issue-button" in base_css
     assert ".nav-bug-icon" in base_css
     assert ".nav-create-group" in base_css

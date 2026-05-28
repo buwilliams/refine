@@ -249,6 +249,9 @@ pre {
   line-height: 1.2;
   text-transform: uppercase;
 }
+.nav-context-section-label {
+  margin-top: 12px;
+}
 .nav-context-summary {
   display: inline-flex;
   align-items: center;
@@ -329,11 +332,26 @@ pre {
 .nav-menu-item {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 30px;
   padding: 6px 8px;
   border-radius: var(--radius-md);
   color: var(--fg);
   text-decoration: none;
+}
+.nav-menu-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--color-text-muted);
+}
+.nav-menu-icon path,
+.nav-menu-icon rect {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* Runtime status indicators in the topbar and context menu. */

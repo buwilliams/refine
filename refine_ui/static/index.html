@@ -42,12 +42,32 @@
             <span class="target-app-dot" aria-hidden="true"></span>
             <span class="target-app-label">Application</span>
           </a>
-          <label class="nav-menu-label" for="global-reporter">Reporter</label>
+          <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
           <select id="global-reporter" aria-label="Reporter"></select>
-          <div class="nav-menu-label">Management</div>
-          <a class="nav-menu-item" href="#/instance/instances" data-route="instance">Instance</a>
-          <a class="nav-menu-item" href="#/project/application" data-route="project">Project</a>
-          <a class="nav-menu-item" href="#/system/processes" data-route="settings">System</a>
+          <div class="nav-menu-label nav-context-section-label">Management</div>
+          <a class="nav-menu-item nav-management-item" href="#/instance/instances" data-route="instance">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+              <path d="M8 8h8"></path>
+              <path d="M8 12h8"></path>
+              <path d="M8 16h5"></path>
+            </svg>
+            <span>Instance</span>
+          </a>
+          <a class="nav-menu-item nav-management-item" href="#/project/application" data-route="project">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M4 20V6a2 2 0 0 1 2-2h7l7 7v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"></path>
+              <path d="M13 4v7h7"></path>
+            </svg>
+            <span>Project</span>
+          </a>
+          <a class="nav-menu-item nav-management-item" href="#/system/processes" data-route="settings">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.03.04a2 2 0 1 1-3.94 0L10 20a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.04-.03a2 2 0 1 1 0-3.94L4 10a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.03-.04a2 2 0 1 1 3.94 0L14 4a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.4 9c.06.36.27.69.6 1l.04.03a2 2 0 1 1 0 3.94L20 14c-.33.31-.54.64-.6 1Z"></path>
+            </svg>
+            <span>System</span>
+          </a>
         </div>
       </details>
       <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
