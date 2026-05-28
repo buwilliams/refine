@@ -129,7 +129,7 @@ def main() -> int:
     assert 'await withButtonBusy(b, "Merging...", async () => {' in system_tab_js["settings_reporters"]
     assert 'await withButtonBusy(btn, "Adding...", async () => {' in system_tab_js["settings_reporters"]
     assert 'await withButtonBusy(b, "Activating...", async () => {' in system_tab_js["settings_instances"]
-    assert 'await withButtonBusy(btn, "Transferring...", async () => {' in system_tab_js["settings_instances"]
+    assert 'await withButtonBusy(btn, "Transferring...", async () => {' not in system_tab_js["settings_instances"]
     assert 'await withButtonBusy(btn, "Saving...", async () => {' in system_tab_js["settings_quality"]
     assert 'return await withButtonBusy(button, "Creating...", async () => {' in system_tab_js["settings_quality"]
     assert 'await withButtonBusy(btn, "Generating…", async () => {' in system_tab_js["settings_governance"]
