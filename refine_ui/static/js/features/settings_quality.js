@@ -2,6 +2,7 @@
 
 function renderSettingsQualityInstanceSections(quality) {
   const qualityEnabled = String(quality.enabled || "0") === "1";
+  const qualityTiming = quality.timing === "post_rebuild" ? "post_rebuild" : "pre_merge";
   const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";
   const regressions = Array.isArray(quality.regressions) ? quality.regressions : [];
   return `
@@ -9,22 +10,28 @@ function renderSettingsQualityInstanceSections(quality) {
       <h3>Quality gate</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
-        Runs pre-merge QA in the Gap worktree before the Merge agent lands work.
+        Choose whether QA runs before merge in the Gap worktree or after the shared application rebuild.
       </p>
-      <button type="button"
-              id="s-quality-enabled"
-              class="${qualityEnabled ? "" : "warn"}"
-              aria-pressed="${qualityEnabled ? "true" : "false"}"
-              data-enabled="${qualityEnabled ? "1" : "0"}">
-        QA ${qualityEnabled ? "enabled" : "disabled"}
-      </button>
+      <div class="actions settings-section-actions">
+        <button type="button"
+                id="s-quality-enabled"
+                class="${qualityEnabled ? "" : "warn"}"
+                aria-pressed="${qualityEnabled ? "true" : "false"}"
+                data-enabled="${qualityEnabled ? "1" : "0"}">
+          QA ${qualityEnabled ? "enabled" : "disabled"}
+        </button>
+        <select id="s-quality-timing" aria-label="Quality timing">
+          <option value="pre_merge" ${qualityTiming === "pre_merge" ? "selected" : ""}>Pre-merge QA</option>
+          <option value="post_rebuild" ${qualityTiming === "post_rebuild" ? "selected" : ""}>Post-rebuild QA</option>
+        </select>
+      </div>
     </section>
 
     <section class="settings-section">
       <h3>Regression checks</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
-        Workflow QA runs these checks against each Gap worktree. Manual runs
+        Workflow QA runs these checks in the active QA environment. Manual runs
         use the current targeted application checkout.
       </p>
       <div class="actions settings-section-actions">
@@ -104,10 +111,12 @@ function renderQualityRegressionList(regressions) {
 async function autosaveSettingsQuality(root = document) {
   const body = {};
   const qualityEnabled = root.querySelector("#s-quality-enabled");
+  const qualityTiming = root.querySelector("#s-quality-timing");
   const regressionsEnabled = root.querySelector("#s-quality-regressions-enabled");
   const requirements = root.querySelector("#s-quality-business-requirements");
   const instructions = root.querySelector("#s-quality-instructions");
   if (qualityEnabled) body.enabled = qualityEnabled.dataset.enabled === "1" ? "1" : "0";
+  if (qualityTiming) body.timing = qualityTiming.value;
   if (regressionsEnabled) {
     body.regressions_enabled = regressionsEnabled.dataset.enabled === "1" ? "1" : "0";
   }
@@ -136,7 +145,7 @@ function bindSettingsQualityInstanceSections(tabSlug = "instances") {
   const autosaveQuality = createSettingsAutosave(
     () => autosaveSettingsQuality(root),
     {
-      controls: $$("#s-quality-enabled, #s-quality-regressions-enabled", root),
+      controls: $$("#s-quality-enabled, #s-quality-timing, #s-quality-regressions-enabled", root),
       errorPrefix: "Save failed",
     },
   );
@@ -153,6 +162,9 @@ function bindSettingsQualityInstanceSections(tabSlug = "instances") {
         await autosaveQuality();
       } catch (err) { await showActionError(err); }
     });
+  });
+  $("#s-quality-timing")?.addEventListener("change", async () => {
+    await autosaveQuality();
   });
   $("#s-quality-regressions-enabled")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;

@@ -3175,6 +3175,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "file_browser_ignore_patterns",
         "agent_subpath", "merge_target_branch",
         "quality_enabled",
+        "quality_timing",
         "quality_regressions_enabled",
         "agent_cli",
         "paused",
@@ -3245,6 +3246,14 @@ def update_settings(body: dict) -> tuple[int, dict]:
                 if str(v).strip().lower() in {"1", "true", "yes", "on"}
                 else "0"
             )
+        elif k == "quality_timing":
+            choice = quality.normalize_timing(v)
+            if str(v or "").strip() not in quality.QUALITY_TIMING_VALUES:
+                return err(
+                    400,
+                    "quality_timing must be one of pre_merge, post_rebuild",
+                )
+            normalized[k] = choice
         elif k == "parallel_run_cap":
             try:
                 n = int(v)
@@ -3411,7 +3420,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
                     "cleanup did not complete"
                 ),
             )
-    if "quality_enabled" in normalized:
+    if "quality_enabled" in normalized or "quality_timing" in normalized:
         try:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:
@@ -3471,6 +3480,7 @@ def quality_get() -> tuple[int, dict]:
     try:
         result = quality.load_settings(conn)
         result["enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"
+        result["timing"] = quality.timing(conn)
         result["regressions_enabled"] = (
             db.get_setting(conn, "quality_regressions_enabled", "0") or "0"
         )
@@ -3482,8 +3492,13 @@ def quality_get() -> tuple[int, dict]:
 
 
 def quality_save(body: dict) -> tuple[int, dict]:
+    if "timing" in body:
+        raw_timing = str(body.get("timing") or "").strip()
+        if raw_timing not in quality.QUALITY_TIMING_VALUES:
+            return err(400, "timing must be one of pre_merge, post_rebuild")
     conn = _conn()
     enabled_changed = False
+    timing_changed = False
     try:
         if "enabled" in body:
             enabled = (
@@ -3494,14 +3509,20 @@ def quality_save(body: dict) -> tuple[int, dict]:
             )
             enabled_changed = enabled != (db.get_setting(conn, "quality_enabled", "0") or "0")
             db.set_setting(conn, "quality_enabled", enabled)
+        if "timing" in body:
+            timing_changed = (
+                str(body.get("timing") or "").strip() != quality.timing(conn)
+            )
         if "regressions_enabled" in body:
             regressions.set_enabled(conn, body.get("regressions_enabled"))
         result = quality.save_settings(
             conn,
             business_requirements=body.get("business_requirements"),
             instructions=body.get("instructions"),
+            timing_value=body.get("timing"),
         )
         result["enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"
+        result["timing"] = quality.timing(conn)
         result["regressions_enabled"] = (
             db.get_setting(conn, "quality_regressions_enabled", "0") or "0"
         )
@@ -3516,7 +3537,7 @@ def quality_save(body: dict) -> tuple[int, dict]:
         )
     finally:
         conn.close()
-    if enabled_changed:
+    if enabled_changed or timing_changed:
         try:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:
@@ -3810,6 +3831,7 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
             else []
         )
         provider = (db.get_setting(conn, "agent_cli") or "claude").strip().lower()
+        quality_timing = quality.timing(conn)
     finally:
         conn.close()
     reporter_stats = _compute_reporter_stats(stat_rows, known_reporters)
@@ -3825,6 +3847,7 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
         "reporter_stats": reporter_stats,
         "instance_scope": instance_scope,
         "instance_filter": "all" if instance_scope == "all" else "current",
+        "quality_timing": quality_timing,
         "active_instance_id": active_instance_id,
         "active_instance_display_name": project_state.gap_instance_display(active_instance_id),
         "needs_attention": _compute_needs_attention(
@@ -5636,26 +5659,33 @@ def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
     ).fetchall()
     if not rows:
         return 0
+    post_rebuild_quality = quality.enabled(conn) and quality.post_rebuild(conn)
+    next_status = "qa" if post_rebuild_quality else "review"
+    message = (
+        "Target application rebuilt; Gap queued for QA"
+        if post_rebuild_quality
+        else "Target application rebuilt; Gap is ready for review"
+    )
     with db.transaction(conn):
         conn.execute(
-            "UPDATE gaps_index SET status = 'review', updated = ? "
+            "UPDATE gaps_index SET status = ?, updated = ? "
             "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-            (now_iso(), active_instance),
+            (next_status, now_iso(), active_instance),
         )
     for row in rows:
         gid = row["id"]
         try:
-            gap_writer.update_fields(gid, status="review", branch_name=None)
+            gap_writer.update_fields(gid, status=next_status, branch_name=None)
             _append_gap_workflow_log(
                 gid,
-                "Target application rebuilt; Gap is ready for review",
+                message,
                 actor="refine",
             )
         except Exception:
             pass
         activity.append(
             conn,
-            message="Target application rebuilt; Gap is ready for review",
+            message=message,
             severity="info", category="state", gap_id=gid, actor="refine",
         )
     return len(rows)

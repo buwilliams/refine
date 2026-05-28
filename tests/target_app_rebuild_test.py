@@ -455,6 +455,30 @@ def main() -> int:
         assert gap.get("branch_name") is None
         messages = [log["message"] for log in gap["rounds"][-1]["logs"]]
         assert "Target application rebuilt; Gap is ready for review" in messages, messages
+
+        db.set_setting(conn, "quality_enabled", "1")
+        db.set_setting(conn, "quality_timing", "post_rebuild")
+        gid_qa = "01TARGETAPPPOSTREBUILDQAAA"
+        create_indexed_gap(conn, gid_qa, status="awaiting-rebuild", branch=None)
+        assert api._promote_rebuilt_gaps(conn) == 1  # noqa: SLF001
+        row = conn.execute(
+            "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gid_qa,),
+        ).fetchone()
+        assert row["status"] == "qa", dict(row)
+        assert row["branch_name"] is None, dict(row)
+        gap = gaps.read_gap_json(gid_qa)
+        assert gap["status"] == "qa"
+        messages = [log["message"] for log in gap["rounds"][-1]["logs"]]
+        assert "Target application rebuilt; Gap queued for QA" in messages, messages
+
+        db.set_setting(conn, "quality_enabled", "0")
+        gid_bypass = "01TARGETAPPPOSTQABYPASSAAA"
+        create_indexed_gap(conn, gid_bypass, status="awaiting-rebuild", branch=None)
+        assert api._promote_rebuilt_gaps(conn) == 1  # noqa: SLF001
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = ?", (gid_bypass,),
+        ).fetchone()
+        assert row["status"] == "review", dict(row)
     finally:
         conn.close()
         cleanup_tmp(tmp)

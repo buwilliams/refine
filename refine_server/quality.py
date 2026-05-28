@@ -5,6 +5,9 @@ from typing import Any
 
 from refine_server import db, regressions
 
+PRE_MERGE = "pre_merge"
+POST_REBUILD = "post_rebuild"
+QUALITY_TIMING_VALUES = (PRE_MERGE, POST_REBUILD)
 
 DEFAULT_INSTRUCTIONS = (
     "Execute the e2e tests for this Gap, if none exist, then write them. "
@@ -25,6 +28,7 @@ def load_settings(conn) -> dict[str, Any]:
             db.get_setting(conn, "quality_instructions", DEFAULT_INSTRUCTIONS)
             or DEFAULT_INSTRUCTIONS
         ),
+        "timing": timing(conn),
     }
 
 
@@ -41,6 +45,7 @@ def save_settings(
     *,
     business_requirements: str | None = None,
     instructions: str | None = None,
+    timing_value: str | None = None,
 ) -> dict[str, Any]:
     if business_requirements is not None:
         db.set_setting(
@@ -51,6 +56,8 @@ def save_settings(
     if instructions is not None:
         text = str(instructions).strip() or DEFAULT_INSTRUCTIONS
         db.set_setting(conn, "quality_instructions", text)
+    if timing_value is not None:
+        db.set_setting(conn, "quality_timing", normalize_timing(timing_value))
     return load_settings(conn)
 
 
@@ -58,11 +65,25 @@ def enabled(conn) -> bool:
     return (db.get_setting(conn, "quality_enabled", "0") or "0") == "1"
 
 
+def normalize_timing(value: Any) -> str:
+    raw = str(value or PRE_MERGE).strip()
+    return raw if raw in QUALITY_TIMING_VALUES else PRE_MERGE
+
+
+def timing(conn) -> str:
+    return normalize_timing(db.get_setting(conn, "quality_timing", PRE_MERGE))
+
+
+def post_rebuild(conn) -> bool:
+    return timing(conn) == POST_REBUILD
+
+
 def format_prompt(
     gap: dict[str, Any],
     *,
     settings: dict[str, Any],
     regression_result: dict[str, Any] | None = None,
+    timing_value: str | None = None,
 ) -> str:
     rounds = gap.get("rounds") or []
     latest = rounds[-1] if rounds else {}
@@ -71,6 +92,25 @@ def format_prompt(
         if regression_result is not None
         else "Managed Playwright regression checks were not run."
     )
+    quality_timing = normalize_timing(timing_value or settings.get("timing"))
+    if quality_timing == POST_REBUILD:
+        return (
+            "You are running the post-rebuild Quality gate for a software change.\n\n"
+            f"Gap name:\n{str(gap.get('name') or '').strip()}\n\n"
+            f"Current behavior (actual):\n{str(latest.get('actual') or '').strip()}\n\n"
+            f"Desired behavior (target):\n{str(latest.get('target') or '').strip()}\n\n"
+            "Business requirements:\n"
+            f"{str(settings.get('business_requirements') or '').strip()}\n\n"
+            "Quality instructions:\n"
+            f"{str(settings.get('instructions') or '').strip()}\n\n"
+            "Managed regression checks:\n"
+            f"{regression_block}\n\n"
+            "Validate the rebuilt shared target application for this Gap. "
+            "Run the minimum meaningful test set needed to verify the behavior. "
+            "Do not modify, add, or commit files during this post-rebuild QA pass. "
+            "If you find a true product or test failure, explain it clearly and "
+            "exit with failure. When quality passes, exit successfully."
+        )
     return (
         "You are running the pre-merge Quality gate for a software change.\n\n"
         f"Gap name:\n{str(gap.get('name') or '').strip()}\n\n"

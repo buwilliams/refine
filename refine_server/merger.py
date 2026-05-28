@@ -44,7 +44,7 @@ import threading
 import time
 from collections.abc import Callable
 
-from refine_server import activity, db, project_state
+from refine_server import activity, db, project_state, quality
 from refine_server.gaps import now_iso
 
 from . import gap_writer, git_ops, mutation_guard, subprocess_mgr, verify_op
@@ -236,19 +236,25 @@ class Merger:
             db.get_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
             or "on_worktree_merge"
         ).strip()
-        if mode != "on_worktree_merge":
-            return False
-        row = conn.execute(
-            "SELECT COUNT(*) AS n FROM gaps_index "
-            "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-            (project_state.active_instance_id(),),
-        ).fetchone()
-        pending = int(row["n"] if row else 0)
-        if pending <= 0:
-            return False
-        if self._queue_rebuild_for_pending is not None:
-            self._queue_rebuild_for_pending()
-        return True
+        if mode == "on_worktree_merge":
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM gaps_index "
+                "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
+                (project_state.active_instance_id(),),
+            ).fetchone()
+            pending = int(row["n"] if row else 0)
+            if pending > 0:
+                if self._queue_rebuild_for_pending is not None:
+                    self._queue_rebuild_for_pending()
+                return True
+        if quality.enabled(conn) and quality.post_rebuild(conn):
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM gaps_index "
+                "WHERE status = 'qa' AND branch_name IS NULL AND instance_id = ?",
+                (project_state.active_instance_id(),),
+            ).fetchone()
+            return int(row["n"] if row else 0) > 0
+        return False
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()

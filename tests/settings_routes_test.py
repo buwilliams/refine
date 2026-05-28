@@ -622,20 +622,25 @@ def main() -> int:
     assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'id="s-quality-enabled"' not in application_body
     assert 'id="s-quality-enabled"' in settings_js
+    assert 'id="s-quality-timing"' in settings_js
     assert 'id="s-quality-regressions-enabled"' in settings_js
     assert 'id="s-quality-regression-new"' in settings_js
     assert 'id="s-quality-regression-run"' in settings_js
-    assert "Workflow QA runs these checks against each Gap worktree." in settings_js
+    assert "Choose whether QA runs before merge in the Gap worktree" in settings_js
+    assert "after the shared application rebuild" in settings_js
+    assert "Workflow QA runs these checks in the active QA environment." in settings_js
     assert "Run current checkout" in settings_js
     assert 'id="regression-create-input-title"' in settings_js
     assert 'id="regression-create-input-prompt"' in settings_js
     assert 'modalPrompt("Regression title"' not in settings_js
     assert 'const qualityEnabled = String(quality.enabled || "0") === "1";' in settings_js
+    assert 'const qualityTiming = quality.timing === "post_rebuild" ? "post_rebuild" : "pre_merge";' in settings_js
     assert 'const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";' in settings_js
     assert 'aria-pressed="${qualityEnabled ? "true" : "false"}"' in settings_js
     assert 'class="${qualityEnabled ? "" : "warn"}"' in settings_js
     assert 'QA ${qualityEnabled ? "enabled" : "disabled"}' in settings_js
     assert 'if (qualityEnabled) body.enabled = qualityEnabled.dataset.enabled === "1" ? "1" : "0";' in settings_js
+    assert "if (qualityTiming) body.timing = qualityTiming.value;" in settings_js
     assert 'btn.classList.toggle("warn", !enabled);' in settings_js
     assert 'btn.textContent = enabled ? "QA enabled" : "QA disabled";' in settings_js
     assert ".toggle-button.on" not in common_css
@@ -681,7 +686,9 @@ def main() -> int:
     assert "const WORKFLOW_STATUSES = [" in common_js
     assert '"qa",' in common_js
     assert '"awaiting-rebuild",' in common_js
-    assert "const orderedStatuses = WORKFLOW_STATUSES;" in dashboard_js
+    assert "const orderedStatuses = workflowStatuses();" in dashboard_js
+    assert "const POST_REBUILD_WORKFLOW_STATUSES = [" in common_js
+    assert 'state.dashboard?.quality_timing === "post_rebuild"' in common_js
     assert "dashboard-status-grid" in dashboard_js
     assert "const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([" in dashboard_js
     assert '"todo",' in dashboard_js

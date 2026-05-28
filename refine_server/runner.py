@@ -11,7 +11,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from refine_server import activity, changes_index, config, db, gaps as shared_gaps, governance, perf_metrics, project_state, reporters, round_logs, search_index
+from refine_server import activity, changes_index, config, db, gaps as shared_gaps, governance, perf_metrics, project_state, quality, reporters, round_logs, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_BACKGROUND_PROCESSES_SET, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
@@ -88,6 +88,7 @@ class Runner:
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
             on_run_finished=lambda _gid: self.merger.wake(),
             launch_blocked=self._automation_blocked,
+            on_post_rebuild_quality_failed=self._handle_post_rebuild_quality_failure,
             target_app_lock=self._target_app_lock,
         )
         self.governance_agent = GovernanceAgent(
@@ -1846,6 +1847,258 @@ class Runner:
                 "push_warning": push_warning,
                 "message": revert_message}
 
+    def _handle_post_rebuild_quality_failure(
+        self,
+        gap_id: str,
+        message: str,
+        details: str | None = None,
+    ) -> None:
+        self.merger.run_under_host_lock(
+            lambda: self._do_post_rebuild_quality_revert(gap_id, message, details),
+            label="post-rebuild-qa-revert",
+        )
+
+    def _do_post_rebuild_quality_revert(
+        self,
+        gap_id: str,
+        message: str,
+        details: str | None = None,
+    ) -> dict:
+        target = self._effective_target_branch()
+        if not target:
+            cleanup_message = (
+                "Post-rebuild QA failed; automatic revert needs manual follow-up "
+                "because the target branch could not be resolved."
+            )
+            self._log_post_rebuild_quality_cleanup(
+                gap_id,
+                cleanup_message,
+                details=details or message,
+                severity="error",
+            )
+            return {"ok": False, "stage": "precheck", "message": cleanup_message}
+        if not git_ops.local_branch_exists(target):
+            cleanup_message = (
+                f"Post-rebuild QA failed; automatic revert needs manual follow-up "
+                f"because target branch `{target}` does not exist locally."
+            )
+            self._log_post_rebuild_quality_cleanup(
+                gap_id,
+                cleanup_message,
+                details=details or message,
+                severity="error",
+            )
+            return {"ok": False, "stage": "precheck", "message": cleanup_message}
+
+        merge = next(
+            (
+                row for row in git_ops.list_refine_merges(target, limit=200)
+                if row.get("gap_id") == gap_id
+            ),
+            None,
+        )
+        if not merge:
+            cleanup_message = (
+                "Post-rebuild QA failed; automatic revert needs manual follow-up "
+                "because Refine could not find the Gap merge commit."
+            )
+            self._log_post_rebuild_quality_cleanup(
+                gap_id,
+                cleanup_message,
+                details=details or message,
+                severity="error",
+            )
+            return {"ok": False, "stage": "lookup", "message": cleanup_message}
+
+        commit_sha = str(merge.get("commit") or "").strip()
+        host_branch = git_ops.current_branch()
+        switched_from: str | None = None
+        stashed = False
+        if git_ops.working_copy_dirty():
+            stash = git_ops.stash_push(
+                f"refine auto-stash before post-rebuild QA revert of {gap_id}",
+            )
+            if not stash.ok:
+                cleanup_message = (
+                    "Post-rebuild QA failed; automatic revert needs manual follow-up "
+                    "because Refine could not stash target worktree changes."
+                )
+                self._log_post_rebuild_quality_cleanup(
+                    gap_id,
+                    cleanup_message,
+                    details=stash.stderr or stash.stdout,
+                    severity="error",
+                )
+                return {"ok": False, "stage": "precheck", "message": cleanup_message}
+            stashed = True
+        if host_branch != target:
+            checkout = git_ops.checkout_branch(target)
+            if not checkout.ok:
+                if stashed:
+                    git_ops.stash_pop()
+                cleanup_message = (
+                    f"Post-rebuild QA failed; automatic revert needs manual follow-up "
+                    f"because Refine could not check out `{target}`."
+                )
+                self._log_post_rebuild_quality_cleanup(
+                    gap_id,
+                    cleanup_message,
+                    details=checkout.stderr or checkout.stdout,
+                    severity="error",
+                )
+                return {"ok": False, "stage": "precheck", "message": cleanup_message}
+            switched_from = host_branch
+
+        pushed = False
+        push_warning: str | None = None
+        pre_revert_head = git_ops.rev_parse(target)
+        try:
+            revert = git_ops.revert_merge_commit(commit_sha)
+            if not revert.ok:
+                blob = (revert.stdout or "") + "\n" + (revert.stderr or "")
+                git_ops.revert_abort()
+                cleanup_message = (
+                    "Post-rebuild QA failed; automatic revert needs manual follow-up "
+                    "because the revert conflicted."
+                )
+                self._log_post_rebuild_quality_cleanup(
+                    gap_id,
+                    cleanup_message,
+                    details=blob[:2000],
+                    severity="error",
+                )
+                return {"ok": False, "stage": "revert", "message": cleanup_message}
+
+            if git_ops.upstream_branch(target) is not None:
+                push = push_ops.push_current_after_pull(
+                    self._conn,
+                    actor="runner",
+                    gap_id=gap_id,
+                    target=target,
+                    merge_message=f"Merge upstream before pushing QA revert of {gap_id}",
+                    prompt_context=(
+                        f"A pull is in progress before pushing a post-rebuild QA "
+                        f"revert on `{target}`.\n"
+                        "HEAD contains a local revert of a Refine merge commit.\n"
+                        "The incoming side contains newer upstream commits.\n"
+                        "Preserve the local revert and integrate upstream changes."
+                    ),
+                )
+                if push.get("ok") and push.get("pushed"):
+                    pushed = True
+                else:
+                    push_warning = (
+                        f"Post-rebuild QA failed; reverted Gap merge `{commit_sha[:10]}…` "
+                        f"locally on `{target}` but push failed. Push manually once "
+                        "the underlying issue is resolved."
+                    )
+        finally:
+            if switched_from:
+                back = git_ops.checkout_branch(switched_from)
+                if not back.ok:
+                    activity.append(
+                        self._conn,
+                        message=(
+                            f"Could not restore host HEAD to `{switched_from}` "
+                            f"after post-rebuild QA revert; host is still on `{target}`"
+                        ),
+                        severity="warn",
+                        category="git",
+                        gap_id=gap_id,
+                        actor="runner",
+                        details=back.stderr[:2000],
+                    )
+            if stashed:
+                pop = git_ops.stash_pop()
+                if not pop.ok:
+                    activity.append(
+                        self._conn,
+                        message=(
+                            "Auto-stash pop after post-rebuild QA revert failed; "
+                            "recover the WIP from git stash."
+                        ),
+                        severity="warn",
+                        category="git",
+                        gap_id=gap_id,
+                        actor="runner",
+                        details=pop.stderr[:2000],
+                    )
+
+        with db.transaction(self._conn):
+            self._conn.execute(
+                "UPDATE gaps_index SET status = 'failed', updated = ? WHERE id = ?",
+                (now_iso(), gap_id),
+            )
+        if pre_revert_head:
+            changes_index.advance_branch_head(
+                self._conn,
+                target,
+                previous_head=pre_revert_head,
+            )
+        try:
+            gap_writer.update_fields(gap_id, status="failed")
+        except Exception:
+            pass
+
+        if push_warning:
+            cleanup_message = push_warning
+            severity = "warn"
+        else:
+            cleanup_message = (
+                f"Post-rebuild QA failed; reverted Gap merge `{commit_sha[:10]}…` "
+                f"on `{target}`"
+                + (" and pushed" if pushed else " (no upstream; push skipped)")
+            )
+            severity = "error"
+        self._log_post_rebuild_quality_cleanup(
+            gap_id,
+            cleanup_message,
+            details=details or message,
+            severity=severity,
+        )
+        return {
+            "ok": True,
+            "gap_id": gap_id,
+            "commit": commit_sha,
+            "target": target,
+            "pushed": pushed,
+            "push_warning": push_warning,
+            "message": cleanup_message,
+        }
+
+    def _log_post_rebuild_quality_cleanup(
+        self,
+        gap_id: str,
+        message: str,
+        *,
+        details: str | None,
+        severity: str,
+    ) -> None:
+        try:
+            gap = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
+            rounds = gap.get("rounds") or []
+            if rounds:
+                gap_writer.append_round_log(
+                    gap_id=gap_id,
+                    round_idx=len(rounds) - 1,
+                    severity=severity,
+                    category="quality",
+                    actor="runner",
+                    message=message,
+                    details=details,
+                )
+        except Exception:
+            pass
+        activity.append(
+            self._conn,
+            message=message,
+            severity=severity,
+            category="quality",
+            gap_id=gap_id,
+            actor="runner",
+            details=details,
+        )
+
     def _h_chat_start(self, params: dict) -> dict:
         gap_id = params.get("gap_id")
         purpose = str(params.get("purpose") or "").strip().lower()
@@ -2091,6 +2344,9 @@ class Runner:
                     conn, result.get("checks") or [], result.get("message") or "",
                 )
             promoted = self._promote_rebuilt_gaps(conn) if ok else 0
+            promoted_label = "ready for review"
+            if ok and quality.enabled(conn) and quality.post_rebuild(conn):
+                promoted_label = "queued for QA"
             details = _automatic_rebuild_details(result) if not ok else None
             if not ok:
                 self._log_automatic_rebuild_failure_to_pending_gaps(
@@ -2101,7 +2357,7 @@ class Runner:
                 message=(
                     f"target-app: automatic rebuild "
                     f"{'completed' if ok else 'failed'}"
-                    + (f"; {promoted} Gap{'s' if promoted != 1 else ''} ready for review"
+                    + (f"; {promoted} Gap{'s' if promoted != 1 else ''} {promoted_label}"
                        if ok else "")
                 ),
                 severity="info" if ok else "error",
@@ -2307,29 +2563,36 @@ class Runner:
         ).fetchall()
         if not rows:
             return 0
+        post_rebuild_quality = quality.enabled(conn) and quality.post_rebuild(conn)
+        next_status = "qa" if post_rebuild_quality else "review"
+        message = (
+            "Target application rebuilt; Gap queued for QA"
+            if post_rebuild_quality
+            else "Target application rebuilt; Gap is ready for review"
+        )
         updated = now_iso()
         with db.transaction(conn):
             conn.execute(
-                "UPDATE gaps_index SET status = 'review', updated = ? "
+                "UPDATE gaps_index SET status = ?, updated = ? "
                 "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-                (updated, active_instance),
+                (next_status, updated, active_instance),
             )
         for row in rows:
             gid = row["id"]
             try:
-                gap_writer.update_fields(gid, status="review", branch_name=None)
+                gap_writer.update_fields(gid, status=next_status, branch_name=None)
                 gap_writer.append_latest_round_log(
                     gap_id=gid,
                     severity="info",
                     category="state",
                     actor="runner",
-                    message="Target application rebuilt; Gap is ready for review",
+                    message=message,
                 )
             except Exception:
                 pass
             activity.append(
                 conn,
-                message="Target application rebuilt; Gap is ready for review",
+                message=message,
                 severity="info", category="state", gap_id=gid, actor="runner",
             )
         return len(rows)

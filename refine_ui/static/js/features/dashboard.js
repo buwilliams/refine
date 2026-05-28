@@ -149,7 +149,7 @@ function drawDashboard(d, opts = {}) {
 
   const needsAttention = (d.needs_attention || []).filter((x) => x.kind === "filter");
   const counts = d.counts || {};
-  const orderedStatuses = WORKFLOW_STATUSES;
+  const orderedStatuses = workflowStatuses();
   const dash = $("#dash");
   const reporterStats = d.reporter_stats || [];
   const reviewsShell = document.getElementById("reviews-for-reporter-card");

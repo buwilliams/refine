@@ -30,6 +30,18 @@ const WORKFLOW_STATUSES = [
   "failed",
   "cancelled",
 ];
+const POST_REBUILD_WORKFLOW_STATUSES = [
+  "backlog",
+  "todo",
+  "in-progress",
+  "ready-merge",
+  "awaiting-rebuild",
+  "qa",
+  "review",
+  "done",
+  "failed",
+  "cancelled",
+];
 const STATUS_FILTER_OPTIONS = ["", ...WORKFLOW_STATUSES];
 const WORKFLOW_STATUS_LABELS = {
   "backlog": "Backlog",
@@ -46,6 +58,12 @@ const WORKFLOW_STATUS_LABELS = {
 
 function workflowStatusLabel(status) {
   return WORKFLOW_STATUS_LABELS[status] || status || "";
+}
+
+function workflowStatuses() {
+  return state.dashboard?.quality_timing === "post_rebuild"
+    ? POST_REBUILD_WORKFLOW_STATUSES
+    : WORKFLOW_STATUSES;
 }
 
 function updateActiveInstanceLabel() {

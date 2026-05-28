@@ -41,6 +41,7 @@ class Dispatcher:
     # instantiate a Dispatcher without one.
     on_run_finished: callable | None = None  # type: ignore[type-arg]
     launch_blocked: callable | None = None  # type: ignore[type-arg]
+    on_post_rebuild_quality_failed: callable | None = None  # type: ignore[type-arg]
     target_app_lock: threading.Lock | None = None
     poll_interval: float = 2.0
 
@@ -198,11 +199,17 @@ class Dispatcher:
                 self._launch_one(conn, gid, row["branch_name"])
             else:
                 if not quality.enabled(conn):
-                    self._promote_quality_bypass(conn, gid)
+                    if row["branch_name"]:
+                        self._promote_quality_bypass(conn, gid)
+                    else:
+                        self._promote_post_rebuild_quality_bypass(conn, gid)
                     continue
                 if self._active_run_count(conn) >= self._parallel_run_cap(conn):
                     return
-                self._launch_quality(conn, gid, row["branch_name"])
+                if not row["branch_name"] and self._post_rebuild_quality_active(conn):
+                    return
+                if not self._launch_quality(conn, gid, row["branch_name"]):
+                    return
             launched += 1
 
     def _next_lane(self, conn: sqlite3.Connection) -> str:
@@ -310,14 +317,18 @@ class Dispatcher:
         if quality.enabled(conn):
             return
         rows = conn.execute(
-            "SELECT id FROM gaps_index WHERE status = 'qa' AND instance_id = ? "
+            "SELECT id, branch_name FROM gaps_index "
+            "WHERE status = 'qa' AND instance_id = ? "
             "ORDER BY updated ASC",
             (project_state.active_instance_id(),),
         ).fetchall()
         for row in rows:
             if self.sub_mgr.is_running(row["id"]):
                 continue
-            self._promote_quality_bypass(conn, row["id"])
+            if row["branch_name"]:
+                self._promote_quality_bypass(conn, row["id"])
+            else:
+                self._promote_post_rebuild_quality_bypass(conn, row["id"])
 
     def _promote_quality_bypass(self, conn: sqlite3.Connection, gap_id: str) -> None:
         active_instance = project_state.active_instance_id()
@@ -367,6 +378,66 @@ class Dispatcher:
                 self.on_run_finished(gap_id)
             except Exception:
                 pass
+
+    def _promote_post_rebuild_quality_bypass(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+    ) -> None:
+        active_instance = project_state.active_instance_id()
+        with db.transaction(conn):
+            cur = conn.execute(
+                "UPDATE gaps_index SET status = 'review', updated = ? "
+                "WHERE id = ? AND status = 'qa' AND branch_name IS NULL "
+                "AND instance_id = ?",
+                (now_iso(), gap_id, active_instance),
+            )
+        if not cur.rowcount:
+            return
+        fields = {
+            "quality_state": "passed",
+            "quality_message": "Quality disabled; post-rebuild QA bypassed.",
+            "quality_details": "",
+            "quality_checked_at": now_iso(),
+        }
+        try:
+            gap_writer.update_fields(gap_id, status="review", branch_name=None)
+            gap_writer.set_latest_round_quality(gap_id, fields)
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="quality",
+                actor="runner",
+                message="Quality disabled; post-rebuild QA bypassed",
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="state",
+                actor="runner",
+                message="Workflow status changed: qa → review; quality disabled",
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message="Quality disabled; post-rebuild QA bypassed",
+            severity="info",
+            category="quality",
+            gap_id=gap_id,
+            actor="runner",
+        )
+
+    def _post_rebuild_quality_active(self, conn: sqlite3.Connection) -> bool:
+        row = conn.execute(
+            "SELECT COUNT(DISTINCT r.gap_id) AS n "
+            "FROM runs r JOIN gaps_index g ON g.id = r.gap_id "
+            "WHERE r.status = 'running' AND r.kind = 'quality' "
+            "AND g.status = 'qa' AND g.branch_name IS NULL "
+            "AND g.instance_id = ?",
+            (project_state.active_instance_id(),),
+        ).fetchone()
+        return bool(int(row["n"] if row else 0))
 
     def _launch_one(self, conn: sqlite3.Connection, gap_id: str,
                     existing_branch: str | None) -> None:
@@ -578,15 +649,9 @@ class Dispatcher:
         conn: sqlite3.Connection,
         gap_id: str,
         branch_name: str | None,
-    ) -> None:
+    ) -> bool:
         if not branch_name:
-            self._fail_quality(
-                conn,
-                gap_id,
-                "Quality cannot run because the Gap has no branch recorded.",
-                category="state",
-            )
-            return
+            return self._launch_post_rebuild_quality(conn, gap_id)
         worktree_root = git_ops.gap_worktree_path(gap_id)
         if not worktree_root.exists():
             self._fail_quality(
@@ -595,7 +660,7 @@ class Dispatcher:
                 "Quality cannot run because the Gap worktree is missing.",
                 category="git",
             )
-            return
+            return True
         gap = read_gap_json(gap_id, include_logs=False)
         if not gap or not gap.get("rounds"):
             self._fail_quality(
@@ -604,7 +669,7 @@ class Dispatcher:
                 "Quality cannot run because the Gap has no rounds.",
                 category="state",
             )
-            return
+            return True
         round_idx = len(gap["rounds"]) - 1
         rev = git_ops._run(["rev-parse", "HEAD"], cwd=worktree_root)
         if not rev.ok:
@@ -615,7 +680,7 @@ class Dispatcher:
                 category="git",
                 details=rev.stderr or rev.stdout,
             )
-            return
+            return True
         base_commit = rev.stdout.strip()
         regression_result = None
         if regressions.enabled(conn):
@@ -742,6 +807,148 @@ class Dispatcher:
                 f"Quality subprocess failed to start: {e!r}",
                 category="cli",
             )
+        return True
+
+    def _launch_post_rebuild_quality(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+    ) -> bool:
+        if self.target_app_lock is not None:
+            acquired = self.target_app_lock.acquire(blocking=False)
+            if not acquired:
+                return False
+        else:
+            acquired = False
+        worktree_root = git_ops.client_repo_path()
+        gap = read_gap_json(gap_id, include_logs=False)
+        if not gap or not gap.get("rounds"):
+            if acquired:
+                self.target_app_lock.release()
+            self._fail_quality(
+                conn,
+                gap_id,
+                "Quality cannot run because the Gap has no rounds.",
+                category="state",
+                revert_post_rebuild=True,
+            )
+            return True
+        round_idx = len(gap["rounds"]) - 1
+        base_commit = git_ops.rev_parse("HEAD", cwd=worktree_root) or "HEAD"
+        regression_result = None
+        if regressions.enabled(conn):
+            regression_result = regressions.run_all(
+                conn,
+                target_root=worktree_root,
+            )
+            try:
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="info" if regression_result.get("ok") else "warn",
+                    category="quality",
+                    actor="runner",
+                    message=(
+                        "Managed regression checks completed: "
+                        f"{regression_result.get('message') or 'complete'}"
+                    ),
+                    details=regressions.summarize_for_prompt(regression_result),
+                )
+            except Exception:
+                pass
+            activity.append(
+                conn,
+                message=(
+                    "Managed regression checks completed: "
+                    f"{regression_result.get('message') or 'complete'}"
+                ),
+                severity="info" if regression_result.get("ok") else "warn",
+                category="quality",
+                gap_id=gap_id,
+                actor="runner",
+                details=regressions.summarize_for_prompt(regression_result),
+            )
+        prompt = quality.format_prompt(
+            gap,
+            settings=quality.load_settings(conn),
+            regression_result=regression_result,
+            timing_value=quality.POST_REBUILD,
+        )
+        try:
+            gap_writer.set_latest_round_quality(
+                gap_id,
+                {
+                    "quality_state": "unclassified",
+                    "quality_message": "Post-rebuild QA started.",
+                    "quality_details": "",
+                    "quality_checked_at": "",
+                },
+            )
+            gap_writer.append_latest_round_log(
+                gap_id=gap_id,
+                severity="info",
+                category="quality",
+                actor="runner",
+                message="Post-rebuild QA started",
+            )
+        except Exception:
+            pass
+        activity.append(
+            conn,
+            message="Post-rebuild QA started",
+            severity="info",
+            category="quality",
+            gap_id=gap_id,
+            actor="runner",
+        )
+        idle = db.get_setting_int(conn, "agent_idle_timeout_seconds", 900)
+        hard_cap = db.get_setting_int(conn, "agent_hard_cap_seconds", 86400)
+        agent_subpath = db.get_setting(conn, "agent_subpath") or ""
+        agent_cwd = git_ops.apply_agent_subpath(
+            worktree_root,
+            agent_subpath,
+            log=lambda msg: activity.append(
+                conn,
+                message=f"agent_subpath: {msg}",
+                severity="warn",
+                category="state",
+                gap_id=gap_id,
+                actor="runner",
+            ),
+        )
+        try:
+            self.sub_mgr.launch(
+                gap_id=gap_id,
+                round_idx=round_idx,
+                prompt=prompt,
+                cwd=agent_cwd,
+                base_ref=base_commit,
+                idle_window=idle,
+                hard_cap=hard_cap,
+                kind="quality",
+                on_finished=(
+                    lambda gid, code, reason, agent_ok, failure_text="": self._finish_post_rebuild_quality(
+                        gid,
+                        round_idx,
+                        code,
+                        reason,
+                        base_commit,
+                        acquired,
+                        agent_reported_success=agent_ok,
+                        failure_text=failure_text,
+                    )
+                ),
+            )
+        except Exception as e:
+            if acquired:
+                self.target_app_lock.release()
+            self._fail_quality(
+                conn,
+                gap_id,
+                f"Post-rebuild QA subprocess failed to start: {e!r}",
+                category="cli",
+                revert_post_rebuild=True,
+            )
+        return True
 
     def _reserve_in_progress_slot(
         self,
@@ -922,9 +1129,13 @@ class Dispatcher:
         success = outcome.kind == "success"
 
         # Failure path: move straight to `failed` and we're done.
-        # Success path: transition to `qa`; Quality owns the pre-merge
-        # validation pass and promotes to `ready-merge` only after it passes.
-        next_status = "qa" if success else "failed"
+        # Success path depends on Quality timing. Pre-merge Quality waits in
+        # `qa`; post-rebuild Quality lets the Merger land work first and runs
+        # after the shared target app is rebuilt.
+        if success and quality.enabled(conn) and quality.post_rebuild(conn):
+            next_status = "ready-merge"
+        else:
+            next_status = "qa" if success else "failed"
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = ?, updated = ? "
@@ -973,8 +1184,14 @@ class Dispatcher:
             self._promote_quality_bypass(conn, gap_id)
             return
 
-        # Passing implementation now waits in `qa`; the Quality run will
-        # wake the Merger after it promotes the Gap to `ready-merge`.
+        if success and next_status == "ready-merge" and self.on_run_finished is not None:
+            try:
+                self.on_run_finished(gap_id)
+            except Exception:
+                pass
+
+        # Passing pre-merge implementation now waits in `qa`; the Quality run
+        # will wake the Merger after it promotes the Gap to `ready-merge`.
 
     def _on_quality_finished(
         self,
@@ -986,10 +1203,18 @@ class Dispatcher:
         *,
         agent_reported_success: bool | None = None,
         failure_text: str | None = None,
+        post_rebuild: bool = False,
     ) -> None:
         conn = self.get_conn()
         if killed_reason in _RESET_TO_TODO_REASONS:
-            self._reset_stopped_quality(conn, gap_id, round_idx, killed_reason, base_commit)
+            self._reset_stopped_quality(
+                conn,
+                gap_id,
+                round_idx,
+                killed_reason,
+                base_commit,
+                post_rebuild=post_rebuild,
+            )
             return
 
         outcome = classify_outcome(
@@ -1000,7 +1225,9 @@ class Dispatcher:
             failure_text=failure_text,
         )
         success = outcome.kind == "success"
-        if success:
+        if post_rebuild:
+            self._discard_post_rebuild_quality_changes(base_commit)
+        elif success:
             commit = self._commit_quality_changes(gap_id)
             if not commit.get("ok"):
                 outcome = type(outcome)(
@@ -1013,7 +1240,9 @@ class Dispatcher:
                 )
                 success = False
 
-        next_status = "ready-merge" if success else "failed"
+        next_status = "review" if post_rebuild and success else (
+            "ready-merge" if success else "failed"
+        )
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = ?, updated = ? "
@@ -1026,7 +1255,11 @@ class Dispatcher:
         fields = {
             "quality_state": "passed" if success else "failed",
             "quality_message": (
-                "Quality passed." if success
+                (
+                    "Post-rebuild QA passed; Gap is ready for review."
+                    if post_rebuild
+                    else "Quality passed."
+                ) if success
                 else (outcome.message or "Quality failed.")
             ),
             "quality_details": outcome.details or "",
@@ -1065,11 +1298,47 @@ class Dispatcher:
         )
         if outcome.limit_kind:
             self._pause_after_limit_failure(conn, outcome.limit_kind, gap_id=gap_id)
-        if success and self.on_run_finished is not None:
+        if post_rebuild and not success and self.on_post_rebuild_quality_failed is not None:
+            try:
+                self.on_post_rebuild_quality_failed(
+                    gap_id,
+                    fields["quality_message"],
+                    fields["quality_details"],
+                )
+            except Exception:
+                pass
+        if success and not post_rebuild and self.on_run_finished is not None:
             try:
                 self.on_run_finished(gap_id)
             except Exception:
                 pass
+
+    def _finish_post_rebuild_quality(
+        self,
+        gap_id: str,
+        round_idx: int,
+        exit_code: int,
+        killed_reason: str | None,
+        base_commit: str,
+        release_target_lock: bool,
+        *,
+        agent_reported_success: bool | None = None,
+        failure_text: str | None = None,
+    ) -> None:
+        try:
+            self._on_quality_finished(
+                gap_id,
+                round_idx,
+                exit_code,
+                killed_reason,
+                base_commit,
+                agent_reported_success=agent_reported_success,
+                failure_text=failure_text,
+                post_rebuild=True,
+            )
+        finally:
+            if release_target_lock and self.target_app_lock is not None:
+                self.target_app_lock.release()
 
     def _commit_quality_changes(self, gap_id: str) -> dict:
         cwd = git_ops.gap_worktree_path(gap_id)
@@ -1089,6 +1358,11 @@ class Dispatcher:
             }
         return {"ok": True, "message": "Quality changes committed."}
 
+    def _discard_post_rebuild_quality_changes(self, base_commit: str) -> None:
+        repo = git_ops.client_repo_path()
+        git_ops.reset_hard(base_commit, cwd=repo)
+        git_ops._run(["clean", "-fd", "--", ".", ":!.refine"], cwd=repo)
+
     def _fail_quality(
         self,
         conn: sqlite3.Connection,
@@ -1097,6 +1371,7 @@ class Dispatcher:
         *,
         category: str,
         details: str | None = None,
+        revert_post_rebuild: bool = False,
     ) -> None:
         with db.transaction(conn):
             cur = conn.execute(
@@ -1142,6 +1417,15 @@ class Dispatcher:
             actor="runner",
             details=details,
         )
+        if revert_post_rebuild and self.on_post_rebuild_quality_failed is not None:
+            try:
+                self.on_post_rebuild_quality_failed(
+                    gap_id,
+                    fields["quality_message"],
+                    fields["quality_details"],
+                )
+            except Exception:
+                pass
 
     def _agent_limit_pause_active(self, conn: sqlite3.Connection) -> bool:
         raw = db.get_setting(conn, _LIMIT_PAUSE_UNTIL_KEY, "") or ""
@@ -1243,10 +1527,15 @@ class Dispatcher:
         round_idx: int,
         reason: str,
         base_commit: str,
+        *,
+        post_rebuild: bool = False,
     ) -> None:
-        cwd = git_ops.gap_worktree_path(gap_id)
-        git_ops._run(["reset", "--hard", base_commit], cwd=cwd)
-        git_ops._run(["clean", "-fd"], cwd=cwd)
+        cwd = git_ops.client_repo_path() if post_rebuild else git_ops.gap_worktree_path(gap_id)
+        git_ops.reset_hard(base_commit, cwd=cwd)
+        if post_rebuild:
+            git_ops._run(["clean", "-fd", "--", ".", ":!.refine"], cwd=cwd)
+        else:
+            git_ops.clean_untracked(cwd=cwd)
         if reason == "priority_preempted":
             message = (
                 "Quality run stopped because higher-priority Gap work is blocking "

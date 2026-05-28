@@ -287,6 +287,7 @@ DEFAULT_SETTINGS = {
     "quality_business_requirements": "",
     "quality_instructions": "",
     "quality_enabled": "0",
+    "quality_timing": "pre_merge",
     # Target-application management. New installs use structured one-line
     # shell commands and checks. The legacy prose settings stay present so
     # old databases can display and convert existing configuration.

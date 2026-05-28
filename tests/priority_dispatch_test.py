@@ -195,9 +195,10 @@ def main() -> int:
         insert_gap("qa-b", "qa", "high", "refine/qa-b")
         quality_launched: list[str] = []
 
-        def launch_quality(_conn, gap_id: str, _branch: str | None) -> None:
+        def launch_quality(_conn, gap_id: str, _branch: str | None) -> bool:
             quality_launched.append(gap_id)
             insert_running_run(gap_id, kind="quality")
+            return True
 
         dispatcher._launch_quality = launch_quality  # type: ignore[method-assign]
         db.set_setting(conn, "parallel_run_cap", "4")
