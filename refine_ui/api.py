@@ -3885,6 +3885,7 @@ def process_summary() -> tuple[int, dict]:
                 "down if either exits."
             ),
             "background_processes_stopped": background_stopped,
+            "agents_paused": agents_paused,
             "actions": [
                 "start_background_processes"
                 if background_stopped

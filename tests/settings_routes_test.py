@@ -426,6 +426,7 @@ def main() -> int:
     assert 'api("POST", "/api/processes/background", { stopped: shouldStop })' in processes_body
     assert 'data-toggle-agent-processes' in processes_body
     assert '${agentsPaused ? "Unpause" : "Pause"} agents</button>' in processes_body
+    assert processes_body.index('if (proc.kind === "supervisor")') < processes_body.index('if (proc.kind === "agent_scheduler")')
     assert 'api("POST", "/api/processes/agents", { paused: shouldPause })' in processes_body
     assert 'title: "Pause agents", okLabel: "Pause agents"' in processes_body
     assert 'title: "Pause or unpause agents"' in commands_js

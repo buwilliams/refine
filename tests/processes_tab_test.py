@@ -196,6 +196,7 @@ def main() -> int:
         assert supervisor["pid"] == 3030, supervisor
         assert "Supervises the UI and runner worker processes" in supervisor["details"], supervisor
         assert supervisor["background_processes_stopped"] is True, supervisor
+        assert supervisor["agents_paused"] is False, supervisor
         assert supervisor["actions"] == ["start_background_processes"], supervisor
         assert stop_status == 200, stop_body
         assert stop_body["stopped"] is True, stop_body

@@ -362,7 +362,10 @@ function processStatusLabel(status) {
 function renderProcessActions(proc) {
   if (proc.kind === "supervisor") {
     const stopped = !!proc.background_processes_stopped;
-    return `<button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
+    const agentsPaused = !!proc.agents_paused;
+    return `
+      <button class="${agentsPaused ? "" : "secondary"}" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}">${agentsPaused ? "Unpause" : "Pause"} agents</button>
+      <button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
   }
   if (proc.kind === "agent_scheduler") {
     const agentsPaused = !!proc.agents_paused;
