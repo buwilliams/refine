@@ -87,7 +87,10 @@ class Dispatcher:
 
     def _tick(self) -> None:
         conn = self.get_conn()
-        paused = db.get_setting_int(conn, "paused", 0)
+        paused = (
+            db.get_setting_int(conn, "paused", 0)
+            or db.get_setting_int(conn, "agents_paused", 0)
+        )
         if paused:
             self._stop_running_agents(reason="paused")
             return

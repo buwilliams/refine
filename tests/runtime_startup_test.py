@@ -17,13 +17,16 @@ def test_configured_app_start_resumes_agents() -> None:
         from refine_ui import runtime
 
         db.set_setting(conn, "paused", "1")
+        db.set_setting(conn, "agents_paused", "1")
         runtime.load_configured(
             client / ".refine" / "refine.toml",
             start_poller=False,
             start_runner=False,
         )
         assert db.get_setting(conn, "paused") == "0"
+        assert db.get_setting(conn, "agents_paused") == "0"
         assert project_state.list_settings()["paused"] == "0"
+        assert project_state.list_settings()["agents_paused"] == "0"
     finally:
         try:
             from refine_ui import runtime

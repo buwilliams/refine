@@ -115,6 +115,24 @@ def _background_processes_stopped() -> bool:
         conn.close()
 
 
+def _agents_paused(conn: sqlite3.Connection | None = None) -> bool:
+    close_conn = False
+    if conn is None:
+        try:
+            conn = _conn()
+        except sqlite3.Error:
+            return False
+        close_conn = True
+    try:
+        return (
+            (db.get_setting(conn, "paused") or "0") == "1"
+            or (db.get_setting(conn, "agents_paused") or "0") == "1"
+        )
+    finally:
+        if close_conn:
+            conn.close()
+
+
 def _background_processes_stopped_response() -> tuple[int, dict] | None:
     if not _background_processes_stopped():
         return None
@@ -1065,7 +1083,7 @@ def _should_enforce_after_instance_transfer(gap_ids: list[str]) -> bool:
     placeholders = ",".join("?" * len(gap_ids))
     conn = _conn()
     try:
-        if (db.get_setting(conn, "paused") or "0") == "1":
+        if _agents_paused(conn):
             return False
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
@@ -1107,8 +1125,8 @@ def _cancel_active_transfer_gaps(
 ) -> dict[str, Any]:
     conn = _conn()
     try:
-        project_state.set_setting("paused", "1")
-        db.set_setting(conn, "paused", "1")
+        project_state.set_setting("agents_paused", "1")
+        db.set_setting(conn, "agents_paused", "1")
         where = ["status IN ('in-progress', 'qa', 'ready-merge', 'awaiting-rebuild')"]
         args: list[Any] = []
         if source_instance_id:
@@ -2460,7 +2478,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
                     "WHERE id = ? AND instance_id = ?",
                     args,
                 )
-                paused_after_update = (db.get_setting(conn, "paused") or "0") == "1"
+                paused_after_update = _agents_paused(conn)
         finally:
             conn.close()
         if not cur.rowcount:
@@ -3830,7 +3848,9 @@ def process_summary() -> tuple[int, dict]:
     conn = _conn()
     try:
         settings = db.list_settings(conn)
-        paused = (db.get_setting(conn, "paused") or "0") == "1"
+        background_stopped = (db.get_setting(conn, "paused") or "0") == "1"
+        agents_paused = (db.get_setting(conn, "agents_paused") or "0") == "1"
+        agent_processes_paused = background_stopped or agents_paused
         target_app = _target_app_snapshot(conn)
     finally:
         conn.close()
@@ -3864,8 +3884,12 @@ def process_summary() -> tuple[int, dict]:
                 "Supervises the UI and runner worker processes; shuts Refine "
                 "down if either exits."
             ),
-            "background_processes_stopped": paused,
-            "actions": ["start_background_processes" if paused else "stop_background_processes"],
+            "background_processes_stopped": background_stopped,
+            "actions": [
+                "start_background_processes"
+                if background_stopped
+                else "stop_background_processes"
+            ],
             **no_caps,
         })
     processes.extend([
@@ -3908,7 +3932,7 @@ def process_summary() -> tuple[int, dict]:
     governance = runner_snap.get("governance") or None
     target_app_rebuild = runner_snap.get("target_app_rebuild") or None
     runner_work = _runner_work_summary(
-        merger, governance, target_app_rebuild, paused=paused,
+        merger, governance, target_app_rebuild, paused=background_stopped,
     )
 
     for chat in runner_snap.get("chat") or []:
@@ -3948,7 +3972,10 @@ def process_summary() -> tuple[int, dict]:
         })
 
     return 200, {
-        "paused": paused,
+        "paused": agent_processes_paused,
+        "agents_paused": agents_paused,
+        "agent_processes_paused": agent_processes_paused,
+        "background_processes_stopped": background_stopped,
         "backend": backend,
         "runner_reachable": runner_reachable,
         "processes": processes,
@@ -4019,6 +4046,63 @@ def set_background_processes(body: dict | None = None) -> tuple[int, dict]:
         "paused": stopped,
         "runner": runner_result,
         "cancelled_background_jobs": len(cancelled_jobs),
+        "processes": summary.get("processes") or [],
+        "runner_work": summary.get("runner_work") or [],
+        "runner_reachable": summary.get("runner_reachable"),
+    }
+
+
+def set_agent_processes(body: dict | None = None) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    body = body or {}
+    conn = _conn()
+    try:
+        current_paused = (db.get_setting(conn, "agents_paused") or "0") == "1"
+        paused = (
+            not current_paused
+            if "paused" not in body
+            else str(body.get("paused")).strip().lower() in {"1", "true", "yes", "on"}
+        )
+        db.set_setting(conn, "agents_paused", "1" if paused else "0")
+        project_state.set_setting("agents_paused", "1" if paused else "0")
+        activity.append(
+            conn,
+            message="Agents paused" if paused else "Agents unpaused",
+            severity="warn" if paused else "info",
+            category="state",
+            actor="refine",
+        )
+    finally:
+        conn.close()
+
+    try:
+        runner_result = get_client().call(
+            M_ENFORCE_SCHEDULING,
+            {"settle_timeout_seconds": 8.0},
+            timeout=30.0 if paused else 10.0,
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    if paused and not runner_result.get("ok", True):
+        cleanup = runner_result.get("cleanup") or {}
+        return err(
+            409,
+            cleanup.get("message") or (
+                "agents paused but target worktree cleanup did not complete"
+            ),
+        )
+
+    status, summary = process_summary()
+    if status != 200:
+        summary = {}
+    return 200, {
+        "paused": paused,
+        "agents_paused": paused,
+        "agent_processes_paused": summary.get("agent_processes_paused", paused),
+        "background_processes_stopped": summary.get("background_processes_stopped"),
+        "runner": runner_result,
         "processes": summary.get("processes") or [],
         "runner_work": summary.get("runner_work") or [],
         "runner_reachable": summary.get("runner_reachable"),

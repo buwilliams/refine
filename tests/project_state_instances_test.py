@@ -64,10 +64,14 @@ def main() -> int:
         assert reporters.list_all(conn)[0]["name"] == "Jane"
 
         db.set_setting(conn, "paused", "1")
+        db.set_setting(conn, "agents_paused", "1")
         assert project_state.list_settings()["paused"] == "1"
+        assert project_state.list_settings()["agents_paused"] == "1"
         assert project_state.resume_agents_for_startup(conn) is True
         assert db.get_setting(conn, "paused") == "0"
+        assert db.get_setting(conn, "agents_paused") == "0"
         assert project_state.list_settings()["paused"] == "0"
+        assert project_state.list_settings()["agents_paused"] == "0"
         assert project_state.resume_agents_for_startup(conn) is False
 
         reporters.add(conn, "Alex")

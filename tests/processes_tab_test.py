@@ -17,7 +17,9 @@ def main() -> int:
     conn = init_refine(client)
     try:
         from refine_server import db
-        from refine_server.backend_protocol import M_BACKGROUND_PROCESSES_SET
+        from refine_server.backend_protocol import (
+            M_BACKGROUND_PROCESSES_SET, M_ENFORCE_SCHEDULING,
+        )
         from refine_ui import api, background_jobs, runtime
 
         db.set_setting(conn, "paused", "1")
@@ -41,6 +43,13 @@ def main() -> int:
             def call(self, method: str, params: dict, timeout: float | None = None) -> dict:
                 calls.append((method, params))
                 return {"ok": True, "stopped": bool(params.get("stopped"))}
+
+        def setting_value(key: str) -> str | None:
+            fresh = db.connect()
+            try:
+                return db.get_setting(fresh, key)
+            finally:
+                fresh.close()
 
         def fake_snapshot() -> dict:
             return {
@@ -156,6 +165,13 @@ def main() -> int:
                     break
                 time.sleep(0.05)
             start_status, start_body = api.set_background_processes({"stopped": False})
+            agent_pause_status, agent_pause_body = api.set_agent_processes({"paused": True})
+            paused_setting_after_agent_pause = setting_value("agents_paused")
+            background_setting_after_agent_pause = setting_value("paused")
+            rebuild_while_agents_paused = api.target_app_rebuild_queue({})
+            agent_unpause_status, agent_unpause_body = api.set_agent_processes({
+                "paused": False,
+            })
         finally:
             runtime.runner_status_snapshot = original_snapshot  # type: ignore[assignment]
             api._active_background_job = original_active_background_job  # type: ignore[attr-defined]
@@ -192,10 +208,24 @@ def main() -> int:
         assert create_status == 201, create_body
         assert start_status == 200, start_body
         assert start_body["stopped"] is False, start_body
+        assert setting_value("paused") == "0"
+        assert agent_pause_status == 200, agent_pause_body
+        assert agent_pause_body["agents_paused"] is True, agent_pause_body
+        assert paused_setting_after_agent_pause == "1"
+        assert background_setting_after_agent_pause == "0"
+        assert rebuild_while_agents_paused[0] != 409, rebuild_while_agents_paused
+        assert agent_unpause_status == 200, agent_unpause_body
+        assert agent_unpause_body["agents_paused"] is False, agent_unpause_body
+        assert setting_value("agents_paused") == "0"
         background_calls = [call for call in calls if call[0] == M_BACKGROUND_PROCESSES_SET]
         assert background_calls == [
             (M_BACKGROUND_PROCESSES_SET, {"stopped": True}),
             (M_BACKGROUND_PROCESSES_SET, {"stopped": False}),
+        ], calls
+        enforce_calls = [call for call in calls if call[0] == M_ENFORCE_SCHEDULING]
+        assert enforce_calls == [
+            (M_ENFORCE_SCHEDULING, {"settle_timeout_seconds": 8.0}),
+            (M_ENFORCE_SCHEDULING, {"settle_timeout_seconds": 8.0}),
         ], calls
         runner = next(p for p in body["processes"] if p["kind"] == "runner")
         assert runner["pid"] == 3131, runner

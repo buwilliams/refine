@@ -252,6 +252,12 @@ class Runner:
             ),
         }
 
+    def _agents_paused(self) -> bool:
+        return bool(
+            db.get_setting_int(self._conn, "paused", 0)
+            or db.get_setting_int(self._conn, "agents_paused", 0)
+        )
+
     def _h_hard_reset_worktree(self, _: dict) -> dict:
         stopped = self._background_processes_stopped()
         if stopped is not None:
@@ -339,7 +345,7 @@ class Runner:
         return {"queued": True}
 
     def _h_enforce_scheduling(self, params: dict) -> dict:
-        if db.get_setting_int(self._conn, "paused", 0):
+        if self._agents_paused():
             killed, still_running = self.sub_mgr.cancel_all_and_wait(
                 "paused",
                 timeout=float(params.get("settle_timeout_seconds") or 8.0),

@@ -261,6 +261,17 @@ def main() -> int:
         db.set_setting(conn, "paused", "0")
 
         reset()
+        insert_gap("agent-paused-running", "in-progress", "low",
+                   "refine/agent-paused-running")
+        fake.running = ["agent-paused-running"]
+        db.set_setting(conn, "agents_paused", "1")
+        dispatcher._tick()
+        assert fake.cancel_calls == [
+            ("agent-paused-running", "paused"),
+        ], fake.cancel_calls
+        db.set_setting(conn, "agents_paused", "0")
+
+        reset()
         insert_gap("low-running", "in-progress", "low", "refine/low-running")
         dispatcher._on_finished(
             "low-running",

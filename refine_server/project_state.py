@@ -53,6 +53,7 @@ RUNTIME_SETTING_KEYS = {
     "backlog_promote_after_seconds",
     "project_update_pulse_interval_seconds",
     "file_browser_ignore_patterns",
+    "agents_paused",
     "paused",
     "agent_cli",
 }
@@ -101,7 +102,9 @@ TARGET_APP_SETTING_KEYS = TARGET_APP_CONFIG_SETTING_KEYS | TARGET_APP_RUNTIME_SE
 APPLICATION_COPY_SETTING_KEYS = (
     APPLICATION_SETTING_KEYS - {"quality_enabled"}
 ) | TARGET_APP_CONFIG_SETTING_KEYS
-RUNTIME_COPY_SETTING_KEYS = RUNTIME_SETTING_KEYS - {"agent_cli", "paused"}
+RUNTIME_COPY_SETTING_KEYS = RUNTIME_SETTING_KEYS - {
+    "agent_cli", "agents_paused", "paused",
+}
 
 
 def volume_root() -> Path:
@@ -626,9 +629,12 @@ def resume_agents_for_startup(conn: sqlite3.Connection | None = None) -> bool:
     try:
         ensure_sqlite_cache_current(conn)
         was_paused = (db.get_setting(conn, "paused") or "0") == "1"
+        agents_were_paused = (db.get_setting(conn, "agents_paused") or "0") == "1"
         if was_paused:
             db.set_setting(conn, "paused", "0")
-        return was_paused
+        if agents_were_paused:
+            db.set_setting(conn, "agents_paused", "0")
+        return was_paused or agents_were_paused
     finally:
         if close_conn:
             conn.close()

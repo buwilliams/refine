@@ -98,7 +98,8 @@ def main() -> int:
         methods = [m for m, _ in fake.calls]
         assert methods[0] == M_CANCEL_ALL, methods
         assert methods.count(M_CANCEL) == 2, methods
-        assert db.get_setting(conn, "paused") == "1"
+        assert db.get_setting(conn, "agents_paused") == "1"
+        assert db.get_setting(conn, "paused") == "0"
 
         rows = {
             row["id"]: (row["status"], row["instance_id"])

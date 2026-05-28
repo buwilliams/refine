@@ -155,8 +155,10 @@ def main() -> int:
     assert 'api("GET", "/api/processes")' in settings_js
     assert '@route("GET", r"/api/processes")' in server_py
     assert '@route("POST", r"/api/processes/background")' in server_py
+    assert '@route("POST", r"/api/processes/agents")' in server_py
     assert "def process_summary" in api_py
     assert "def set_background_processes" in api_py
+    assert "def set_agent_processes" in api_py
     assert "def _background_processes_stopped_response" in api_py
     assert "background_processes_stopped" in api_py
     assert 'allow_busy_when=lambda _owner: _background_processes_stopped()' in api_py
@@ -422,6 +424,12 @@ def main() -> int:
     assert '${stopped ? "Start" : "Stop"} Background</button>' in processes_body
     assert '${stopped ? "Start" : "Stop"} Background Processes' not in processes_body
     assert 'api("POST", "/api/processes/background", { stopped: shouldStop })' in processes_body
+    assert 'data-toggle-agent-processes' in processes_body
+    assert '${agentsPaused ? "Unpause" : "Pause"} agents</button>' in processes_body
+    assert 'api("POST", "/api/processes/agents", { paused: shouldPause })' in processes_body
+    assert 'title: "Pause agents", okLabel: "Pause agents"' in processes_body
+    assert 'title: "Pause or unpause agents"' in commands_js
+    assert 'api("POST", "/api/processes/agents", { paused: !agentsPaused })' in commands_js
     assert "scheduleProcessesTabRefreshes()" in commands_js
     assert "function scheduleProcessesTabRefreshes()" in processes_body
     assert '[data-tab-pane="processes"].active' in processes_body

@@ -3,9 +3,12 @@
 let supervisorProcessExpanded = false;
 
 function renderProcessesTab(processData, settings, diag, dash) {
-  const paused = typeof processData.paused === "boolean"
-    ? processData.paused
+  const backgroundStopped = typeof processData.background_processes_stopped === "boolean"
+    ? processData.background_processes_stopped
     : settings.paused === "1";
+  const agentsPaused = typeof processData.agents_paused === "boolean"
+    ? processData.agents_paused
+    : settings.agents_paused === "1";
   const backend = processData.backend || diag.backend || dash.backend || {};
   const processes = processData.processes || [];
   const runnerWork = processData.runner_work || [];
@@ -14,7 +17,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     : !!diag.reachable;
   const anchorMs = Date.now();
   const rows = buildManagedProcessRows(
-    processes, paused, backend, runnerReachable, diag,
+    processes, { backgroundStopped, agentsPaused }, backend, runnerReachable, diag,
   ).map((proc) => renderManagedProcessRow(proc)).join("");
   const agentRows = (processes || [])
     .filter((proc) => proc.kind === "agent" || proc.kind === "chat")
@@ -87,7 +90,9 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>`;
 }
 
-function buildManagedProcessRows(processes, paused, backend, runnerReachable, diag) {
+function buildManagedProcessRows(processes, pauseState, backend, runnerReachable, diag) {
+  const backgroundStopped = !!pauseState.backgroundStopped;
+  const agentsPaused = !!pauseState.agentsPaused;
   const rows = (processes || [])
     .filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")
     .map((proc) => {
@@ -101,28 +106,47 @@ function buildManagedProcessRows(processes, paused, backend, runnerReachable, di
     id: "background-processes",
     kind: "background_processes",
     label: "Background processes",
-    status: paused ? "paused" : "active",
+    status: backgroundStopped ? "paused" : "active",
     runner_reachable: runnerReachable,
     pid: null,
-    details: paused
+    details: backgroundStopped
       ? "Automatic runner work, agent launches, chats, and UI background jobs are stopped."
       : "Automatic runner work, agent launches, chats, and UI background jobs can run.",
-    background_processes_stopped: paused,
-    actions: [paused ? "start_background_processes" : "stop_background_processes", "hard_reset_worktree"],
+    background_processes_stopped: backgroundStopped,
+    actions: [backgroundStopped ? "start_background_processes" : "stop_background_processes", "hard_reset_worktree"],
+    cpu_priority: { label: "-" },
+    max_memory: { label: "-" },
+  };
+  const agentScheduler = {
+    id: "agent-scheduler",
+    kind: "agent_scheduler",
+    label: "Agent scheduler",
+    status: backgroundStopped || agentsPaused ? "paused" : "active",
+    runner_reachable: runnerReachable,
+    pid: null,
+    details: backgroundStopped
+      ? "Background processes are stopped; agent launches wait."
+      : agentsPaused
+        ? "New agent subprocesses wait; running subprocesses are cancelled."
+        : "New agent subprocesses launch on demand.",
+    agents_paused: agentsPaused,
+    background_processes_stopped: backgroundStopped,
+    actions: [agentsPaused ? "unpause_agents" : "pause_agents"],
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
   return orderManagedProcessRows(
-    rows, background, backend.process_model === "supervisor",
+    rows, agentScheduler, background, backend.process_model === "supervisor",
   );
 }
 
-function orderManagedProcessRows(rows, background, supervised) {
+function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
   const targetApp = rows.find((proc) => proc.kind === "target_app");
   const targetAppId = targetApp ? targetApp.id : null;
   if (!supervised) {
     return [
       ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
+      agentScheduler,
       background,
       ...(targetApp ? [targetApp] : []),
     ];
@@ -131,13 +155,15 @@ function orderManagedProcessRows(rows, background, supervised) {
   if (!supervisor) {
     return [
       ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
-      scheduler,
+      agentScheduler,
+      background,
       ...(targetApp ? [targetApp] : []),
     ];
   }
   const childKinds = new Set(["ui", "runner"]);
   const children = [
     ...rows.filter((proc) => childKinds.has(proc.kind)),
+    agentScheduler,
     background,
   ].map((proc) => ({
     ...proc,
@@ -307,6 +333,7 @@ function processKindLabel(kind) {
     runner: "runner",
     target_app: "application",
     agent_scheduler: "agent scheduler",
+    background_processes: "background processes",
     agent: "agent",
     chat: "chat",
   }[kind] || "process";
@@ -336,6 +363,11 @@ function renderProcessActions(proc) {
   if (proc.kind === "supervisor") {
     const stopped = !!proc.background_processes_stopped;
     return `<button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
+  }
+  if (proc.kind === "agent_scheduler") {
+    const agentsPaused = !!proc.agents_paused;
+    return `
+      <button class="${agentsPaused ? "" : "secondary"}" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}" ${proc.runner_reachable ? "" : "disabled"}>${agentsPaused ? "Unpause" : "Pause"} agents</button>`;
   }
   if (proc.kind === "background_processes") {
     const paused = proc.status === "paused";
@@ -699,6 +731,26 @@ function bindSettingsProcessesTab(s) {
           await refreshProcessesSettingsTab({ force: true });
           if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
           if (!shouldStop) scheduleProcessesTabRefreshes();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$("[data-toggle-agent-processes]").forEach((b) => {
+    b.addEventListener("click", async () => {
+      const shouldPause = b.dataset.toggleAgentProcesses === "pause";
+      const ok = shouldPause
+        ? await modalConfirm(
+            "Pause agent scheduling? Refine will stop running Gap agents and leave other background processes alone.",
+            { title: "Pause agents", okLabel: "Pause agents", danger: true },
+          )
+        : true;
+      if (!ok) return;
+      await withButtonBusy(b, shouldPause ? "Pausing…" : "Unpausing…", async () => {
+        try {
+          await api("POST", "/api/processes/agents", { paused: shouldPause });
+          await refreshProcessesSettingsTab({ force: true });
+          if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
+          if (!shouldPause) scheduleProcessesTabRefreshes();
         } catch (e) { await showActionError(e); }
       });
     });
