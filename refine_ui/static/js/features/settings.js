@@ -126,7 +126,6 @@ async function loadSettingsSurfaceData() {
     instanceCounts: instances.counts || {},
     activeInstanceId,
     activeInstanceLabel,
-    transferTargetInstances: instanceList.filter((inst) => !inst.archived),
     guidanceItems: guidance.guidance || [],
     performance: performance || {},
     performanceBackend: (performance || {}).backend || (diag || {}).backend || {},
@@ -665,7 +664,6 @@ function renderSettingsTabBody(surface, slug, data) {
         instances: data.instances,
         instanceCounts: data.instanceCounts,
         activeInstanceId: data.activeInstanceId,
-        transferTargetInstances: data.transferTargetInstances,
       });
     }
     if (slug === "reporters") {

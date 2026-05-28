@@ -1,7 +1,7 @@
 // ---- System / Instances -----------------------------------------------------
 
 function renderSettingsInstancesTab({
-  instances, instanceCounts, activeInstanceId, transferTargetInstances,
+  instances, instanceCounts, activeInstanceId,
 }) {
   return `
     <section class="settings-section">
@@ -31,26 +31,6 @@ function renderSettingsInstancesTab({
         <button class="secondary" id="s-project-sync-now">Trigger sync repo</button>
         <button id="instance-add">Create instance</button>
       </div>
-    </section>
-    <section class="settings-section">
-      <h3>Transfer Gaps</h3>
-      <p class="muted small" style="margin-top:0">
-        Transfers matching Gaps to another instance. If active work is present,
-        Refine pauses agents, stops agent processes, cancels in-progress, qa,
-        ready-merge, and awaiting-rebuild Gaps, then transfers them.
-      </p>
-      <div class="form-grid two">
-        <div class="form-row"><label>From</label>
-          <select id="instance-transfer-source">
-            <option value="">All instances</option>
-            ${instances.map((inst) => `<option value="${htmlEscape(inst.id)}">${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
-          </select></div>
-        <div class="form-row"><label>To</label>
-          <select id="instance-transfer-target">
-            ${transferTargetInstances.map((inst) => `<option value="${htmlEscape(inst.id)}" ${inst.id === activeInstanceId ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
-          </select></div>
-      </div>
-      <div class="actions"><button class="warn" id="instance-transfer">Transfer matching Gaps</button></div>
     </section>`;
 }
 
@@ -112,39 +92,6 @@ function bindSettingsInstancesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $("#instance-transfer")?.addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    const source = $("#instance-transfer-source")?.value || "";
-    const target = $("#instance-transfer-target")?.value || "";
-    if (!target) return;
-    const ok = await modalConfirm(
-      "Refine will pause agents, stop all running agent processes, mark matching " +
-      "in-progress, qa, ready-merge, and awaiting-rebuild Gaps as cancelled, then transfer all matching " +
-      "Gaps to the selected instance.",
-      {
-        title: "Transfer Gaps",
-        okLabel: "Pause, cancel, and transfer",
-        cancelLabel: "Keep Gaps unchanged",
-        danger: true,
-      },
-    );
-    if (!ok) return;
-    await withButtonBusy(btn, "Transferring...", async () => {
-      try {
-        const r = await api("POST", "/api/instances/transfer-gaps", {
-          source_instance_id: source,
-          target_instance_id: target,
-          cancel_active: true,
-        });
-        toast(
-          `Transferred ${r.updated}; cancelled ${r.cancelled || 0}; ` +
-          `stopped ${r.stopped_processes || 0} processes; skipped ${r.skipped}.`,
-          "info",
-        );
-        await refreshSettingsTab("instances", { force: true });
-      } catch (e) { await showActionError(e); }
-    });
-  });
   $("#s-project-sync-now")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     await withButtonBusy(btn, "Syncing…", async () => {

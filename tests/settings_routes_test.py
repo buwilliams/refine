@@ -428,14 +428,13 @@ def main() -> int:
     assert '@route("POST", r"/api/reporters/(\\d+)/merge")' in server_py
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
-        assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
+    assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
     assert 'slug: "instances"' in settings_js
     assert 'api("GET", "/api/instances")' in settings_js
-    assert "transferTargetInstances: instanceList.filter((inst) => !inst.archived)" in settings_js
-    assert "Pause, cancel, and transfer" in settings_js
-    assert "cancel_active: true" in settings_js
-    assert "in-progress, qa, ready-merge, and awaiting-rebuild" in settings_js
-    assert "stopped ${r.stopped_processes || 0} processes" in settings_js
+    assert "Transfer Gaps" not in settings_tab_files["settings_instances"]
+    assert "instance-transfer" not in settings_tab_files["settings_instances"]
+    assert 'api("POST", "/api/instances/transfer-gaps"' not in settings_tab_files["settings_instances"]
+    assert 'api("POST", "/api/instances/transfer-gaps"' in gaps_bulk_js
     processes_body = settings_tab_files["settings_processes"]
     application_body = settings_tab_files["settings_application"]
     runtime_body = settings_tab_files["settings_runtime"]
@@ -574,7 +573,7 @@ def main() -> int:
     assert ".managed-process-table tr.supervisor-child[hidden]" in common_css
     assert ".target-app-action-slot" in common_css
     assert ".target-app-action-hidden" in common_css
-    instances_body = settings_tab_files["settings_instances"].split('<h3>Transfer Gaps</h3>', 1)[0]
+    instances_body = settings_tab_files["settings_instances"]
     assert '<button class="secondary" id="s-project-sync-now">Trigger sync repo</button>' in instances_body
     assert instances_body.index('id="s-project-sync-now"') < instances_body.index('id="instance-add"')
     assert 'api("GET", "/api/guidance")' in settings_js
