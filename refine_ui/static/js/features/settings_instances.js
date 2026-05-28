@@ -28,7 +28,6 @@ function renderSettingsInstancesTab({
         </tbody>
       </table>
       <div class="actions" style="margin-top:8px">
-        <button class="secondary" id="s-project-sync-now">Trigger sync repo</button>
         <button id="instance-add">Create instance</button>
       </div>
     </section>`;
@@ -92,16 +91,4 @@ function bindSettingsInstancesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $("#s-project-sync-now")?.addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    await withButtonBusy(btn, "Syncing…", async () => {
-      try {
-        await syncProjectUpdates();
-        await refreshReporters({ selectFallback: true });
-        await refreshSettingsTab("instances", { force: true });
-      } catch {
-        // syncProjectUpdates already surfaced the specific git error.
-      }
-    });
-  });
 }

@@ -574,8 +574,9 @@ def main() -> int:
     assert ".target-app-action-slot" in common_css
     assert ".target-app-action-hidden" in common_css
     instances_body = settings_tab_files["settings_instances"]
-    assert '<button class="secondary" id="s-project-sync-now">Trigger sync repo</button>' in instances_body
-    assert instances_body.index('id="s-project-sync-now"') < instances_body.index('id="instance-add"')
+    assert 'id="s-project-sync-now"' not in instances_body
+    assert "Trigger sync repo" not in instances_body
+    assert 'id="instance-add"' in instances_body
     assert 'api("GET", "/api/guidance")' in settings_js
     assert 'id="guidance-add"' in settings_js
     assert 'id="guidance-form"' in settings_js
@@ -593,7 +594,7 @@ def main() -> int:
     assert 'id="guidance-save"' not in settings_js
     assert 'api("PUT", "/api/guidance"' in settings_js
     assert 'name="instructions"' in settings_js
-    assert 'await syncProjectUpdates();' in settings_js
+    assert 'await syncProjectUpdates();' not in settings_tab_files["settings_instances"]
     assert 'sseSource.addEventListener("project_updated"' in (
         root / "refine_ui/static/js/common.js"
     ).read_text(encoding="utf-8")
