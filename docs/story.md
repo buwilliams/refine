@@ -99,3 +99,19 @@ Effort: Very High (32 commits, 4 milestones)
 Milestones started: installer polish and repo reorganization; Typer CLI; command palette and Playwright regressions; semver release and upgrade path.
 
 Product polish and UI platform work: installer defaults, docs/script reorganization, README simplification, Typer CLI migration, design-system refinements, mobile table fixes, System tab controls, command palette, GitHub issue shortcut, managed Playwright regression checks, hype-video planning, and published-release upgrade detection with local-development safeguards.
+
+## Day 14: 2026-05-26 (Tuesday)
+
+Effort: High (16 commits, 4 milestones)
+
+Milestones started: file browser/search workflow; background process pause controls; installer upgrade prompt parity; decentralized positioning cleanup.
+
+File and process ergonomics took shape: backend file search, toolbar path controls, ignore patterns, chevron tree controls, copy actions, preview polish, Logs pagination parity, UI error activity capture, and draft preservation during modal refresh. The runtime controls also got sharper with grouped supervisor rows, a background process stop toggle, runner-worker pausing, rebuild cancellation, unified pause controls, and clearer process-management naming, while the installer and hype-video docs tightened around upgrade and positioning details.
+
+## Day 15: 2026-05-27 (Wednesday)
+
+Effort: Low (4 commits, 2 milestones)
+
+Milestones started: setup/install polish; legacy installer checkout recovery.
+
+A smaller hardening day: installer output and setup flow became clearer, the splash text was polished, no-op target-app rebuilds became the default, and legacy installer checkouts gained an upgrade repair path.
