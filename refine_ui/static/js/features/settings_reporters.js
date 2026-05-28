@@ -48,7 +48,7 @@ function bindSettingsReportersTab() {
         const newName = r.new || target?.name || "";
         if (state.lastReporter === oldName && newName) setLastReporter(newName);
         await refreshReporters();
-        await renderSettings();
+        await refreshCurrentSettingsSurface({ force: true });
         toast(`Merged ${oldName} into ${newName || "selected reporter"}`, "info");
       } catch (e) { await showActionError(e); }
     });
@@ -60,7 +60,7 @@ function bindSettingsReportersTab() {
     );
     if (!ok) return;
     await withButtonBusy(b, "Removing...", async () => {
-      try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await renderSettings(); }
+      try { await api("DELETE", "/api/reporters/" + b.dataset.rdel); await refreshCurrentSettingsSurface({ force: true }); }
       catch (e) { await showActionError(e); }
     });
   }));
@@ -75,7 +75,7 @@ function bindSettingsReportersTab() {
         await api("PATCH", "/api/reporters/" + b.dataset.rename, { name: newName });
         if (state.lastReporter === oldName) setLastReporter(newName);
         await refreshReporters();
-        await renderSettings();
+        await refreshCurrentSettingsSurface({ force: true });
       } catch (e) { await showActionError(e); }
     });
   }));
@@ -85,7 +85,11 @@ function bindSettingsReportersTab() {
                                    { title: "Add reporter" });
     if (!name || !name.trim()) return;
     await withButtonBusy(btn, "Adding...", async () => {
-      try { await api("POST", "/api/reporters", { name: name.trim() }); await refreshReporters(); await renderSettings(); }
+      try {
+        await api("POST", "/api/reporters", { name: name.trim() });
+        await refreshReporters();
+        await refreshCurrentSettingsSurface({ force: true });
+      }
       catch (e) { await showActionError(e); }
     });
   });

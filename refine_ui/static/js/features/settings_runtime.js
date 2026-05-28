@@ -1,11 +1,10 @@
 // ---- System / Runtime -------------------------------------------------------
 
-function renderSettingsRuntimeTab(s, activeInstanceLabel, cli) {
+function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   return `
     <section class="settings-section">
-      <div id="runtime-upgrade-banner"></div>
       <h3>Runtime configuration</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
       <div class="actions settings-section-actions">
@@ -238,31 +237,33 @@ async function autosaveSettingsRuntime(options = {}) {
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
     agent_cli: chosen,
   });
-  if (options.refresh) await refreshSettingsTab("runtime", { force: true });
+  if (options.refresh) {
+    await refreshSettingsTab(options.refreshTab || readSettingsTab(), { force: true });
+  }
 }
 
-function bindSettingsRuntimeTab() {
+function bindInstanceRuntimeConfigControls() {
   bindCommand("#s-runtime-copy-instance", "settings.runtime.copy_instance");
   const root = document.querySelector('[data-tab-pane="runtime"]');
-  root?.addEventListener("click", (e) => {
-    const button = e.target.closest("[data-runtime-copy-upgrade]");
-    if (!button) return;
-    copyRuntimeUpgradeCommand(button.getAttribute("data-runtime-copy-upgrade") || "");
-  });
   const autosaveRuntime = bindSettingsAutosave(
     root,
     "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-project-update-pulse, #s-file-browser-ignore",
     autosaveSettingsRuntime,
   );
-  const autosaveRuntimeAndRefresh = createSettingsAutosave(
-    () => autosaveSettingsRuntime({ refresh: true }),
+  bindSettingsAutosave(
+    root,
+    "#s-cli",
+    () => autosaveSettingsRuntime({ refresh: true, refreshTab: "runtime" }),
   );
-  $("#s-cli")?.addEventListener("change", autosaveRuntimeAndRefresh);
   bindCommand("#s-recheck", "runtime.recheck_auth");
-  if (document.querySelector('[data-tab-pane="runtime"].active')) {
-    refreshRuntimeUpgradeBanner();
-  }
-  document.querySelector('[data-tab-target="runtime"]')?.addEventListener("click", () => {
-    setTimeout(refreshRuntimeUpgradeBanner, 0);
+  return autosaveRuntime;
+}
+
+function bindRuntimeUpgradeBanner(rootSelector = '[data-tab-pane="processes"]') {
+  const root = document.querySelector(rootSelector);
+  root?.addEventListener("click", (e) => {
+    const button = e.target.closest("[data-runtime-copy-upgrade]");
+    if (!button) return;
+    copyRuntimeUpgradeCommand(button.getAttribute("data-runtime-copy-upgrade") || "");
   });
 }

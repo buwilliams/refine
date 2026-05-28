@@ -57,7 +57,7 @@ def test_client_switch_path(root: Path) -> None:
         "await syncProjectUpdates({ silent: true })",
         "await refreshInstanceScopedState({ selectReporterFallback: true })",
         "await refreshTargetAppToggle()",
-        'location.hash = "#/system/application"',
+        'location.hash = "#/project/application"',
     ):
         assert expected in switch_body, expected
 

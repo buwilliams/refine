@@ -11,6 +11,8 @@ const routes = {
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
+  instance: renderInstanceSettings,
+  project: renderProjectSettings,
 };
 
 function parseHash() {
@@ -33,6 +35,12 @@ function parseHash() {
   if (parts[0] === "changes") return { route: "changes" };
   if (parts[0] === "system" || parts[0] === "settings") {
     return { route: "settings", tab: parts[1] || null };
+  }
+  if (parts[0] === "instance") {
+    return { route: "instance", tab: parts[1] || null };
+  }
+  if (parts[0] === "project") {
+    return { route: "project", tab: parts[1] || null };
   }
   return { route: "dashboard" };
 }
@@ -81,8 +89,11 @@ function navigate() {
   // since we're already moving to a different one).
   if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
 
-  if (prevRoute === "settings" && r.route === "settings") {
-    state.currentRoute = "settings";
+  if (
+    prevRoute === r.route &&
+    (r.route === "settings" || r.route === "instance" || r.route === "project")
+  ) {
+    state.currentRoute = r.route;
     state.currentGap = null;
     state.underlayHash = location.hash || "#/";
     highlightNav(r.route);

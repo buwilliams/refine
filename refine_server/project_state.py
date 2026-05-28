@@ -28,6 +28,8 @@ PROJECT_SETTING_KEYS = {
     "governance_product",
     "governance_constitution",
     "governance_rules_json",
+    "quality_enabled",
+    "quality_regressions_enabled",
     "quality_business_requirements",
     "quality_instructions",
 }
@@ -35,8 +37,6 @@ PROJECT_SETTING_KEYS = {
 APPLICATION_SETTING_KEYS = {
     "agent_subpath",
     "merge_target_branch",
-    "quality_enabled",
-    "quality_regressions_enabled",
 }
 
 RUNTIME_SETTING_KEYS = {
@@ -99,9 +99,7 @@ TARGET_APP_RUNTIME_SETTING_KEYS = {
 
 TARGET_APP_SETTING_KEYS = TARGET_APP_CONFIG_SETTING_KEYS | TARGET_APP_RUNTIME_SETTING_KEYS
 
-APPLICATION_COPY_SETTING_KEYS = (
-    APPLICATION_SETTING_KEYS - {"quality_enabled"}
-) | TARGET_APP_CONFIG_SETTING_KEYS
+APPLICATION_COPY_SETTING_KEYS = APPLICATION_SETTING_KEYS | TARGET_APP_CONFIG_SETTING_KEYS
 RUNTIME_COPY_SETTING_KEYS = RUNTIME_SETTING_KEYS - {
     "agent_cli", "agents_paused", "paused",
 }
@@ -216,6 +214,7 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
         ensure_default_instance(root=root)
         ensure_active_instance(root=root)
         ensure_guidance_file(root=root)
+        ensure_project_quality_settings(root=root)
         return status
     if not migrate or not status.get("migration_required"):
         return status
@@ -378,6 +377,28 @@ def ensure_guidance_file(*, root: Path | None = None) -> None:
             "guidance": [],
             "updated_at": now_iso(),
         })
+
+
+def ensure_project_quality_settings(*, root: Path | None = None) -> None:
+    """Lift legacy per-instance quality flags into project settings."""
+    root = root or volume_root()
+    cfg = read_project_config(root=root)
+    settings = cfg.setdefault("settings", {})
+    changed = False
+    for key in ("quality_enabled", "quality_regressions_enabled"):
+        if key in settings:
+            continue
+        for entry in list_instances(root=root):
+            instance_id = str(entry.get("id") or "")
+            if not instance_id:
+                continue
+            values = _read_json(instance_dir(instance_id, root) / "application.json", {})
+            if key in values:
+                settings[key] = str(values.get(key) or "0")
+                changed = True
+                break
+    if changed:
+        write_project_config(cfg, root=root)
 
 
 def list_instances(*, root: Path | None = None) -> list[dict[str, Any]]:

@@ -1,6 +1,8 @@
 // ---- System / Instances -----------------------------------------------------
 
-function renderSettingsInstancesTab(instances, instanceCounts, activeInstanceId, transferTargetInstances) {
+function renderSettingsInstancesTab({
+  instances, instanceCounts, activeInstanceId, transferTargetInstances,
+}) {
   return `
     <section class="settings-section">
       <h3>Instances</h3>

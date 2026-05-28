@@ -115,9 +115,9 @@ async function autosaveSettingsGovernance() {
   });
 }
 
-function bindSettingsGovernanceTab() {
+function bindSettingsGovernanceTab(tabSlug = "governance") {
   bindGovernanceRuleButtons();
-  const root = document.querySelector('[data-tab-pane="governance"]');
+  const root = document.querySelector(`[data-tab-pane="${tabSlug}"]`);
   bindSettingsMarkdownFields(root);
   bindSettingsAutosave(
     root,

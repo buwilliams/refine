@@ -89,29 +89,41 @@ def main() -> int:
         encoding="utf-8",
     )
 
-    settings_tab_block = re.search(
-        r"const SETTINGS_TABS = \[(.*?)\];",
-        settings_js,
-        re.S,
-    )
-    assert settings_tab_block, "Settings tabs must be declared centrally"
-    slugs = re.findall(r'slug:\s*"([^"]+)"', settings_tab_block.group(1))
-    assert slugs == [
-        "processes", "instances", "reporters", "quality",
-        "governance", "guidance", "performance", "application", "runtime",
-    ], slugs
+    assert "const SETTINGS_SURFACES = {" in settings_js
+    assert 'basePath: "#/system"' in settings_js
+    assert 'basePath: "#/instance"' in settings_js
+    assert 'basePath: "#/project"' in settings_js
+    assert '{ slug: "processes", label: "Processes" }' in settings_js
+    assert '{ slug: "performance", label: "Performance" }' in settings_js
+    assert '{ slug: "instances", label: "Instances" }' in settings_js
+    assert '{ slug: "reporters", label: "Reporters" }' in settings_js
+    assert '{ slug: "application", label: "Application" }' in settings_js
+    assert '{ slug: "quality", label: "Quality" }' in settings_js
+    assert '{ slug: "governance", label: "Governance" }' in settings_js
+    assert '{ slug: "guidance", label: "Guidance" }' in settings_js
+    system_surface = settings_js.split('settings: {', 1)[1].split('instance: {', 1)[0]
+    assert '{ slug: "runtime", label: "Runtime" }' not in system_surface
+    slugs = [
+        "processes", "performance", "runtime", "instances", "reporters",
+        "application", "quality", "governance", "guidance",
+    ]
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
+    assert 'return { route: "instance", tab: parts[1] || null };' in router_js
+    assert 'return { route: "project", tab: parts[1] || null };' in router_js
     assert 'gaps_plan: renderGapPlan' in router_js
     assert 'if (parts[1] === "plan") return { route: "gaps_plan" };' in router_js
-    assert 'prevRoute === "settings" && r.route === "settings"' in router_js
+    assert 'r.route === "settings" || r.route === "instance" || r.route === "project"' in router_js
     assert "refreshSettingsTab(slug).catch(showActionError);" in router_js
-    assert 'parsed.route === "settings" && !parsed.tab' in settings_js
+    assert 'parsed.route === state.currentRoute && !parsed.tab' in settings_js
     assert 'return first;' in settings_js
-    assert 'if (slug === "system" || slug === "project") return "application";' in settings_js
-    assert 'if (slug === "agents") return "guidance";' in settings_js
-    assert "function activeSettingsTabFromRoute()" in settings_js
+    assert 'if (slug === "system") return "processes";' in settings_js
+    assert 'if (slug === "agents") return "processes";' in settings_js
+    assert 'if (slug === "project") return surface.tabs[0]?.slug || null;' in settings_js
+    assert "function activeSettingsTabFromRoute(surface = settingsSurfaceForRoute())" in settings_js
     assert "let _targetAppDraftDirty = false;" in settings_js
+    assert "async function renderInstanceSettings()" in settings_js
+    assert "async function renderProjectSettings()" in settings_js
     assert "async function refreshSettings(options = {})" in settings_js
     assert "async function refreshActiveSettingsTab(options = {})" in settings_js
     assert "function updateSettingsTabContent(slug, body, bind)" in settings_js
@@ -119,7 +131,7 @@ def main() -> int:
     assert "function reconcileSettingsNode(current, next)" in settings_js
     assert "_targetAppDraftDirty &&" in settings_js
     assert 'document.querySelector(\'[data-tab-pane="application"].active\')' in settings_js
-    assert 'href="#/system/${t.slug}"' in settings_js
+    assert 'href="${surface.basePath}/${t.slug}"' in settings_js
     assert "<button class=\"settings-tab" not in settings_js
     assert '<div class="card settings-tab-card">${body}</div>' in settings_js
     assert 'input[type="text"], input[type="number"], input[type="url"], textarea, select' in common_css
@@ -131,6 +143,11 @@ def main() -> int:
     assert save_button_ids == [], save_button_ids
     assert "function createSettingsAutosave" in settings_js
     assert "function bindSettingsAutosave" in settings_js
+    assert "function revertSettingsAutosaveValues" in settings_js
+    assert 'await modalAlert(' in settings_js
+    assert '{ title: "Save failed" }' in settings_js
+    assert "The fields were restored to the last saved values." in settings_js
+    assert "await refreshActiveSettingsTab({ force: true });" in settings_js
     assert 'id="s-project-update-pulse"' in settings_js
     assert "project_update_pulse_interval_seconds" in settings_js
     assert 'id="s-file-browser-ignore"' in settings_js
@@ -205,6 +222,7 @@ def main() -> int:
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '"copilot": "copilot login"' in api_py
     assert 'id="runtime-upgrade-banner"' in settings_js
+    assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index("<h3>Process management</h3>")
     assert 'api("GET", "/api/upgrade")' in settings_js
     assert "function renderRuntimeUpgradeBanner" in settings_js
     assert "Refine is up to date" in settings_js
@@ -221,7 +239,7 @@ def main() -> int:
     assert '@route("GET", r"/api/upgrade")' in server_py
     assert "def upgrade_status" in api_py
     runtime_save_body = settings_js.split("async function autosaveSettingsRuntime", 1)[1]
-    runtime_save_body = runtime_save_body.split("\nfunction bindSettingsRuntimeTab", 1)[0]
+    runtime_save_body = runtime_save_body.split("\nfunction bindInstanceRuntimeConfigControls", 1)[0]
     application_save_body = settings_js.split("async function autosaveSettingsApplication", 1)[1]
     application_save_body = application_save_body.split("\nfunction applyGeneratedTargetAppConfig", 1)[0]
     assert 'worker_memory_limit_mb: $("#s-worker-memory").value' in runtime_save_body
@@ -324,11 +342,19 @@ def main() -> int:
     assert settings_section_css and "border-top: 1px solid var(--border)" in settings_section_css.group(1)
 
     for slug in slugs:
-        assert settings_js.count(f'pane("{slug}",') == 1
-    assert 'pane("project",' not in settings_js
+        assert f'if (slug === "{slug}")' in settings_js or f'slug: "{slug}"' in settings_js
+    assert "surface.tabs.map(pane).join" in settings_js
 
-    assert '<a href="#/system/processes" data-route="settings">System</a>' in index_html
+    primary_nav = index_html.split('<nav class="nav">', 1)[1].split("</nav>", 1)[0]
+    assert 'data-route="settings"' not in primary_nav
+    assert 'data-route="instance"' not in primary_nav
+    assert 'data-route="project"' not in primary_nav
     assert 'class="nav-menu nav-context-menu" id="nav-context-menu"' in index_html
+    context_panel = index_html.split('class="nav-menu-panel nav-context-panel"', 1)[1].split("</details>", 1)[0]
+    assert '<div class="nav-menu-label">Management</div>' in context_panel
+    assert '<a class="nav-menu-item" href="#/instance/instances" data-route="instance">Instance</a>' in context_panel
+    assert '<a class="nav-menu-item" href="#/project/application" data-route="project">Project</a>' in context_panel
+    assert '<a class="nav-menu-item" href="#/system/processes" data-route="settings">System</a>' in context_panel
     assert 'id="nav-context-app-summary">Application</span>' in index_html
     assert 'id="nav-context-reporter-summary">No reporter</span>' in index_html
     assert '<select id="global-reporter" aria-label="Reporter"></select>' in index_html
@@ -390,6 +416,8 @@ def main() -> int:
     assert "function openReporterMergeModal(source)" in settings_js
     assert 'api("POST", `/api/reporters/${b.dataset.rmerge}/merge`' in settings_js
     assert "Merging a reporter moves its Gaps to another" in settings_js
+    assert "renderSettingsReportersTab(data.reps, data.activeInstanceLabel)" in settings_js
+    assert "bindSettingsReportersTab();" in settings_js
     assert 'def merge_reporter(rid: int, body: dict)' in api_py
     assert 'M_MERGE_REPORTER' in api_py
     assert '@route("POST", r"/api/reporters/(\\d+)/merge")' in server_py
@@ -398,7 +426,7 @@ def main() -> int:
         assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
     assert 'slug: "instances"' in settings_js
     assert 'api("GET", "/api/instances")' in settings_js
-    assert "const transferTargetInstances = instances.filter((inst) => !inst.archived);" in settings_js
+    assert "transferTargetInstances: instanceList.filter((inst) => !inst.archived)" in settings_js
     assert "Pause, cancel, and transfer" in settings_js
     assert "cancel_active: true" in settings_js
     assert "in-progress, qa, ready-merge, and awaiting-rebuild" in settings_js
@@ -435,7 +463,7 @@ def main() -> int:
     assert "function scheduleProcessesTabRefreshes()" in processes_body
     assert '[data-tab-pane="processes"].active' in processes_body
     assert "refreshCurrentSettingsSurface()" in common_js
-    assert 'if (state.currentRoute === "settings") {' in common_js
+    assert '["settings", "instance", "project"].includes(state.currentRoute || "")' in common_js
     assert "refreshActiveSettingsTab({ force: true })" in processes_body
     assert "function refreshProcessesSettingsTab(options = {})" in processes_body
     assert 'data-cancel-agent="' in processes_body
@@ -569,15 +597,17 @@ def main() -> int:
     assert 'id="s-target-app-url"' in settings_js
     assert '<input type="url" id="s-target-app-url"' in settings_js
     assert 'target_app_url: $("#s-target-app-url").value' in settings_js
-    application_refresh_body = settings_core_js.split(
-        '} else if (activeSlug === "application") {',
-        1,
-    )[1].split('} else if (activeSlug === "runtime") {', 1)[0]
-    assert 'api("GET", "/api/settings")' in application_refresh_body
-    assert "renderSettingsApplicationTab({" in application_refresh_body
+    assert "async function loadSettingsSurfaceData()" in settings_core_js
+    assert 'api("GET", "/api/settings")' in settings_core_js
+    assert 'api("GET", "/api/reporters")' in settings_core_js
+    assert "renderSettingsInstancesTab({" in settings_js
+    assert "renderSettingsReportersTab(data.reps, data.activeInstanceLabel)" in settings_js
+    assert "renderInstanceApplicationConfigSections" in settings_js
+    assert "renderInstanceRuntimeConfigSections" in settings_js
+    assert "function renderSettingsApplicationTab" in settings_js
     assert "target_app_url" not in common_js
-    assert 'id="s-application-copy-instance"' in application_body
-    assert 'id="s-target-generate-ai"' in application_body
+    assert 'id="s-application-copy-instance"' in settings_js
+    assert 'id="s-target-generate-ai"' in settings_js
     assert 'copySettingsFromInstance("application"' in commands_js
     assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in commands_js
     assert 'id="s-runtime-copy-instance"' in runtime_body
@@ -600,7 +630,7 @@ def main() -> int:
     assert 'aria-pressed="${qualityEnabled ? "true" : "false"}"' in settings_js
     assert 'class="${qualityEnabled ? "" : "warn"}"' in settings_js
     assert 'QA ${qualityEnabled ? "enabled" : "disabled"}' in settings_js
-    assert 'enabled: $("#s-quality-enabled").dataset.enabled === "1" ? "1" : "0"' in settings_js
+    assert 'if (qualityEnabled) body.enabled = qualityEnabled.dataset.enabled === "1" ? "1" : "0";' in settings_js
     assert 'btn.classList.toggle("warn", !enabled);' in settings_js
     assert 'btn.textContent = enabled ? "QA enabled" : "QA disabled";' in settings_js
     assert ".toggle-button.on" not in common_css

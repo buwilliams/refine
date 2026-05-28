@@ -3,50 +3,45 @@
 let _targetAppDraftDirty = false;
 
 async function renderSettings() {
+  await renderSettingsSurface("settings");
+}
+
+async function renderInstanceSettings() {
+  await renderSettingsSurface("instance");
+}
+
+async function renderProjectSettings() {
+  await renderSettingsSurface("project");
+}
+
+async function renderSettingsSurface(route) {
   renderBanners([]);
+  const surface = settingsSurfaceForRoute(route);
   // First-paint scaffold only; subsequent refreshes route through
   // `refreshSettings` so SSE / post-save reloads don't flash `Loading…`.
-  if (!document.getElementById("settings-content")) {
-    $("#main").innerHTML = `<h2>System</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
+  if (
+    !document.getElementById("settings-content") ||
+    document.querySelector("#main > h2")?.textContent !== surface.title
+  ) {
+    $("#main").innerHTML = `<h2>${htmlEscape(surface.title)}</h2><div id="settings-content"><p class="muted">Loading…</p></div>`;
   }
   await refreshSettings();
 }
 
 async function refreshSettings(options = {}) {
-  if (state.currentRoute !== "settings") return;
+  if (!isSettingsRoute()) return;
+  const surface = settingsSurfaceForRoute();
   if (
     _targetAppDraftDirty &&
     !options.force &&
+    state.currentRoute === "instance" &&
     document.querySelector('[data-tab-pane="application"].active')
   ) {
     return;
   }
   try {
-    const [
-      s, diag, reps, project, gov, quality, dash, instances, guidance,
-      performance, processes,
-    ] = await Promise.all([
-      api("GET", "/api/settings"),
-      api("GET", "/api/diagnostics"),
-      api("GET", "/api/reporters"),
-      api("GET", "/api/project/status"),
-      api("GET", "/api/governance"),
-      api("GET", "/api/quality"),
-      api("GET", "/api/dashboard"),
-      api("GET", "/api/instances"),
-      api("GET", "/api/guidance"),
-      api("GET", typeof performanceApiPath === "function"
-        ? performanceApiPath()
-        : "/api/performance"),
-      api("GET", "/api/processes"),
-    ]);
-    state.project = project;
-    updateActiveInstanceLabel();
-    drawSettings(
-      s.settings || {}, diag, reps.reporters || [],
-      gov || {}, quality || {}, dash || {}, instances || {}, guidance || {},
-      performance || {}, processes || {},
-    );
+    const data = await loadSettingsSurfaceData();
+    drawSettingsSurface(surface, data);
   } catch (e) {
     const root = document.getElementById("settings-content");
     if (root) drawRuntimeRecovery(e);
@@ -54,18 +49,20 @@ async function refreshSettings(options = {}) {
 }
 
 async function refreshActiveSettingsTab(options = {}) {
-  if (state.currentRoute !== "settings") return;
-  const slug = readSettingsTab();
+  if (!isSettingsRoute()) return;
+  const slug = readSettingsTab(settingsSurfaceForRoute());
   await refreshSettingsTab(slug, options);
 }
 
 async function refreshSettingsTab(slug, options = {}) {
-  const activeSlug = normalizeSettingsTab(slug) || readSettingsTab();
+  const surface = settingsSurfaceForRoute();
+  const activeSlug = normalizeSettingsTab(slug, surface) || readSettingsTab(surface);
   if (!document.querySelector(`[data-tab-pane="${activeSlug}"] .settings-tab-card`)) {
     await refreshSettings(options);
     return;
   }
   if (
+    state.currentRoute === "instance" &&
     activeSlug === "application" &&
     _targetAppDraftDirty &&
     !options.force
@@ -73,129 +70,73 @@ async function refreshSettingsTab(slug, options = {}) {
     return;
   }
   try {
-    if (activeSlug === "processes") {
-      const [s, diag, dash, processes] = await Promise.all([
-        api("GET", "/api/settings"),
-        api("GET", "/api/diagnostics"),
-        api("GET", "/api/dashboard"),
-        api("GET", "/api/processes"),
-      ]);
-      updateSettingsTabContent(
-        "processes",
-        renderProcessesTab(processes || {}, s.settings || {}, diag || {}, dash || {}),
-        () => bindSettingsProcessesTab(s.settings || {}),
-      );
-    } else if (activeSlug === "instances") {
-      const [project, instances] = await Promise.all([
-        api("GET", "/api/project/status"),
-        api("GET", "/api/instances"),
-      ]);
-      state.project = project;
-      updateActiveInstanceLabel();
-      const list = instances.instances || [];
-      updateSettingsTabContent(
-        "instances",
-        renderSettingsInstancesTab(
-          list,
-          instances.counts || {},
-          instances.active_instance_id || project.active_instance_id || "",
-          list.filter((inst) => !inst.archived),
-        ),
-        bindSettingsInstancesTab,
-      );
-    } else if (activeSlug === "performance") {
-      const [performance, diag] = await Promise.all([
-        api("GET", typeof performanceApiPath === "function"
-          ? performanceApiPath()
-          : "/api/performance"),
-        api("GET", "/api/diagnostics"),
-      ]);
-      const backend = (performance || {}).backend || (diag || {}).backend || {};
-      updateSettingsTabContent(
-        "performance",
-        renderSettingsPerformanceTab(performance || {}, backend),
-        () => bindSettingsPerformanceTab(null, diag || {}, [], null, {}, {}, {}, {}, backend),
-      );
-    } else if (activeSlug === "reporters") {
-      const [project, reps] = await Promise.all([
-        api("GET", "/api/project/status"),
-        api("GET", "/api/reporters"),
-      ]);
-      state.project = project;
-      state.reporters = reps.reporters || [];
-      updateActiveInstanceLabel();
-      updateSettingsTabContent(
-        "reporters",
-        renderSettingsReportersTab(state.reporters, settingsActiveInstanceLabel()),
-        bindSettingsReportersTab,
-      );
-    } else if (activeSlug === "guidance") {
-      const guidance = await api("GET", "/api/guidance");
-      const items = guidance.guidance || [];
-      updateSettingsTabContent(
-        "guidance",
-        renderSettingsGuidanceTab(items),
-        () => bindSettingsGuidanceTab(items),
-      );
-    } else if (activeSlug === "governance") {
-      const gov = await api("GET", "/api/governance");
-      updateSettingsTabContent(
-        "governance",
-        renderSettingsGovernanceTab(gov || {}),
-        bindSettingsGovernanceTab,
-      );
-    } else if (activeSlug === "quality") {
-      const quality = await api("GET", "/api/quality");
-      updateSettingsTabContent(
-        "quality",
-        renderSettingsQualityTab(quality || {}),
-        bindSettingsQualityTab,
-      );
-    } else if (activeSlug === "application") {
-      const [s, project] = await Promise.all([
-        api("GET", "/api/settings"),
-        api("GET", "/api/project/status"),
-      ]);
-      state.project = project;
-      updateActiveInstanceLabel();
-      const projectApps = project.apps || [];
-      const currentProject = project.client_repo || "";
-      const appOptions = projectApps.map((app) => `
-        <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
-          ${htmlEscape(app.name || app.path)}
-        </option>`).join("");
-      updateSettingsTabContent(
-        "application",
-        renderSettingsApplicationTab({
-          s: s.settings || {},
-          projectApps,
-          currentProject,
-          projectRegistryEnabled: project.registry_enabled !== false,
-          appOptions,
-          activeInstanceLabel: settingsActiveInstanceLabel(project),
-        }),
-        () => bindSettingsApplicationTab(currentProject),
-      );
-    } else if (activeSlug === "runtime") {
-      const [s, project] = await Promise.all([
-        api("GET", "/api/settings"),
-        api("GET", "/api/project/status"),
-      ]);
-      state.project = project;
-      updateActiveInstanceLabel();
-      const settings = s.settings || {};
-      const cli = (settings.agent_cli || "claude").toLowerCase();
-      updateSettingsTabContent(
-        "runtime",
-        renderSettingsRuntimeTab(settings, settingsActiveInstanceLabel(project), cli),
-        bindSettingsRuntimeTab,
-      );
-    } else {
-      await refreshSettings(options);
-    }
+    const data = await loadSettingsSurfaceData();
+    updateSettingsTabContent(
+      activeSlug,
+      renderSettingsTabBody(surface, activeSlug, data),
+      () => bindSettingsTabBody(surface, activeSlug, data),
+    );
   } catch (e) {
     await showActionError(e);
   }
+}
+
+async function loadSettingsSurfaceData() {
+  const [
+    s, diag, reps, project, gov, quality, dash, instances, guidance,
+    performance, processes,
+  ] = await Promise.all([
+    api("GET", "/api/settings"),
+    api("GET", "/api/diagnostics"),
+    api("GET", "/api/reporters"),
+    api("GET", "/api/project/status"),
+    api("GET", "/api/governance"),
+    api("GET", "/api/quality"),
+    api("GET", "/api/dashboard"),
+    api("GET", "/api/instances"),
+    api("GET", "/api/guidance"),
+    api("GET", typeof performanceApiPath === "function"
+      ? performanceApiPath()
+      : "/api/performance"),
+    api("GET", "/api/processes"),
+  ]);
+  state.project = project;
+  state.reporters = reps.reporters || [];
+  updateActiveInstanceLabel();
+  const settings = s.settings || {};
+  const instanceList = instances.instances || state.project?.instances || [];
+  const activeInstanceId = instances.active_instance_id || state.project?.active_instance_id || "";
+  const activeInstance = instanceList.find((i) => i.id === activeInstanceId) || null;
+  const activeInstanceLabel = activeInstance?.display_name || activeInstanceId || "Default";
+  const projectApps = state.project?.apps || [];
+  const currentProject = state.project?.client_repo || "";
+  const appOptions = projectApps.map((app) => `
+    <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
+      ${htmlEscape(app.name || app.path)}
+    </option>`).join("");
+  return {
+    s: settings,
+    diag: diag || {},
+    reps: state.reporters,
+    project: project || {},
+    gov: gov || {},
+    quality: quality || {},
+    dash: dash || {},
+    instances: instanceList,
+    instanceCounts: instances.counts || {},
+    activeInstanceId,
+    activeInstanceLabel,
+    transferTargetInstances: instanceList.filter((inst) => !inst.archived),
+    guidanceItems: guidance.guidance || [],
+    performance: performance || {},
+    performanceBackend: (performance || {}).backend || (diag || {}).backend || {},
+    processes: processes || {},
+    cli: (settings.agent_cli || "claude").toLowerCase(),
+    projectApps,
+    currentProject,
+    projectRegistryEnabled: project.registry_enabled !== false,
+    appOptions,
+  };
 }
 
 function updateSettingsTabContent(slug, body, bind) {
@@ -338,9 +279,16 @@ function createSettingsAutosave(save, options = {}) {
     inFlight = true;
     try {
       await save();
+      rememberSettingsAutosaveValues(options.controls || []);
       if (typeof options.afterSave === "function") await options.afterSave();
     } catch (e) {
-      await showActionError(e, options.errorPrefix || "Autosave failed");
+      revertSettingsAutosaveValues(options.controls || []);
+      const message = e?.message || "Request failed";
+      await modalAlert(
+        `${options.errorPrefix || "Save failed"}: ${message}\n\nThe fields were restored to the last saved values.`,
+        { title: "Save failed" },
+      );
+      await refreshActiveSettingsTab({ force: true });
     } finally {
       inFlight = false;
       if (pending) {
@@ -351,10 +299,54 @@ function createSettingsAutosave(save, options = {}) {
   };
 }
 
+function settingsControlValue(el) {
+  if (!el) return "";
+  if (el.dataset && "enabled" in el.dataset) return el.dataset.enabled || "0";
+  if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+    return el.checked ? "1" : "0";
+  }
+  return el.value == null ? "" : String(el.value);
+}
+
+function setSettingsControlValue(el, value) {
+  if (!el) return;
+  if (el.dataset && "enabled" in el.dataset) {
+    const enabled = value === "1";
+    el.dataset.enabled = enabled ? "1" : "0";
+    el.setAttribute("aria-pressed", enabled ? "true" : "false");
+    el.classList.toggle("warn", !enabled);
+    if (el.id === "s-quality-enabled") {
+      el.textContent = enabled ? "QA enabled" : "QA disabled";
+    } else if (el.id === "s-quality-regressions-enabled") {
+      el.textContent = enabled ? "Regressions enabled" : "Regressions disabled";
+    }
+  } else if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
+    el.checked = value === "1";
+  } else {
+    el.value = value == null ? "" : String(value);
+  }
+}
+
+function rememberSettingsAutosaveValues(controls) {
+  (controls || []).forEach((el) => {
+    el.dataset.settingsSavedValue = settingsControlValue(el);
+  });
+}
+
+function revertSettingsAutosaveValues(controls) {
+  (controls || []).forEach((el) => {
+    if ("settingsSavedValue" in el.dataset) {
+      setSettingsControlValue(el, el.dataset.settingsSavedValue);
+    }
+  });
+}
+
 function bindSettingsAutosave(root, selector, save, options = {}) {
-  const autosave = createSettingsAutosave(save, options);
+  const controls = root ? $$(selector, root) : [];
+  rememberSettingsAutosaveValues(controls);
+  const autosave = createSettingsAutosave(save, { ...options, controls });
   if (!root) return autosave;
-  $$(selector, root).forEach((el) => {
+  controls.forEach((el) => {
     el.addEventListener(options.event || "change", autosave);
   });
   return autosave;
@@ -478,47 +470,84 @@ function bindSettingsMarkdownFields(root) {
   });
 }
 
-const SETTINGS_TAB_STORAGE_KEY = "refine_settings_tab";
-const SETTINGS_TABS = [
-  { slug: "processes",    label: "Processes" },
-  { slug: "instances",    label: "Instances" },
-  { slug: "reporters",    label: "Reporters" },
-  { slug: "quality",      label: "Quality" },
-  { slug: "governance",   label: "Governance" },
-  { slug: "guidance",     label: "Guidance" },
-  { slug: "performance",  label: "Performance" },
-  { slug: "application",  label: "Application" },
-  { slug: "runtime",      label: "Runtime" },
-];
+const SETTINGS_SURFACES = {
+  settings: {
+    title: "System",
+    basePath: "#/system",
+    storageKey: "refine_system_tab",
+    tabs: [
+      { slug: "processes", label: "Processes" },
+      { slug: "performance", label: "Performance" },
+    ],
+  },
+  instance: {
+    title: "Instance",
+    basePath: "#/instance",
+    storageKey: "refine_instance_tab",
+    tabs: [
+      { slug: "instances", label: "Instances" },
+      { slug: "reporters", label: "Reporters" },
+      { slug: "application", label: "Application" },
+      { slug: "runtime", label: "Runtime" },
+    ],
+  },
+  project: {
+    title: "Project",
+    basePath: "#/project",
+    storageKey: "refine_project_tab",
+    tabs: [
+      { slug: "application", label: "Application" },
+      { slug: "quality", label: "Quality" },
+      { slug: "governance", label: "Governance" },
+      { slug: "guidance", label: "Guidance" },
+    ],
+  },
+};
+const SETTINGS_TABS = SETTINGS_SURFACES.settings.tabs;
+const INSTANCE_SETTINGS_TABS = SETTINGS_SURFACES.instance.tabs;
+const PROJECT_SETTINGS_TABS = SETTINGS_SURFACES.project.tabs;
 
-function normalizeSettingsTab(slug) {
-  if (slug === "system" || slug === "project") return "application";
-  if (slug === "agents") return "guidance";
-  return SETTINGS_TABS.some((t) => t.slug === slug) ? slug : null;
+function settingsSurfaceForRoute(route = state.currentRoute) {
+  return SETTINGS_SURFACES[route] || SETTINGS_SURFACES.settings;
 }
 
-function activeSettingsTabFromRoute() {
+function isSettingsRoute(route = state.currentRoute) {
+  return !!SETTINGS_SURFACES[route];
+}
+
+function normalizeSettingsTab(slug, surface = settingsSurfaceForRoute()) {
+  if (slug === "system") return "processes";
+  if (slug === "agents") return "processes";
+  if (slug === "project") return surface.tabs[0]?.slug || null;
+  return surface.tabs.some((t) => t.slug === slug) ? slug : null;
+}
+
+function activeSettingsTabFromRoute(surface = settingsSurfaceForRoute()) {
   const parsed = typeof parseHash === "function" ? parseHash() : {};
-  return parsed.route === "settings" ? normalizeSettingsTab(parsed.tab) : null;
+  return parsed.route === state.currentRoute ? normalizeSettingsTab(parsed.tab, surface) : null;
 }
 
-function readSettingsTab(tabs = SETTINGS_TABS) {
-  const routed = activeSettingsTabFromRoute();
+function readSettingsTab(tabsOrSurface = settingsSurfaceForRoute()) {
+  const surface = Array.isArray(tabsOrSurface)
+    ? { ...settingsSurfaceForRoute(), tabs: tabsOrSurface }
+    : tabsOrSurface;
+  const tabs = surface.tabs;
+  const routed = activeSettingsTabFromRoute(surface);
   if (routed) {
-    localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, routed);
+    localStorage.setItem(surface.storageKey, routed);
     return routed;
   }
   const parsed = typeof parseHash === "function" ? parseHash() : {};
-  if (parsed.route === "settings" && !parsed.tab) {
+  if (parsed.route === state.currentRoute && !parsed.tab) {
     const first = tabs[0]?.slug;
-    if (first) localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, first);
+    if (first) localStorage.setItem(surface.storageKey, first);
     return first;
   }
-  const stored = localStorage.getItem(SETTINGS_TAB_STORAGE_KEY);
-  const normalizedStored = normalizeSettingsTab(stored);
+  const stored = localStorage.getItem(surface.storageKey);
+  const normalizedStored = normalizeSettingsTab(stored, surface);
   if (normalizedStored && tabs.some((t) => t.slug === normalizedStored)) {
     if (normalizedStored !== stored) {
-      localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, normalizedStored);
+      localStorage.setItem(surface.storageKey, normalizedStored);
     }
     return normalizedStored;
   }
@@ -526,9 +555,10 @@ function readSettingsTab(tabs = SETTINGS_TABS) {
 }
 
 function setSettingsTab(slug) {
-  const normalized = normalizeSettingsTab(slug);
+  const surface = settingsSurfaceForRoute();
+  const normalized = normalizeSettingsTab(slug, surface);
   if (!normalized) return;
-  localStorage.setItem(SETTINGS_TAB_STORAGE_KEY, normalized);
+  localStorage.setItem(surface.storageKey, normalized);
   // Toggle classes immediately; hashchange handles normal linked tab
   // navigation, and this keeps repeated clicks on the current hash responsive.
   $$("[data-tab-pane]").forEach((pane) => {
@@ -540,12 +570,12 @@ function setSettingsTab(slug) {
 }
 
 
-function renderSettingsTabStrip(activeSlug) {
+function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute()) {
   return `
     <nav class="settings-tabs" id="settings-tabs">
-      ${SETTINGS_TABS.map((t) => `
+      ${surface.tabs.map((t) => `
         <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
-           href="#/system/${t.slug}"
+           href="${surface.basePath}/${t.slug}"
            data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
     </nav>`;
 }
@@ -603,10 +633,13 @@ function drawSqliteCacheProgress(progress = {}) {
 }
 
 function drawRuntimeRecovery(error) {
-  const activeSlug = "runtime";
+  const surface = settingsSurfaceForRoute();
+  const activeSlug = surface.tabs.some((t) => t.slug === "runtime")
+    ? "runtime"
+    : surface.tabs[0]?.slug || "runtime";
   $("#settings-content").innerHTML = `
-    ${renderSettingsTabStrip(activeSlug)}
-    ${renderSettingsPane("runtime", renderSqliteCacheSection(error), activeSlug)}
+    ${renderSettingsTabStrip(activeSlug, surface)}
+    ${renderSettingsPane(activeSlug, renderSqliteCacheSection(error), activeSlug)}
   `;
   bindSettingsTabHandlers();
   bindRebuildCacheHandler();
@@ -617,59 +650,91 @@ function bindRebuildCacheHandler() {
 }
 
 
-function drawSettings(
-  s, diag, reps, gov = {}, quality = {}, dash = {}, instanceData = {},
-  guidanceData = {}, performanceData = {}, processData = {},
-) {
-  const cli = (s.agent_cli || "claude").toLowerCase();
-  const projectApps = state.project?.apps || [];
-  const currentProject = state.project?.client_repo || "";
-  const projectRegistryEnabled = state.project?.registry_enabled !== false;
-  const instances = instanceData.instances || state.project?.instances || [];
-  const activeInstanceId = instanceData.active_instance_id || state.project?.active_instance_id || "";
-  const activeInstance = instances.find((i) => i.id === activeInstanceId) || null;
-  const activeInstanceLabel = activeInstance?.display_name || activeInstanceId || "Default";
-  const transferTargetInstances = instances.filter((inst) => !inst.archived);
-  const instanceCounts = instanceData.counts || {};
-  const guidanceItems = guidanceData.guidance || [];
-  const performance = performanceData || {};
-  const performanceBackend = performance.backend || diag.backend || {};
-  const appOptions = projectApps.map((app) => `
-    <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
-      ${htmlEscape(app.name || app.path)}
-    </option>`).join("");
-  // Tab definitions. Order here drives the tab strip; `slug` is the
-  // localStorage key, route segment, and DOM hook.
-  const tabs = SETTINGS_TABS;
-  const activeSlug = readSettingsTab(tabs);
-  const tabStrip = renderSettingsTabStrip(activeSlug);
-  const pane = (slug, body) => renderSettingsPane(slug, body, activeSlug);
+function renderSettingsTabBody(surface, slug, data) {
+  if (surface === SETTINGS_SURFACES.settings) {
+    if (slug === "processes") {
+      return renderProcessesTab(data.processes, data.s, data.diag, data.dash);
+    }
+    if (slug === "performance") {
+      return renderSettingsPerformanceTab(data.performance, data.performanceBackend);
+    }
+  }
+  if (surface === SETTINGS_SURFACES.instance) {
+    if (slug === "instances") {
+      return renderSettingsInstancesTab({
+        instances: data.instances,
+        instanceCounts: data.instanceCounts,
+        activeInstanceId: data.activeInstanceId,
+        transferTargetInstances: data.transferTargetInstances,
+      });
+    }
+    if (slug === "reporters") {
+      return renderSettingsReportersTab(data.reps, data.activeInstanceLabel);
+    }
+    if (slug === "application") {
+      return renderInstanceApplicationConfigSections({
+        s: data.s,
+        activeInstanceLabel: data.activeInstanceLabel,
+      });
+    }
+    if (slug === "runtime") {
+      return renderInstanceRuntimeConfigSections(data.s, data.activeInstanceLabel, data.cli);
+    }
+  }
+  if (surface === SETTINGS_SURFACES.project) {
+    if (slug === "application") {
+      return renderSettingsApplicationTab({
+        projectApps: data.projectApps,
+        currentProject: data.currentProject,
+        projectRegistryEnabled: data.projectRegistryEnabled,
+        appOptions: data.appOptions,
+      });
+    }
+    if (slug === "quality") return renderSettingsQualityTab(data.quality);
+    if (slug === "governance") return renderSettingsGovernanceTab(data.gov);
+    if (slug === "guidance") return renderSettingsGuidanceTab(data.guidanceItems);
+  }
+  return `<p class="muted">Unknown settings tab.</p>`;
+}
+
+function bindSettingsTabBody(surface, slug, data) {
+  if (surface === SETTINGS_SURFACES.settings) {
+    if (slug === "processes") bindSettingsProcessesTab(data.s);
+    else if (slug === "performance") {
+      bindSettingsPerformanceTab(
+        data.s, data.diag, data.reps, null, data.gov,
+        data.dash, { instances: data.instances, counts: data.instanceCounts },
+        { guidance: data.guidanceItems }, data.performanceBackend,
+      );
+    }
+  } else if (surface === SETTINGS_SURFACES.instance) {
+    if (slug === "instances") bindSettingsInstancesTab();
+    else if (slug === "reporters") bindSettingsReportersTab();
+    else if (slug === "application") bindInstanceApplicationConfigControls();
+    else if (slug === "runtime") bindInstanceRuntimeConfigControls();
+  } else if (surface === SETTINGS_SURFACES.project) {
+    if (slug === "application") bindSettingsApplicationTab(data.currentProject);
+    else if (slug === "quality") bindSettingsQualityTab();
+    else if (slug === "governance") bindSettingsGovernanceTab();
+    else if (slug === "guidance") bindSettingsGuidanceTab(data.guidanceItems);
+  }
+}
+
+function drawSettingsSurface(surface, data) {
+  const root = document.getElementById("settings-content");
+  if (!root) return;
+  const activeSlug = readSettingsTab(surface);
+  const tabStrip = renderSettingsTabStrip(activeSlug, surface);
+  const pane = (tab) => renderSettingsPane(
+    tab.slug,
+    renderSettingsTabBody(surface, tab.slug, data),
+    activeSlug,
+  );
   $("#settings-content").innerHTML = `
     ${tabStrip}
-    ${pane("application", renderSettingsApplicationTab({
-      s, projectApps, currentProject, projectRegistryEnabled,
-      appOptions, activeInstanceLabel,
-    }))}
-    ${pane("processes", renderProcessesTab(processData, s, diag, dash))}
-    ${pane("guidance", renderSettingsGuidanceTab(guidanceItems))}
-    ${pane("runtime", renderSettingsRuntimeTab(s, activeInstanceLabel, cli))}
-    ${pane("performance", renderSettingsPerformanceTab(performance, performanceBackend))}
-    ${pane("governance", renderSettingsGovernanceTab(gov))}
-    ${pane("quality", renderSettingsQualityTab(quality))}
-    ${pane("instances", renderSettingsInstancesTab(
-      instances, instanceCounts, activeInstanceId, transferTargetInstances,
-    ))}
-    ${pane("reporters", renderSettingsReportersTab(reps, activeInstanceLabel))}
+    ${surface.tabs.map(pane).join("")}
   `;
 
   bindSettingsTabHandlers();
-  bindSettingsProcessesTab(s);
-  bindSettingsGuidanceTab(guidanceItems);
-  bindSettingsRuntimeTab();
-  bindSettingsPerformanceTab(s, diag, reps, null, gov, dash, instanceData, guidanceData);
-  bindSettingsGovernanceTab();
-  bindSettingsQualityTab();
-  bindSettingsApplicationTab(currentProject);
-  bindSettingsInstancesTab();
-  bindSettingsReportersTab();
+  surface.tabs.forEach((tab) => bindSettingsTabBody(surface, tab.slug, data));
 }

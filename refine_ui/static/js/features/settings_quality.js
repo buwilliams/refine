@@ -1,13 +1,13 @@
 // ---- System / Quality -------------------------------------------------------
 
-function renderSettingsQualityTab(quality) {
+function renderSettingsQualityInstanceSections(quality) {
   const qualityEnabled = String(quality.enabled || "0") === "1";
   const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";
   const regressions = Array.isArray(quality.regressions) ? quality.regressions : [];
   return `
     <section class="settings-section">
       <h3>Quality gate</h3>
-      <p class="scope-label muted small">Instance-scoped</p>
+      <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
         Runs pre-merge QA in the Gap worktree before the Merge agent lands work.
       </p>
@@ -22,7 +22,7 @@ function renderSettingsQualityTab(quality) {
 
     <section class="settings-section">
       <h3>Regression checks</h3>
-      <p class="scope-label muted small">Instance-scoped</p>
+      <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
         Workflow QA runs these checks against each Gap worktree. Manual runs
         use the current targeted application checkout.
@@ -41,8 +41,11 @@ function renderSettingsQualityTab(quality) {
       <div class="settings-list" id="quality-regression-list">
         ${renderQualityRegressionList(regressions)}
       </div>
-    </section>
+    </section>`;
+}
 
+function renderSettingsQualityProjectSections(quality) {
+  return `
     ${renderSettingsMarkdownField({
       id: "s-quality-business-requirements",
       title: "Business requirements",
@@ -56,6 +59,7 @@ function renderSettingsQualityTab(quality) {
       id: "s-quality-instructions",
       title: "Instructions",
       value: quality.instructions || "",
+      scope: "Project-wide",
       description: "How the Quality agent should choose and evaluate test coverage.",
       rows: 9,
     })}
@@ -65,6 +69,12 @@ function renderSettingsQualityTab(quality) {
           Quality can run once business requirements and instructions are both filled in.
         </p>
       </section>`}`;
+}
+
+function renderSettingsQualityTab(quality) {
+  return `
+    ${renderSettingsQualityInstanceSections(quality)}
+    ${renderSettingsQualityProjectSections(quality)}`;
 }
 
 function renderQualityRegressionList(regressions) {
@@ -91,25 +101,48 @@ function renderQualityRegressionList(regressions) {
   }).join("");
 }
 
-async function autosaveSettingsQuality() {
-  await api("PATCH", "/api/quality", {
-    enabled: $("#s-quality-enabled").dataset.enabled === "1" ? "1" : "0",
-    regressions_enabled: $("#s-quality-regressions-enabled").dataset.enabled === "1" ? "1" : "0",
-    business_requirements: $("#s-quality-business-requirements").value,
-    instructions: $("#s-quality-instructions").value,
-  });
+async function autosaveSettingsQuality(root = document) {
+  const body = {};
+  const qualityEnabled = root.querySelector("#s-quality-enabled");
+  const regressionsEnabled = root.querySelector("#s-quality-regressions-enabled");
+  const requirements = root.querySelector("#s-quality-business-requirements");
+  const instructions = root.querySelector("#s-quality-instructions");
+  if (qualityEnabled) body.enabled = qualityEnabled.dataset.enabled === "1" ? "1" : "0";
+  if (regressionsEnabled) {
+    body.regressions_enabled = regressionsEnabled.dataset.enabled === "1" ? "1" : "0";
+  }
+  if (requirements) body.business_requirements = requirements.value;
+  if (instructions) body.instructions = instructions.value;
+  await api("PATCH", "/api/quality", body);
 }
 
 function bindSettingsQualityTab() {
-  const root = document.querySelector('[data-tab-pane="quality"]');
+  bindSettingsQualityInstanceSections("quality");
+  bindSettingsQualityProjectSections("quality");
+}
+
+function bindSettingsQualityProjectSections(tabSlug = "runtime") {
+  const root = document.querySelector(`[data-tab-pane="${tabSlug}"]`);
   bindSettingsMarkdownFields(root);
-  const autosaveQuality = bindSettingsAutosave(
+  bindSettingsAutosave(
     root,
     "#s-quality-business-requirements, #s-quality-instructions",
-    autosaveSettingsQuality,
+    () => autosaveSettingsQuality(root),
+  );
+}
+
+function bindSettingsQualityInstanceSections(tabSlug = "instances") {
+  const root = document.querySelector(`[data-tab-pane="${tabSlug}"]`);
+  const autosaveQuality = createSettingsAutosave(
+    () => autosaveSettingsQuality(root),
+    {
+      controls: $$("#s-quality-enabled, #s-quality-regressions-enabled", root),
+      errorPrefix: "Save failed",
+    },
   );
   $("#s-quality-enabled")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
+    btn.dataset.settingsSavedValue = btn.dataset.enabled || "0";
     const enabled = btn.dataset.enabled !== "1";
     btn.dataset.enabled = enabled ? "1" : "0";
     btn.setAttribute("aria-pressed", enabled ? "true" : "false");
@@ -123,6 +156,7 @@ function bindSettingsQualityTab() {
   });
   $("#s-quality-regressions-enabled")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
+    btn.dataset.settingsSavedValue = btn.dataset.enabled || "0";
     const enabled = btn.dataset.enabled !== "1";
     btn.dataset.enabled = enabled ? "1" : "0";
     btn.setAttribute("aria-pressed", enabled ? "true" : "false");
@@ -248,7 +282,7 @@ async function openRegressionCreateModal(initialPrompt = "", button = null) {
       description: prompt,
     });
     toast("Regression created", "info");
-    if (state.currentRoute === "settings") await refreshSettingsTab("quality", { force: true });
+    if (state.currentRoute === "project") await refreshSettingsTab("quality", { force: true });
     return result.regression;
   });
 }
@@ -257,6 +291,6 @@ async function runQualityRegressions(button = null) {
   await withButtonBusy(button, "Running...", async () => {
     const result = await api("POST", "/api/quality/regressions/run", {});
     toast(result.message || "Current-checkout regression run complete", result.ok ? "info" : "warn");
-    if (state.currentRoute === "settings") await refreshSettingsTab("quality", { force: true });
+    if (state.currentRoute === "project") await refreshSettingsTab("quality", { force: true });
   });
 }

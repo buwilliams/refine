@@ -23,7 +23,6 @@
       <a href="#/gaps" data-route="gaps">Gaps</a>
       <a href="#/changes" data-route="changes">Changes</a>
       <a href="#/logs" data-route="logs">Logs</a>
-      <a href="#/system/processes" data-route="settings">System</a>
     </nav>
     <div class="topbar-actions">
       <details class="nav-menu nav-context-menu" id="nav-context-menu">
@@ -45,6 +44,10 @@
           </a>
           <label class="nav-menu-label" for="global-reporter">Reporter</label>
           <select id="global-reporter" aria-label="Reporter"></select>
+          <div class="nav-menu-label">Management</div>
+          <a class="nav-menu-item" href="#/instance/instances" data-route="instance">Instance</a>
+          <a class="nav-menu-item" href="#/project/application" data-route="project">Project</a>
+          <a class="nav-menu-item" href="#/system/processes" data-route="settings">System</a>
         </div>
       </details>
       <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"

@@ -283,8 +283,7 @@ DEFAULT_SETTINGS = {
     "governance_product": "",
     "governance_constitution": "",
     "governance_rules_json": "[]",
-    # Quality gate. Business requirements + instructions are project-wide;
-    # quality_enabled is instance/application scoped.
+    # Quality gate. Quality settings are project-wide.
     "quality_business_requirements": "",
     "quality_instructions": "",
     "quality_enabled": "0",

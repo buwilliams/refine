@@ -25,7 +25,7 @@ function renderGuidanceRow(item = {}, idx = 0) {
 
 let _guidanceModalOpen = false;
 
-function openGuidanceModal(items, index = null) {
+function openGuidanceModal(items, index = null, refreshTab = "guidance") {
   if (_guidanceModalOpen) return;
   _guidanceModalOpen = true;
   const editing = Number.isInteger(index);
@@ -119,7 +119,7 @@ function openGuidanceModal(items, index = null) {
         await api("PUT", "/api/guidance", { guidance: next });
         toast(editing ? "Guidance saved" : "Guidance created", "info");
         close();
-        await refreshSettingsTab("guidance", { force: true });
+        await refreshSettingsTab(refreshTab, { force: true });
       } catch (e) { await showActionError(e); }
     });
   }
@@ -136,7 +136,7 @@ function openGuidanceModal(items, index = null) {
         await api("PUT", "/api/guidance", { guidance: next });
         toast("Guidance deleted", "info");
         close();
-        await refreshSettingsTab("guidance", { force: true });
+        await refreshSettingsTab(refreshTab, { force: true });
       } catch (e) { await showActionError(e); }
     });
   }
@@ -185,19 +185,19 @@ function renderSettingsGuidanceTab(guidanceItems) {
     </section>`;
 }
 
-function bindSettingsGuidanceTab(guidanceItems) {
+function bindSettingsGuidanceTab(guidanceItems, refreshTab = "guidance") {
   $("#guidance-list")?.addEventListener("click", (e) => {
     const row = e.target.closest("[data-guidance-open]");
-    if (row) openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen));
+    if (row) openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab);
   });
   $("#guidance-list")?.addEventListener("keydown", (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     const row = e.target.closest("[data-guidance-open]");
     if (!row) return;
     e.preventDefault();
-    openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen));
+    openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab);
   });
   $("#guidance-add")?.addEventListener("click", () => {
-    openGuidanceModal(guidanceItems);
+    openGuidanceModal(guidanceItems, null, refreshTab);
   });
 }

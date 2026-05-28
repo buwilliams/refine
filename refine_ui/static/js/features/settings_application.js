@@ -1,6 +1,8 @@
 // ---- System / Application ---------------------------------------------------
 
-function renderSettingsApplicationTab({ s, projectApps, currentProject, projectRegistryEnabled, appOptions, activeInstanceLabel }) {
+function renderProjectApplicationsSection({
+  projectApps, currentProject, projectRegistryEnabled, appOptions,
+}) {
   return `
     <section class="settings-section">
       <h3>Applications</h3>
@@ -24,8 +26,22 @@ function renderSettingsApplicationTab({ s, projectApps, currentProject, projectR
         <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
-    </section>
+    </section>`;
+}
 
+function renderSettingsApplicationTab({
+  projectApps, currentProject, projectRegistryEnabled, appOptions,
+}) {
+  return renderProjectApplicationsSection({
+    projectApps,
+    currentProject,
+    projectRegistryEnabled,
+    appOptions,
+  });
+}
+
+function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
+  return `
     <section class="settings-section">
       <h3>Application</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
@@ -205,12 +221,17 @@ function applyGeneratedTargetAppConfig(cfg) {
   }
   autosaveSettingsApplication({ refresh: true })
     .then(() => toast("Generated target-app config saved", "info"))
-    .catch((e) => showActionError(e, "Target-app config autosave failed"));
+    .catch(async (e) => {
+      _targetAppDraftDirty = false;
+      await modalAlert(
+        `Target-app config autosave failed: ${e?.message || "Request failed"}\n\nThe fields were restored to the last saved values.`,
+        { title: "Save failed" },
+      );
+      await refreshSettingsTab("application", { force: true });
+    });
 }
 
-function bindSettingsApplicationTab(currentProject) {
-  bindCommand("#s-application-copy-instance", "settings.application.copy_instance");
-  bindCommand("#s-target-generate-ai", "target_app.generate");
+function bindProjectApplicationsControls(currentProject, refreshTab = "runtime") {
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
   });
@@ -256,14 +277,23 @@ function bindSettingsApplicationTab(currentProject) {
         const result = await api("DELETE", "/api/projects", { path });
         state.project = { ...(state.project || {}), apps: result.apps || [] };
         toast("App removed", "info");
-        await refreshSettingsTab("application", { force: true });
+        await refreshSettingsTab(refreshTab, { force: true });
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });
+}
+
+function bindInstanceApplicationConfigControls() {
+  bindCommand("#s-application-copy-instance", "settings.application.copy_instance");
+  bindCommand("#s-target-generate-ai", "target_app.generate");
   const root = document.querySelector('[data-tab-pane="application"]');
   bindSettingsAutosave(
     root,
     "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-rebuild-command, #s-target-auto-rebuild, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-rebuild-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
     autosaveSettingsApplication,
   );
+}
+
+function bindSettingsApplicationTab(currentProject) {
+  bindProjectApplicationsControls(currentProject, "application");
 }

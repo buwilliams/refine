@@ -74,6 +74,7 @@ function updateNavAppContextLabel(label) {
 }
 
 function refreshCurrentSettingsSurface(options = {}) {
+  if (!["settings", "instance", "project"].includes(state.currentRoute || "")) return undefined;
   if (typeof refreshActiveSettingsTab === "function") {
     return refreshActiveSettingsTab(options);
   }
@@ -403,7 +404,7 @@ async function applyProjectAttachResult(result) {
   updateActiveInstanceLabel();
   state.dashboard = null;
   state.currentGap = null;
-  state.underlayHash = "#/system/application";
+  state.underlayHash = "#/project/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
   showProjectAttachToast(result);
   if (result.restart_pending) {
@@ -415,9 +416,9 @@ async function applyProjectAttachResult(result) {
   await syncProjectUpdates({ silent: true });
   await refreshInstanceScopedState({ selectReporterFallback: true });
   await refreshTargetAppToggle();
-  if (location.hash !== "#/system/application") {
-    location.hash = "#/system/application";
-  } else if (state.currentRoute === "settings") {
+  if (location.hash !== "#/project/application") {
+    location.hash = "#/project/application";
+  } else if (["settings", "instance", "project"].includes(state.currentRoute || "")) {
     await refreshSettings();
   } else {
     navigate();
@@ -881,6 +882,8 @@ document.addEventListener("click", (e) => {
     runCommand("refine.issue.request");
   } else if (e.target.closest("#target-app-indicator")) {
     closeTopbarMenus();
+  } else if (e.target.closest(".nav-context-panel .nav-menu-item")) {
+    closeTopbarMenus();
   } else if (!e.target.closest(".nav-menu")) {
     closeTopbarMenus();
   }
@@ -941,7 +944,7 @@ function initSSE() {
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    if (state.currentRoute === "settings") {
+    if (["settings", "instance", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
     // Changes screen: the Merge agent can land a new merge commit;
@@ -959,7 +962,7 @@ function initSSE() {
   });
   sseSource.addEventListener("reporters_changed", async () => {
     await refreshReporters();
-    if (state.currentRoute === "settings"
+    if (state.currentRoute === "instance"
         && document.querySelector('[data-tab-pane="reporters"].active')) {
       refreshCurrentSettingsSurface();
     }
@@ -971,7 +974,7 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    if (state.currentRoute === "settings") refreshCurrentSettingsSurface();
+    if (["settings", "instance", "project"].includes(state.currentRoute || "")) refreshCurrentSettingsSurface();
     if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);

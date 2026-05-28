@@ -25,6 +25,10 @@ function renderProcessesTab(processData, settings, diag, dash) {
   const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
   return `
     <section class="settings-section">
+      <div id="runtime-upgrade-banner"></div>
+    </section>
+
+    <section class="settings-section">
       <h3>Process management</h3>
       ${rows ? `
         <table class="table process-table managed-process-table mobile-card-table">
@@ -718,6 +722,8 @@ function drawTargetAppStatusBlock(snap) {
 function bindSettingsProcessesTab(s) {
   bindProcessDetailCells();
   bindSupervisorProcessToggle();
+  bindRuntimeUpgradeBanner("[data-tab-pane=\"processes\"]");
+  refreshRuntimeUpgradeBanner();
   $$("[data-toggle-background-processes]").forEach((b) => {
     b.addEventListener("click", async () => {
       const shouldStop = b.dataset.toggleBackgroundProcesses === "stop";
