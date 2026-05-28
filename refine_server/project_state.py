@@ -29,6 +29,7 @@ PROJECT_SETTING_KEYS = {
     "governance_constitution",
     "governance_rules_json",
     "quality_enabled",
+    "quality_timing",
     "quality_regressions_enabled",
     "quality_business_requirements",
     "quality_instructions",
@@ -214,7 +215,7 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
         ensure_default_instance(root=root)
         ensure_active_instance(root=root)
         ensure_guidance_file(root=root)
-        ensure_project_quality_settings(root=root)
+        ensure_project_quality_settings(conn, root=root)
         return status
     if not migrate or not status.get("migration_required"):
         return status
@@ -379,12 +380,29 @@ def ensure_guidance_file(*, root: Path | None = None) -> None:
         })
 
 
-def ensure_project_quality_settings(*, root: Path | None = None) -> None:
+def ensure_project_quality_settings(
+    conn: sqlite3.Connection | None = None,
+    *,
+    root: Path | None = None,
+) -> None:
     """Lift legacy per-instance quality flags into project settings."""
+    from . import db
+
     root = root or volume_root()
     cfg = read_project_config(root=root)
     settings = cfg.setdefault("settings", {})
     changed = False
+    for key in ("quality_timing",):
+        if key in settings:
+            continue
+        value = db.DEFAULT_SETTINGS.get(key, "")
+        if conn is not None:
+            try:
+                value = db.get_setting(conn, key, value) or value
+            except sqlite3.Error:
+                pass
+        settings[key] = str(value)
+        changed = True
     for key in ("quality_enabled", "quality_regressions_enabled"):
         if key in settings:
             continue

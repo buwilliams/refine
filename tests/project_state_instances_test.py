@@ -1,6 +1,7 @@
 """Canonical JSON state, rebuildable cache, and instance ownership tests."""
 from __future__ import annotations
 
+import json
 import sys
 import shutil
 from pathlib import Path
@@ -65,8 +66,27 @@ def main() -> int:
 
         db.set_setting(conn, "paused", "1")
         db.set_setting(conn, "agents_paused", "1")
+        db.set_setting(conn, "quality_timing", "post_rebuild")
+        config_settings = json.loads(
+            (root / "config.json").read_text(encoding="utf-8")
+        )["settings"]
+        assert config_settings["quality_timing"] == "post_rebuild"
         assert project_state.list_settings()["paused"] == "1"
         assert project_state.list_settings()["agents_paused"] == "1"
+        assert project_state.list_settings()["quality_timing"] == "post_rebuild"
+        project_state.rebuild_sqlite_cache(conn)
+        assert db.get_setting(conn, "quality_timing") == "post_rebuild"
+
+        cfg = json.loads((root / "config.json").read_text(encoding="utf-8"))
+        cfg["settings"].pop("quality_timing", None)
+        (root / "config.json").write_text(json.dumps(cfg), encoding="utf-8")
+        db.set_setting(conn, "quality_timing", "post_rebuild", persist=False)
+        project_state.ensure_initialized(conn)
+        config_settings = json.loads(
+            (root / "config.json").read_text(encoding="utf-8")
+        )["settings"]
+        assert config_settings["quality_timing"] == "post_rebuild"
+
         assert project_state.resume_agents_for_startup(conn) is True
         assert db.get_setting(conn, "paused") == "0"
         assert db.get_setting(conn, "agents_paused") == "0"
