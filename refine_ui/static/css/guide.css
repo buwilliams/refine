@@ -1,0 +1,303 @@
+/* --- Guide panel --------------------------------------------------------- */
+:root {
+  --guide-panel-width: 360px;
+}
+
+body.guide-open {
+  padding-right: var(--guide-panel-width);
+}
+
+body.guide-open .toolbar-dock {
+  right: var(--guide-panel-width);
+}
+
+.guide-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--guide-panel-width);
+  min-width: 280px;
+  max-width: min(560px, calc(100vw - 48px));
+  z-index: 130;
+  display: none;
+  flex-direction: column;
+  background: var(--card);
+  border-left: 1px solid var(--color-border-subtle);
+  box-shadow: -8px 0 24px rgba(15, 23, 42, 0.10);
+}
+
+.guide-panel.open {
+  display: flex;
+}
+
+.guide-panel.resizing {
+  user-select: none;
+}
+
+.guide-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  width: 12px;
+  cursor: ew-resize;
+  background: transparent;
+}
+
+.guide-resize::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 3px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.guide-resize:hover::after,
+.guide-panel.resizing .guide-resize::after {
+  background: var(--accent);
+}
+
+.guide-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 14px 0 18px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.guide-header h2 {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.guide-close {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+.guide-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+}
+
+.guide-intro {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.guide-progress {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  margin-bottom: 12px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.guide-progress strong {
+  color: var(--fg);
+}
+
+.guide-category {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.guide-category > summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.guide-category > summary::-webkit-details-marker {
+  display: none;
+}
+
+.guide-category-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 12px;
+}
+
+.guide-chevron {
+  width: 14px;
+  height: 14px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.guide-category[open] > summary .guide-chevron,
+.guide-item.active .guide-item-open .guide-chevron {
+  transform: rotate(90deg);
+}
+
+.guide-category-title {
+  font-weight: 750;
+}
+
+.guide-category-description {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.guide-item-list {
+  border-top: 1px solid var(--color-border-subtle);
+  padding: 6px;
+}
+
+.guide-item {
+  border-radius: var(--radius-md);
+}
+
+.guide-item.active {
+  background: var(--color-surface-muted);
+}
+
+.guide-item-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 8px;
+}
+
+.guide-item-open {
+  height: auto;
+  min-height: 28px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  color: inherit;
+  justify-content: flex-start;
+  white-space: normal;
+}
+
+.guide-item-open:hover:not(:disabled) {
+  background: transparent;
+  border-color: transparent;
+  color: inherit;
+}
+
+.guide-item-title {
+  flex: 1;
+  min-width: 0;
+  font-weight: 650;
+  text-align: left;
+  line-height: 1.25;
+}
+
+.guide-status {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  flex: 0 0 26px;
+  border-radius: 999px;
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-soft);
+  box-shadow: none;
+}
+
+.guide-status:hover:not(:disabled) {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.guide-status svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.guide-status-checked {
+  color: var(--success);
+}
+
+.guide-status-skipped {
+  color: var(--warn);
+}
+
+.guide-item-body {
+  padding: 0 8px 10px 30px;
+}
+
+.guide-item-body p {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.guide-default {
+  margin: 0 0 10px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.guide-item-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.guide-target-highlight {
+  outline: 2px solid rgba(37, 99, 235, 0.60);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+  transition: outline-color 0.2s ease;
+}
+
+@media (max-width: 760px) {
+  :root {
+    --guide-panel-width: min(420px, 92vw);
+  }
+
+  body.guide-open {
+    padding-right: 0;
+  }
+
+  body.guide-open .toolbar-dock {
+    right: 0;
+  }
+
+  .guide-panel {
+    width: var(--guide-panel-width);
+  }
+}

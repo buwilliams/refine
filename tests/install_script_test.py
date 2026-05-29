@@ -552,8 +552,6 @@ def main() -> int:
                 "codex",
                 "n",
                 "n",
-                str(target),
-                "n",
                 "18080",
                 "n",
             ],
@@ -564,7 +562,9 @@ def main() -> int:
         assert "Installed provider CLIs: codex" in output
         assert "Missing provider CLIs: claude gemini copilot" in output
         assert "Provider (claude codex gemini copilot) [codex]" in output
-        assert "Target app path or Git remote" in output
+        assert "Target app path or Git remote" not in output
+        assert "No target app attached" in output
+        assert "Target app:       not attached yet" in output
         assert f"Refine checkout: {checkout}" in output
         assert "Provider:         codex" in output
         assert f"Cloned Refine to {default_checkout / 'refine'}" not in output

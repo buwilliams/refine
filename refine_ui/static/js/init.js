@@ -24,6 +24,7 @@ async function init() {
     // not fatal — likely fresh install with no reporters yet
   }
   initToolbar();
+  if (typeof initGuide === "function") initGuide();
   if (typeof initCommandPalette === "function") initCommandPalette();
   initSSE();
   initTargetAppToggle();

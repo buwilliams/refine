@@ -43,6 +43,9 @@ def main() -> int:
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
+    guide_js = (root / "refine_ui/static/js/features/guide.js").read_text(
+        encoding="utf-8",
+    )
     import_js = (root / "refine_ui/static/js/features/gaps-import.js").read_text(
         encoding="utf-8",
     )
@@ -86,6 +89,9 @@ def main() -> int:
         encoding="utf-8",
     )
     toolbar_css = (root / "refine_ui/static/css/toolbar.css").read_text(
+        encoding="utf-8",
+    )
+    guide_css = (root / "refine_ui/static/css/guide.css").read_text(
         encoding="utf-8",
     )
 
@@ -355,10 +361,11 @@ def main() -> int:
     context_panel = index_html.split('class="nav-menu-panel nav-context-panel"', 1)[1].split("</details>", 1)[0]
     assert '<label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>' in context_panel
     assert '<div class="nav-menu-label nav-context-section-label">Management</div>' in context_panel
+    assert '<a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/instance/instances" data-route="instance">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/project/application" data-route="project">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/system/processes" data-route="settings">' in context_panel
-    assert context_panel.count('class="nav-menu-icon"') == 3
+    assert context_panel.count('class="nav-menu-icon"') == 4
     assert 'id="nav-context-app-summary">Application</span>' in index_html
     assert 'id="nav-context-reporter-summary">No reporter</span>' in index_html
     assert '<select id="global-reporter" aria-label="Reporter"></select>' in index_html
@@ -408,6 +415,41 @@ def main() -> int:
     assert ".nav-context-section-label" in base_css
     assert "margin-top: 12px;" in base_css
     assert ".nav-menu-icon" in base_css
+    assert 'id="nav-guide-open"' in index_html
+    assert '<aside id="guide-panel"' in index_html
+    assert '<script src="/static/js/features/guide.js"></script>' in index_html
+    assert '<link rel="stylesheet" href="/static/css/guide.css">' in index_html
+    assert "const GUIDE_CATEGORIES = [" in guide_js
+    assert 'id: "guide.open"' in guide_js
+    assert 'id: "guide.toggle"' in guide_js
+    assert 'class="guide-category"' in guide_js
+    assert 'class="guide-item ' in guide_js
+    assert 'data-guide-open-item' in guide_js
+    assert 'data-guide-status' in guide_js
+    assert 'data-guide-default' in guide_js
+    assert 'data-guide-skip' in guide_js
+    assert 'data-guide-complete' in guide_js
+    assert 'class="guide-progress"' in guide_js
+    assert 'class="guide-status guide-status-' in guide_js
+    assert "function firstIncompleteGuideItem" in guide_js
+    assert "function openGuideItemTarget" in guide_js
+    assert "function completeGuideItem" in guide_js
+    assert 'class="guide-item-kind"' not in guide_js
+    assert "Focus in app" not in guide_js
+    assert 'hash: "#/instance/application"' in guide_js
+    assert 'hash: "#/project/quality"' in guide_js
+    assert 'hash: "#/system/processes"' in guide_js
+    assert 'command: "gap.new"' in guide_js
+    assert 'command: "gap.import"' in guide_js
+    assert 'command: "refine.issue.request"' in guide_js
+    assert ".guide-resize::after" in guide_css
+    assert ".guide-progress" in guide_css
+    assert ".guide-item-open" in guide_css
+    assert ".guide-item-actions" in guide_css
+    assert ".guide-status-checked" in guide_css
+    assert ".guide-status-skipped" in guide_css
+    assert "body.guide-open .toolbar-dock" in guide_css
+    assert "--guide-panel-width" in guide_css
     assert ".nav-issue-button" in base_css
     assert ".nav-bug-icon" in base_css
     assert ".nav-create-group" in base_css

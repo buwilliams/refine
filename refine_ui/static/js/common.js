@@ -305,6 +305,7 @@ function openProjectAttachModal({
   okLabel = "Attach project",
   defaultPath = "",
   reloadOnSuccess = true,
+  openGuideOnSuccess = false,
 } = {}) {
   return new Promise((resolve) => {
     const root = document.createElement("div");
@@ -315,13 +316,14 @@ function openProjectAttachModal({
           <div class="modal-title" id="project-setup-title">${htmlEscape(title)}</div>
           <div class="modal-body">
             <p class="muted">${htmlEscape(message)}</p>
-            <label for="project-setup-path">Project path</label>
+            <label for="project-setup-path">Project path or Git remote</label>
             <input id="project-setup-path" name="path" type="text" class="modal-input"
-                   placeholder="/path/to/app" autocomplete="off" required
+                   placeholder="/path/to/app or git@github.com:org/app.git" autocomplete="off" required
                    value="${htmlEscape(defaultPath)}">
             <p class="muted small">
-              If the directory does not exist, refine will create it, run git init,
-              and add the .refine configuration.
+              If the directory does not exist, refine will create it and run git init.
+              If you paste a Git remote, refine will clone it first; private repos
+              require working host credentials.
             </p>
             <div class="form-error" id="project-setup-error" style="display:none"></div>
           </div>
@@ -358,7 +360,7 @@ function openProjectAttachModal({
           showProjectAttachToast(result);
           window.location.reload();
         } else {
-          await applyProjectAttachResult(result);
+          await applyProjectAttachResult(result, { openGuide: openGuideOnSuccess });
           root.remove();
         }
         resolve(result);
@@ -376,7 +378,7 @@ function openProjectAttachModal({
                 showProjectAttachToast(result);
                 window.location.reload();
               } else {
-                await applyProjectAttachResult(result);
+                await applyProjectAttachResult(result, { openGuide: openGuideOnSuccess });
                 root.remove();
               }
               resolve(result);
@@ -397,10 +399,11 @@ function openProjectAttachModal({
 
 function openAddAppModal(options = {}) {
   return openProjectAttachModal({
-    message: "Add an existing app path or a new directory to create and initialize.",
+    message: "Add an existing app path, paste a Git remote, or choose a new directory to create and initialize.",
     title: "Add app",
     okLabel: "Add and switch",
     reloadOnSuccess: false,
+    openGuideOnSuccess: true,
     ...options,
   });
 }
@@ -417,7 +420,7 @@ function showProjectAttachToast(result) {
   }
 }
 
-async function applyProjectAttachResult(result) {
+async function applyProjectAttachResult(result, options = {}) {
   state.project = result;
   updateActiveInstanceLabel();
   state.dashboard = null;
@@ -440,6 +443,13 @@ async function applyProjectAttachResult(result) {
     await refreshSettings();
   } else {
     navigate();
+  }
+  if (options.openGuide && typeof openGuide === "function") {
+    openGuide({
+      context: result.config_created ? "app-created" : "app-existing",
+      categoryId: "project",
+      itemId: "project-application",
+    });
   }
 }
 

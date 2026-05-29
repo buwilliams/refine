@@ -38,6 +38,7 @@ def test_client_switch_path(root: Path) -> None:
         'title: "Add app"',
         'okLabel: "Add and switch"',
         "reloadOnSuccess: false",
+        "openGuideOnSuccess: true",
     ):
         assert expected in add_app_body, expected
 
@@ -47,8 +48,8 @@ def test_client_switch_path(root: Path) -> None:
     assert "await syncProjectUpdates({ silent: true })" in common_js
     assert "return !!result" in first_run_body
 
-    assert "async function applyProjectAttachResult(result)" in common_js
-    switch_body = common_js.split("async function applyProjectAttachResult(result)", 1)[1]
+    assert "async function applyProjectAttachResult(result, options = {})" in common_js
+    switch_body = common_js.split("async function applyProjectAttachResult(result, options = {})", 1)[1]
     switch_body = switch_body.split("\n}", 1)[0]
     for expected in (
         "state.project = result",
@@ -58,6 +59,7 @@ def test_client_switch_path(root: Path) -> None:
         "await refreshInstanceScopedState({ selectReporterFallback: true })",
         "await refreshTargetAppToggle()",
         'location.hash = "#/project/application"',
+        "openGuide({",
     ):
         assert expected in switch_body, expected
 

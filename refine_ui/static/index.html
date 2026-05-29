@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/static/css/common.css">
   <link rel="stylesheet" href="/static/css/modals.css">
   <link rel="stylesheet" href="/static/css/gaps.css">
+  <link rel="stylesheet" href="/static/css/guide.css">
   <link rel="stylesheet" href="/static/css/toolbar.css">
 </head>
 <body>
@@ -45,6 +46,14 @@
           <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
           <select id="global-reporter" aria-label="Reporter"></select>
           <div class="nav-menu-label nav-context-section-label">Management</div>
+          <a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <circle cx="12" cy="12" r="9"></circle>
+              <path d="M9.6 9a2.4 2.4 0 0 1 4.6 1.1c0 1.6-2.2 2-2.2 3.4"></path>
+              <path d="M12 17h.01"></path>
+            </svg>
+            <span>Guide</span>
+          </a>
           <a class="nav-menu-item nav-management-item" href="#/instance/instances" data-route="instance">
             <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
               <rect x="3" y="4" width="18" height="16" rx="2"></rect>
@@ -108,6 +117,7 @@
   <main id="main"></main>
 
   <aside id="toolbar-dock" class="toolbar-dock" aria-label="Toolbar"></aside>
+  <aside id="guide-panel" class="guide-panel" aria-label="Guide" aria-hidden="true"></aside>
 
   <template id="t-banner">
     <div class="banner">
@@ -126,6 +136,7 @@
   <script src="/static/js/features/gaps-import.js"></script>
   <script src="/static/js/features/changes.js"></script>
   <script src="/static/js/features/toolbar.js"></script>
+  <script src="/static/js/features/guide.js"></script>
   <script src="/static/js/features/logs.js"></script>
   <script src="/static/js/features/settings_application.js"></script>
   <script src="/static/js/features/settings_processes.js"></script>

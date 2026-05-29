@@ -16,7 +16,7 @@ Linux, macOS, or Ubuntu/WSL:
 curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
 ```
 
-The installer checks the host, installs or repairs missing tools when you approve, asks which AI provider to use, optionally clones or attaches the target application, and starts Refine.
+The installer checks the host, installs or repairs missing tools when you approve, asks which AI provider to use, and starts Refine. Attach a target application from the browser Guide after startup, or set `REFINE_INSTALL_TARGET_APP` for scripted installs.
 
 refine has a robust CLI:
 

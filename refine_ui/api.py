@@ -12,6 +12,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -1411,10 +1412,9 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     """Create or attach a target app path and make it active."""
     raw_path = (body.get("path") or "").strip()
     if not raw_path:
-        return err(400, "Enter a project path.")
+        return err(400, "Enter a project path or Git remote.")
 
     clone_dir = Path.cwd().resolve()
-    client_repo = Path(raw_path).expanduser()
 
     try:
         from refine_cli.cli import (
@@ -1432,6 +1432,11 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 ),
         )
 
+        client_repo = (
+            _clone_project_remote(raw_path, clone_dir)
+            if _looks_like_git_remote(raw_path)
+            else Path(raw_path).expanduser()
+        )
         current_before = _current_client_repo()
         switching = current_before is not None and current_before != client_repo.resolve()
         _validate_target_schema_before_switch(client_repo.resolve(), body)
@@ -1526,6 +1531,65 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
 
 def _project_registry_enabled(clone_dir: Path) -> bool:
     return (clone_dir / "pyproject.toml").is_file() and (clone_dir / "refine_cli" / "cli.py").is_file()
+
+
+def _looks_like_git_remote(value: str) -> bool:
+    text = str(value or "").strip()
+    if text.startswith(("git@", "ssh://", "git://")):
+        return True
+    parsed = urlparse(text)
+    return parsed.scheme in {"http", "https", "file"} and bool(parsed.netloc or parsed.scheme == "file")
+
+
+def _clone_project_remote(remote: str, clone_dir: Path) -> Path:
+    git = shutil.which("git")
+    if git is None:
+        raise config.ConfigError("could not find `git` on PATH; install git or use a local app path")
+    target = _default_project_clone_path(remote, clone_dir)
+    if target.exists():
+        if (target / ".git").exists():
+            return target
+        try:
+            has_entries = any(target.iterdir())
+        except OSError as e:
+            raise config.ConfigError(f"cannot inspect clone target {target}: {e}") from e
+        if has_entries:
+            raise config.ConfigError(
+                f"clone target already exists and is not empty: {target}"
+            )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [git, "clone", remote, str(target)],
+        cwd=str(clone_dir),
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "git clone failed").strip()
+        raise config.ConfigError(
+            "could not clone target app. Check the Git remote and host credentials: "
+            + detail
+        )
+    return target
+
+
+def _default_project_clone_path(remote: str, clone_dir: Path) -> Path:
+    parsed = urlparse(remote)
+    raw_name = Path(parsed.path or remote.rstrip("/")).name or "target-app"
+    if raw_name.endswith(".git"):
+        raw_name = raw_name[:-4]
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", raw_name).strip(".-") or "target-app"
+    base = clone_dir.parent
+    candidate = base / name
+    if not candidate.exists() or (candidate / ".git").exists():
+        return candidate
+    i = 2
+    while True:
+        numbered = base / f"{name}-{i}"
+        if not numbered.exists() or (numbered / ".git").exists():
+            return numbered
+        i += 1
 
 
 def _validate_target_schema_before_switch(client_repo: Path, body: dict[str, Any]) -> None:
