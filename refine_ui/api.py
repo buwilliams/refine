@@ -128,7 +128,7 @@ def _schema_block_response() -> tuple[int, dict] | None:
 def _background_processes_stopped() -> bool:
     try:
         conn = _conn()
-    except sqlite3.Error:
+    except (sqlite3.Error, config.ConfigError):
         return False
     try:
         return (db.get_setting(conn, "paused") or "0") == "1"
@@ -141,7 +141,7 @@ def _agents_paused(conn: sqlite3.Connection | None = None) -> bool:
     if conn is None:
         try:
             conn = _conn()
-        except sqlite3.Error:
+        except (sqlite3.Error, config.ConfigError):
             return False
         close_conn = True
     try:

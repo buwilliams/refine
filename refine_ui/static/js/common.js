@@ -426,6 +426,7 @@ function openProjectAttachModal({
       try {
         const result = await api("POST", "/api/project/attach", { path });
         if (reloadOnSuccess) {
+          if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
           state.project = result;
           showProjectAttachToast(result);
           window.location.reload();
@@ -444,6 +445,7 @@ function openProjectAttachModal({
             try {
               const result = await api("POST", "/api/project/attach", { path, migrate: true });
               if (reloadOnSuccess) {
+                if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
                 state.project = result;
                 showProjectAttachToast(result);
                 window.location.reload();
@@ -491,6 +493,7 @@ function showProjectAttachToast(result) {
 }
 
 async function applyProjectAttachResult(result, options = {}) {
+  if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
   state.project = result;
   updateActiveInstanceLabel();
   state.dashboard = null;

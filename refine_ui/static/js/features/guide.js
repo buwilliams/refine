@@ -209,6 +209,16 @@ function saveGuideChecklist() {
   } catch {}
 }
 
+function resetGuideState({ redraw = true } = {}) {
+  guideState.statuses = {};
+  guideState.context = "";
+  guideState.activeCategory = "";
+  guideState.activeItem = "";
+  clearGuideTargetHighlight();
+  try { localStorage.removeItem(GUIDE_CHECKLIST_KEY); } catch {}
+  if (redraw) drawGuide();
+}
+
 function guideItemsInOrder() {
   return GUIDE_CATEGORIES.flatMap((category) => (
     category.items.map((item) => ({ category, item }))

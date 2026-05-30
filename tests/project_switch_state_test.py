@@ -41,6 +41,7 @@ def test_client_switch_path(root: Path) -> None:
         root / "refine_ui/static/js/features/settings_instances.js"
     ).read_text(encoding="utf-8")
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(encoding="utf-8")
+    settings_surface_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
     dashboard_js = (root / "refine_ui/static/js/features/dashboard.js").read_text(encoding="utf-8")
     gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(encoding="utf-8")
     changes_js = (root / "refine_ui/static/js/features/changes.js").read_text(encoding="utf-8")
@@ -93,6 +94,20 @@ def test_client_switch_path(root: Path) -> None:
     assert 'if (!hasAttachedProject()) {' in target_app_js
     assert 'guideState.context === "no-app"' in guide_js
     assert "options.openTarget !== false" in guide_js
+    assert "function resetGuideState" in guide_js
+    assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
+    assert "async function loadSettingsSurfaceData()" in settings_surface_js
+    assert 'const project = await api("GET", "/api/project/status");' in settings_surface_js
+    assert "if (project.attached === false)" in settings_surface_js
+    assert "return detachedSettingsSurfaceData(project);" in settings_surface_js
+    assert "function renderSettingsNoProjectTab" in settings_surface_js
+    assert "Open the Guide to configure Refine and attach an app before using" in settings_surface_js
+    assert "data-settings-open-guide" in settings_surface_js
+    no_app_tab_body = settings_surface_js.split("if (data.noProject)", 1)[1]
+    no_app_tab_body = no_app_tab_body.split("if (surface === SETTINGS_SURFACES.settings)", 1)[0]
+    assert "surface === SETTINGS_SURFACES.project && slug === \"application\"" in no_app_tab_body
+    assert "return renderSettingsApplicationTab({" in no_app_tab_body
+    assert "return renderSettingsNoProjectTab(surface.title);" in no_app_tab_body
     assert "_project_attached()" in api_py
     assert '"attached": False' in api_py
 
@@ -100,6 +115,7 @@ def test_client_switch_path(root: Path) -> None:
     switch_body = common_js.split("async function applyProjectAttachResult(result, options = {})", 1)[1]
     switch_body = switch_body.split("\n}", 1)[0]
     for expected in (
+        'if (typeof resetGuideState === "function") resetGuideState({ redraw: false });',
         "state.project = result",
         "resetChatForProjectSwitch()",
         "initSSE()",
@@ -123,6 +139,9 @@ def test_client_switch_path(root: Path) -> None:
     assert "function resetChatForProjectSwitch()" in toolbar_js
     assert "await openAddAppModal()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
+    remove_body = settings_js.split('api("DELETE", "/api/projects", { path })', 1)[1]
+    remove_body = remove_body.split("await refreshSettingsTab", 1)[0]
+    assert 'resetGuideState({ redraw: false })' in remove_body
     assert "await refreshInstanceScopedState()" in settings_js
     assert "active_instance_id: result.active_instance_id" in settings_js
     assert "updateActiveInstanceLabel()" in settings_js

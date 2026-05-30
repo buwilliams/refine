@@ -278,6 +278,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
         state.project = result.attached === false
           ? { ...result, apps: result.apps || [] }
           : { ...(state.project || {}), ...result, apps: result.apps || [] };
+        if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
         updateActiveInstanceLabel();
         toast("App removed", "info");
         if (result.attached === false) {

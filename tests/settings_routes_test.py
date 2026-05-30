@@ -437,6 +437,8 @@ def main() -> int:
     assert "function firstIncompleteGuideItem" in guide_js
     assert "function openGuideItemTarget" in guide_js
     assert "function completeGuideItem" in guide_js
+    assert "function resetGuideState" in guide_js
+    assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
     assert "function clearGuideTargetHighlight" in guide_js
     assert "setTimeout(() => el.classList.remove(\"guide-target-highlight\")" not in guide_js
     assert "if (!guideState.activeItem || !findGuideItem(guideState.activeItem))" in guide_js
