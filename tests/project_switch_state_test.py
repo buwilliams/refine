@@ -12,6 +12,23 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo, reset_refine_imports
 
 
+def _read_optional(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def _restore_optional(path: Path, data: bytes | None) -> None:
+    if data is None:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        return
+    path.write_bytes(data)
+
+
 def test_client_switch_path(root: Path) -> None:
     index_html = (root / "refine_ui/static/index.html").read_text(encoding="utf-8")
     base_css = (root / "refine_ui/static/css/base.css").read_text(encoding="utf-8")
@@ -155,6 +172,8 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
     old_cfg = os.environ.get("REFINE_CONFIG_PATH")
     try:
         conn = init_refine(client1)
@@ -268,6 +287,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
         if old_cfg is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
@@ -283,6 +303,8 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
     try:
@@ -359,6 +381,7 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
         if old_cfg_env is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
@@ -448,6 +471,8 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
     try:
@@ -543,6 +568,7 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
         if old_cfg_env is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:

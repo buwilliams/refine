@@ -867,9 +867,12 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
         current = config.get(reload=True).client_repo
     except config.ConfigError:
         current = None
-    if current is not None and current == target:
-        return err(409, "Cannot remove the currently attached app. Switch to another app first.")
     apps = project_registry.remove_app(clone_dir, target)
+    if current is not None and current == target:
+        _detach_current_project(clone_dir, target)
+        status, body = project_status()
+        body["removed_path"] = str(target)
+        return status, body
     return 200, {"apps": apps}
 
 
@@ -1631,6 +1634,21 @@ def _ensure_current_app(apps: list[dict[str, str]], client_repo: Path) -> list[d
             "last_used_at": "",
         },
     ]
+
+
+def _detach_current_project(clone_dir: Path, target: Path) -> None:
+    binding = clone_dir / config.BINDING_FILENAME
+    if binding.exists():
+        try:
+            bound = config.read_binding(binding)
+        except config.ConfigError:
+            bound = None
+        if bound is None or bound == target.resolve():
+            try:
+                binding.unlink()
+            except FileNotFoundError:
+                pass
+    runtime.detach_configured()
 
 
 def _instance_summary() -> dict[str, Any]:

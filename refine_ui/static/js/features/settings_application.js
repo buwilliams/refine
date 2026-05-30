@@ -23,7 +23,7 @@ function renderProjectApplicationsSection({
         </select></div>
       <div class="actions settings-section-actions">
         <button class="secondary" id="s-project-add" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
-        <button class="warn" id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
+        <button id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
     </section>`;
@@ -275,12 +275,38 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
     await withButtonBusy(btn, "Removing…", async () => {
       try {
         const result = await api("DELETE", "/api/projects", { path });
-        state.project = { ...(state.project || {}), apps: result.apps || [] };
+        state.project = result.attached === false
+          ? { ...result, apps: result.apps || [] }
+          : { ...(state.project || {}), ...result, apps: result.apps || [] };
+        updateActiveInstanceLabel();
         toast("App removed", "info");
+        if (result.attached === false) {
+          refreshProjectApplicationsSectionOnly(result);
+          return;
+        }
         await refreshSettingsTab(refreshTab, { force: true });
       } catch (e) { toast(e.details || e.message, "error"); }
     });
   });
+}
+
+function refreshProjectApplicationsSectionOnly(project) {
+  const projectApps = project?.apps || [];
+  const currentProject = project?.client_repo || "";
+  const appOptions = projectApps.map((app) => `
+    <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
+      ${htmlEscape(app.name || app.path)}
+    </option>`).join("");
+  updateSettingsTabContent(
+    "application",
+    renderSettingsApplicationTab({
+      projectApps,
+      currentProject,
+      projectRegistryEnabled: project?.registry_enabled !== false,
+      appOptions,
+    }),
+    () => bindSettingsApplicationTab(currentProject),
+  );
 }
 
 function bindInstanceApplicationConfigControls() {

@@ -150,9 +150,17 @@ def main() -> int:
         assert [app["path"] for app in removed["apps"]] == [str(existing)]
         print("[ok] app registry remove works")
 
-        status, rejected = delete_json("/api/projects", {"path": str(existing)})
-        assert status == 409, rejected
-        print("[ok] current app cannot be removed from registry")
+        status, detached = delete_json("/api/projects", {"path": str(existing)})
+        assert status == 200, detached
+        assert detached["attached"] is False
+        assert detached["apps"] == []
+        assert detached["removed_path"] == str(existing.resolve())
+        assert not (clone / ".refine-binding").exists()
+        status, snap = get_json("/api/project/status")
+        assert status == 200, snap
+        assert snap["attached"] is False, snap
+        assert snap["apps"] == []
+        print("[ok] removing current final app detaches the checkout")
     finally:
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)

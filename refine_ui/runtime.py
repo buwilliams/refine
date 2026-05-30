@@ -184,3 +184,12 @@ def runner_status_snapshot() -> dict:
 def stop_all() -> None:
     stop_runner()
     stop_poller()
+
+
+def detach_configured() -> None:
+    """Stop project-scoped services and return this process to setup mode."""
+    global _loaded_config_path
+    stop_all()
+    os.environ.pop(config.ENV_CONFIG_PATH, None)
+    config.clear_cache()
+    _loaded_config_path = None
