@@ -281,7 +281,19 @@ body.guide-open .toolbar-dock {
   outline: 2px solid rgba(37, 99, 235, 0.60);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
-  transition: outline-color 0.2s ease;
+  animation: guide-target-pulse 1.15s ease-in-out infinite;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.22);
+}
+
+@keyframes guide-target-pulse {
+  0%, 100% {
+    outline-color: rgba(37, 99, 235, 0.52);
+    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.20);
+  }
+  50% {
+    outline-color: rgba(37, 99, 235, 0.95);
+    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.12);
+  }
 }
 
 @media (max-width: 760px) {

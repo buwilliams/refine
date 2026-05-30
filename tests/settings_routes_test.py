@@ -429,11 +429,17 @@ def main() -> int:
     assert 'data-guide-default' in guide_js
     assert 'data-guide-skip' in guide_js
     assert 'data-guide-complete' in guide_js
+    assert "canUseDefault: options.canUseDefault !== false" in guide_js
+    assert "{ canUseDefault: false }" in guide_js
+    assert "const defaultButton = item.canUseDefault" in guide_js
     assert 'class="guide-progress"' in guide_js
     assert 'class="guide-status guide-status-' in guide_js
     assert "function firstIncompleteGuideItem" in guide_js
     assert "function openGuideItemTarget" in guide_js
     assert "function completeGuideItem" in guide_js
+    assert "function clearGuideTargetHighlight" in guide_js
+    assert "setTimeout(() => el.classList.remove(\"guide-target-highlight\")" not in guide_js
+    assert "if (!guideState.activeItem || !findGuideItem(guideState.activeItem))" in guide_js
     assert 'class="guide-item-kind"' not in guide_js
     assert "Focus in app" not in guide_js
     assert 'hash: "#/instance/application"' in guide_js
@@ -448,6 +454,8 @@ def main() -> int:
     assert ".guide-item-actions" in guide_css
     assert ".guide-status-checked" in guide_css
     assert ".guide-status-skipped" in guide_css
+    assert "animation: guide-target-pulse" in guide_css
+    assert "@keyframes guide-target-pulse" in guide_css
     assert "body.guide-open .toolbar-dock" in guide_css
     assert "--guide-panel-width" in guide_css
     assert ".nav-issue-button" in base_css
