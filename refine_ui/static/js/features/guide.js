@@ -8,6 +8,7 @@ const GUIDE_MAX_WIDTH = 560;
 const GUIDE_STATUS_UNCHECKED = "unchecked";
 const GUIDE_STATUS_CHECKED = "checked";
 const GUIDE_STATUS_SKIPPED = "skipped";
+let guideHighlightedTarget = null;
 
 const guideState = {
   open: false,
@@ -30,24 +31,27 @@ const GUIDE_CATEGORIES = [
         { hash: "#/instance/instances", selector: "#settings-tabs" }),
       guideItem("instance-create", "Create an instance", "Educate and configure",
         "Create an instance when this machine, operator, or environment should own separate Gaps and local runtime settings.",
-        "Default: use the existing instance unless this is a new machine or role.",
-        { hash: "#/instance/instances", selector: "#instance-add" }),
+        "Action: create one only when this machine or role needs separate ownership.",
+        { hash: "#/instance/instances", selector: "#instance-add" },
+        { canUseDefault: false }),
       guideItem("instance-active", "Active instance", "Educate and configure",
         "The active instance controls local ownership and instance-scoped settings. Switch it before changing reporters or application commands for another machine.",
         "Default: keep the current active instance unless setup is for another machine.",
         { hash: "#/instance/instances", selector: "[data-instance-activate], .filter-pill, .table" }),
       guideItem("reporter-add", "Add reporter", "Educate and configure",
         "Reporters identify who submitted or owns feedback. Add the names your team will use when creating Gaps.",
-        "Default: add a reporter before creating the first Gap.",
-        { hash: "#/instance/reporters", selector: "#r-add" }),
+        "Action: add the reporter names your team will use before creating Gaps.",
+        { hash: "#/instance/reporters", selector: "#r-add" },
+        { canUseDefault: false }),
       guideItem("reporter-manage", "Manage reporters", "Educate and configure",
         "Reporter rename, merge, and remove actions keep the dropdown useful while preserving historical Gap rounds.",
         "Default: leave existing reporters unchanged until duplicates or stale names appear.",
         { hash: "#/instance/reporters", selector: "[data-rename], [data-rmerge], [data-rdel]" }),
       guideItem("application-ai", "General with AI button", "Educate and configure",
         "The AI generator can draft target-app commands from the codebase. Dedicated refine start, stop, and rebuild scripts are usually more reliable when the app already has them.",
-        "Default: generate with AI only when app-specific scripts are not already known.",
-        { hash: "#/instance/application", selector: "#s-target-generate-ai" }),
+        "Action: generate with AI only when app-specific scripts are not already known.",
+        { hash: "#/instance/application", selector: "#s-target-generate-ai" },
+        { canUseDefault: false }),
       guideItem("application-url", "App URL", "Educate and configure",
         "The app URL is opened from the application status indicator when the target app is running.",
         "Default: blank until the local app has a stable URL.",
@@ -85,8 +89,9 @@ const GUIDE_CATEGORIES = [
     items: [
       guideItem("project-educate", "Project-wide settings", "Educate",
         "Project settings are stored with the app and shared by all refine instances. Use them for product intent, quality policy, and governance.",
-        "Default: configure these once per target app.",
-        { hash: "#/project/application", selector: "#settings-tabs" }),
+        "Action: review these once per target app so shared policy is intentional.",
+        { hash: "#/project/application", selector: "#settings-tabs" },
+        { canUseDefault: false }),
       guideItem("project-application", "App selection and creation", "Educate",
         "Add an existing app path, paste a Git clone URL, or create a new directory. refine will attach the app and initialize .refine state when needed.",
         "Default: keep the current app unless you are setting up a new target app.",
@@ -143,34 +148,48 @@ const GUIDE_CATEGORIES = [
     items: [
       guideItem("nav-application-status", "Application status", "Educate",
         "The application status indicator shows target-app state and opens the System process view for start, stop, rebuild, sync, and checks.",
-        "Default: unknown until target-app commands or checks are configured.",
-        { selector: "#target-app-indicator", openContextMenu: true }),
+        "Action: use this indicator to inspect and control the target app.",
+        { selector: "#target-app-indicator", openContextMenu: true },
+        { canUseDefault: false }),
       guideItem("nav-agent-status", "Agent status", "Educate",
         "The agent status pill summarizes active or paused agent work and links to System processes.",
-        "Default: no active agents.",
-        { selector: "#agent-status-indicator" }),
+        "Action: use this pill to inspect whether agents are running or paused.",
+        { selector: "#agent-status-indicator" },
+        { canUseDefault: false }),
       guideItem("nav-reporter", "Reporter", "Educate and configure",
         "The reporter selector chooses who new Gaps are submitted as.",
-        "Default: pick or add a reporter before creating Gaps.",
-        { selector: "#global-reporter", openContextMenu: true }),
+        "Action: pick or add the reporter before creating Gaps.",
+        { selector: "#global-reporter", openContextMenu: true },
+        { canUseDefault: false }),
       guideItem("nav-create-gap", "Creating Gap", "Educate",
         "Create a Gap when actual behavior differs from target behavior.",
-        "Default: low priority unless the work should run sooner.",
-        { command: "gap.new" }),
+        "Action: open the Gap form, write actual vs target behavior, then save it.",
+        { command: "gap.new" },
+        { canUseDefault: false }),
       guideItem("nav-import-gaps", "Importing Gaps", "Educate",
         "Import turns CSV or pasted feedback into editable Gap drafts before saving.",
-        "Default: review drafts before importing.",
-        { command: "gap.import" }),
+        "Action: review the drafts before importing them.",
+        { command: "gap.import" },
+        { canUseDefault: false }),
       guideItem("nav-report-bug", "Report refine bug", "Educate",
         "Use the refine issue action for product feedback, bugs, and feature requests about refine itself.",
-        "Default: opens GitHub with your report.",
-        { command: "refine.issue.request" }),
+        "Action: open the issue form when refine itself needs feedback or a fix.",
+        { command: "refine.issue.request" },
+        { canUseDefault: false }),
     ],
   },
 ];
 
-function guideItem(id, title, kind, description, defaultText, target) {
-  return { id, title, kind, description, defaultText, target };
+function guideItem(id, title, kind, description, defaultText, target, options = {}) {
+  return {
+    id,
+    title,
+    kind,
+    description,
+    defaultText,
+    target,
+    canUseDefault: options.canUseDefault !== false,
+  };
 }
 
 function readGuideChecklist() {
@@ -235,7 +254,7 @@ function guideItemByOffset(id, offset) {
 }
 
 function ensureGuideSelection() {
-  if (!guideState.activeItem || !guideItemIsIncomplete(guideState.activeItem)) {
+  if (!guideState.activeItem || !findGuideItem(guideState.activeItem)) {
     activateGuideItem(firstIncompleteGuideItem());
   }
 }
@@ -334,6 +353,7 @@ function closeGuide() {
   guideState.context = "";
   guideState.activeCategory = "";
   guideState.activeItem = "";
+  clearGuideTargetHighlight();
   drawGuide();
 }
 
@@ -441,6 +461,9 @@ function renderGuideItem(item) {
   const open = guideState.activeItem === item.id;
   const status = guideItemStatus(item.id);
   const previous = guideItemByOffset(item.id, -1);
+  const defaultButton = item.canUseDefault
+    ? `<button type="button" class="secondary" data-guide-default="${htmlEscape(item.id)}">Use default</button>`
+    : "";
   return `
     <div class="guide-item ${open ? "active" : ""}" data-guide-item="${htmlEscape(item.id)}">
       <div class="guide-item-summary">
@@ -457,7 +480,7 @@ function renderGuideItem(item) {
         <div class="guide-default">${htmlEscape(item.defaultText)}</div>
         <div class="guide-item-actions">
           <button type="button" class="secondary" data-guide-prev="${htmlEscape(item.id)}" ${previous ? "" : "disabled"}>Prev</button>
-          <button type="button" class="secondary" data-guide-default="${htmlEscape(item.id)}">Use default</button>
+          ${defaultButton}
           <button type="button" class="secondary" data-guide-skip="${htmlEscape(item.id)}">Skip</button>
           <button type="button" data-guide-complete="${htmlEscape(item.id)}">Complete</button>
         </div>
@@ -526,6 +549,7 @@ function openActiveGuideTarget() {
 async function openGuideItemTarget(item) {
   const target = item?.target || {};
   if (target.command) {
+    clearGuideTargetHighlight();
     closeTopbarMenus();
     await runCommand(target.command);
     return;
@@ -544,10 +568,13 @@ async function openGuideItemTarget(item) {
   if (target.selector) {
     const el = await waitForGuideTarget(target.selector);
     if (!el) {
+      clearGuideTargetHighlight();
       toast("Guide target is not available on this screen.", "warn");
       return;
     }
     focusAndHighlightGuideTarget(el);
+  } else {
+    clearGuideTargetHighlight();
   }
 }
 
@@ -576,8 +603,18 @@ function focusAndHighlightGuideTarget(el) {
   if (typeof el.focus === "function") {
     try { el.focus({ preventScroll: true }); } catch { el.focus(); }
   }
+  clearGuideTargetHighlight(el);
   el.classList.add("guide-target-highlight");
-  setTimeout(() => el.classList.remove("guide-target-highlight"), 2200);
+  guideHighlightedTarget = el;
+}
+
+function clearGuideTargetHighlight(except = null) {
+  if (guideHighlightedTarget && guideHighlightedTarget !== except) {
+    guideHighlightedTarget.classList.remove("guide-target-highlight");
+  }
+  if (guideHighlightedTarget !== except) {
+    guideHighlightedTarget = null;
+  }
 }
 
 function wireGuideResize(root) {
