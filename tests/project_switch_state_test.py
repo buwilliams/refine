@@ -41,6 +41,13 @@ def test_client_switch_path(root: Path) -> None:
         root / "refine_ui/static/js/features/settings_instances.js"
     ).read_text(encoding="utf-8")
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(encoding="utf-8")
+    dashboard_js = (root / "refine_ui/static/js/features/dashboard.js").read_text(encoding="utf-8")
+    gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(encoding="utf-8")
+    changes_js = (root / "refine_ui/static/js/features/changes.js").read_text(encoding="utf-8")
+    logs_js = (root / "refine_ui/static/js/features/logs.js").read_text(encoding="utf-8")
+    init_js = (root / "refine_ui/static/js/init.js").read_text(encoding="utf-8")
+    target_app_js = (root / "refine_ui/static/js/target-app.js").read_text(encoding="utf-8")
+    guide_js = (root / "refine_ui/static/js/features/guide.js").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
 
     assert 'id="active-instance-label"' in index_html
@@ -61,9 +68,33 @@ def test_client_switch_path(root: Path) -> None:
 
     first_run_body = common_js.split("async function ensureProjectAttached()", 1)[1]
     first_run_body = first_run_body.split("\n}", 1)[0]
-    assert "openAddAppModal(" in first_run_body
+    assert "openAddAppModal(" not in first_run_body
+    assert "enterNoProjectMode(snap)" in first_run_body
+    assert "return false" in first_run_body
     assert "await syncProjectUpdates({ silent: true })" in common_js
-    assert "return !!result" in first_run_body
+    assert "function renderNoProjectEmptyState" in common_js
+    assert "Open the Guide to configure Refine and attach an app." in common_js
+    assert "function renderNoProjectIfDetached" in common_js
+    assert "function renderNoProjectIfApiDetached" in common_js
+    assert 'updateNavAppContextLabel("No app")' in common_js
+    assert "sseSource.close()" in common_js
+    assert "enterNoProjectMode(state.project, { openGuidePanel: true })" in init_js
+    assert "if (!attached) return" not in init_js
+    for source, title in (
+        (dashboard_js, "Dashboard"),
+        (gaps_list_js, "Gaps"),
+        (changes_js, "Changes"),
+        (logs_js, "Logs"),
+    ):
+        assert f'renderNoProjectIfDetached("{title}")' in source
+        assert "renderNoProjectIfApiDetached" in source
+    assert "function applyNoTargetAppSnapshot()" in target_app_js
+    assert 'if (project.attached === false) return "No app";' in target_app_js
+    assert 'if (!hasAttachedProject()) {' in target_app_js
+    assert 'guideState.context === "no-app"' in guide_js
+    assert "options.openTarget !== false" in guide_js
+    assert "_project_attached()" in api_py
+    assert '"attached": False' in api_py
 
     assert "async function applyProjectAttachResult(result, options = {})" in common_js
     switch_body = common_js.split("async function applyProjectAttachResult(result, options = {})", 1)[1]

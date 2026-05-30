@@ -91,6 +91,75 @@ function updateNavAppContextLabel(label) {
   el.title = el.textContent;
 }
 
+function hasAttachedProject() {
+  return state.project?.attached === true;
+}
+
+function clearProjectScopedUiState() {
+  state.reporters = [];
+  state.dashboard = null;
+  state.currentGap = null;
+  if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
+  if (typeof gapsIncludedIds !== "undefined") gapsIncludedIds.clear();
+  setLastReporter("");
+  populateAllReporterDropdowns();
+  updateActiveInstanceLabel();
+  updateNavAppContextLabel("No app");
+  if (typeof applyNoTargetAppSnapshot === "function") applyNoTargetAppSnapshot();
+  if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
+}
+
+function renderNoProjectEmptyState(title = "Refine") {
+  renderBanners([]);
+  $("#main").innerHTML = `
+    <h2>${htmlEscape(title)}</h2>
+    <div class="empty-state">
+      <div class="empty-state-title">No app configured.</div>
+      <p class="muted">Open the Guide to configure Refine and attach an app.</p>
+      <button type="button" class="secondary" id="empty-open-guide">Open Guide</button>
+    </div>`;
+  $("#empty-open-guide")?.addEventListener("click", () => {
+    if (typeof openGuide === "function") {
+      openGuide({
+        context: "no-app",
+        categoryId: "project",
+        itemId: "project-application",
+        openTarget: false,
+      });
+    }
+  });
+}
+
+function renderNoProjectIfDetached(title) {
+  if (hasAttachedProject()) return false;
+  renderNoProjectEmptyState(title);
+  return true;
+}
+
+function renderNoProjectIfApiDetached(data, title) {
+  if (data?.attached !== false) return false;
+  enterNoProjectMode({ ...(state.project || {}), attached: false });
+  renderNoProjectEmptyState(title);
+  return true;
+}
+
+function enterNoProjectMode(project = null, { openGuidePanel = false } = {}) {
+  if (project) state.project = project;
+  clearProjectScopedUiState();
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
+  if (openGuidePanel && typeof openGuide === "function") {
+    openGuide({
+      context: "no-app",
+      categoryId: "project",
+      itemId: "project-application",
+      openTarget: false,
+    });
+  }
+}
+
 function refreshCurrentSettingsSurface(options = {}) {
   if (!["settings", "instance", "project"].includes(state.currentRoute || "")) return undefined;
   if (typeof refreshActiveSettingsTab === "function") {
@@ -262,10 +331,8 @@ async function ensureProjectAttached() {
       <p class="muted">This app was not loaded because its .refine state was written by a newer Refine version.</p>`;
     return false;
   }
-  const result = await openAddAppModal({
-    message: snap.message || "Add an existing app path or a new directory to create and initialize.",
-  });
-  return !!result;
+  enterNoProjectMode(snap);
+  return false;
 }
 
 async function refreshProjectStatus() {
@@ -278,6 +345,9 @@ async function refreshProjectStatus() {
   }
   state.project = snap;
   updateActiveInstanceLabel();
+  if (snap.attached === false) {
+    clearProjectScopedUiState();
+  }
   return snap;
 }
 
@@ -770,6 +840,12 @@ function mdInline(text) {
 // ---- reporter dropdown ------------------------------------------------------
 
 async function refreshReporters({ selectFallback = false } = {}) {
+  if (!hasAttachedProject()) {
+    state.reporters = [];
+    setLastReporter("");
+    populateAllReporterDropdowns();
+    return;
+  }
   const data = await api("GET", "/api/reporters");
   state.reporters = data.reporters || [];
   reconcileLastReporter({ selectFallback });
@@ -803,7 +879,7 @@ function populateAllReporterDropdowns() {
     sel.innerHTML = "";
     const optBlank = document.createElement("option");
     optBlank.value = "";
-    optBlank.textContent = "— pick reporter —";
+    optBlank.textContent = hasAttachedProject() ? "— pick reporter —" : "No reporter";
     sel.appendChild(optBlank);
     for (const r of state.reporters) {
       const opt = document.createElement("option");
@@ -811,10 +887,12 @@ function populateAllReporterDropdowns() {
       opt.textContent = r.name;
       sel.appendChild(opt);
     }
-    const optAdd = document.createElement("option");
-    optAdd.value = "__add__";
-    optAdd.textContent = "+ Add new reporter…";
-    sel.appendChild(optAdd);
+    if (hasAttachedProject()) {
+      const optAdd = document.createElement("option");
+      optAdd.value = "__add__";
+      optAdd.textContent = "+ Add new reporter…";
+      sel.appendChild(optAdd);
+    }
     // Restore selection if still valid
     const stillValid = state.reporters.some((r) => r.name === current);
     sel.value = stillValid ? current : "";
@@ -869,6 +947,11 @@ function setLastReporter(name) {
 // react to "+ Add new reporter" selection on any dropdown
 document.addEventListener("change", async (e) => {
   if (e.target.matches("[data-reporter-select], #global-reporter")) {
+    if (!hasAttachedProject()) {
+      e.target.value = "";
+      setLastReporter("");
+      return;
+    }
     if (e.target.value === "__add__") {
       const newName = await handleReporterAdd(e.target);
       if (newName) e.target.dispatchEvent(new Event("change-after-add"));

@@ -84,6 +84,26 @@ def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
     return conn
 
 
+def _project_attached() -> bool:
+    if config.find_config() is None:
+        return False
+    try:
+        config.get(reload=True)
+    except config.ConfigError:
+        return False
+    return True
+
+
+def _empty_page(limit: int, offset: int) -> dict[str, Any]:
+    page_limit, page_offset = _page_bounds(limit, offset)
+    return {
+        "limit": page_limit,
+        "offset": page_offset,
+        "has_more": False,
+        "total": 0,
+    }
+
+
 def _schema_block_response() -> tuple[int, dict] | None:
     try:
         cfg = config.get(reload=True)
@@ -1966,6 +1986,15 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     the indexed `gaps_index.reporter` column, which the runner keeps in
     sync with the latest round's reporter on every write.
     """
+    if not _project_attached():
+        body: dict[str, Any] = {
+            "gaps": [],
+            "page": _empty_page(limit, offset),
+            "attached": False,
+        }
+        if include_facets:
+            body["facets"] = {"categories": [], "actors": []}
+        return 200, body
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
@@ -2986,6 +3015,18 @@ def list_changes(*, limit: int = 50, offset: int = 0,
     """List refine merge commits on the target branch (plus the Gap
     metadata for each). Used by the Changes screen."""
     page_limit, page_offset = _page_bounds(limit, offset)
+    if not _project_attached():
+        return 200, {
+            "changes": [],
+            "branch": "",
+            "page": {
+                "limit": page_limit,
+                "offset": page_offset,
+                "has_more": False,
+                "total": 0,
+            },
+            "attached": False,
+        }
     try:
         result = get_client().call(
             M_LIST_CHANGES,
@@ -3736,6 +3777,24 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
                   include_facets: bool = False) -> tuple[int, dict]:
     metric_start = perf_metrics.now()
     page_limit, page_offset = _page_bounds(limit, offset)
+    if not _project_attached():
+        body: dict[str, Any] = {
+            "activity": [],
+            "page": {
+                "limit": page_limit,
+                "offset": page_offset,
+                "has_more": False,
+                "total": 0,
+            },
+            "attached": False,
+        }
+        if include_facets:
+            body["facets"] = {
+                "categories": [],
+                "actors": [],
+                "severities": ["info", "warn", "error"],
+            }
+        return 200, body
     conn = _conn()
     try:
         entries = activity.recent(
@@ -3861,13 +3920,31 @@ def cleanup_logs(body: dict) -> tuple[int, dict]:
 
 
 def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
+    instance_scope = (instance or "current").strip() or "current"
+    if instance_scope not in ("all", "current"):
+        instance_scope = "current"
+    if not _project_attached():
+        return 200, {
+            "counts": {},
+            "running": [],
+            "merger": None,
+            "governance": None,
+            "preflight": None,
+            "activity": [],
+            "runner_reachable": False,
+            "reporter_stats": [],
+            "instance_scope": instance_scope,
+            "instance_filter": "all" if instance_scope == "all" else "current",
+            "quality_timing": "pre_merge",
+            "active_instance_id": "",
+            "active_instance_display_name": "",
+            "needs_attention": [],
+            "attached": False,
+        }
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
     runner_snap = runtime.runner_status_snapshot()
-    instance_scope = (instance or "current").strip() or "current"
-    if instance_scope not in ("all", "current"):
-        instance_scope = "current"
     active_instance_id = project_state.active_instance_id()
     instance_where = ""
     instance_args: list[Any] = []

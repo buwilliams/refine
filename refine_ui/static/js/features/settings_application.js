@@ -281,7 +281,11 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
         updateActiveInstanceLabel();
         toast("App removed", "info");
         if (result.attached === false) {
+          enterNoProjectMode(result, { openGuidePanel: true });
           refreshProjectApplicationsSectionOnly(result);
+          if (["dashboard", "gaps", "changes", "logs"].includes(state.currentRoute || "")) {
+            navigate();
+          }
           return;
         }
         await refreshSettingsTab(refreshTab, { force: true });

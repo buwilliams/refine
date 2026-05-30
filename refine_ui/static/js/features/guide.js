@@ -31,13 +31,14 @@ const GUIDE_CATEGORIES = [
         { hash: "#/instance/instances", selector: "#settings-tabs" }),
       guideItem("instance-create", "Create an instance", "Educate and configure",
         "Create an instance when this machine, operator, or environment should own separate Gaps and local runtime settings.",
-        "Action: create one only when this machine or role needs separate ownership.",
+        "Action: create when setting up a new machine.",
         { hash: "#/instance/instances", selector: "#instance-add" },
         { canUseDefault: false }),
-      guideItem("instance-active", "Active instance", "Educate and configure",
+      guideItem("instance-active", "Activate instance", "Educate and configure",
         "The active instance controls local ownership and instance-scoped settings. Switch it before changing reporters or application commands for another machine.",
         "Default: keep the current active instance unless setup is for another machine.",
-        { hash: "#/instance/instances", selector: "[data-instance-activate], .filter-pill, .table" }),
+        { hash: "#/instance/instances", selector: "[data-instance-activate], .filter-pill, .table" },
+        { canUseDefault: false }),
       guideItem("reporter-add", "Add reporter", "Educate and configure",
         "Reporters identify who submitted or owns feedback. Add the names your team will use when creating Gaps.",
         "Action: add the reporter names your team will use before creating Gaps.",
@@ -46,7 +47,8 @@ const GUIDE_CATEGORIES = [
       guideItem("reporter-manage", "Manage reporters", "Educate and configure",
         "Reporter rename, merge, and remove actions keep the dropdown useful while preserving historical Gap rounds.",
         "Default: leave existing reporters unchanged until duplicates or stale names appear.",
-        { hash: "#/instance/reporters", selector: "[data-rename], [data-rmerge], [data-rdel]" }),
+        { hash: "#/instance/reporters", selector: "[data-rename], [data-rmerge], [data-rdel]" },
+        { canUseDefault: false }),
       guideItem("application-ai", "General with AI button", "Educate and configure",
         "The AI generator can draft target-app commands from the codebase. Dedicated refine start, stop, and rebuild scripts are usually more reliable when the app already has them.",
         "Action: generate with AI only when app-specific scripts are not already known.",
@@ -341,11 +343,12 @@ function initGuide() {
 function openGuide(options = {}) {
   guideState.open = true;
   guideState.context = options.context || guideState.context || "";
-  const firstIncomplete = firstIncompleteGuideItem();
+  const requested = options.itemId ? findGuideItem(options.itemId) : null;
+  const firstIncomplete = requested || firstIncompleteGuideItem();
   if (firstIncomplete) activateGuideItem(firstIncomplete);
   setGuideWidth(guideState.width, { persist: false });
   drawGuide();
-  if (firstIncomplete) openActiveGuideTarget();
+  if (firstIncomplete && options.openTarget !== false) openActiveGuideTarget();
 }
 
 function closeGuide() {
@@ -376,6 +379,9 @@ function guideContextMessage() {
   }
   if (guideState.context === "app-existing") {
     return "This app already has refine state. Review Project settings, then select or create the right Instance for this machine.";
+  }
+  if (guideState.context === "no-app") {
+    return "No app is attached. Configure Refine from Project Application, then select or create the right Instance for this machine.";
   }
   return "Use the Guide as a checklist. Opening an item takes you to the related refine control, and the action bar records progress.";
 }
