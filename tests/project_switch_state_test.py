@@ -160,9 +160,13 @@ def test_client_switch_path(root: Path) -> None:
     assert "await openAddAppModal()" in settings_js
     assert 'id="s-project-template"' in settings_js
     assert "await openProjectTemplateSelector()" in settings_js
+    assert "if (options.toast !== false) showProjectAttachToast(result)" in common_js
     assert "await applyProjectAttachResult(result)" in settings_js
     remove_body = settings_js.split('api("DELETE", "/api/projects", { path })', 1)[1]
     remove_body = remove_body.split("await refreshSettingsTab", 1)[0]
+    assert "if (result.auto_attached)" in remove_body
+    assert "await applyProjectAttachResult(result, { toast: false })" in remove_body
+    assert "App removed; loaded next app" in remove_body
     assert 'resetGuideState({ redraw: false })' in remove_body
     assert "await refreshInstanceScopedState()" in settings_js
     assert "active_instance_id: result.active_instance_id" in settings_js
@@ -455,6 +459,92 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
+def test_removing_active_project_hot_loads_next_app() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="refine-remove-next-app-"))
+    clone = tmp / "refine-source"
+    (clone / "refine_cli").mkdir(parents=True)
+    (clone / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+
+    def make_app(name: str) -> Path:
+        app = tmp / name
+        app.mkdir()
+        git(app, "init", "-q")
+        git(app, "config", "user.email", "t@x")
+        git(app, "config", "user.name", "t")
+        (app / "app.txt").write_text(f"{name}\n", encoding="utf-8")
+        git(app, "add", "app.txt")
+        git(app, "commit", "-m", "init")
+        return app
+
+    app_one = make_app("app-one")
+    app_two = make_app("app-two")
+    app_three = make_app("app-three")
+    original_cwd = Path.cwd()
+    conn = init_refine(app_two)
+    conn.close()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        os.chdir(clone)
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        reset_refine_imports()
+        from refine_server import config, project_registry
+        from refine_ui import api, runtime
+
+        config.write_binding(clone, app_two)
+        config.get(reload=True)
+        runtime.load_configured(
+            app_two / ".refine" / "refine.toml",
+            start_runner=False,
+            start_poller=False,
+        )
+        project_registry.upsert_app(clone, app_one)
+        project_registry.upsert_app(clone, app_two, make_current=True)
+        project_registry.upsert_app(clone, app_three)
+
+        old_commit_refine_state = api._commit_refine_state  # type: ignore[attr-defined]
+        old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
+        try:
+            api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
+            api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
+            status, body = api.project_remove({
+                "path": str(app_two),
+                "start_runner": False,
+                "start_poller": False,
+            })
+        finally:
+            api._commit_refine_state = old_commit_refine_state  # type: ignore[assignment]
+            api._git_stdout = old_git_stdout  # type: ignore[assignment]
+
+        assert status == 200, body
+        assert body["attached"] is True
+        assert body["auto_attached"] is True
+        assert body["removed_path"] == str(app_two.resolve())
+        assert body["client_repo"] == str(app_three.resolve())
+        assert [app["path"] for app in body["apps"]] == [
+            str(app_one.resolve()),
+            str(app_three.resolve()),
+        ]
+        assert config.get(reload=True).client_repo == app_three.resolve()
+        assert config.read_binding(clone / ".refine-binding") == app_three.resolve()
+        assert runtime._loaded_config_path == app_three / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
 def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None:
     tmp, client = make_client_repo("refine-supervised-initial-attach-")
     clone = tmp / "refine-source"
@@ -622,7 +712,15 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
         status, templates = api.list_project_templates()
         assert status == 200, templates
         template_ids = {t["id"] for t in templates["templates"]}
-        assert {"nodejs-webapp", "python-webapp", "blank"} <= template_ids
+        assert {
+            "ai-chat-app",
+            "astro-content-site",
+            "blank",
+            "nextjs-fullstack",
+            "nodejs-webapp",
+            "python-webapp",
+            "sveltekit-webapp",
+        } <= template_ids
 
         status, attached = api.project_attach({
             "path": origin.as_uri(),
@@ -1055,6 +1153,7 @@ def main() -> int:
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
     test_supervised_switch_hot_loads_without_restart(root)
+    test_removing_active_project_hot_loads_next_app()
     test_supervised_initial_attach_hot_loads_without_restart(root)
     test_supervised_switch_migrates_target_before_hot_load(root)
     test_empty_project_attach_creates_scaffold_gap(root)

@@ -498,7 +498,7 @@ async function applyProjectAttachResult(result, options = {}) {
   state.currentGap = null;
   state.underlayHash = "#/project/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
-  showProjectAttachToast(result);
+  if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
   await syncProjectUpdates({ silent: true });

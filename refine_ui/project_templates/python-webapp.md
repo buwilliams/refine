@@ -1,6 +1,6 @@
 # Python WebApp
 
-Scaffold a production-ready Python web application for the attached empty project.
+Scaffold a production-ready Python API or web application for the attached empty project.
 
 ## Stack
 
@@ -9,8 +9,9 @@ Scaffold a production-ready Python web application for the attached empty projec
 - Uvicorn/FastAPI CLI for local development and container entrypoints.
 - `uv` with `pyproject.toml` and `uv.lock` for dependency and environment management.
 - Ruff for linting and formatting.
+- Pydantic models for request, response, settings, and environment validation.
 - Pytest plus HTTPX/TestClient coverage for the HTTP surface.
-- Dockerfile suitable for running the app as a single web process.
+- Dockerfile suitable for running the app as a single web process, with no mandatory cloud provider.
 
 ## Requirements
 
@@ -20,6 +21,7 @@ Scaffold a production-ready Python web application for the attached empty projec
 - Add a `/health` endpoint and a simple root route that returns HTML or JSON.
 - Include a concise README with setup, development, testing, and container commands.
 - Use typed request/response models where data crosses the API boundary.
+- Include OpenAPI-driven API docs and a small example client request in the README.
 - Do not add authentication, a database, or paid services unless the repository already requires them.
 
 ## Acceptance

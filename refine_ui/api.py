@@ -883,16 +883,44 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     if not _project_registry_enabled(clone_dir):
         return err(409, "Known-apps list is only available from the host refine source checkout.")
     target = Path(raw_path).expanduser().resolve()
+    apps_before = project_registry.list_apps(clone_dir)
     try:
         current = config.get(reload=True).client_repo
     except config.ConfigError:
         current = None
-    apps = project_registry.remove_app(clone_dir, target)
     if current is not None and current == target:
+        remaining = [app for app in apps_before if app.get("path") != str(target)]
+        if remaining:
+            removed_index = next(
+                (
+                    i for i, app in enumerate(apps_before)
+                    if app.get("path") == str(target)
+                ),
+                0,
+            )
+            next_app = remaining[removed_index % len(remaining)]
+            attach_body = {
+                "path": next_app["path"],
+                "install_unit": body.get("install_unit") is True,
+            }
+            if "start_runner" in body:
+                attach_body["start_runner"] = body.get("start_runner")
+            if "start_poller" in body:
+                attach_body["start_poller"] = body.get("start_poller")
+            status, attached = project_attach(attach_body)
+            if status != 200:
+                return status, attached
+            apps = project_registry.remove_app(clone_dir, target)
+            attached["apps"] = apps
+            attached["removed_path"] = str(target)
+            attached["auto_attached"] = True
+            return status, attached
+        apps = project_registry.remove_app(clone_dir, target)
         _detach_current_project(clone_dir, target)
         status, body = project_status()
         body["removed_path"] = str(target)
         return status, body
+    apps = project_registry.remove_app(clone_dir, target)
     return 200, {"apps": apps}
 
 
