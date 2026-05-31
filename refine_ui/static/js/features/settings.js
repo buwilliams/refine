@@ -212,7 +212,7 @@ async function copySettingsFromInstance(section, {
   const body = () => `
     <div class="modal-title">${htmlEscape(title)}</div>
     <div class="modal-body">
-      <label>Source instance</label>
+      <label>${renderSettingsGuideLabel("Source instance", "instance-copy-settings-source")}</label>
       <select class="modal-input" style="width:100%">
         ${opts}
       </select>
@@ -402,6 +402,7 @@ function renderSettingsMarkdownField({
   scope = "",
   description = "",
   rows = 7,
+  guideItemId = "",
 }) {
   const htmlId = htmlEscape(id);
   const describedById = `${htmlId}-description`;
@@ -410,7 +411,7 @@ function renderSettingsMarkdownField({
   return `
     <section class="settings-section settings-markdown-field" data-settings-markdown-field>
       <div class="settings-section-heading">
-        <h3>${htmlEscape(title)}</h3>
+        <h3>${renderSettingsGuideLabel(title, guideItemId)}</h3>
         <button type="button"
                 class="secondary settings-markdown-edit"
                 title="Edit ${htmlEscape(title)}"
@@ -430,6 +431,29 @@ function renderSettingsMarkdownField({
                 ${description ? `aria-describedby="${describedById}"` : ""}
                 hidden>${htmlEscape(value)}</textarea>
     </section>`;
+}
+
+function renderSettingsGuideLabel(title, itemId = "", description = "") {
+  return `
+    <span class="settings-label-text">${htmlEscape(title)}</span>
+    ${renderSettingsGuideIcon(itemId, title)}
+    ${description ? `<span class="muted small">— ${htmlEscape(description)}</span>` : ""}`;
+}
+
+function renderSettingsGuideIcon(itemId = "", title = "setting") {
+  if (!itemId) return "";
+  return `
+    <button type="button"
+            class="settings-guide-icon"
+            data-guide-label-item="${htmlEscape(itemId)}"
+            title="Open Guide: ${htmlEscape(title)}"
+            aria-label="Open Guide for ${htmlEscape(title)}">
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M9.8 9.4a2.4 2.4 0 0 1 4.4 1.3c0 1.7-2.2 2.1-2.2 3.8"></path>
+        <path d="M12 17.5h.01"></path>
+      </svg>
+    </button>`;
 }
 
 function settingsMarkdownIcon(name) {

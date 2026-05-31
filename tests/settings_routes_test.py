@@ -230,7 +230,7 @@ def main() -> int:
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '"copilot": "copilot login"' in api_py
     assert 'id="runtime-upgrade-banner"' in settings_js
-    assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index("<h3>Process management</h3>")
+    assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index('renderSettingsGuideLabel("Process management", "process-management")')
     assert 'api("GET", "/api/upgrade")' in settings_js
     assert "function renderRuntimeUpgradeBanner" in settings_js
     assert "Refine is up to date" in settings_js
@@ -274,6 +274,12 @@ def main() -> int:
     assert "autosaveSettingsApplication" in settings_js
     assert "autosaveSettingsRuntime" in settings_js
     assert "function renderSettingsMarkdownField" in settings_js
+    assert "function renderSettingsGuideLabel" in settings_js
+    assert "function renderSettingsGuideIcon" in settings_js
+    assert 'data-guide-label-item="${htmlEscape(itemId)}"' in settings_js
+    assert ".settings-guide-icon" in common_css
+    assert "[data-guide-label-item]" in guide_js
+    assert "openGuide({ itemId, openTarget: false })" in guide_js
     assert "function bindSettingsMarkdownFields" in settings_js
     assert "data-settings-markdown-preview" in settings_js
     assert "data-settings-markdown-editor" in settings_js
@@ -447,6 +453,71 @@ def main() -> int:
     assert 'hash: "#/instance/application"' in guide_js
     assert 'hash: "#/project/quality"' in guide_js
     assert 'hash: "#/system/processes"' in guide_js
+    settings_guide_field_ids = [
+        "instance-manage",
+        "reporter-manage",
+        "reporter-merge-into",
+        "instance-copy-settings-source",
+        "application-agent-subpath",
+        "application-merge-target",
+        "application-url",
+        "application-start",
+        "application-stop",
+        "application-rebuild",
+        "application-auto-rebuild",
+        "application-status",
+        "application-working-directory",
+        "application-environment",
+        "application-start-timeout",
+        "application-stop-timeout",
+        "application-rebuild-timeout",
+        "application-status-timeout",
+        "application-log-path",
+        "application-http-check-url",
+        "application-tcp-host",
+        "application-tcp-port",
+        "application-process-check-command",
+        "runtime-parallel-run-cap",
+        "runtime-branch-name-pattern",
+        "runtime-agent-idle-timeout",
+        "runtime-agent-hard-cap",
+        "runtime-worker-memory-limit",
+        "runtime-ui-memory-limit",
+        "runtime-worker-cpu-priority",
+        "runtime-resource-isolation",
+        "runtime-agent-limit-pause",
+        "runtime-chat-idle-timeout",
+        "runtime-backlog-promote",
+        "runtime-project-update-pulse",
+        "runtime-file-browser-ignore",
+        "runtime-ai-provider",
+        "project-known-apps",
+        "quality-enabled",
+        "quality-gate",
+        "quality-regressions-enabled",
+        "quality-regression-title",
+        "quality-regression-scenario",
+        "quality-requirements",
+        "quality-instructions",
+        "governance-product",
+        "governance-constitution",
+        "governance-rules",
+        "guidance-items",
+        "guidance-name",
+        "guidance-rule",
+        "guidance-instructions",
+        "guidance-status",
+        "process-management",
+        "process-agent-processes",
+        "process-runner-processes",
+        "performance-overview",
+        "performance-operation-filter",
+        "performance-outcome-filter",
+        "performance-limit",
+    ]
+    for field_id in settings_guide_field_ids:
+        assert f'"{field_id}"' in settings_js
+        assert f'guideItem("{field_id}"' in guide_js
     assert 'command: "gap.new"' in guide_js
     assert 'command: "gap.import"' in guide_js
     assert 'command: "refine.issue.request"' in guide_js
@@ -535,7 +606,7 @@ def main() -> int:
     assert 'class="table process-table managed-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table agents-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table runner-workers-table mobile-card-table"' in processes_body
-    assert processes_body.index("<h3>Process management</h3>") < processes_body.index("<h3>Agent processes</h3>") < processes_body.index("<h3>Runner processes</h3>")
+    assert processes_body.index('renderSettingsGuideLabel("Process management", "process-management")') < processes_body.index('renderSettingsGuideLabel("Agent processes", "process-agent-processes")') < processes_body.index('renderSettingsGuideLabel("Runner processes", "process-runner-processes")')
     managed_table = processes_body.split('class="table process-table managed-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     runner_table = processes_body.split('class="table process-table runner-workers-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
@@ -579,9 +650,9 @@ def main() -> int:
     assert '<span class="role-pill ${kind === "agent"' not in processes_body
     assert '<span class="role-pill merger"' not in processes_body
     assert 'class="process-actions"><div class="actions">' in processes_body
-    assert "<h3>Process management</h3>" in processes_body
-    assert "<h3>Agent processes</h3>" in processes_body
-    assert "<h3>Runner processes</h3>" in processes_body
+    assert 'renderSettingsGuideLabel("Process management", "process-management")' in processes_body
+    assert 'renderSettingsGuideLabel("Agent processes", "process-agent-processes")' in processes_body
+    assert 'renderSettingsGuideLabel("Runner processes", "process-runner-processes")' in processes_body
     assert 'data-process-id="${htmlEscape(proc.id || "")}"' in processes_body
     assert '[data-process-id="target-app"]' in settings_js
     assert "Background processes" in processes_body

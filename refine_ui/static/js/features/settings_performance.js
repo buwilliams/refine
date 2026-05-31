@@ -86,22 +86,28 @@ function renderPerformanceEvents(perf = {}) {
       <div class="filter-shell-body">
         <div class="filter-bar">
           <div class="filter-row filter-row-filters">
-            <select id="performance-operation-filter">
-              <option value="">all operations</option>
-              ${operations.map((op) => `
-                <option value="${htmlEscape(op)}" ${op === f.operation ? "selected" : ""}>${htmlEscape(op)}</option>`).join("")}
-              ${f.operation && !operations.includes(f.operation)
-                ? `<option value="${htmlEscape(f.operation)}" selected>${htmlEscape(f.operation)}</option>` : ""}
-            </select>
-            <select id="performance-success-filter">
-              <option value="" ${f.success === "" ? "selected" : ""}>all outcomes</option>
-              <option value="1" ${f.success === "1" ? "selected" : ""}>success</option>
-              <option value="0" ${f.success === "0" ? "selected" : ""}>failure</option>
-            </select>
-            <select id="performance-limit">
-              ${PERFORMANCE_LIMIT_OPTIONS.map((n) =>
-                `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} events</option>`).join("")}
-            </select>
+            <label class="filter-field">${renderSettingsGuideLabel("Operation", "performance-operation-filter")}
+              <select id="performance-operation-filter">
+                <option value="">all operations</option>
+                ${operations.map((op) => `
+                  <option value="${htmlEscape(op)}" ${op === f.operation ? "selected" : ""}>${htmlEscape(op)}</option>`).join("")}
+                ${f.operation && !operations.includes(f.operation)
+                  ? `<option value="${htmlEscape(f.operation)}" selected>${htmlEscape(f.operation)}</option>` : ""}
+              </select>
+            </label>
+            <label class="filter-field">${renderSettingsGuideLabel("Outcome", "performance-outcome-filter")}
+              <select id="performance-success-filter">
+                <option value="" ${f.success === "" ? "selected" : ""}>all outcomes</option>
+                <option value="1" ${f.success === "1" ? "selected" : ""}>success</option>
+                <option value="0" ${f.success === "0" ? "selected" : ""}>failure</option>
+              </select>
+            </label>
+            <label class="filter-field">${renderSettingsGuideLabel("Limit", "performance-limit")}
+              <select id="performance-limit">
+                ${PERFORMANCE_LIMIT_OPTIONS.map((n) =>
+                  `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} events</option>`).join("")}
+              </select>
+            </label>
             <span class="spacer"></span>
             <button class="secondary" id="performance-filter-clear">Clear filters</button>
           </div>
@@ -144,7 +150,7 @@ function performanceResourceLabel(event = {}) {
 function renderSettingsPerformanceTab(performance, performanceBackend) {
   return `
     <section class="settings-section">
-      <h3>Performance</h3>
+      <h3>${renderSettingsGuideLabel("Performance", "performance-overview")}</h3>
       <p class="scope-label muted small">Local runtime history</p>
       <p class="muted small" style="margin-top:0">
         SQLite-only metrics for Refine operations. Retention is

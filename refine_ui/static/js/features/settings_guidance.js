@@ -40,23 +40,23 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
       <div class="modal-body" style="max-height:70vh;overflow:auto">
         <form id="guidance-form">
           <div class="form-row">
-            <label>Name</label>
+            <label>${renderSettingsGuideLabel("Name", "guidance-name")}</label>
             <input type="text" name="name"
                    value="${htmlEscape(current.name || "")}"
                    placeholder="e.g. Frontend accessibility">
           </div>
           <div class="form-row">
-            <label>Rule</label>
+            <label>${renderSettingsGuideLabel("Rule", "guidance-rule")}</label>
             <textarea name="rule" rows="4"
                       placeholder="When should this guidance apply?">${htmlEscape(current.rule || "")}</textarea>
           </div>
           <div class="form-row">
-            <label>Instructions</label>
+            <label>${renderSettingsGuideLabel("Instructions", "guidance-instructions")}</label>
             <textarea name="instructions" rows="8"
                       placeholder="What additional context should the agent receive?">${htmlEscape(current.instructions || "")}</textarea>
           </div>
           <div class="form-row guidance-status-row">
-            <label>Status</label>
+            <label>${renderSettingsGuideLabel("Status", "guidance-status")}</label>
             <div class="guidance-status-control">
               <span class="status-pill ${guidanceEnabled ? "guidance-enabled" : "guidance-disabled"}" data-enabled-status>
                 ${guidanceEnabled ? "Enabled" : "Disabled"}
@@ -170,7 +170,7 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
 function renderSettingsGuidanceTab(guidanceItems) {
   return `
     <section class="settings-section">
-      <h3>Guidance</h3>
+      <h3>${renderSettingsGuideLabel("Guidance", "guidance-items")}</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
         Guidance is classified against each Gap before work starts. Accepted
