@@ -30,7 +30,6 @@ def main() -> int:
     resource_settings = _load_resource_settings(cfg_path)
     resources = ResourceManager(resource_settings)
 
-    worker: subprocess.Popen | None = None
     ui: subprocess.Popen | None = None
     stopping = False
 
@@ -61,22 +60,10 @@ def main() -> int:
         sys.stderr.write(f"\n[refine-supervisor] caught signal {signum}, shutting down\n")
         stopping = True
         _terminate(ui)
-        _terminate(worker)
+        return
 
     signal.signal(signal.SIGINT, _on_signal)
     signal.signal(signal.SIGTERM, _on_signal)
-
-    if cfg_path:
-        worker = resources.popen(
-            [sys.executable, "-m", "refine_runtime.worker"],
-            cwd=str(Path.cwd()),
-            env=env,
-            kind="worker",
-            stdin=subprocess.DEVNULL,
-            stdout=None,
-            stderr=None,
-        )
-        _wait_for_socket(sock, worker)
 
     ui = resources.popen(
         [sys.executable, "-m", "refine_cli", "ui"],
@@ -95,37 +82,20 @@ def main() -> int:
                     break
                 sys.stderr.write("[refine-supervisor] UI exited; shutting down\n")
                 return ui.returncode or 1
-            if worker is not None and worker.poll() is not None:
-                sys.stderr.write("[refine-supervisor] runner exited; shutting down UI\n")
-                _terminate(ui)
-                return worker.returncode or 1
             time.sleep(0.5)
     finally:
         _terminate(ui)
-        _terminate(worker)
         deadline = time.time() + 5
         while time.time() < deadline:
             live = [
-                p for p in (ui, worker)
+                p for p in (ui,)
                 if p is not None and p.poll() is None
             ]
             if not live:
                 break
             time.sleep(0.1)
         _kill(ui)
-        _kill(worker)
     return 0
-
-
-def _wait_for_socket(path: Path, proc: subprocess.Popen) -> None:
-    deadline = time.time() + 20
-    while time.time() < deadline:
-        if path.exists():
-            return
-        if proc.poll() is not None:
-            raise SystemExit(proc.returncode or 1)
-        time.sleep(0.1)
-    raise SystemExit(f"runner socket did not appear: {path}")
 
 
 def _load_resource_settings(cfg_path: str | None) -> ResourceSettings:

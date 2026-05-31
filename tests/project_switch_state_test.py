@@ -59,14 +59,9 @@ def test_client_switch_path(root: Path) -> None:
 
     assert "function openAddAppModal(options = {})" in common_js
     assert "async function maybeOpenProjectTemplateModal(project)" in common_js
-    assert "function rememberPendingProjectTemplateModal(project)" in common_js
-    assert "async function maybeOpenPendingProjectTemplateModal(project = state.project)" in common_js
     assert "function openProjectTemplateModal(templates)" in common_js
     assert 'api("GET", "/api/project/templates")' in common_js
     assert 'api("POST", "/api/project/scaffold"' in common_js
-    assert "rememberPendingProjectTemplateModal(result)" in common_js
-    assert "sessionStorage.setItem(PENDING_SCAFFOLD_PROJECT_KEY" in common_js
-    assert "sessionStorage.removeItem(PENDING_SCAFFOLD_PROJECT_KEY)" in common_js
     add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
     add_app_body = add_app_body.split("\n}", 1)[0]
     for expected in (
@@ -90,7 +85,6 @@ def test_client_switch_path(root: Path) -> None:
     assert 'updateNavAppContextLabel("No app")' in common_js
     assert "sseSource.close()" in common_js
     assert "enterNoProjectMode(state.project, { openGuidePanel: true })" in init_js
-    assert "maybeOpenPendingProjectTemplateModal();" in init_js
     assert "if (!attached) return" not in init_js
     for source, title in (
         (dashboard_js, "Dashboard"),
@@ -157,13 +151,14 @@ def test_client_switch_path(root: Path) -> None:
     assert "active_instance_id: result.active_instance_id" in settings_js
     assert "updateActiveInstanceLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
-    assert "restart_pending" in api_py
+    assert "restart_pending" not in api_py
+    assert "_schedule_supervisor_restart" not in api_py
     assert '"scaffold_required": scaffold_required' in api_py
     assert '"scaffold_required": _project_needs_scaffold_template(cfg.client_repo)' in api_py
     assert "PROJECT_TEMPLATE_DIR" in api_py
     assert "def list_project_templates()" in api_py
     assert "def create_project_scaffold_gap" in api_py
-    assert "Refine is restarting for the selected app" in common_js
+    assert "Refine is restarting for the selected app" not in common_js
 
 
 def test_runtime_switch_resets_services() -> None:
@@ -362,7 +357,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
-def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> None:
+def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
     tmp, client1 = make_client_repo("refine-supervised-switch-")
     conn = init_refine(client1)
     conn.close()
@@ -395,23 +390,11 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
         git(client2, "add", "app.txt")
         git(client2, "commit", "-m", "init")
 
-        old_backend_info = runtime.backend_info
-        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
         old_commit_refine_state = api._commit_refine_state  # type: ignore[attr-defined]
         old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
-        restarts: list[tuple[Path, Path]] = []
         try:
-            runtime.backend_info = lambda: {  # type: ignore[assignment]
-                "process_model": "supervisor",
-                "ui_controls_runner_lifecycle": False,
-            }
             api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
             api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
-            api._schedule_supervisor_restart = (  # type: ignore[assignment]
-                lambda clone_arg, cfg_arg: restarts.append(
-                    (clone_arg, cfg_arg.config_path)
-                ) or {"scheduled": True, "port": 18181, "log_path": "restart.log"}
-            )
             os.environ["REFINE_UI_PORT"] = "18181"
 
             status, body = api.project_attach({
@@ -421,19 +404,14 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
                 "start_poller": False,
             })
         finally:
-            runtime.backend_info = old_backend_info  # type: ignore[assignment]
-            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
             api._commit_refine_state = old_commit_refine_state  # type: ignore[assignment]
             api._git_stdout = old_git_stdout  # type: ignore[assignment]
 
         assert status == 200, body
-        assert body["restart_pending"] is True
+        assert "restart_pending" not in body
         assert body["client_repo"] == str(client2.resolve())
-        assert restarts == [
-            (root.resolve(), client2.resolve() / ".refine" / "refine.toml")
-        ]
         assert config.read_binding(binding) == client2.resolve()
-        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert runtime._loaded_config_path == client2 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
             from refine_ui import runtime
@@ -460,7 +438,7 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
         cleanup_tmp(tmp)
 
 
-def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
+def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None:
     tmp, client = make_client_repo("refine-supervised-initial-attach-")
     clone = tmp / "refine-source"
     (clone / "refine_cli").mkdir(parents=True)
@@ -479,44 +457,18 @@ def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
         reset_refine_imports()
         from refine_ui import api, runtime
 
-        old_backend_info = runtime.backend_info
-        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
-        old_load_configured = runtime.load_configured
-        restarts: list[tuple[Path, Path]] = []
-        try:
-            runtime.backend_info = lambda: {  # type: ignore[assignment]
-                "process_model": "supervisor",
-                "ui_controls_runner_lifecycle": False,
-            }
-            runtime.load_configured = (  # type: ignore[assignment]
-                lambda *args, **kwargs: (_ for _ in ()).throw(
-                    AssertionError("initial supervised attach must restart")
-                )
-            )
-            api._schedule_supervisor_restart = (  # type: ignore[assignment]
-                lambda clone_arg, cfg_arg: restarts.append(
-                    (clone_arg, cfg_arg.config_path)
-                ) or {"scheduled": True, "port": 18182, "log_path": "restart.log"}
-            )
-
-            status, body = api.project_attach({
-                "path": str(client),
-                "install_unit": False,
-                "start_runner": False,
-                "start_poller": False,
-            })
-        finally:
-            runtime.backend_info = old_backend_info  # type: ignore[assignment]
-            runtime.load_configured = old_load_configured  # type: ignore[assignment]
-            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
+        status, body = api.project_attach({
+            "path": str(client),
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
 
         assert status == 200, body
-        assert body["restart_pending"] is True
+        assert "restart_pending" not in body
         assert body["client_repo"] == str(client.resolve())
-        assert restarts == [
-            (clone.resolve(), client.resolve() / ".refine" / "refine.toml")
-        ]
         assert (clone / ".refine-binding").is_file()
+        assert runtime._loaded_config_path == client / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         os.chdir(original_cwd)
         if old_cfg_env is None:
@@ -530,7 +482,7 @@ def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
-def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
+def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
     tmp, client1 = make_client_repo("refine-supervised-migrate-")
     conn = init_refine(client1)
     conn.close()
@@ -576,24 +528,12 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
             legacy_conn.close()
         assert project_state.schema_status(legacy / ".refine")["migration_required"] is True
 
-        old_backend_info = runtime.backend_info
-        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
         old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
-        restarts: list[tuple[Path, Path]] = []
         try:
-            runtime.backend_info = lambda: {  # type: ignore[assignment]
-                "process_model": "supervisor",
-                "ui_controls_runner_lifecycle": False,
-            }
             api._git_stdout = (  # type: ignore[assignment]
                 lambda repo, args: ""
                 if repo.resolve() == client1.resolve()
                 else old_git_stdout(repo, args)
-            )
-            api._schedule_supervisor_restart = (  # type: ignore[assignment]
-                lambda clone_arg, cfg_arg: restarts.append(
-                    (clone_arg, cfg_arg.config_path)
-                ) or {"scheduled": True, "port": 18182, "log_path": "restart.log"}
             )
             os.environ["REFINE_UI_PORT"] = "18182"
 
@@ -605,22 +545,17 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
                 "start_poller": False,
             })
         finally:
-            runtime.backend_info = old_backend_info  # type: ignore[assignment]
-            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
             api._git_stdout = old_git_stdout  # type: ignore[assignment]
 
         assert status == 200, body
-        assert body["restart_pending"] is True
+        assert "restart_pending" not in body
         assert body["schema"]["compatible"] is True
         assert (legacy / ".refine" / "config.json").is_file()
         migrated = json.loads((legacy / ".refine" / "config.json").read_text(encoding="utf-8"))
         assert migrated["settings"]["governance_product"] == "Legacy app"
         assert git(legacy, "status", "--porcelain").stdout.strip() == ""
-        assert restarts == [
-            (root.resolve(), legacy.resolve() / ".refine" / "refine.toml")
-        ]
         assert config.read_binding(binding) == legacy.resolve()
-        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert runtime._loaded_config_path == legacy / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
             from refine_ui import runtime
@@ -966,6 +901,11 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
         assert status == 200, body
         assert project_state.CACHE_ACTIVE_INSTANCE_KEY not in body["settings"]
     finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
         conn.close()
         cleanup_tmp(tmp)
 
@@ -1083,6 +1023,11 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         assert other_target["target_app_env_json"] == '{"PORT": "3001"}'
         assert other_target["target_app_process_check_command"] == "pgrep -f node"
     finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
         conn.close()
         cleanup_tmp(tmp)
 
@@ -1092,9 +1037,9 @@ def main() -> int:
     test_client_switch_path(root)
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
-    test_supervised_switch_schedules_restart_without_hot_loading(root)
-    test_supervised_initial_attach_schedules_restart(root)
-    test_supervised_switch_migrates_target_before_restart(root)
+    test_supervised_switch_hot_loads_without_restart(root)
+    test_supervised_initial_attach_hot_loads_without_restart(root)
+    test_supervised_switch_migrates_target_before_hot_load(root)
     test_empty_project_attach_creates_scaffold_gap(root)
     test_active_instance_is_per_application()
     test_active_instance_is_checkout_local_for_same_application()

@@ -15,7 +15,6 @@ import re
 import shutil
 import sqlite3
 import subprocess
-import sys
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -1465,11 +1464,6 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         current_before = _current_client_repo()
         switching = current_before is not None and current_before != client_repo.resolve()
         _validate_target_schema_before_switch(client_repo.resolve(), body)
-        backend = runtime.backend_info()
-        supervised_restart = (
-            backend.get("process_model") == "supervisor"
-            and (switching or current_before is None)
-        )
         prep = (
             _prepare_current_project_for_switch(clone_dir)
             if switching else {"warnings": []}
@@ -1485,41 +1479,6 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
             reuse_existing_config=True,
             install_unit=install_unit,
         )
-        if supervised_restart:
-            cfg = config.Config.load(result["config_path"])
-            schema = _prepare_supervised_switch_target(
-                cfg,
-                migrate=bool(body.get("migrate")),
-            )
-            if body.get("migrate"):
-                _commit_refine_state(cfg.client_repo)
-            restart = _schedule_supervisor_restart(clone_dir, cfg)
-            return 200, {
-                "attached": True,
-                "client_repo": str(cfg.client_repo),
-                "volume_root": str(cfg.volume_root),
-                "config_path": str(cfg.config_path),
-                "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
-                "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
-                "ui_unit_path": str(result["ui_unit_path"]) if result.get("ui_unit_path") else "",
-                "git_initialized": bool(result.get("git_initialized")),
-                "config_created": bool(result.get("config_created")),
-                "apps": project_registry.list_apps(clone_dir),
-                "registry_enabled": True,
-                "schema": schema,
-                "active_instance_id": "",
-                "active_instance": None,
-                "instances": [],
-                "switch_warnings": prep.get("warnings", []),
-                "restart_pending": True,
-                "scaffold_required": scaffold_required,
-                "scaffold_templates": list_project_templates()[1]["templates"],
-                "restart": restart,
-                "runner": {
-                    "started": False,
-                    "message": "Refine is restarting for the selected app.",
-                },
-            }
         cfg = runtime.load_configured(
             result["config_path"],
             start_poller=body.get("start_poller") is not False,
@@ -1969,12 +1928,7 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     """Stop active agents and leave the current target app clean before switching."""
     warnings: list[str] = []
     cfg = config.get(reload=True)
-    if runtime.backend_info().get("process_model") == "supervisor":
-        warnings.append(
-            "Refine will restart so the UI and runner worker use the selected app."
-        )
-    else:
-        runtime.stop_runner()
+    runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)
     dirty = _git_stdout(cfg.client_repo, ["status", "--porcelain"])
@@ -1987,89 +1941,6 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
             ),
         )
     return {"warnings": warnings}
-
-
-def _prepare_supervised_switch_target(
-    cfg: config.Config,
-    *,
-    migrate: bool,
-) -> dict[str, Any]:
-    """Prepare target .refine state without hot-loading it in this UI process."""
-    schema = project_state.schema_status(cfg.volume_root)
-    if schema.get("compatible"):
-        return project_state.ensure_initialized(
-            migrate=False,
-            root=cfg.volume_root,
-        )
-    if not schema.get("migration_required"):
-        return schema
-
-    conn: sqlite3.Connection | None = None
-    try:
-        if project_state.empty_refine_state(cfg.volume_root):
-            db.init_db(cfg.sqlite_path)
-            conn = db.connect(cfg.sqlite_path)
-        elif not migrate:
-            return schema
-        return project_state.ensure_initialized(
-            conn,
-            migrate=True,
-            root=cfg.volume_root,
-        )
-    finally:
-        if conn is not None:
-            conn.close()
-
-
-def _schedule_supervisor_restart(clone_dir: Path, cfg: config.Config) -> dict[str, Any]:
-    try:
-        port = int(os.environ.get("REFINE_UI_PORT") or cfg.web_port)
-    except ValueError:
-        port = cfg.web_port
-    run_dir = config.local_run_dir(clone_dir)
-    run_dir.mkdir(parents=True, exist_ok=True)
-    log_path = run_dir / f"restart-{port}.log"
-    command = [
-        sys.executable,
-        "-m",
-        "refine_cli",
-        "--config",
-        str(cfg.config_path),
-        "restart",
-        str(port),
-    ]
-    launcher = [
-        sys.executable,
-        "-c",
-        (
-            "import os, sys, time; "
-            "time.sleep(0.5); "
-            "os.execvpe(sys.argv[1], sys.argv[1:], os.environ)"
-        ),
-        *command,
-    ]
-    env = os.environ.copy()
-    env.pop("REFINE_RUNNER_SOCKET", None)
-    env.pop("REFINE_NO_INPROCESS_RUNNER", None)
-    env.pop("REFINE_SUPERVISOR_PID", None)
-    env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
-    env["REFINE_UI_PORT"] = str(port)
-    with log_path.open("ab") as log:
-        proc = subprocess.Popen(
-            launcher,
-            cwd=str(clone_dir),
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            env=env,
-            start_new_session=True,
-        )
-    return {
-        "scheduled": True,
-        "pid": proc.pid,
-        "port": port,
-        "log_path": str(log_path),
-    }
 
 
 def _commit_refine_state(repo: Path) -> None:

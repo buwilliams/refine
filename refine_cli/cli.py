@@ -1621,7 +1621,7 @@ def _start_background_ui(
     if cfg is not None:
         env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
     env.setdefault("PYTHONUNBUFFERED", "1")
-    command = [uv, "run", "refine", "ui" if cfg is None else "supervisor"]
+    command = [uv, "run", "refine", "supervisor"]
     with log_path.open("ab") as log:
         proc = subprocess.Popen(
             command,

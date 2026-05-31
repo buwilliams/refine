@@ -1,4 +1,4 @@
-"""Spin up the UI backend + in-process runner on temp paths and validate the wiring.
+"""Spin up the UI backend on temp paths and validate the wiring.
 
 This is a "does the whole thing boot and respond to pings" test. It does NOT
 exercise a real agent CLI or push to a remote — those need a configured

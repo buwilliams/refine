@@ -39,9 +39,6 @@ async function init() {
     recoverImportSessionOnLoad();
   }
   navigate();
-  if (attached && typeof maybeOpenPendingProjectTemplateModal === "function") {
-    maybeOpenPendingProjectTemplateModal();
-  }
 }
 
 init();

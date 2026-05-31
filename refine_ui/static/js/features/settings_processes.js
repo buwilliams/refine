@@ -557,13 +557,11 @@ async function openProcessDetailsIfOverflowing(cell) {
 
 function backendProcessLabel(backend = {}) {
   if (backend.process_model === "supervisor") return "Supervisor: UI + worker process";
-  if (backend.process_model === "single_process") return "Single UI process";
   return "Unknown";
 }
 
 function backendTransportLabel(backend = {}) {
   if (backend.transport === "unix_socket") return "Unix socket";
-  if (backend.transport === "direct_call") return "Direct in-process call";
   return "Unknown";
 }
 

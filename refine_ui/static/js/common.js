@@ -2,7 +2,6 @@
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-const PENDING_SCAFFOLD_PROJECT_KEY = "refine_pending_scaffold_project";
 
 const state = {
   reporters: [],
@@ -426,7 +425,6 @@ function openProjectAttachModal({
       button.textContent = "Attaching...";
       try {
         const result = await api("POST", "/api/project/attach", { path });
-        rememberPendingProjectTemplateModal(result);
         if (reloadOnSuccess) {
           if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
           state.project = result;
@@ -447,7 +445,6 @@ function openProjectAttachModal({
           if (migrate) {
             try {
               const result = await api("POST", "/api/project/attach", { path, migrate: true });
-              rememberPendingProjectTemplateModal(result);
               if (reloadOnSuccess) {
                 if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
                 state.project = result;
@@ -486,36 +483,10 @@ function openAddAppModal(options = {}) {
 }
 
 function showProjectAttachToast(result) {
-  if (result.restart_pending) {
-    toast("Refine is restarting for the selected app", "info");
-    return;
-  }
   if (result.runner && result.runner.started === false && result.runner.message) {
     toast(result.runner.message, "warn");
   } else {
     toast("Project attached", "success");
-  }
-}
-
-function rememberPendingProjectTemplateModal(project) {
-  if (!project || project.scaffold_required !== true || !project.restart_pending || !project.client_repo) return;
-  try {
-    sessionStorage.setItem(PENDING_SCAFFOLD_PROJECT_KEY, String(project.client_repo));
-  } catch {}
-}
-
-function clearPendingProjectTemplateModal() {
-  try {
-    sessionStorage.removeItem(PENDING_SCAFFOLD_PROJECT_KEY);
-  } catch {}
-}
-
-function pendingProjectTemplateModalMatches(project) {
-  if (!project || !project.client_repo) return false;
-  try {
-    return sessionStorage.getItem(PENDING_SCAFFOLD_PROJECT_KEY) === String(project.client_repo);
-  } catch {
-    return false;
   }
 }
 
@@ -528,10 +499,6 @@ async function applyProjectAttachResult(result, options = {}) {
   state.underlayHash = "#/project/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
   showProjectAttachToast(result);
-  if (result.restart_pending) {
-    setTimeout(() => window.location.reload(), 2500);
-    return;
-  }
   resetChatForProjectSwitch();
   initSSE();
   await syncProjectUpdates({ silent: true });
@@ -554,7 +521,7 @@ async function applyProjectAttachResult(result, options = {}) {
 }
 
 async function maybeOpenProjectTemplateModal(project) {
-  if (!project || project.scaffold_required !== true || project.restart_pending) return null;
+  if (!project || project.scaffold_required !== true) return null;
   let templates = Array.isArray(project.scaffold_templates) ? project.scaffold_templates : [];
   if (!templates.length) {
     try {
@@ -567,17 +534,6 @@ async function maybeOpenProjectTemplateModal(project) {
   }
   if (!templates.length) return null;
   return openProjectTemplateModal(templates);
-}
-
-async function maybeOpenPendingProjectTemplateModal(project = state.project) {
-  if (!pendingProjectTemplateModalMatches(project)) return null;
-  if (!project || project.scaffold_required !== true) {
-    clearPendingProjectTemplateModal();
-    return null;
-  }
-  const result = await maybeOpenProjectTemplateModal(project);
-  clearPendingProjectTemplateModal();
-  return result;
 }
 
 function openProjectTemplateModal(templates) {

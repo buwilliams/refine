@@ -41,6 +41,7 @@ def main() -> int:
         run(host=host, port=port)
     except KeyboardInterrupt:
         sys.stderr.write("\n[refine-ui] shutting down\n")
+    finally:
         runtime.stop_all()
     return 0
 
