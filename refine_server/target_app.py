@@ -26,47 +26,67 @@ from .chat_mgr import _chat_env, _merge_paths, _user_login_path
 
 _TAIL_LIMIT = 8000
 
-_GENERATE_PROMPT = """\
-Analyse this codebase and produce target-application management
-configuration for Refine.
+# Refine writes the generated bodies into this script (repo-relative) and the
+# saved start/stop/rebuild/status commands all invoke it. This gives every
+# target app a single, consistent management entry point that operators can
+# read and edit.
+MANAGE_SCRIPT_RELPATH = ".refine/manage-app.sh"
+MANAGE_COMMANDS = {
+    "start_command": "./.refine/manage-app.sh start",
+    "stop_command": "./.refine/manage-app.sh stop",
+    "rebuild_command": "./.refine/manage-app.sh rebuild",
+    "status_command": "./.refine/manage-app.sh status",
+}
 
-Refine will NOT send prose to an agent at runtime. It will run the
-commands you provide directly in a non-interactive shell from the
-configured working directory.
+_GENERATE_PROMPT = """\
+Analyse this codebase and design how to start, stop, rebuild, and check the
+status of THIS application from the command line.
+
+Refine will write your answer into a shell script at `.refine/manage-app.sh`
+and then run `./.refine/manage-app.sh start|stop|rebuild|status` directly in a
+non-interactive bash shell from the repository root. You only design the body
+of each command — Refine adds the `#!/usr/bin/env bash` header, timestamped
+STDOUT logging, repo-root path resolution, and the start|stop|rebuild|status
+dispatch around your snippets.
+
+Determine the best management approach by inspecting the repo. Prefer whatever
+this project actually uses; the most common stacks are:
+- Docker / docker compose (Dockerfile, compose.yaml, docker-compose.yml)
+- Node / npm / pnpm / yarn (package.json scripts)
+- Python / uv / pip / poetry (pyproject.toml, requirements.txt, manage.py)
+- Make / Procfile / framework CLIs (Django, Rails, Go, etc.)
 
 Return ONLY a JSON object with these keys:
 {
-  "start_command": "one-line shell command that starts the app and returns promptly",
-  "stop_command": "one-line shell command that stops the app and returns promptly",
-  "rebuild_command": "one-line shell command that rebuilds generated artifacts for review",
-  "status_command": "one-line shell command; exit 0 only when the app is healthy/running",
-  "cwd": "repo-relative working directory, or empty string for repo root",
+  "summary": "one short line naming the detected stack and chosen approach",
+  "helpers": "optional bash run once before the command: shared variables or functions (e.g. PORT=3000; PIDFILE=.refine/run/app.pid). Empty string if none.",
+  "start": "bash that starts the app and returns promptly; background long-running servers and redirect their logs, do not block",
+  "stop": "bash that stops the app and is idempotent (succeeds even if nothing is running)",
+  "rebuild": "bash that rebuilds or prepares generated artifacts for review without starting a long-running dev server",
+  "status": "bash that exits 0 only when the app is running/healthy and non-zero otherwise",
   "env": {"NAME": "value"},
   "start_timeout_seconds": 120,
   "stop_timeout_seconds": 60,
   "rebuild_timeout_seconds": 300,
   "status_timeout_seconds": 10,
-  "log_path": "optional repo-relative or absolute log path",
-  "http_check_url": "optional URL for web apps",
-  "tcp_check_host": "optional host for TCP checks",
-  "tcp_check_port": "optional port for TCP checks",
-  "process_check_command": "optional one-line shell command; exit 0 when expected process exists",
+  "http_check_url": "optional URL for web apps, used as an extra health probe",
+  "tcp_check_host": "optional host for an extra TCP probe",
+  "tcp_check_port": "optional port for an extra TCP probe",
   "notes": "short warnings or rationale for the operator"
 }
 
-Rules:
-- Commands must be single-line CLI commands, not numbered lists.
-- Prefer project-native commands discovered from package.json scripts,
-  Makefile targets, pyproject.toml, Dockerfile, README, compose files,
-  Procfile, or similar sources.
-- The start command must not block forever. Use an existing process
-  manager, docker compose detach mode, or backgrounding with logging.
-- The stop command must be idempotent when practical.
-- The rebuild command should prepare the app for review after code changes
-  without starting a long-running dev server.
-- The status command is required unless no reliable CLI check exists.
-- Use optional HTTP/TCP/process checks only when they add confidence.
-- Do not include markdown, comments, or prose outside the JSON object.
+Rules for the bash snippets:
+- Plain bash that runs under `set -uo pipefail`. Multiple lines are fine.
+- Log meaningful progress with echo/printf so failures are debuggable; Refine
+  already timestamps and captures STDOUT.
+- Prefer project-native commands discovered from package.json scripts, Makefile
+  targets, pyproject.toml, Dockerfile, compose files, Procfile, or the README.
+- For `start`, never block forever: use a process manager, `docker compose up -d`,
+  or background the process (e.g. `nohup ... > .refine/run/app.log 2>&1 &`).
+- Reference paths relative to the repository root.
+- Do not add a shebang and do not redefine the start|stop|rebuild|status
+  dispatch — only provide the command bodies.
+- Output the JSON object only: no markdown fences, comments, or prose around it.
 """
 
 
@@ -548,6 +568,19 @@ def generate_config(provider: str | None = None,
         return {"ok": False, "config": {}, "message": "agent did not return a JSON object",
                 "raw": raw}
     config = normalize_generated_config(parsed)
+    script_rel = MANAGE_SCRIPT_RELPATH
+    script_error = ""
+    try:
+        write_manage_script(build_manage_script(parsed), root=cwd)
+    except OSError as e:
+        script_error = f"could not write {script_rel}: {e}"
+    summary = _one_line(parsed.get("summary") or "")
+    lead = (
+        script_error
+        or f"Wrote {script_rel}" + (f" ({summary})" if summary else "") + "."
+    )
+    config["notes"] = (f"{lead} {config['notes']}".strip()
+                       if config.get("notes") else lead)
     perf_metrics.record(
         "ai.target_app_generate",
         elapsed_ms=perf_metrics.elapsed_ms(metric_start),
@@ -555,17 +588,30 @@ def generate_config(provider: str | None = None,
         bytes_in=len(_GENERATE_PROMPT.encode("utf-8", errors="replace")),
         bytes_out=len(raw.encode("utf-8", errors="replace")),
     )
-    return {"ok": True, "config": config, "message": "generated", "raw": raw}
+    return {
+        "ok": True,
+        "config": config,
+        "message": "generated",
+        "raw": raw,
+        "script_path": script_rel,
+    }
 
 
 def normalize_generated_config(obj: dict[str, Any]) -> dict[str, Any]:
+    """Map a generated analysis into saved target-app settings.
+
+    The start/stop/rebuild/status commands always point at the generated
+    `.refine/manage-app.sh` wrapper (operators may override them later). The
+    working directory is pinned to the repo root so the relative script path
+    resolves; the script itself cd's to the repo root regardless.
+    """
     env = obj.get("env") if isinstance(obj.get("env"), dict) else {}
     return {
-        "start_command": _one_line(obj.get("start_command") or ""),
-        "stop_command": _one_line(obj.get("stop_command") or ""),
-        "rebuild_command": _one_line(obj.get("rebuild_command") or ""),
-        "status_command": _one_line(obj.get("status_command") or ""),
-        "cwd": str(obj.get("cwd") or "").strip(),
+        "start_command": MANAGE_COMMANDS["start_command"],
+        "stop_command": MANAGE_COMMANDS["stop_command"],
+        "rebuild_command": MANAGE_COMMANDS["rebuild_command"],
+        "status_command": MANAGE_COMMANDS["status_command"],
+        "cwd": "",
         "env": {str(k): str(v) for k, v in env.items()},
         "start_timeout_seconds": _positive_int(obj.get("start_timeout_seconds"), 120),
         "stop_timeout_seconds": _positive_int(obj.get("stop_timeout_seconds"), 60),
@@ -575,9 +621,149 @@ def normalize_generated_config(obj: dict[str, Any]) -> dict[str, Any]:
         "http_check_url": str(obj.get("http_check_url") or "").strip(),
         "tcp_check_host": str(obj.get("tcp_check_host") or "").strip(),
         "tcp_check_port": str(obj.get("tcp_check_port") or "").strip(),
-        "process_check_command": _one_line(obj.get("process_check_command") or ""),
+        # Status is handled by the wrapper's `status` subcommand, so we do not
+        # configure a redundant separate process check here.
+        "process_check_command": "",
         "notes": str(obj.get("notes") or "").strip(),
     }
+
+
+_SCRIPT_DEFAULT_BODIES = {
+    "start": 'log "no start command was generated; nothing to do"',
+    "stop": 'log "no stop command was generated; nothing to do"',
+    "rebuild": 'log "no rebuild command was generated; nothing to do"',
+    # Default status is conservative: report "not running" rather than claim
+    # health we cannot verify.
+    "status": ('log "no status command was generated; reporting not running"\n'
+               'return 1'),
+}
+
+
+def _indent_block(text: str, prefix: str) -> str:
+    lines = str(text or "").splitlines()
+    return "\n".join((prefix + line) if line.strip() else line for line in lines)
+
+
+def build_manage_script(obj: dict[str, Any]) -> str:
+    """Assemble the `.refine/manage-app.sh` contents from a generated analysis.
+
+    Refine owns the harness — shebang, timestamped STDOUT logging, repo-root
+    resolution, and the start|stop|rebuild|status dispatch — so logging and
+    structure are guaranteed regardless of what the agent returns. The agent
+    only supplies the per-command bodies and optional shared `helpers`.
+    """
+    summary = _one_line(obj.get("summary") or "") or "auto-detected"
+    helpers = str(obj.get("helpers") or "").strip()
+    bodies = {}
+    for name in ("start", "stop", "rebuild", "status"):
+        snippet = str(obj.get(name) or "").strip() or _SCRIPT_DEFAULT_BODIES[name]
+        bodies[name] = _indent_block(snippet, "  ")
+    helpers_block = (
+        f"# Shared setup from analysis.\n{helpers}"
+        if helpers else "# (no shared setup)"
+    )
+    template = _MANAGE_SCRIPT_TEMPLATE
+    return (
+        template
+        .replace("__SUMMARY__", summary)
+        .replace("__HELPERS__", helpers_block)
+        .replace("__START__", bodies["start"])
+        .replace("__STOP__", bodies["stop"])
+        .replace("__REBUILD__", bodies["rebuild"])
+        .replace("__STATUS__", bodies["status"])
+    )
+
+
+def write_manage_script(content: str, *, root: Path | None = None) -> Path:
+    """Write (overwrite) the manage-app.sh wrapper and mark it executable."""
+    base = Path(root) if root is not None else git_ops.client_repo_path()
+    path = base / MANAGE_SCRIPT_RELPATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    try:
+        path.chmod(0o755)
+    except OSError:
+        pass
+    return path
+
+
+_MANAGE_SCRIPT_TEMPLATE = """\
+#!/usr/bin/env bash
+#
+# .refine/manage-app.sh - generated by Refine "Generate with AI".
+#
+# A consistent entry point Refine uses to manage the target application:
+#
+#     ./.refine/manage-app.sh start     # start the app, return promptly
+#     ./.refine/manage-app.sh stop      # stop the app (idempotent)
+#     ./.refine/manage-app.sh rebuild   # rebuild generated artifacts
+#     ./.refine/manage-app.sh status    # exit 0 only when running/healthy
+#
+# Regenerated whenever you click "Generate with AI". Edit it freely - Refine
+# only calls the four subcommands above, and you can override the saved
+# commands in Settings > Instance > Application.
+#
+# Detected stack: __SUMMARY__
+
+set -uo pipefail
+
+# --- logging -----------------------------------------------------------------
+# Every step logs to STDOUT with a UTC timestamp so Refine's process logs and
+# the status panel show exactly what ran and how it exited.
+_ts()  { date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date; }
+log()  { printf '[manage-app %s] %s\\n' "$(_ts)" "$*"; }
+run()  { log "RUN: $*"; "$@"; local rc=$?; log "EXIT ${rc}: $*"; return "$rc"; }
+
+# Resolve paths relative to this script so it works from any working directory.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
+APP_DIR="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
+cd "$APP_DIR" || { log "FATAL: cannot cd to $APP_DIR"; exit 1; }
+
+CMD="${1:-}"
+log "begin: cmd='${CMD}' app_dir='${APP_DIR}' user='$(id -un 2>/dev/null || echo '?')'"
+
+# --- shared setup (from analysis) --------------------------------------------
+__HELPERS__
+
+# --- commands (from analysis) ------------------------------------------------
+do_start() {
+  log "starting application"
+__START__
+}
+
+do_stop() {
+  log "stopping application"
+__STOP__
+}
+
+do_rebuild() {
+  log "rebuilding application"
+__REBUILD__
+}
+
+do_status() {
+  log "checking application status"
+__STATUS__
+}
+
+rc=0
+case "$CMD" in
+  start)   do_start;   rc=$? ;;
+  stop)    do_stop;    rc=$? ;;
+  rebuild) do_rebuild; rc=$? ;;
+  status)  do_status;  rc=$? ;;
+  ""|-h|--help|help)
+    log "usage: manage-app.sh {start|stop|rebuild|status}"
+    rc=2 ;;
+  *)
+    log "ERROR: unknown command '${CMD}'"
+    log "usage: manage-app.sh {start|stop|rebuild|status}"
+    rc=2 ;;
+esac
+
+log "done: cmd='${CMD}' exit=${rc}"
+exit "$rc"
+"""
 
 
 def _one_line(value: Any) -> str:

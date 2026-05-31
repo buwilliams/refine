@@ -6227,6 +6227,7 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
         "config": result.get("config") or {},
         "notes": (result.get("config") or {}).get("notes") or "",
         "raw": result.get("raw") or "",
+        "script_path": result.get("script_path") or "",
     }
 
 
