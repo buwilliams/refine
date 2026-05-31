@@ -33,6 +33,7 @@ def _restore_optional(path: Path, data: bytes | None) -> None:
 def test_client_switch_path(root: Path) -> None:
     index_html = (root / "refine_ui/static/index.html").read_text(encoding="utf-8")
     base_css = (root / "refine_ui/static/css/base.css").read_text(encoding="utf-8")
+    modals_css = (root / "refine_ui/static/css/modals.css").read_text(encoding="utf-8")
     common_js = (root / "refine_ui/static/js/common.js").read_text(encoding="utf-8")
     settings_js = (
         root / "refine_ui/static/js/features/settings.js"
@@ -62,6 +63,17 @@ def test_client_switch_path(root: Path) -> None:
     assert "function openProjectTemplateModal(templates)" in common_js
     assert 'api("GET", "/api/project/templates")' in common_js
     assert 'api("POST", "/api/project/scaffold"' in common_js
+    assert ".project-template-modal .modal-body" in modals_css
+    assert "max-height: calc(100vh - 48px);" in modals_css
+    assert "grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));" in modals_css
+    assert "max-height: min(52vh, 420px);" in modals_css
+    assert "overflow-y: auto;" in modals_css
+    template_hover_css = modals_css.split(
+        ".project-template-option:hover:not(:disabled),", 1,
+    )[1].split("}", 1)[0]
+    assert "background: var(--color-primary-soft);" in template_hover_css
+    assert "color: var(--color-primary);" in template_hover_css
+    assert ".project-template-option:hover:not(:disabled) .project-template-summary" in modals_css
     add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
     add_app_body = add_app_body.split("\n}", 1)[0]
     for expected in (
