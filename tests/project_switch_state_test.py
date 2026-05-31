@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -12,9 +13,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo, reset_refine_imports
 
 
+def _read_optional(path: Path) -> bytes | None:
+    try:
+        return path.read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def _restore_optional(path: Path, data: bytes | None) -> None:
+    if data is None:
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+        return
+    path.write_bytes(data)
+
+
 def test_client_switch_path(root: Path) -> None:
     index_html = (root / "refine_ui/static/index.html").read_text(encoding="utf-8")
     base_css = (root / "refine_ui/static/css/base.css").read_text(encoding="utf-8")
+    modals_css = (root / "refine_ui/static/css/modals.css").read_text(encoding="utf-8")
     common_js = (root / "refine_ui/static/js/common.js").read_text(encoding="utf-8")
     settings_js = (
         root / "refine_ui/static/js/features/settings.js"
@@ -24,6 +43,14 @@ def test_client_switch_path(root: Path) -> None:
         root / "refine_ui/static/js/features/settings_instances.js"
     ).read_text(encoding="utf-8")
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(encoding="utf-8")
+    settings_surface_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
+    dashboard_js = (root / "refine_ui/static/js/features/dashboard.js").read_text(encoding="utf-8")
+    gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(encoding="utf-8")
+    changes_js = (root / "refine_ui/static/js/features/changes.js").read_text(encoding="utf-8")
+    logs_js = (root / "refine_ui/static/js/features/logs.js").read_text(encoding="utf-8")
+    init_js = (root / "refine_ui/static/js/init.js").read_text(encoding="utf-8")
+    target_app_js = (root / "refine_ui/static/js/target-app.js").read_text(encoding="utf-8")
+    guide_js = (root / "refine_ui/static/js/features/guide.js").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
 
     assert 'id="active-instance-label"' in index_html
@@ -32,25 +59,83 @@ def test_client_switch_path(root: Path) -> None:
     assert "updateActiveInstanceLabel()" in common_js
 
     assert "function openAddAppModal(options = {})" in common_js
+    assert "async function maybeOpenProjectTemplateModal(project)" in common_js
+    assert "async function openProjectTemplateSelector()" in common_js
+    assert "async function loadProjectTemplates()" in common_js
+    assert "function openProjectTemplateModal(templates)" in common_js
+    assert "Select app template" in common_js
+    assert 'api("GET", "/api/project/templates")' in common_js
+    assert 'api("POST", "/api/project/scaffold"' in common_js
+    assert ".project-template-modal .modal-body" in modals_css
+    assert "max-height: calc(100vh - 48px);" in modals_css
+    assert "grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));" in modals_css
+    assert "max-height: min(52vh, 420px);" in modals_css
+    assert "overflow-y: auto;" in modals_css
+    template_hover_css = modals_css.split(
+        ".project-template-option:hover:not(:disabled),", 1,
+    )[1].split("}", 1)[0]
+    assert "background: var(--color-primary-soft);" in template_hover_css
+    assert "color: var(--color-primary);" in template_hover_css
+    assert ".project-template-option:hover:not(:disabled) .project-template-summary" in modals_css
     add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
     add_app_body = add_app_body.split("\n}", 1)[0]
     for expected in (
         'title: "Add app"',
         'okLabel: "Add and switch"',
         "reloadOnSuccess: false",
+        "openGuideOnSuccess: true",
     ):
         assert expected in add_app_body, expected
 
     first_run_body = common_js.split("async function ensureProjectAttached()", 1)[1]
     first_run_body = first_run_body.split("\n}", 1)[0]
-    assert "openAddAppModal(" in first_run_body
+    assert "openAddAppModal(" not in first_run_body
+    assert "enterNoProjectMode(snap)" in first_run_body
+    assert "return false" in first_run_body
     assert "await syncProjectUpdates({ silent: true })" in common_js
-    assert "return !!result" in first_run_body
+    assert "function renderNoProjectEmptyState" in common_js
+    assert "Open the Guide to configure Refine and attach an app." in common_js
+    assert "function renderNoProjectIfDetached" in common_js
+    assert "function renderNoProjectIfApiDetached" in common_js
+    assert 'updateNavAppContextLabel("No app")' in common_js
+    assert "sseSource.close()" in common_js
+    assert "enterNoProjectMode(state.project, { openGuidePanel: true })" in init_js
+    assert "if (!attached) return" not in init_js
+    for source, title in (
+        (dashboard_js, "Dashboard"),
+        (gaps_list_js, "Gaps"),
+        (changes_js, "Changes"),
+        (logs_js, "Logs"),
+    ):
+        assert f'renderNoProjectIfDetached("{title}")' in source
+        assert "renderNoProjectIfApiDetached" in source
+    assert "function applyNoTargetAppSnapshot()" in target_app_js
+    assert 'if (project.attached === false) return "No app";' in target_app_js
+    assert 'if (!hasAttachedProject()) {' in target_app_js
+    assert 'guideState.context === "no-app"' in guide_js
+    assert "options.openTarget !== false" in guide_js
+    assert "function resetGuideState" in guide_js
+    assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
+    assert "async function loadSettingsSurfaceData()" in settings_surface_js
+    assert 'const project = await api("GET", "/api/project/status");' in settings_surface_js
+    assert "if (project.attached === false)" in settings_surface_js
+    assert "return detachedSettingsSurfaceData(project);" in settings_surface_js
+    assert "function renderSettingsNoProjectTab" in settings_surface_js
+    assert "Open the Guide to configure Refine and attach an app before using" in settings_surface_js
+    assert "data-settings-open-guide" in settings_surface_js
+    no_app_tab_body = settings_surface_js.split("if (data.noProject)", 1)[1]
+    no_app_tab_body = no_app_tab_body.split("if (surface === SETTINGS_SURFACES.settings)", 1)[0]
+    assert "surface === SETTINGS_SURFACES.project && slug === \"application\"" in no_app_tab_body
+    assert "return renderSettingsApplicationTab({" in no_app_tab_body
+    assert "return renderSettingsNoProjectTab(surface.title);" in no_app_tab_body
+    assert "_project_attached()" in api_py
+    assert '"attached": False' in api_py
 
-    assert "async function applyProjectAttachResult(result)" in common_js
-    switch_body = common_js.split("async function applyProjectAttachResult(result)", 1)[1]
+    assert "async function applyProjectAttachResult(result, options = {})" in common_js
+    switch_body = common_js.split("async function applyProjectAttachResult(result, options = {})", 1)[1]
     switch_body = switch_body.split("\n}", 1)[0]
     for expected in (
+        'if (typeof resetGuideState === "function") resetGuideState({ redraw: false });',
         "state.project = result",
         "resetChatForProjectSwitch()",
         "initSSE()",
@@ -58,6 +143,7 @@ def test_client_switch_path(root: Path) -> None:
         "await refreshInstanceScopedState({ selectReporterFallback: true })",
         "await refreshTargetAppToggle()",
         'location.hash = "#/project/application"',
+        "openGuide({",
     ):
         assert expected in switch_body, expected
 
@@ -72,13 +158,28 @@ def test_client_switch_path(root: Path) -> None:
     assert "migrate: true" in common_js
     assert "function resetChatForProjectSwitch()" in toolbar_js
     assert "await openAddAppModal()" in settings_js
+    assert 'id="s-project-template"' in settings_js
+    assert "await openProjectTemplateSelector()" in settings_js
+    assert "if (options.toast !== false) showProjectAttachToast(result)" in common_js
     assert "await applyProjectAttachResult(result)" in settings_js
+    remove_body = settings_js.split('api("DELETE", "/api/projects", { path })', 1)[1]
+    remove_body = remove_body.split("await refreshSettingsTab", 1)[0]
+    assert "if (result.auto_attached)" in remove_body
+    assert "await applyProjectAttachResult(result, { toast: false })" in remove_body
+    assert "App removed; loaded next app" in remove_body
+    assert 'resetGuideState({ redraw: false })' in remove_body
     assert "await refreshInstanceScopedState()" in settings_js
     assert "active_instance_id: result.active_instance_id" in settings_js
     assert "updateActiveInstanceLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
-    assert "restart_pending" in api_py
-    assert "Refine is restarting for the selected app" in common_js
+    assert "restart_pending" not in api_py
+    assert "_schedule_supervisor_restart" not in api_py
+    assert '"scaffold_required": scaffold_required' in api_py
+    assert '"scaffold_required": _project_needs_scaffold_template(cfg.client_repo)' in api_py
+    assert "PROJECT_TEMPLATE_DIR" in api_py
+    assert "def list_project_templates()" in api_py
+    assert "def create_project_scaffold_gap" in api_py
+    assert "Refine is restarting for the selected app" not in common_js
 
 
 def test_runtime_switch_resets_services() -> None:
@@ -153,6 +254,8 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
     old_cfg = os.environ.get("REFINE_CONFIG_PATH")
     try:
         conn = init_refine(client1)
@@ -266,6 +369,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
         if old_cfg is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
@@ -274,13 +378,15 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
-def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> None:
+def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
     tmp, client1 = make_client_repo("refine-supervised-switch-")
     conn = init_refine(client1)
     conn.close()
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
     try:
@@ -305,23 +411,11 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
         git(client2, "add", "app.txt")
         git(client2, "commit", "-m", "init")
 
-        old_backend_info = runtime.backend_info
-        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
         old_commit_refine_state = api._commit_refine_state  # type: ignore[attr-defined]
         old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
-        restarts: list[tuple[Path, Path]] = []
         try:
-            runtime.backend_info = lambda: {  # type: ignore[assignment]
-                "process_model": "supervisor",
-                "ui_controls_runner_lifecycle": False,
-            }
             api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
             api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
-            api._schedule_supervisor_restart = (  # type: ignore[assignment]
-                lambda clone_arg, cfg_arg: restarts.append(
-                    (clone_arg, cfg_arg.config_path)
-                ) or {"scheduled": True, "port": 18181, "log_path": "restart.log"}
-            )
             os.environ["REFINE_UI_PORT"] = "18181"
 
             status, body = api.project_attach({
@@ -331,19 +425,14 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
                 "start_poller": False,
             })
         finally:
-            runtime.backend_info = old_backend_info  # type: ignore[assignment]
-            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
             api._commit_refine_state = old_commit_refine_state  # type: ignore[assignment]
             api._git_stdout = old_git_stdout  # type: ignore[assignment]
 
         assert status == 200, body
-        assert body["restart_pending"] is True
+        assert "restart_pending" not in body
         assert body["client_repo"] == str(client2.resolve())
-        assert restarts == [
-            (root.resolve(), client2.resolve() / ".refine" / "refine.toml")
-        ]
         assert config.read_binding(binding) == client2.resolve()
-        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert runtime._loaded_config_path == client2 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
             from refine_ui import runtime
@@ -357,6 +446,7 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
         if old_cfg_env is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
@@ -369,7 +459,93 @@ def test_supervised_switch_schedules_restart_without_hot_loading(root: Path) -> 
         cleanup_tmp(tmp)
 
 
-def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
+def test_removing_active_project_hot_loads_next_app() -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="refine-remove-next-app-"))
+    clone = tmp / "refine-source"
+    (clone / "refine_cli").mkdir(parents=True)
+    (clone / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+
+    def make_app(name: str) -> Path:
+        app = tmp / name
+        app.mkdir()
+        git(app, "init", "-q")
+        git(app, "config", "user.email", "t@x")
+        git(app, "config", "user.name", "t")
+        (app / "app.txt").write_text(f"{name}\n", encoding="utf-8")
+        git(app, "add", "app.txt")
+        git(app, "commit", "-m", "init")
+        return app
+
+    app_one = make_app("app-one")
+    app_two = make_app("app-two")
+    app_three = make_app("app-three")
+    original_cwd = Path.cwd()
+    conn = init_refine(app_two)
+    conn.close()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        os.chdir(clone)
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        reset_refine_imports()
+        from refine_server import config, project_registry
+        from refine_ui import api, runtime
+
+        config.write_binding(clone, app_two)
+        config.get(reload=True)
+        runtime.load_configured(
+            app_two / ".refine" / "refine.toml",
+            start_runner=False,
+            start_poller=False,
+        )
+        project_registry.upsert_app(clone, app_one)
+        project_registry.upsert_app(clone, app_two, make_current=True)
+        project_registry.upsert_app(clone, app_three)
+
+        old_commit_refine_state = api._commit_refine_state  # type: ignore[attr-defined]
+        old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
+        try:
+            api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
+            api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
+            status, body = api.project_remove({
+                "path": str(app_two),
+                "start_runner": False,
+                "start_poller": False,
+            })
+        finally:
+            api._commit_refine_state = old_commit_refine_state  # type: ignore[assignment]
+            api._git_stdout = old_git_stdout  # type: ignore[assignment]
+
+        assert status == 200, body
+        assert body["attached"] is True
+        assert body["auto_attached"] is True
+        assert body["removed_path"] == str(app_two.resolve())
+        assert body["client_repo"] == str(app_three.resolve())
+        assert [app["path"] for app in body["apps"]] == [
+            str(app_one.resolve()),
+            str(app_three.resolve()),
+        ]
+        assert config.get(reload=True).client_repo == app_three.resolve()
+        assert config.read_binding(clone / ".refine-binding") == app_three.resolve()
+        assert runtime._loaded_config_path == app_three / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None:
     tmp, client = make_client_repo("refine-supervised-initial-attach-")
     clone = tmp / "refine-source"
     (clone / "refine_cli").mkdir(parents=True)
@@ -388,44 +564,18 @@ def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
         reset_refine_imports()
         from refine_ui import api, runtime
 
-        old_backend_info = runtime.backend_info
-        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
-        old_load_configured = runtime.load_configured
-        restarts: list[tuple[Path, Path]] = []
-        try:
-            runtime.backend_info = lambda: {  # type: ignore[assignment]
-                "process_model": "supervisor",
-                "ui_controls_runner_lifecycle": False,
-            }
-            runtime.load_configured = (  # type: ignore[assignment]
-                lambda *args, **kwargs: (_ for _ in ()).throw(
-                    AssertionError("initial supervised attach must restart")
-                )
-            )
-            api._schedule_supervisor_restart = (  # type: ignore[assignment]
-                lambda clone_arg, cfg_arg: restarts.append(
-                    (clone_arg, cfg_arg.config_path)
-                ) or {"scheduled": True, "port": 18182, "log_path": "restart.log"}
-            )
-
-            status, body = api.project_attach({
-                "path": str(client),
-                "install_unit": False,
-                "start_runner": False,
-                "start_poller": False,
-            })
-        finally:
-            runtime.backend_info = old_backend_info  # type: ignore[assignment]
-            runtime.load_configured = old_load_configured  # type: ignore[assignment]
-            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
+        status, body = api.project_attach({
+            "path": str(client),
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
 
         assert status == 200, body
-        assert body["restart_pending"] is True
+        assert "restart_pending" not in body
         assert body["client_repo"] == str(client.resolve())
-        assert restarts == [
-            (clone.resolve(), client.resolve() / ".refine" / "refine.toml")
-        ]
         assert (clone / ".refine-binding").is_file()
+        assert runtime._loaded_config_path == client / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         os.chdir(original_cwd)
         if old_cfg_env is None:
@@ -439,13 +589,15 @@ def test_supervised_initial_attach_schedules_restart(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
-def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
+def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
     tmp, client1 = make_client_repo("refine-supervised-migrate-")
     conn = init_refine(client1)
     conn.close()
     original_cwd = Path.cwd()
     binding = root / ".refine-binding"
     prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
     try:
@@ -483,24 +635,12 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
             legacy_conn.close()
         assert project_state.schema_status(legacy / ".refine")["migration_required"] is True
 
-        old_backend_info = runtime.backend_info
-        old_schedule_restart = api._schedule_supervisor_restart  # type: ignore[attr-defined]
         old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
-        restarts: list[tuple[Path, Path]] = []
         try:
-            runtime.backend_info = lambda: {  # type: ignore[assignment]
-                "process_model": "supervisor",
-                "ui_controls_runner_lifecycle": False,
-            }
             api._git_stdout = (  # type: ignore[assignment]
                 lambda repo, args: ""
                 if repo.resolve() == client1.resolve()
                 else old_git_stdout(repo, args)
-            )
-            api._schedule_supervisor_restart = (  # type: ignore[assignment]
-                lambda clone_arg, cfg_arg: restarts.append(
-                    (clone_arg, cfg_arg.config_path)
-                ) or {"scheduled": True, "port": 18182, "log_path": "restart.log"}
             )
             os.environ["REFINE_UI_PORT"] = "18182"
 
@@ -512,22 +652,17 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
                 "start_poller": False,
             })
         finally:
-            runtime.backend_info = old_backend_info  # type: ignore[assignment]
-            api._schedule_supervisor_restart = old_schedule_restart  # type: ignore[assignment]
             api._git_stdout = old_git_stdout  # type: ignore[assignment]
 
         assert status == 200, body
-        assert body["restart_pending"] is True
+        assert "restart_pending" not in body
         assert body["schema"]["compatible"] is True
         assert (legacy / ".refine" / "config.json").is_file()
         migrated = json.loads((legacy / ".refine" / "config.json").read_text(encoding="utf-8"))
         assert migrated["settings"]["governance_product"] == "Legacy app"
         assert git(legacy, "status", "--porcelain").stdout.strip() == ""
-        assert restarts == [
-            (root.resolve(), legacy.resolve() / ".refine" / "refine.toml")
-        ]
         assert config.read_binding(binding) == legacy.resolve()
-        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert runtime._loaded_config_path == legacy / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
             from refine_ui import runtime
@@ -541,6 +676,7 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
                 pass
         else:
             binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
         if old_cfg_env is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
@@ -550,6 +686,97 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
         else:
             os.environ["REFINE_UI_PORT"] = old_port
         os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="refine-scaffold-template-"))
+    clone = tmp / "refine-source"
+    (clone / "refine_cli").mkdir(parents=True)
+    (clone / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    origin = tmp / "empty-origin.git"
+    original_cwd = Path.cwd()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        git(tmp, "init", "--bare", str(origin))
+        os.chdir(clone)
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        reset_refine_imports()
+        from refine_server import db, gaps as shared_gaps
+        from refine_ui import api
+
+        status, templates = api.list_project_templates()
+        assert status == 200, templates
+        template_ids = {t["id"] for t in templates["templates"]}
+        assert {
+            "ai-chat-app",
+            "astro-content-site",
+            "blank",
+            "nextjs-fullstack",
+            "nodejs-webapp",
+            "python-webapp",
+            "sveltekit-webapp",
+        } <= template_ids
+
+        status, attached = api.project_attach({
+            "path": origin.as_uri(),
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
+        assert status == 200, attached
+        assert attached["scaffold_required"] is True
+        assert {t["id"] for t in attached["scaffold_templates"]} == template_ids
+        cloned = tmp / "empty-origin"
+        assert attached["client_repo"] == str(cloned.resolve())
+        assert (cloned / ".git").exists()
+
+        status, snap = api.project_status()
+        assert status == 200, snap
+        assert snap["scaffold_required"] is True
+
+        status, created = api.create_project_scaffold_gap({"template": "nodejs-webapp"})
+        assert status == 201, created
+        gap = created["gap"]
+        assert gap["priority"] == "high"
+        assert gap["status"] == "backlog"
+        assert gap["name"] == "Scaffold Node.js WebApp"
+        latest = gap["rounds"][-1]
+        assert latest["reporter"] == "Refine"
+        assert "Node.js 24 LTS" in latest["target"]
+        assert "Vite" in latest["target"]
+
+        reread = shared_gaps.read_gap_json(gap["id"])
+        assert reread["priority"] == "high"
+        conn = db.connect()
+        try:
+            row = conn.execute(
+                "SELECT priority, reporter FROM gaps_index WHERE id = ?",
+                (gap["id"],),
+            ).fetchone()
+            assert dict(row) == {"priority": "high", "reporter": "Refine"}
+        finally:
+            conn.close()
+
+        app = tmp / "existing-app"
+        app.mkdir()
+        (app / "package.json").write_text('{"scripts":{"dev":"vite"}}\n', encoding="utf-8")
+        assert api._project_needs_scaffold_template(app) is False  # type: ignore[attr-defined]
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        os.chdir(original_cwd)
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
         cleanup_tmp(tmp)
 
 
@@ -789,6 +1016,11 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
         assert status == 200, body
         assert project_state.CACHE_ACTIVE_INSTANCE_KEY not in body["settings"]
     finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
         conn.close()
         cleanup_tmp(tmp)
 
@@ -906,6 +1138,11 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         assert other_target["target_app_env_json"] == '{"PORT": "3001"}'
         assert other_target["target_app_process_check_command"] == "pgrep -f node"
     finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
         conn.close()
         cleanup_tmp(tmp)
 
@@ -915,9 +1152,11 @@ def main() -> int:
     test_client_switch_path(root)
     test_runtime_switch_resets_services()
     test_blocked_switch_does_not_stop_current_app(root)
-    test_supervised_switch_schedules_restart_without_hot_loading(root)
-    test_supervised_initial_attach_schedules_restart(root)
-    test_supervised_switch_migrates_target_before_restart(root)
+    test_supervised_switch_hot_loads_without_restart(root)
+    test_removing_active_project_hot_loads_next_app()
+    test_supervised_initial_attach_hot_loads_without_restart(root)
+    test_supervised_switch_migrates_target_before_hot_load(root)
+    test_empty_project_attach_creates_scaffold_gap(root)
     test_active_instance_is_per_application()
     test_active_instance_is_checkout_local_for_same_application()
     test_active_instance_is_port_scoped_for_same_checkout()

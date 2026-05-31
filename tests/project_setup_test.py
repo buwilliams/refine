@@ -150,9 +150,38 @@ def main() -> int:
         assert [app["path"] for app in removed["apps"]] == [str(existing)]
         print("[ok] app registry remove works")
 
-        status, rejected = delete_json("/api/projects", {"path": str(existing)})
-        assert status == 409, rejected
-        print("[ok] current app cannot be removed from registry")
+        status, detached = delete_json("/api/projects", {"path": str(existing)})
+        assert status == 200, detached
+        assert detached["attached"] is False
+        assert detached["apps"] == []
+        assert detached["removed_path"] == str(existing.resolve())
+        assert not (clone / ".refine-binding").exists()
+        status, snap = get_json("/api/project/status")
+        assert status == 200, snap
+        assert snap["attached"] is False, snap
+        assert snap["apps"] == []
+        status, dash = get_json("/api/dashboard")
+        assert status == 200, dash
+        assert dash["attached"] is False
+        assert dash["counts"] == {}
+        assert dash["activity"] == []
+        status, gaps = get_json("/api/gaps?facets=1")
+        assert status == 200, gaps
+        assert gaps["attached"] is False
+        assert gaps["gaps"] == []
+        assert gaps["facets"] == {"categories": [], "actors": []}
+        status, changes = get_json("/api/changes")
+        assert status == 200, changes
+        assert changes["attached"] is False
+        assert changes["changes"] == []
+        assert changes["branch"] == ""
+        status, logs = get_json("/api/activity?facets=1")
+        assert status == 200, logs
+        assert logs["attached"] is False
+        assert logs["activity"] == []
+        assert logs["facets"]["categories"] == []
+        assert logs["facets"]["actors"] == []
+        print("[ok] removing current final app detaches the checkout")
     finally:
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)

@@ -17,16 +17,23 @@ function tickRunningCells() {
 
 async function init() {
   const attached = await ensureProjectAttached();
-  if (!attached) return;
-  try {
-    await refreshReporters();
-  } catch (e) {
-    // not fatal — likely fresh install with no reporters yet
+  if (!attached && state.project?.attached !== false) return;
+  if (attached) {
+    try {
+      await refreshReporters();
+    } catch (e) {
+      // not fatal — likely fresh install with no reporters yet
+    }
   }
   initToolbar();
+  if (typeof initGuide === "function") initGuide();
   if (typeof initCommandPalette === "function") initCommandPalette();
-  initSSE();
   initTargetAppToggle();
+  if (attached) {
+    initSSE();
+  } else {
+    enterNoProjectMode(state.project, { openGuidePanel: true });
+  }
   setInterval(tickRunningCells, 1000);
   if (typeof recoverImportSessionOnLoad === "function") {
     recoverImportSessionOnLoad();

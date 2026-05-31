@@ -80,6 +80,7 @@ function renderSettingsGovernanceTab(gov) {
       scope: "Project-wide",
       description: "The what and why: who the product is for, what problems it solves, and what success looks like.",
       rows: 7,
+      guideItemId: "governance-product",
     })}
 
     ${renderSettingsMarkdownField({
@@ -88,10 +89,11 @@ function renderSettingsGovernanceTab(gov) {
       value: gov.constitution || "",
       description: "Non-negotiable principles for the entire project.",
       rows: 7,
+      guideItemId: "governance-constitution",
     })}
 
     <section class="settings-section">
-      <h3>Rules</h3>
+      <h3>${renderSettingsGuideLabel("Rules", "governance-rules")}</h3>
       <p class="muted small" style="margin-top:0">
         One-line rules the Governance agent applies before implementation.
       </p>

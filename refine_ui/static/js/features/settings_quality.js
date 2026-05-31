@@ -12,18 +12,20 @@ function renderSettingsQualityInstanceSections(quality) {
       <p class="muted small" style="margin-top:0">
         Choose whether QA runs before merge in the Gap worktree or after the shared application rebuild.
       </p>
-      <div class="actions settings-section-actions">
-        <button type="button"
-                id="s-quality-enabled"
-                class="${qualityEnabled ? "" : "warn"}"
-                aria-pressed="${qualityEnabled ? "true" : "false"}"
-                data-enabled="${qualityEnabled ? "1" : "0"}">
-          QA ${qualityEnabled ? "enabled" : "disabled"}
-        </button>
-        <select id="s-quality-timing" aria-label="Quality timing">
-          <option value="pre_merge" ${qualityTiming === "pre_merge" ? "selected" : ""}>Pre-merge QA</option>
-          <option value="post_rebuild" ${qualityTiming === "post_rebuild" ? "selected" : ""}>Post-rebuild QA</option>
-        </select>
+      <div class="form-grid two">
+        <div class="form-row"><label>${renderSettingsGuideLabel("QA enabled", "quality-enabled")}</label>
+          <button type="button"
+                  id="s-quality-enabled"
+                  class="${qualityEnabled ? "" : "warn"}"
+                  aria-pressed="${qualityEnabled ? "true" : "false"}"
+                  data-enabled="${qualityEnabled ? "1" : "0"}">
+            QA ${qualityEnabled ? "enabled" : "disabled"}
+          </button></div>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Quality timing", "quality-gate")}</label>
+          <select id="s-quality-timing" aria-label="Quality timing">
+            <option value="pre_merge" ${qualityTiming === "pre_merge" ? "selected" : ""}>Pre-merge QA</option>
+            <option value="post_rebuild" ${qualityTiming === "post_rebuild" ? "selected" : ""}>Post-rebuild QA</option>
+          </select></div>
       </div>
     </section>
 
@@ -34,16 +36,18 @@ function renderSettingsQualityInstanceSections(quality) {
         Workflow QA runs these checks in the active QA environment. Manual runs
         use the current targeted application checkout.
       </p>
-      <div class="actions settings-section-actions">
-        <button type="button"
-                id="s-quality-regressions-enabled"
-                class="${regressionsEnabled ? "" : "warn"}"
-                aria-pressed="${regressionsEnabled ? "true" : "false"}"
-                data-enabled="${regressionsEnabled ? "1" : "0"}">
-          Regressions ${regressionsEnabled ? "enabled" : "disabled"}
-        </button>
-        <button type="button" class="secondary" id="s-quality-regression-new">New regression</button>
-        <button type="button" class="secondary" id="s-quality-regression-run" ${regressions.length ? "" : "disabled"}>Run current checkout</button>
+      <div class="form-row"><label>${renderSettingsGuideLabel("Regression checks enabled", "quality-regressions-enabled")}</label>
+        <div class="actions settings-section-actions">
+          <button type="button"
+                  id="s-quality-regressions-enabled"
+                  class="${regressionsEnabled ? "" : "warn"}"
+                  aria-pressed="${regressionsEnabled ? "true" : "false"}"
+                  data-enabled="${regressionsEnabled ? "1" : "0"}">
+            Regressions ${regressionsEnabled ? "enabled" : "disabled"}
+          </button>
+          <button type="button" class="secondary" id="s-quality-regression-new">New regression</button>
+          <button type="button" class="secondary" id="s-quality-regression-run" ${regressions.length ? "" : "disabled"}>Run current checkout</button>
+        </div>
       </div>
       <div class="settings-list" id="quality-regression-list">
         ${renderQualityRegressionList(regressions)}
@@ -60,6 +64,7 @@ function renderSettingsQualityProjectSections(quality) {
       scope: "Project-wide",
       description: "Product behavior and requirements the Quality agent checks against tests.",
       rows: 9,
+      guideItemId: "quality-requirements",
     })}
 
     ${renderSettingsMarkdownField({
@@ -69,6 +74,7 @@ function renderSettingsQualityProjectSections(quality) {
       scope: "Project-wide",
       description: "How the Quality agent should choose and evaluate test coverage.",
       rows: 9,
+      guideItemId: "quality-instructions",
     })}
     ${quality.configured ? "" : `
       <section class="settings-section settings-quality-configured-message">
@@ -226,12 +232,12 @@ async function openRegressionCreateModal(initialPrompt = "", button = null) {
         <div class="modal-body">
           <form id="regression-create-form">
             <div class="form-row">
-              <label>Title</label>
+              <label>${renderSettingsGuideLabel("Title", "quality-regression-title")}</label>
               <input type="text" id="regression-create-input-title"
                      placeholder="Dashboard smoke">
             </div>
             <div class="form-row">
-              <label>Scenario</label>
+              <label>${renderSettingsGuideLabel("Scenario", "quality-regression-scenario")}</label>
               <textarea id="regression-create-input-prompt" rows="7"
                         placeholder="Navigate to the page, set up the state, wait for the key selector, then capture a screenshot.">${htmlEscape(initialPrompt || "")}</textarea>
             </div>

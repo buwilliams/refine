@@ -26,6 +26,7 @@ function gapsHash(parts) {
 }
 
 async function renderGapsList() {
+  if (renderNoProjectIfDetached("Gaps")) return;
   renderBanners([]);
   const f = gapsFilterFromHash();
   // Preserve the filter shell's open/closed state across full re-renders
@@ -194,6 +195,7 @@ function updateGapsFilter(patch) {
 
 async function refreshGapsTable() {
   if (state.currentRoute !== "gaps") return;
+  if (renderNoProjectIfDetached("Gaps")) return;
   const f = gapsFilterFromHash();
   const params = new URLSearchParams();
   if (f.status) params.set("status", f.status);
@@ -210,6 +212,7 @@ async function refreshGapsTable() {
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/gaps?" + params);
+    if (renderNoProjectIfApiDetached(data, "Gaps")) return;
     const gaps = data.gaps || [];
     const facets = data.facets || {};
     // Refresh the category / actor dropdowns from the server-side

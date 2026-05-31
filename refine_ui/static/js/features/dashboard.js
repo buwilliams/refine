@@ -29,6 +29,7 @@ function dashboardScopeParam(d = null) {
 }
 
 async function renderDashboard() {
+  if (renderNoProjectIfDetached("Dashboard")) return;
   // First paint only: lay out the outer chrome and a `Loading…`
   // placeholder. SSE-triggered refreshes route through `refreshDashboard`
   // below so the screen doesn't flicker back to `Loading…` between events.
@@ -50,6 +51,7 @@ async function renderDashboard() {
 }
 
 async function refreshDashboard() {
+  if (renderNoProjectIfDetached("Dashboard")) return;
   // Silent refresh — fetch + redraw in place, no `Loading…` flash. Used
   // by both the route handler (after the first-paint scaffold above) and
   // every SSE handler that wants the dashboard to track live state.
@@ -76,6 +78,7 @@ async function refreshDashboard() {
         : Promise.resolve({ gaps: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
+    if (renderNoProjectIfApiDetached(d, "Dashboard")) return;
     state.dashboard = d;
     state.dashboardReviewSnapshot = { reviewsForReporter: reviews.gaps || [], reporter };
     drawDashboard(d, state.dashboardReviewSnapshot);

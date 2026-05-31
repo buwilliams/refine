@@ -1137,7 +1137,8 @@ target_from_remote() {
   local remote="$1"
   local default_dir="$2"
   local path
-  path="$(prompt "Where should the target app be cloned?" "$default_dir")"
+  path="$default_dir"
+  info "Cloning target app into $path"
   path="${path/#\~/$HOME}"
   if [ -d "$path/.git" ]; then
     ok "Target app checkout already exists: $path"
@@ -1171,8 +1172,9 @@ choose_target_app() {
       ok "Using existing target app binding: $TARGET_APP_PATH"
       return 0
     fi
-    say "Refine works against your application repository. Use a local path, paste a Git remote, or press Enter to attach one later in Refine."
-    input="$(prompt "Target app path or Git remote (blank to skip)" "")"
+    TARGET_APP_PATH=""
+    info "No target app attached. Add a local path or Git remote from the Refine Guide in the browser."
+    return 0
   fi
   if [ -z "$input" ]; then
     TARGET_APP_PATH=""

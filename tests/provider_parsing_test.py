@@ -207,20 +207,40 @@ def main() -> int:
         "{\"status_command\":\"curl -fsS http://localhost:3000\"}"
     )
     normalized_cfg = target_app.normalize_generated_config({
-        "start_command": "npm run dev\n-- --host 0.0.0.0",
-        "rebuild_command": "npm run build\n-- --mode production",
-        "stop_command": "",
+        "summary": "Node app via npm scripts",
+        "start": "npm run dev",
+        "rebuild": "npm run build",
         "rebuild_timeout_seconds": "bad",
         "status_timeout_seconds": "bad",
         "tcp_check_port": 3000,
         "env": {"PORT": 3000},
     })
-    assert normalized_cfg["start_command"] == "npm run dev -- --host 0.0.0.0"
-    assert normalized_cfg["rebuild_command"] == "npm run build -- --mode production"
+    # Commands always invoke the generated wrapper; bodies live in the script.
+    assert normalized_cfg["start_command"] == "./.refine/manage-app.sh start"
+    assert normalized_cfg["stop_command"] == "./.refine/manage-app.sh stop"
+    assert normalized_cfg["rebuild_command"] == "./.refine/manage-app.sh rebuild"
+    assert normalized_cfg["status_command"] == "./.refine/manage-app.sh status"
+    assert normalized_cfg["cwd"] == ""
     assert normalized_cfg["rebuild_timeout_seconds"] == 300
     assert normalized_cfg["status_timeout_seconds"] == 10
     assert normalized_cfg["tcp_check_port"] == "3000"
     assert normalized_cfg["env"] == {"PORT": "3000"}
+
+    # The wrapper itself is assembled from the analysis bodies, with a fixed
+    # logging/dispatch harness supplied by Refine.
+    script = target_app.build_manage_script({
+        "summary": "Node app via npm scripts",
+        "helpers": "PORT=3000",
+        "start": "npm run dev",
+        "stop": "pkill -f 'npm run dev' || true",
+        "rebuild": "npm run build",
+        "status": "curl -fsS http://localhost:$PORT >/dev/null",
+    })
+    assert script.startswith("#!/usr/bin/env bash")
+    for sub in ("start)", "stop)", "rebuild)", "status)"):
+        assert sub in script
+    assert "npm run dev" in script and "npm run build" in script
+    assert "[manage-app" in script  # timestamped STDOUT logging
 
     # --- Chat stream parsing ------------------------------------------------
     manager = ChatManager(get_standalone_idle_timeout=lambda: 0)
@@ -254,6 +274,8 @@ def main() -> int:
         provider="codex",
         last_activity_ts=time.monotonic(),
     )
+    with manager._lock:  # noqa: SLF001
+        manager._sessions[session.session_id] = session  # noqa: SLF001
     try:
         decoder = json.JSONDecoder()
         tail = manager._drain_json_objects(
@@ -265,6 +287,19 @@ def main() -> int:
                 + json.dumps({
                     "type": "item.completed",
                     "item": {"type": "agent_message", "text": "hello\nworld"},
+                })
+                + "\n"
+                + json.dumps({
+                    "type": "item.completed",
+                    "item": {"type": "local_shell_call", "command": "pytest\nsecond"},
+                })
+                + "\n"
+                + json.dumps({
+                    "type": "item.completed",
+                    "item": {
+                        "type": "local_shell_call_output",
+                        "output": [{"type": "text", "text": "\n tests passed\n"}],
+                    },
                 })
                 + "\nplain diagnostic\n"
                 + json.dumps({
@@ -280,6 +315,22 @@ def main() -> int:
             assert list(session.out_lines) == [
                 "hello", "world", "plain diagnostic", "[refine] bad request",
             ]
+            assert list(session.progress_lines) == [
+                "[tool] pytest",
+                "[tool result] tests passed",
+                "[error] bad request",
+            ]
+
+        read = manager.read("chat-test")
+        assert read["lines"] == [
+            "hello", "world", "plain diagnostic", "[refine] bad request",
+        ]
+        assert read["progress_lines"] == [
+            "[tool] pytest",
+            "[tool result] tests passed",
+            "[error] bad request",
+        ]
+        assert manager.read("chat-test")["progress_lines"] == []
 
         hidden = ChatSession(
             session_id="chat-hidden",
@@ -299,6 +350,7 @@ def main() -> int:
         )
         with hidden.out_lock:
             assert list(hidden.out_lines) == []
+            assert list(hidden.progress_lines) == []
 
         class DoneProc:
             pid = 123456

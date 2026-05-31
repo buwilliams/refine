@@ -28,6 +28,9 @@ def main() -> int:
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
+    toolbar_css = (root / "refine_ui/static/css/toolbar.css").read_text(
+        encoding="utf-8",
+    )
     system_tab_js = {
         name: (root / f"refine_ui/static/js/features/{name}.js").read_text(
             encoding="utf-8",
@@ -229,6 +232,13 @@ def main() -> int:
     assert "/api/files/read?path=${encodeURIComponent(path)}&offset=0&limit=${FILE_TEXT_CHUNK_BYTES}" in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
+    assert "function renderChatProgress(text)" in toolbar_js
+    assert "function toggleChatProgress()" in toolbar_js
+    assert "r.progress_lines && r.progress_lines.length" in toolbar_js
+    assert "btn-chat-progress-toggle" in toolbar_js
+    assert "chat-progress-panel" in toolbar_js
+    assert ".chat-progress-panel" in toolbar_css
+    assert ".chat-progress-line::before" in toolbar_css
 
     assert ".nav-command-button" in base_css
     assert ".nav-issue-button" in base_css

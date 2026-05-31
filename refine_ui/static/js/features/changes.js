@@ -34,6 +34,7 @@ function changesHashFromFilters(f) {
 }
 
 async function renderChanges() {
+  if (renderNoProjectIfDetached("Changes")) return;
   renderBanners([]);
   const f = changesFiltersFromHash();
   const filterShell = document.getElementById("changes-filter-shell");
@@ -111,6 +112,7 @@ function updateChangesFilter(patch) {
 
 async function loadChanges() {
   if (state.currentRoute !== "changes") return;
+  if (renderNoProjectIfDetached("Changes")) return;
   const f = changesFiltersFromHash();
   const params = new URLSearchParams();
   if (f.q) params.set("q", f.q);
@@ -120,6 +122,7 @@ async function loadChanges() {
   params.set("offset", String((f.page - 1) * f.limit));
   try {
     const data = await api("GET", "/api/changes?" + params);
+    if (renderNoProjectIfApiDetached(data, "Changes")) return;
     drawChanges(data, f);
   } catch (e) {
     const root = document.getElementById("changes-body");

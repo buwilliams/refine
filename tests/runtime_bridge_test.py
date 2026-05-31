@@ -1,4 +1,4 @@
-"""UI-to-runner bridge behavior for supervisor and in-process modes."""
+"""UI-to-runner bridge behavior for the supervisor runtime."""
 from __future__ import annotations
 
 import errno
@@ -52,7 +52,7 @@ def main() -> int:
         info = runtime.backend_info()
         assert info["process_model"] == "supervisor"
         assert info["transport"] == "unix_socket"
-        assert info["ui_controls_runner_lifecycle"] is False
+        assert info["ui_controls_runner_lifecycle"] is True
         assert info["in_process_runner_allowed"] is False
 
         status, body = api.backend_diagnostics()
@@ -107,9 +107,10 @@ def main() -> int:
         os.environ.pop("REFINE_RUNNER_SOCKET", None)
         os.environ.pop("REFINE_NO_INPROCESS_RUNNER", None)
         info = runtime.backend_info()
-        assert info["process_model"] == "single_process"
-        assert info["transport"] == "direct_call"
+        assert info["process_model"] == "supervisor"
+        assert info["transport"] == "unix_socket"
         assert info["ui_controls_runner_lifecycle"] is True
+        assert info["in_process_runner_allowed"] is False
     finally:
         ipc.request = original_request  # type: ignore[assignment]
         ipc.socket.socket = original_socket_factory  # type: ignore[assignment]

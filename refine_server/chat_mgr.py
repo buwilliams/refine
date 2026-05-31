@@ -159,6 +159,62 @@ def _resource_manager_for_chat() -> ResourceManager:
     return ResourceManager(ResourceSettings.from_settings(settings))
 
 
+def _summarize_chat_tool_input(name: str, value) -> str:
+    if isinstance(value, dict):
+        if name == "Bash":
+            command = value.get("command") or ""
+            first = str(command).strip().splitlines()
+            return first[0][:160] if first else "(empty)"
+        if name in {"Read", "Edit", "Write", "NotebookEdit"}:
+            return str(value.get("file_path") or "(?)")[:160]
+        if name in {"Glob", "Grep"}:
+            return str(value.get("pattern") or "(?)")[:160]
+        if name == "TodoWrite":
+            todos = value.get("todos") or []
+            return f"{len(todos)} todo{'' if len(todos) == 1 else 's'}"
+        if name == "Task":
+            return str(
+                value.get("description") or value.get("prompt") or "(task)"
+            )[:160]
+        command = value.get("command") or value.get("cmd") or value.get("input")
+        if command:
+            first = str(command).strip().splitlines()
+            return first[0][:160] if first else ""
+        try:
+            return json.dumps(value, ensure_ascii=False)[:160]
+        except Exception:
+            return "?"
+    first = str(value or "").strip().splitlines()
+    return first[0][:160] if first else ""
+
+
+def _summarize_chat_tool_result(value) -> str:
+    if isinstance(value, str):
+        for line in value.splitlines():
+            line = line.strip()
+            if line:
+                return line[:200]
+        return ""
+    if isinstance(value, list):
+        for block in value:
+            if isinstance(block, dict):
+                text = block.get("text") or block.get("content")
+                if text:
+                    summary = _summarize_chat_tool_result(str(text))
+                    if summary:
+                        return summary
+            elif block:
+                summary = _summarize_chat_tool_result(str(block))
+                if summary:
+                    return summary
+        return ""
+    if isinstance(value, dict):
+        for key in ("output", "result", "content", "text", "message"):
+            if value.get(key):
+                return _summarize_chat_tool_result(value.get(key))
+    return ""
+
+
 def _resolve_agent(provider: str | None,
                    env: dict[str, str]) -> tuple[agent_cli.CliSpec, str]:
     spec = agent_cli.get_spec(provider)
@@ -179,6 +235,7 @@ class ChatSession:
     # reused by provider-specific resume args to thread context.
     provider_session_id: str | None = None
     out_lines: Deque[str] = field(default_factory=lambda: deque(maxlen=10_000))
+    progress_lines: Deque[str] = field(default_factory=lambda: deque(maxlen=2_000))
     out_lock: threading.Lock = field(default_factory=threading.Lock)
     proc_lock: threading.Lock = field(default_factory=threading.Lock)
     proc: subprocess.Popen | None = None   # in-flight request, if any
@@ -452,16 +509,24 @@ class ChatManager:
         with self._lock:
             s = self._sessions.get(session_id)
         if not s:
-            return {"alive": False, "lines": [], "session_id": session_id}
+            return {
+                "alive": False,
+                "lines": [],
+                "progress_lines": [],
+                "session_id": session_id,
+            }
         with s.out_lock:
             lines = list(s.out_lines)
+            progress_lines = list(s.progress_lines)
             s.out_lines.clear()
+            s.progress_lines.clear()
         with s.proc_lock:
             in_flight = s.proc is not None and s.proc.poll() is None
         return {
             "alive": s.alive,
             "session_id": session_id,
             "lines": lines[-max_lines:],
+            "progress_lines": progress_lines[-max_lines:],
             "closed_reason": s.closed_reason,
             "in_flight": in_flight,
         }
@@ -609,27 +674,48 @@ class ChatManager:
             sid = evt.get("session_id")
             if sid and not s.provider_session_id:
                 s.provider_session_id = sid
+            if not suppress_assistant:
+                model = evt.get("model") or ""
+                label = f"Session initialized{f' with {model}' if model else ''}."
+                self._emit_progress(s, label)
             return
 
         # ---- Copilot JSONL events ---------------------------------------
+        if t == "assistant.tool_call":
+            name = data.get("name") or data.get("toolName") or "tool"
+            command = data.get("command") or data.get("input") or ""
+            summary = _summarize_chat_tool_input(str(name), command)
+            if summary and not suppress_assistant:
+                self._emit_progress(s, f"[{name}] {summary}")
+            return
+        if t == "assistant.tool_result":
+            content = data.get("content") or data.get("output") or data.get("text")
+            summary = _summarize_chat_tool_result(content)
+            if summary and not suppress_assistant:
+                self._emit_progress(s, f"[tool result] {summary}")
+            return
         if t == "assistant.message":
             content = data.get("content")
             if content and not suppress_assistant:
                 self._emit_text(s, str(content))
             return
-        if t == "result":
+        if t == "result" and ("exitCode" in data or "exitCode" in evt):
             exit_code = data.get("exitCode", evt.get("exitCode"))
             if exit_code not in (None, 0):
                 with s.out_lock:
                     s.out_lines.append(
                         f"[refine] Copilot exited {exit_code}"
                     )
+                if not suppress_assistant:
+                    self._emit_progress(s, f"[result error] Copilot exited {exit_code}")
             return
         if t == "error" and not isinstance(evt.get("item"), dict):
             message = data.get("message") or evt.get("message") \
                 or evt.get("error") or "Copilot returned an error."
             with s.out_lock:
                 s.out_lines.append(f"[refine] {message}")
+            if not suppress_assistant:
+                self._emit_progress(s, f"[error] {message}")
             return
 
         # ---- Codex JSONL item events ------------------------------------
@@ -644,11 +730,37 @@ class ChatManager:
                 if not suppress_assistant:
                     self._emit_text(s, str(text))
                 return
+            command = (
+                item.get("command") or item.get("cmd") or item.get("input")
+                or evt.get("command")
+            )
+            if item_type in (
+                "tool_call", "function_call", "local_shell_call",
+                "command_execution", "exec_command",
+            ) and command:
+                summary = _summarize_chat_tool_input("tool", command)
+                if summary and not suppress_assistant:
+                    self._emit_progress(s, f"[tool] {summary}")
+                return
+            result = (
+                item.get("output") or item.get("result") or item.get("content")
+                or evt.get("output")
+            )
+            if item_type in (
+                "tool_result", "function_call_output",
+                "local_shell_call_output", "command_output",
+            ) and result:
+                summary = _summarize_chat_tool_result(result)
+                if summary and not suppress_assistant:
+                    self._emit_progress(s, f"[tool result] {summary}")
+                return
             if item_type == "error" or t == "error":
                 err = item.get("error") or evt.get("error") or text \
                     or "Codex returned an error."
                 with s.out_lock:
                     s.out_lines.append(f"[refine] {err}")
+                if not suppress_assistant:
+                    self._emit_progress(s, f"[error] {err}")
                 return
 
         # ---- assistant message (new wrapped shape) ----------------------
@@ -660,6 +772,19 @@ class ChatManager:
             )
             return
 
+        # ---- tool results from Claude-style user events -----------------
+        if t == "user":
+            message = evt.get("message") or {}
+            for block in message.get("content") or []:
+                if not isinstance(block, dict) or block.get("type") != "tool_result":
+                    continue
+                summary = _summarize_chat_tool_result(block.get("content"))
+                if not summary or suppress_assistant:
+                    continue
+                prefix = "[tool err]" if block.get("is_error") else "[tool result]"
+                self._emit_progress(s, f"{prefix} {summary}")
+            return
+
         # ---- result event ------------------------------------------------
         if t == "result":
             if evt.get("is_error"):
@@ -667,6 +792,8 @@ class ChatManager:
                        or "Agent returned an error.")
                 with s.out_lock:
                     s.out_lines.append(f"[refine] {err}")
+                if not suppress_assistant:
+                    self._emit_progress(s, f"[result error] {err}")
             # Once the agent has logically finished, give the CLI a short
             # grace to exit; if a backgrounded subprocess (HTTP server,
             # file watcher, …) is keeping the stdio pipes open, kill
@@ -691,16 +818,21 @@ class ChatManager:
 
     def _emit_assistant_content(self, s: ChatSession, blocks: list,
                                   *, suppress_assistant: bool) -> None:
-        if suppress_assistant:
-            return
         chunks: list[str] = []
         for block in blocks:
             if not isinstance(block, dict):
                 continue
             if block.get("type") == "text":
                 text = block.get("text") or ""
-                if text:
+                if text and not suppress_assistant:
                     chunks.append(text)
+            elif block.get("type") == "tool_use":
+                name = block.get("name") or "tool"
+                summary = _summarize_chat_tool_input(
+                    str(name), block.get("input") or {},
+                )
+                if summary and not suppress_assistant:
+                    self._emit_progress(s, f"[{name}] {summary}")
         if not chunks:
             return
         self._emit_text(s, "\n".join(chunks))
@@ -712,6 +844,14 @@ class ChatManager:
                 s.out_lines.append("")
             for ln in text.split("\n"):
                 s.out_lines.append(ln)
+
+    def _emit_progress(self, s: ChatSession, text: str) -> None:
+        line = " ".join(str(text or "").split())
+        if not line:
+            return
+        with s.out_lock:
+            if not s.progress_lines or s.progress_lines[-1] != line:
+                s.progress_lines.append(line[:240])
 
     def _arm_result_watchdog(self, s: ChatSession) -> None:
         """Schedule a one-shot watchdog for the currently in-flight chat

@@ -43,6 +43,9 @@ def main() -> int:
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
+    guide_js = (root / "refine_ui/static/js/features/guide.js").read_text(
+        encoding="utf-8",
+    )
     import_js = (root / "refine_ui/static/js/features/gaps-import.js").read_text(
         encoding="utf-8",
     )
@@ -86,6 +89,9 @@ def main() -> int:
         encoding="utf-8",
     )
     toolbar_css = (root / "refine_ui/static/css/toolbar.css").read_text(
+        encoding="utf-8",
+    )
+    guide_css = (root / "refine_ui/static/css/guide.css").read_text(
         encoding="utf-8",
     )
 
@@ -224,7 +230,7 @@ def main() -> int:
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '"copilot": "copilot login"' in api_py
     assert 'id="runtime-upgrade-banner"' in settings_js
-    assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index("<h3>Process management</h3>")
+    assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index('renderSettingsGuideLabel("Process management", "process-management")')
     assert 'api("GET", "/api/upgrade")' in settings_js
     assert "function renderRuntimeUpgradeBanner" in settings_js
     assert "Refine is up to date" in settings_js
@@ -268,6 +274,12 @@ def main() -> int:
     assert "autosaveSettingsApplication" in settings_js
     assert "autosaveSettingsRuntime" in settings_js
     assert "function renderSettingsMarkdownField" in settings_js
+    assert "function renderSettingsGuideLabel" in settings_js
+    assert "function renderSettingsGuideIcon" in settings_js
+    assert 'data-guide-label-item="${htmlEscape(itemId)}"' in settings_js
+    assert ".settings-guide-icon" in common_css
+    assert "[data-guide-label-item]" in guide_js
+    assert "openGuide({ itemId, openTarget: false })" in guide_js
     assert "function bindSettingsMarkdownFields" in settings_js
     assert "data-settings-markdown-preview" in settings_js
     assert "data-settings-markdown-editor" in settings_js
@@ -355,10 +367,11 @@ def main() -> int:
     context_panel = index_html.split('class="nav-menu-panel nav-context-panel"', 1)[1].split("</details>", 1)[0]
     assert '<label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>' in context_panel
     assert '<div class="nav-menu-label nav-context-section-label">Management</div>' in context_panel
+    assert '<a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/instance/instances" data-route="instance">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/project/application" data-route="project">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/system/processes" data-route="settings">' in context_panel
-    assert context_panel.count('class="nav-menu-icon"') == 3
+    assert context_panel.count('class="nav-menu-icon"') == 4
     assert 'id="nav-context-app-summary">Application</span>' in index_html
     assert 'id="nav-context-reporter-summary">No reporter</span>' in index_html
     assert '<select id="global-reporter" aria-label="Reporter"></select>' in index_html
@@ -408,6 +421,116 @@ def main() -> int:
     assert ".nav-context-section-label" in base_css
     assert "margin-top: 12px;" in base_css
     assert ".nav-menu-icon" in base_css
+    assert 'id="nav-guide-open"' in index_html
+    assert '<aside id="guide-panel"' in index_html
+    assert '<script src="/static/js/features/guide.js"></script>' in index_html
+    assert '<link rel="stylesheet" href="/static/css/guide.css">' in index_html
+    assert "const GUIDE_CATEGORIES = [" in guide_js
+    assert 'id: "guide.open"' in guide_js
+    assert 'id: "guide.toggle"' in guide_js
+    assert 'class="guide-category"' in guide_js
+    assert 'class="guide-item ' in guide_js
+    assert 'data-guide-open-item' in guide_js
+    assert 'data-guide-status' in guide_js
+    assert 'data-guide-default' in guide_js
+    assert 'data-guide-skip' in guide_js
+    assert 'data-guide-complete' in guide_js
+    assert "canUseDefault: options.canUseDefault !== false" in guide_js
+    assert "{ canUseDefault: false }" in guide_js
+    assert "const defaultButton = item.canUseDefault" in guide_js
+    assert 'class="guide-progress"' in guide_js
+    assert 'class="guide-status guide-status-' in guide_js
+    assert "function firstIncompleteGuideItem" in guide_js
+    assert "function openGuideItemTarget" in guide_js
+    assert "function completeGuideItem" in guide_js
+    assert "function resetGuideState" in guide_js
+    assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
+    assert "function clearGuideTargetHighlight" in guide_js
+    assert "setTimeout(() => el.classList.remove(\"guide-target-highlight\")" not in guide_js
+    assert "if (!guideState.activeItem || !findGuideItem(guideState.activeItem))" in guide_js
+    assert 'class="guide-item-kind"' not in guide_js
+    assert "Focus in app" not in guide_js
+    assert 'hash: "#/instance/application"' in guide_js
+    assert 'hash: "#/project/quality"' in guide_js
+    assert 'hash: "#/system/processes"' in guide_js
+    settings_guide_field_ids = [
+        "instance-manage",
+        "reporter-manage",
+        "reporter-merge-into",
+        "instance-copy-settings-source",
+        "application-agent-subpath",
+        "application-merge-target",
+        "application-url",
+        "application-start",
+        "application-stop",
+        "application-rebuild",
+        "application-auto-rebuild",
+        "application-status",
+        "application-working-directory",
+        "application-environment",
+        "application-start-timeout",
+        "application-stop-timeout",
+        "application-rebuild-timeout",
+        "application-status-timeout",
+        "application-log-path",
+        "application-http-check-url",
+        "application-tcp-host",
+        "application-tcp-port",
+        "application-process-check-command",
+        "runtime-parallel-run-cap",
+        "runtime-branch-name-pattern",
+        "runtime-agent-idle-timeout",
+        "runtime-agent-hard-cap",
+        "runtime-worker-memory-limit",
+        "runtime-ui-memory-limit",
+        "runtime-worker-cpu-priority",
+        "runtime-resource-isolation",
+        "runtime-agent-limit-pause",
+        "runtime-chat-idle-timeout",
+        "runtime-backlog-promote",
+        "runtime-project-update-pulse",
+        "runtime-file-browser-ignore",
+        "runtime-ai-provider",
+        "project-known-apps",
+        "quality-enabled",
+        "quality-gate",
+        "quality-regressions-enabled",
+        "quality-regression-title",
+        "quality-regression-scenario",
+        "quality-requirements",
+        "quality-instructions",
+        "governance-product",
+        "governance-constitution",
+        "governance-rules",
+        "guidance-items",
+        "guidance-name",
+        "guidance-rule",
+        "guidance-instructions",
+        "guidance-status",
+        "process-management",
+        "process-agent-processes",
+        "process-runner-processes",
+        "performance-overview",
+        "performance-operation-filter",
+        "performance-outcome-filter",
+        "performance-limit",
+    ]
+    for field_id in settings_guide_field_ids:
+        assert f'"{field_id}"' in settings_js
+        assert f'guideItem("{field_id}"' in guide_js
+    assert 'command: "gap.new"' in guide_js
+    assert 'command: "gap.import"' in guide_js
+    assert 'command: "refine.issue.request"' in guide_js
+    assert ".guide-resize::after" in guide_css
+    assert ".guide-progress" in guide_css
+    assert ".guide-item-open" in guide_css
+    assert ".guide-item-actions" in guide_css
+    assert ".guide-status-checked" in guide_css
+    assert ".guide-status-skipped" in guide_css
+    assert "animation: guide-target-pulse" in guide_css
+    assert "@keyframes guide-target-pulse" in guide_css
+    assert "body.guide-open .toolbar-dock" in guide_css
+    assert "--guide-panel-width" in guide_css
     assert ".nav-issue-button" in base_css
     assert ".nav-bug-icon" in base_css
     assert ".nav-create-group" in base_css
@@ -483,7 +606,7 @@ def main() -> int:
     assert 'class="table process-table managed-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table agents-process-table mobile-card-table"' in processes_body
     assert 'class="table process-table runner-workers-table mobile-card-table"' in processes_body
-    assert processes_body.index("<h3>Process management</h3>") < processes_body.index("<h3>Agent processes</h3>") < processes_body.index("<h3>Runner processes</h3>")
+    assert processes_body.index('renderSettingsGuideLabel("Process management", "process-management")') < processes_body.index('renderSettingsGuideLabel("Agent processes", "process-agent-processes")') < processes_body.index('renderSettingsGuideLabel("Runner processes", "process-runner-processes")')
     managed_table = processes_body.split('class="table process-table managed-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     runner_table = processes_body.split('class="table process-table runner-workers-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
     agents_table = processes_body.split('class="table process-table agents-process-table mobile-card-table"', 1)[1].split("</table>", 1)[0]
@@ -527,9 +650,9 @@ def main() -> int:
     assert '<span class="role-pill ${kind === "agent"' not in processes_body
     assert '<span class="role-pill merger"' not in processes_body
     assert 'class="process-actions"><div class="actions">' in processes_body
-    assert "<h3>Process management</h3>" in processes_body
-    assert "<h3>Agent processes</h3>" in processes_body
-    assert "<h3>Runner processes</h3>" in processes_body
+    assert 'renderSettingsGuideLabel("Process management", "process-management")' in processes_body
+    assert 'renderSettingsGuideLabel("Agent processes", "process-agent-processes")' in processes_body
+    assert 'renderSettingsGuideLabel("Runner processes", "process-runner-processes")' in processes_body
     assert 'data-process-id="${htmlEscape(proc.id || "")}"' in processes_body
     assert '[data-process-id="target-app"]' in settings_js
     assert "Background processes" in processes_body
@@ -613,6 +736,9 @@ def main() -> int:
     assert "renderInstanceRuntimeConfigSections" in settings_js
     assert "function renderSettingsApplicationTab" in settings_js
     assert "target_app_url" not in common_js
+    assert 'id="s-project-template"' in settings_js
+    assert "Select app template" in settings_js
+    assert "await openProjectTemplateSelector()" in settings_js
     assert 'id="s-application-copy-instance"' in settings_js
     assert 'id="s-target-generate-ai"' in settings_js
     assert 'copySettingsFromInstance("application"' in commands_js
@@ -910,6 +1036,8 @@ def main() -> int:
         root / "refine_ui/server.py"
     ).read_text(encoding="utf-8")
     server_js = (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    assert '@route("GET", r"/api/project/templates")' in server_js
+    assert '@route("POST", r"/api/project/scaffold")' in server_js
     assert '@route("GET", r"/api/guidance")' in server_js
     assert '@route("PUT", r"/api/guidance")' in server_js
     assert "def do_PUT" in server_js

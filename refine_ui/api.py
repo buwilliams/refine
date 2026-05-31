@@ -12,9 +12,9 @@ import io
 import json
 import os
 import re
+import shutil
 import sqlite3
 import subprocess
-import sys
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -83,6 +83,26 @@ def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
     return conn
 
 
+def _project_attached() -> bool:
+    if config.find_config() is None:
+        return False
+    try:
+        config.get(reload=True)
+    except config.ConfigError:
+        return False
+    return True
+
+
+def _empty_page(limit: int, offset: int) -> dict[str, Any]:
+    page_limit, page_offset = _page_bounds(limit, offset)
+    return {
+        "limit": page_limit,
+        "offset": page_offset,
+        "has_more": False,
+        "total": 0,
+    }
+
+
 def _schema_block_response() -> tuple[int, dict] | None:
     try:
         cfg = config.get(reload=True)
@@ -107,7 +127,7 @@ def _schema_block_response() -> tuple[int, dict] | None:
 def _background_processes_stopped() -> bool:
     try:
         conn = _conn()
-    except sqlite3.Error:
+    except (sqlite3.Error, config.ConfigError):
         return False
     try:
         return (db.get_setting(conn, "paused") or "0") == "1"
@@ -120,7 +140,7 @@ def _agents_paused(conn: sqlite3.Connection | None = None) -> bool:
     if conn is None:
         try:
             conn = _conn()
-        except sqlite3.Error:
+        except (sqlite3.Error, config.ConfigError):
             return False
         close_conn = True
     try:
@@ -834,6 +854,7 @@ def project_status() -> tuple[int, dict]:
         "volume_root": str(cfg.volume_root),
         "config_path": str(cfg.config_path),
         "schema": schema,
+        "scaffold_required": _project_needs_scaffold_template(cfg.client_repo),
         **instance_summary,
     }
 
@@ -862,12 +883,43 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     if not _project_registry_enabled(clone_dir):
         return err(409, "Known-apps list is only available from the host refine source checkout.")
     target = Path(raw_path).expanduser().resolve()
+    apps_before = project_registry.list_apps(clone_dir)
     try:
         current = config.get(reload=True).client_repo
     except config.ConfigError:
         current = None
     if current is not None and current == target:
-        return err(409, "Cannot remove the currently attached app. Switch to another app first.")
+        remaining = [app for app in apps_before if app.get("path") != str(target)]
+        if remaining:
+            removed_index = next(
+                (
+                    i for i, app in enumerate(apps_before)
+                    if app.get("path") == str(target)
+                ),
+                0,
+            )
+            next_app = remaining[removed_index % len(remaining)]
+            attach_body = {
+                "path": next_app["path"],
+                "install_unit": body.get("install_unit") is True,
+            }
+            if "start_runner" in body:
+                attach_body["start_runner"] = body.get("start_runner")
+            if "start_poller" in body:
+                attach_body["start_poller"] = body.get("start_poller")
+            status, attached = project_attach(attach_body)
+            if status != 200:
+                return status, attached
+            apps = project_registry.remove_app(clone_dir, target)
+            attached["apps"] = apps
+            attached["removed_path"] = str(target)
+            attached["auto_attached"] = True
+            return status, attached
+        apps = project_registry.remove_app(clone_dir, target)
+        _detach_current_project(clone_dir, target)
+        status, body = project_status()
+        body["removed_path"] = str(target)
+        return status, body
     apps = project_registry.remove_app(clone_dir, target)
     return 200, {"apps": apps}
 
@@ -1411,10 +1463,9 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     """Create or attach a target app path and make it active."""
     raw_path = (body.get("path") or "").strip()
     if not raw_path:
-        return err(400, "Enter a project path.")
+        return err(400, "Enter a project path or Git remote.")
 
     clone_dir = Path.cwd().resolve()
-    client_repo = Path(raw_path).expanduser()
 
     try:
         from refine_cli.cli import (
@@ -1432,14 +1483,15 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 ),
         )
 
+        client_repo = (
+            _clone_project_remote(raw_path, clone_dir)
+            if _looks_like_git_remote(raw_path)
+            else Path(raw_path).expanduser()
+        )
+        scaffold_required = _project_needs_scaffold_template(client_repo)
         current_before = _current_client_repo()
         switching = current_before is not None and current_before != client_repo.resolve()
         _validate_target_schema_before_switch(client_repo.resolve(), body)
-        backend = runtime.backend_info()
-        supervised_restart = (
-            backend.get("process_model") == "supervisor"
-            and (switching or current_before is None)
-        )
         prep = (
             _prepare_current_project_for_switch(clone_dir)
             if switching else {"warnings": []}
@@ -1455,39 +1507,6 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
             reuse_existing_config=True,
             install_unit=install_unit,
         )
-        if supervised_restart:
-            cfg = config.Config.load(result["config_path"])
-            schema = _prepare_supervised_switch_target(
-                cfg,
-                migrate=bool(body.get("migrate")),
-            )
-            if body.get("migrate"):
-                _commit_refine_state(cfg.client_repo)
-            restart = _schedule_supervisor_restart(clone_dir, cfg)
-            return 200, {
-                "attached": True,
-                "client_repo": str(cfg.client_repo),
-                "volume_root": str(cfg.volume_root),
-                "config_path": str(cfg.config_path),
-                "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
-                "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
-                "ui_unit_path": str(result["ui_unit_path"]) if result.get("ui_unit_path") else "",
-                "git_initialized": bool(result.get("git_initialized")),
-                "config_created": bool(result.get("config_created")),
-                "apps": project_registry.list_apps(clone_dir),
-                "registry_enabled": True,
-                "schema": schema,
-                "active_instance_id": "",
-                "active_instance": None,
-                "instances": [],
-                "switch_warnings": prep.get("warnings", []),
-                "restart_pending": True,
-                "restart": restart,
-                "runner": {
-                    "started": False,
-                    "message": "Refine is restarting for the selected app.",
-                },
-            }
         cfg = runtime.load_configured(
             result["config_path"],
             start_poller=body.get("start_poller") is not False,
@@ -1520,12 +1539,332 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "schema": project_state.schema_status(cfg.volume_root),
         **_instance_summary(),
         "switch_warnings": prep.get("warnings", []),
+        "scaffold_required": scaffold_required,
+        "scaffold_templates": list_project_templates()[1]["templates"],
         "runner": runner,
     }
 
 
+PROJECT_TEMPLATE_DIR = Path(__file__).resolve().parent / "project_templates"
+_PROJECT_TEMPLATE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_APP_MARKER_FILES = {
+    "package.json",
+    "pnpm-lock.yaml",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+    "bun.lock",
+    "deno.json",
+    "vite.config.js",
+    "vite.config.ts",
+    "next.config.js",
+    "next.config.ts",
+    "astro.config.mjs",
+    "svelte.config.js",
+    "pyproject.toml",
+    "requirements.txt",
+    "Pipfile",
+    "poetry.lock",
+    "uv.lock",
+    "manage.py",
+    "main.py",
+    "app.py",
+    "Dockerfile",
+    "docker-compose.yml",
+    "compose.yml",
+    "index.html",
+}
+_APP_MARKER_DIRS = {
+    "src",
+    "app",
+    "pages",
+    "components",
+    "public",
+    "static",
+    "templates",
+    "backend",
+    "frontend",
+}
+_APP_CODE_EXTS = {
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".css",
+    ".html",
+    ".vue",
+    ".svelte",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".cs",
+    ".php",
+    ".rb",
+}
+_APP_SCAN_IGNORED_DIRS = {
+    ".git",
+    ".refine",
+    ".github",
+    ".vscode",
+    ".idea",
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+}
+
+
+def _project_needs_scaffold_template(client_repo: Path) -> bool:
+    """True when the target has no detectable application code yet."""
+    try:
+        path = client_repo.expanduser()
+    except RuntimeError:
+        return False
+    if not path.exists():
+        return True
+    if not path.is_dir():
+        return False
+    return not _target_has_existing_application(path)
+
+
+def _target_has_existing_application(path: Path) -> bool:
+    for marker in _APP_MARKER_FILES:
+        if (path / marker).is_file():
+            return True
+    for dirname in _APP_MARKER_DIRS:
+        child = path / dirname
+        if child.is_dir() and _directory_has_visible_files(child):
+            return True
+
+    seen = 0
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in _APP_SCAN_IGNORED_DIRS]
+        rel_root = Path(root).relative_to(path)
+        if rel_root.parts and rel_root.parts[0] in _APP_SCAN_IGNORED_DIRS:
+            continue
+        for filename in files:
+            seen += 1
+            if seen > 500:
+                return False
+            if Path(filename).suffix.lower() in _APP_CODE_EXTS:
+                return True
+    return False
+
+
+def _directory_has_visible_files(path: Path) -> bool:
+    try:
+        for child in path.rglob("*"):
+            if any(part in _APP_SCAN_IGNORED_DIRS for part in child.relative_to(path).parts):
+                continue
+            if child.is_file():
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def list_project_templates() -> tuple[int, dict]:
+    templates: list[dict[str, str]] = []
+    if not PROJECT_TEMPLATE_DIR.is_dir():
+        return 200, {"templates": templates}
+    for path in sorted(PROJECT_TEMPLATE_DIR.glob("*.md")):
+        if not _PROJECT_TEMPLATE_ID_RE.match(path.stem):
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        templates.append(_project_template_summary(path.stem, content))
+    return 200, {"templates": templates}
+
+
+def _project_template_summary(template_id: str, content: str) -> dict[str, str]:
+    title = ""
+    summary = ""
+    for raw in content.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("# "):
+            title = line[2:].strip()
+            continue
+        if not summary and not line.startswith("#"):
+            summary = line
+        if title and summary:
+            break
+    if not title:
+        title = template_id.replace("-", " ").replace("_", " ").title()
+    return {"id": template_id, "name": title, "summary": summary}
+
+
+def _load_project_template(template_id: str) -> tuple[dict[str, str], str] | None:
+    if not _PROJECT_TEMPLATE_ID_RE.match(template_id):
+        return None
+    path = PROJECT_TEMPLATE_DIR / f"{template_id}.md"
+    if not path.is_file():
+        return None
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return _project_template_summary(template_id, content), content
+
+
+@_exclusive_mutation(
+    "Create Scaffold Gap",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
+def create_project_scaffold_gap(body: dict[str, Any]) -> tuple[int, dict]:
+    template_id = str(body.get("template") or "").strip()
+    loaded = _load_project_template(template_id)
+    if loaded is None:
+        return err(404, "Unknown project template.")
+    summary, content = loaded
+    reporter = str(body.get("reporter") or "Refine").strip()
+    if not reporter or not _VALID_REPORTER.match(reporter):
+        return err(400, "invalid reporter name")
+
+    name = f"Scaffold {summary['name']}"
+    actual = (
+        "The attached project has no detectable application scaffold yet. "
+        f"Implement the selected project template: {summary['name']}."
+    )
+    target = content
+    gap = _create_indexed_gap(
+        name=name,
+        reporter=reporter,
+        actual=actual,
+        target=target,
+        priority="high",
+    )
+    return 201, {"ok": True, "gap": gap, "template": summary}
+
+
+def _create_indexed_gap(
+    *,
+    name: str,
+    reporter: str,
+    actual: str,
+    target: str,
+    priority: str,
+) -> dict[str, Any]:
+    gap_id = new_ulid()
+    instance_id = project_state.active_instance_id()
+    round_obj = shared_gaps.new_round(
+        reporter=reporter,
+        actual=actual,
+        target=target,
+    )
+    gap = gap_writer.create_gap(
+        gap_id=gap_id,
+        name=name,
+        initial_round=round_obj,
+        status="backlog",
+        priority=priority,
+        instance_id=instance_id,
+    )
+
+    from refine_server.paths import relative_gap_path
+
+    conn = _conn()
+    try:
+        with db.transaction(conn):
+            conn.execute(
+                "INSERT INTO gaps_index "
+                "(id, name, status, priority, reporter, created, updated, instance_id, json_path) "
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?)",
+                (
+                    gap_id,
+                    name,
+                    priority,
+                    reporter,
+                    gap["created"],
+                    gap["updated"],
+                    instance_id,
+                    relative_gap_path(gap_id),
+                ),
+            )
+            search_index.upsert_gap(conn, gap)
+            reporters.add(conn, reporter)
+            activity.append(
+                conn,
+                message=f"Gap created: {name}",
+                severity="info",
+                category="state",
+                gap_id=gap_id,
+                actor=reporter,
+            )
+    finally:
+        conn.close()
+    return gap
+
+
 def _project_registry_enabled(clone_dir: Path) -> bool:
     return (clone_dir / "pyproject.toml").is_file() and (clone_dir / "refine_cli" / "cli.py").is_file()
+
+
+def _looks_like_git_remote(value: str) -> bool:
+    text = str(value or "").strip()
+    if text.startswith(("git@", "ssh://", "git://")):
+        return True
+    parsed = urlparse(text)
+    return parsed.scheme in {"http", "https", "file"} and bool(parsed.netloc or parsed.scheme == "file")
+
+
+def _clone_project_remote(remote: str, clone_dir: Path) -> Path:
+    git = shutil.which("git")
+    if git is None:
+        raise config.ConfigError("could not find `git` on PATH; install git or use a local app path")
+    target = _default_project_clone_path(remote, clone_dir)
+    if target.exists():
+        if (target / ".git").exists():
+            return target
+        try:
+            has_entries = any(target.iterdir())
+        except OSError as e:
+            raise config.ConfigError(f"cannot inspect clone target {target}: {e}") from e
+        if has_entries:
+            raise config.ConfigError(
+                f"clone target already exists and is not empty: {target}"
+            )
+    target.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        [git, "clone", remote, str(target)],
+        cwd=str(clone_dir),
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "git clone failed").strip()
+        raise config.ConfigError(
+            "could not clone target app. Check the Git remote and host credentials: "
+            + detail
+        )
+    return target
+
+
+def _default_project_clone_path(remote: str, clone_dir: Path) -> Path:
+    parsed = urlparse(remote)
+    raw_name = Path(parsed.path or remote.rstrip("/")).name or "target-app"
+    if raw_name.endswith(".git"):
+        raw_name = raw_name[:-4]
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", raw_name).strip(".-") or "target-app"
+    base = clone_dir.parent
+    candidate = base / name
+    if not candidate.exists() or (candidate / ".git").exists():
+        return candidate
+    i = 2
+    while True:
+        numbered = base / f"{name}-{i}"
+        if not numbered.exists() or (numbered / ".git").exists():
+            return numbered
+        i += 1
 
 
 def _validate_target_schema_before_switch(client_repo: Path, body: dict[str, Any]) -> None:
@@ -1569,6 +1908,21 @@ def _ensure_current_app(apps: list[dict[str, str]], client_repo: Path) -> list[d
     ]
 
 
+def _detach_current_project(clone_dir: Path, target: Path) -> None:
+    binding = clone_dir / config.BINDING_FILENAME
+    if binding.exists():
+        try:
+            bound = config.read_binding(binding)
+        except config.ConfigError:
+            bound = None
+        if bound is None or bound == target.resolve():
+            try:
+                binding.unlink()
+            except FileNotFoundError:
+                pass
+    runtime.detach_configured()
+
+
 def _instance_summary() -> dict[str, Any]:
     try:
         instances = project_state.list_instances()
@@ -1602,12 +1956,7 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     """Stop active agents and leave the current target app clean before switching."""
     warnings: list[str] = []
     cfg = config.get(reload=True)
-    if runtime.backend_info().get("process_model") == "supervisor":
-        warnings.append(
-            "Refine will restart so the UI and runner worker use the selected app."
-        )
-    else:
-        runtime.stop_runner()
+    runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)
     dirty = _git_stdout(cfg.client_repo, ["status", "--porcelain"])
@@ -1620,89 +1969,6 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
             ),
         )
     return {"warnings": warnings}
-
-
-def _prepare_supervised_switch_target(
-    cfg: config.Config,
-    *,
-    migrate: bool,
-) -> dict[str, Any]:
-    """Prepare target .refine state without hot-loading it in this UI process."""
-    schema = project_state.schema_status(cfg.volume_root)
-    if schema.get("compatible"):
-        return project_state.ensure_initialized(
-            migrate=False,
-            root=cfg.volume_root,
-        )
-    if not schema.get("migration_required"):
-        return schema
-
-    conn: sqlite3.Connection | None = None
-    try:
-        if project_state.empty_refine_state(cfg.volume_root):
-            db.init_db(cfg.sqlite_path)
-            conn = db.connect(cfg.sqlite_path)
-        elif not migrate:
-            return schema
-        return project_state.ensure_initialized(
-            conn,
-            migrate=True,
-            root=cfg.volume_root,
-        )
-    finally:
-        if conn is not None:
-            conn.close()
-
-
-def _schedule_supervisor_restart(clone_dir: Path, cfg: config.Config) -> dict[str, Any]:
-    try:
-        port = int(os.environ.get("REFINE_UI_PORT") or cfg.web_port)
-    except ValueError:
-        port = cfg.web_port
-    run_dir = config.local_run_dir(clone_dir)
-    run_dir.mkdir(parents=True, exist_ok=True)
-    log_path = run_dir / f"restart-{port}.log"
-    command = [
-        sys.executable,
-        "-m",
-        "refine_cli",
-        "--config",
-        str(cfg.config_path),
-        "restart",
-        str(port),
-    ]
-    launcher = [
-        sys.executable,
-        "-c",
-        (
-            "import os, sys, time; "
-            "time.sleep(0.5); "
-            "os.execvpe(sys.argv[1], sys.argv[1:], os.environ)"
-        ),
-        *command,
-    ]
-    env = os.environ.copy()
-    env.pop("REFINE_RUNNER_SOCKET", None)
-    env.pop("REFINE_NO_INPROCESS_RUNNER", None)
-    env.pop("REFINE_SUPERVISOR_PID", None)
-    env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
-    env["REFINE_UI_PORT"] = str(port)
-    with log_path.open("ab") as log:
-        proc = subprocess.Popen(
-            launcher,
-            cwd=str(clone_dir),
-            stdin=subprocess.DEVNULL,
-            stdout=log,
-            stderr=subprocess.STDOUT,
-            env=env,
-            start_new_session=True,
-        )
-    return {
-        "scheduled": True,
-        "pid": proc.pid,
-        "port": port,
-        "log_path": str(log_path),
-    }
 
 
 def _commit_refine_state(repo: Path) -> None:
@@ -1884,6 +2150,15 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     the indexed `gaps_index.reporter` column, which the runner keeps in
     sync with the latest round's reporter on every write.
     """
+    if not _project_attached():
+        body: dict[str, Any] = {
+            "gaps": [],
+            "page": _empty_page(limit, offset),
+            "attached": False,
+        }
+        if include_facets:
+            body["facets"] = {"categories": [], "actors": []}
+        return 200, body
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
@@ -2904,6 +3179,18 @@ def list_changes(*, limit: int = 50, offset: int = 0,
     """List refine merge commits on the target branch (plus the Gap
     metadata for each). Used by the Changes screen."""
     page_limit, page_offset = _page_bounds(limit, offset)
+    if not _project_attached():
+        return 200, {
+            "changes": [],
+            "branch": "",
+            "page": {
+                "limit": page_limit,
+                "offset": page_offset,
+                "has_more": False,
+                "total": 0,
+            },
+            "attached": False,
+        }
     try:
         result = get_client().call(
             M_LIST_CHANGES,
@@ -3654,6 +3941,24 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
                   include_facets: bool = False) -> tuple[int, dict]:
     metric_start = perf_metrics.now()
     page_limit, page_offset = _page_bounds(limit, offset)
+    if not _project_attached():
+        body: dict[str, Any] = {
+            "activity": [],
+            "page": {
+                "limit": page_limit,
+                "offset": page_offset,
+                "has_more": False,
+                "total": 0,
+            },
+            "attached": False,
+        }
+        if include_facets:
+            body["facets"] = {
+                "categories": [],
+                "actors": [],
+                "severities": ["info", "warn", "error"],
+            }
+        return 200, body
     conn = _conn()
     try:
         entries = activity.recent(
@@ -3779,13 +4084,31 @@ def cleanup_logs(body: dict) -> tuple[int, dict]:
 
 
 def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
+    instance_scope = (instance or "current").strip() or "current"
+    if instance_scope not in ("all", "current"):
+        instance_scope = "current"
+    if not _project_attached():
+        return 200, {
+            "counts": {},
+            "running": [],
+            "merger": None,
+            "governance": None,
+            "preflight": None,
+            "activity": [],
+            "runner_reachable": False,
+            "reporter_stats": [],
+            "instance_scope": instance_scope,
+            "instance_filter": "all" if instance_scope == "all" else "current",
+            "quality_timing": "pre_merge",
+            "active_instance_id": "",
+            "active_instance_display_name": "",
+            "needs_attention": [],
+            "attached": False,
+        }
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
     runner_snap = runtime.runner_status_snapshot()
-    instance_scope = (instance or "current").strip() or "current"
-    if instance_scope not in ("all", "current"):
-        instance_scope = "current"
     active_instance_id = project_state.active_instance_id()
     instance_where = ""
     instance_args: list[Any] = []
@@ -5804,6 +6127,7 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
         "config": result.get("config") or {},
         "notes": (result.get("config") or {}).get("notes") or "",
         "raw": result.get("raw") or "",
+        "script_path": result.get("script_path") or "",
     }
 
 

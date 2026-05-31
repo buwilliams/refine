@@ -91,6 +91,75 @@ function updateNavAppContextLabel(label) {
   el.title = el.textContent;
 }
 
+function hasAttachedProject() {
+  return state.project?.attached === true;
+}
+
+function clearProjectScopedUiState() {
+  state.reporters = [];
+  state.dashboard = null;
+  state.currentGap = null;
+  if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
+  if (typeof gapsIncludedIds !== "undefined") gapsIncludedIds.clear();
+  setLastReporter("");
+  populateAllReporterDropdowns();
+  updateActiveInstanceLabel();
+  updateNavAppContextLabel("No app");
+  if (typeof applyNoTargetAppSnapshot === "function") applyNoTargetAppSnapshot();
+  if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
+}
+
+function renderNoProjectEmptyState(title = "Refine") {
+  renderBanners([]);
+  $("#main").innerHTML = `
+    <h2>${htmlEscape(title)}</h2>
+    <div class="empty-state">
+      <div class="empty-state-title">No app configured.</div>
+      <p class="muted">Open the Guide to configure Refine and attach an app.</p>
+      <button type="button" class="secondary" id="empty-open-guide">Open Guide</button>
+    </div>`;
+  $("#empty-open-guide")?.addEventListener("click", () => {
+    if (typeof openGuide === "function") {
+      openGuide({
+        context: "no-app",
+        categoryId: "project",
+        itemId: "project-application",
+        openTarget: false,
+      });
+    }
+  });
+}
+
+function renderNoProjectIfDetached(title) {
+  if (hasAttachedProject()) return false;
+  renderNoProjectEmptyState(title);
+  return true;
+}
+
+function renderNoProjectIfApiDetached(data, title) {
+  if (data?.attached !== false) return false;
+  enterNoProjectMode({ ...(state.project || {}), attached: false });
+  renderNoProjectEmptyState(title);
+  return true;
+}
+
+function enterNoProjectMode(project = null, { openGuidePanel = false } = {}) {
+  if (project) state.project = project;
+  clearProjectScopedUiState();
+  if (sseSource) {
+    sseSource.close();
+    sseSource = null;
+  }
+  if (openGuidePanel && typeof openGuide === "function") {
+    openGuide({
+      context: "no-app",
+      categoryId: "project",
+      itemId: "project-application",
+      openTarget: false,
+    });
+  }
+}
+
 function refreshCurrentSettingsSurface(options = {}) {
   if (!["settings", "instance", "project"].includes(state.currentRoute || "")) return undefined;
   if (typeof refreshActiveSettingsTab === "function") {
@@ -262,10 +331,8 @@ async function ensureProjectAttached() {
       <p class="muted">This app was not loaded because its .refine state was written by a newer Refine version.</p>`;
     return false;
   }
-  const result = await openAddAppModal({
-    message: snap.message || "Add an existing app path or a new directory to create and initialize.",
-  });
-  return !!result;
+  enterNoProjectMode(snap);
+  return false;
 }
 
 async function refreshProjectStatus() {
@@ -278,6 +345,9 @@ async function refreshProjectStatus() {
   }
   state.project = snap;
   updateActiveInstanceLabel();
+  if (snap.attached === false) {
+    clearProjectScopedUiState();
+  }
   return snap;
 }
 
@@ -305,6 +375,7 @@ function openProjectAttachModal({
   okLabel = "Attach project",
   defaultPath = "",
   reloadOnSuccess = true,
+  openGuideOnSuccess = false,
 } = {}) {
   return new Promise((resolve) => {
     const root = document.createElement("div");
@@ -315,13 +386,14 @@ function openProjectAttachModal({
           <div class="modal-title" id="project-setup-title">${htmlEscape(title)}</div>
           <div class="modal-body">
             <p class="muted">${htmlEscape(message)}</p>
-            <label for="project-setup-path">Project path</label>
+            <label for="project-setup-path">Project path or Git remote</label>
             <input id="project-setup-path" name="path" type="text" class="modal-input"
-                   placeholder="/path/to/app" autocomplete="off" required
+                   placeholder="/path/to/app or git@github.com:org/app.git" autocomplete="off" required
                    value="${htmlEscape(defaultPath)}">
             <p class="muted small">
-              If the directory does not exist, refine will create it, run git init,
-              and add the .refine configuration.
+              If the directory does not exist, refine will create it and run git init.
+              If you paste a Git remote, refine will clone it first; private repos
+              require working host credentials.
             </p>
             <div class="form-error" id="project-setup-error" style="display:none"></div>
           </div>
@@ -354,12 +426,14 @@ function openProjectAttachModal({
       try {
         const result = await api("POST", "/api/project/attach", { path });
         if (reloadOnSuccess) {
+          if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
           state.project = result;
           showProjectAttachToast(result);
           window.location.reload();
         } else {
-          await applyProjectAttachResult(result);
+          await applyProjectAttachResult(result, { openGuide: openGuideOnSuccess });
           root.remove();
+          await maybeOpenProjectTemplateModal(result);
         }
         resolve(result);
       } catch (err) {
@@ -372,12 +446,14 @@ function openProjectAttachModal({
             try {
               const result = await api("POST", "/api/project/attach", { path, migrate: true });
               if (reloadOnSuccess) {
+                if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
                 state.project = result;
                 showProjectAttachToast(result);
                 window.location.reload();
               } else {
-                await applyProjectAttachResult(result);
+                await applyProjectAttachResult(result, { openGuide: openGuideOnSuccess });
                 root.remove();
+                await maybeOpenProjectTemplateModal(result);
               }
               resolve(result);
               return;
@@ -397,19 +473,16 @@ function openProjectAttachModal({
 
 function openAddAppModal(options = {}) {
   return openProjectAttachModal({
-    message: "Add an existing app path or a new directory to create and initialize.",
+    message: "Add an existing app path, paste a Git remote, or choose a new directory to create and initialize.",
     title: "Add app",
     okLabel: "Add and switch",
     reloadOnSuccess: false,
+    openGuideOnSuccess: true,
     ...options,
   });
 }
 
 function showProjectAttachToast(result) {
-  if (result.restart_pending) {
-    toast("Refine is restarting for the selected app", "info");
-    return;
-  }
   if (result.runner && result.runner.started === false && result.runner.message) {
     toast(result.runner.message, "warn");
   } else {
@@ -417,18 +490,15 @@ function showProjectAttachToast(result) {
   }
 }
 
-async function applyProjectAttachResult(result) {
+async function applyProjectAttachResult(result, options = {}) {
+  if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
   state.project = result;
   updateActiveInstanceLabel();
   state.dashboard = null;
   state.currentGap = null;
   state.underlayHash = "#/project/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
-  showProjectAttachToast(result);
-  if (result.restart_pending) {
-    setTimeout(() => window.location.reload(), 2500);
-    return;
-  }
+  if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
   await syncProjectUpdates({ silent: true });
@@ -441,6 +511,114 @@ async function applyProjectAttachResult(result) {
   } else {
     navigate();
   }
+  if (options.openGuide && typeof openGuide === "function") {
+    openGuide({
+      context: result.config_created ? "app-created" : "app-existing",
+      categoryId: "project",
+      itemId: "project-application",
+    });
+  }
+}
+
+async function maybeOpenProjectTemplateModal(project) {
+  if (!project || project.scaffold_required !== true) return null;
+  let templates = Array.isArray(project.scaffold_templates) ? project.scaffold_templates : [];
+  if (!templates.length) {
+    templates = await loadProjectTemplates();
+  }
+  if (!templates.length) return null;
+  return openProjectTemplateModal(templates);
+}
+
+async function openProjectTemplateSelector() {
+  const templates = await loadProjectTemplates();
+  if (!templates.length) {
+    toast("No app templates are available", "warn");
+    return null;
+  }
+  return openProjectTemplateModal(templates);
+}
+
+async function loadProjectTemplates() {
+  try {
+    const result = await api("GET", "/api/project/templates");
+    return Array.isArray(result.templates) ? result.templates : [];
+  } catch (e) {
+    toast(e.message || "Could not load app templates", "error");
+    return [];
+  }
+}
+
+function openProjectTemplateModal(templates) {
+  return new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop project-template-backdrop";
+    root.innerHTML = `
+      <div class="modal project-template-modal" role="dialog" aria-modal="true" aria-labelledby="project-template-title">
+        <div class="modal-title" id="project-template-title">Select app template</div>
+        <div class="modal-body">
+          <p class="muted small">
+            This app does not have application code yet. Refine will create a high-priority Gap for the selected scaffold.
+          </p>
+          <div class="project-template-options">
+            ${templates.map((template) => `
+              <button type="button" class="project-template-option" data-template-id="${htmlEscape(template.id)}">
+                <span class="project-template-name">${htmlEscape(template.name || template.id)}</span>
+                <span class="project-template-summary">${htmlEscape(template.summary || "")}</span>
+              </button>
+            `).join("")}
+          </div>
+          <div class="form-error" id="project-template-error" style="display:none"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" type="button" id="project-template-cancel">Skip</button>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const error = root.querySelector("#project-template-error");
+    let closed = false;
+    function close(value) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(null);
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    root.addEventListener("click", (e) => {
+      if (e.target === root) close(null);
+    });
+    root.querySelector("#project-template-cancel").addEventListener("click", () => close(null));
+    $$(".project-template-option", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const templateId = button.dataset.templateId || "";
+        error.style.display = "none";
+        $$(".project-template-option", root).forEach((b) => { b.disabled = true; });
+        button.classList.add("is-selected");
+        try {
+          const result = await api("POST", "/api/project/scaffold", { template: templateId });
+          const gap = result.gap || {};
+          toast("Scaffold Gap created", "success");
+          close(result);
+          if (gap.id) location.hash = "#/gaps/" + encodeURIComponent(gap.id);
+        } catch (e) {
+          error.textContent = e.details || e.message || "Could not create scaffold Gap";
+          error.style.display = "";
+          button.classList.remove("is-selected");
+          $$(".project-template-option", root).forEach((b) => { b.disabled = false; });
+        }
+      });
+    });
+    const first = root.querySelector(".project-template-option");
+    if (first) first.focus();
+  });
 }
 
 // ---- Modals (replace native prompt / confirm) -------------------------------
@@ -760,6 +938,12 @@ function mdInline(text) {
 // ---- reporter dropdown ------------------------------------------------------
 
 async function refreshReporters({ selectFallback = false } = {}) {
+  if (!hasAttachedProject()) {
+    state.reporters = [];
+    setLastReporter("");
+    populateAllReporterDropdowns();
+    return;
+  }
   const data = await api("GET", "/api/reporters");
   state.reporters = data.reporters || [];
   reconcileLastReporter({ selectFallback });
@@ -793,7 +977,7 @@ function populateAllReporterDropdowns() {
     sel.innerHTML = "";
     const optBlank = document.createElement("option");
     optBlank.value = "";
-    optBlank.textContent = "— pick reporter —";
+    optBlank.textContent = hasAttachedProject() ? "— pick reporter —" : "No reporter";
     sel.appendChild(optBlank);
     for (const r of state.reporters) {
       const opt = document.createElement("option");
@@ -801,10 +985,12 @@ function populateAllReporterDropdowns() {
       opt.textContent = r.name;
       sel.appendChild(opt);
     }
-    const optAdd = document.createElement("option");
-    optAdd.value = "__add__";
-    optAdd.textContent = "+ Add new reporter…";
-    sel.appendChild(optAdd);
+    if (hasAttachedProject()) {
+      const optAdd = document.createElement("option");
+      optAdd.value = "__add__";
+      optAdd.textContent = "+ Add new reporter…";
+      sel.appendChild(optAdd);
+    }
     // Restore selection if still valid
     const stillValid = state.reporters.some((r) => r.name === current);
     sel.value = stillValid ? current : "";
@@ -859,6 +1045,11 @@ function setLastReporter(name) {
 // react to "+ Add new reporter" selection on any dropdown
 document.addEventListener("change", async (e) => {
   if (e.target.matches("[data-reporter-select], #global-reporter")) {
+    if (!hasAttachedProject()) {
+      e.target.value = "";
+      setLastReporter("");
+      return;
+    }
     if (e.target.value === "__add__") {
       const newName = await handleReporterAdd(e.target);
       if (newName) e.target.dispatchEvent(new Event("change-after-add"));

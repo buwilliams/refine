@@ -82,14 +82,20 @@ async function refreshSettingsTab(slug, options = {}) {
 }
 
 async function loadSettingsSurfaceData() {
+  const project = await api("GET", "/api/project/status");
+  state.project = project;
+  updateActiveInstanceLabel();
+  if (project.attached === false) {
+    enterNoProjectMode(project);
+    return detachedSettingsSurfaceData(project);
+  }
   const [
-    s, diag, reps, project, gov, quality, dash, instances, guidance,
+    s, diag, reps, gov, quality, dash, instances, guidance,
     performance, processes,
   ] = await Promise.all([
     api("GET", "/api/settings"),
     api("GET", "/api/diagnostics"),
     api("GET", "/api/reporters"),
-    api("GET", "/api/project/status"),
     api("GET", "/api/governance"),
     api("GET", "/api/quality"),
     api("GET", "/api/dashboard"),
@@ -115,6 +121,7 @@ async function loadSettingsSurfaceData() {
       ${htmlEscape(app.name || app.path)}
     </option>`).join("");
   return {
+    noProject: false,
     s: settings,
     diag: diag || {},
     reps: state.reporters,
@@ -134,6 +141,43 @@ async function loadSettingsSurfaceData() {
     projectApps,
     currentProject,
     projectRegistryEnabled: project.registry_enabled !== false,
+    appOptions,
+  };
+}
+
+function detachedSettingsSurfaceData(project = {}) {
+  const projectApps = project?.apps || [];
+  const currentProject = project?.client_repo || "";
+  const appOptions = projectApps.map((app) => `
+    <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
+      ${htmlEscape(app.name || app.path)}
+    </option>`).join("");
+  return {
+    noProject: true,
+    s: {},
+    diag: { backend: {} },
+    reps: [],
+    project: project || {},
+    gov: {},
+    quality: { regressions: [] },
+    dash: {},
+    instances: [],
+    instanceCounts: {},
+    activeInstanceId: "",
+    activeInstanceLabel: "No app",
+    guidanceItems: [],
+    performance: {},
+    performanceBackend: {},
+    processes: {
+      runner_reachable: false,
+      paused: false,
+      processes: [],
+      target_app: { state: "unknown" },
+    },
+    cli: "",
+    projectApps,
+    currentProject,
+    projectRegistryEnabled: project?.registry_enabled !== false,
     appOptions,
   };
 }
@@ -168,7 +212,7 @@ async function copySettingsFromInstance(section, {
   const body = () => `
     <div class="modal-title">${htmlEscape(title)}</div>
     <div class="modal-body">
-      <label>Source instance</label>
+      <label>${renderSettingsGuideLabel("Source instance", "instance-copy-settings-source")}</label>
       <select class="modal-input" style="width:100%">
         ${opts}
       </select>
@@ -358,6 +402,7 @@ function renderSettingsMarkdownField({
   scope = "",
   description = "",
   rows = 7,
+  guideItemId = "",
 }) {
   const htmlId = htmlEscape(id);
   const describedById = `${htmlId}-description`;
@@ -366,7 +411,7 @@ function renderSettingsMarkdownField({
   return `
     <section class="settings-section settings-markdown-field" data-settings-markdown-field>
       <div class="settings-section-heading">
-        <h3>${htmlEscape(title)}</h3>
+        <h3>${renderSettingsGuideLabel(title, guideItemId)}</h3>
         <button type="button"
                 class="secondary settings-markdown-edit"
                 title="Edit ${htmlEscape(title)}"
@@ -386,6 +431,29 @@ function renderSettingsMarkdownField({
                 ${description ? `aria-describedby="${describedById}"` : ""}
                 hidden>${htmlEscape(value)}</textarea>
     </section>`;
+}
+
+function renderSettingsGuideLabel(title, itemId = "", description = "") {
+  return `
+    <span class="settings-label-text">${htmlEscape(title)}</span>
+    ${renderSettingsGuideIcon(itemId, title)}
+    ${description ? `<span class="muted small">— ${htmlEscape(description)}</span>` : ""}`;
+}
+
+function renderSettingsGuideIcon(itemId = "", title = "setting") {
+  if (!itemId) return "";
+  return `
+    <button type="button"
+            class="settings-guide-icon"
+            data-guide-label-item="${htmlEscape(itemId)}"
+            title="Open Guide: ${htmlEscape(title)}"
+            aria-label="Open Guide for ${htmlEscape(title)}">
+      <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M9.8 9.4a2.4 2.4 0 0 1 4.4 1.3c0 1.7-2.2 2.1-2.2 3.8"></path>
+        <path d="M12 17.5h.01"></path>
+      </svg>
+    </button>`;
 }
 
 function settingsMarkdownIcon(name) {
@@ -650,6 +718,17 @@ function bindRebuildCacheHandler() {
 
 
 function renderSettingsTabBody(surface, slug, data) {
+  if (data.noProject) {
+    if (surface === SETTINGS_SURFACES.project && slug === "application") {
+      return renderSettingsApplicationTab({
+        projectApps: data.projectApps,
+        currentProject: data.currentProject,
+        projectRegistryEnabled: data.projectRegistryEnabled,
+        appOptions: data.appOptions,
+      });
+    }
+    return renderSettingsNoProjectTab(surface.title);
+  }
   if (surface === SETTINGS_SURFACES.settings) {
     if (slug === "processes") {
       return renderProcessesTab(data.processes, data.s, data.diag, data.dash);
@@ -695,7 +774,39 @@ function renderSettingsTabBody(surface, slug, data) {
   return `<p class="muted">Unknown settings tab.</p>`;
 }
 
+function renderSettingsNoProjectTab(title = "Settings") {
+  return `
+    <section class="settings-section">
+      <h3>No app configured.</h3>
+      <p class="muted">Open the Guide to configure Refine and attach an app before using ${htmlEscape(title)} settings.</p>
+      <button type="button" class="secondary" data-settings-open-guide>Open Guide</button>
+    </section>`;
+}
+
+function bindSettingsNoProjectTab() {
+  $$("[data-settings-open-guide]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (typeof openGuide === "function") {
+        openGuide({
+          context: "no-app",
+          categoryId: "project",
+          itemId: "project-application",
+          openTarget: false,
+        });
+      }
+    });
+  });
+}
+
 function bindSettingsTabBody(surface, slug, data) {
+  if (data.noProject) {
+    if (surface === SETTINGS_SURFACES.project && slug === "application") {
+      bindSettingsApplicationTab(data.currentProject);
+    } else {
+      bindSettingsNoProjectTab();
+    }
+    return;
+  }
   if (surface === SETTINGS_SURFACES.settings) {
     if (slug === "processes") bindSettingsProcessesTab(data.s);
     else if (slug === "performance") {

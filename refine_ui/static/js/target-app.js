@@ -11,6 +11,7 @@ let _agentStatusRefreshTimer = null;
 
 function targetAppProjectLabel() {
   const project = state.project || {};
+  if (project.attached === false) return "No app";
   const current = project.client_repo || "";
   const apps = Array.isArray(project.apps) ? project.apps : [];
   const app = apps.find((candidate) => candidate.path === current);
@@ -33,12 +34,26 @@ function initTargetAppToggle() {
 async function refreshTargetAppToggle() {
   const indicator = document.getElementById("target-app-indicator");
   if (!indicator) return;
+  if (!hasAttachedProject()) {
+    applyNoTargetAppSnapshot();
+    return;
+  }
   try {
     const snap = await api("GET", "/api/target-app/status");
     applyTargetAppSnapshot(snap);
   } catch {
     // Leave whatever state the dot was showing; we'll retry on the next tick.
   }
+}
+
+function applyNoTargetAppSnapshot() {
+  applyTargetAppSnapshot({
+    state: "unknown",
+    app_url: "",
+    last_check_at: "",
+    last_health_at: "",
+    last_error: "",
+  });
 }
 
 function scheduleAgentStatusRefresh() {
@@ -52,6 +67,15 @@ function scheduleAgentStatusRefresh() {
 async function refreshAgentStatusIndicator() {
   const indicator = document.getElementById("agent-status-indicator");
   if (!indicator) return;
+  if (!hasAttachedProject()) {
+    applyAgentStatusSnapshot({
+      runner_reachable: false,
+      paused: false,
+      processes: [],
+      error: "No app configured",
+    });
+    return;
+  }
   try {
     const snap = await api("GET", "/api/processes");
     applyAgentStatusSnapshot(snap);

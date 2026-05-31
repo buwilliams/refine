@@ -236,6 +236,50 @@ button.toolbar-tab:hover:not(:disabled),
 .chat-output a { color: var(--accent); }
 .chat-output a:hover { text-decoration: underline; }
 
+.chat-progress-panel {
+  border-top: 1px solid var(--color-border-subtle);
+  background: #f8fafc;
+}
+.chat-progress-panel[hidden] { display: none; }
+.chat-progress-title {
+  padding: 7px 12px 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+.chat-progress {
+  max-height: 132px;
+  overflow: auto;
+  padding: 6px 12px 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+.chat-progress-line {
+  position: relative;
+  padding-left: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-progress-line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0.55;
+}
+.chat-progress-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .chat-pending {
   display: flex;
   align-items: center;

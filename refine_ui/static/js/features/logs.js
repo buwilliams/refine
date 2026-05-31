@@ -44,6 +44,7 @@ function logsHashFromFilters(f) {
 }
 
 async function renderLogs() {
+  if (renderNoProjectIfDetached("Logs")) return;
   renderBanners([]);
   const f = logsFiltersFromHash();
   // Preserve the filter shell's open/closed state across full re-renders.
@@ -140,6 +141,7 @@ function navigateLogsPage(page) {
 
 async function loadLogs() {
   if (state.currentRoute !== "logs") return;
+  if (renderNoProjectIfDetached("Logs")) return;
   const f = logsFiltersFromHash();
   const params = new URLSearchParams();
   if (f.severity) params.set("severity", f.severity);
@@ -154,6 +156,7 @@ async function loadLogs() {
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/activity?" + params);
+    if (renderNoProjectIfApiDetached(data, "Logs")) return;
     drawLogsList(data, f);
   } catch (e) {
     $("#logs-list").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;

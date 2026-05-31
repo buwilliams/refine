@@ -340,6 +340,12 @@ def get(*, path: Path | str | None = None, reload: bool = False) -> Config:
     return _cached
 
 
+def clear_cache() -> None:
+    """Forget the process-local config cache."""
+    global _cached
+    _cached = None
+
+
 def _parse_toml(text: str) -> dict:
     """Parse our (very small) refine.toml schema.
 

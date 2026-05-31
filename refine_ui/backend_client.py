@@ -1,7 +1,6 @@
 """Backend client used by HTTP handlers.
 
-The runner may be in-process during tests/dev setup or behind the local
-supervisor's Unix socket in normal configured runs.
+The runner is reached through the local supervisor runtime's Unix socket.
 """
 from __future__ import annotations
 

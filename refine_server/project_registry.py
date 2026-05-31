@@ -31,7 +31,10 @@ def list_apps(clone_dir: Path) -> list[dict[str, str]]:
         raw_path = str(app.get("path") or "").strip()
         if not raw_path:
             continue
-        resolved = str(Path(raw_path).expanduser().resolve())
+        resolved_path = Path(raw_path).expanduser().resolve()
+        if not resolved_path.exists():
+            continue
+        resolved = str(resolved_path)
         if resolved in seen:
             continue
         seen.add(resolved)

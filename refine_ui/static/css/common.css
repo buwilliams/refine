@@ -345,6 +345,37 @@ select {
 
 .form-row { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
 .form-row label { font-weight: 650; font-size: 13px; color: var(--color-text); }
+.settings-label-text { vertical-align: middle; }
+.settings-guide-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: white;
+  color: var(--color-primary);
+  vertical-align: -3px;
+  box-shadow: none;
+}
+.settings-guide-icon:hover,
+.settings-guide-icon:focus-visible {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+.settings-guide-icon svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 .table {
   width: 100%;
   border-collapse: separate;
@@ -844,6 +875,15 @@ select {
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
+}
+.filter-row .filter-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--color-text);
 }
 .filter-row select { width: auto; }
 .filter-row input[type="text"] { width: auto; }
