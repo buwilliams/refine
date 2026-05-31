@@ -403,6 +403,16 @@ def _h_project_attach(_h, _m, body, _q):
     return api.project_attach(body or {})
 
 
+@route("GET", r"/api/project/templates")
+def _h_project_templates(_h, _m, _b, _q):
+    return api.list_project_templates()
+
+
+@route("POST", r"/api/project/scaffold")
+def _h_project_scaffold(_h, _m, body, _q):
+    return api.create_project_scaffold_gap(body or {})
+
+
 @route("DELETE", r"/api/projects")
 def _h_project_remove(_h, _m, body, _q):
     return api.project_remove(body or {})

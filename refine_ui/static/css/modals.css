@@ -41,6 +41,44 @@
 .project-setup-modal .small {
   margin: 8px 0 0;
 }
+.project-template-modal {
+  max-width: 560px;
+}
+.project-template-options {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.project-template-option {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 76px;
+  padding: 12px;
+  text-align: left;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+.project-template-option:hover:not(:disabled),
+.project-template-option:focus-visible {
+  border-color: var(--accent);
+  background: var(--color-surface-muted);
+}
+.project-template-option.is-selected {
+  border-color: var(--accent);
+}
+.project-template-name {
+  font-weight: 750;
+  font-size: 14px;
+}
+.project-template-summary {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
 .import-modal {
   width: 80vw;
   max-width: 80vw;

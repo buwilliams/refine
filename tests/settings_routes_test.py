@@ -962,6 +962,8 @@ def main() -> int:
         root / "refine_ui/server.py"
     ).read_text(encoding="utf-8")
     server_js = (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    assert '@route("GET", r"/api/project/templates")' in server_js
+    assert '@route("POST", r"/api/project/scaffold")' in server_js
     assert '@route("GET", r"/api/guidance")' in server_js
     assert '@route("PUT", r"/api/guidance")' in server_js
     assert "def do_PUT" in server_js

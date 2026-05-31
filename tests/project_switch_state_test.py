@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -57,6 +58,10 @@ def test_client_switch_path(root: Path) -> None:
     assert "updateActiveInstanceLabel()" in common_js
 
     assert "function openAddAppModal(options = {})" in common_js
+    assert "async function maybeOpenProjectTemplateModal(project)" in common_js
+    assert "function openProjectTemplateModal(templates)" in common_js
+    assert 'api("GET", "/api/project/templates")' in common_js
+    assert 'api("POST", "/api/project/scaffold"' in common_js
     add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
     add_app_body = add_app_body.split("\n}", 1)[0]
     for expected in (
@@ -147,6 +152,10 @@ def test_client_switch_path(root: Path) -> None:
     assert "updateActiveInstanceLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
     assert "restart_pending" in api_py
+    assert '"scaffold_required": scaffold_required' in api_py
+    assert "PROJECT_TEMPLATE_DIR" in api_py
+    assert "def list_project_templates()" in api_py
+    assert "def create_project_scaffold_gap" in api_py
     assert "Refine is restarting for the selected app" in common_js
 
 
@@ -631,6 +640,85 @@ def test_supervised_switch_migrates_target_before_restart(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
+def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
+    tmp = Path(tempfile.mkdtemp(prefix="refine-scaffold-template-"))
+    clone = tmp / "refine-source"
+    (clone / "refine_cli").mkdir(parents=True)
+    (clone / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    origin = tmp / "empty-origin.git"
+    original_cwd = Path.cwd()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        git(tmp, "init", "--bare", str(origin))
+        os.chdir(clone)
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        reset_refine_imports()
+        from refine_server import db, gaps as shared_gaps
+        from refine_ui import api
+
+        status, templates = api.list_project_templates()
+        assert status == 200, templates
+        template_ids = {t["id"] for t in templates["templates"]}
+        assert {"nodejs-webapp", "python-webapp", "blank"} <= template_ids
+
+        status, attached = api.project_attach({
+            "path": origin.as_uri(),
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
+        assert status == 200, attached
+        assert attached["scaffold_required"] is True
+        assert {t["id"] for t in attached["scaffold_templates"]} == template_ids
+        cloned = tmp / "empty-origin"
+        assert attached["client_repo"] == str(cloned.resolve())
+        assert (cloned / ".git").exists()
+
+        status, created = api.create_project_scaffold_gap({"template": "nodejs-webapp"})
+        assert status == 201, created
+        gap = created["gap"]
+        assert gap["priority"] == "high"
+        assert gap["status"] == "backlog"
+        assert gap["name"] == "Scaffold Node.js WebApp"
+        latest = gap["rounds"][-1]
+        assert latest["reporter"] == "Refine"
+        assert "Node.js 24 LTS" in latest["target"]
+        assert "Vite" in latest["target"]
+
+        reread = shared_gaps.read_gap_json(gap["id"])
+        assert reread["priority"] == "high"
+        conn = db.connect()
+        try:
+            row = conn.execute(
+                "SELECT priority, reporter FROM gaps_index WHERE id = ?",
+                (gap["id"],),
+            ).fetchone()
+            assert dict(row) == {"priority": "high", "reporter": "Refine"}
+        finally:
+            conn.close()
+
+        app = tmp / "existing-app"
+        app.mkdir()
+        (app / "package.json").write_text('{"scripts":{"dev":"vite"}}\n', encoding="utf-8")
+        assert api._project_needs_scaffold_template(app) is False  # type: ignore[attr-defined]
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        os.chdir(original_cwd)
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        cleanup_tmp(tmp)
+
+
 def test_active_instance_is_per_application() -> None:
     tmp, client1 = make_client_repo("refine-active-instance-")
     conn = init_refine(client1)
@@ -996,6 +1084,7 @@ def main() -> int:
     test_supervised_switch_schedules_restart_without_hot_loading(root)
     test_supervised_initial_attach_schedules_restart(root)
     test_supervised_switch_migrates_target_before_restart(root)
+    test_empty_project_attach_creates_scaffold_gap(root)
     test_active_instance_is_per_application()
     test_active_instance_is_checkout_local_for_same_application()
     test_active_instance_is_port_scoped_for_same_checkout()
