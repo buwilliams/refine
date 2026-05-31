@@ -59,9 +59,14 @@ def test_client_switch_path(root: Path) -> None:
 
     assert "function openAddAppModal(options = {})" in common_js
     assert "async function maybeOpenProjectTemplateModal(project)" in common_js
+    assert "function rememberPendingProjectTemplateModal(project)" in common_js
+    assert "async function maybeOpenPendingProjectTemplateModal(project = state.project)" in common_js
     assert "function openProjectTemplateModal(templates)" in common_js
     assert 'api("GET", "/api/project/templates")' in common_js
     assert 'api("POST", "/api/project/scaffold"' in common_js
+    assert "rememberPendingProjectTemplateModal(result)" in common_js
+    assert "sessionStorage.setItem(PENDING_SCAFFOLD_PROJECT_KEY" in common_js
+    assert "sessionStorage.removeItem(PENDING_SCAFFOLD_PROJECT_KEY)" in common_js
     add_app_body = common_js.split("function openAddAppModal(options = {})", 1)[1]
     add_app_body = add_app_body.split("\n}", 1)[0]
     for expected in (
@@ -85,6 +90,7 @@ def test_client_switch_path(root: Path) -> None:
     assert 'updateNavAppContextLabel("No app")' in common_js
     assert "sseSource.close()" in common_js
     assert "enterNoProjectMode(state.project, { openGuidePanel: true })" in init_js
+    assert "maybeOpenPendingProjectTemplateModal();" in init_js
     assert "if (!attached) return" not in init_js
     for source, title in (
         (dashboard_js, "Dashboard"),
@@ -153,6 +159,7 @@ def test_client_switch_path(root: Path) -> None:
     assert "window.location.reload()" not in settings_js
     assert "restart_pending" in api_py
     assert '"scaffold_required": scaffold_required' in api_py
+    assert '"scaffold_required": _project_needs_scaffold_template(cfg.client_repo)' in api_py
     assert "PROJECT_TEMPLATE_DIR" in api_py
     assert "def list_project_templates()" in api_py
     assert "def create_project_scaffold_gap" in api_py
@@ -677,6 +684,10 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
         cloned = tmp / "empty-origin"
         assert attached["client_repo"] == str(cloned.resolve())
         assert (cloned / ".git").exists()
+
+        status, snap = api.project_status()
+        assert status == 200, snap
+        assert snap["scaffold_required"] is True
 
         status, created = api.create_project_scaffold_gap({"template": "nodejs-webapp"})
         assert status == 201, created

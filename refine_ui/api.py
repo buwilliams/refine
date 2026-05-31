@@ -855,6 +855,7 @@ def project_status() -> tuple[int, dict]:
         "volume_root": str(cfg.volume_root),
         "config_path": str(cfg.config_path),
         "schema": schema,
+        "scaffold_required": _project_needs_scaffold_template(cfg.client_repo),
         **instance_summary,
     }
 

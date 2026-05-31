@@ -2,6 +2,7 @@
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const PENDING_SCAFFOLD_PROJECT_KEY = "refine_pending_scaffold_project";
 
 const state = {
   reporters: [],
@@ -425,6 +426,7 @@ function openProjectAttachModal({
       button.textContent = "Attaching...";
       try {
         const result = await api("POST", "/api/project/attach", { path });
+        rememberPendingProjectTemplateModal(result);
         if (reloadOnSuccess) {
           if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
           state.project = result;
@@ -445,6 +447,7 @@ function openProjectAttachModal({
           if (migrate) {
             try {
               const result = await api("POST", "/api/project/attach", { path, migrate: true });
+              rememberPendingProjectTemplateModal(result);
               if (reloadOnSuccess) {
                 if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
                 state.project = result;
@@ -491,6 +494,28 @@ function showProjectAttachToast(result) {
     toast(result.runner.message, "warn");
   } else {
     toast("Project attached", "success");
+  }
+}
+
+function rememberPendingProjectTemplateModal(project) {
+  if (!project || project.scaffold_required !== true || !project.restart_pending || !project.client_repo) return;
+  try {
+    sessionStorage.setItem(PENDING_SCAFFOLD_PROJECT_KEY, String(project.client_repo));
+  } catch {}
+}
+
+function clearPendingProjectTemplateModal() {
+  try {
+    sessionStorage.removeItem(PENDING_SCAFFOLD_PROJECT_KEY);
+  } catch {}
+}
+
+function pendingProjectTemplateModalMatches(project) {
+  if (!project || !project.client_repo) return false;
+  try {
+    return sessionStorage.getItem(PENDING_SCAFFOLD_PROJECT_KEY) === String(project.client_repo);
+  } catch {
+    return false;
   }
 }
 
@@ -542,6 +567,17 @@ async function maybeOpenProjectTemplateModal(project) {
   }
   if (!templates.length) return null;
   return openProjectTemplateModal(templates);
+}
+
+async function maybeOpenPendingProjectTemplateModal(project = state.project) {
+  if (!pendingProjectTemplateModalMatches(project)) return null;
+  if (!project || project.scaffold_required !== true) {
+    clearPendingProjectTemplateModal();
+    return null;
+  }
+  const result = await maybeOpenProjectTemplateModal(project);
+  clearPendingProjectTemplateModal();
+  return result;
 }
 
 function openProjectTemplateModal(templates) {
