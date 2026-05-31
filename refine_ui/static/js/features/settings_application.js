@@ -73,9 +73,12 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
     <section class="settings-section">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
-        The AI provider drafts this configuration from the codebase.
-        Refine then runs the saved shell commands directly on the host
-        and checks status through CLI / HTTP / TCP / process probes.
+        <strong>Generate with AI</strong> analyses the codebase, writes a
+        <code>.refine/manage-app.sh</code> wrapper with timestamped logging,
+        and points the commands below at it
+        (<code>./.refine/manage-app.sh start|stop|rebuild|status</code>).
+        Refine runs the saved commands directly on the host. You can override
+        any field — including swapping in your own commands.
       </p>
       ${(s.target_app_start_instructions || s.target_app_stop_instructions || s.target_app_health_url) ? `
         <p class="muted small" style="color:var(--warn)">
@@ -91,17 +94,17 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
       <div class="form-row"><label>Start command
         <span class="muted small">— one-line shell command that starts the app and returns promptly.</span></label>
         <input type="text" id="s-target-start-command"
-               placeholder="nohup npm run dev > /tmp/refine-target.log 2>&1 &"
+               placeholder="./.refine/manage-app.sh start"
                value="${htmlEscape(s.target_app_start_command || "")}"></div>
       <div class="form-row"><label>Stop command
         <span class="muted small">— one-line shell command that stops the app; should be idempotent when practical.</span></label>
         <input type="text" id="s-target-stop-command"
-               placeholder="pkill -f 'npm run dev' || true"
+               placeholder="./.refine/manage-app.sh stop"
                value="${htmlEscape(s.target_app_stop_command || "")}"></div>
       <div class="form-row"><label>Rebuild command
         <span class="muted small">— one-line shell command that prepares generated artifacts for review.</span></label>
         <input type="text" id="s-target-rebuild-command"
-               placeholder="npm run build"
+               placeholder="./.refine/manage-app.sh rebuild"
                value="${htmlEscape(s.target_app_rebuild_command || "")}"></div>
       <div class="form-row"><label>Automatic application rebuild
         <span class="muted small">— controls when Refine rebuilds merged work before it becomes ready for review.</span></label>
@@ -116,7 +119,7 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
       <div class="form-row"><label>Status command
         <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>
         <input type="text" id="s-target-status-command"
-               placeholder="pgrep -f 'npm run dev' >/dev/null"
+               placeholder="./.refine/manage-app.sh status"
                value="${htmlEscape(s.target_app_status_command || "")}"></div>
       <div class="form-row"><label>Working directory
         <span class="muted small">— repo-relative path, or blank for repo root.</span></label>

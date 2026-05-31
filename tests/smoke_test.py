@@ -228,14 +228,15 @@ def main() -> int:
     xres = target_app.run_operation("stop", stop_cfg)
     assert xres["ok"] and xres["state"] == "stopped", xres
     gen = target_app.normalize_generated_config({
-        "start_command": "npm run dev\n",
-        "stop_command": "pkill -f dev || true",
-        "rebuild_command": "npm run build",
-        "status_command": "pgrep -f dev",
+        "summary": "npm app",
+        "start": "npm run dev",
+        "stop": "pkill -f dev || true",
+        "rebuild": "npm run build",
+        "status": "pgrep -f dev",
         "env": {"PORT": 3000},
     })
-    assert gen["start_command"] == "npm run dev"
-    assert gen["rebuild_command"] == "npm run build"
+    assert gen["start_command"] == "./.refine/manage-app.sh start"
+    assert gen["rebuild_command"] == "./.refine/manage-app.sh rebuild"
     assert gen["env"]["PORT"] == "3000"
     ready_file = client / ".refine" / "ready"
     delayed_cfg = {
