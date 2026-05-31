@@ -47,7 +47,7 @@ function ensureStandaloneTab() {
     chatState.tabs.standalone = {
       gapId: null, label: "Standalone", mode: "standalone",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false,
+      agentResponded: false, progress: "", showProgress: true,
     };
   }
   ensureFilesTab();
@@ -58,7 +58,7 @@ function ensureFilesTab() {
     chatState.tabs[FILES_TAB_ID] = {
       gapId: null, label: "Files", mode: "files",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false,
+      agentResponded: false, progress: "", showProgress: true,
     };
   }
 }
@@ -96,6 +96,8 @@ function saveChatStateToStorage() {
         mode: t.mode || (t.gapId ? "gap" : id === "plan" ? "plan" : "standalone"),
         sessionId: t.sessionId,
         output: (t.output || "").slice(-50_000),
+        progress: (t.progress || "").slice(-20_000),
+        showProgress: t.showProgress !== false,
         closedReason: t.closedReason,
         agentResponded: !!t.agentResponded,
     };
@@ -220,7 +222,8 @@ function openChatDock({ gapId = null } = {}) {
         gapId,
         label: `Gap ${gapId.slice(0, 8)}…`,
         mode: "gap",
-        sessionId: null, output: "", closedReason: null, agentResponded: false,
+        sessionId: null, output: "", progress: "", showProgress: true,
+        closedReason: null, agentResponded: false,
       };
     }
     chatState.activeTabId = gapId;
@@ -248,6 +251,8 @@ function ensurePlanTab() {
       mode: "plan",
       sessionId: null,
       output: "",
+      progress: "",
+      showProgress: true,
       closedReason: null,
       agentResponded: false,
     };
@@ -280,6 +285,8 @@ async function startPlanChatSession(tab) {
     tab.sessionId = r.session_id;
     tab.closedReason = null;
     tab.mode = "plan";
+    tab.progress = "";
+    tab.showProgress = true;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
     drawToolbar();
@@ -294,6 +301,8 @@ async function startGapChatSession(tab) {
     const r = await api("POST", "/api/chat/start", { gap_id: tab.gapId });
     tab.sessionId = r.session_id;
     tab.closedReason = null;
+    tab.progress = "";
+    tab.showProgress = true;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
     drawToolbar();
@@ -428,6 +437,7 @@ function drawToolbar() {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
     $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
     $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
+    $("#btn-chat-progress-toggle")?.addEventListener("click", toggleChatProgress);
     $("#chat-input")?.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -446,6 +456,9 @@ function drawToolbar() {
 function drawChatDock() { drawToolbar(); }
 
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
+  const progressText = active.progress || "";
+  const showProgress = active.showProgress !== false;
+  const progressButtonLabel = showProgress ? "Hide activity" : "Show activity";
   return `
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
@@ -455,14 +468,22 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
             Draft Gaps
           </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
-                ${(active.output || active.sessionId) ? "" : "disabled"}>
+                ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>
           Clear history
+        </button>
+        <button id="btn-chat-progress-toggle" class="secondary"
+                ${hasSession || progressText ? "" : "disabled"}>
+          ${htmlEscape(progressButtonLabel)}
         </button>
         <span class="spacer"></span>
         <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
       </div>
       <div class="chat-output-box">
         <div id="chat-output" class="chat-output">${mdToHtml(active.output || "")}</div>
+        <div id="chat-progress-panel" class="chat-progress-panel" ${showProgress ? "" : "hidden"}>
+          <div class="chat-progress-title">Agent activity</div>
+          <div id="chat-progress" class="chat-progress">${renderChatProgress(progressText)}</div>
+        </div>
         <div id="chat-pending" class="chat-pending" hidden>
           <span class="chat-pending-dots"><span></span><span></span><span></span></span>
           Agent is thinking…
@@ -476,6 +497,20 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                ${hasSession && !active.pending ? "" : "disabled"}>
       </div>
     `;
+}
+
+function renderChatProgress(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .slice(-80);
+  if (!lines.length) {
+    return `<div class="chat-progress-empty">Waiting for activity.</div>`;
+  }
+  return lines.map((line) => `
+    <div class="chat-progress-line">${htmlEscape(line)}</div>
+  `).join("");
 }
 
 function toolbarIcon(name) {
@@ -1336,7 +1371,7 @@ async function closeChatTab(tabId) {
 async function clearActiveChat() {
   const t = chatState.tabs[chatState.activeTabId];
   if (!t) return;
-  if (!t.output && !t.sessionId) return;     // nothing to clear
+  if (!t.output && !t.progress && !t.sessionId) return;     // nothing to clear
   const btn = $("#btn-chat-clear");
   const ok = await modalConfirm(
     "Clear this chat's history? Any active session will be stopped and " +
@@ -1352,6 +1387,8 @@ async function clearActiveChat() {
     }
     t.sessionId = null;
     t.output = "";
+    t.progress = "";
+    t.showProgress = true;
     t.closedReason = null;
     t.pending = false;
     t.agentResponded = false;
@@ -1382,6 +1419,8 @@ async function toggleActiveChat() {
       t.sessionId = r.session_id;
       t.closedReason = null;
       t.output = "";
+      t.progress = "";
+      t.showProgress = true;
       t.agentResponded = false;
       saveChatStateToStorage();
       refreshProcessesTabForChatChange();
@@ -1391,6 +1430,14 @@ async function toggleActiveChat() {
       toast("Could not start chat: " + e.message, "error");
     }
   });
+}
+
+function toggleChatProgress() {
+  const t = chatState.tabs[chatState.activeTabId];
+  if (!t) return;
+  t.showProgress = t.showProgress === false;
+  saveChatStateToStorage();
+  drawChat();
 }
 
 function planTranscriptText(tab) {
@@ -1456,6 +1503,19 @@ async function pollChat() {
           // can span multiple chunks.
           out.innerHTML = mdToHtml(t.output || "");
           if (atBottom) out.scrollTop = out.scrollHeight;
+        }
+      }
+      saveChatStateToStorage();
+    }
+    if (r.progress_lines && r.progress_lines.length) {
+      t.progress = (t.progress || "") + r.progress_lines.join("\n") + "\n";
+      if (chatState.activeTabId in chatState.tabs &&
+          chatState.tabs[chatState.activeTabId].sessionId === sid) {
+        const progress = $("#chat-progress");
+        if (progress) {
+          const atBottom = progress.scrollHeight - progress.scrollTop - progress.clientHeight < 50;
+          progress.innerHTML = renderChatProgress(t.progress || "");
+          if (atBottom) progress.scrollTop = progress.scrollHeight;
         }
       }
       saveChatStateToStorage();

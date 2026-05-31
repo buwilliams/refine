@@ -254,6 +254,8 @@ def main() -> int:
         provider="codex",
         last_activity_ts=time.monotonic(),
     )
+    with manager._lock:  # noqa: SLF001
+        manager._sessions[session.session_id] = session  # noqa: SLF001
     try:
         decoder = json.JSONDecoder()
         tail = manager._drain_json_objects(
@@ -265,6 +267,19 @@ def main() -> int:
                 + json.dumps({
                     "type": "item.completed",
                     "item": {"type": "agent_message", "text": "hello\nworld"},
+                })
+                + "\n"
+                + json.dumps({
+                    "type": "item.completed",
+                    "item": {"type": "local_shell_call", "command": "pytest\nsecond"},
+                })
+                + "\n"
+                + json.dumps({
+                    "type": "item.completed",
+                    "item": {
+                        "type": "local_shell_call_output",
+                        "output": [{"type": "text", "text": "\n tests passed\n"}],
+                    },
                 })
                 + "\nplain diagnostic\n"
                 + json.dumps({
@@ -280,6 +295,22 @@ def main() -> int:
             assert list(session.out_lines) == [
                 "hello", "world", "plain diagnostic", "[refine] bad request",
             ]
+            assert list(session.progress_lines) == [
+                "[tool] pytest",
+                "[tool result] tests passed",
+                "[error] bad request",
+            ]
+
+        read = manager.read("chat-test")
+        assert read["lines"] == [
+            "hello", "world", "plain diagnostic", "[refine] bad request",
+        ]
+        assert read["progress_lines"] == [
+            "[tool] pytest",
+            "[tool result] tests passed",
+            "[error] bad request",
+        ]
+        assert manager.read("chat-test")["progress_lines"] == []
 
         hidden = ChatSession(
             session_id="chat-hidden",
@@ -299,6 +330,7 @@ def main() -> int:
         )
         with hidden.out_lock:
             assert list(hidden.out_lines) == []
+            assert list(hidden.progress_lines) == []
 
         class DoneProc:
             pid = 123456
