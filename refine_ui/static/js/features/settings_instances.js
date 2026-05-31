@@ -5,7 +5,7 @@ function renderSettingsInstancesTab({
 }) {
   return `
     <section class="settings-section">
-      <h3>Instances</h3>
+      <h3>${renderSettingsGuideLabel("Instances", "instance-manage")}</h3>
       <p class="scope-label muted small">Project-wide</p>
       <table class="table">
         <thead><tr><th>Name</th><th>ID</th><th>Gaps</th><th></th></tr></thead>

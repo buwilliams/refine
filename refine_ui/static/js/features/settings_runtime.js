@@ -10,24 +10,30 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
       <div class="actions settings-section-actions">
         <button class="secondary" id="s-runtime-copy-instance">Copy from instance</button>
       </div>
-      <div class="form-row"><label>Parallel-run cap</label>
+      <div class="form-row"><label>${renderSettingsGuideLabel("Parallel-run cap", "runtime-parallel-run-cap")}</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 5}"></div>
-      <div class="form-row"><label>Branch name pattern</label>
+      <div class="form-row"><label>${renderSettingsGuideLabel("Branch name pattern", "runtime-branch-name-pattern")}</label>
         <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
-      <div class="form-row"><label>Agent idle timeout (seconds)</label>
+      <div class="form-row"><label>${renderSettingsGuideLabel("Agent idle timeout (seconds)", "runtime-agent-idle-timeout")}</label>
         <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
-      <div class="form-row"><label>Agent hard cap (seconds)</label>
+      <div class="form-row"><label>${renderSettingsGuideLabel("Agent hard cap (seconds)", "runtime-agent-hard-cap")}</label>
         <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
       <div class="form-grid two">
-        <div class="form-row"><label>Worker memory limit (MB)
-          <span class="muted small">— 0 disables the per-process limit</span></label>
+        <div class="form-row"><label>${renderSettingsGuideLabel(
+          "Worker memory limit (MB)",
+          "runtime-worker-memory-limit",
+          "0 disables the per-process limit",
+        )}</label>
           <input type="number" id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 2000}"></div>
-        <div class="form-row"><label>UI memory limit (MB)
-          <span class="muted small">— 0 disables the supervised UI process limit</span></label>
+        <div class="form-row"><label>${renderSettingsGuideLabel(
+          "UI memory limit (MB)",
+          "runtime-ui-memory-limit",
+          "0 disables the supervised UI process limit",
+        )}</label>
           <input type="number" id="s-ui-memory" min="0" value="${s.ui_memory_limit_mb ?? 2000}"></div>
       </div>
       <div class="form-grid two">
-        <div class="form-row"><label>Worker CPU priority</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Worker CPU priority", "runtime-worker-cpu-priority")}</label>
           <select id="s-worker-cpu-priority">
             ${[
               ["normal", "Normal"],
@@ -35,7 +41,7 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
               ["very_low", "Very low"],
             ].map(([v, lbl]) => `<option value="${v}" ${String(s.worker_cpu_priority ?? "low") === v ? "selected" : ""}>${lbl}</option>`).join("")}
           </select></div>
-        <div class="form-row"><label>Resource isolation mode</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Resource isolation mode", "runtime-resource-isolation")}</label>
           <select id="s-resource-isolation">
             ${[
               ["auto", "Auto"],
@@ -44,8 +50,11 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
             ].map(([v, lbl]) => `<option value="${v}" ${String(s.resource_isolation_mode ?? "auto") === v ? "selected" : ""}>${lbl}</option>`).join("")}
           </select></div>
       </div>
-      <div class="form-row"><label>Rate/token limit pause
-        <span class="muted small">— how long agents wait before continuing after provider rate-limit or token-limit errors.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Rate/token limit pause",
+        "runtime-agent-limit-pause",
+        "how long agents wait before continuing after provider rate-limit or token-limit errors.",
+      )}</label>
         <select id="s-agent-limit-pause">
           ${[
             ["30",    "30 seconds"],
@@ -54,11 +63,17 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
             ["10800", "3 hours"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.agent_limit_pause_seconds ?? "60") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
-      <div class="form-row"><label>Standalone chat idle timeout (seconds)
-        <span class="muted small">— set to 0 to disable auto-close</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Standalone chat idle timeout (seconds)",
+        "runtime-chat-idle-timeout",
+        "set to 0 to disable auto-close",
+      )}</label>
         <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
-      <div class="form-row"><label>Auto-promote backlog → todo
-        <span class="muted small">— how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Auto-promote backlog → todo",
+        "runtime-backlog-promote",
+        "how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.",
+      )}</label>
         <select id="s-backlog-promote">
           ${[
             ["-1",    "Never"],
@@ -71,8 +86,11 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
             ["86400", "24 hours"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.backlog_promote_after_seconds ?? "3600") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
-      <div class="form-row"><label>Target repo update pulse
-        <span class="muted small">— checks for local commits or upstream commits and refreshes this instance's projected state.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Target repo update pulse",
+        "runtime-project-update-pulse",
+        "checks for local commits or upstream commits and refreshes this instance's projected state.",
+      )}</label>
         <select id="s-project-update-pulse">
           ${[
             ["-1",   "Never"],
@@ -84,16 +102,22 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
             ["3600", "1 hour"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.project_update_pulse_interval_seconds ?? "60") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
-      <div class="form-row"><label>File browser ignore patterns
-        <span class="muted small">— comma-delimited file or directory patterns hidden during normal browsing.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "File browser ignore patterns",
+        "runtime-file-browser-ignore",
+        "comma-delimited file or directory patterns hidden during normal browsing.",
+      )}</label>
         <input type="text" id="s-file-browser-ignore"
                value="${htmlEscape(s.file_browser_ignore_patterns || "node_modules, .git, .refine")}"></div>
     </section>
 
     <section class="settings-section">
       <h3>AI Provider</h3>
-      <div class="form-row"><label>Which AI provider refine drives
-        <span class="muted small">— used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Which AI provider refine drives",
+        "runtime-ai-provider",
+        "used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.",
+      )}</label>
         <select id="s-cli">
           ${cliOption("claude", "Claude Code (default)")}
           ${cliOption("codex", "OpenAI Codex")}

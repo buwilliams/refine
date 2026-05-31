@@ -16,8 +16,11 @@ function renderProjectApplicationsSection({
           source checkout with <code>uv run refine start</code> before a project
           is attached.
         </p>`}
-      <div class="form-row"><label>Known apps
-        <span class="muted small">— add an existing repo or a new directory, then switch between apps here.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Known apps",
+        "project-known-apps",
+        "add an existing repo or a new directory, then switch between apps here.",
+      )}</label>
         <select id="s-project-select" ${projectApps.length ? "" : "disabled"}>
           ${appOptions || `<option value="">No apps yet</option>`}
         </select></div>
@@ -58,13 +61,19 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
         repo location still owns all git plumbing — worktree create, fetch,
         merge, push.
       </p>
-      <div class="form-row"><label>Agent subpath
-        <span class="muted small">— optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Agent subpath",
+        "application-agent-subpath",
+        "optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.",
+      )}</label>
         <input type="text" id="s-subpath"
                placeholder="e.g. apps/web"
                value="${htmlEscape(s.agent_subpath || "")}"></div>
-      <div class="form-row"><label>Merge target branch
-        <span class="muted small">— branch all Gap worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch. When set, the Merge agent auto-stashes WIP, switches HEAD, and restores the host's original branch afterward.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Merge target branch",
+        "application-merge-target",
+        "branch all Gap worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch.",
+      )}</label>
         <input type="text" id="s-merge-target"
                placeholder="e.g. main"
                value="${htmlEscape(s.merge_target_branch || "")}"></div>
@@ -73,9 +82,12 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
     <section class="settings-section">
       <h3>Target application</h3>
       <p class="muted small" style="margin-top:0">
-        The AI provider drafts this configuration from the codebase.
-        Refine then runs the saved shell commands directly on the host
-        and checks status through CLI / HTTP / TCP / process probes.
+        <strong>Generate with AI</strong> analyses the codebase, writes a
+        <code>.refine/manage-app.sh</code> wrapper with timestamped logging,
+        and points the commands below at it
+        (<code>./.refine/manage-app.sh start|stop|rebuild|status</code>).
+        Refine runs the saved commands directly on the host. You can override
+        any field — including swapping in your own commands.
       </p>
       ${(s.target_app_start_instructions || s.target_app_stop_instructions || s.target_app_health_url) ? `
         <p class="muted small" style="color:var(--warn)">
@@ -83,28 +95,43 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
           workers → target-app config generator to convert them into structured
           commands.
         </p>` : ""}
-      <div class="form-row"><label>App URL
-        <span class="muted small">— opened from the status indicator when the app is running.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "App URL",
+        "application-url",
+        "opened from the status indicator when the app is running.",
+      )}</label>
         <input type="url" id="s-target-app-url"
                placeholder="http://localhost:3000"
                value="${htmlEscape(s.target_app_url || "")}"></div>
-      <div class="form-row"><label>Start command
-        <span class="muted small">— one-line shell command that starts the app and returns promptly.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Start command",
+        "application-start",
+        "one-line shell command that starts the app and returns promptly.",
+      )}</label>
         <input type="text" id="s-target-start-command"
-               placeholder="nohup npm run dev > /tmp/refine-target.log 2>&1 &"
+               placeholder="./.refine/manage-app.sh start"
                value="${htmlEscape(s.target_app_start_command || "")}"></div>
-      <div class="form-row"><label>Stop command
-        <span class="muted small">— one-line shell command that stops the app; should be idempotent when practical.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Stop command",
+        "application-stop",
+        "one-line shell command that stops the app; should be idempotent when practical.",
+      )}</label>
         <input type="text" id="s-target-stop-command"
-               placeholder="pkill -f 'npm run dev' || true"
+               placeholder="./.refine/manage-app.sh stop"
                value="${htmlEscape(s.target_app_stop_command || "")}"></div>
-      <div class="form-row"><label>Rebuild command
-        <span class="muted small">— one-line shell command that prepares generated artifacts for review.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Rebuild command",
+        "application-rebuild",
+        "one-line shell command that prepares generated artifacts for review.",
+      )}</label>
         <input type="text" id="s-target-rebuild-command"
-               placeholder="npm run build"
+               placeholder="./.refine/manage-app.sh rebuild"
                value="${htmlEscape(s.target_app_rebuild_command || "")}"></div>
-      <div class="form-row"><label>Automatic application rebuild
-        <span class="muted small">— controls when Refine rebuilds merged work before it becomes ready for review.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Automatic application rebuild",
+        "application-auto-rebuild",
+        "controls when Refine rebuilds merged work before it becomes ready for review.",
+      )}</label>
         <select id="s-target-auto-rebuild">
           ${[
             ["never", "Never"],
@@ -113,45 +140,60 @@ function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
             ["nightly", "Nightly (midnight)"],
           ].map(([v, lbl]) => `<option value="${v}" ${String(s.target_app_auto_rebuild || "on_worktree_merge") === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
-      <div class="form-row"><label>Status command
-        <span class="muted small">— exit 0 only when the app is healthy or running.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Status command",
+        "application-status",
+        "exit 0 only when the app is healthy or running.",
+      )}</label>
         <input type="text" id="s-target-status-command"
-               placeholder="pgrep -f 'npm run dev' >/dev/null"
+               placeholder="./.refine/manage-app.sh status"
                value="${htmlEscape(s.target_app_status_command || "")}"></div>
-      <div class="form-row"><label>Working directory
-        <span class="muted small">— repo-relative path, or blank for repo root.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Working directory",
+        "application-working-directory",
+        "repo-relative path, or blank for repo root.",
+      )}</label>
         <input type="text" id="s-target-cwd"
                placeholder="."
                value="${htmlEscape(s.target_app_cwd || "")}"></div>
-      <div class="form-row"><label>Environment overrides
-        <span class="muted small">— JSON object merged into the host environment.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Environment overrides",
+        "application-environment",
+        "JSON object merged into the host environment.",
+      )}</label>
         <textarea id="s-target-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea></div>
       <div class="form-grid two">
-        <div class="form-row"><label>Start timeout (s)</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Start timeout (s)", "application-start-timeout")}</label>
           <input type="number" id="s-target-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
-        <div class="form-row"><label>Stop timeout (s)</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Stop timeout (s)", "application-stop-timeout")}</label>
           <input type="number" id="s-target-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
-        <div class="form-row"><label>Rebuild timeout (s)</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Rebuild timeout (s)", "application-rebuild-timeout")}</label>
           <input type="number" id="s-target-rebuild-timeout" value="${htmlEscape(s.target_app_rebuild_timeout_seconds || "300")}"></div>
-        <div class="form-row"><label>Status timeout (s)</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Status timeout (s)", "application-status-timeout")}</label>
           <input type="number" id="s-target-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
-        <div class="form-row"><label>Log path</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Log path", "application-log-path")}</label>
           <input type="text" id="s-target-log-path" value="${htmlEscape(s.target_app_log_path || "")}"></div>
       </div>
       <h4 style="margin:16px 0 8px">Optional checks</h4>
-      <div class="form-row"><label>HTTP check URL
-        <span class="muted small">— optional; 2xx means healthy. Runs on the host.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "HTTP check URL",
+        "application-http-check-url",
+        "optional; 2xx means healthy. Runs on the host.",
+      )}</label>
         <input type="text" id="s-target-http-url"
                placeholder="http://localhost:3000/health"
                value="${htmlEscape(s.target_app_http_check_url || s.target_app_health_url || "")}"></div>
       <div class="form-grid two">
-        <div class="form-row"><label>TCP host</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("TCP host", "application-tcp-host")}</label>
           <input type="text" id="s-target-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}"></div>
-        <div class="form-row"><label>TCP port</label>
+        <div class="form-row"><label>${renderSettingsGuideLabel("TCP port", "application-tcp-port")}</label>
           <input type="number" id="s-target-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}"></div>
       </div>
-      <div class="form-row"><label>Process check command
-        <span class="muted small">— optional one-line command; exit 0 when the expected process exists.</span></label>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Process check command",
+        "application-process-check-command",
+        "optional one-line command; exit 0 when the expected process exists.",
+      )}</label>
         <input type="text" id="s-target-process-command"
                value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>

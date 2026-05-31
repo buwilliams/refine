@@ -29,7 +29,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>Process management</h3>
+      <h3>${renderSettingsGuideLabel("Process management", "process-management")}</h3>
       ${rows ? `
         <table class="table process-table managed-process-table mobile-card-table">
           <colgroup>
@@ -50,7 +50,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>Agent processes</h3>
+      <h3>${renderSettingsGuideLabel("Agent processes", "process-agent-processes")}</h3>
       ${agentRows ? `
         <table class="table process-table agents-process-table mobile-card-table">
           <colgroup>
@@ -73,7 +73,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>Runner processes</h3>
+      <h3>${renderSettingsGuideLabel("Runner processes", "process-runner-processes")}</h3>
       <table class="table process-table runner-workers-table mobile-card-table">
         <colgroup>
           <col class="worker-col">

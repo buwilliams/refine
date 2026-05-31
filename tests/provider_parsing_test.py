@@ -207,20 +207,40 @@ def main() -> int:
         "{\"status_command\":\"curl -fsS http://localhost:3000\"}"
     )
     normalized_cfg = target_app.normalize_generated_config({
-        "start_command": "npm run dev\n-- --host 0.0.0.0",
-        "rebuild_command": "npm run build\n-- --mode production",
-        "stop_command": "",
+        "summary": "Node app via npm scripts",
+        "start": "npm run dev",
+        "rebuild": "npm run build",
         "rebuild_timeout_seconds": "bad",
         "status_timeout_seconds": "bad",
         "tcp_check_port": 3000,
         "env": {"PORT": 3000},
     })
-    assert normalized_cfg["start_command"] == "npm run dev -- --host 0.0.0.0"
-    assert normalized_cfg["rebuild_command"] == "npm run build -- --mode production"
+    # Commands always invoke the generated wrapper; bodies live in the script.
+    assert normalized_cfg["start_command"] == "./.refine/manage-app.sh start"
+    assert normalized_cfg["stop_command"] == "./.refine/manage-app.sh stop"
+    assert normalized_cfg["rebuild_command"] == "./.refine/manage-app.sh rebuild"
+    assert normalized_cfg["status_command"] == "./.refine/manage-app.sh status"
+    assert normalized_cfg["cwd"] == ""
     assert normalized_cfg["rebuild_timeout_seconds"] == 300
     assert normalized_cfg["status_timeout_seconds"] == 10
     assert normalized_cfg["tcp_check_port"] == "3000"
     assert normalized_cfg["env"] == {"PORT": "3000"}
+
+    # The wrapper itself is assembled from the analysis bodies, with a fixed
+    # logging/dispatch harness supplied by Refine.
+    script = target_app.build_manage_script({
+        "summary": "Node app via npm scripts",
+        "helpers": "PORT=3000",
+        "start": "npm run dev",
+        "stop": "pkill -f 'npm run dev' || true",
+        "rebuild": "npm run build",
+        "status": "curl -fsS http://localhost:$PORT >/dev/null",
+    })
+    assert script.startswith("#!/usr/bin/env bash")
+    for sub in ("start)", "stop)", "rebuild)", "status)"):
+        assert sub in script
+    assert "npm run dev" in script and "npm run build" in script
+    assert "[manage-app" in script  # timestamped STDOUT logging
 
     # --- Chat stream parsing ------------------------------------------------
     manager = ChatManager(get_standalone_idle_timeout=lambda: 0)

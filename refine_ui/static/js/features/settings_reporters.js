@@ -3,7 +3,7 @@
 function renderSettingsReportersTab(reps, activeInstanceLabel) {
   return `
     <section class="settings-section">
-      <h3>Reporters</h3>
+      <h3>${renderSettingsGuideLabel("Reporters", "reporter-manage")}</h3>
       <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
       <table class="table">
         <thead><tr><th>Name</th><th></th></tr></thead>
@@ -110,7 +110,7 @@ function openReporterMergeModal(source) {
         to another reporter, then remove <strong>${htmlEscape(source.name)}</strong>
         from the dropdown.
       </p>
-      <label>Merge into</label>
+      <label>${renderSettingsGuideLabel("Merge into", "reporter-merge-into")}</label>
       <select class="modal-input" style="width:100%">
         ${targets.map((r) => `
           <option value="${r.id}">${htmlEscape(r.name)}</option>
