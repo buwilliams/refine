@@ -60,7 +60,10 @@ def test_client_switch_path(root: Path) -> None:
 
     assert "function openAddAppModal(options = {})" in common_js
     assert "async function maybeOpenProjectTemplateModal(project)" in common_js
+    assert "async function openProjectTemplateSelector()" in common_js
+    assert "async function loadProjectTemplates()" in common_js
     assert "function openProjectTemplateModal(templates)" in common_js
+    assert "Select app template" in common_js
     assert 'api("GET", "/api/project/templates")' in common_js
     assert 'api("POST", "/api/project/scaffold"' in common_js
     assert ".project-template-modal .modal-body" in modals_css
@@ -155,6 +158,8 @@ def test_client_switch_path(root: Path) -> None:
     assert "migrate: true" in common_js
     assert "function resetChatForProjectSwitch()" in toolbar_js
     assert "await openAddAppModal()" in settings_js
+    assert 'id="s-project-template"' in settings_js
+    assert "await openProjectTemplateSelector()" in settings_js
     assert "await applyProjectAttachResult(result)" in settings_js
     remove_body = settings_js.split('api("DELETE", "/api/projects", { path })', 1)[1]
     remove_body = remove_body.split("await refreshSettingsTab", 1)[0]

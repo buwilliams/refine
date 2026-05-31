@@ -26,6 +26,7 @@ function renderProjectApplicationsSection({
         </select></div>
       <div class="actions settings-section-actions">
         <button class="secondary" id="s-project-add" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
+        <button class="secondary" id="s-project-template" ${currentProject ? "" : "disabled"}>Select app template</button>
         <button id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
@@ -276,6 +277,9 @@ function applyGeneratedTargetAppConfig(cfg) {
 function bindProjectApplicationsControls(currentProject, refreshTab = "runtime") {
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
+  });
+  $("#s-project-template")?.addEventListener("click", async () => {
+    await openProjectTemplateSelector();
   });
   $("#s-project-switch")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;

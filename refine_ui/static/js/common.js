@@ -524,16 +524,29 @@ async function maybeOpenProjectTemplateModal(project) {
   if (!project || project.scaffold_required !== true) return null;
   let templates = Array.isArray(project.scaffold_templates) ? project.scaffold_templates : [];
   if (!templates.length) {
-    try {
-      const result = await api("GET", "/api/project/templates");
-      templates = Array.isArray(result.templates) ? result.templates : [];
-    } catch (e) {
-      toast(e.message || "Could not load project templates", "error");
-      return null;
-    }
+    templates = await loadProjectTemplates();
   }
   if (!templates.length) return null;
   return openProjectTemplateModal(templates);
+}
+
+async function openProjectTemplateSelector() {
+  const templates = await loadProjectTemplates();
+  if (!templates.length) {
+    toast("No app templates are available", "warn");
+    return null;
+  }
+  return openProjectTemplateModal(templates);
+}
+
+async function loadProjectTemplates() {
+  try {
+    const result = await api("GET", "/api/project/templates");
+    return Array.isArray(result.templates) ? result.templates : [];
+  } catch (e) {
+    toast(e.message || "Could not load app templates", "error");
+    return [];
+  }
 }
 
 function openProjectTemplateModal(templates) {
@@ -542,7 +555,7 @@ function openProjectTemplateModal(templates) {
     root.className = "modal-backdrop project-template-backdrop";
     root.innerHTML = `
       <div class="modal project-template-modal" role="dialog" aria-modal="true" aria-labelledby="project-template-title">
-        <div class="modal-title" id="project-template-title">Select project template</div>
+        <div class="modal-title" id="project-template-title">Select app template</div>
         <div class="modal-body">
           <p class="muted small">
             This app does not have application code yet. Refine will create a high-priority Gap for the selected scaffold.

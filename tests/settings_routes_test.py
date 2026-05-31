@@ -736,6 +736,9 @@ def main() -> int:
     assert "renderInstanceRuntimeConfigSections" in settings_js
     assert "function renderSettingsApplicationTab" in settings_js
     assert "target_app_url" not in common_js
+    assert 'id="s-project-template"' in settings_js
+    assert "Select app template" in settings_js
+    assert "await openProjectTemplateSelector()" in settings_js
     assert 'id="s-application-copy-instance"' in settings_js
     assert 'id="s-target-generate-ai"' in settings_js
     assert 'copySettingsFromInstance("application"' in commands_js
