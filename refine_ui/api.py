@@ -1460,6 +1460,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
             if _looks_like_git_remote(raw_path)
             else Path(raw_path).expanduser()
         )
+        scaffold_required = _project_needs_scaffold_template(client_repo)
         current_before = _current_client_repo()
         switching = current_before is not None and current_before != client_repo.resolve()
         _validate_target_schema_before_switch(client_repo.resolve(), body)
@@ -1510,6 +1511,8 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 "instances": [],
                 "switch_warnings": prep.get("warnings", []),
                 "restart_pending": True,
+                "scaffold_required": scaffold_required,
+                "scaffold_templates": list_project_templates()[1]["templates"],
                 "restart": restart,
                 "runner": {
                     "started": False,
@@ -1548,8 +1551,269 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "schema": project_state.schema_status(cfg.volume_root),
         **_instance_summary(),
         "switch_warnings": prep.get("warnings", []),
+        "scaffold_required": scaffold_required,
+        "scaffold_templates": list_project_templates()[1]["templates"],
         "runner": runner,
     }
+
+
+PROJECT_TEMPLATE_DIR = Path(__file__).resolve().parent / "project_templates"
+_PROJECT_TEMPLATE_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+_APP_MARKER_FILES = {
+    "package.json",
+    "pnpm-lock.yaml",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+    "bun.lock",
+    "deno.json",
+    "vite.config.js",
+    "vite.config.ts",
+    "next.config.js",
+    "next.config.ts",
+    "astro.config.mjs",
+    "svelte.config.js",
+    "pyproject.toml",
+    "requirements.txt",
+    "Pipfile",
+    "poetry.lock",
+    "uv.lock",
+    "manage.py",
+    "main.py",
+    "app.py",
+    "Dockerfile",
+    "docker-compose.yml",
+    "compose.yml",
+    "index.html",
+}
+_APP_MARKER_DIRS = {
+    "src",
+    "app",
+    "pages",
+    "components",
+    "public",
+    "static",
+    "templates",
+    "backend",
+    "frontend",
+}
+_APP_CODE_EXTS = {
+    ".py",
+    ".js",
+    ".jsx",
+    ".ts",
+    ".tsx",
+    ".mjs",
+    ".cjs",
+    ".css",
+    ".html",
+    ".vue",
+    ".svelte",
+    ".go",
+    ".rs",
+    ".java",
+    ".kt",
+    ".cs",
+    ".php",
+    ".rb",
+}
+_APP_SCAN_IGNORED_DIRS = {
+    ".git",
+    ".refine",
+    ".github",
+    ".vscode",
+    ".idea",
+    "__pycache__",
+    "node_modules",
+    "dist",
+    "build",
+    ".venv",
+    "venv",
+}
+
+
+def _project_needs_scaffold_template(client_repo: Path) -> bool:
+    """True when the target has no detectable application code yet."""
+    try:
+        path = client_repo.expanduser()
+    except RuntimeError:
+        return False
+    if not path.exists():
+        return True
+    if not path.is_dir():
+        return False
+    return not _target_has_existing_application(path)
+
+
+def _target_has_existing_application(path: Path) -> bool:
+    for marker in _APP_MARKER_FILES:
+        if (path / marker).is_file():
+            return True
+    for dirname in _APP_MARKER_DIRS:
+        child = path / dirname
+        if child.is_dir() and _directory_has_visible_files(child):
+            return True
+
+    seen = 0
+    for root, dirs, files in os.walk(path):
+        dirs[:] = [d for d in dirs if d not in _APP_SCAN_IGNORED_DIRS]
+        rel_root = Path(root).relative_to(path)
+        if rel_root.parts and rel_root.parts[0] in _APP_SCAN_IGNORED_DIRS:
+            continue
+        for filename in files:
+            seen += 1
+            if seen > 500:
+                return False
+            if Path(filename).suffix.lower() in _APP_CODE_EXTS:
+                return True
+    return False
+
+
+def _directory_has_visible_files(path: Path) -> bool:
+    try:
+        for child in path.rglob("*"):
+            if any(part in _APP_SCAN_IGNORED_DIRS for part in child.relative_to(path).parts):
+                continue
+            if child.is_file():
+                return True
+    except OSError:
+        return False
+    return False
+
+
+def list_project_templates() -> tuple[int, dict]:
+    templates: list[dict[str, str]] = []
+    if not PROJECT_TEMPLATE_DIR.is_dir():
+        return 200, {"templates": templates}
+    for path in sorted(PROJECT_TEMPLATE_DIR.glob("*.md")):
+        if not _PROJECT_TEMPLATE_ID_RE.match(path.stem):
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        templates.append(_project_template_summary(path.stem, content))
+    return 200, {"templates": templates}
+
+
+def _project_template_summary(template_id: str, content: str) -> dict[str, str]:
+    title = ""
+    summary = ""
+    for raw in content.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("# "):
+            title = line[2:].strip()
+            continue
+        if not summary and not line.startswith("#"):
+            summary = line
+        if title and summary:
+            break
+    if not title:
+        title = template_id.replace("-", " ").replace("_", " ").title()
+    return {"id": template_id, "name": title, "summary": summary}
+
+
+def _load_project_template(template_id: str) -> tuple[dict[str, str], str] | None:
+    if not _PROJECT_TEMPLATE_ID_RE.match(template_id):
+        return None
+    path = PROJECT_TEMPLATE_DIR / f"{template_id}.md"
+    if not path.is_file():
+        return None
+    try:
+        content = path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return _project_template_summary(template_id, content), content
+
+
+@_exclusive_mutation(
+    "Create Scaffold Gap",
+    allow_busy_when=lambda _owner: _background_processes_stopped(),
+)
+def create_project_scaffold_gap(body: dict[str, Any]) -> tuple[int, dict]:
+    template_id = str(body.get("template") or "").strip()
+    loaded = _load_project_template(template_id)
+    if loaded is None:
+        return err(404, "Unknown project template.")
+    summary, content = loaded
+    reporter = str(body.get("reporter") or "Refine").strip()
+    if not reporter or not _VALID_REPORTER.match(reporter):
+        return err(400, "invalid reporter name")
+
+    name = f"Scaffold {summary['name']}"
+    actual = (
+        "The attached project has no detectable application scaffold yet. "
+        f"Implement the selected project template: {summary['name']}."
+    )
+    target = content
+    gap = _create_indexed_gap(
+        name=name,
+        reporter=reporter,
+        actual=actual,
+        target=target,
+        priority="high",
+    )
+    return 201, {"ok": True, "gap": gap, "template": summary}
+
+
+def _create_indexed_gap(
+    *,
+    name: str,
+    reporter: str,
+    actual: str,
+    target: str,
+    priority: str,
+) -> dict[str, Any]:
+    gap_id = new_ulid()
+    instance_id = project_state.active_instance_id()
+    round_obj = shared_gaps.new_round(
+        reporter=reporter,
+        actual=actual,
+        target=target,
+    )
+    gap = gap_writer.create_gap(
+        gap_id=gap_id,
+        name=name,
+        initial_round=round_obj,
+        status="backlog",
+        priority=priority,
+        instance_id=instance_id,
+    )
+
+    from refine_server.paths import relative_gap_path
+
+    conn = _conn()
+    try:
+        with db.transaction(conn):
+            conn.execute(
+                "INSERT INTO gaps_index "
+                "(id, name, status, priority, reporter, created, updated, instance_id, json_path) "
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?)",
+                (
+                    gap_id,
+                    name,
+                    priority,
+                    reporter,
+                    gap["created"],
+                    gap["updated"],
+                    instance_id,
+                    relative_gap_path(gap_id),
+                ),
+            )
+            search_index.upsert_gap(conn, gap)
+            reporters.add(conn, reporter)
+            activity.append(
+                conn,
+                message=f"Gap created: {name}",
+                severity="info",
+                category="state",
+                gap_id=gap_id,
+                actor=reporter,
+            )
+    finally:
+        conn.close()
+    return gap
 
 
 def _project_registry_enabled(clone_dir: Path) -> bool:

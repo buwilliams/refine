@@ -433,6 +433,7 @@ function openProjectAttachModal({
         } else {
           await applyProjectAttachResult(result, { openGuide: openGuideOnSuccess });
           root.remove();
+          await maybeOpenProjectTemplateModal(result);
         }
         resolve(result);
       } catch (err) {
@@ -452,6 +453,7 @@ function openProjectAttachModal({
               } else {
                 await applyProjectAttachResult(result, { openGuide: openGuideOnSuccess });
                 root.remove();
+                await maybeOpenProjectTemplateModal(result);
               }
               resolve(result);
               return;
@@ -524,6 +526,94 @@ async function applyProjectAttachResult(result, options = {}) {
       itemId: "project-application",
     });
   }
+}
+
+async function maybeOpenProjectTemplateModal(project) {
+  if (!project || project.scaffold_required !== true || project.restart_pending) return null;
+  let templates = Array.isArray(project.scaffold_templates) ? project.scaffold_templates : [];
+  if (!templates.length) {
+    try {
+      const result = await api("GET", "/api/project/templates");
+      templates = Array.isArray(result.templates) ? result.templates : [];
+    } catch (e) {
+      toast(e.message || "Could not load project templates", "error");
+      return null;
+    }
+  }
+  if (!templates.length) return null;
+  return openProjectTemplateModal(templates);
+}
+
+function openProjectTemplateModal(templates) {
+  return new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop project-template-backdrop";
+    root.innerHTML = `
+      <div class="modal project-template-modal" role="dialog" aria-modal="true" aria-labelledby="project-template-title">
+        <div class="modal-title" id="project-template-title">Select project template</div>
+        <div class="modal-body">
+          <p class="muted small">
+            This app does not have application code yet. Refine will create a high-priority Gap for the selected scaffold.
+          </p>
+          <div class="project-template-options">
+            ${templates.map((template) => `
+              <button type="button" class="project-template-option" data-template-id="${htmlEscape(template.id)}">
+                <span class="project-template-name">${htmlEscape(template.name || template.id)}</span>
+                <span class="project-template-summary">${htmlEscape(template.summary || "")}</span>
+              </button>
+            `).join("")}
+          </div>
+          <div class="form-error" id="project-template-error" style="display:none"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" type="button" id="project-template-cancel">Skip</button>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const error = root.querySelector("#project-template-error");
+    let closed = false;
+    function close(value) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    }
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(null);
+      }
+    }
+    document.addEventListener("keydown", onKey, true);
+    root.addEventListener("click", (e) => {
+      if (e.target === root) close(null);
+    });
+    root.querySelector("#project-template-cancel").addEventListener("click", () => close(null));
+    $$(".project-template-option", root).forEach((button) => {
+      button.addEventListener("click", async () => {
+        const templateId = button.dataset.templateId || "";
+        error.style.display = "none";
+        $$(".project-template-option", root).forEach((b) => { b.disabled = true; });
+        button.classList.add("is-selected");
+        try {
+          const result = await api("POST", "/api/project/scaffold", { template: templateId });
+          const gap = result.gap || {};
+          toast("Scaffold Gap created", "success");
+          close(result);
+          if (gap.id) location.hash = "#/gaps/" + encodeURIComponent(gap.id);
+        } catch (e) {
+          error.textContent = e.details || e.message || "Could not create scaffold Gap";
+          error.style.display = "";
+          button.classList.remove("is-selected");
+          $$(".project-template-option", root).forEach((b) => { b.disabled = false; });
+        }
+      });
+    });
+    const first = root.querySelector(".project-template-option");
+    if (first) first.focus();
+  });
 }
 
 // ---- Modals (replace native prompt / confirm) -------------------------------

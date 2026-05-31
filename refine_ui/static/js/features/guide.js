@@ -21,6 +21,33 @@ const guideState = {
 
 const GUIDE_CATEGORIES = [
   {
+    id: "quick-start",
+    title: "Quick Start",
+    description: "The few steps needed to get refine running on a new app.",
+    items: [
+      guideItem("quickstart-add-app", "Add app", "Configure",
+        "Register the target app so refine can attach to it. Add an existing path, paste a Git clone URL, or create a new directory.",
+        "Action: add the app you want refine to work on.",
+        { hash: "#/project/application", selector: "#s-project-add" },
+        { canUseDefault: false }),
+      guideItem("quickstart-create-instance", "Create instance", "Configure",
+        "Create an instance so this machine owns its Gaps and local runtime settings.",
+        "Action: create an instance for this machine.",
+        { hash: "#/instance/instances", selector: "#instance-add" },
+        { canUseDefault: false }),
+      guideItem("quickstart-generate-ai", "Generate with AI", "Configure",
+        "Let the AI generator draft the target-app start, stop, and rebuild commands from the codebase.",
+        "Action: generate the application commands with AI.",
+        { hash: "#/instance/application", selector: "#s-target-generate-ai" },
+        { canUseDefault: false }),
+      guideItem("quickstart-start", "Start", "Configure",
+        "Start the target app from System process management to confirm the commands work.",
+        "Action: start the target app.",
+        { hash: "#/system/processes", selector: "#s-target-run-start" },
+        { canUseDefault: false }),
+    ],
+  },
+  {
     id: "instance",
     title: "Instance",
     description: "Settings for this machine and active refine instance.",
