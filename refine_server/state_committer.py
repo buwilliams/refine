@@ -16,7 +16,7 @@ from typing import Callable
 
 from refine_server import activity, config
 
-from . import git_ops, push_ops
+from . import git_ops, project_sync
 
 
 class StateCommitter:
@@ -77,15 +77,11 @@ class StateCommitter:
         paths = git_ops.dirty_paths_under(".refine")
         if not paths:
             return False
-        r = git_ops.commit_refine_sync_state(paths)
-        if not r.ok:
-            return False
-        if r.stderr == "(nothing to commit)":
-            return False
         conn = self.get_conn()
-        push = push_ops.push_current_after_pull(
+        sync = project_sync.commit_and_push_refine_state(
             conn,
             actor="runner",
+            state_message="refine: sync project state",
             merge_message="Merge upstream before pushing Refine project state",
             prompt_context=(
                 "A pull is in progress before pushing Refine project state.\n"
@@ -95,6 +91,8 @@ class StateCommitter:
                 "conflict, keep valid JSON and include all non-duplicate entries."
             ),
         )
+        if not sync.get("ok") or not sync.get("committed_state"):
+            return False
         try:
             syncable_count = len(git_ops.syncable_refine_paths(paths))
             activity.append(
@@ -105,7 +103,7 @@ class StateCommitter:
                 ),
                 severity="info", category="git", actor="runner",
             )
-            if push.get("ok") and push.get("pushed"):
+            if sync.get("pushed_state"):
                 activity.append(
                     conn,
                     message="Pushed Refine project state upstream",

@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from refine_server import activity, cluster, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, regressions, reporters, round_logs, search_index, upgrade
+from refine_server import activity, cluster, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, project_sync as project_sync_mod, quality, regressions, reporters, round_logs, search_index, upgrade
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -103,13 +103,13 @@ def _empty_page(limit: int, offset: int) -> dict[str, Any]:
     }
 
 
-def _schema_block_response() -> tuple[int, dict] | None:
+def _schema_block_response(*, block_maintenance: bool = True) -> tuple[int, dict] | None:
     try:
         cfg = config.get(reload=True)
     except config.ConfigError:
         return None
     maintenance = project_state.read_maintenance(root=cfg.volume_root)
-    if maintenance is not None:
+    if block_maintenance and maintenance is not None:
         return err(
             409,
             "Project maintenance is active.",
@@ -195,10 +195,14 @@ def _exclusive_mutation(
     *,
     allow_active_kinds: set[str] | None = None,
     allow_busy_when: Callable[[dict[str, Any]], bool] | None = None,
+    block_maintenance: bool = True,
 ) -> Callable:
     def decorator(fn: Callable) -> Callable:
         @wraps(fn)
         def wrapped(*args, **kwargs):
+            blocked = _schema_block_response(block_maintenance=block_maintenance)
+            if blocked is not None:
+                return blocked
             try:
                 with background_jobs.exclusive_operation(
                     label,
@@ -939,9 +943,9 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, {"apps": apps}
 
 
-@_exclusive_mutation("Sync project")
+@_exclusive_mutation("Sync project", block_maintenance=False)
 def project_sync(_: dict[str, Any] | None = None) -> tuple[int, dict]:
-    block = _schema_block_response()
+    block = _schema_block_response(block_maintenance=False)
     if block:
         return block
     try:
@@ -990,8 +994,10 @@ def create_node(body: dict[str, Any]) -> tuple[int, dict]:
     if not name:
         return err(400, "display_name is required")
     entry = project_state.create_node(name)
-    _rebuild_cache()
-    return 201, {"node": entry, **_node_summary()}
+    sync = _sync_refine_state_after_mutation("refine: create node")
+    if not sync.get("ok"):
+        return err(409, "Could not sync Refine node state.", sync.get("details") or sync.get("message"))
+    return 201, {"node": entry, "sync": sync, **_node_summary()}
 
 
 @_exclusive_mutation("Update node")
@@ -1004,8 +1010,10 @@ def update_node(node_id: str, body: dict[str, Any]) -> tuple[int, dict]:
         )
     except ValueError as e:
         return err(400, str(e))
-    _rebuild_cache()
-    return 200, {"node": entry, **_node_summary()}
+    sync = _sync_refine_state_after_mutation("refine: update node")
+    if not sync.get("ok"):
+        return err(409, "Could not sync Refine node state.", sync.get("details") or sync.get("message"))
+    return 200, {"node": entry, "sync": sync, **_node_summary()}
 
 
 @_exclusive_mutation("Copy node settings")
@@ -1018,7 +1026,9 @@ def copy_node_settings(body: dict[str, Any]) -> tuple[int, dict]:
         result = project_state.copy_node_settings(source, section)
     except ValueError as e:
         return err(400, str(e))
-    _rebuild_cache()
+    sync = _sync_refine_state_after_mutation("refine: copy node settings")
+    if not sync.get("ok"):
+        return err(409, "Could not sync Refine node settings.", sync.get("details") or sync.get("message"))
     conn = _conn()
     try:
         settings = db.list_settings(conn)
@@ -1034,7 +1044,7 @@ def copy_node_settings(body: dict[str, Any]) -> tuple[int, dict]:
         )
     finally:
         conn.close()
-    return 200, {"ok": True, "settings": settings, **result}
+    return 200, {"ok": True, "settings": settings, "sync": sync, **result}
 
 
 @_exclusive_mutation("Activate node")
@@ -1133,13 +1143,16 @@ def transfer_node_gaps(body: dict[str, Any]) -> tuple[int, dict]:
         )
     except ValueError as e:
         return err(400, str(e))
-    _rebuild_cache()
+    sync = _sync_refine_state_after_mutation("refine: transfer node gaps")
+    if not sync.get("ok"):
+        return err(409, "Could not sync transferred Gaps.", sync.get("details") or sync.get("message"))
     if _should_enforce_after_node_transfer(result.get("ids") or []):
         try:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:
             pass
     result.update(cancelled)
+    result["sync"] = sync
     return 200, result
 
 
@@ -1156,8 +1169,10 @@ def upsert_cluster_node(body: dict[str, Any]) -> tuple[int, dict]:
         node = cluster.upsert_node(body)
     except ValueError as e:
         return err(400, str(e))
-    _rebuild_cache()
-    return 200, {"node": node, **cluster.read_cluster()}
+    sync = _sync_refine_state_after_mutation("refine: update cluster node")
+    if not sync.get("ok"):
+        return err(409, "Could not sync cluster node state.", sync.get("details") or sync.get("message"))
+    return 200, {"node": node, "sync": sync, **cluster.read_cluster()}
 
 
 @_exclusive_mutation("Update cluster node")
@@ -1166,8 +1181,10 @@ def update_cluster_node(node_id: str, body: dict[str, Any]) -> tuple[int, dict]:
         node = cluster.update_node(node_id, body)
     except ValueError as e:
         return err(400, str(e))
-    _rebuild_cache()
-    return 200, {"node": node, **cluster.read_cluster()}
+    sync = _sync_refine_state_after_mutation("refine: update cluster node")
+    if not sync.get("ok"):
+        return err(409, "Could not sync cluster node state.", sync.get("details") or sync.get("message"))
+    return 200, {"node": node, "sync": sync, **cluster.read_cluster()}
 
 
 def run_cluster_node(node_id: str, body: dict[str, Any]) -> tuple[int, dict]:
@@ -1187,6 +1204,10 @@ def bootstrap_cluster_node(node_id: str, _body: dict[str, Any] | None = None) ->
         result = cluster.bootstrap(node_id)
     except (ValueError, subprocess.SubprocessError, OSError) as e:
         return err(400, str(e))
+    sync = _sync_refine_state_after_mutation("refine: update cluster node health")
+    if not sync.get("ok"):
+        return err(409, "Could not sync cluster node health.", sync.get("details") or sync.get("message"))
+    result["sync"] = sync
     return (200 if result.get("ok") else 502), result
 
 
@@ -2009,6 +2030,20 @@ def _node_summary() -> dict[str, Any]:
     }
 
 
+def _sync_refine_state_after_mutation(message: str) -> dict:
+    conn = _conn(ensure_cache=False)
+    try:
+        result = project_sync_mod.commit_and_push_refine_state(
+            conn,
+            actor="refine",
+            state_message=message,
+            rebuild_cache=True,
+        )
+    finally:
+        conn.close()
+    return result
+
+
 class _SwitchBlocked(Exception):
     def __init__(self, message: str, details: str | None = None) -> None:
         super().__init__(message)
@@ -2042,49 +2077,29 @@ def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
 
 
 def _commit_refine_state(repo: Path) -> None:
-    from refine_server import git_ops, push_ops
+    from refine_server import project_sync
 
     config.ensure_refine_gitignore(repo / ".refine")
     dirty_refine = _git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
     if not dirty_refine.strip():
         return
-    paths = git_ops.dirty_paths_under(".refine", cwd=repo)
-    result = git_ops.commit_refine_sync_state(
-        paths,
-        state_message="refine: sync project state before switch",
-        cwd=repo,
-    )
-    if result.ok and result.stderr == "(nothing to commit)":
-        return
-    if result.ok:
-        repo_cfg = config.Config.load(repo / ".refine" / config.CONFIG_FILENAME)
-        db.init_db(repo_cfg.sqlite_path)
-        conn = db.connect(repo_cfg.sqlite_path)
-        try:
-            push = push_ops.push_current_after_pull(
-                conn,
-                actor="refine",
-                cwd=repo,
-                merge_message="Merge upstream before pushing Refine project state",
-                prompt_context=(
-                    "A pull is in progress before pushing Refine project state.\n"
-                    "HEAD contains local `.refine/` state commits created by Refine.\n"
-                    "The incoming side contains newer upstream commits.\n"
-                    "Preserve durable `.refine/` state from both sides. If JSON files "
-                    "conflict, keep valid JSON and include all non-duplicate entries."
-                ),
-            )
-        finally:
-            conn.close()
-        if push.get("ok"):
-            return
-        raise _SwitchBlocked(
-            "Could not push current app Refine state.",
-            str(push.get("details") or push.get("message") or "git push failed").strip(),
+    repo_cfg = config.Config.load(repo / ".refine" / config.CONFIG_FILENAME)
+    db.init_db(repo_cfg.sqlite_path)
+    conn = db.connect(repo_cfg.sqlite_path)
+    try:
+        result = project_sync.commit_and_push_refine_state(
+            conn,
+            actor="refine",
+            cwd=repo,
+            state_message="refine: sync project state before switch",
         )
+    finally:
+        conn.close()
+    if result.get("ok"):
+        return
     raise _SwitchBlocked(
         "Could not commit current app Refine state.",
-        (result.stderr or result.stdout or "git commit failed").strip(),
+        str(result.get("details") or result.get("message") or "git commit failed").strip(),
     )
 
 

@@ -44,10 +44,19 @@ def main() -> int:
         assert result["ok"] is True, result
         assert calls, calls
         cmd = calls[0][0]
-        assert cmd[:3] == ["ssh", "-p", "2222"], cmd
-        assert cmd[3] == "buildbox.example", cmd
-        assert "@" not in cmd[3], cmd
-        assert cmd[4] == "cd /opt/refine && uv run refine node list", cmd
+        assert cmd[:5] == ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"], cmd
+        assert cmd[5:7] == ["-p", "2222"], cmd
+        assert cmd[7] == "buildbox.example", cmd
+        assert "@" not in cmd[7], cmd
+        assert cmd[8] == (
+            "cd /opt/refine && uv run refine --config "
+            "/srv/app/.refine/refine.toml node list"
+        ), cmd
+        try:
+            cluster.upsert_node({"id": "bad-host", "ssh_host": "alice@example.com"})
+            raise AssertionError("ssh_host with user should fail")
+        except ValueError as e:
+            assert "must not include a user" in str(e), e
 
         cluster.upsert_node({
             "id": "remote-b",

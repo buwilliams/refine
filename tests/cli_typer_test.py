@@ -131,7 +131,8 @@ def main() -> int:
         assert rc == 0, err
         result = json.loads(out)
         assert result["schema"]["compatible"] is True
-        assert result["committed"] is True
+        assert result["lock_sync"]["committed_state"] is True
+        assert result["migration_sync"]["committed_state"] is True
         assert (refine_root / "nodes.json").exists()
         assert not (refine_root / "instances.json").exists()
         subject = subprocess.run(

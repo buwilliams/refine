@@ -59,8 +59,7 @@ def upsert_node(body: dict[str, Any], *, root: Path | None = None) -> dict[str, 
     node_id = node["id"]
     if not _VALID_NODE_ID.match(node_id):
         raise ValueError("node id must start with a lowercase letter or digit and contain only lowercase letters, digits, _ or -")
-    if not node["ssh_host"]:
-        raise ValueError("ssh_host is required")
+    _validate_ssh_host(node["ssh_host"])
     _ensure_project_node(node, root=root)
     data = read_cluster(root=root)
     nodes = data["nodes"]
@@ -85,6 +84,7 @@ def update_node(node_id: str, body: dict[str, Any], *, root: Path | None = None)
         if existing.get("id") != node_id:
             continue
         merged = _normalize_node({**existing, **body, "id": node_id})
+        _validate_ssh_host(merged["ssh_host"])
         _ensure_project_node(merged, root=root)
         merged["created_at"] = existing.get("created_at") or now_iso()
         merged["updated_at"] = now_iso()
@@ -96,7 +96,7 @@ def update_node(node_id: str, body: dict[str, Any], *, root: Path | None = None)
 
 def run_remote(node_id: str, refine_args: list[str], *,
                root: Path | None = None,
-               timeout: float | None = None) -> dict[str, Any]:
+               timeout: float | None = 300.0) -> dict[str, Any]:
     node = get_node(node_id, root=root)
     if node is None:
         raise ValueError(f"unknown cluster node: {node_id}")
@@ -128,8 +128,8 @@ def bootstrap(node_id: str, *, root: Path | None = None,
     if not str(node.get("target_app_path") or "").strip():
         raise ValueError("target_app_path is required before bootstrap")
     install = "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash"
-    checkout = shlex.quote(str(node.get("refine_checkout") or "~/refine"))
-    target = shlex.quote(str(node.get("target_app_path") or ""))
+    checkout = _quote_remote_path(str(node.get("refine_checkout") or "~/refine"))
+    target = _quote_remote_path(str(node.get("target_app_path") or ""))
     port = shlex.quote(str(node.get("refine_port") or 8080))
     remote_cmd = (
         f"{install} && cd {checkout} && "
@@ -152,7 +152,7 @@ def bootstrap(node_id: str, *, root: Path | None = None,
 
 
 def _ssh_command(node: dict[str, Any], remote_cmd: str) -> list[str]:
-    cmd = ["ssh"]
+    cmd = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10"]
     port = int(node.get("ssh_port") or 22)
     if port != 22:
         cmd.extend(["-p", str(port)])
@@ -161,9 +161,29 @@ def _ssh_command(node: dict[str, Any], remote_cmd: str) -> list[str]:
 
 
 def _remote_refine_command(node: dict[str, Any], refine_args: list[str]) -> str:
-    checkout = shlex.quote(str(node.get("refine_checkout") or "~/refine"))
+    checkout = _quote_remote_path(str(node.get("refine_checkout") or "~/refine"))
+    config_path = _quote_remote_path(
+        str(Path(str(node.get("target_app_path") or "")) / ".refine" / "refine.toml")
+    )
     args = " ".join(shlex.quote(str(arg)) for arg in refine_args)
-    return f"cd {checkout} && uv run refine {args}"
+    return f"cd {checkout} && uv run refine --config {config_path} {args}"
+
+
+def _validate_ssh_host(host: str) -> None:
+    if not host:
+        raise ValueError("ssh_host is required")
+    if "@" in host:
+        raise ValueError("ssh_host must not include a user; the current host user is assumed")
+    if host.startswith("-"):
+        raise ValueError("ssh_host must not start with '-'")
+
+
+def _quote_remote_path(value: str) -> str:
+    if value == "~":
+        return "~"
+    if value.startswith("~/"):
+        return "~/" + shlex.quote(value[2:])
+    return shlex.quote(value)
 
 
 def _normalize_node(raw: dict[str, Any]) -> dict[str, Any]:

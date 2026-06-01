@@ -35,6 +35,12 @@ def main() -> int:
         active = project_state.active_node_id()
         assert active == "default"
 
+        project_state.write_maintenance({"reason": "test maintenance"}, root=root)
+        status, body = api.create_node({"display_name": "Blocked"})
+        assert status == 409, body
+        assert "maintenance" in body["error"]["message"].lower()
+        project_state.clear_maintenance(root=root)
+
         reporters.add(conn, "Jane")
         gid = "01PROJECTSTATECACHEAAAAAA"
         gap_writer.create_gap(

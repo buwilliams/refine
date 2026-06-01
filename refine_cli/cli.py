@@ -39,7 +39,7 @@ from typing import Annotated, Callable
 
 import click
 import typer
-from refine_server import cluster, config, db, project_registry, project_state, upgrade
+from refine_server import cluster, config, db, project_registry, project_state, project_sync, upgrade
 
 
 SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
@@ -187,6 +187,31 @@ def _migration_config(ctx: typer.Context) -> config.Config:
     return config.get(path=cfg_path, reload=True) if cfg_path else config.get(reload=True)
 
 
+def _sync_cli_refine_state(
+    cfg: config.Config,
+    *,
+    message: str,
+    rebuild_cache: bool = True,
+) -> dict:
+    db.init_db(cfg.sqlite_path)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        result = project_sync.commit_and_push_refine_state(
+            conn,
+            actor="cli",
+            cwd=cfg.client_repo,
+            state_message=message,
+            rebuild_cache=rebuild_cache,
+        )
+    finally:
+        conn.close()
+    if not result.get("ok"):
+        raise click.ClickException(
+            str(result.get("details") or result.get("message") or "Refine state sync failed")
+        )
+    return result
+
+
 @migrate_app.command("status", help="Show project-state migration status.")
 def migrate_status_command(ctx: typer.Context) -> int:
     cfg = _migration_config(ctx)
@@ -205,6 +230,15 @@ def migrate_run_command(ctx: typer.Context) -> int:
     cfg = _migration_config(ctx)
     status = project_state.schema_status(cfg.volume_root)
     if status.get("compatible"):
+        if project_state.read_maintenance(root=cfg.volume_root) is not None:
+            project_state.clear_maintenance(root=cfg.volume_root)
+            result = _sync_cli_refine_state(
+                cfg,
+                message="refine: clear project migration maintenance",
+                rebuild_cache=True,
+            )
+            typer.echo(json.dumps({"ok": True, "schema": status, "maintenance_cleared": True, "sync": result}, indent=2))
+            return 0
         typer.echo("No migration required.")
         return 0
     if not status.get("migration_required"):
@@ -217,7 +251,7 @@ def migrate_run_command(ctx: typer.Context) -> int:
     }:
         raise click.ClickException(project_state.migration_block_details(status))
 
-    from refine_server import git_ops, push_ops
+    from refine_server import git_ops
 
     stuck = git_ops.in_progress_op(cwd=cfg.client_repo)
     if stuck is not None:
@@ -238,59 +272,68 @@ def migrate_run_command(ctx: typer.Context) -> int:
 
     db.init_db(cfg.sqlite_path)
     conn = db.connect(cfg.sqlite_path)
-    maintenance_written = False
     try:
-        try:
+        project_state.write_maintenance(
+            {
+                "migration_id": status.get("migration_id") or "",
+                "reason": "project_state_migration",
+                "operator": "refine migrate run",
+                "operator_instructions": project_state.migration_block_details(status),
+            },
+            root=cfg.volume_root,
+        )
+        lock_sync = project_sync.commit_and_push_refine_state(
+            conn,
+            actor="cli",
+            cwd=cfg.client_repo,
+            state_message="refine: enter maintenance for project migration",
+            rebuild_cache=False,
+        )
+        if not lock_sync.get("ok"):
+            raise click.ClickException(
+                str(lock_sync.get("details") or lock_sync.get("message") or "Maintenance lock sync failed")
+            )
+        status = project_state.ensure_initialized(
+            conn,
+            migrate=True,
+            allow_manual_migrations=True,
+            root=cfg.volume_root,
+        )
+        if not status.get("compatible"):
+            raise click.ClickException(project_state.migration_block_details(status))
+        project_state.rebuild_sqlite_cache(conn, force=True)
+        project_state.clear_maintenance(root=cfg.volume_root)
+        migration_sync = project_sync.commit_and_push_refine_state(
+            conn,
+            actor="cli",
+            cwd=cfg.client_repo,
+            state_message="refine: migrate project state",
+            rebuild_cache=True,
+        )
+        if not migration_sync.get("ok"):
             project_state.write_maintenance(
                 {
                     "migration_id": status.get("migration_id") or "",
-                    "reason": "project_state_migration",
+                    "reason": "project_state_migration_push_failed",
                     "operator": "refine migrate run",
+                    "operator_instructions": (
+                        "Migration completed locally, but pushing the migrated "
+                        "state failed. Resolve Git sync, then rerun `refine migrate run` "
+                        "or push the migration commit before restarting nodes."
+                    ),
                 },
                 root=cfg.volume_root,
             )
-            maintenance_written = True
-            status = project_state.ensure_initialized(
-                conn,
-                migrate=True,
-                allow_manual_migrations=True,
-                root=cfg.volume_root,
-            )
-            if not status.get("compatible"):
-                raise click.ClickException(project_state.migration_block_details(status))
-            project_state.rebuild_sqlite_cache(conn, force=True)
-        finally:
-            if maintenance_written:
-                project_state.clear_maintenance(root=cfg.volume_root)
-
-        paths = git_ops.dirty_paths_under(".refine", cwd=cfg.client_repo)
-        commit = git_ops.commit_refine_sync_state(
-            paths,
-            state_message="refine: migrate project state",
-            cwd=cfg.client_repo,
-        )
-        if not commit.ok:
             raise click.ClickException(
-                commit.stderr or commit.stdout or "Migration commit failed."
+                str(migration_sync.get("details") or migration_sync.get("message") or "Migration sync failed")
             )
-        push = push_ops.push_current_after_pull(
-            conn,
-            actor="cli",
-            merge_message="Merge upstream before pushing Refine project migration",
-            prompt_context=(
-                "A pull is in progress before pushing a Refine project-state migration.\n"
-                "Preserve the migrated `.refine/` node-state files and valid JSON."
-            ),
-            cwd=cfg.client_repo,
-        )
     finally:
         conn.close()
     payload = {
-        "ok": bool(push.get("ok", True)),
+        "ok": bool(migration_sync.get("ok", True)),
         "schema": project_state.schema_status(cfg.volume_root),
-        "committed": commit.stderr != "(nothing to commit)",
-        "commit_output": (commit.stdout or commit.stderr or "").strip(),
-        "push": push,
+        "lock_sync": lock_sync,
+        "migration_sync": migration_sync,
     }
     typer.echo(json.dumps(payload, indent=2))
     return 0 if payload["ok"] else 1
@@ -313,13 +356,10 @@ def node_create_command(
     name: Annotated[str, typer.Argument(help="Node display name.")],
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
+    cfg = config.get(reload=True)
     node = project_state.create_node(name)
-    conn = db.connect()
-    try:
-        project_state.rebuild_sqlite_cache(conn)
-    finally:
-        conn.close()
-    typer.echo(json.dumps({"node": node}, indent=2))
+    sync = _sync_cli_refine_state(cfg, message="refine: create node")
+    typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
 
 
@@ -346,8 +386,10 @@ def node_rename_command(
     name: Annotated[str, typer.Argument(help="New display name.")],
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
+    cfg = config.get(reload=True)
     node = project_state.update_node(node_id, display_name=name)
-    typer.echo(json.dumps({"node": node}, indent=2))
+    sync = _sync_cli_refine_state(cfg, message="refine: update node")
+    typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
 
 
@@ -357,8 +399,10 @@ def node_archive_command(
     node_id: Annotated[str, typer.Argument(help="Node ID.")],
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
+    cfg = config.get(reload=True)
     node = project_state.update_node(node_id, archived=True)
-    typer.echo(json.dumps({"node": node}, indent=2))
+    sync = _sync_cli_refine_state(cfg, message="refine: update node")
+    typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
 
 
@@ -372,12 +416,10 @@ def node_transfer_gaps_command(
     ] = None,
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
+    cfg = config.get(reload=True)
     result = project_state.transfer_gaps(source_node_id, target_node_id)
-    conn = db.connect()
-    try:
-        project_state.rebuild_sqlite_cache(conn)
-    finally:
-        conn.close()
+    sync = _sync_cli_refine_state(cfg, message="refine: transfer node gaps")
+    result["sync"] = sync
     typer.echo(json.dumps(result, indent=2))
     return 0
 
@@ -410,16 +452,21 @@ def cluster_register_command(
     refine_port: Annotated[int, typer.Option("--refine-port", help="Remote Refine UI port.")] = 8080,
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
-    node = cluster.upsert_node({
-        "id": node_id,
-        "display_name": display_name or node_id,
-        "ssh_host": ssh_host,
-        "ssh_port": ssh_port,
-        "refine_checkout": refine_checkout,
-        "target_app_path": target_app_path,
-        "refine_port": refine_port,
-    })
-    typer.echo(json.dumps({"node": node}, indent=2))
+    cfg = config.get(reload=True)
+    try:
+        node = cluster.upsert_node({
+            "id": node_id,
+            "display_name": display_name or node_id,
+            "ssh_host": ssh_host,
+            "ssh_port": ssh_port,
+            "refine_checkout": refine_checkout,
+            "target_app_path": target_app_path,
+            "refine_port": refine_port,
+        })
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    sync = _sync_cli_refine_state(cfg, message="refine: update cluster node")
+    typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
 
 
@@ -429,7 +476,13 @@ def cluster_bootstrap_command(
     node_id: Annotated[str, typer.Argument(help="Cluster node ID.")],
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
-    result = cluster.bootstrap(node_id)
+    cfg = config.get(reload=True)
+    try:
+        result = cluster.bootstrap(node_id)
+    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        raise click.ClickException(str(e)) from e
+    sync = _sync_cli_refine_state(cfg, message="refine: update cluster node health")
+    result["sync"] = sync
     typer.echo(result.get("stdout") or "", nl=False)
     if result.get("stderr"):
         typer.echo(result["stderr"], err=True, nl=False)
@@ -449,7 +502,10 @@ def cluster_run_command(
     args = list(ctx.args)
     if args and args[0] == "--":
         args = args[1:]
-    result = cluster.run_remote(node_id, args)
+    try:
+        result = cluster.run_remote(node_id, args)
+    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        raise click.ClickException(str(e)) from e
     typer.echo(result.get("stdout") or "", nl=False)
     if result.get("stderr"):
         typer.echo(result["stderr"], err=True, nl=False)

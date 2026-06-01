@@ -12,6 +12,116 @@ _PULSE_HEAD_KEY = "__refine_project_pulse_head"
 _PULSE_UPSTREAM_KEY = "__refine_project_pulse_upstream"
 
 
+def commit_and_push_refine_state(
+    conn: sqlite3.Connection,
+    *,
+    actor: str = "refine",
+    cwd=None,
+    state_message: str = "refine: sync project state",
+    merge_message: str = "Merge upstream before pushing Refine project state",
+    prompt_context: str | None = None,
+    rebuild_cache: bool = False,
+) -> dict:
+    """Commit syncable `.refine/**` state and push it through the shared flow."""
+    repo = cwd or git_ops.client_repo_path()
+    branch = git_ops.current_branch(cwd=repo)
+    if not branch:
+        return {
+            "ok": False,
+            "stage": "precheck",
+            "message": "Cannot sync Refine state while detached from a branch.",
+        }
+
+    config.ensure_refine_gitignore(repo / ".refine")
+    dirty_refine = git_ops.dirty_paths_under(".refine", cwd=repo)
+    syncable_refine = git_ops.syncable_refine_paths(dirty_refine)
+    committed_state = False
+    commit_output = ""
+    if dirty_refine:
+        commit = git_ops.commit_refine_sync_state(
+            dirty_refine,
+            state_message=state_message,
+            cwd=repo,
+        )
+        commit_output = (commit.stdout or commit.stderr or "").strip()
+        if not commit.ok:
+            return {
+                "ok": False,
+                "stage": "commit",
+                "branch": branch,
+                "message": "Could not commit local Refine project state.",
+                "details": commit.stderr or commit.stdout,
+                "dirty_refine_count": len(dirty_refine),
+                "syncable_refine_count": len(syncable_refine),
+            }
+        committed_state = commit.stderr != "(nothing to commit)"
+
+    upstream = git_ops.upstream_branch(branch, cwd=repo)
+    if upstream is None:
+        if rebuild_cache:
+            project_state.rebuild_sqlite_cache(conn)
+        return {
+            "ok": True,
+            "stage": "skipped",
+            "branch": branch,
+            "upstream": "",
+            "committed_state": committed_state,
+            "pushed_state": False,
+            "pulled": False,
+            "commit_output": commit_output,
+            "dirty_refine_count": len(dirty_refine),
+            "syncable_refine_count": len(syncable_refine),
+            "message": f"Branch `{branch}` has no upstream; Refine state push skipped.",
+        }
+
+    if not prompt_context:
+        prompt_context = (
+            "A pull is in progress before pushing Refine project state.\n"
+            "HEAD contains local `.refine/` state commits created by Refine.\n"
+            "The incoming side contains newer upstream commits.\n"
+            "Preserve durable `.refine/` state from both sides. If JSON files "
+            "conflict, keep valid JSON and include all non-duplicate entries."
+        )
+    push = push_ops.push_current_after_pull(
+        conn,
+        actor=actor,
+        target=branch,
+        cwd=repo,
+        merge_message=merge_message,
+        prompt_context=prompt_context,
+    )
+    if not push.get("ok"):
+        return {
+            "ok": False,
+            "stage": push.get("stage") or "push",
+            "branch": branch,
+            "upstream": upstream,
+            "committed_state": committed_state,
+            "pushed_state": bool(push.get("pushed")),
+            "pulled": True,
+            "commit_output": commit_output,
+            "message": push.get("message") or "Could not push local Refine project state.",
+            "details": push.get("details") or push.get("message"),
+        }
+
+    config.get(reload=True)
+    if rebuild_cache:
+        project_state.rebuild_sqlite_cache(conn)
+    return {
+        "ok": True,
+        "stage": "synced",
+        "branch": branch,
+        "upstream": upstream,
+        "committed_state": committed_state,
+        "pushed_state": bool(push.get("pushed")),
+        "pulled": True,
+        "commit_output": commit_output,
+        "dirty_refine_count": len(dirty_refine),
+        "syncable_refine_count": len(syncable_refine),
+        "message": push.get("message") or f"Synced `{branch}` with `{upstream}`.",
+    }
+
+
 def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
     """Fetch/pull the active app branch and rebuild SQLite from JSON state."""
     metric_start = perf_metrics.now()
@@ -42,22 +152,38 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
             "message": "Cannot sync while the target app is in detached HEAD.",
         })
 
-    committed_state = False
     config.ensure_refine_gitignore(config.get().volume_root)
     dirty_refine = git_ops.dirty_paths_under(".refine")
     syncable_refine = git_ops.syncable_refine_paths(dirty_refine)
     metric_details["dirty_refine_count"] = len(dirty_refine)
     metric_details["syncable_refine_count"] = len(syncable_refine)
     if dirty_refine:
-        commit = git_ops.commit_refine_sync_state(dirty_refine)
-        if not commit.ok:
+        sync_state = commit_and_push_refine_state(
+            conn,
+            actor=actor,
+            rebuild_cache=True,
+            state_message="refine: sync project state",
+        )
+        metric_details["rebuild_ms"] = sync_state.get("rebuild_ms", 0)
+        if not sync_state.get("ok"):
             return finish({
-                "ok": False,
-                "stage": "commit",
-                "message": "Could not commit local Refine project state before sync.",
-                "details": commit.stderr or commit.stdout,
+                **sync_state,
+                "message": sync_state.get("message")
+                    or "Could not sync local Refine project state.",
             })
-        committed_state = commit.code == 0 and commit.stderr != "(nothing to commit)"
+        msg = (
+            f"Synced `{sync_state.get('branch')}` with `{sync_state.get('upstream')}`, "
+            "pushed local Refine state, and rebuilt the cache."
+            if sync_state.get("pushed_state")
+            else str(sync_state.get("message") or "Synced local Refine project state.")
+        )
+        activity.append(
+            conn, message=msg, severity="info", category="git", actor=actor,
+        )
+        return finish({
+            **sync_state,
+            "message": msg,
+        })
 
     upstream = git_ops.upstream_branch(branch)
     if upstream is None:
@@ -73,51 +199,8 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
             "stage": "skipped",
             "branch": branch,
             "upstream": "",
-            "committed_state": committed_state,
+            "committed_state": False,
             "pulled": False,
-            "message": msg,
-        })
-
-    if committed_state:
-        push = push_ops.push_current_after_pull(
-            conn,
-            actor=actor,
-            target=branch,
-            merge_message="Merge upstream before pushing Refine project state",
-            prompt_context=(
-                "A pull is in progress before pushing Refine project state.\n"
-                "HEAD contains local `.refine/` state commits created by Refine.\n"
-                "The incoming side contains newer upstream commits.\n"
-                "Preserve durable `.refine/` state from both sides. If JSON files "
-                "conflict, keep valid JSON and include all non-duplicate entries."
-            ),
-        )
-        if not push.get("ok"):
-            return finish({
-                "ok": False,
-                "stage": push.get("stage") or "push",
-                "branch": branch,
-                "upstream": upstream,
-                "committed_state": committed_state,
-                "message": "Could not push local Refine project state.",
-                "details": push.get("details") or push.get("message"),
-            })
-        config.get(reload=True)
-        rebuild_start = perf_metrics.now()
-        project_state.rebuild_sqlite_cache(conn)
-        metric_details["rebuild_ms"] = round(perf_metrics.elapsed_ms(rebuild_start), 2)
-        msg = f"Synced `{branch}` with `{upstream}`, pushed local Refine state, and rebuilt the cache."
-        activity.append(
-            conn, message=msg, severity="info", category="git", actor=actor,
-        )
-        return finish({
-            "ok": True,
-            "stage": "synced",
-            "branch": branch,
-            "upstream": upstream,
-            "committed_state": committed_state,
-            "pulled": True,
-            "pushed_state": bool(push.get("pushed")),
             "message": msg,
         })
 
@@ -140,7 +223,7 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
             "stage": sync.get("stage") or "sync",
             "branch": branch,
             "upstream": upstream,
-            "committed_state": committed_state,
+            "committed_state": False,
             "message": "Could not sync latest target-app updates.",
             "details": sync.get("details") or sync.get("message"),
         })
@@ -158,7 +241,7 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
         "stage": "synced",
         "branch": branch,
         "upstream": upstream,
-        "committed_state": committed_state,
+        "committed_state": False,
         "pulled": True,
         "pushed_state": bool(sync.get("pushed")),
         "message": msg,
