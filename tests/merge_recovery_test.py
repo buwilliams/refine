@@ -4,6 +4,7 @@ from __future__ import annotations
 import sqlite3
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -444,6 +445,13 @@ def main() -> int:
 
         gid_runtime_local = "01RECOVERYRUNTIMELOCALAA"
         create_indexed_gap(conn, gid_runtime_local, status="in-progress")
+        stale_updated = (
+            datetime.now(timezone.utc) - timedelta(minutes=5)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+        conn.execute(
+            "UPDATE gaps_index SET updated = ? WHERE id = ?",
+            (stale_updated, gid_runtime_local),
+        )
         conn.execute(
             "INSERT INTO runs "
             "(gap_id, round_idx, started_at, pid, status, failure_category) "
@@ -467,6 +475,12 @@ def main() -> int:
         assert moved == 1
         assert db_status(conn, gid_runtime_local) == "failed"
         assert db_status(conn, gid_runtime_remote) == "in-progress"
+
+        gid_runtime_fresh = "01RECOVERYRUNTIMEFRESHAAA"
+        create_indexed_gap(conn, gid_runtime_fresh, status="in-progress")
+        moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
+        assert moved == 0
+        assert db_status(conn, gid_runtime_fresh) == "in-progress"
     finally:
         try:
             conn.close()

@@ -182,6 +182,10 @@ def main() -> int:
         reset()
         db.set_setting(conn, "parallel_run_cap", "1")
         insert_gap("stale-in-progress", "in-progress", "high")
+        conn.execute(
+            "UPDATE gaps_index SET updated = ? WHERE id = ?",
+            ("2000-01-01T00:00:00Z", "stale-in-progress"),
+        )
         insert_gap("launch-after-stale", "todo", "high")
         dispatcher._tick()
         assert launched == ["launch-after-stale"], launched

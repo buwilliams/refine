@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import os
 import sqlite3
+from datetime import datetime, timezone
 
 from refine_server import activity, db, project_state, quality
 from refine_server.gaps import now_iso
 
 from . import gap_writer
+
+_RUNTIME_ORPHAN_GRACE_SECONDS = 60
 
 
 def reconcile_on_start(conn: sqlite3.Connection) -> int:
@@ -73,7 +76,7 @@ def _reconcile_active_agent_states(
     startup: bool,
 ) -> int:
     rows = conn.execute(
-        "SELECT id, status FROM gaps_index "
+        "SELECT id, status, updated FROM gaps_index "
         "WHERE status IN ('in-progress', 'qa') AND node_id = ?",
         (project_state.active_node_id(),),
     ).fetchall()
@@ -145,6 +148,8 @@ def _reconcile_active_agent_states(
             and _pid_may_be_alive(rrow["pid"])
         ):
             continue
+        if not startup and _within_runtime_orphan_grace(row["updated"]):
+            continue
 
         # Orphan agent case — kill the run record + flip to failed.
         failure_category = "runner_restart" if startup else "agent_orphaned"
@@ -193,6 +198,19 @@ def _reconcile_active_agent_states(
         )
         moved += 1
     return moved
+
+
+def _within_runtime_orphan_grace(updated: object) -> bool:
+    text = str(updated or "").strip()
+    if not text:
+        return False
+    try:
+        updated_at = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    now = datetime.now(updated_at.tzinfo or timezone.utc)
+    age = (now - updated_at).total_seconds()
+    return 0 <= age < _RUNTIME_ORPHAN_GRACE_SECONDS
 
 
 def _pid_may_be_alive(pid: object) -> bool:
