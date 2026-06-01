@@ -534,7 +534,7 @@ def target_command(
         bool,
         typer.Option(
             "--force",
-            help="Overwrite an existing refine.toml / .refine-binding.",
+            help="Overwrite an existing refine.toml or systemd unit.",
         ),
     ] = False,
 ) -> int:
@@ -780,7 +780,7 @@ def cmd_target(args: _Args) -> int:
             force=args.force,
             create=False,
             init_git=False,
-            reuse_existing_config=False,
+            reuse_existing_config=not args.force,
             install_unit=False,
         )
     except (config.ConfigError, _InitError) as e:
@@ -922,10 +922,6 @@ def bootstrap_client_repo(
     ui_unit_path = None
     if _is_refine_source_dir(clone_dir):
         binding_path = clone_dir / config.BINDING_FILENAME
-        if binding_path.exists() and not force:
-            raise config.ConfigError(
-                f"{binding_path} already exists (use --force to rebind)"
-            )
         binding_written = config.write_binding(clone_dir, client_repo)
         _remove_legacy_docker_artifacts(clone_dir)
         if install_unit:

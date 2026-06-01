@@ -81,6 +81,28 @@ def main() -> int:
         assert rc == 0, err
         assert (clone / ".refine-binding").exists()
         assert (client / ".refine" / "refine.toml").exists()
+        other = tmp / "other-target-app"
+        other.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=other, check=True)
+        from refine_server import config, project_registry
+
+        other_cfg = config.write_defaults(other / ".refine")
+        other_cfg.write_text(
+            other_cfg.read_text(encoding="utf-8") + "\n# sentinel: keep me\n",
+            encoding="utf-8",
+        )
+        os.chdir(clone)
+        try:
+            rc, _out, err = _run_cli(["target", str(other)])
+        finally:
+            os.chdir(old_cwd)
+        assert rc == 0, err
+        assert config.read_binding(clone / ".refine-binding") == other.resolve()
+        assert "# sentinel: keep me" in other_cfg.read_text(encoding="utf-8")
+        assert [app["path"] for app in project_registry.list_apps(clone)] == [
+            str(client.resolve()),
+            str(other.resolve()),
+        ]
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
