@@ -25,4 +25,10 @@ where = ["."]
 include = ["refine_cli*", "refine_runtime*", "refine_server*", "refine_ui*"]
 
 [tool.setuptools.package-data]
-refine_ui = ["static/*", "static/css/*", "static/js/*", "static/js/features/*"]
+refine_ui = [
+    "project_templates/*",
+    "static/*",
+    "static/css/*",
+    "static/js/*",
+    "static/js/features/*",
+]
