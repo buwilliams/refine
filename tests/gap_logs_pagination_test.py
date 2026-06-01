@@ -54,7 +54,7 @@ def main() -> int:
         shared_gaps.write_gap_json(gap)
         conn.execute(
             "INSERT INTO gaps_index "
-            "(id, name, status, priority, reporter, created, updated, branch_name, instance_id, json_path) "
+            "(id, name, status, priority, reporter, created, updated, branch_name, node_id, json_path) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 gap_id,

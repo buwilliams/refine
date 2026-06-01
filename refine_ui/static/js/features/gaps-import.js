@@ -138,6 +138,10 @@ function openImportModal() {
               </label>
               <textarea id="import-csv-text" rows="8" placeholder="actual,target,reporter,priority&#10;Current behavior,Desired behavior,Alice,medium"></textarea>
             </div>
+            <label class="checkbox-row">
+              <input type="checkbox" id="import-csv-distribute">
+              <span>Distribute across cluster nodes</span>
+            </label>
           </section>
           <section class="settings-pane import-panel" data-import-panel="upload">
             <p class="muted small">
@@ -152,6 +156,10 @@ function openImportModal() {
               </div>
               <input type="file" id="import-csv-file" class="visually-hidden" accept=".csv,text/csv">
             </div>
+            <label class="checkbox-row">
+              <input type="checkbox" id="import-upload-distribute">
+              <span>Distribute across cluster nodes</span>
+            </label>
           </section>
           <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
         </div>
@@ -342,7 +350,10 @@ function openImportModal() {
           completed: 0,
           total: estimateImportCsvRows(csvText),
         });
-        const drafts = await parseImportCsvBackend(csvText, draftsRoot, saveSession);
+        const distribute = activeMode === "csv"
+          ? !!root.querySelector("#import-csv-distribute")?.checked
+          : !!root.querySelector("#import-upload-distribute")?.checked;
+        const drafts = await parseImportCsvBackend(csvText, draftsRoot, saveSession, { distribute });
         if (saveSession) saveSession({ phase: "review", drafts, prepareJobId: "", error: "" });
         drawImportDrafts(root, drafts, close, { saveSession });
       } catch (e) {
@@ -558,11 +569,12 @@ function readImportCsvFile(input) {
   });
 }
 
-async function parseImportCsvBackend(text, progressRoot = null, saveSession = null) {
+async function parseImportCsvBackend(text, progressRoot = null, saveSession = null, options = {}) {
   let r = await api("POST", "/api/import/csv/parse", {
     text,
     background: true,
     dedup: true,
+    distribute: !!options.distribute,
   });
   if (r.job) {
     if (saveSession) {
@@ -1034,6 +1046,7 @@ function normalizeImportDraft(draft) {
     priority: String(draft.priority || "low").toLowerCase(),
     duplicate: draft.duplicate || null,
     duplicateDecision: draft.duplicateDecision || "",
+    node_id: draft.node_id || "",
     selected: !!draft.selected,
     error: draft.error || "",
   };
@@ -1140,6 +1153,7 @@ function importDraftPayload(draft) {
     target: draft.target.trim(),
     reporter: draft.reporter.trim(),
     priority: draft.priority,
+    node_id: (draft.node_id || "").trim(),
     duplicate_decision: draft.duplicateDecision || "",
   };
 }
@@ -1162,6 +1176,7 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected 
         <col class="import-col-name">
         <col class="import-col-reporter">
         <col class="import-col-priority">
+        <col class="import-col-node">
         <col class="import-col-actual">
         <col class="import-col-target">
       </colgroup>
@@ -1176,6 +1191,7 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected 
           <th>Name</th>
           <th>Reporter</th>
           <th>Priority</th>
+          <th>Node</th>
           <th>Actual</th>
           <th>Target</th>
         </tr>
@@ -1206,6 +1222,7 @@ function renderImportDraftRow(d, index) {
             <option value="${priority}" ${d.priority === priority ? "selected" : ""}>${priority}</option>`).join("")}
         </select>
       </td>
+      <td><input type="text" class="d-node" value="${htmlEscape(d.node_id || "")}" placeholder="current"></td>
       <td>
         <textarea class="d-actual" rows="3">${htmlEscape(d.actual)}</textarea>
         ${d.duplicate ? renderImportDuplicateActual(d.duplicate) : ""}
@@ -1232,7 +1249,7 @@ function renderImportDuplicateActual(match) {
     <div class="import-duplicate">
       <div class="small" style="font-weight:600">Possible duplicate</div>
       <p class="muted small" style="margin:4px 0">
-        ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.instance_display_name || match.instance_id || "Default")}
+        ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.node_display_name || match.node_id || "Default")}
         · ${htmlEscape(match.status || "")}
       </p>
       <div class="small muted">Matched actual</div>
@@ -1319,5 +1336,6 @@ function syncImportDraftRow(row, draftState) {
   draft.target = row.querySelector(".d-target")?.value || "";
   draft.reporter = row.querySelector(".d-reporter")?.value || "";
   draft.priority = row.querySelector(".d-priority")?.value || "low";
+  draft.node_id = row.querySelector(".d-node")?.value || "";
   draft.duplicateDecision = row.dataset.duplicateDecision || "";
 }

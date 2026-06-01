@@ -6,8 +6,8 @@ async function renderSettings() {
   await renderSettingsSurface("settings");
 }
 
-async function renderInstanceSettings() {
-  await renderSettingsSurface("instance");
+async function renderNodeSettings() {
+  await renderSettingsSurface("node");
 }
 
 async function renderProjectSettings() {
@@ -34,7 +34,7 @@ async function refreshSettings(options = {}) {
   if (
     _targetAppDraftDirty &&
     !options.force &&
-    state.currentRoute === "instance" &&
+    state.currentRoute === "node" &&
     document.querySelector('[data-tab-pane="application"].active')
   ) {
     return;
@@ -62,7 +62,7 @@ async function refreshSettingsTab(slug, options = {}) {
     return;
   }
   if (
-    state.currentRoute === "instance" &&
+    state.currentRoute === "node" &&
     activeSlug === "application" &&
     _targetAppDraftDirty &&
     !options.force
@@ -84,13 +84,13 @@ async function refreshSettingsTab(slug, options = {}) {
 async function loadSettingsSurfaceData() {
   const project = await api("GET", "/api/project/status");
   state.project = project;
-  updateActiveInstanceLabel();
+  updateActiveNodeLabel();
   if (project.attached === false) {
     enterNoProjectMode(project);
     return detachedSettingsSurfaceData(project);
   }
   const [
-    s, diag, reps, gov, quality, dash, instances, guidance,
+    s, diag, reps, gov, quality, dash, nodes, cluster, guidance,
     performance, processes,
   ] = await Promise.all([
     api("GET", "/api/settings"),
@@ -99,7 +99,8 @@ async function loadSettingsSurfaceData() {
     api("GET", "/api/governance"),
     api("GET", "/api/quality"),
     api("GET", "/api/dashboard"),
-    api("GET", "/api/instances"),
+    api("GET", "/api/nodes"),
+    api("GET", "/api/cluster"),
     api("GET", "/api/guidance"),
     api("GET", typeof performanceApiPath === "function"
       ? performanceApiPath()
@@ -108,12 +109,12 @@ async function loadSettingsSurfaceData() {
   ]);
   state.project = project;
   state.reporters = reps.reporters || [];
-  updateActiveInstanceLabel();
+  updateActiveNodeLabel();
   const settings = s.settings || {};
-  const instanceList = instances.instances || state.project?.instances || [];
-  const activeInstanceId = instances.active_instance_id || state.project?.active_instance_id || "";
-  const activeInstance = instanceList.find((i) => i.id === activeInstanceId) || null;
-  const activeInstanceLabel = activeInstance?.display_name || activeInstanceId || "Default";
+  const nodeList = nodes.nodes || state.project?.nodes || [];
+  const activeNodeId = nodes.active_node_id || state.project?.active_node_id || "";
+  const activeNode = nodeList.find((i) => i.id === activeNodeId) || null;
+  const activeNodeLabel = activeNode?.display_name || activeNodeId || "Default";
   const projectApps = state.project?.apps || [];
   const currentProject = state.project?.client_repo || "";
   const appOptions = projectApps.map((app) => `
@@ -129,10 +130,11 @@ async function loadSettingsSurfaceData() {
     gov: gov || {},
     quality: quality || {},
     dash: dash || {},
-    instances: instanceList,
-    instanceCounts: instances.counts || {},
-    activeInstanceId,
-    activeInstanceLabel,
+    nodes: nodeList,
+    nodeCounts: nodes.counts || {},
+    clusterNodes: cluster.nodes || [],
+    activeNodeId,
+    activeNodeLabel,
     guidanceItems: guidance.guidance || [],
     performance: performance || {},
     performanceBackend: (performance || {}).backend || (diag || {}).backend || {},
@@ -161,10 +163,11 @@ function detachedSettingsSurfaceData(project = {}) {
     gov: {},
     quality: { regressions: [] },
     dash: {},
-    instances: [],
-    instanceCounts: {},
-    activeInstanceId: "",
-    activeInstanceLabel: "No app",
+    nodes: [],
+    nodeCounts: {},
+    clusterNodes: [],
+    activeNodeId: "",
+    activeNodeLabel: "No app",
     guidanceItems: [],
     performance: {},
     performanceBackend: {},
@@ -193,16 +196,16 @@ function updateSettingsTabContent(slug, body, bind) {
   if (typeof bind === "function") bind();
 }
 
-async function copySettingsFromInstance(section, {
+async function copySettingsFromNode(section, {
   title = "Copy settings",
   refreshTab = readSettingsTab(),
   button = null,
 } = {}) {
-  const snap = await api("GET", "/api/instances");
-  const active = snap.active_instance_id || state.project?.active_instance_id || "";
-  const choices = (snap.instances || []).filter((inst) => inst.id && inst.id !== active);
+  const snap = await api("GET", "/api/nodes");
+  const active = snap.active_node_id || state.project?.active_node_id || "";
+  const choices = (snap.nodes || []).filter((inst) => inst.id && inst.id !== active);
   if (!choices.length) {
-    toast("No other instances available.", "warn");
+    toast("No other nodes available.", "warn");
     return;
   }
   const opts = choices.map((inst) => `
@@ -212,7 +215,7 @@ async function copySettingsFromInstance(section, {
   const body = () => `
     <div class="modal-title">${htmlEscape(title)}</div>
     <div class="modal-body">
-      <label>${renderSettingsGuideLabel("Source instance", "instance-copy-settings-source")}</label>
+      <label>${renderSettingsGuideLabel("Source node", "node-copy-settings-source")}</label>
       <select class="modal-input" style="width:100%">
         ${opts}
       </select>
@@ -227,8 +230,8 @@ async function copySettingsFromInstance(section, {
   if (source === null) return;
   await withButtonBusy(button, "Copying...", async () => {
     try {
-      const r = await api("POST", "/api/instances/copy-settings", {
-        source_instance_id: source,
+      const r = await api("POST", "/api/nodes/copy-settings", {
+        source_node_id: source,
         section,
       });
       toast(`Copied ${r.copied_count || 0} setting${r.copied_count === 1 ? "" : "s"}.`, "info");
@@ -302,11 +305,11 @@ function rearmSettingsControls(root) {
   });
 }
 
-function settingsActiveInstanceLabel(project = state.project) {
-  const instances = project?.instances || [];
-  const activeId = project?.active_instance_id || "";
-  const active = project?.active_instance
-    || instances.find((i) => i.id === activeId)
+function settingsActiveNodeLabel(project = state.project) {
+  const nodes = project?.nodes || [];
+  const activeId = project?.active_node_id || "";
+  const active = project?.active_node
+    || nodes.find((i) => i.id === activeId)
     || null;
   return active?.display_name || active?.name || activeId || "Default";
 }
@@ -547,12 +550,12 @@ const SETTINGS_SURFACES = {
       { slug: "performance", label: "Performance" },
     ],
   },
-  instance: {
-    title: "Instance",
-    basePath: "#/instance",
-    storageKey: "refine_instance_tab",
+  node: {
+    title: "Node",
+    basePath: "#/node",
+    storageKey: "refine_node_tab",
     tabs: [
-      { slug: "instances", label: "Instances" },
+      { slug: "nodes", label: "Nodes" },
       { slug: "reporters", label: "Reporters" },
       { slug: "application", label: "Application" },
       { slug: "runtime", label: "Runtime" },
@@ -571,7 +574,7 @@ const SETTINGS_SURFACES = {
   },
 };
 const SETTINGS_TABS = SETTINGS_SURFACES.settings.tabs;
-const INSTANCE_SETTINGS_TABS = SETTINGS_SURFACES.instance.tabs;
+const INSTANCE_SETTINGS_TABS = SETTINGS_SURFACES.node.tabs;
 const PROJECT_SETTINGS_TABS = SETTINGS_SURFACES.project.tabs;
 
 function settingsSurfaceForRoute(route = state.currentRoute) {
@@ -737,25 +740,26 @@ function renderSettingsTabBody(surface, slug, data) {
       return renderSettingsPerformanceTab(data.performance, data.performanceBackend);
     }
   }
-  if (surface === SETTINGS_SURFACES.instance) {
-    if (slug === "instances") {
-      return renderSettingsInstancesTab({
-        instances: data.instances,
-        instanceCounts: data.instanceCounts,
-        activeInstanceId: data.activeInstanceId,
+  if (surface === SETTINGS_SURFACES.node) {
+    if (slug === "nodes") {
+      return renderSettingsNodesTab({
+        nodes: data.nodes,
+        nodeCounts: data.nodeCounts,
+        activeNodeId: data.activeNodeId,
+        clusterNodes: data.clusterNodes,
       });
     }
     if (slug === "reporters") {
-      return renderSettingsReportersTab(data.reps, data.activeInstanceLabel);
+      return renderSettingsReportersTab(data.reps, data.activeNodeLabel);
     }
     if (slug === "application") {
-      return renderInstanceApplicationConfigSections({
+      return renderNodeApplicationConfigSections({
         s: data.s,
-        activeInstanceLabel: data.activeInstanceLabel,
+        activeNodeLabel: data.activeNodeLabel,
       });
     }
     if (slug === "runtime") {
-      return renderInstanceRuntimeConfigSections(data.s, data.activeInstanceLabel, data.cli);
+      return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli);
     }
   }
   if (surface === SETTINGS_SURFACES.project) {
@@ -812,15 +816,15 @@ function bindSettingsTabBody(surface, slug, data) {
     else if (slug === "performance") {
       bindSettingsPerformanceTab(
         data.s, data.diag, data.reps, null, data.gov,
-        data.dash, { instances: data.instances, counts: data.instanceCounts },
+        data.dash, { nodes: data.nodes, counts: data.nodeCounts },
         { guidance: data.guidanceItems }, data.performanceBackend,
       );
     }
-  } else if (surface === SETTINGS_SURFACES.instance) {
-    if (slug === "instances") bindSettingsInstancesTab();
+  } else if (surface === SETTINGS_SURFACES.node) {
+    if (slug === "nodes") bindSettingsNodesTab();
     else if (slug === "reporters") bindSettingsReportersTab();
-    else if (slug === "application") bindInstanceApplicationConfigControls();
-    else if (slug === "runtime") bindInstanceRuntimeConfigControls();
+    else if (slug === "application") bindNodeApplicationConfigControls();
+    else if (slug === "runtime") bindNodeRuntimeConfigControls();
   } else if (surface === SETTINGS_SURFACES.project) {
     if (slug === "application") bindSettingsApplicationTab(data.currentProject);
     else if (slug === "quality") bindSettingsQualityTab();

@@ -1,4 +1,4 @@
-"""Gaps-list bulk instance transfer tests."""
+"""Gaps-list bulk node transfer tests."""
 from __future__ import annotations
 
 import sys
@@ -10,25 +10,25 @@ from tests.helpers import cleanup_tmp, init_refine, make_client_repo
 
 
 def main() -> int:
-    tmp, client = make_client_repo("refine-gaps-bulk-instances-")
+    tmp, client = make_client_repo("refine-gaps-bulk-nodes-")
     conn = init_refine(client)
     try:
         from refine_server import db, gap_writer, gaps, project_state
         from refine_ui import api
 
-        active = project_state.active_instance_id()
-        other = project_state.create_instance("Other")
-        target = project_state.create_instance("Target")
+        active = project_state.active_node_id()
+        other = project_state.create_node("Other")
+        target = project_state.create_node("Target")
 
         def create(gap_id: str, reporter: str, status: str,
-                   instance_id: str = active) -> None:
+                   node_id: str = active) -> None:
             gap_writer.create_gap(
                 gap_id=gap_id,
                 name=gap_id,
                 initial_round=gaps.new_round(reporter, "Actual", "Target"),
                 status=status,
                 priority="medium",
-                instance_id=instance_id,
+                node_id=node_id,
             )
 
         transfer_me = "01GAPSBULKTRANSFERAAAAAA"
@@ -43,11 +43,11 @@ def main() -> int:
         create(wrong_instance, "Bulk Jane", "todo", other["id"])
         project_state.rebuild_sqlite_cache(conn)
 
-        status, body = api.transfer_instance_gaps({
-            "target_instance_id": target["id"],
+        status, body = api.transfer_node_gaps({
+            "target_node_id": target["id"],
             "filter": {
                 "reporter": "Bulk Jane",
-                "instance": active,
+                "node": active,
             },
             "exclude_ids": [excluded],
         })
@@ -61,9 +61,9 @@ def main() -> int:
         }], body
 
         rows = {
-            row["id"]: row["instance_id"]
+            row["id"]: row["node_id"]
             for row in conn.execute(
-                "SELECT id, instance_id FROM gaps_index WHERE id IN (?, ?, ?, ?, ?)",
+                "SELECT id, node_id FROM gaps_index WHERE id IN (?, ?, ?, ?, ?)",
                 (transfer_me, excluded, wrong_reporter, blocked_status, wrong_instance),
             )
         }
@@ -78,18 +78,18 @@ def main() -> int:
         create(selected_transfer, "Selected Jane", "todo")
         create(visible_but_unchecked, "Selected Jane", "todo")
         project_state.rebuild_sqlite_cache(conn)
-        status, body = api.transfer_instance_gaps({
-            "target_instance_id": target["id"],
-            "filter": {"reporter": "Selected Jane", "instance": active},
+        status, body = api.transfer_node_gaps({
+            "target_node_id": target["id"],
+            "filter": {"reporter": "Selected Jane", "node": active},
             "selected_ids": [selected_transfer],
         })
         assert status == 200, body
         assert body["updated"] == 1, body
         assert body["ids"] == [selected_transfer], body
         rows = {
-            row["id"]: row["instance_id"]
+            row["id"]: row["node_id"]
             for row in conn.execute(
-                "SELECT id, instance_id FROM gaps_index WHERE id IN (?, ?)",
+                "SELECT id, node_id FROM gaps_index WHERE id IN (?, ?)",
                 (selected_transfer, visible_but_unchecked),
             )
         }
@@ -103,16 +103,16 @@ def main() -> int:
         gaps_bulk = (root / "refine_ui/static/js/features/gaps-bulk.js").read_text(
             encoding="utf-8",
         )
-        assert 'id="bulk-transfer-instance"' in gaps_list
+        assert 'id="bulk-transfer-node"' in gaps_list
         assert 'id="gap-select-page"' in gaps_list
         assert "selectCurrentGapsPage" in gaps_list
-        assert "openBulkTransferInstanceModal" in gaps_bulk
-        assert 'api("POST", "/api/instances/transfer-gaps"' in gaps_bulk
+        assert "openBulkTransferNodeModal" in gaps_bulk
+        assert 'api("POST", "/api/nodes/transfer-gaps"' in gaps_bulk
         assert "filter, ...selectionFields" in gaps_bulk
         assert "exclude_ids: Array.from(gapsExcludedIds)" in gaps_bulk
         assert "selected_ids: Array.from(gapsIncludedIds)" in gaps_bulk
-        assert "instance: f.instance" in gaps_bulk
-        assert '"filter-instance": !!f.instance' in gaps_bulk
+        assert "node: f.node" in gaps_bulk
+        assert '"filter-node": !!f.node' in gaps_bulk
     finally:
         try:
             conn.close()
@@ -120,7 +120,7 @@ def main() -> int:
             pass
         cleanup_tmp(tmp)
 
-    print("gaps bulk instance transfer tests OK")
+    print("gaps bulk node transfer tests OK")
     return 0
 
 

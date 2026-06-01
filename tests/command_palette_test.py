@@ -39,7 +39,7 @@ def main() -> int:
             "settings",
             "settings_application",
             "settings_reporters",
-            "settings_instances",
+            "settings_nodes",
             "settings_quality",
             "settings_governance",
             "settings_performance",
@@ -131,8 +131,8 @@ def main() -> int:
     assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in commands_js
     assert 'await withButtonBusy(b, "Merging...", async () => {' in system_tab_js["settings_reporters"]
     assert 'await withButtonBusy(btn, "Adding...", async () => {' in system_tab_js["settings_reporters"]
-    assert 'await withButtonBusy(b, "Activating...", async () => {' in system_tab_js["settings_instances"]
-    assert 'await withButtonBusy(btn, "Transferring...", async () => {' not in system_tab_js["settings_instances"]
+    assert 'await withButtonBusy(b, "Activating...", async () => {' in system_tab_js["settings_nodes"]
+    assert 'await withButtonBusy(btn, "Transferring...", async () => {' not in system_tab_js["settings_nodes"]
     assert 'await withButtonBusy(btn, "Saving...", async () => {' in system_tab_js["settings_quality"]
     assert 'return await withButtonBusy(button, "Creating...", async () => {' in system_tab_js["settings_quality"]
     assert 'await withButtonBusy(btn, "Generating…", async () => {' in system_tab_js["settings_governance"]

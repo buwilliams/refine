@@ -395,7 +395,7 @@ def is_refine_runtime_path(path: str) -> bool:
 
 
 def syncable_refine_paths(paths: list[str]) -> list[str]:
-    """Return dirty .refine paths worth committing for cross-instance sync."""
+    """Return dirty .refine paths worth committing for cross-node sync."""
     out: list[str] = []
     for path in paths:
         clean = path.strip().strip('"')
@@ -476,7 +476,7 @@ def commit_refine_sync_state(
     cleanup_message: str = "refine: stop tracking runtime state",
     cwd: Path | None = None,
 ) -> GitResult:
-    """Commit only cross-instance Refine state, plus one-time runtime untracking.
+    """Commit only cross-node Refine state, plus one-time runtime untracking.
 
     Per-round logs, process logs, PID files, and SQLite are high-churn local
     runtime files. They may need to be removed from the index once, but they

@@ -185,7 +185,7 @@ class SqlitePoller:
         })
 
     def _run_project_update_pulse(self, now: float) -> None:
-        """Check for target-repo updates at the instance-configured cadence."""
+        """Check for target-repo updates at the node-configured cadence."""
         conn = self._conn()
         try:
             interval = db.get_setting_int(

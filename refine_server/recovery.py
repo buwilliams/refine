@@ -74,8 +74,8 @@ def _reconcile_active_agent_states(
 ) -> int:
     rows = conn.execute(
         "SELECT id, status FROM gaps_index "
-        "WHERE status IN ('in-progress', 'qa') AND instance_id = ?",
-        (project_state.active_instance_id(),),
+        "WHERE status IN ('in-progress', 'qa') AND node_id = ?",
+        (project_state.active_node_id(),),
     ).fetchall()
     moved = 0
     for row in rows:

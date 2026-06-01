@@ -25,14 +25,14 @@ def _lock_for(gap_id: str) -> threading.Lock:
 
 def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any],
                status: str = "backlog", priority: str = "low",
-               instance_id: str | None = None) -> dict[str, Any]:
+               node_id: str | None = None) -> dict[str, Any]:
     """Initialize gap.json with one round. Returns the new Gap record."""
     with _lock_for(gap_id):
         gap = shared_gaps.empty_gap(gap_id, name)
         gap["status"] = status
         gap["priority"] = priority
-        if instance_id:
-            gap["instance_id"] = instance_id
+        if node_id:
+            gap["node_id"] = node_id
         gap["rounds"].append(initial_round)
         gap["updated"] = now_iso()
         shared_gaps.write_gap_json(gap)
@@ -41,7 +41,7 @@ def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any],
 
 def update_fields(gap_id: str, **fields: Any) -> dict[str, Any]:
     """Update canonical top-level gap fields and touch updated."""
-    allowed = {"name", "status", "priority", "branch_name", "instance_id"}
+    allowed = {"name", "status", "priority", "branch_name", "node_id"}
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"unknown gap fields: {', '.join(sorted(unknown))}")
@@ -202,7 +202,7 @@ def rename_reporter_in_rounds(
     old_name: str,
     new_name: str,
     *,
-    instance_id: str | None = None,
+    node_id: str | None = None,
 ) -> int:
     """Rewrite every round whose `reporter == old_name` to `new_name`.
 
@@ -219,12 +219,12 @@ def rename_reporter_in_rounds(
     """
     if not old_name or not new_name or old_name == new_name:
         return 0
-    if instance_id is None:
+    if node_id is None:
         rows = conn.execute("SELECT id FROM gaps_index").fetchall()
     else:
         rows = conn.execute(
-            "SELECT id FROM gaps_index WHERE instance_id = ?",
-            (instance_id,),
+            "SELECT id FROM gaps_index WHERE node_id = ?",
+            (node_id,),
         ).fetchall()
     touched = 0
     for row in rows:

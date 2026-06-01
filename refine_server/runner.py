@@ -316,7 +316,7 @@ class Runner:
         self,
         gap_id: str,
         *,
-        columns: str = "status, branch_name, instance_id",
+        columns: str = "status, branch_name, node_id",
     ) -> sqlite3.Row:
         row = self._conn.execute(
             f"SELECT {columns} FROM gaps_index WHERE id = ?",
@@ -324,13 +324,13 @@ class Runner:
         ).fetchone()
         if not row:
             raise ValueError("Gap not found")
-        active = project_state.active_instance_id()
-        owner = str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+        active = project_state.active_node_id()
+        owner = str(row["node_id"] or project_state.DEFAULT_NODE_ID)
         if owner != active:
-            owner_name = project_state.gap_instance_display(owner)
-            active_name = project_state.gap_instance_display(active)
+            owner_name = project_state.gap_node_display(owner)
+            active_name = project_state.gap_node_display(active)
             raise ValueError(
-                "Action not allowed: Gap is owned by another instance "
+                "Action not allowed: Gap is owned by another node "
                 f"({owner_name}). Transfer to {active_name} before making changes."
             )
         return row
@@ -724,7 +724,7 @@ class Runner:
         gap_id = params["gap_id"]
         row = self._require_active_gap(
             gap_id,
-            columns="status, branch_name, instance_id",
+            columns="status, branch_name, node_id",
         )
         if row["status"] != "failed":
             return {
@@ -785,7 +785,7 @@ class Runner:
         gap_id = params["gap_id"]
         row = self._require_active_gap(
             gap_id,
-            columns="status, branch_name, instance_id",
+            columns="status, branch_name, node_id",
         )
         if row["status"] != "failed":
             return {
@@ -867,7 +867,7 @@ class Runner:
         gap_id = params["gap_id"]
         name = params.get("name", "Untitled Gap")
         priority = _normalize_priority(params.get("priority"))
-        instance_id = project_state.active_instance_id()
+        node_id = str(params.get("node_id") or project_state.active_node_id())
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -875,14 +875,14 @@ class Runner:
         )
         gap = gap_writer.create_gap(
             gap_id=gap_id, name=name, initial_round=round_obj,
-            status="backlog", priority=priority, instance_id=instance_id,
+            status="backlog", priority=priority, node_id=node_id,
         )
 
         from refine_server.paths import relative_gap_path
         with db.transaction(self._conn):
             self._conn.execute(
                 "INSERT INTO gaps_index "
-                "(id, name, status, priority, reporter, created, updated, instance_id, json_path) "
+                "(id, name, status, priority, reporter, created, updated, node_id, json_path) "
                 "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET "
                 "name = excluded.name, "
@@ -891,10 +891,10 @@ class Runner:
                 "reporter = excluded.reporter, "
                 "created = excluded.created, "
                 "updated = excluded.updated, "
-                "instance_id = excluded.instance_id, "
+                "node_id = excluded.node_id, "
                 "json_path = excluded.json_path",
                 (gap_id, name, priority, params["reporter"],
-                 gap["created"], gap["updated"], instance_id, relative_gap_path(gap_id)),
+                 gap["created"], gap["updated"], node_id, relative_gap_path(gap_id)),
             )
             search_index.upsert_gap(self._conn, gap)
         # ensure reporter exists in dropdown list
@@ -918,7 +918,7 @@ class Runner:
 
     def _h_append_round(self, params: dict) -> dict:
         gap_id = params["gap_id"]
-        row = self._require_active_gap(gap_id, columns="status, instance_id")
+        row = self._require_active_gap(gap_id, columns="status, node_id")
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -960,7 +960,7 @@ class Runner:
         return {"gap": gap}
 
     def _h_edit_round(self, params: dict) -> dict:
-        self._require_active_gap(params["gap_id"], columns="status, instance_id")
+        self._require_active_gap(params["gap_id"], columns="status, node_id")
         gap = gap_writer.edit_latest_round(
             params["gap_id"],
             actual=params.get("actual"),
@@ -1041,12 +1041,12 @@ class Runner:
         value: str,
         gap_ids: list[str],
     ) -> dict:
-        active = project_state.active_instance_id()
+        active = project_state.active_node_id()
         rows: list[sqlite3.Row] = []
         for chunk in _chunks(gap_ids):
             placeholders = ",".join("?" * len(chunk))
             rows.extend(self._conn.execute(
-                "SELECT id, status, branch_name, instance_id FROM gaps_index "
+                "SELECT id, status, branch_name, node_id FROM gaps_index "
                 f"WHERE id IN ({placeholders})",
                 chunk,
             ).fetchall())
@@ -1055,15 +1055,15 @@ class Runner:
         if missing:
             raise ValueError(f"Gap not found: {missing[0]}")
         owners = {
-            str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+            str(row["node_id"] or project_state.DEFAULT_NODE_ID)
             for row in rows
         }
         if owners != {active}:
             owner = sorted(owners - {active})[0]
-            owner_name = project_state.gap_instance_display(owner)
-            active_name = project_state.gap_instance_display(active)
+            owner_name = project_state.gap_node_display(owner)
+            active_name = project_state.gap_node_display(active)
             raise ValueError(
-                "Action not allowed: Gap is owned by another instance "
+                "Action not allowed: Gap is owned by another node "
                 f"({owner_name}). Transfer to {active_name} before making changes."
             )
 
@@ -1089,7 +1089,7 @@ class Runner:
                     placeholders = ",".join("?" * len(chunk))
                     self._conn.execute(
                         f"UPDATE gaps_index SET {field} = ?, updated = ? "
-                        f"WHERE id IN ({placeholders}) AND instance_id = ?",
+                        f"WHERE id IN ({placeholders}) AND node_id = ?",
                         [value, now, *chunk, active],
                     )
             for idx, gap_id in enumerate(gap_ids, start=1):
@@ -1133,7 +1133,7 @@ class Runner:
                     with db.transaction(self._conn):
                         self._conn.execute(
                             "UPDATE gaps_index SET reporter = ?, updated = ? "
-                            "WHERE id = ? AND instance_id = ?",
+                            "WHERE id = ? AND node_id = ?",
                             (value, now_iso(), gap_id, active),
                         )
                     updated_ids.append(gap_id)
@@ -1190,7 +1190,7 @@ class Runner:
                     placeholders = ",".join("?" * len(chunk))
                     self._conn.execute(
                         "UPDATE gaps_index SET status = ?, updated = ? "
-                        f"WHERE id IN ({placeholders}) AND instance_id = ?",
+                        f"WHERE id IN ({placeholders}) AND node_id = ?",
                         [target, now, *chunk, active],
                     )
 
@@ -1300,7 +1300,7 @@ class Runner:
                 pass
 
     def _h_log_append(self, params: dict) -> dict:
-        self._require_active_gap(params["gap_id"], columns="status, instance_id")
+        self._require_active_gap(params["gap_id"], columns="status, node_id")
         gap_writer.append_round_log(
             gap_id=params["gap_id"],
             round_idx=int(params["round_idx"]),
@@ -1371,7 +1371,7 @@ class Runner:
 
     def _h_set_notes(self, params: dict) -> dict:
         gap_id = params["gap_id"]
-        self._require_active_gap(gap_id, columns="status, instance_id")
+        self._require_active_gap(gap_id, columns="status, node_id")
         notes = params.get("notes")
         if not isinstance(notes, list):
             raise ValueError("notes must be a list of {id, author, body, ...} objects")
@@ -1426,7 +1426,7 @@ class Runner:
             self._conn,
             old_name,
             new_name,
-            instance_id=project_state.active_instance_id(),
+            node_id=project_state.active_node_id(),
         )
         activity.append(
             self._conn,
@@ -1466,7 +1466,7 @@ class Runner:
             self._conn,
             old_name,
             new_name,
-            instance_id=project_state.active_instance_id(),
+            node_id=project_state.active_node_id(),
         )
         reporters.remove(self._conn, rid)
         activity.append(
@@ -1490,7 +1490,7 @@ class Runner:
             self._conn,
             old,
             new,
-            instance_id=project_state.active_instance_id(),
+            node_id=project_state.active_node_id(),
         )
         activity.append(
             self._conn,
@@ -1669,20 +1669,20 @@ class Runner:
         # against a stale UI where the button was visible/clickable
         # after a concurrent undo from another tab.
         row = self._conn.execute(
-            "SELECT status, instance_id FROM gaps_index WHERE id = ?", (gap_id,),
+            "SELECT status, node_id FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
         if row:
-            active = project_state.active_instance_id()
-            owner = str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
+            active = project_state.active_node_id()
+            owner = str(row["node_id"] or project_state.DEFAULT_NODE_ID)
             if owner != active:
-                owner_name = project_state.gap_instance_display(owner)
-                active_name = project_state.gap_instance_display(active)
+                owner_name = project_state.gap_node_display(owner)
+                active_name = project_state.gap_node_display(active)
                 return {
                     "ok": False,
-                    "stage": "instance",
-                    "code": "instance_ownership",
+                    "stage": "node",
+                    "code": "node_ownership",
                     "message": (
-                        "Action not allowed: Gap is owned by another instance "
+                        "Action not allowed: Gap is owned by another node "
                         f"({owner_name}). Transfer to {active_name} before "
                         "making changes."
                     ),
@@ -2534,11 +2534,11 @@ class Runner:
         *,
         details: str | None,
     ) -> None:
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         rows = conn.execute(
             "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
-            "AND instance_id = ? ORDER BY updated ASC",
-            (active_instance,),
+            "AND node_id = ? ORDER BY updated ASC",
+            (active_node,),
         ).fetchall()
         for row in rows:
             gap_id = row["id"]
@@ -2555,11 +2555,11 @@ class Runner:
                 pass
 
     def _promote_rebuilt_gaps(self, conn: sqlite3.Connection) -> int:
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         rows = conn.execute(
             "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
-            "AND instance_id = ? ORDER BY updated ASC",
-            (active_instance,),
+            "AND node_id = ? ORDER BY updated ASC",
+            (active_node,),
         ).fetchall()
         if not rows:
             return 0
@@ -2574,8 +2574,8 @@ class Runner:
         with db.transaction(conn):
             conn.execute(
                 "UPDATE gaps_index SET status = ?, updated = ? "
-                "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-                (next_status, updated, active_instance),
+                "WHERE status = 'awaiting-rebuild' AND node_id = ?",
+                (next_status, updated, active_node),
             )
         for row in rows:
             gid = row["id"]

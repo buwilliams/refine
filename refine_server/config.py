@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import os
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,11 +49,11 @@ def unit_name_for(clone_dir: Path) -> str:
     Derived from the checkout directory's basename, lowercased, with anything
     outside [a-z0-9._-] collapsed to '-'. The prefix `refine-` is added
     if the basename does not already start with it, so
-    `systemctl list-units 'refine*'` lists every refine instance.
+    `systemctl list-units 'refine*'` lists every refine node.
     """
     import re
     base = clone_dir.resolve().name.lower()
-    base = re.sub(r"[^a-z0-9._-]+", "-", base).strip("-") or "instance"
+    base = re.sub(r"[^a-z0-9._-]+", "-", base).strip("-") or "node"
     if not base.startswith("refine-"):
         base = f"refine-{base}"
     return base
@@ -181,7 +182,12 @@ def find_config(start: Path | None = None) -> Path | None:
 
 def find_binding(start: Path | None = None) -> Path | None:
     """Look for `.refine-binding` in cwd (or `start`) and its ancestors."""
-    start = (start or Path.cwd()).resolve()
+    if start is None:
+        try:
+            start = Path.cwd()
+        except FileNotFoundError:
+            return None
+    start = start.resolve()
     for d in [start, *start.parents]:
         b = d / BINDING_FILENAME
         if b.is_file():
@@ -205,7 +211,10 @@ def local_run_dir(start: Path | None = None) -> Path:
     cached = globals().get("_cached")
     if cached is not None:
         return cached.client_repo / "run"
-    return Path.cwd().resolve() / "run"
+    try:
+        return Path.cwd().resolve() / "run"
+    except FileNotFoundError:
+        return Path(tempfile.gettempdir()) / "refine-run"
 
 
 def runtime_scope() -> str:
@@ -306,6 +315,25 @@ def ensure_refine_gitignore(volume_root: Path) -> Path:
     return path
 
 
+def ensure_runtime_gitignore(client_repo: Path) -> Path:
+    """Ensure checkout-local runtime sockets/logs are not stashed or committed."""
+    client_repo = client_repo.resolve()
+    git_dir = client_repo / ".git"
+    path = (
+        git_dir / "info" / "exclude"
+        if git_dir.is_dir()
+        else client_repo / ".gitignore"
+    )
+    existing = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+    next_lines = list(existing)
+    if "/run/" not in next_lines:
+        next_lines.append("/run/")
+    if next_lines != existing or not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("\n".join(next_lines).rstrip() + "\n", encoding="utf-8")
+    return path
+
+
 def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     """Write a default refine.toml to `volume_root` (creating the directory).
 
@@ -324,6 +352,7 @@ def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     (volume_root / "gaps").mkdir(exist_ok=True)
 
     ensure_refine_gitignore(volume_root)
+    ensure_runtime_gitignore(volume_root.parent)
     return cfg
 
 

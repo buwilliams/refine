@@ -43,8 +43,8 @@ def main() -> int:
         assert [item["name"] for item in saved] == ["Accessibility", "Database"]
         assert [item["enabled"] for item in saved] == [True, False]
         assert (client / ".refine" / "guidance.json").exists()
-        other = project_state.create_instance("Laptop")
-        project_state.set_active_instance(other["id"])
+        other = project_state.create_node("Laptop")
+        project_state.set_active_node(other["id"])
         assert [item["name"] for item in project_state.list_guidance()] == [
             "Accessibility", "Database",
         ]

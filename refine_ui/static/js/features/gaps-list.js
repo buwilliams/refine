@@ -2,7 +2,7 @@
 
 const GAPS_DEFAULT_DIR = {
   name: "asc", status: "asc", priority: "asc",
-  reporter: "asc", instance: "asc", updated: "desc", id: "desc",
+  reporter: "asc", node: "asc", updated: "desc", id: "desc",
 };
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
@@ -14,7 +14,7 @@ function gapsHash(parts) {
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
   if (parts.reporter) next.set("reporter", parts.reporter);
-  if (parts.instance) next.set("instance", parts.instance);
+  if (parts.node) next.set("node", parts.node);
   if (parts.severity) next.set("severity", parts.severity);
   if (parts.category) next.set("category", parts.category);
   if (parts.actor)    next.set("actor", parts.actor);
@@ -62,12 +62,12 @@ async function renderGapsList() {
           ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
-        <select id="filter-instance">
-          <option value="" ${f.instance === "" ? "selected" : ""}>all instances</option>
-          <option value="current" ${f.instance === "current" ? "selected" : ""}>current instance</option>
-          <option value="unknown" ${f.instance === "unknown" ? "selected" : ""}>unknown instance</option>
-          ${(state.project?.instances || []).map((inst) =>
-            `<option value="${htmlEscape(inst.id)}" ${inst.id === f.instance ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
+        <select id="filter-node">
+          <option value="" ${f.node === "" ? "selected" : ""}>all nodes</option>
+          <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
+          <option value="unknown" ${f.node === "unknown" ? "selected" : ""}>unknown node</option>
+          ${(state.project?.nodes || []).map((inst) =>
+            `<option value="${htmlEscape(inst.id)}" ${inst.id === f.node ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
         </select>
         <select id="gaps-severity">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
@@ -90,7 +90,7 @@ async function renderGapsList() {
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
-        <button class="secondary small" id="bulk-transfer-instance">Instance…</button>
+        <button class="secondary small" id="bulk-transfer-node">Node…</button>
         <button class="secondary small" id="bulk-delete">Delete…</button>
       </div>
     </div>
@@ -111,8 +111,8 @@ async function renderGapsList() {
     updateGapsFilter({ status: e.target.value, page: 1 }));
   $("#filter-reporter").addEventListener("change", (e) =>
     updateGapsFilter({ reporter: e.target.value, page: 1 }));
-  $("#filter-instance").addEventListener("change", (e) =>
-    updateGapsFilter({ instance: e.target.value, page: 1 }));
+  $("#filter-node").addEventListener("change", (e) =>
+    updateGapsFilter({ node: e.target.value, page: 1 }));
   $("#gaps-severity").addEventListener("change", (e) =>
     updateGapsFilter({ severity: e.target.value, page: 1 }));
   $("#gaps-category").addEventListener("change", (e) =>
@@ -133,7 +133,7 @@ async function renderGapsList() {
   bindCommand("#bulk-set-priority", "gaps.bulk.priority");
   bindCommand("#bulk-set-status", "gaps.bulk.status");
   bindCommand("#bulk-set-reporter", "gaps.bulk.reporter");
-  bindCommand("#bulk-transfer-instance", "gaps.bulk.transfer_instance");
+  bindCommand("#bulk-transfer-node", "gaps.bulk.transfer_node");
   bindCommand("#bulk-delete", "gaps.bulk.delete");
   bindCommand("#gap-select-page", "gaps.select_page");
 
@@ -159,7 +159,7 @@ function gapsFilterFromHash() {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
     reporter: hashQs.get("reporter") || "",
-    instance: hashQs.get("instance") || "",
+    node: hashQs.get("node") || "",
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
     actor: hashQs.get("actor") || "",
@@ -180,7 +180,7 @@ function updateGapsFilter(patch) {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
     reporter: "reporter" in patch ? patch.reporter : current.reporter,
-    instance: "instance" in patch ? patch.instance : current.instance,
+    node: "node" in patch ? patch.node : current.node,
     severity: "severity" in patch ? patch.severity : current.severity,
     category: "category" in patch ? patch.category : current.category,
     actor: "actor" in patch ? patch.actor : current.actor,
@@ -201,7 +201,7 @@ async function refreshGapsTable() {
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
   if (f.reporter) params.set("reporter", f.reporter);
-  if (f.instance) params.set("instance", f.instance);
+  if (f.node) params.set("node", f.node);
   if (f.severity) params.set("severity", f.severity);
   if (f.category) params.set("category", f.category);
   if (f.actor) params.set("actor", f.actor);
@@ -309,7 +309,7 @@ function drawGapsTable(gaps, state) {
     { key: "status",   label: "Status",   sortable: true },
     { key: "priority", label: "Priority", sortable: true },
     { key: "reporter", label: "Reporter", sortable: true },
-    { key: "instance", label: "Instance", sortable: true },
+    { key: "node", label: "Node", sortable: true },
     { key: "updated",  label: "Updated",  sortable: true },
   ];
   const sortHeads = columns.map((c) => {
@@ -339,7 +339,7 @@ function drawGapsTable(gaps, state) {
         <col class="gaps-col-status">
         <col class="gaps-col-priority">
         <col class="gaps-col-reporter">
-        <col class="gaps-col-instance">
+        <col class="gaps-col-node">
         <col class="gaps-col-updated">
       </colgroup>
       <thead><tr>${selectionHead}${sortHeads}</tr></thead>
@@ -360,7 +360,7 @@ function drawGapsTable(gaps, state) {
             <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
             <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
-            <td class="muted small" data-label="Instance">${htmlEscape(g.instance_display_name || g.instance_id || "Unknown")}</td>
+            <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
             <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
           </tr>`;
         }).join("")}

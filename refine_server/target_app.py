@@ -701,7 +701,7 @@ _MANAGE_SCRIPT_TEMPLATE = """\
 #
 # Regenerated whenever you click "Generate with AI". Edit it freely - Refine
 # only calls the four subcommands above, and you can override the saved
-# commands in Settings > Instance > Application.
+# commands in Settings > Node > Application.
 #
 # Detected stack: __SUMMARY__
 

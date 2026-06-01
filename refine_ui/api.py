@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from refine_server import activity, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, regressions, reporters, round_logs, search_index, upgrade
+from refine_server import activity, cluster, config, db, gap_writer, gaps as shared_gaps, governance, project_registry, project_state, quality, regressions, reporters, round_logs, search_index, upgrade
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -696,8 +696,8 @@ def files_read(
     }
 
 
-def _instance_owner(instance_id: str | None) -> str:
-    return str(instance_id or project_state.DEFAULT_INSTANCE_ID)
+def _node_owner(node_id: str | None) -> str:
+    return str(node_id or project_state.DEFAULT_NODE_ID)
 
 
 def _ownership_error(
@@ -706,18 +706,18 @@ def _ownership_error(
     active_id: str | None = None,
     count: int = 1,
 ) -> tuple[int, dict]:
-    owner = _instance_owner(owner_id)
-    active = active_id or project_state.active_instance_id()
-    owner_name = project_state.gap_instance_display(owner)
-    active_name = project_state.gap_instance_display(active)
+    owner = _node_owner(owner_id)
+    active = active_id or project_state.active_node_id()
+    owner_name = project_state.gap_node_display(owner)
+    active_name = project_state.gap_node_display(active)
     subject = "Gap is" if count == 1 else f"{count} Gaps are"
     return err(
         409,
         (
-            f"Action not allowed: {subject} owned by another instance "
+            f"Action not allowed: {subject} owned by another node "
             f"({owner_name}). Transfer to {active_name} before making changes."
         ),
-        error_code="instance_ownership",
+        error_code="node_ownership",
     )
 
 
@@ -725,7 +725,7 @@ def _require_active_gap(
     conn: sqlite3.Connection,
     gap_id: str,
     *,
-    columns: str = "status, branch_name, instance_id",
+    columns: str = "status, branch_name, node_id",
 ) -> tuple[sqlite3.Row | None, tuple[int, dict] | None]:
     row = conn.execute(
         f"SELECT {columns} FROM gaps_index WHERE id = ?",
@@ -733,9 +733,9 @@ def _require_active_gap(
     ).fetchone()
     if not row:
         return None, err(404, "Gap not found")
-    active = project_state.active_instance_id()
-    if _instance_owner(row["instance_id"]) != active:
-        return None, _ownership_error(row["instance_id"], active_id=active)
+    active = project_state.active_node_id()
+    if _node_owner(row["node_id"]) != active:
+        return None, _ownership_error(row["node_id"], active_id=active)
     return row, None
 
 
@@ -744,20 +744,20 @@ def _require_active_gap_ids(gap_ids: list[str]) -> tuple[bool, tuple[int, dict] 
         return True, None
     conn = _conn()
     try:
-        active = project_state.active_instance_id()
+        active = project_state.active_node_id()
         rows = []
         for chunk in _id_chunks(gap_ids):
             placeholders = ",".join("?" * len(chunk))
             rows.extend(conn.execute(
-                f"SELECT id, instance_id FROM gaps_index WHERE id IN ({placeholders})",
+                f"SELECT id, node_id FROM gaps_index WHERE id IN ({placeholders})",
                 chunk,
             ).fetchall())
     finally:
         conn.close()
     violations = [
-        _instance_owner(row["instance_id"])
+        _node_owner(row["node_id"])
         for row in rows
-        if _instance_owner(row["instance_id"]) != active
+        if _node_owner(row["node_id"]) != active
     ]
     if violations:
         return False, _ownership_error(
@@ -842,9 +842,9 @@ def project_status() -> tuple[int, dict]:
     else:
         apps = _ensure_current_app(apps, cfg.client_repo)
     schema = project_state.schema_status(cfg.volume_root)
-    instance_summary = _instance_summary() if schema.get("compatible") else {
-        "instances": [],
-        "active_instance_id": "",
+    node_summary = _node_summary() if schema.get("compatible") else {
+        "nodes": [],
+        "active_node_id": "",
     }
     return 200, {
         "attached": True,
@@ -855,7 +855,7 @@ def project_status() -> tuple[int, dict]:
         "config_path": str(cfg.config_path),
         "schema": schema,
         "scaffold_required": _project_needs_scaffold_template(cfg.client_repo),
-        **instance_summary,
+        **node_summary,
     }
 
 
@@ -942,9 +942,9 @@ def project_sync(_: dict[str, Any] | None = None) -> tuple[int, dict]:
     return 200, result
 
 
-# --- Instances ---------------------------------------------------------------
+# --- Nodes ---------------------------------------------------------------
 
-def list_instances() -> tuple[int, dict]:
+def list_nodes() -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
         return blocked
@@ -952,55 +952,55 @@ def list_instances() -> tuple[int, dict]:
     try:
         counts = {}
         for row in conn.execute(
-            "SELECT instance_id, status, COUNT(*) AS n "
-            "FROM gaps_index GROUP BY instance_id, status"
+            "SELECT node_id, status, COUNT(*) AS n "
+            "FROM gaps_index GROUP BY node_id, status"
         ):
-            counts.setdefault(row["instance_id"] or "", {})[row["status"]] = row["n"]
+            counts.setdefault(row["node_id"] or "", {})[row["status"]] = row["n"]
     finally:
         conn.close()
-    instances = project_state.list_instances()
-    known = {i.get("id") for i in instances}
+    nodes = project_state.list_nodes()
+    known = {i.get("id") for i in nodes}
     unknown_ids = [iid for iid in counts if iid and iid not in known]
     return 200, {
-        "instances": instances,
-        "active_instance_id": project_state.active_instance_id(),
+        "nodes": nodes,
+        "active_node_id": project_state.active_node_id(),
         "counts": counts,
-        "unknown_instance_ids": unknown_ids,
+        "unknown_node_ids": unknown_ids,
     }
 
 
-@_exclusive_mutation("Create instance")
-def create_instance(body: dict[str, Any]) -> tuple[int, dict]:
+@_exclusive_mutation("Create node")
+def create_node(body: dict[str, Any]) -> tuple[int, dict]:
     name = (body.get("display_name") or body.get("name") or "").strip()
     if not name:
         return err(400, "display_name is required")
-    entry = project_state.create_instance(name)
+    entry = project_state.create_node(name)
     _rebuild_cache()
-    return 201, {"instance": entry, **_instance_summary()}
+    return 201, {"node": entry, **_node_summary()}
 
 
-@_exclusive_mutation("Update instance")
-def update_instance(instance_id: str, body: dict[str, Any]) -> tuple[int, dict]:
+@_exclusive_mutation("Update node")
+def update_node(node_id: str, body: dict[str, Any]) -> tuple[int, dict]:
     try:
-        entry = project_state.update_instance(
-            instance_id,
+        entry = project_state.update_node(
+            node_id,
             display_name=body.get("display_name") if "display_name" in body else body.get("name"),
             archived=body.get("archived") if "archived" in body else None,
         )
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
-    return 200, {"instance": entry, **_instance_summary()}
+    return 200, {"node": entry, **_node_summary()}
 
 
-@_exclusive_mutation("Copy instance settings")
-def copy_instance_settings(body: dict[str, Any]) -> tuple[int, dict]:
-    source = (body.get("source_instance_id") or body.get("instance_id") or "").strip()
+@_exclusive_mutation("Copy node settings")
+def copy_node_settings(body: dict[str, Any]) -> tuple[int, dict]:
+    source = (body.get("source_node_id") or body.get("node_id") or "").strip()
     section = (body.get("section") or "").strip()
     if not source:
-        return err(400, "source_instance_id is required")
+        return err(400, "source_node_id is required")
     try:
-        result = project_state.copy_instance_settings(source, section)
+        result = project_state.copy_node_settings(source, section)
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
@@ -1011,7 +1011,7 @@ def copy_instance_settings(body: dict[str, Any]) -> tuple[int, dict]:
             conn,
             message=(
                 f"Copied {section} settings from "
-                f"{project_state.gap_instance_display(source)}"
+                f"{project_state.gap_node_display(source)}"
             ),
             severity="info",
             category="settings",
@@ -1022,20 +1022,20 @@ def copy_instance_settings(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, {"ok": True, "settings": settings, **result}
 
 
-@_exclusive_mutation("Activate instance")
-def activate_instance(body: dict[str, Any]) -> tuple[int, dict]:
-    instance_id = (body.get("instance_id") or body.get("id") or "").strip()
-    if not instance_id:
-        return err(400, "instance_id is required")
+@_exclusive_mutation("Activate node")
+def activate_node(body: dict[str, Any]) -> tuple[int, dict]:
+    node_id = (body.get("node_id") or body.get("id") or "").strip()
+    if not node_id:
+        return err(400, "node_id is required")
     try:
-        project_state.set_active_instance(instance_id)
+        project_state.set_active_node(node_id)
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
     try:
         get_client().call(
             M_CHAT_RESET_ALL,
-            {"reason": "instance activated"},
+            {"reason": "node activated"},
             timeout=10.0,
         )
     except BackendError:
@@ -1044,20 +1044,20 @@ def activate_instance(body: dict[str, Any]) -> tuple[int, dict]:
         get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
     except BackendError:
         pass
-    return 200, {"ok": True, **_instance_summary()}
+    return 200, {"ok": True, **_node_summary()}
 
 
-@_exclusive_mutation("Transfer Gaps between instances")
-def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
-    target = (body.get("target_instance_id") or "").strip()
-    source = (body.get("source_instance_id") or "").strip() or None
+@_exclusive_mutation("Transfer Gaps between nodes")
+def transfer_node_gaps(body: dict[str, Any]) -> tuple[int, dict]:
+    target = (body.get("target_node_id") or "").strip()
+    source = (body.get("source_node_id") or "").strip() or None
     if not target:
-        return err(400, "target_instance_id is required")
-    target_instance = project_state.instance_by_id(target)
-    if target_instance is None:
-        return err(400, f"unknown target instance: {target}")
-    if target_instance.get("archived"):
-        return err(400, f"archived target instance: {target}")
+        return err(400, "target_node_id is required")
+    target_node = project_state.node_by_id(target)
+    if target_node is None:
+        return err(400, f"unknown target node: {target}")
+    if target_node.get("archived"):
+        return err(400, f"archived target node: {target}")
     statuses = body.get("statuses")
     allowed = None
     if statuses is not None:
@@ -1083,7 +1083,7 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
             category=filt.get("category") or None,
             actor=filt.get("actor") or None,
             reporter=filt.get("reporter") or None,
-            instance=filt.get("instance") or None,
+            node=filt.get("node") or None,
             limit=10_000,
         )
         if code != 200:
@@ -1119,7 +1119,7 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     except ValueError as e:
         return err(400, str(e))
     _rebuild_cache()
-    if _should_enforce_after_instance_transfer(result.get("ids") or []):
+    if _should_enforce_after_node_transfer(result.get("ids") or []):
         try:
             get_client().call(M_ENFORCE_SCHEDULING, {}, timeout=10.0)
         except BackendError:
@@ -1128,10 +1128,57 @@ def transfer_instance_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, result
 
 
-def _should_enforce_after_instance_transfer(gap_ids: list[str]) -> bool:
+def list_cluster() -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    return 200, cluster.read_cluster()
+
+
+@_exclusive_mutation("Upsert cluster node")
+def upsert_cluster_node(body: dict[str, Any]) -> tuple[int, dict]:
+    try:
+        node = cluster.upsert_node(body)
+    except ValueError as e:
+        return err(400, str(e))
+    _rebuild_cache()
+    return 200, {"node": node, **cluster.read_cluster()}
+
+
+@_exclusive_mutation("Update cluster node")
+def update_cluster_node(node_id: str, body: dict[str, Any]) -> tuple[int, dict]:
+    try:
+        node = cluster.update_node(node_id, body)
+    except ValueError as e:
+        return err(400, str(e))
+    _rebuild_cache()
+    return 200, {"node": node, **cluster.read_cluster()}
+
+
+def run_cluster_node(node_id: str, body: dict[str, Any]) -> tuple[int, dict]:
+    args = body.get("args")
+    if not isinstance(args, list):
+        return err(400, "args must be a list")
+    try:
+        result = cluster.run_remote(node_id, [str(arg) for arg in args])
+    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        return err(400, str(e))
+    return (200 if result.get("ok") else 502), result
+
+
+@_exclusive_mutation("Bootstrap cluster node")
+def bootstrap_cluster_node(node_id: str, _body: dict[str, Any] | None = None) -> tuple[int, dict]:
+    try:
+        result = cluster.bootstrap(node_id)
+    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        return err(400, str(e))
+    return (200 if result.get("ok") else 502), result
+
+
+def _should_enforce_after_node_transfer(gap_ids: list[str]) -> bool:
     if not gap_ids:
         return False
-    active = project_state.active_instance_id()
+    active = project_state.active_node_id()
     placeholders = ",".join("?" * len(gap_ids))
     conn = _conn()
     try:
@@ -1140,7 +1187,7 @@ def _should_enforce_after_instance_transfer(gap_ids: list[str]) -> bool:
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
             f"WHERE id IN ({placeholders}) "
-            "AND instance_id = ? AND status = 'todo'",
+            "AND node_id = ? AND status = 'todo'",
             [*gap_ids, active],
         ).fetchone()
         return bool(row and int(row["n"] or 0) > 0)
@@ -1172,7 +1219,7 @@ def update_guidance(body: dict[str, Any]) -> tuple[int, dict]:
 
 
 def _cancel_active_transfer_gaps(
-    source_instance_id: str | None,
+    source_node_id: str | None,
     gap_ids: set[str] | None,
 ) -> dict[str, Any]:
     conn = _conn()
@@ -1181,9 +1228,9 @@ def _cancel_active_transfer_gaps(
         db.set_setting(conn, "agents_paused", "1")
         where = ["status IN ('in-progress', 'qa', 'ready-merge', 'awaiting-rebuild')"]
         args: list[Any] = []
-        if source_instance_id:
-            where.append("instance_id = ?")
-            args.append(source_instance_id)
+        if source_node_id:
+            where.append("node_id = ?")
+            args.append(source_node_id)
         if gap_ids is not None:
             if not gap_ids:
                 return {
@@ -1201,7 +1248,7 @@ def _cancel_active_transfer_gaps(
         active_ids = [r["id"] for r in rows]
         activity.append(
             conn,
-            message="Agents paused for instance transfer",
+            message="Agents paused for node transfer",
             severity="warn",
             category="state",
             actor="refine",
@@ -1537,7 +1584,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "apps": project_registry.list_apps(clone_dir),
         "registry_enabled": True,
         "schema": project_state.schema_status(cfg.volume_root),
-        **_instance_summary(),
+        **_node_summary(),
         "switch_warnings": prep.get("warnings", []),
         "scaffold_required": scaffold_required,
         "scaffold_templates": list_project_templates()[1]["templates"],
@@ -1754,7 +1801,7 @@ def _create_indexed_gap(
     priority: str,
 ) -> dict[str, Any]:
     gap_id = new_ulid()
-    instance_id = project_state.active_instance_id()
+    node_id = project_state.active_node_id()
     round_obj = shared_gaps.new_round(
         reporter=reporter,
         actual=actual,
@@ -1766,7 +1813,7 @@ def _create_indexed_gap(
         initial_round=round_obj,
         status="backlog",
         priority=priority,
-        instance_id=instance_id,
+        node_id=node_id,
     )
 
     from refine_server.paths import relative_gap_path
@@ -1776,7 +1823,7 @@ def _create_indexed_gap(
         with db.transaction(conn):
             conn.execute(
                 "INSERT INTO gaps_index "
-                "(id, name, status, priority, reporter, created, updated, instance_id, json_path) "
+                "(id, name, status, priority, reporter, created, updated, node_id, json_path) "
                 "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?)",
                 (
                     gap_id,
@@ -1785,7 +1832,7 @@ def _create_indexed_gap(
                     reporter,
                     gap["created"],
                     gap["updated"],
-                    instance_id,
+                    node_id,
                     relative_gap_path(gap_id),
                 ),
             )
@@ -1923,17 +1970,17 @@ def _detach_current_project(clone_dir: Path, target: Path) -> None:
     runtime.detach_configured()
 
 
-def _instance_summary() -> dict[str, Any]:
+def _node_summary() -> dict[str, Any]:
     try:
-        instances = project_state.list_instances()
-        active = project_state.active_instance_id()
+        nodes = project_state.list_nodes()
+        active = project_state.active_node_id()
     except Exception:
-        return {"instances": [], "active_instance_id": ""}
+        return {"nodes": [], "active_node_id": ""}
     return {
-        "instances": instances,
-        "active_instance_id": active,
-        "active_instance": next(
-            (i for i in instances if i.get("id") == active),
+        "nodes": nodes,
+        "active_node_id": active,
+        "active_node": next(
+            (i for i in nodes if i.get("id") == active),
             None,
         ),
     }
@@ -2082,7 +2129,7 @@ _GAPS_SORT_EXPRESSIONS: dict[str, str] = {
     "status":   "status",
     "priority": "CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END",
     "reporter": "reporter COLLATE NOCASE",
-    "instance": "instance_id COLLATE NOCASE",
+    "node": "node_id COLLATE NOCASE",
     "updated":  "updated",
     "created":  "created",
     "id":       "id",
@@ -2093,7 +2140,7 @@ _GAPS_DEFAULT_DIR: dict[str, str] = {
     "status":   "ASC",
     "priority": "ASC",   # CASE maps high=0, so ASC = high first
     "reporter": "ASC",
-    "instance": "ASC",
+    "node": "ASC",
     "updated":  "DESC",
     "created":  "DESC",
     "id":       "DESC",
@@ -2139,7 +2186,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
               category: str | None = None,
               actor: str | None = None,
               reporter: str | None = None,
-              instance: str | None = None,
+              node: str | None = None,
               limit: int = 50,
               offset: int = 0,
               sort: str | None = None,
@@ -2167,7 +2214,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     fts_match = search_index.fts_query(q)
     sql = [
         "SELECT id, name, status, priority, reporter, "
-        "created, updated, branch_name, instance_id "
+        "created, updated, branch_name, node_id "
         "FROM gaps_index"
     ]
     args: list[Any] = []
@@ -2197,23 +2244,23 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
-    if instance:
-        if instance == "current":
-            where.append("instance_id = ?")
-            args.append(project_state.active_instance_id())
-        elif instance == "unknown":
-            known = [i.get("id") for i in project_state.list_instances()]
+    if node:
+        if node == "current":
+            where.append("node_id = ?")
+            args.append(project_state.active_node_id())
+        elif node == "unknown":
+            known = [i.get("id") for i in project_state.list_nodes()]
             if known:
                 where.append(
-                    "(instance_id = '' OR instance_id NOT IN ("
+                    "(node_id = '' OR node_id NOT IN ("
                     + ",".join("?" * len(known)) + "))"
                 )
                 args.extend(known)
             else:
                 where.append("1 = 1")
-        elif instance != "all":
-            where.append("instance_id = ?")
-            args.append(instance)
+        elif node != "all":
+            where.append("node_id = ?")
+            args.append(node)
     # Activity-derived filters: gap must have at least one matching entry.
     if severity or category or actor:
         sub_where = ["gap_id IS NOT NULL"]
@@ -2274,7 +2321,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
             "category": category or "",
             "actor": actor or "",
             "reporter": reporter or "",
-            "instance": instance or "",
+            "node": node or "",
             "limit": page_limit,
             "offset": page_offset,
             "sort": sort or "",
@@ -2304,7 +2351,7 @@ def _select_bulk_update_candidates(
                 placeholders = ",".join("?" * len(chunk))
                 rows = conn.execute(
                     "SELECT id, name, status, priority, reporter, "
-                    "created, updated, branch_name, instance_id "
+                    "created, updated, branch_name, node_id "
                     f"FROM gaps_index WHERE id IN ({placeholders})",
                     chunk,
                 ).fetchall()
@@ -2325,7 +2372,7 @@ def _select_bulk_update_candidates(
     reporter = filt.get("reporter") or None
     sql = [
         "SELECT id, name, status, priority, reporter, "
-        "created, updated, branch_name, instance_id "
+        "created, updated, branch_name, node_id "
         "FROM gaps_index"
     ]
     args: list[Any] = []
@@ -2349,24 +2396,24 @@ def _select_bulk_update_candidates(
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
-    instance = filt.get("instance") or None
-    if instance:
-        if instance == "current":
-            where.append("instance_id = ?")
-            args.append(project_state.active_instance_id())
-        elif instance == "unknown":
-            known = [i.get("id") for i in project_state.list_instances()]
+    node = filt.get("node") or None
+    if node:
+        if node == "current":
+            where.append("node_id = ?")
+            args.append(project_state.active_node_id())
+        elif node == "unknown":
+            known = [i.get("id") for i in project_state.list_nodes()]
             if known:
                 where.append(
-                    "(instance_id = '' OR instance_id NOT IN ("
+                    "(node_id = '' OR node_id NOT IN ("
                     + ",".join("?" * len(known)) + "))"
                 )
                 args.extend(known)
             else:
                 where.append("1 = 1")
-        elif instance != "all":
-            where.append("instance_id = ?")
-            args.append(instance)
+        elif node != "all":
+            where.append("node_id = ?")
+            args.append(node)
     if severity or category or actor:
         sub_where = ["gap_id IS NOT NULL"]
         sub_args: list[Any] = []
@@ -2428,7 +2475,7 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
         row = conn.execute(
-            "SELECT id, name, status, priority, created, updated, branch_name, instance_id "
+            "SELECT id, name, status, priority, created, updated, branch_name, node_id "
             "FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
         if not row:
@@ -2446,8 +2493,8 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     gap["status"] = row["status"]
     gap["priority"] = row["priority"] or "low"
     gap["branch_name"] = row["branch_name"]
-    gap["instance_id"] = row["instance_id"]
-    gap["instance_display_name"] = project_state.gap_instance_display(row["instance_id"])
+    gap["node_id"] = row["node_id"]
+    gap["node_display_name"] = project_state.gap_node_display(row["node_id"])
     rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
     log_counts = round_logs.count_by_round(gap_id, len(rounds))
     for idx, round_obj in enumerate(rounds):
@@ -2612,8 +2659,8 @@ def _activity_for_round(
 
 
 def _enrich_gap_row(row: dict[str, Any]) -> dict[str, Any]:
-    row["instance_display_name"] = project_state.gap_instance_display(
-        row.get("instance_id"),
+    row["node_display_name"] = project_state.gap_node_display(
+        row.get("node_id"),
     )
     return row
 
@@ -2741,7 +2788,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             return transition_err
     paused_after_update = False
     if sql_fields:
-        active = project_state.active_instance_id()
+        active = project_state.active_node_id()
         updated_at = now_iso()
         set_clause = ", ".join(f"{k} = ?" for k in sql_fields) + ", updated = ?"
         args = list(sql_fields.values()) + [updated_at, gap_id, active]
@@ -2750,7 +2797,7 @@ def update_gap_name(gap_id: str, body: dict) -> tuple[int, dict]:
             with db.transaction(conn):
                 cur = conn.execute(
                     f"UPDATE gaps_index SET {set_clause} "
-                    "WHERE id = ? AND instance_id = ?",
+                    "WHERE id = ? AND node_id = ?",
                     args,
                 )
                 paused_after_update = _agents_paused(conn)
@@ -2825,9 +2872,9 @@ def delete_gap(gap_id: str) -> tuple[int, dict]:
 
 
 def bulk_update_gaps(body: dict) -> tuple[int, dict]:
-    allow_active_kinds = (
-        {"merge_agent"} if _is_last_workflow_bulk_update(body) else None
-    )
+    allow_active_kinds = {"target_app_rebuild"}
+    if _is_last_workflow_bulk_update(body):
+        allow_active_kinds.add("merge_agent")
     try:
         with background_jobs.exclusive_operation(
             "Bulk update Gaps",
@@ -2854,9 +2901,9 @@ def _bulk_update_gaps_impl(body: dict) -> tuple[int, dict]:
     status operation, which asks the runner to reopen safe retry queues
     (`todo` or `ready-merge`) from each Gap's latest workflow history.
     """
-    allow_active_kinds = (
-        {"merge_agent"} if _is_last_workflow_bulk_update(body) else None
-    )
+    allow_active_kinds = {"target_app_rebuild"}
+    if _is_last_workflow_bulk_update(body):
+        allow_active_kinds.add("merge_agent")
     update = body.get("update") or {}
     update = {k: v for k, v in update.items()
               if k in ("priority", "status", "reporter")}
@@ -3105,7 +3152,7 @@ def append_round(gap_id: str, body: dict) -> tuple[int, dict]:
     conn = _conn()
     try:
         row, ownership_err = _require_active_gap(
-            conn, gap_id, columns="status, instance_id",
+            conn, gap_id, columns="status, node_id",
         )
     finally:
         conn.close()
@@ -3136,7 +3183,7 @@ def edit_latest_round(gap_id: str, body: dict) -> tuple[int, dict]:
     conn = _conn()
     try:
         row, ownership_err = _require_active_gap(
-            conn, gap_id, columns="status, instance_id",
+            conn, gap_id, columns="status, node_id",
         )
     finally:
         conn.close()
@@ -3246,7 +3293,7 @@ def retry(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
         row, ownership_err = _require_active_gap(
-            conn, gap_id, columns="status, instance_id",
+            conn, gap_id, columns="status, node_id",
         )
         if ownership_err is not None:
             return ownership_err
@@ -3273,8 +3320,8 @@ def retry(gap_id: str) -> tuple[int, dict]:
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'todo', updated = ? "
-                "WHERE id = ? AND instance_id = ?",
-                (now_iso(), gap_id, project_state.active_instance_id()),
+                "WHERE id = ? AND node_id = ?",
+                (now_iso(), gap_id, project_state.active_node_id()),
             )
         if not cur.rowcount:
             return _ownership_error(None)
@@ -3346,7 +3393,7 @@ def cancel(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
         row, ownership_err = _require_active_gap(
-            conn, gap_id, columns="status, instance_id",
+            conn, gap_id, columns="status, node_id",
         )
     finally:
         conn.close()
@@ -4318,10 +4365,10 @@ def cleanup_logs(body: dict) -> tuple[int, dict]:
     return 200, {"deleted": deleted, "days_kept": days}
 
 
-def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
-    instance_scope = (instance or "current").strip() or "current"
-    if instance_scope not in ("all", "current"):
-        instance_scope = "current"
+def dashboard_summary(*, node: str | None = None) -> tuple[int, dict]:
+    node_scope = (node or "current").strip() or "current"
+    if node_scope not in ("all", "current"):
+        node_scope = "current"
     if not _project_attached():
         return 200, {
             "counts": {},
@@ -4332,11 +4379,11 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
             "activity": [],
             "runner_reachable": False,
             "reporter_stats": [],
-            "instance_scope": instance_scope,
-            "instance_filter": "all" if instance_scope == "all" else "current",
+            "node_scope": node_scope,
+            "node_filter": "all" if node_scope == "all" else "current",
             "quality_timing": "pre_merge",
-            "active_instance_id": "",
-            "active_instance_display_name": "",
+            "active_node_id": "",
+            "active_node_display_name": "",
             "needs_attention": [],
             "attached": False,
         }
@@ -4344,19 +4391,19 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
     if blocked is not None:
         return blocked
     runner_snap = runtime.runner_status_snapshot()
-    active_instance_id = project_state.active_instance_id()
-    instance_where = ""
-    instance_args: list[Any] = []
-    if instance_scope == "current":
-        instance_where = "WHERE instance_id = ?"
-        instance_args.append(active_instance_id)
+    active_node_id = project_state.active_node_id()
+    node_where = ""
+    node_args: list[Any] = []
+    if node_scope == "current":
+        node_where = "WHERE node_id = ?"
+        node_args.append(active_node_id)
     conn = _conn()
     try:
         counts = {}
         for row in conn.execute(
             "SELECT status, COUNT(*) AS n FROM gaps_index "
-            f"{instance_where} GROUP BY status",
-            instance_args,
+            f"{node_where} GROUP BY status",
+            node_args,
         ):
             counts[row["status"]] = row["n"]
         pf = conn.execute(
@@ -4373,9 +4420,9 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
         # gives us exact counts without reading every gap.json.
         reporter_where = "WHERE reporter != ''"
         reporter_args = []
-        if instance_where:
-            reporter_where += " AND instance_id = ?"
-            reporter_args.append(active_instance_id)
+        if node_where:
+            reporter_where += " AND node_id = ?"
+            reporter_args.append(active_node_id)
         stat_rows = conn.execute(
             "SELECT reporter, status, COUNT(*) AS n "
             "FROM gaps_index "
@@ -4385,7 +4432,7 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
         ).fetchall()
         known_reporters = (
             [r["name"] for r in reporters.list_all(conn)]
-            if instance_scope == "all"
+            if node_scope == "all"
             else []
         )
         provider = (db.get_setting(conn, "agent_cli") or "claude").strip().lower()
@@ -4403,14 +4450,14 @@ def dashboard_summary(*, instance: str | None = None) -> tuple[int, dict]:
         "activity": feed,
         "runner_reachable": runner_reachable,
         "reporter_stats": reporter_stats,
-        "instance_scope": instance_scope,
-        "instance_filter": "all" if instance_scope == "all" else "current",
+        "node_scope": node_scope,
+        "node_filter": "all" if node_scope == "all" else "current",
         "quality_timing": quality_timing,
-        "active_instance_id": active_instance_id,
-        "active_instance_display_name": project_state.gap_instance_display(active_instance_id),
+        "active_node_id": active_node_id,
+        "active_node_display_name": project_state.gap_node_display(active_node_id),
         "needs_attention": _compute_needs_attention(
             counts, preflight, runner_reachable, provider,
-            instance_filter="all" if instance_scope == "all" else "current",
+            node_filter="all" if node_scope == "all" else "current",
         ),
     }
 
@@ -4959,7 +5006,7 @@ def _compute_reporter_stats(stat_rows, known_reporters: list[str]) -> list[dict]
 def _compute_needs_attention(counts: dict, preflight: dict | None,
                               runner_reachable: bool,
                               provider: str = "claude",
-                              instance_filter: str = "current") -> list[dict]:
+                              node_filter: str = "current") -> list[dict]:
     items: list[dict] = []
     if not runner_reachable:
         items.append({
@@ -4981,7 +5028,7 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
         items.append({
             "kind": "filter", "severity": "warn",
             "message": f"{counts['failed']} failed Gaps",
-            "filter": {"status": "failed", "instance": instance_filter},
+            "filter": {"status": "failed", "node": node_filter},
         })
     return items
 
@@ -5022,7 +5069,12 @@ def import_parse_csv(body: dict) -> tuple[int, dict]:
         stopped = _background_processes_stopped_response()
         if stopped is not None:
             return stopped
-        job_body = {"text": raw, "background": False, "dedup": bool(body.get("dedup"))}
+        job_body = {
+            "text": raw,
+            "background": False,
+            "dedup": bool(body.get("dedup")),
+            "distribute": bool(body.get("distribute")),
+        }
 
         def run_job() -> dict[str, Any]:
             status, result = import_parse_csv(job_body)
@@ -5038,6 +5090,11 @@ def import_parse_csv(body: dict) -> tuple[int, dict]:
         drafts = _import_parse_csv_drafts(raw)
     except ValueError as e:
         return err(400, str(e))
+    if body.get("distribute"):
+        try:
+            drafts = _assign_import_nodes(drafts)
+        except ValueError as e:
+            return err(400, str(e))
     if body.get("dedup"):
         matches = _import_dedup_matches(drafts)
         drafts = _annotate_import_duplicate_drafts(drafts, matches)
@@ -5129,6 +5186,28 @@ def _import_parse_csv_drafts(raw: str) -> list[dict[str, str]]:
     return drafts
 
 
+def _assign_import_nodes(drafts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    candidates = [
+        str(n.get("id") or "")
+        for n in cluster.list_nodes()
+        if n.get("enabled", True) and str(n.get("id") or "")
+    ]
+    if not candidates:
+        candidates = [
+            str(n.get("id") or "")
+            for n in project_state.list_nodes()
+            if not n.get("archived") and str(n.get("id") or "")
+        ]
+    if not candidates:
+        raise ValueError("no enabled nodes are available for distribution")
+    out: list[dict[str, Any]] = []
+    for idx, draft in enumerate(drafts):
+        assigned = dict(draft)
+        assigned["node_id"] = candidates[idx % len(candidates)]
+        out.append(assigned)
+    return out
+
+
 def import_dedup(body: dict) -> tuple[int, dict]:
     drafts = body.get("drafts") or []
     if not isinstance(drafts, list):
@@ -5216,7 +5295,7 @@ def _move_duplicate_original_to_backlog(gap_id: str) -> dict[str, Any]:
     conn = _conn()
     try:
         row = conn.execute(
-            "SELECT id, status, instance_id FROM gaps_index WHERE id = ?",
+            "SELECT id, status, node_id FROM gaps_index WHERE id = ?",
             (gap_id,),
         ).fetchone()
         if row is None:
@@ -5284,8 +5363,12 @@ def _move_duplicate_original_to_backlog(gap_id: str) -> dict[str, Any]:
 
 def _import_dedup_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
     rows = conn.execute(
-        "SELECT id, name, status, priority, instance_id FROM gaps_index"
+        "SELECT id, name, status, priority, node_id FROM gaps_index"
     ).fetchall()
+    node_names = {
+        str(node.get("id") or ""): str(node.get("display_name") or node.get("id") or "Unknown")
+        for node in project_state.list_nodes()
+    }
     out: list[dict[str, Any]] = []
     for row in rows:
         gap = shared_gaps.read_gap_json(row["id"], include_logs=False) or {}
@@ -5303,8 +5386,8 @@ def _import_dedup_candidates(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             "name": row["name"] or gap.get("name") or row["id"],
             "status": row["status"],
             "priority": row["priority"] or gap.get("priority") or "low",
-            "instance_id": row["instance_id"] or project_state.DEFAULT_INSTANCE_ID,
-            "instance_display_name": project_state.gap_instance_display(row["instance_id"]),
+            "node_id": row["node_id"] or project_state.DEFAULT_NODE_ID,
+            "node_display_name": node_names.get(row["node_id"], "Unknown"),
             "actual": actual,
             "target": target,
             **move_gate,
@@ -5704,11 +5787,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
     drafts = body.get("drafts") or []
     if not isinstance(drafts, list) or not drafts:
         return err(400, "drafts must be a non-empty list")
-    conn = _conn()
-    try:
-        dedup_candidates = _import_dedup_candidates(conn)
-    finally:
-        conn.close()
+    dedup_candidates: list[dict[str, Any]] | None = None
     created: list[str] = []
     failures: list[dict[str, Any]] = []
     duplicate_actions = {
@@ -5742,6 +5821,22 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
         name = (d.get("name") or "").strip() or _autoname(actual, target)
         draft_reporter = (d.get("reporter") or reporter).strip()
         priority = (d.get("priority") or "low").strip().lower()
+        draft_node_id = str(d.get("node_id") or "").strip()
+        if draft_node_id and project_state.node_by_id(draft_node_id) is None:
+            failures.append({
+                "index": idx,
+                "error": f"unknown node: {draft_node_id}",
+                "draft": {
+                    "name": name,
+                    "actual": actual,
+                    "target": target,
+                    "reporter": draft_reporter,
+                    "priority": priority,
+                    "node_id": draft_node_id,
+                },
+            })
+            _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
+            continue
         if priority not in _VALID_PRIORITIES:
             failures.append({
                 "index": idx,
@@ -5803,12 +5898,20 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
             duplicate_actions["ignored"] += 1
             _import_persist_progress(idx, total, f"Imported {idx} of {total} drafts")
             continue
-        duplicate = _find_import_duplicate(
-            actual,
-            target,
-            candidates=dedup_candidates,
-        )
         update_field = _duplicate_update_field(duplicate_decision)
+        duplicate = None
+        if duplicate_decision != _DUPLICATE_DECISION_IMPORT or update_field:
+            if dedup_candidates is None:
+                conn = _conn()
+                try:
+                    dedup_candidates = _import_dedup_candidates(conn)
+                finally:
+                    conn.close()
+            duplicate = _find_import_duplicate(
+                actual,
+                target,
+                candidates=dedup_candidates,
+            )
         if update_field and not duplicate:
             failures.append({
                 "index": idx,
@@ -5888,6 +5991,7 @@ def _import_persist_sync(body: dict) -> tuple[int, dict]:
             get_client().call(M_CREATE_GAP, {
                 "gap_id": gap_id, "name": name, "reporter": draft_reporter,
                 "priority": priority, "actual": actual, "target": target,
+                "node_id": draft_node_id or project_state.active_node_id(),
             })
             created.append(gap_id)
             _cancel_import_if_requested(created, duplicate_moves, duplicate_updates)
@@ -6209,11 +6313,11 @@ def _record_target_app_operation(conn: sqlite3.Connection, kind: str,
 
 
 def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
-    active_instance = project_state.active_instance_id()
+    active_node = project_state.active_node_id()
     rows = conn.execute(
         "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
-        "AND instance_id = ? ORDER BY updated ASC",
-        (active_instance,),
+        "AND node_id = ? ORDER BY updated ASC",
+        (active_node,),
     ).fetchall()
     if not rows:
         return 0
@@ -6227,8 +6331,8 @@ def _promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
     with db.transaction(conn):
         conn.execute(
             "UPDATE gaps_index SET status = ?, updated = ? "
-            "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-            (next_status, now_iso(), active_instance),
+            "WHERE status = 'awaiting-rebuild' AND node_id = ?",
+            (next_status, now_iso(), active_node),
         )
     for row in rows:
         gid = row["id"]
@@ -6371,7 +6475,7 @@ def target_app_generate(body: dict) -> tuple[int, dict]:
 def _backend_err(e: BackendError) -> tuple[int, dict]:
     if e.code == "backend_unavailable":
         code = 502
-    elif e.code == "instance_ownership":
+    elif e.code == "node_ownership":
         code = 409
     elif e.code == "bad_request":
         code = 400

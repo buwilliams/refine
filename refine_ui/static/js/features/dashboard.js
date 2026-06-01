@@ -17,15 +17,15 @@ const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
 
 function dashboardScopeFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
-  return hashQs.get("instance") === "all" ? "all" : "current";
+  return hashQs.get("node") === "all" ? "all" : "current";
 }
 
 function dashboardHash(scope) {
-  return scope === "all" ? "#/?instance=all" : "#/";
+  return scope === "all" ? "#/?node=all" : "#/";
 }
 
 function dashboardScopeParam(d = null) {
-  return d?.instance_filter || dashboardScopeFromHash();
+  return d?.node_filter || dashboardScopeFromHash();
 }
 
 async function renderDashboard() {
@@ -39,7 +39,7 @@ async function renderDashboard() {
     $("#main").innerHTML = `
       <div class="dashboard-title-row">
         <h2>Dashboard</h2>
-        <div class="segmented-control dashboard-scope-switch" role="group" aria-label="Dashboard instance scope">
+        <div class="segmented-control dashboard-scope-switch" role="group" aria-label="Dashboard node scope">
           <button type="button" data-dashboard-scope="current">Current</button>
           <button type="button" data-dashboard-scope="all">All</button>
         </div>
@@ -70,11 +70,11 @@ async function refreshDashboard() {
   try {
     const reporter = state.lastReporter || "";
     const scope = dashboardScopeFromHash();
-    const instanceParam = encodeURIComponent(scope);
+    const nodeParam = encodeURIComponent(scope);
     const [d, reviews] = await Promise.all([
-      dashboardApi("GET", `/api/dashboard?instance=${instanceParam}`),
+      dashboardApi("GET", `/api/dashboard?node=${nodeParam}`),
       reporter
-        ? dashboardApi("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + `&instance=${instanceParam}&limit=200`)
+        ? dashboardApi("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
         : Promise.resolve({ gaps: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
@@ -168,7 +168,7 @@ function drawDashboard(d, opts = {}) {
       ${orderedStatuses.map((s) => {
         const agentManaged = AGENT_MANAGED_DASHBOARD_STATUSES.has(s);
         return `
-        <a class="card dashboard-status-card ${s}${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, instance: scope })}" style="text-decoration:none;color:inherit"
+        <a class="card dashboard-status-card ${s}${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, node: scope })}" style="text-decoration:none;color:inherit"
            title="${counts[s] || 0} ${workflowStatusLabel(s)} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
           <div class="dashboard-status-head">
             ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="AI-managed automation">AI</span>` : ""}
@@ -193,7 +193,7 @@ function drawDashboard(d, opts = {}) {
             ${needsAttention.map((x) => `
               <a href="${gapsHash({
                 status: x.filter?.status || "",
-                instance: x.filter?.instance || scope,
+                node: x.filter?.node || scope,
               })}" class="btn">
                 ${htmlEscape(x.message)}
               </a>`).join("")}
@@ -278,7 +278,7 @@ function drawDashboard(d, opts = {}) {
   // name can contain spaces/quotes without HTML-escaping hazards.
   $$(".reporter-stats-row").forEach((row) => {
     row.addEventListener("click", () => {
-      location.hash = gapsHash({ reporter: row.dataset.reporter, instance: scope });
+      location.hash = gapsHash({ reporter: row.dataset.reporter, node: scope });
     });
   });
 
@@ -387,7 +387,7 @@ function wireReviewsForReporter(reviews) {
           else dashboardReviewSelectedIds.delete(id);
         } catch (e) {
           failed++;
-          if (isInstanceOwnershipError(e) && !ownershipError) ownershipError = e;
+          if (isNodeOwnershipError(e) && !ownershipError) ownershipError = e;
         }
         done++;
       }

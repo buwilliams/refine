@@ -85,7 +85,7 @@ def main() -> int:
     assert ".import-file-control" in common_css
     assert ".import-file-name" in common_css
     assert ".visually-hidden" in common_css
-    assert "async function parseImportCsvBackend(text, progressRoot = null, saveSession = null)" in import_js
+    assert "async function parseImportCsvBackend(text, progressRoot = null, saveSession = null, options = {})" in import_js
     assert 'api("POST", "/api/import/csv/parse", {' in import_js
     assert "background: true" in import_js
     assert "dedup: true" in import_js

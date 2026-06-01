@@ -76,9 +76,13 @@ def main() -> int:
 
         class SlowCreateClient:
             def call(self, method, params, timeout=None):  # noqa: ANN001, ANN202
-                result = real_client.call(method, params, timeout=timeout)
                 if method == M_CREATE_GAP:
                     first_created.set()
+                if timeout is None:
+                    result = real_client.call(method, params)
+                else:
+                    result = real_client.call(method, params, timeout=timeout)
+                if method == M_CREATE_GAP:
                     assert release_create.wait(timeout=2), "cancel rollback test was not released"
                 return result
 
@@ -211,19 +215,19 @@ def main() -> int:
 
         def create_gap_and_project(*, gap_id, name, initial_round,
                                    status="backlog", priority="low",
-                                   instance_id=None):
+                                   node_id=None):
             gap = original_create_gap(
                 gap_id=gap_id,
                 name=name,
                 initial_round=initial_round,
                 status=status,
                 priority=priority,
-                instance_id=instance_id,
+                node_id=node_id,
             )
             runner._conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, "
-                "instance_id, json_path) "
+                "node_id, json_path) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     gap_id,
@@ -233,7 +237,7 @@ def main() -> int:
                     initial_round["reporter"],
                     gap["created"],
                     gap["updated"],
-                    instance_id or project_state.active_instance_id(),
+                    node_id or project_state.active_node_id(),
                     relative_gap_path(gap_id),
                 ),
             )

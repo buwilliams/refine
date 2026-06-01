@@ -32,8 +32,8 @@ function normalizeCommandStatus(value) {
   }[compact] || compact;
 }
 
-function currentInstanceBulkFilter(status) {
-  return { status, instance: "current" };
+function currentNodeBulkFilter(status) {
+  return { status, node: "current" };
 }
 
 async function promptCommandValue(label, current = "") {
@@ -57,7 +57,7 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
     return;
   }
   const ok = await modalConfirm(
-    `Move all current-instance Gaps with status ${source} to ${dest}?`,
+    `Move all current-node Gaps with status ${source} to ${dest}?`,
     {
       title: "Bulk move Gaps",
       okLabel: "Move Gaps",
@@ -67,7 +67,7 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
   if (!ok) return;
   await withButtonBusy(button, "Moving...", async () => {
     let r = await api("POST", "/api/gaps/bulk", {
-      filter: currentInstanceBulkFilter(source),
+      filter: currentNodeBulkFilter(source),
       update: { status: dest },
     });
     r = await resolveBackgroundJobResponse(
@@ -82,7 +82,7 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
 
 async function runFailedBackCommand({ button = null } = {}) {
   const ok = await modalConfirm(
-    "Move all current-instance failed Gaps back to their last safe workflow state?",
+    "Move all current-node failed Gaps back to their last safe workflow state?",
     {
       title: "Bulk retry failed Gaps",
       okLabel: "Move failed Gaps",
@@ -92,7 +92,7 @@ async function runFailedBackCommand({ button = null } = {}) {
   if (!ok) return;
   await withButtonBusy(button, "Moving...", async () => {
     let r = await api("POST", "/api/gaps/bulk", {
-      filter: currentInstanceBulkFilter("failed"),
+      filter: currentNodeBulkFilter("failed"),
       update: { status: "__last_workflow_state" },
     });
     r = await resolveBackgroundJobResponse(
@@ -379,12 +379,12 @@ registerCommand({
 });
 
 registerCommand({
-  id: "gaps.bulk.transfer_instance",
-  title: "Bulk: transfer selected Gaps to instance",
+  id: "gaps.bulk.transfer_node",
+  title: "Bulk: transfer selected Gaps to node",
   group: "Gaps",
-  aliases: ["bulk-instance"],
+  aliases: ["bulk-node"],
   visible: () => state.currentRoute === "gaps",
-  run: () => openBulkTransferInstanceModal(),
+  run: () => openBulkTransferNodeModal(),
 });
 
 registerCommand({
@@ -548,8 +548,8 @@ registerCommand({
     { title: "Generate target-app config", okLabel: "Generate" },
   ),
   run: async ({ button } = {}) => {
-    if (state.currentRoute !== "instance") {
-      location.hash = "#/instance/application";
+    if (state.currentRoute !== "node") {
+      location.hash = "#/node/application";
     } else {
       setSettingsTab("application");
     }
@@ -577,7 +577,7 @@ registerCommand({
       toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
       if (state.currentRoute === "settings") {
         await refreshSettingsTab("processes", { force: true });
-      } else if (state.currentRoute === "instance") {
+      } else if (state.currentRoute === "node") {
         await refreshSettingsTab("runtime", { force: true });
       }
     });
@@ -640,7 +640,7 @@ registerCommand({
       }
       const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
       toast(`SQLite cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
-      if (["settings", "instance", "project"].includes(state.currentRoute || "")) await refreshSettings({ force: true });
+      if (["settings", "node", "project"].includes(state.currentRoute || "")) await refreshSettings({ force: true });
     });
   },
 });
@@ -680,11 +680,11 @@ registerCommand({
 });
 
 registerCommand({
-  id: "settings.application.copy_instance",
-  title: "Application: copy settings from instance",
+  id: "settings.application.copy_node",
+  title: "Application: copy settings from node",
   group: "System",
   aliases: ["copy-application-settings"],
-  run: ({ button } = {}) => copySettingsFromInstance("application", {
+  run: ({ button } = {}) => copySettingsFromNode("application", {
     title: "Copy application settings",
     refreshTab: "application",
     button,
@@ -692,11 +692,11 @@ registerCommand({
 });
 
 registerCommand({
-  id: "settings.runtime.copy_instance",
-  title: "Runtime: copy settings from instance",
+  id: "settings.runtime.copy_node",
+  title: "Runtime: copy settings from node",
   group: "System",
   aliases: ["copy-runtime-settings"],
-  run: ({ button } = {}) => copySettingsFromInstance("runtime", {
+  run: ({ button } = {}) => copySettingsFromNode("runtime", {
     title: "Copy runtime settings",
     refreshTab: "runtime",
     button,

@@ -39,7 +39,7 @@ from typing import Annotated, Callable
 
 import click
 import typer
-from refine_server import config, project_registry, upgrade
+from refine_server import cluster, config, db, project_registry, project_state, upgrade
 
 
 SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
@@ -63,6 +63,22 @@ app = typer.Typer(
     context_settings=_CONTEXT_SETTINGS,
     no_args_is_help=True,
 )
+node_app = typer.Typer(
+    name="node",
+    help="Manage work-owning Refine nodes.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+cluster_app = typer.Typer(
+    name="cluster",
+    help="Manage distributed Refine cluster nodes.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+app.add_typer(node_app, name="node")
+app.add_typer(cluster_app, name="cluster")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -143,6 +159,179 @@ def _run_command(command: _Command, ctx: typer.Context, **kwargs: object) -> int
     return command(_Args(config=_ctx_config(ctx), **kwargs))
 
 
+def _ensure_cli_project(config_path: str | None = None) -> None:
+    if config_path:
+        config.get(path=config_path, reload=True)
+    else:
+        config.get(reload=True)
+    conn = db.connect()
+    try:
+        project_state.ensure_initialized(conn, migrate=True)
+        project_state.rebuild_sqlite_cache(conn)
+    finally:
+        conn.close()
+
+
+@node_app.command("list", help="List nodes.")
+def node_list_command(ctx: typer.Context) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    payload = {
+        "nodes": project_state.list_nodes(),
+        "active_node_id": project_state.active_node_id(),
+    }
+    typer.echo(json.dumps(payload, indent=2))
+    return 0
+
+
+@node_app.command("create", help="Create a node.")
+def node_create_command(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Node display name.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    node = project_state.create_node(name)
+    conn = db.connect()
+    try:
+        project_state.rebuild_sqlite_cache(conn)
+    finally:
+        conn.close()
+    typer.echo(json.dumps({"node": node}, indent=2))
+    return 0
+
+
+@node_app.command("activate", help="Activate a node.")
+def node_activate_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Node ID.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    project_state.set_active_node(node_id)
+    conn = db.connect()
+    try:
+        project_state.rebuild_sqlite_cache(conn)
+    finally:
+        conn.close()
+    typer.echo(f"Activated node {node_id}.")
+    return 0
+
+
+@node_app.command("rename", help="Rename a node.")
+def node_rename_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Node ID.")],
+    name: Annotated[str, typer.Argument(help="New display name.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    node = project_state.update_node(node_id, display_name=name)
+    typer.echo(json.dumps({"node": node}, indent=2))
+    return 0
+
+
+@node_app.command("archive", help="Archive a node.")
+def node_archive_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Node ID.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    node = project_state.update_node(node_id, archived=True)
+    typer.echo(json.dumps({"node": node}, indent=2))
+    return 0
+
+
+@node_app.command("transfer-gaps", help="Transfer Gaps to another node.")
+def node_transfer_gaps_command(
+    ctx: typer.Context,
+    target_node_id: Annotated[str, typer.Argument(help="Target node ID.")],
+    source_node_id: Annotated[
+        str | None,
+        typer.Option("--source", help="Only transfer Gaps owned by this node."),
+    ] = None,
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    result = project_state.transfer_gaps(source_node_id, target_node_id)
+    conn = db.connect()
+    try:
+        project_state.rebuild_sqlite_cache(conn)
+    finally:
+        conn.close()
+    typer.echo(json.dumps(result, indent=2))
+    return 0
+
+
+@cluster_app.command("list", help="List cluster nodes.")
+def cluster_list_command(ctx: typer.Context) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    typer.echo(json.dumps(cluster.read_cluster(), indent=2))
+    return 0
+
+
+@cluster_app.command("register", help="Register or update a cluster node.")
+def cluster_register_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Cluster node ID.")],
+    ssh_host: Annotated[str, typer.Argument(help="SSH host. Current user is assumed.")],
+    display_name: Annotated[
+        str | None,
+        typer.Option("--name", help="Display name."),
+    ] = None,
+    ssh_port: Annotated[int, typer.Option("--ssh-port", help="SSH port.")] = 22,
+    refine_checkout: Annotated[
+        str,
+        typer.Option("--refine-checkout", help="Remote Refine checkout path."),
+    ] = "~/refine",
+    target_app_path: Annotated[
+        str,
+        typer.Option("--target-app", help="Remote target app path."),
+    ] = "",
+    refine_port: Annotated[int, typer.Option("--refine-port", help="Remote Refine UI port.")] = 8080,
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    node = cluster.upsert_node({
+        "id": node_id,
+        "display_name": display_name or node_id,
+        "ssh_host": ssh_host,
+        "ssh_port": ssh_port,
+        "refine_checkout": refine_checkout,
+        "target_app_path": target_app_path,
+        "refine_port": refine_port,
+    })
+    typer.echo(json.dumps({"node": node}, indent=2))
+    return 0
+
+
+@cluster_app.command("bootstrap", help="Bootstrap a cluster node over SSH.")
+def cluster_bootstrap_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Cluster node ID.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    result = cluster.bootstrap(node_id)
+    typer.echo(result.get("stdout") or "", nl=False)
+    if result.get("stderr"):
+        typer.echo(result["stderr"], err=True, nl=False)
+    return 0 if result.get("ok") else int(result.get("exit_code") or 1)
+
+
+@cluster_app.command(
+    "run",
+    help="Run a Refine command on a cluster node over SSH.",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def cluster_run_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Cluster node ID.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    args = list(ctx.args)
+    if args and args[0] == "--":
+        args = args[1:]
+    result = cluster.run_remote(node_id, args)
+    typer.echo(result.get("stdout") or "", nl=False)
+    if result.get("stderr"):
+        typer.echo(result["stderr"], err=True, nl=False)
+    return 0 if result.get("ok") else int(result.get("exit_code") or 1)
+
+
 @app.command(
     "target",
     help="Attach a target app and make it active.",
@@ -178,7 +367,7 @@ def target_command(
         "Writes, enables, and starts a system-level systemd unit for this "
         "checkout. The service runs as the installing user, restarts on "
         "failure, survives terminal close, and starts at boot. Pass a port "
-        "to run multiple Refine instances on one host."
+        "to run multiple Refine nodes on one host."
     ),
 )
 def install_command(
@@ -240,7 +429,7 @@ def reset_command(
         "this checkout has an installed systemd service, the command starts "
         "that service; otherwise it starts a detached background supervisor. "
         "The supervisor keeps the UI/control process separate from the work "
-        "runner. Pass a port to run multiple Refine instances on one host."
+        "runner. Pass a port to run multiple Refine nodes on one host."
     ),
 )
 def start_command(
@@ -544,6 +733,7 @@ def bootstrap_client_repo(
     if cfg_path.exists() and reuse_existing_config:
         (target / "gaps").mkdir(parents=True, exist_ok=True)
         config.ensure_refine_gitignore(target)
+        config.ensure_runtime_gitignore(client_repo)
     else:
         cfg_path = config.write_defaults(target, force=force)
         config_created = True
@@ -827,7 +1017,11 @@ def cmd_start(args: _Args) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
-    _ensure_sqlite_schema(cfg)
+    try:
+        _ensure_sqlite_schema(cfg)
+    except _InitError as e:
+        print(f"refine start: {e}", file=sys.stderr)
+        return 1
     port = _runtime_action_port(args, clone, cfg, unit)
     _sync_bound_project_registry(clone, cfg)
     ui_unit = _installed_ui_unit(unit, port)
@@ -912,7 +1106,11 @@ def cmd_restart(args: _Args) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
     _load_config_or_exit(args)
     cfg = config.get()
-    _ensure_sqlite_schema(cfg)
+    try:
+        _ensure_sqlite_schema(cfg)
+    except _InitError as e:
+        print(f"refine restart: {e}", file=sys.stderr)
+        return 1
     port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
@@ -2486,16 +2684,25 @@ def _load_config_or_exit(args: _Args) -> None:
 
 
 def _ensure_sqlite_schema(cfg: "config.Config") -> None:
-    """Apply lightweight SQLite schema migrations before runtime handoff.
+    """Apply blocking project-state and SQLite migrations before runtime handoff.
 
     The UI backend initializes SQLite too, but start/restart can delegate to a
     systemd unit that was installed from a different checkout. Running schema
-    setup from the invoking CLI makes cache-table migrations immediate after a
-    pull, before the service process starts serving requests.
+    setup from the invoking CLI makes project-state/cache migrations complete
+    before the service process starts serving requests.
     """
-    from refine_server import db
+    from refine_server import db, project_state
 
-    db.init_db(cfg.sqlite_path)
+    try:
+        db.init_db(cfg.sqlite_path)
+        conn = db.connect(cfg.sqlite_path)
+        try:
+            project_state.ensure_initialized(conn, migrate=True, root=cfg.volume_root)
+            project_state.rebuild_sqlite_cache(conn, force=True)
+        finally:
+            conn.close()
+    except Exception as e:
+        raise _InitError(f"project migration failed before startup: {e}") from e
 
 
 def _resolve_clone_and_unit_or_exit() -> tuple[Path, str]:

@@ -1,7 +1,7 @@
 """Canonical per-application Refine state.
 
 SQLite is a rebuildable cache. This module owns the JSON files under
-``<app>/.refine`` that carry durable project, instance, reporter, settings,
+``<app>/.refine`` that carry durable project, node, reporter, settings,
 and Gap ownership state.
 """
 from __future__ import annotations
@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any, Callable
@@ -18,10 +19,11 @@ from . import config
 from .gaps import now_iso
 
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 MIN_SUPPORTED_SCHEMA_VERSION = 1
-DEFAULT_INSTANCE_ID = "default"
-CACHE_ACTIVE_INSTANCE_KEY = "__refine_cache_active_instance_id"
+DEFAULT_NODE_ID = "default"
+CACHE_ACTIVE_NODE_KEY = "__refine_cache_active_node_id"
+LEGACY_CACHE_ACTIVE_INSTANCE_KEY = "__refine_cache_active_instance_id"
 CACHE_STATE_FINGERPRINT_KEY = "__refine_cache_state_fingerprint"
 
 PROJECT_SETTING_KEYS = {
@@ -114,7 +116,11 @@ def config_json_path(root: Path | None = None) -> Path:
     return (root or volume_root()) / "config.json"
 
 
-def instances_json_path(root: Path | None = None) -> Path:
+def nodes_json_path(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "nodes.json"
+
+
+def legacy_instances_json_path(root: Path | None = None) -> Path:
     return (root or volume_root()) / "instances.json"
 
 
@@ -122,7 +128,15 @@ def guidance_json_path(root: Path | None = None) -> Path:
     return (root or volume_root()) / "guidance.json"
 
 
-def instances_dir(root: Path | None = None) -> Path:
+def cluster_json_path(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "cluster.json"
+
+
+def nodes_dir(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "nodes"
+
+
+def legacy_instances_dir(root: Path | None = None) -> Path:
     return (root or volume_root()) / "instances"
 
 
@@ -134,16 +148,24 @@ def legacy_run_dir(root: Path | None = None) -> Path:
     return (root or volume_root()) / "run"
 
 
-def active_instances_path() -> Path:
+def active_nodes_path() -> Path:
+    return run_dir() / "active-nodes.json"
+
+
+def legacy_active_instances_path() -> Path:
     return run_dir() / "active-instances.json"
 
 
-def active_instance_path(root: Path | None = None) -> Path:
+def active_node_path(root: Path | None = None) -> Path:
+    return legacy_run_dir(root) / "active-node.json"
+
+
+def legacy_active_instance_path(root: Path | None = None) -> Path:
     return legacy_run_dir(root) / "active-instance.json"
 
 
-def instance_dir(instance_id: str, root: Path | None = None) -> Path:
-    return instances_dir(root) / instance_id
+def node_dir(node_id: str, root: Path | None = None) -> Path:
+    return nodes_dir(root) / node_id
 
 
 def schema_status(root: Path | None = None) -> dict[str, Any]:
@@ -185,6 +207,14 @@ def schema_status(root: Path | None = None) -> dict[str, Any]:
             "current_schema_version": CURRENT_SCHEMA_VERSION,
             "reason": "outdated_schema",
         }
+    if version < CURRENT_SCHEMA_VERSION:
+        return {
+            "compatible": False,
+            "migration_required": True,
+            "schema_version": version,
+            "current_schema_version": CURRENT_SCHEMA_VERSION,
+            "reason": "schema_upgrade",
+        }
     return {
         "compatible": True,
         "migration_required": False,
@@ -208,20 +238,106 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
     root = root or volume_root()
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
-    instances_dir(root).mkdir(exist_ok=True)
     config.ensure_refine_gitignore(root)
+    config.ensure_runtime_gitignore(root.parent)
     status = schema_status(root)
     if status["compatible"]:
-        ensure_default_instance(root=root)
-        ensure_active_instance(root=root)
+        ensure_default_node(root=root)
+        ensure_active_node(root=root)
         ensure_guidance_file(root=root)
         ensure_project_quality_settings(conn, root=root)
-        ensure_active_instance_runtime_settings(conn, root=root)
+        ensure_active_node_runtime_settings(conn, root=root)
         return status
     if not migrate or not status.get("migration_required"):
         return status
-    migrate_legacy(conn, root=root)
+    if status.get("reason") == "legacy_project":
+        migrate_legacy(conn, root=root)
+    else:
+        migrate_project_state(root=root)
     return schema_status(root)
+
+
+def migrate_project_state(*, root: Path | None = None) -> None:
+    """Upgrade v1 project state from instance naming to node naming."""
+    root = root or volume_root()
+    _rename_legacy_node_paths(root)
+    _rewrite_nodes_registry(root)
+    _rewrite_gap_node_ownership(root)
+    cfg = read_project_config(root=root)
+    cfg["schema_version"] = CURRENT_SCHEMA_VERSION
+    cfg.setdefault("refine", {})["version"] = _refine_version()
+    write_project_config(cfg, root=root)
+    ensure_default_node(root=root)
+    ensure_active_node(root=root)
+
+
+def _rename_legacy_node_paths(root: Path) -> None:
+    old_registry = legacy_instances_json_path(root)
+    new_registry = nodes_json_path(root)
+    if old_registry.exists() and not new_registry.exists():
+        _git_mv_or_rename(root, old_registry, new_registry)
+    old_dir = legacy_instances_dir(root)
+    new_dir = nodes_dir(root)
+    if old_dir.exists() and not new_dir.exists():
+        _git_mv_or_rename(root, old_dir, new_dir)
+    elif old_dir.exists() and new_dir.exists() and not any(new_dir.iterdir()):
+        new_dir.rmdir()
+        _git_mv_or_rename(root, old_dir, new_dir)
+    new_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _git_mv_or_rename(root: Path, src: Path, dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    repo = root.parent
+    rel_src = src.relative_to(repo).as_posix()
+    rel_dst = dst.relative_to(repo).as_posix()
+    tracked = subprocess.run(
+        ["git", "ls-files", "--error-unmatch", rel_src],
+        cwd=repo,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    if tracked.returncode == 0:
+        moved = subprocess.run(
+            ["git", "mv", rel_src, rel_dst],
+            cwd=repo,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if moved.returncode == 0:
+            return
+    src.rename(dst)
+
+
+def _rewrite_nodes_registry(root: Path) -> None:
+    path = nodes_json_path(root)
+    data = _read_json(path, {"nodes": []})
+    if "nodes" not in data and isinstance(data.get("instances"), list):
+        data["nodes"] = data.get("instances") or []
+    data.pop("instances", None)
+    if not isinstance(data.get("nodes"), list):
+        data["nodes"] = []
+    _write_json(path, data)
+
+
+def _rewrite_gap_node_ownership(root: Path) -> None:
+    for path in sorted((root / "gaps").glob("**/gap.json")):
+        gap = _read_json(path, {})
+        if not isinstance(gap, dict) or not gap.get("id"):
+            continue
+        changed = False
+        if "node_id" not in gap and "instance_id" in gap:
+            gap["node_id"] = gap.get("instance_id") or DEFAULT_NODE_ID
+            changed = True
+        elif "node_id" not in gap:
+            gap["node_id"] = DEFAULT_NODE_ID
+            changed = True
+        if "instance_id" in gap:
+            gap.pop("instance_id", None)
+            changed = True
+        if changed:
+            gap["updated"] = gap.get("updated") or now_iso()
+            _write_json(path, gap)
 
 
 def migrate_legacy(conn: sqlite3.Connection | None = None, *,
@@ -230,7 +346,7 @@ def migrate_legacy(conn: sqlite3.Connection | None = None, *,
     root = root or volume_root()
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
-    instances_dir(root).mkdir(exist_ok=True)
+    nodes_dir(root).mkdir(exist_ok=True)
     config.ensure_refine_gitignore(root)
 
     from . import db
@@ -261,9 +377,9 @@ def migrate_legacy(conn: sqlite3.Connection | None = None, *,
             if k in PROJECT_SETTING_KEYS
         },
     })
-    _write_json(instances_json_path(root), {
-        "instances": [{
-            "id": DEFAULT_INSTANCE_ID,
+    _write_json(nodes_json_path(root), {
+        "nodes": [{
+            "id": DEFAULT_NODE_ID,
             "display_name": "Default",
             "created_at": now_iso(),
             "updated_at": now_iso(),
@@ -274,13 +390,13 @@ def migrate_legacy(conn: sqlite3.Connection | None = None, *,
         "guidance": [],
         "updated_at": now_iso(),
     })
-    _write_instance_files(
-        DEFAULT_INSTANCE_ID,
+    _write_node_files(
+        DEFAULT_NODE_ID,
         settings=legacy_settings,
         reporters=reporters,
         root=root,
     )
-    set_active_instance(DEFAULT_INSTANCE_ID, root=root)
+    set_active_node(DEFAULT_NODE_ID, root=root)
     _migrate_gap_files(gap_rows, root=root)
 
 
@@ -320,34 +436,39 @@ def _migrate_gap_files(rows: dict[str, dict[str, Any]], *, root: Path) -> None:
             "status": row.get("status") if row else "backlog",
             "priority": row.get("priority") if row else "low",
             "branch_name": row.get("branch_name") if row else None,
-            "instance_id": DEFAULT_INSTANCE_ID,
+            "node_id": DEFAULT_NODE_ID,
         }
+        if "node_id" not in gap and "instance_id" in gap:
+            defaults["node_id"] = gap.get("instance_id") or DEFAULT_NODE_ID
         for key, value in defaults.items():
             if key not in gap:
                 gap[key] = value
                 changed = True
+        if "instance_id" in gap:
+            gap.pop("instance_id", None)
+            changed = True
         if changed:
             gap["updated"] = gap.get("updated") or now_iso()
             _write_json(path, gap)
 
 
-def ensure_default_instance(*, root: Path | None = None) -> dict[str, Any]:
+def ensure_default_node(*, root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
-    registry = read_instances(root=root)
-    entries = registry.get("instances") or []
+    registry = read_nodes(root=root)
+    entries = registry.get("nodes") or []
     if not entries:
         entries = [{
-            "id": DEFAULT_INSTANCE_ID,
+            "id": DEFAULT_NODE_ID,
             "display_name": "Default",
             "created_at": now_iso(),
             "updated_at": now_iso(),
             "archived": False,
         }]
-        registry["instances"] = entries
-        _write_json(instances_json_path(root), registry)
+        registry["nodes"] = entries
+        _write_json(nodes_json_path(root), registry)
     for entry in entries:
         if entry.get("id"):
-            _ensure_instance_files(str(entry["id"]), root=root)
+            _ensure_node_files(str(entry["id"]), root=root)
     return entries[0]
 
 
@@ -360,16 +481,16 @@ def write_project_config(data: dict[str, Any], *, root: Path | None = None) -> N
     _write_json(config_json_path(root), data)
 
 
-def read_instances(*, root: Path | None = None) -> dict[str, Any]:
+def read_nodes(*, root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
-    data = _read_json(instances_json_path(root), {"instances": []})
-    if not isinstance(data.get("instances"), list):
-        data["instances"] = []
+    data = _read_json(nodes_json_path(root), {"nodes": []})
+    if not isinstance(data.get("nodes"), list):
+        data["nodes"] = []
     return data
 
 
-def write_instances(data: dict[str, Any], *, root: Path | None = None) -> None:
-    _write_json(instances_json_path(root), data)
+def write_nodes(data: dict[str, Any], *, root: Path | None = None) -> None:
+    _write_json(nodes_json_path(root), data)
 
 
 def ensure_guidance_file(*, root: Path | None = None) -> None:
@@ -386,7 +507,7 @@ def ensure_project_quality_settings(
     *,
     root: Path | None = None,
 ) -> None:
-    """Lift legacy per-instance quality flags into project settings."""
+    """Lift legacy per-node quality flags into project settings."""
     from . import db
 
     root = root or volume_root()
@@ -407,11 +528,11 @@ def ensure_project_quality_settings(
     for key in ("quality_enabled", "quality_regressions_enabled"):
         if key in settings:
             continue
-        for entry in list_instances(root=root):
-            instance_id = str(entry.get("id") or "")
-            if not instance_id:
+        for entry in list_nodes(root=root):
+            node_id = str(entry.get("id") or "")
+            if not node_id:
                 continue
-            values = _read_json(instance_dir(instance_id, root) / "application.json", {})
+            values = _read_json(node_dir(node_id, root) / "application.json", {})
             if key in values:
                 settings[key] = str(values.get(key) or "0")
                 changed = True
@@ -420,7 +541,7 @@ def ensure_project_quality_settings(
         write_project_config(cfg, root=root)
 
 
-def ensure_active_instance_runtime_settings(
+def ensure_active_node_runtime_settings(
     conn: sqlite3.Connection | None = None,
     *,
     root: Path | None = None,
@@ -429,11 +550,11 @@ def ensure_active_instance_runtime_settings(
     from . import db
 
     root = root or volume_root()
-    active = active_instance_id(root=root)
-    runtime_path = instance_dir(active, root) / "runtime.json"
+    active = active_node_id(root=root)
+    runtime_path = node_dir(active, root) / "runtime.json"
     data = _read_json(runtime_path, {})
     changed = False
-    cached_active = _cached_active_instance_id(conn) if conn is not None else ""
+    cached_active = _cached_active_node_id(conn) if conn is not None else ""
     for key in ("backlog_promote_after_seconds",):
         if key in data:
             continue
@@ -449,74 +570,87 @@ def ensure_active_instance_runtime_settings(
         _write_json(runtime_path, data)
 
 
-def list_instances(*, root: Path | None = None) -> list[dict[str, Any]]:
-    return list(read_instances(root=root).get("instances") or [])
+def list_nodes(*, root: Path | None = None) -> list[dict[str, Any]]:
+    return list(read_nodes(root=root).get("nodes") or [])
 
 
-def instance_by_id(instance_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
-    for entry in list_instances(root=root):
-        if entry.get("id") == instance_id:
+def node_by_id(node_id: str, *, root: Path | None = None) -> dict[str, Any] | None:
+    for entry in list_nodes(root=root):
+        if entry.get("id") == node_id:
             return entry
     return None
 
 
-def ensure_active_instance(*, root: Path | None = None) -> str:
+def ensure_active_node(*, root: Path | None = None) -> str:
     root = root or volume_root()
-    registry = read_instances(root=root)
-    entries = registry.get("instances") or []
-    active, legacy = _read_active_instance_selection(root)
+    registry = read_nodes(root=root)
+    entries = registry.get("nodes") or []
+    active, legacy = _read_active_node_selection(root)
     if active and any(e.get("id") == active and not e.get("archived") for e in entries):
-        _ensure_instance_files(str(active), root=root)
+        _ensure_node_files(str(active), root=root)
         if legacy:
-            _write_active_instance_selection(root, str(active))
+            _write_active_node_selection(root, str(active))
         _cleanup_legacy_run_state(root)
         return str(active)
     fallback = next((e for e in entries if not e.get("archived")), None)
     if fallback is None:
-        fallback = ensure_default_instance(root=root)
+        fallback = ensure_default_node(root=root)
     active_id = str(fallback["id"])
-    set_active_instance(active_id, root=root)
+    set_active_node(active_id, root=root)
     return active_id
 
 
-def active_instance_id(*, root: Path | None = None) -> str:
-    return ensure_active_instance(root=root)
+def active_node_id(*, root: Path | None = None) -> str:
+    return ensure_active_node(root=root)
 
 
-def _active_instance_selection_key(root: Path) -> str:
+def _active_node_selection_key(root: Path) -> str:
     base = str(root.resolve())
     scope = config.runtime_scope()
     return f"{base}#scope={scope}" if scope else base
 
 
-def _legacy_active_instance_selection_key(root: Path) -> str:
+def _legacy_active_node_selection_key(root: Path) -> str:
     return str(root.resolve())
 
 
-def _read_active_instance_selection(root: Path) -> tuple[str | None, bool]:
-    key = _active_instance_selection_key(root)
-    data = _read_json(active_instances_path(), {"selections": {}})
+def _read_active_node_selection(root: Path) -> tuple[str | None, bool]:
+    key = _active_node_selection_key(root)
+    data = _read_json(active_nodes_path(), {"selections": {}})
     selections = data.get("selections") or {}
     selection = selections.get(key) or {}
-    active = selection.get("active_instance_id")
+    active = selection.get("active_node_id")
     if active:
         return str(active), False
-    legacy_selection = selections.get(_legacy_active_instance_selection_key(root)) or {}
+    legacy_selection = selections.get(_legacy_active_node_selection_key(root)) or {}
+    active = legacy_selection.get("active_node_id")
+    if active:
+        return str(active), False
+    legacy_data = _read_json(legacy_active_instances_path(), {"selections": {}})
+    legacy_selections = legacy_data.get("selections") or {}
+    legacy_selection = legacy_selections.get(key) or {}
     active = legacy_selection.get("active_instance_id")
     if active:
-        return str(active), False
-    legacy = _read_json(active_instance_path(root), {}).get("active_instance_id")
+        return str(active), True
+    legacy_selection = legacy_selections.get(_legacy_active_node_selection_key(root)) or {}
+    active = legacy_selection.get("active_instance_id")
+    if active:
+        return str(active), True
+    legacy = _read_json(active_node_path(root), {}).get("active_node_id")
+    if legacy:
+        return str(legacy), True
+    legacy = _read_json(legacy_active_instance_path(root), {}).get("active_instance_id")
     if legacy:
         return str(legacy), True
     return None, False
 
 
-def _write_active_instance_selection(root: Path, instance_id: str) -> None:
-    path = active_instances_path()
+def _write_active_node_selection(root: Path, node_id: str) -> None:
+    path = active_nodes_path()
     data = _read_json(path, {"selections": {}})
     selections = data.setdefault("selections", {})
-    selections[_active_instance_selection_key(root)] = {
-        "active_instance_id": instance_id,
+    selections[_active_node_selection_key(root)] = {
+        "active_node_id": node_id,
         "volume_root": str(root.resolve()),
         "updated_at": now_iso(),
     }
@@ -524,48 +658,49 @@ def _write_active_instance_selection(root: Path, instance_id: str) -> None:
     _write_json(path, data)
 
 
-def set_active_instance(instance_id: str, *, root: Path | None = None) -> None:
+def set_active_node(node_id: str, *, root: Path | None = None) -> None:
     root = root or volume_root()
-    entry = instance_by_id(instance_id, root=root)
+    entry = node_by_id(node_id, root=root)
     if entry is None:
-        raise ValueError(f"unknown instance_id: {instance_id}")
+        raise ValueError(f"unknown node_id: {node_id}")
     if entry.get("archived"):
-        raise ValueError(f"archived instance cannot be activated: {instance_id}")
-    _write_active_instance_selection(root, instance_id)
-    _ensure_instance_files(instance_id, root=root)
+        raise ValueError(f"archived node cannot be activated: {node_id}")
+    _write_active_node_selection(root, node_id)
+    _ensure_node_files(node_id, root=root)
 
 
-def create_instance(display_name: str, *, root: Path | None = None) -> dict[str, Any]:
+def create_node(display_name: str, *, node_id: str | None = None,
+                root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
-    name = display_name.strip() or "New instance"
-    instance_id = _slug_instance_id(name)
-    existing = {str(e.get("id")) for e in list_instances(root=root)}
-    base = instance_id
+    name = display_name.strip() or "New node"
+    node_id = node_id or _slug_node_id(name)
+    existing = {str(e.get("id")) for e in list_nodes(root=root)}
+    base = node_id
     i = 2
-    while instance_id in existing:
-        instance_id = f"{base}-{i}"
+    while node_id in existing:
+        node_id = f"{base}-{i}"
         i += 1
     entry = {
-        "id": instance_id,
+        "id": node_id,
         "display_name": name,
         "created_at": now_iso(),
         "updated_at": now_iso(),
         "archived": False,
     }
-    registry = read_instances(root=root)
-    registry.setdefault("instances", []).append(entry)
-    write_instances(registry, root=root)
-    _ensure_instance_files(instance_id, root=root)
+    registry = read_nodes(root=root)
+    registry.setdefault("nodes", []).append(entry)
+    write_nodes(registry, root=root)
+    _ensure_node_files(node_id, root=root)
     return entry
 
 
-def update_instance(instance_id: str, *, display_name: str | None = None,
+def update_node(node_id: str, *, display_name: str | None = None,
                     archived: bool | None = None,
                     root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
-    registry = read_instances(root=root)
-    for entry in registry.get("instances") or []:
-        if entry.get("id") != instance_id:
+    registry = read_nodes(root=root)
+    for entry in registry.get("nodes") or []:
+        if entry.get("id") != node_id:
             continue
         if display_name is not None:
             name = display_name.strip()
@@ -575,11 +710,11 @@ def update_instance(instance_id: str, *, display_name: str | None = None,
         if archived is not None:
             entry["archived"] = bool(archived)
         entry["updated_at"] = now_iso()
-        write_instances(registry, root=root)
-        if archived and active_instance_id(root=root) == instance_id:
-            ensure_active_instance(root=root)
+        write_nodes(registry, root=root)
+        if archived and active_node_id(root=root) == node_id:
+            ensure_active_node(root=root)
         return entry
-    raise ValueError(f"unknown instance_id: {instance_id}")
+    raise ValueError(f"unknown node_id: {node_id}")
 
 
 def list_settings() -> dict[str, str]:
@@ -587,11 +722,11 @@ def list_settings() -> dict[str, str]:
 
     root = volume_root()
     ensure_initialized(migrate=True)
-    active = active_instance_id(root=root)
-    return instance_settings(active, root=root)
+    active = active_node_id(root=root)
+    return node_settings(active, root=root)
 
 
-def instance_settings(instance_id: str, *, root: Path | None = None) -> dict[str, str]:
+def node_settings(node_id: str, *, root: Path | None = None) -> dict[str, str]:
     from . import db
 
     root = root or volume_root()
@@ -600,32 +735,32 @@ def instance_settings(instance_id: str, *, root: Path | None = None) -> dict[str
     cfg = read_project_config(root=root)
     settings.update(_string_map(cfg.get("settings") or {}))
     settings.update(_string_map(
-        _read_json(instance_dir(instance_id, root) / "application.json", {}),
+        _read_json(node_dir(node_id, root) / "application.json", {}),
         allowed=APPLICATION_SETTING_KEYS,
     ))
     settings.update(_string_map(
-        _read_json(instance_dir(instance_id, root) / "runtime.json", {}),
+        _read_json(node_dir(node_id, root) / "runtime.json", {}),
         allowed=RUNTIME_SETTING_KEYS,
     ))
     settings.update(_string_map(
-        _read_json(instance_dir(instance_id, root) / "target-app.json", {}),
+        _read_json(node_dir(node_id, root) / "target-app.json", {}),
         allowed=TARGET_APP_CONFIG_SETTING_KEYS,
     ))
     return settings
 
 
-def copy_instance_settings(source_instance_id: str, section: str,
+def copy_node_settings(source_node_id: str, section: str,
                            *, root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
     ensure_initialized(migrate=True)
-    source = instance_by_id(source_instance_id, root=root)
+    source = node_by_id(source_node_id, root=root)
     if source is None:
-        raise ValueError(f"unknown source instance: {source_instance_id}")
-    target = active_instance_id(root=root)
-    if source_instance_id == target:
-        raise ValueError("source instance must be different from the active instance")
+        raise ValueError(f"unknown source node: {source_node_id}")
+    target = active_node_id(root=root)
+    if source_node_id == target:
+        raise ValueError("source node must be different from the active node")
 
-    source_settings = instance_settings(source_instance_id, root=root)
+    source_settings = node_settings(source_node_id, root=root)
     if section == "application":
         app_values = {
             k: source_settings.get(k, "")
@@ -637,11 +772,11 @@ def copy_instance_settings(source_instance_id: str, section: str,
             for k in TARGET_APP_CONFIG_SETTING_KEYS
             if k in APPLICATION_COPY_SETTING_KEYS
         }
-        _update_instance_file(
-            "application.json", app_values, instance_id=target, root=root,
+        _update_node_file(
+            "application.json", app_values, node_id=target, root=root,
         )
-        _update_instance_file(
-            "target-app.json", target_values, instance_id=target, root=root,
+        _update_node_file(
+            "target-app.json", target_values, node_id=target, root=root,
         )
         copied = {**app_values, **target_values}
     elif section == "runtime":
@@ -649,15 +784,15 @@ def copy_instance_settings(source_instance_id: str, section: str,
             k: source_settings.get(k, "")
             for k in RUNTIME_COPY_SETTING_KEYS
         }
-        _update_instance_file(
-            "runtime.json", values, instance_id=target, root=root,
+        _update_node_file(
+            "runtime.json", values, node_id=target, root=root,
         )
         copied = values
     else:
         raise ValueError("section must be application or runtime")
     return {
-        "source_instance_id": source_instance_id,
-        "target_instance_id": target,
+        "source_node_id": source_node_id,
+        "target_node_id": target,
         "section": section,
         "copied": copied,
         "copied_count": len(copied),
@@ -680,11 +815,11 @@ def set_setting(key: str, value: str) -> None:
         settings[key] = value
         write_project_config(cfg, root=root)
     elif key in APPLICATION_SETTING_KEYS:
-        _update_instance_file("application.json", {key: value}, root=root)
+        _update_node_file("application.json", {key: value}, root=root)
     elif key in RUNTIME_SETTING_KEYS:
-        _update_instance_file("runtime.json", {key: value}, root=root)
+        _update_node_file("runtime.json", {key: value}, root=root)
     elif key in TARGET_APP_CONFIG_SETTING_KEYS:
-        _update_instance_file("target-app.json", {key: value}, root=root)
+        _update_node_file("target-app.json", {key: value}, root=root)
 
 
 def resume_agents_for_startup(conn: sqlite3.Connection | None = None) -> bool:
@@ -711,16 +846,16 @@ def resume_agents_for_startup(conn: sqlite3.Connection | None = None) -> bool:
 
 def list_reporters(*, root: Path | None = None) -> list[dict[str, Any]]:
     root = root or volume_root()
-    active = active_instance_id(root=root)
-    data = _read_json(instance_dir(active, root) / "reporters.json", {"reporters": []})
+    active = active_node_id(root=root)
+    data = _read_json(node_dir(active, root) / "reporters.json", {"reporters": []})
     return [r for r in data.get("reporters") or [] if isinstance(r, dict)]
 
 
 def write_reporters(reporters: list[dict[str, Any]], *,
                     root: Path | None = None) -> None:
     root = root or volume_root()
-    active = active_instance_id(root=root)
-    _write_json(instance_dir(active, root) / "reporters.json", {
+    active = active_node_id(root=root)
+    _write_json(node_dir(active, root) / "reporters.json", {
         "reporters": reporters,
         "updated_at": now_iso(),
     })
@@ -770,23 +905,23 @@ def _coerce_guidance_enabled(value: Any) -> bool:
     return True
 
 
-def gap_instance_display(instance_id: str | None) -> str:
-    if not instance_id:
+def gap_node_display(node_id: str | None) -> str:
+    if not node_id:
         return "Unknown"
-    entry = instance_by_id(instance_id)
+    entry = node_by_id(node_id)
     if entry is None:
         return "Unknown"
     return str(entry.get("display_name") or entry.get("id") or "Unknown")
 
 
-def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
+def transfer_gaps(source_node_id: str | None, target_node_id: str,
                   *, statuses: set[str] | None = None,
                   gap_ids: set[str] | None = None) -> dict[str, Any]:
-    target = instance_by_id(target_instance_id)
+    target = node_by_id(target_node_id)
     if target is None:
-        raise ValueError(f"unknown target instance: {target_instance_id}")
+        raise ValueError(f"unknown target node: {target_node_id}")
     if target.get("archived"):
-        raise ValueError(f"archived target instance: {target_instance_id}")
+        raise ValueError(f"archived target node: {target_node_id}")
     allowed = statuses or {
         "backlog", "todo", "failed", "qa", "awaiting-rebuild",
         "review", "done", "cancelled",
@@ -801,17 +936,17 @@ def transfer_gaps(source_instance_id: str | None, target_instance_id: str,
             continue
         if gap_ids is not None and gid not in gap_ids:
             continue
-        current = str(gap.get("instance_id") or "")
-        if source_instance_id and current != source_instance_id:
+        current = str(gap.get("node_id") or "")
+        if source_node_id and current != source_node_id:
             continue
         status = str(gap.get("status") or "backlog")
         if status not in allowed:
             skipped.append({"id": gid, "reason": f"status:{status}"})
             continue
-        if current == target_instance_id:
+        if current == target_node_id:
             skipped.append({"id": gid, "reason": "already_target"})
             continue
-        gap["instance_id"] = target_instance_id
+        gap["node_id"] = target_node_id
         gap["updated"] = now_iso()
         _write_json(path, gap)
         updated.append(gid)
@@ -842,7 +977,7 @@ def rebuild_sqlite_cache(
     phase_ms: dict[str, float] = {}
     rows_updated = 0
     ensure_initialized(conn, migrate=True)
-    active = active_instance_id()
+    active = active_node_id()
     settings = list_settings()
     reps = list_reporters()
     root = volume_root()
@@ -875,7 +1010,7 @@ def rebuild_sqlite_cache(
             )
         conn.execute(
             "INSERT INTO settings(key, value) VALUES(?, ?)",
-            (CACHE_ACTIVE_INSTANCE_KEY, active),
+            (CACHE_ACTIVE_NODE_KEY, active),
         )
         conn.execute(
             "INSERT INTO settings(key, value) VALUES(?, ?)",
@@ -919,29 +1054,34 @@ def rebuild_sqlite_cache(
 
 
 def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
-    """Ensure SQLite projections are scoped to the active instance.
+    """Ensure SQLite projections are scoped to the active node.
 
     Routine reads must stay O(1) with respect to the number of Gap JSON files.
     Normal Refine writes update SQLite and canonical JSON together; incremental
     projection refreshes are reserved for startup, project sync, and
-    app/instance switches. The explicit System > Runtime rebuild action uses
+    app/node switches. The explicit System > Runtime rebuild action uses
     a forced rebuild instead.
     """
-    active = active_instance_id()
-    cached = _cached_active_instance_id(conn)
+    active = active_node_id()
+    cached = _cached_active_node_id(conn)
     if cached != active:
         rebuild_sqlite_cache(conn)
     return active
 
 
-def _cached_active_instance_id(conn: sqlite3.Connection | None) -> str:
+def _cached_active_node_id(conn: sqlite3.Connection | None) -> str:
     if conn is None:
         return ""
     try:
         row = conn.execute(
             "SELECT value FROM settings WHERE key = ?",
-            (CACHE_ACTIVE_INSTANCE_KEY,),
+            (CACHE_ACTIVE_NODE_KEY,),
         ).fetchone()
+        if row is None:
+            row = conn.execute(
+                "SELECT value FROM settings WHERE key = ?",
+                (LEGACY_CACHE_ACTIVE_INSTANCE_KEY,),
+            ).fetchone()
         if row is None:
             return ""
         try:
@@ -957,10 +1097,11 @@ def state_fingerprint(*, root: Path | None = None) -> str:
     root = root or volume_root()
     paths: list[Path] = [
         config_json_path(root),
-        instances_json_path(root),
+        nodes_json_path(root),
+        cluster_json_path(root),
         guidance_json_path(root),
     ]
-    paths.extend(sorted(instances_dir(root).glob("**/*.json")))
+    paths.extend(sorted(nodes_dir(root).glob("**/*.json")))
     parts: list[str] = []
     for path in paths:
         try:
@@ -1187,7 +1328,7 @@ def _upsert_gap_index_row(conn: sqlite3.Connection,
     conn.execute(
         "INSERT OR REPLACE INTO gaps_index "
         "(id, name, status, priority, reporter, created, updated, "
-        "branch_name, instance_id, json_path) "
+        "branch_name, node_id, json_path) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(gap.get("id") or ""),
@@ -1198,7 +1339,7 @@ def _upsert_gap_index_row(conn: sqlite3.Connection,
             str(gap.get("created") or now_iso()),
             str(gap.get("updated") or gap.get("created") or now_iso()),
             gap.get("branch_name"),
-            str(gap.get("instance_id") or DEFAULT_INSTANCE_ID),
+            str(gap.get("node_id") or DEFAULT_NODE_ID),
             rel_path,
         ),
     )
@@ -1226,10 +1367,10 @@ def _latest_reporter(gap: dict[str, Any]) -> str:
     return ""
 
 
-def _write_instance_files(instance_id: str, *, settings: dict[str, str],
+def _write_node_files(node_id: str, *, settings: dict[str, str],
                           reporters: list[dict[str, Any]],
                           root: Path) -> None:
-    d = instance_dir(instance_id, root)
+    d = node_dir(node_id, root)
     d.mkdir(parents=True, exist_ok=True)
     files = {
         "application.json": APPLICATION_SETTING_KEYS,
@@ -1244,10 +1385,10 @@ def _write_instance_files(instance_id: str, *, settings: dict[str, str],
     })
 
 
-def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
+def _ensure_node_files(node_id: str, *, root: Path) -> None:
     from . import db
 
-    d = instance_dir(instance_id, root)
+    d = node_dir(node_id, root)
     d.mkdir(parents=True, exist_ok=True)
     defaults = db.DEFAULT_SETTINGS
     for name, keys in {
@@ -1259,7 +1400,7 @@ def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
         if not p.exists():
             _write_json(p, {k: defaults[k] for k in keys if k in defaults})
         else:
-            _prune_instance_file(p, keys)
+            _prune_node_file(p, keys)
         if name == "target-app.json":
             _cleanup_legacy_target_app_config(p)
     reps = d / "reporters.json"
@@ -1267,12 +1408,12 @@ def _ensure_instance_files(instance_id: str, *, root: Path) -> None:
         _write_json(reps, {"reporters": [], "updated_at": now_iso()})
 
 
-def _update_instance_file(filename: str, updates: dict[str, str], *,
-                          instance_id: str | None = None,
+def _update_node_file(filename: str, updates: dict[str, str], *,
+                          node_id: str | None = None,
                           root: Path | None = None) -> None:
     root = root or volume_root()
-    target = instance_id or active_instance_id(root=root)
-    p = instance_dir(target, root) / filename
+    target = node_id or active_node_id(root=root)
+    p = node_dir(target, root) / filename
     data = _read_json(p, {})
     normalized = {k: str(v) for k, v in updates.items()}
     if all(data.get(k) == v for k, v in normalized.items()):
@@ -1282,7 +1423,7 @@ def _update_instance_file(filename: str, updates: dict[str, str], *,
     _write_json(p, data)
 
 
-def _prune_instance_file(path: Path, allowed_keys: set[str]) -> None:
+def _prune_node_file(path: Path, allowed_keys: set[str]) -> None:
     data = _read_json(path, {})
     if not isinstance(data, dict):
         return
@@ -1374,18 +1515,19 @@ def _unlink_quietly(path: Path) -> None:
 
 
 def _cleanup_legacy_run_state(root: Path) -> None:
-    _unlink_quietly(active_instance_path(root))
+    _unlink_quietly(active_node_path(root))
+    _unlink_quietly(legacy_active_instance_path(root))
     try:
         legacy_run_dir(root).rmdir()
     except OSError:
         pass
 
 
-def _slug_instance_id(name: str) -> str:
+def _slug_node_id(name: str) -> str:
     import re
 
     slug = re.sub(r"[^a-z0-9_-]+", "-", name.lower()).strip("-")
-    return slug[:40] or "instance"
+    return slug[:40] or "node"
 
 
 def _refine_version() -> str:

@@ -124,13 +124,13 @@ class GovernanceAgent:
                 return self._find_pending(scoped_conn, limit=limit)
         rows = conn.execute(
             "SELECT id, priority, updated FROM gaps_index "
-            "WHERE status = 'todo' AND instance_id = ? "
+            "WHERE status = 'todo' AND node_id = ? "
             "ORDER BY CASE priority "
             "  WHEN 'high' THEN 0 "
             "  WHEN 'medium' THEN 1 "
             "  ELSE 2 "
             "END, updated ASC LIMIT ?",
-            (project_state.active_instance_id(), limit),
+            (project_state.active_node_id(), limit),
         ).fetchall()
         out = []
         for row in rows:
@@ -146,15 +146,15 @@ class GovernanceAgent:
 
     def _review_one(self, gap_id: str) -> None:
         with self._conn_scope() as conn:
-            active_instance = project_state.active_instance_id()
+            active_node = project_state.active_node_id()
             row = conn.execute(
-                "SELECT instance_id FROM gaps_index WHERE id = ?",
+                "SELECT node_id FROM gaps_index WHERE id = ?",
                 (gap_id,),
             ).fetchone()
             if (
                 row
-                and str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
-                != active_instance
+                and str(row["node_id"] or project_state.DEFAULT_NODE_ID)
+                != active_node
             ):
                 return
             with self._snap_lock:
@@ -247,8 +247,8 @@ class GovernanceAgent:
                     with db.transaction(conn):
                         conn.execute(
                             "UPDATE gaps_index SET status = 'backlog', updated = ? "
-                            "WHERE id = ? AND status = 'todo' AND instance_id = ?",
-                            (now_iso(), gap_id, active_instance),
+                            "WHERE id = ? AND status = 'todo' AND node_id = ?",
+                            (now_iso(), gap_id, active_node),
                         )
                     try:
                         gap_writer.update_fields(gap_id, status="backlog")

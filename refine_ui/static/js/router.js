@@ -11,7 +11,7 @@ const routes = {
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
-  instance: renderInstanceSettings,
+  node: renderNodeSettings,
   project: renderProjectSettings,
 };
 
@@ -36,8 +36,8 @@ function parseHash() {
   if (parts[0] === "system" || parts[0] === "settings") {
     return { route: "settings", tab: parts[1] || null };
   }
-  if (parts[0] === "instance") {
-    return { route: "instance", tab: parts[1] || null };
+  if (parts[0] === "node") {
+    return { route: "node", tab: parts[1] || null };
   }
   if (parts[0] === "project") {
     return { route: "project", tab: parts[1] || null };
@@ -91,7 +91,7 @@ function navigate() {
 
   if (
     prevRoute === r.route &&
-    (r.route === "settings" || r.route === "instance" || r.route === "project")
+    (r.route === "settings" || r.route === "node" || r.route === "project")
   ) {
     state.currentRoute = r.route;
     state.currentGap = null;

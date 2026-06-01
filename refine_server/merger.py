@@ -124,11 +124,11 @@ class Merger:
         # system-owned and only ever set by the dispatcher after a
         # successful agent run, so the count is the merge backlog.
         queued = 0
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         for row in self._get_conn().execute(
             "SELECT id FROM gaps_index "
-            "WHERE status = 'ready-merge' AND instance_id = ?",
-            (active_instance,),
+            "WHERE status = 'ready-merge' AND node_id = ?",
+            (active_node,),
         ):
             gid = row["id"]
             if gid == gap_id:
@@ -219,9 +219,9 @@ class Merger:
         oldest-flipped first (FIFO) so Gaps don't starve."""
         row = self._get_conn().execute(
             "SELECT id FROM gaps_index "
-            "WHERE status = 'ready-merge' AND instance_id = ? "
+            "WHERE status = 'ready-merge' AND node_id = ? "
             "ORDER BY updated ASC LIMIT 1",
-            (project_state.active_instance_id(),),
+            (project_state.active_node_id(),),
         ).fetchone()
         return row["id"] if row else None
 
@@ -239,8 +239,8 @@ class Merger:
         if mode == "on_worktree_merge":
             row = conn.execute(
                 "SELECT COUNT(*) AS n FROM gaps_index "
-                "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-                (project_state.active_instance_id(),),
+                "WHERE status = 'awaiting-rebuild' AND node_id = ?",
+                (project_state.active_node_id(),),
             ).fetchone()
             pending = int(row["n"] if row else 0)
             if pending > 0:
@@ -250,23 +250,23 @@ class Merger:
         if quality.enabled(conn) and quality.post_rebuild(conn):
             row = conn.execute(
                 "SELECT COUNT(*) AS n FROM gaps_index "
-                "WHERE status = 'qa' AND branch_name IS NULL AND instance_id = ?",
-                (project_state.active_instance_id(),),
+                "WHERE status = 'qa' AND branch_name IS NULL AND node_id = ?",
+                (project_state.active_node_id(),),
             ).fetchone()
             return int(row["n"] if row else 0) > 0
         return False
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         row = conn.execute(
-            "SELECT instance_id FROM gaps_index WHERE id = ?",
+            "SELECT node_id FROM gaps_index WHERE id = ?",
             (gap_id,),
         ).fetchone()
         if (
             row
-            and str(row["instance_id"] or project_state.DEFAULT_INSTANCE_ID)
-            != active_instance
+            and str(row["node_id"] or project_state.DEFAULT_NODE_ID)
+            != active_node
         ):
             return
         # Mark this Gap as the one we're working on so the snapshot

@@ -1,10 +1,10 @@
 // ---- System / Reporters -----------------------------------------------------
 
-function renderSettingsReportersTab(reps, activeInstanceLabel) {
+function renderSettingsReportersTab(reps, activeNodeLabel) {
   return `
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Reporters", "reporter-manage")}</h3>
-      <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
+      <p class="scope-label muted small">Node: ${htmlEscape(activeNodeLabel)}</p>
       <table class="table">
         <thead><tr><th>Name</th><th></th></tr></thead>
         <tbody>

@@ -60,16 +60,16 @@ def empty_gap(gap_id: str, name: str) -> dict[str, Any]:
     now = now_iso()
     try:
         from . import project_state
-        instance_id = project_state.active_instance_id()
+        node_id = project_state.active_node_id()
     except Exception:
-        instance_id = "default"
+        node_id = "default"
     return {
         "id": gap_id,
         "name": name,
         "status": "backlog",
         "priority": "low",
         "branch_name": None,
-        "instance_id": instance_id,
+        "node_id": node_id,
         "created": now,
         "updated": now,
         "notes": [],
@@ -186,7 +186,10 @@ def read_gap_json(gap_id: str, *, include_logs: bool = True) -> dict[str, Any] |
         gap.setdefault("status", "backlog")
         gap.setdefault("priority", "low")
         gap.setdefault("branch_name", None)
-        gap.setdefault("instance_id", "default")
+        if "node_id" not in gap and "instance_id" in gap:
+            gap["node_id"] = gap.get("instance_id") or "default"
+        gap.pop("instance_id", None)
+        gap.setdefault("node_id", "default")
         for round_obj in gap.get("rounds") or []:
             if isinstance(round_obj, dict):
                 normalize_round_governance(round_obj)

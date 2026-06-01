@@ -64,14 +64,14 @@ def main() -> int:
         rebuilder._drain_queue()  # noqa: SLF001
         assert len(runs) == 3, runs
         db.set_setting(conn, "target_app_auto_rebuild", "on_worktree_merge")
-        other_instance = project_state.create_instance("Remote Rebuild Host")
+        other_instance = project_state.create_node("Remote Rebuild Host")
         gid_remote_pending = "01TARGETAPPREMOTEPENDINGA"
         create_indexed_gap(
             conn,
             gid_remote_pending,
             status="awaiting-rebuild",
             branch=None,
-            instance_id=other_instance["id"],
+            node_id=other_instance["id"],
         )
         assert rebuilder.queue_pending_awaiting_rebuild() is False
         gid_pending = "01TARGETAPPPENDINGREBUILDA"
@@ -188,7 +188,7 @@ def main() -> int:
         assert len(runs) == 5, runs
         assert runs[-1] == "hourly automatic rebuild", runs
         target_settings = json.loads(
-            (client / ".refine" / "instances" / "default" / "target-app.json")
+            (client / ".refine" / "nodes" / "default" / "target-app.json")
             .read_text(encoding="utf-8")
         )
         assert target_settings["target_app_auto_rebuild"] == "hourly"

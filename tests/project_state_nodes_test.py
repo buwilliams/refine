@@ -1,4 +1,4 @@
-"""Canonical JSON state, rebuildable cache, and instance ownership tests."""
+"""Canonical JSON state, rebuildable cache, and node ownership tests."""
 from __future__ import annotations
 
 import json
@@ -30,9 +30,9 @@ def main() -> int:
 
         root = client / ".refine"
         assert (root / "config.json").is_file()
-        assert (root / "instances.json").is_file()
+        assert (root / "nodes.json").is_file()
         assert_refine_gitignore(root)
-        active = project_state.active_instance_id()
+        active = project_state.active_node_id()
         assert active == "default"
 
         reporters.add(conn, "Jane")
@@ -43,7 +43,7 @@ def main() -> int:
             initial_round=gaps.new_round("Jane", "Actual", "Target"),
             status="todo",
             priority="high",
-            instance_id=active,
+            node_id=active,
         )
 
         conn.close()
@@ -55,13 +55,13 @@ def main() -> int:
         db.init_db()
         conn = db.connect()
         row = conn.execute(
-            "SELECT status, priority, reporter, instance_id FROM gaps_index WHERE id = ?",
+            "SELECT status, priority, reporter, node_id FROM gaps_index WHERE id = ?",
             (gid,),
         ).fetchone()
         assert row["status"] == "todo"
         assert row["priority"] == "high"
         assert row["reporter"] == "Jane"
-        assert row["instance_id"] == active
+        assert row["node_id"] == active
         assert reporters.list_all(conn)[0]["name"] == "Jane"
 
         db.set_setting(conn, "paused", "1")
@@ -77,7 +77,7 @@ def main() -> int:
         project_state.rebuild_sqlite_cache(conn)
         assert db.get_setting(conn, "quality_timing") == "post_rebuild"
 
-        runtime_path = root / "instances" / active / "runtime.json"
+        runtime_path = root / "nodes" / active / "runtime.json"
         runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
         runtime.pop("backlog_promote_after_seconds", None)
         runtime_path.write_text(json.dumps(runtime), encoding="utf-8")
@@ -88,7 +88,7 @@ def main() -> int:
         )
         conn.execute(
             "DELETE FROM settings WHERE key = ?",
-            (project_state.CACHE_ACTIVE_INSTANCE_KEY,),
+            (project_state.CACHE_ACTIVE_NODE_KEY,),
         )
         project_state.ensure_initialized(conn)
         runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
@@ -115,14 +115,14 @@ def main() -> int:
 
         reporters.add(conn, "Alex")
 
-        laptop = project_state.create_instance("Laptop")
+        laptop = project_state.create_node("Laptop")
         result = project_state.transfer_gaps(active, laptop["id"])
         assert result["updated"] == 1, result
         project_state.rebuild_sqlite_cache(conn)
         row = conn.execute(
-            "SELECT instance_id FROM gaps_index WHERE id = ?", (gid,),
+            "SELECT node_id FROM gaps_index WHERE id = ?", (gid,),
         ).fetchone()
-        assert row["instance_id"] == laptop["id"]
+        assert row["node_id"] == laptop["id"]
 
         blocked = "01PROJECTSTATESKIPAAAAAAA"
         gap_writer.create_gap(
@@ -131,7 +131,7 @@ def main() -> int:
             initial_round=gaps.new_round("Jane", "Actual", "Target"),
             status="in-progress",
             priority="medium",
-            instance_id=laptop["id"],
+            node_id=laptop["id"],
         )
         result = project_state.transfer_gaps(laptop["id"], active)
         assert result["updated"] == 1, result
@@ -148,7 +148,7 @@ def main() -> int:
             initial_round=gaps.new_round("Jane", "Actual", "Target"),
             status="failed",
             priority="medium",
-            instance_id=active,
+            node_id=active,
         )
         gap_writer.create_gap(
             gap_id=failed_laptop,
@@ -156,7 +156,7 @@ def main() -> int:
             initial_round=gaps.new_round("Jane", "Actual", "Target"),
             status="failed",
             priority="medium",
-            instance_id=laptop["id"],
+            node_id=laptop["id"],
         )
         gap_writer.create_gap(
             gap_id=done_laptop,
@@ -164,7 +164,7 @@ def main() -> int:
             initial_round=gaps.new_round("Jane", "Actual", "Target"),
             status="done",
             priority="medium",
-            instance_id=laptop["id"],
+            node_id=laptop["id"],
         )
         gap_writer.create_gap(
             gap_id=alex_done_laptop,
@@ -172,12 +172,12 @@ def main() -> int:
             initial_round=gaps.new_round("Alex", "Actual", "Target"),
             status="done",
             priority="medium",
-            instance_id=laptop["id"],
+            node_id=laptop["id"],
         )
         project_state.rebuild_sqlite_cache(conn)
         status, dash_current = api.dashboard_summary()
         assert status == 200, dash_current
-        assert dash_current["instance_scope"] == "current", dash_current
+        assert dash_current["node_scope"] == "current", dash_current
         assert dash_current["counts"].get("failed") == 1, dash_current
         assert dash_current["counts"].get("in-progress", 0) == 0, dash_current
         jane_current = next(
@@ -189,11 +189,11 @@ def main() -> int:
         ), dash_current
         assert dash_current["needs_attention"][-1]["filter"] == {
             "status": "failed",
-            "instance": "current",
+            "node": "current",
         }
-        status, dash_all = api.dashboard_summary(instance="all")
+        status, dash_all = api.dashboard_summary(node="all")
         assert status == 200, dash_all
-        assert dash_all["instance_scope"] == "all", dash_all
+        assert dash_all["node_scope"] == "all", dash_all
         assert dash_all["counts"].get("failed") == 2, dash_all
         assert dash_all["counts"].get("in-progress") == 1, dash_all
         jane_all = next(
@@ -207,12 +207,12 @@ def main() -> int:
         assert alex_all["done"] == 1, dash_all
         assert dash_all["needs_attention"][-1]["filter"] == {
             "status": "failed",
-            "instance": "all",
+            "node": "all",
         }
-        status, body = api.list_gaps(status="failed", instance="current")
+        status, body = api.list_gaps(status="failed", node="current")
         assert status == 200, body
         assert [g["id"] for g in body["gaps"]] == [failed_active], body
-        status, body = api.list_gaps(status="failed", instance="all")
+        status, body = api.list_gaps(status="failed", node="all")
         assert status == 200, body
         assert {g["id"] for g in body["gaps"]} == {
             failed_active,
@@ -226,7 +226,7 @@ def main() -> int:
             initial_round=gaps.new_round("Jane", "Actual", "Target"),
             status="todo",
             priority="medium",
-            instance_id=active,
+            node_id=active,
         )
         project_state.rebuild_sqlite_cache(conn)
         row = conn.execute(
@@ -250,7 +250,7 @@ def main() -> int:
             assert project_state.ensure_sqlite_cache_current(conn) == active
             status, body = api.list_settings()
             assert status == 200, body
-            status, body = api.list_instances()
+            status, body = api.list_nodes()
             assert status == 200, body
 
             original_get_client = api.get_client
@@ -290,7 +290,7 @@ def main() -> int:
                 initial_round=gaps.new_round("Jane", "Actual", "Target"),
                 status="todo",
                 priority="low",
-                instance_id=active,
+                node_id=active,
             )
         project_state.rebuild_sqlite_cache(conn)
         meta_count = conn.execute(
@@ -362,27 +362,27 @@ def main() -> int:
         ).fetchone()
         assert row["status"] == "failed", dict(row)
 
-        archived = project_state.create_instance("Archived")
-        project_state.update_instance(archived["id"], archived=True)
+        archived = project_state.create_node("Archived")
+        project_state.update_node(archived["id"], archived=True)
         try:
-            project_state.set_active_instance(archived["id"])
-            raise AssertionError("archived instance should not activate")
+            project_state.set_active_node(archived["id"])
+            raise AssertionError("archived node should not activate")
         except ValueError as e:
-            assert "archived instance" in str(e)
-        assert project_state.active_instance_id() == active
+            assert "archived node" in str(e)
+        assert project_state.active_node_id() == active
 
         try:
             project_state.transfer_gaps(None, archived["id"])
-            raise AssertionError("archived instance should not receive transfers")
+            raise AssertionError("archived node should not receive transfers")
         except ValueError as e:
             assert "archived target" in str(e)
 
-        status, body = api.activate_instance({"instance_id": archived["id"]})
+        status, body = api.activate_node({"node_id": archived["id"]})
         assert status == 400, body
-        assert "archived instance" in body["error"]["message"]
-        status, body = api.transfer_instance_gaps({
-            "target_instance_id": archived["id"],
-            "filter": {"instance": active},
+        assert "archived node" in body["error"]["message"]
+        status, body = api.transfer_node_gaps({
+            "target_node_id": archived["id"],
+            "filter": {"node": active},
         })
         assert status == 400, body
         assert "archived target" in body["error"]["message"]
@@ -406,8 +406,8 @@ def main() -> int:
 
         (root / ".gitignore").unlink()
         (root / "config.json").unlink()
-        (root / "instances.json").unlink()
-        shutil.rmtree(root / "instances", ignore_errors=True)
+        (root / "nodes.json").unlink()
+        shutil.rmtree(root / "nodes", ignore_errors=True)
         project_state.ensure_initialized(conn, migrate=True)
         assert_refine_gitignore(root)
         from refine_ui.api import _commit_refine_state
@@ -428,7 +428,7 @@ def main() -> int:
             pass
         cleanup_tmp(tmp)
 
-    print("project state and instances tests OK")
+    print("project state and nodes tests OK")
     return 0
 
 

@@ -1,6 +1,6 @@
 // ---- System / Quality -------------------------------------------------------
 
-function renderSettingsQualityInstanceSections(quality) {
+function renderSettingsQualityNodeSections(quality) {
   const qualityEnabled = String(quality.enabled || "0") === "1";
   const qualityTiming = quality.timing === "post_rebuild" ? "post_rebuild" : "pre_merge";
   const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";
@@ -86,7 +86,7 @@ function renderSettingsQualityProjectSections(quality) {
 
 function renderSettingsQualityTab(quality) {
   return `
-    ${renderSettingsQualityInstanceSections(quality)}
+    ${renderSettingsQualityNodeSections(quality)}
     ${renderSettingsQualityProjectSections(quality)}`;
 }
 
@@ -132,7 +132,7 @@ async function autosaveSettingsQuality(root = document) {
 }
 
 function bindSettingsQualityTab() {
-  bindSettingsQualityInstanceSections("quality");
+  bindSettingsQualityNodeSections("quality");
   bindSettingsQualityProjectSections("quality");
 }
 
@@ -146,7 +146,7 @@ function bindSettingsQualityProjectSections(tabSlug = "runtime") {
   );
 }
 
-function bindSettingsQualityInstanceSections(tabSlug = "instances") {
+function bindSettingsQualityNodeSections(tabSlug = "nodes") {
   const root = document.querySelector(`[data-tab-pane="${tabSlug}"]`);
   const autosaveQuality = createSettingsAutosave(
     () => autosaveSettingsQuality(root),

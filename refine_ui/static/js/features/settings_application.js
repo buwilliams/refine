@@ -44,13 +44,13 @@ function renderSettingsApplicationTab({
   });
 }
 
-function renderInstanceApplicationConfigSections({ s, activeInstanceLabel }) {
+function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
   return `
     <section class="settings-section">
       <h3>Application</h3>
-      <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
+      <p class="scope-label muted small">Node: ${htmlEscape(activeNodeLabel)}</p>
       <div class="actions">
-        <button class="secondary" id="s-application-copy-instance">Copy from instance</button>
+        <button class="secondary" id="s-application-copy-node">Copy from node</button>
         <button class="secondary" id="s-target-generate-ai">Generate with AI</button>
       </div>
     </section>
@@ -301,7 +301,13 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
             { title: "Migrate app", okLabel: "Migrate and open" },
           );
           if (!migrate) return;
-          const result = await api("POST", "/api/project/attach", { path, migrate: true });
+          const closeMigration = showProjectMigrationDialog();
+          let result;
+          try {
+            result = await api("POST", "/api/project/attach", { path, migrate: true });
+          } finally {
+            closeMigration();
+          }
           await applyProjectAttachResult(result);
           return;
         }
@@ -331,7 +337,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
           ? { ...result, apps: result.apps || [] }
           : { ...(state.project || {}), ...result, apps: result.apps || [] };
         if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
-        updateActiveInstanceLabel();
+        updateActiveNodeLabel();
         toast("App removed", "info");
         if (result.attached === false) {
           enterNoProjectMode(result, { openGuidePanel: true });
@@ -366,8 +372,8 @@ function refreshProjectApplicationsSectionOnly(project) {
   );
 }
 
-function bindInstanceApplicationConfigControls() {
-  bindCommand("#s-application-copy-instance", "settings.application.copy_instance");
+function bindNodeApplicationConfigControls() {
+  bindCommand("#s-application-copy-node", "settings.application.copy_node");
   bindCommand("#s-target-generate-ai", "target_app.generate");
   const root = document.querySelector('[data-tab-pane="application"]');
   bindSettingsAutosave(

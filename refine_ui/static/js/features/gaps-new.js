@@ -217,7 +217,7 @@ function renderGapDuplicatePrompt(match) {
     <div class="import-duplicate">
       <div class="small" style="font-weight:600">Possible duplicate</div>
       <p class="muted small" style="margin:4px 0">
-        ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.instance_display_name || match.instance_id || "Default")}
+        ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.node_display_name || match.node_id || "Default")}
         · ${htmlEscape(match.status || "")}
       </p>
       <div class="import-duplicate-content">

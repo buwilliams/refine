@@ -40,7 +40,7 @@ def test_client_switch_path(root: Path) -> None:
     ).read_text(encoding="utf-8") + (
         root / "refine_ui/static/js/features/settings_application.js"
     ).read_text(encoding="utf-8") + (
-        root / "refine_ui/static/js/features/settings_instances.js"
+        root / "refine_ui/static/js/features/settings_nodes.js"
     ).read_text(encoding="utf-8")
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(encoding="utf-8")
     settings_surface_js = (root / "refine_ui/static/js/features/settings.js").read_text(encoding="utf-8")
@@ -53,10 +53,10 @@ def test_client_switch_path(root: Path) -> None:
     guide_js = (root / "refine_ui/static/js/features/guide.js").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
 
-    assert 'id="active-instance-label"' in index_html
-    assert ".brand-instance" in base_css
-    assert "function updateActiveInstanceLabel()" in common_js
-    assert "updateActiveInstanceLabel()" in common_js
+    assert 'id="active-node-label"' in index_html
+    assert ".brand-node" in base_css
+    assert "function updateActiveNodeLabel()" in common_js
+    assert "updateActiveNodeLabel()" in common_js
 
     assert "function openAddAppModal(options = {})" in common_js
     assert "async function maybeOpenProjectTemplateModal(project)" in common_js
@@ -144,7 +144,7 @@ def test_client_switch_path(root: Path) -> None:
         "resetChatForProjectSwitch()",
         "initSSE()",
         "await syncProjectUpdates({ silent: true })",
-        "await refreshInstanceScopedState({ selectReporterFallback: true })",
+        "await refreshNodeScopedState({ selectReporterFallback: true })",
         "await refreshTargetAppToggle()",
         'location.hash = "#/project/application"',
         "openGuide({",
@@ -152,10 +152,10 @@ def test_client_switch_path(root: Path) -> None:
         assert expected in switch_body, expected
 
     assert "function reconcileLastReporter" in common_js
-    assert "async function refreshInstanceScopedState" in common_js
-    instance_state_body = common_js.split("async function refreshInstanceScopedState", 1)[1]
-    instance_state_body = instance_state_body.split("\n}", 1)[0]
-    assert "resetChatForProjectSwitch()" in instance_state_body
+    assert "async function refreshNodeScopedState" in common_js
+    node_state_body = common_js.split("async function refreshNodeScopedState", 1)[1]
+    node_state_body = node_state_body.split("\n}", 1)[0]
+    assert "resetChatForProjectSwitch()" in node_state_body
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
     assert "Migrate and open" in common_js
     assert 'api("POST", "/api/project/attach", {' in common_js
@@ -172,9 +172,9 @@ def test_client_switch_path(root: Path) -> None:
     assert "await applyProjectAttachResult(result, { toast: false })" in remove_body
     assert "App removed; loaded next app" in remove_body
     assert 'resetGuideState({ redraw: false })' in remove_body
-    assert "await refreshInstanceScopedState()" in settings_js
-    assert "active_instance_id: result.active_instance_id" in settings_js
-    assert "updateActiveInstanceLabel()" in settings_js
+    assert "await refreshNodeScopedState()" in settings_js
+    assert "active_node_id: result.active_node_id" in settings_js
+    assert "updateActiveNodeLabel()" in settings_js
     assert "window.location.reload()" not in settings_js
     assert "restart_pending" not in api_py
     assert "_schedule_supervisor_restart" not in api_py
@@ -321,7 +321,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         assert "migration required" in body["error"]["message"].lower()
         status, body = api.list_gaps()
         assert status == 409, body
-        status, body = api.list_instances()
+        status, body = api.list_nodes()
         assert status == 409, body
         config.write_binding(root, client1)
         config.get(reload=True)
@@ -784,15 +784,15 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
-def test_active_instance_is_per_application() -> None:
-    tmp, client1 = make_client_repo("refine-active-instance-")
+def test_active_node_is_per_application() -> None:
+    tmp, client1 = make_client_repo("refine-active-node-")
     conn = init_refine(client1)
     conn.close()
     try:
         from refine_server import project_state as ps1
 
-        laptop = ps1.create_instance("Laptop")
-        ps1.set_active_instance(laptop["id"])
+        laptop = ps1.create_node("Laptop")
+        ps1.set_active_node(laptop["id"])
 
         client2 = tmp / "client-two"
         client2.mkdir()
@@ -807,8 +807,8 @@ def test_active_instance_is_per_application() -> None:
         from refine_server import project_state as ps2
         from refine_ui import runtime
 
-        desktop = ps2.create_instance("Desktop")
-        ps2.set_active_instance(desktop["id"])
+        desktop = ps2.create_node("Desktop")
+        ps2.set_active_node(desktop["id"])
 
         runtime.load_configured(
             client1 / ".refine" / "refine.toml",
@@ -816,21 +816,21 @@ def test_active_instance_is_per_application() -> None:
             start_runner=False,
         )
         from refine_server import project_state
-        assert project_state.active_instance_id() == laptop["id"]
+        assert project_state.active_node_id() == laptop["id"]
 
         runtime.load_configured(
             client2 / ".refine" / "refine.toml",
             start_poller=False,
             start_runner=False,
         )
-        assert project_state.active_instance_id() == desktop["id"]
+        assert project_state.active_node_id() == desktop["id"]
 
         runtime.load_configured(
             client1 / ".refine" / "refine.toml",
             start_poller=False,
             start_runner=False,
         )
-        assert project_state.active_instance_id() == laptop["id"]
+        assert project_state.active_node_id() == laptop["id"]
     finally:
         try:
             runtime.stop_all()  # type: ignore[name-defined]
@@ -839,57 +839,57 @@ def test_active_instance_is_per_application() -> None:
         cleanup_tmp(tmp)
 
 
-def test_active_instance_is_checkout_local_for_same_application() -> None:
-    tmp, client = make_client_repo("refine-active-instance-local-")
+def test_active_node_is_checkout_local_for_same_application() -> None:
+    tmp, client = make_client_repo("refine-active-node-local-")
     conn = init_refine(client)
     conn.close()
     original_cwd = Path.cwd()
     try:
         from refine_server import config, project_state
 
-        laptop = project_state.create_instance("Laptop")
-        desktop = project_state.create_instance("Desktop")
+        laptop = project_state.create_node("Laptop")
+        desktop = project_state.create_node("Desktop")
         clone1 = tmp / "refine-one"
         clone2 = tmp / "refine-two"
         clone1.mkdir()
         clone2.mkdir()
         config.write_binding(clone1, client)
         config.write_binding(clone2, client)
-        legacy_active = client / ".refine" / "run" / "active-instance.json"
+        legacy_active = client / ".refine" / "run" / "active-node.json"
         legacy_active.parent.mkdir(parents=True, exist_ok=True)
         legacy_active.write_text(
-            json.dumps({"active_instance_id": laptop["id"]}),
+            json.dumps({"active_node_id": laptop["id"]}),
             encoding="utf-8",
         )
 
         os.chdir(clone1)
         config.get(reload=True)
-        assert project_state.active_instance_id() == laptop["id"]
+        assert project_state.active_node_id() == laptop["id"]
         assert not legacy_active.exists()
 
         os.chdir(clone2)
         config.get(reload=True)
-        project_state.set_active_instance(desktop["id"])
-        assert project_state.active_instance_id() == desktop["id"]
+        project_state.set_active_node(desktop["id"])
+        assert project_state.active_node_id() == desktop["id"]
 
         os.chdir(clone1)
         config.get(reload=True)
-        assert project_state.active_instance_id() == laptop["id"]
+        assert project_state.active_node_id() == laptop["id"]
 
         os.chdir(clone2)
         config.get(reload=True)
-        assert project_state.active_instance_id() == desktop["id"]
+        assert project_state.active_node_id() == desktop["id"]
 
-        assert (clone1 / "run" / "active-instances.json").is_file()
-        assert (clone2 / "run" / "active-instances.json").is_file()
-        assert not (client / ".refine" / "run" / "active-instance.json").exists()
+        assert (clone1 / "run" / "active-nodes.json").is_file()
+        assert (clone2 / "run" / "active-nodes.json").is_file()
+        assert not (client / ".refine" / "run" / "active-node.json").exists()
     finally:
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
 
-def test_active_instance_is_port_scoped_for_same_checkout() -> None:
-    tmp, client = make_client_repo("refine-active-instance-port-")
+def test_active_node_is_port_scoped_for_same_checkout() -> None:
+    tmp, client = make_client_repo("refine-active-node-port-")
     conn = init_refine(client)
     conn.close()
     original_cwd = Path.cwd()
@@ -899,8 +899,8 @@ def test_active_instance_is_port_scoped_for_same_checkout() -> None:
     try:
         from refine_server import config, project_state
 
-        laptop = project_state.create_instance("Laptop")
-        desktop = project_state.create_instance("Desktop")
+        laptop = project_state.create_node("Laptop")
+        desktop = project_state.create_node("Desktop")
         clone = tmp / "refine-one"
         clone.mkdir()
         config.write_binding(clone, client)
@@ -911,23 +911,23 @@ def test_active_instance_is_port_scoped_for_same_checkout() -> None:
 
         os.environ["REFINE_UI_SCOPE"] = "8080"
         cfg8080 = config.get(reload=True)
-        project_state.set_active_instance(laptop["id"])
-        assert project_state.active_instance_id() == laptop["id"]
+        project_state.set_active_node(laptop["id"])
+        assert project_state.active_node_id() == laptop["id"]
         sqlite8080 = cfg8080.sqlite_path
 
         os.environ["REFINE_UI_SCOPE"] = "8081"
         cfg8081 = config.get(reload=True)
-        project_state.set_active_instance(desktop["id"])
-        assert project_state.active_instance_id() == desktop["id"]
+        project_state.set_active_node(desktop["id"])
+        assert project_state.active_node_id() == desktop["id"]
         sqlite8081 = cfg8081.sqlite_path
 
         os.environ["REFINE_UI_SCOPE"] = "8080"
         config.get(reload=True)
-        assert project_state.active_instance_id() == laptop["id"]
+        assert project_state.active_node_id() == laptop["id"]
 
         os.environ["REFINE_UI_SCOPE"] = "8081"
         config.get(reload=True)
-        assert project_state.active_instance_id() == desktop["id"]
+        assert project_state.active_node_id() == desktop["id"]
 
         assert sqlite8080 != sqlite8081
         assert sqlite8080.parent == clone / "run" / "cache"
@@ -989,19 +989,19 @@ def test_process_config_path_is_not_shared_through_binding() -> None:
         cleanup_tmp(tmp)
 
 
-def test_instance_switch_refreshes_reporter_cache() -> None:
-    tmp, client = make_client_repo("refine-instance-reporters-")
+def test_node_switch_refreshes_reporter_cache() -> None:
+    tmp, client = make_client_repo("refine-node-reporters-")
     conn = init_refine(client)
     try:
         from refine_server import project_state, reporters
         from refine_ui import api
 
         reporters.add(conn, "Alice")
-        other = project_state.create_instance("refine2")
+        other = project_state.create_node("refine2")
 
         # Simulate another Refine process changing the checkout-local active
-        # instance marker without touching this process's SQLite connection.
-        project_state.set_active_instance(other["id"])
+        # node marker without touching this process's SQLite connection.
+        project_state.set_active_node(other["id"])
         status, body = api.list_reporters()
         assert status == 200, body
         assert body["reporters"] == []
@@ -1010,7 +1010,7 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
         assert status == 201, body
         assert body["reporter"]["name"] == "Bob"
 
-        project_state.set_active_instance(project_state.DEFAULT_INSTANCE_ID)
+        project_state.set_active_node(project_state.DEFAULT_NODE_ID)
         status, body = api.list_reporters()
         assert status == 200, body
         names = [r["name"] for r in body["reporters"]]
@@ -1018,7 +1018,7 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
 
         status, body = api.list_settings()
         assert status == 200, body
-        assert project_state.CACHE_ACTIVE_INSTANCE_KEY not in body["settings"]
+        assert project_state.CACHE_ACTIVE_NODE_KEY not in body["settings"]
     finally:
         try:
             from refine_ui import runtime
@@ -1029,15 +1029,15 @@ def test_instance_switch_refreshes_reporter_cache() -> None:
         cleanup_tmp(tmp)
 
 
-def test_settings_are_scoped_to_active_instance_files() -> None:
-    tmp, client = make_client_repo("refine-instance-settings-")
+def test_settings_are_scoped_to_active_node_files() -> None:
+    tmp, client = make_client_repo("refine-node-settings-")
     conn = init_refine(client)
     try:
         from refine_server import db, project_state
         from refine_ui import api
 
-        default = project_state.active_instance_id()
-        other = project_state.create_instance("refine2")
+        default = project_state.active_node_id()
+        other = project_state.create_node("refine2")
         db.set_setting(conn, "governance_product", "Shared product")
 
         status, body = api.update_settings({
@@ -1049,7 +1049,7 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         })
         assert status == 200, body
 
-        project_state.set_active_instance(other["id"])
+        project_state.set_active_node(other["id"])
         status, body = api.list_settings()
         assert status == 200, body
         settings = body["settings"]
@@ -1087,7 +1087,7 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         assert settings["target_app_env_json"] == '{"PORT": "3001"}'
         assert settings["target_app_process_check_command"] == "pgrep -f node"
 
-        project_state.set_active_instance(default)
+        project_state.set_active_node(default)
         status, body = api.list_settings()
         assert status == 200, body
         settings = body["settings"]
@@ -1104,22 +1104,22 @@ def test_settings_are_scoped_to_active_instance_files() -> None:
         root = client / ".refine"
         project_config = json.loads((root / "config.json").read_text(encoding="utf-8"))
         default_app = json.loads(
-            (root / "instances" / default / "application.json").read_text(encoding="utf-8")
+            (root / "nodes" / default / "application.json").read_text(encoding="utf-8")
         )
         default_runtime = json.loads(
-            (root / "instances" / default / "runtime.json").read_text(encoding="utf-8")
+            (root / "nodes" / default / "runtime.json").read_text(encoding="utf-8")
         )
         default_target = json.loads(
-            (root / "instances" / default / "target-app.json").read_text(encoding="utf-8")
+            (root / "nodes" / default / "target-app.json").read_text(encoding="utf-8")
         )
         other_app = json.loads(
-            (root / "instances" / other["id"] / "application.json").read_text(encoding="utf-8")
+            (root / "nodes" / other["id"] / "application.json").read_text(encoding="utf-8")
         )
         other_runtime = json.loads(
-            (root / "instances" / other["id"] / "runtime.json").read_text(encoding="utf-8")
+            (root / "nodes" / other["id"] / "runtime.json").read_text(encoding="utf-8")
         )
         other_target = json.loads(
-            (root / "instances" / other["id"] / "target-app.json").read_text(encoding="utf-8")
+            (root / "nodes" / other["id"] / "target-app.json").read_text(encoding="utf-8")
         )
 
         assert project_config["settings"]["governance_product"] == "Shared product"
@@ -1161,12 +1161,12 @@ def main() -> int:
     test_supervised_initial_attach_hot_loads_without_restart(root)
     test_supervised_switch_migrates_target_before_hot_load(root)
     test_empty_project_attach_creates_scaffold_gap(root)
-    test_active_instance_is_per_application()
-    test_active_instance_is_checkout_local_for_same_application()
-    test_active_instance_is_port_scoped_for_same_checkout()
+    test_active_node_is_per_application()
+    test_active_node_is_checkout_local_for_same_application()
+    test_active_node_is_port_scoped_for_same_checkout()
     test_process_config_path_is_not_shared_through_binding()
-    test_instance_switch_refreshes_reporter_cache()
-    test_settings_are_scoped_to_active_instance_files()
+    test_node_switch_refreshes_reporter_cache()
+    test_settings_are_scoped_to_active_node_files()
     print("project switch state tests OK")
     return 0
 

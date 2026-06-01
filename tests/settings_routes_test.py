@@ -23,7 +23,7 @@ def main() -> int:
             "settings_performance",
             "settings_governance",
             "settings_quality",
-            "settings_instances",
+            "settings_nodes",
             "settings_reporters",
         )
     }
@@ -97,29 +97,29 @@ def main() -> int:
 
     assert "const SETTINGS_SURFACES = {" in settings_js
     assert 'basePath: "#/system"' in settings_js
-    assert 'basePath: "#/instance"' in settings_js
+    assert 'basePath: "#/node"' in settings_js
     assert 'basePath: "#/project"' in settings_js
     assert '{ slug: "processes", label: "Processes" }' in settings_js
     assert '{ slug: "performance", label: "Performance" }' in settings_js
-    assert '{ slug: "instances", label: "Instances" }' in settings_js
+    assert '{ slug: "nodes", label: "Nodes" }' in settings_js
     assert '{ slug: "reporters", label: "Reporters" }' in settings_js
     assert '{ slug: "application", label: "Application" }' in settings_js
     assert '{ slug: "quality", label: "Quality" }' in settings_js
     assert '{ slug: "governance", label: "Governance" }' in settings_js
     assert '{ slug: "guidance", label: "Guidance" }' in settings_js
-    system_surface = settings_js.split('settings: {', 1)[1].split('instance: {', 1)[0]
+    system_surface = settings_js.split('settings: {', 1)[1].split('node: {', 1)[0]
     assert '{ slug: "runtime", label: "Runtime" }' not in system_surface
     slugs = [
-        "processes", "performance", "runtime", "instances", "reporters",
+        "processes", "performance", "runtime", "nodes", "reporters",
         "application", "quality", "governance", "guidance",
     ]
 
     assert 'return { route: "settings", tab: parts[1] || null };' in router_js
-    assert 'return { route: "instance", tab: parts[1] || null };' in router_js
+    assert 'return { route: "node", tab: parts[1] || null };' in router_js
     assert 'return { route: "project", tab: parts[1] || null };' in router_js
     assert 'gaps_plan: renderGapPlan' in router_js
     assert 'if (parts[1] === "plan") return { route: "gaps_plan" };' in router_js
-    assert 'r.route === "settings" || r.route === "instance" || r.route === "project"' in router_js
+    assert 'r.route === "settings" || r.route === "node" || r.route === "project"' in router_js
     assert "refreshSettingsTab(slug).catch(showActionError);" in router_js
     assert 'parsed.route === state.currentRoute && !parsed.tab' in settings_js
     assert 'return first;' in settings_js
@@ -128,7 +128,7 @@ def main() -> int:
     assert 'if (slug === "project") return surface.tabs[0]?.slug || null;' in settings_js
     assert "function activeSettingsTabFromRoute(surface = settingsSurfaceForRoute())" in settings_js
     assert "let _targetAppDraftDirty = false;" in settings_js
-    assert "async function renderInstanceSettings()" in settings_js
+    assert "async function renderNodeSettings()" in settings_js
     assert "async function renderProjectSettings()" in settings_js
     assert "async function refreshSettings(options = {})" in settings_js
     assert "async function refreshActiveSettingsTab(options = {})" in settings_js
@@ -247,7 +247,7 @@ def main() -> int:
     assert '@route("GET", r"/api/upgrade")' in server_py
     assert "def upgrade_status" in api_py
     runtime_save_body = settings_js.split("async function autosaveSettingsRuntime", 1)[1]
-    runtime_save_body = runtime_save_body.split("\nfunction bindInstanceRuntimeConfigControls", 1)[0]
+    runtime_save_body = runtime_save_body.split("\nfunction bindNodeRuntimeConfigControls", 1)[0]
     application_save_body = settings_js.split("async function autosaveSettingsApplication", 1)[1]
     application_save_body = application_save_body.split("\nfunction applyGeneratedTargetAppConfig", 1)[0]
     assert 'worker_memory_limit_mb: $("#s-worker-memory").value' in runtime_save_body
@@ -361,14 +361,14 @@ def main() -> int:
 
     primary_nav = index_html.split('<nav class="nav">', 1)[1].split("</nav>", 1)[0]
     assert 'data-route="settings"' not in primary_nav
-    assert 'data-route="instance"' not in primary_nav
+    assert 'data-route="node"' not in primary_nav
     assert 'data-route="project"' not in primary_nav
     assert 'class="nav-menu nav-context-menu" id="nav-context-menu"' in index_html
     context_panel = index_html.split('class="nav-menu-panel nav-context-panel"', 1)[1].split("</details>", 1)[0]
     assert '<label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>' in context_panel
     assert '<div class="nav-menu-label nav-context-section-label">Management</div>' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide">' in context_panel
-    assert '<a class="nav-menu-item nav-management-item" href="#/instance/instances" data-route="instance">' in context_panel
+    assert '<a class="nav-menu-item nav-management-item" href="#/node/nodes" data-route="node">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/project/application" data-route="project">' in context_panel
     assert '<a class="nav-menu-item nav-management-item" href="#/system/processes" data-route="settings">' in context_panel
     assert context_panel.count('class="nav-menu-icon"') == 4
@@ -487,14 +487,14 @@ def main() -> int:
     assert "if (active && !(active.category.checklist && guideChecklistComplete()))" in guide_js
     assert 'class="guide-item-kind"' not in guide_js
     assert "Focus in app" not in guide_js
-    assert 'hash: "#/instance/application"' in guide_js
+    assert 'hash: "#/node/application"' in guide_js
     assert 'hash: "#/project/quality"' in guide_js
     assert 'hash: "#/system/processes"' in guide_js
     settings_guide_field_ids = [
-        "instance-manage",
+        "node-manage",
         "reporter-manage",
         "reporter-merge-into",
-        "instance-copy-settings-source",
+        "node-copy-settings-source",
         "application-agent-subpath",
         "application-merge-target",
         "application-url",
@@ -592,7 +592,7 @@ def main() -> int:
     assert "function openReporterMergeModal(source)" in settings_js
     assert 'api("POST", `/api/reporters/${b.dataset.rmerge}/merge`' in settings_js
     assert "Merging a reporter moves its Gaps to another" in settings_js
-    assert "renderSettingsReportersTab(data.reps, data.activeInstanceLabel)" in settings_js
+    assert "renderSettingsReportersTab(data.reps, data.activeNodeLabel)" in settings_js
     assert "bindSettingsReportersTab();" in settings_js
     assert 'def merge_reporter(rid: int, body: dict)' in api_py
     assert 'M_MERGE_REPORTER' in api_py
@@ -600,12 +600,12 @@ def main() -> int:
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
     assert index_html.index(f"/static/js/features/{name}.js") < index_html.index("/static/js/features/settings.js")
-    assert 'slug: "instances"' in settings_js
-    assert 'api("GET", "/api/instances")' in settings_js
-    assert "Transfer Gaps" not in settings_tab_files["settings_instances"]
-    assert "instance-transfer" not in settings_tab_files["settings_instances"]
-    assert 'api("POST", "/api/instances/transfer-gaps"' not in settings_tab_files["settings_instances"]
-    assert 'api("POST", "/api/instances/transfer-gaps"' in gaps_bulk_js
+    assert 'slug: "nodes"' in settings_js
+    assert 'api("GET", "/api/nodes")' in settings_js
+    assert "Transfer Gaps" not in settings_tab_files["settings_nodes"]
+    assert "node-transfer" not in settings_tab_files["settings_nodes"]
+    assert 'api("POST", "/api/nodes/transfer-gaps"' not in settings_tab_files["settings_nodes"]
+    assert 'api("POST", "/api/nodes/transfer-gaps"' in gaps_bulk_js
     processes_body = settings_tab_files["settings_processes"]
     application_body = settings_tab_files["settings_application"]
     runtime_body = settings_tab_files["settings_runtime"]
@@ -638,7 +638,7 @@ def main() -> int:
     assert "function scheduleProcessesTabRefreshes()" in processes_body
     assert '[data-tab-pane="processes"].active' in processes_body
     assert "refreshCurrentSettingsSurface()" in common_js
-    assert '["settings", "instance", "project"].includes(state.currentRoute || "")' in common_js
+    assert '["settings", "node", "project"].includes(state.currentRoute || "")' in common_js
     assert "refreshActiveSettingsTab({ force: true })" in processes_body
     assert "function refreshProcessesSettingsTab(options = {})" in processes_body
     assert 'data-cancel-agent="' in processes_body
@@ -744,10 +744,10 @@ def main() -> int:
     assert ".managed-process-table tr.supervisor-child[hidden]" in common_css
     assert ".target-app-action-slot" in common_css
     assert ".target-app-action-hidden" in common_css
-    instances_body = settings_tab_files["settings_instances"]
-    assert 'id="s-project-sync-now"' not in instances_body
-    assert "Trigger sync repo" not in instances_body
-    assert 'id="instance-add"' in instances_body
+    nodes_body = settings_tab_files["settings_nodes"]
+    assert 'id="s-project-sync-now"' not in nodes_body
+    assert "Trigger sync repo" not in nodes_body
+    assert 'id="node-add"' in nodes_body
     assert 'api("GET", "/api/guidance")' in settings_js
     assert 'id="guidance-add"' in settings_js
     assert 'id="guidance-form"' in settings_js
@@ -765,7 +765,7 @@ def main() -> int:
     assert 'id="guidance-save"' not in settings_js
     assert 'api("PUT", "/api/guidance"' in settings_js
     assert 'name="instructions"' in settings_js
-    assert 'await syncProjectUpdates();' not in settings_tab_files["settings_instances"]
+    assert 'await syncProjectUpdates();' not in settings_tab_files["settings_nodes"]
     assert 'sseSource.addEventListener("project_updated"' in (
         root / "refine_ui/static/js/common.js"
     ).read_text(encoding="utf-8")
@@ -776,23 +776,23 @@ def main() -> int:
     assert "async function loadSettingsSurfaceData()" in settings_core_js
     assert 'api("GET", "/api/settings")' in settings_core_js
     assert 'api("GET", "/api/reporters")' in settings_core_js
-    assert "renderSettingsInstancesTab({" in settings_js
-    assert "renderSettingsReportersTab(data.reps, data.activeInstanceLabel)" in settings_js
-    assert "renderInstanceApplicationConfigSections" in settings_js
-    assert "renderInstanceRuntimeConfigSections" in settings_js
+    assert "renderSettingsNodesTab({" in settings_js
+    assert "renderSettingsReportersTab(data.reps, data.activeNodeLabel)" in settings_js
+    assert "renderNodeApplicationConfigSections" in settings_js
+    assert "renderNodeRuntimeConfigSections" in settings_js
     assert "function renderSettingsApplicationTab" in settings_js
     assert "target_app_url" not in common_js
     assert 'id="s-project-template"' in settings_js
     assert "Select app template" in settings_js
     assert "await openProjectTemplateSelector()" in settings_js
-    assert 'id="s-application-copy-instance"' in settings_js
+    assert 'id="s-application-copy-node"' in settings_js
     assert 'id="s-target-generate-ai"' in settings_js
-    assert 'copySettingsFromInstance("application"' in commands_js
+    assert 'copySettingsFromNode("application"' in commands_js
     assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in commands_js
-    assert 'id="s-runtime-copy-instance"' in runtime_body
-    assert 'copySettingsFromInstance("runtime"' in commands_js
-    assert 'api("POST", "/api/instances/copy-settings"' in settings_js
-    assert '@route("POST", r"/api/instances/copy-settings")' in server_py
+    assert 'id="s-runtime-copy-node"' in runtime_body
+    assert 'copySettingsFromNode("runtime"' in commands_js
+    assert 'api("POST", "/api/nodes/copy-settings"' in settings_js
+    assert '@route("POST", r"/api/nodes/copy-settings")' in server_py
     assert 'id="s-target-auto-rebuild"' in settings_js
     assert 'id="s-quality-enabled"' not in application_body
     assert 'id="s-quality-enabled"' in settings_js
@@ -885,23 +885,23 @@ def main() -> int:
     assert "scheduleDashboardRetry()" in dashboard_js
     assert "function dashboardScopeFromHash()" in dashboard_js
     assert "function dashboardHash(scope)" in dashboard_js
-    assert "`/api/dashboard?instance=${instanceParam}`" in dashboard_js
-    assert "`&instance=${instanceParam}&limit=200`" in dashboard_js
+    assert "`/api/dashboard?node=${nodeParam}`" in dashboard_js
+    assert "`&node=${nodeParam}&limit=200`" in dashboard_js
     assert "dashboard-title-row" in dashboard_js
     assert "dashboard-scope-switch" in dashboard_js
     assert "function wireDashboardScopeSwitch()" in dashboard_js
     assert "function syncDashboardScopeSwitch(scope)" in dashboard_js
-    assert 'aria-label="Dashboard instance scope"' in dashboard_js
+    assert 'aria-label="Dashboard node scope"' in dashboard_js
     assert 'btn.setAttribute("aria-pressed", active ? "true" : "false")' in dashboard_js
     assert 'data-dashboard-scope="current"' in dashboard_js
     assert 'data-dashboard-scope="all"' in dashboard_js
     assert "Stats for" not in dashboard_js
     assert "scopeLabel" not in dashboard_js
-    assert "Current instance" not in dashboard_js
-    assert "All instances" not in dashboard_js
-    assert "instance: x.filter?.instance || scope" in dashboard_js
-    assert "gapsHash({ status: s, instance: scope })" in dashboard_js
-    assert "gapsHash({ reporter: row.dataset.reporter, instance: scope })" in dashboard_js
+    assert "Current node" not in dashboard_js
+    assert "All nodes" not in dashboard_js
+    assert "node: x.filter?.node || scope" in dashboard_js
+    assert "gapsHash({ status: s, node: scope })" in dashboard_js
+    assert "gapsHash({ reporter: row.dataset.reporter, node: scope })" in dashboard_js
     assert "const showReviewPanel = !!reviewReporter || needsAttention.length > 0;" in dashboard_js
     assert "Needs attention</span>" in dashboard_js
     assert "options.signal" in common_js

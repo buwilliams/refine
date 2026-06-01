@@ -1,4 +1,4 @@
-"""Copying Application and Runtime settings between instances."""
+"""Copying Application and Runtime settings between nodes."""
 from __future__ import annotations
 
 import sys
@@ -10,15 +10,15 @@ from tests.helpers import cleanup_tmp, init_refine, make_client_repo
 
 
 def main() -> int:
-    tmp, client = make_client_repo("refine-instance-settings-copy-")
+    tmp, client = make_client_repo("refine-node-settings-copy-")
     conn = init_refine(client)
     try:
         from refine_server import db, project_state
         from refine_ui import api
 
-        default = project_state.active_instance_id()
-        source = project_state.create_instance("Source")
-        project_state.set_active_instance(source["id"])
+        default = project_state.active_node_id()
+        source = project_state.create_node("Source")
+        project_state.set_active_node(source["id"])
         db.set_setting(conn, "agent_subpath", "apps/web")
         db.set_setting(conn, "merge_target_branch", "release")
         db.set_setting(conn, "quality_enabled", "1")
@@ -32,7 +32,7 @@ def main() -> int:
         db.set_setting(conn, "agent_cli", "codex")
         db.set_setting(conn, "paused", "1")
 
-        project_state.set_active_instance(default)
+        project_state.set_active_node(default)
         db.set_setting(conn, "agent_subpath", "")
         db.set_setting(conn, "merge_target_branch", "")
         db.set_setting(conn, "quality_enabled", "0")
@@ -46,8 +46,8 @@ def main() -> int:
         db.set_setting(conn, "agent_cli", "claude")
         db.set_setting(conn, "paused", "0")
 
-        status, body = api.copy_instance_settings({
-            "source_instance_id": source["id"],
+        status, body = api.copy_node_settings({
+            "source_node_id": source["id"],
             "section": "application",
         })
         assert status == 200, body
@@ -59,8 +59,8 @@ def main() -> int:
         assert settings["target_app_rebuild_command"] == "npm run build", settings
         assert settings["quality_enabled"] == "0", settings
 
-        status, body = api.copy_instance_settings({
-            "source_instance_id": source["id"],
+        status, body = api.copy_node_settings({
+            "source_node_id": source["id"],
             "section": "runtime",
         })
         assert status == 200, body
@@ -72,12 +72,12 @@ def main() -> int:
         assert settings["agent_cli"] == "claude", settings
         assert settings["paused"] == "0", settings
 
-        status, body = api.copy_instance_settings({
-            "source_instance_id": default,
+        status, body = api.copy_node_settings({
+            "source_node_id": default,
             "section": "runtime",
         })
         assert status == 400, body
-        assert "different from the active instance" in body["error"]["message"]
+        assert "different from the active node" in body["error"]["message"]
     finally:
         try:
             conn.close()
@@ -85,7 +85,7 @@ def main() -> int:
             pass
         cleanup_tmp(tmp)
 
-    print("instance settings copy tests OK")
+    print("node settings copy tests OK")
     return 0
 
 

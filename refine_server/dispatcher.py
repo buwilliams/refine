@@ -11,6 +11,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 import time
+import traceback
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
@@ -76,7 +77,8 @@ class Dispatcher:
                 activity.append(
                     conn,
                     message=f"Dispatcher error: {e!r}",
-                    severity="error", category="cli", actor="runner",
+                    severity="error", category="runner", actor="runner",
+                    details=traceback.format_exc(limit=20),
                 )
             self._stop.wait(self.poll_interval)
 
@@ -128,11 +130,11 @@ class Dispatcher:
         *,
         running_snapshot: list[dict] | None = None,
     ) -> int:
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
-            "WHERE status = 'in-progress' AND instance_id = ?",
-            (active_instance,),
+            "WHERE status = 'in-progress' AND node_id = ?",
+            (active_node,),
         ).fetchone()
         in_progress = int(row["n"] if row else 0)
         row = conn.execute(
@@ -140,8 +142,8 @@ class Dispatcher:
             "FROM runs r "
             "JOIN gaps_index g ON g.id = r.gap_id "
             "WHERE r.status = 'running' AND r.kind = 'quality' "
-            "AND g.status = 'qa' AND g.instance_id = ?",
-            (active_instance,),
+            "AND g.status = 'qa' AND g.node_id = ?",
+            (active_node,),
         ).fetchone()
         indexed = in_progress + int(row["n"] if row else 0)
         # The SQLite state is the shared cross-runner reservation source. Keep
@@ -162,14 +164,14 @@ class Dispatcher:
     ) -> None:
         if available_slots <= 0:
             return
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         limit = max(1, available_slots * 2)
         pending = {
             lane: list(conn.execute(
                 "SELECT id, name, branch_name FROM gaps_index "
-                f"WHERE status = ? AND instance_id = ? AND {priority_case_sql()} = ? "
+                f"WHERE status = ? AND node_id = ? AND {priority_case_sql()} = ? "
                 "ORDER BY updated ASC LIMIT ?",
-                (lane, active_instance, active_rank, limit),
+                (lane, active_node, active_rank, limit),
             ).fetchall())
             for lane in _LANES
         }
@@ -223,9 +225,9 @@ class Dispatcher:
         placeholders = ",".join("?" * len(BLOCKING_STATUSES))
         row = conn.execute(
             f"SELECT {priority_case_sql()} AS rank FROM gaps_index "
-            f"WHERE instance_id = ? AND status IN ({placeholders}) "
+            f"WHERE node_id = ? AND status IN ({placeholders}) "
             "ORDER BY rank ASC LIMIT 1",
-            (project_state.active_instance_id(), *BLOCKING_STATUSES),
+            (project_state.active_node_id(), *BLOCKING_STATUSES),
         ).fetchone()
         return int(row["rank"]) if row else None
 
@@ -264,11 +266,11 @@ class Dispatcher:
         n = db.get_setting_int(conn, "backlog_promote_after_seconds", 3600)
         if n < 0:
             return
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         if n == 0:
             rows = conn.execute(
-                "SELECT id FROM gaps_index WHERE status = 'backlog' AND instance_id = ?",
-                (active_instance,),
+                "SELECT id FROM gaps_index WHERE status = 'backlog' AND node_id = ?",
+                (active_node,),
             ).fetchall()
         else:
             cutoff = (datetime.now(timezone.utc) - timedelta(seconds=n)).strftime(
@@ -276,8 +278,8 @@ class Dispatcher:
             )
             rows = conn.execute(
                 "SELECT id FROM gaps_index "
-                "WHERE status = 'backlog' AND instance_id = ? AND updated <= ?",
-                (active_instance, cutoff),
+                "WHERE status = 'backlog' AND node_id = ? AND updated <= ?",
+                (active_node, cutoff),
             ).fetchall()
         if not rows:
             return
@@ -291,8 +293,8 @@ class Dispatcher:
             with db.transaction(conn):
                 cur = conn.execute(
                     "UPDATE gaps_index SET status = 'todo', updated = ? "
-                    "WHERE id = ? AND status = 'backlog' AND instance_id = ?",
-                    (ts, gid, active_instance),
+                    "WHERE id = ? AND status = 'backlog' AND node_id = ?",
+                    (ts, gid, active_node),
                 )
             if cur.rowcount:
                 try:
@@ -318,9 +320,9 @@ class Dispatcher:
             return
         rows = conn.execute(
             "SELECT id, branch_name FROM gaps_index "
-            "WHERE status = 'qa' AND instance_id = ? "
+            "WHERE status = 'qa' AND node_id = ? "
             "ORDER BY updated ASC",
-            (project_state.active_instance_id(),),
+            (project_state.active_node_id(),),
         ).fetchall()
         for row in rows:
             if self.sub_mgr.is_running(row["id"]):
@@ -331,12 +333,12 @@ class Dispatcher:
                 self._promote_post_rebuild_quality_bypass(conn, row["id"])
 
     def _promote_quality_bypass(self, conn: sqlite3.Connection, gap_id: str) -> None:
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'ready-merge', updated = ? "
-                "WHERE id = ? AND status = 'qa' AND instance_id = ?",
-                (now_iso(), gap_id, active_instance),
+                "WHERE id = ? AND status = 'qa' AND node_id = ?",
+                (now_iso(), gap_id, active_node),
             )
         if not cur.rowcount:
             return
@@ -384,13 +386,13 @@ class Dispatcher:
         conn: sqlite3.Connection,
         gap_id: str,
     ) -> None:
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'review', updated = ? "
                 "WHERE id = ? AND status = 'qa' AND branch_name IS NULL "
-                "AND instance_id = ?",
-                (now_iso(), gap_id, active_instance),
+                "AND node_id = ?",
+                (now_iso(), gap_id, active_node),
             )
         if not cur.rowcount:
             return
@@ -434,8 +436,8 @@ class Dispatcher:
             "FROM runs r JOIN gaps_index g ON g.id = r.gap_id "
             "WHERE r.status = 'running' AND r.kind = 'quality' "
             "AND g.status = 'qa' AND g.branch_name IS NULL "
-            "AND g.instance_id = ?",
-            (project_state.active_instance_id(),),
+            "AND g.node_id = ?",
+            (project_state.active_node_id(),),
         ).fetchone()
         return bool(int(row["n"] if row else 0))
 
@@ -956,24 +958,24 @@ class Dispatcher:
         gap_id: str,
         branch_name: str,
     ) -> bool:
-        active_instance = project_state.active_instance_id()
+        active_node = project_state.active_node_id()
         parallel_cap = self._parallel_run_cap(conn)
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'in-progress', updated = ?, branch_name = ? "
-                "WHERE id = ? AND status = 'todo' AND instance_id = ? "
+                "WHERE id = ? AND status = 'todo' AND node_id = ? "
                 "AND ("
                 "  SELECT COUNT(*) FROM gaps_index "
-                "  WHERE status = 'in-progress' AND instance_id = ?"
+                "  WHERE status = 'in-progress' AND node_id = ?"
                 ") + ("
                 "  SELECT COUNT(DISTINCT r.gap_id) FROM runs r "
                 "  JOIN gaps_index g ON g.id = r.gap_id "
                 "  WHERE r.status = 'running' AND r.kind = 'quality' "
-                "  AND g.status = 'qa' AND g.instance_id = ?"
+                "  AND g.status = 'qa' AND g.node_id = ?"
                 ") < ?",
                 (
-                    now_iso(), branch_name, gap_id, active_instance,
-                    active_instance, active_instance, parallel_cap,
+                    now_iso(), branch_name, gap_id, active_node,
+                    active_node, active_node, parallel_cap,
                 ),
             )
         return bool(cur.rowcount)
@@ -1246,8 +1248,8 @@ class Dispatcher:
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = ?, updated = ? "
-                "WHERE id = ? AND status = 'qa' AND instance_id = ?",
-                (next_status, now_iso(), gap_id, project_state.active_instance_id()),
+                "WHERE id = ? AND status = 'qa' AND node_id = ?",
+                (next_status, now_iso(), gap_id, project_state.active_node_id()),
             )
         if cur.rowcount == 0:
             return
@@ -1376,8 +1378,8 @@ class Dispatcher:
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'failed', updated = ? "
-                "WHERE id = ? AND status = 'qa' AND instance_id = ?",
-                (now_iso(), gap_id, project_state.active_instance_id()),
+                "WHERE id = ? AND status = 'qa' AND node_id = ?",
+                (now_iso(), gap_id, project_state.active_node_id()),
             )
         if not cur.rowcount:
             return
@@ -1465,21 +1467,21 @@ class Dispatcher:
     def _reset_stopped_run_to_todo(self, conn: sqlite3.Connection, gap_id: str,
                                    round_idx: int, reason: str) -> None:
         row = conn.execute(
-            "SELECT status, branch_name, instance_id FROM gaps_index WHERE id = ?",
+            "SELECT status, branch_name, node_id FROM gaps_index WHERE id = ?",
             (gap_id,),
         ).fetchone()
         if not row:
             return
 
         branch_name = row["branch_name"]
-        active_instance = project_state.active_instance_id()
-        if row["status"] == "in-progress" and row["instance_id"] == active_instance:
+        active_node = project_state.active_node_id()
+        if row["status"] == "in-progress" and row["node_id"] == active_node:
             with db.transaction(conn):
                 conn.execute(
                     "UPDATE gaps_index SET status = 'todo', branch_name = NULL, "
                     "updated = ? WHERE id = ? AND status = 'in-progress' "
-                    "AND instance_id = ?",
-                    (now_iso(), gap_id, active_instance),
+                    "AND node_id = ?",
+                    (now_iso(), gap_id, active_node),
                 )
             try:
                 gap_writer.update_fields(gap_id, status="todo", branch_name=None)

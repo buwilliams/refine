@@ -11,11 +11,11 @@ def main() -> int:
         from refine_server import project_state
         from refine_ui import api
 
-        other = project_state.create_instance("External triage")
+        other = project_state.create_node("External triage")
         create_indexed_gap(
             conn,
             "01IMPORTDEDUP0000000000001",
-            instance_id=other["id"],
+            node_id=other["id"],
             status="review",
             priority="high",
         )
@@ -42,8 +42,8 @@ def main() -> int:
         assert match["index"] == 1, match
         assert match["score"] == 1.0, match
         assert match["match"]["id"] == "01IMPORTDEDUP0000000000001", match
-        assert match["match"]["instance_id"] == other["id"], match
-        assert match["match"]["instance_display_name"] == "External triage", match
+        assert match["match"]["node_id"] == other["id"], match
+        assert match["match"]["node_display_name"] == "External triage", match
         assert match["match"]["actual"].startswith("Current behavior"), match
         assert match["match"]["target"].startswith("Target behavior"), match
 

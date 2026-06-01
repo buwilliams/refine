@@ -29,8 +29,8 @@ class BackendClient:
         except KeyError as e:
             raise BackendError("unknown_method", str(e)) from e
         except ValueError as e:
-            if "owned by another instance" in str(e):
-                raise BackendError("instance_ownership", str(e)) from e
+            if "owned by another node" in str(e):
+                raise BackendError("node_ownership", str(e)) from e
             raise BackendError("bad_request", str(e)) from e
         except Exception as e:
             raise BackendError("internal", repr(e)) from e

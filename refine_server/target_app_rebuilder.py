@@ -109,8 +109,8 @@ class TargetAppRebuilder:
                 return False
         row = self._get_conn().execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
-            "WHERE status = 'awaiting-rebuild' AND instance_id = ?",
-            (project_state.active_instance_id(),),
+            "WHERE status = 'awaiting-rebuild' AND node_id = ?",
+            (project_state.active_node_id(),),
         ).fetchone()
         n = int(row["n"] if row else 0)
         if n <= 0:

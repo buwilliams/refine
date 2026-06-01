@@ -63,20 +63,20 @@ def main() -> int:
 
         def insert_gap(gid: str, status: str = "todo",
                        priority: str = "low",
-                       instance_id: str | None = None) -> None:
+                       node_id: str | None = None) -> None:
             gap = gap_writer.create_gap(
                 gap_id=gid,
                 name=gid,
                 initial_round=gaps.new_round("Reporter", "Actual", "Target"),
-                instance_id=instance_id,
+                node_id=node_id,
             )
             conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, "
-                "instance_id, json_path) "
+                "node_id, json_path) "
                 "VALUES (?, ?, ?, ?, 'Reporter', ?, ?, ?, ?)",
                 (gid, gid, status, priority, gap["created"], gap["updated"],
-                 gap.get("instance_id") or "default", f"gaps/{gid}.json"),
+                 gap.get("node_id") or "default", f"gaps/{gid}.json"),
             )
 
         launched: list[str] = []
@@ -123,12 +123,12 @@ def main() -> int:
         )
         conn.execute("DELETE FROM gaps_index")
         shutil.rmtree(client / ".refine" / "gaps", ignore_errors=True)
-        other_instance = project_state.create_instance("Remote Governance Host")
+        other_instance = project_state.create_node("Remote Governance Host")
         insert_gap(
             "01REMOTECCCCCCCCCCCCCCCCC",
             "todo",
             "high",
-            instance_id=other_instance["id"],
+            node_id=other_instance["id"],
         )
         insert_gap("01CCCCCCCCCCCCCCCCCCCCCCCC", "todo", "medium")
 

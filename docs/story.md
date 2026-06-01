@@ -48,9 +48,9 @@ Workflow maturity: governance, approval-only verify, lifecycle tests, Settings c
 
 Effort: High (11 commits, 1 milestone)
 
-Milestones started: multi-instance architecture.
+Milestones started: multi-node architecture.
 
-Fewer commits, but meaningful architecture: instance-scoped JSON state, transfer flow, active Gap cancellation during transfer, target app rebuild, guidance.
+Fewer commits, but meaningful architecture: node-scoped JSON state, transfer flow, active Gap cancellation during transfer, target app rebuild, guidance.
 
 ## Day 8: 2026-05-20 (Wednesday)
 
@@ -58,7 +58,7 @@ Effort: Extreme (44 commits, 2 milestones)
 
 Milestones started: per-port Refine runtimes; cache/import/background-job hardening.
 
-Huge systems day: backend isolation, gap ownership, instance hardening, transition guards, provider env capture, large import recovery, SQLite cache rebuild/background jobs.
+Huge systems day: backend isolation, gap ownership, node hardening, transition guards, provider env capture, large import recovery, SQLite cache rebuild/background jobs.
 
 ## Day 9: 2026-05-21 (Thursday)
 
@@ -74,7 +74,7 @@ Effort: Extreme (41 commits, 1 milestone)
 
 Milestones started: supervisor runtime and process observability.
 
-Supervisor runtime: supervised processes, resource caps, Processes UI, `refine ps`, runner workers, IPC backpressure tolerance, instance-scoped recovery/background workers, merge retry, cleanup hardening.
+Supervisor runtime: supervised processes, resource caps, Processes UI, `refine ps`, runner workers, IPC backpressure tolerance, node-scoped recovery/background workers, merge retry, cleanup hardening.
 
 ## Day 11: 2026-05-23 (Saturday)
 

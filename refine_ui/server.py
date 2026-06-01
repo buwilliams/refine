@@ -34,7 +34,7 @@ def route(method: str, pattern: str) -> Callable[[Handler], Handler]:
 
 @route("GET", r"/api/dashboard")
 def _h_dashboard(_h, _m, _b, q):
-    return api.dashboard_summary(instance=_get_one(q, "instance"))
+    return api.dashboard_summary(node=_get_one(q, "node"))
 
 
 @route("GET", r"/api/gaps")
@@ -47,7 +47,7 @@ def _h_list_gaps(_h, _m, _b, q):
         category=_get_one(q, "category"),
         actor=_get_one(q, "actor"),
         reporter=_get_one(q, "reporter"),
-        instance=_get_one(q, "instance"),
+        node=_get_one(q, "node"),
         limit=int(_get_one(q, "limit", "50")),
         offset=int(_get_one(q, "offset", "0")),
         sort=_get_one(q, "sort"),
@@ -423,34 +423,59 @@ def _h_project_sync(_h, _m, body, _q):
     return api.project_sync(body or {})
 
 
-@route("GET", r"/api/instances")
-def _h_instances_list(_h, _m, _b, _q):
-    return api.list_instances()
+@route("GET", r"/api/nodes")
+def _h_nodes_list(_h, _m, _b, _q):
+    return api.list_nodes()
 
 
-@route("POST", r"/api/instances")
-def _h_instances_create(_h, _m, body, _q):
-    return api.create_instance(body or {})
+@route("POST", r"/api/nodes")
+def _h_nodes_create(_h, _m, body, _q):
+    return api.create_node(body or {})
 
 
-@route("PATCH", r"/api/instances/([^/]+)")
-def _h_instances_patch(_h, m, body, _q):
-    return api.update_instance(m.group(1), body or {})
+@route("PATCH", r"/api/nodes/([^/]+)")
+def _h_nodes_patch(_h, m, body, _q):
+    return api.update_node(m.group(1), body or {})
 
 
-@route("POST", r"/api/instances/copy-settings")
-def _h_instances_copy_settings(_h, _m, body, _q):
-    return api.copy_instance_settings(body or {})
+@route("POST", r"/api/nodes/copy-settings")
+def _h_nodes_copy_settings(_h, _m, body, _q):
+    return api.copy_node_settings(body or {})
 
 
-@route("POST", r"/api/instances/activate")
-def _h_instances_activate(_h, _m, body, _q):
-    return api.activate_instance(body or {})
+@route("POST", r"/api/nodes/activate")
+def _h_nodes_activate(_h, _m, body, _q):
+    return api.activate_node(body or {})
 
 
-@route("POST", r"/api/instances/transfer-gaps")
-def _h_instances_transfer(_h, _m, body, _q):
-    return api.transfer_instance_gaps(body or {})
+@route("POST", r"/api/nodes/transfer-gaps")
+def _h_nodes_transfer(_h, _m, body, _q):
+    return api.transfer_node_gaps(body or {})
+
+
+@route("GET", r"/api/cluster")
+def _h_cluster_get(_h, _m, _b, _q):
+    return api.list_cluster()
+
+
+@route("POST", r"/api/cluster/nodes")
+def _h_cluster_node_upsert(_h, _m, body, _q):
+    return api.upsert_cluster_node(body or {})
+
+
+@route("PATCH", r"/api/cluster/nodes/([^/]+)")
+def _h_cluster_node_patch(_h, m, body, _q):
+    return api.update_cluster_node(m.group(1), body or {})
+
+
+@route("POST", r"/api/cluster/nodes/([^/]+)/run")
+def _h_cluster_node_run(_h, m, body, _q):
+    return api.run_cluster_node(m.group(1), body or {})
+
+
+@route("POST", r"/api/cluster/nodes/([^/]+)/bootstrap")
+def _h_cluster_node_bootstrap(_h, m, body, _q):
+    return api.bootstrap_cluster_node(m.group(1), body or {})
 
 
 @route("GET", r"/api/guidance")

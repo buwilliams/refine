@@ -22,7 +22,7 @@ def main() -> int:
         db.set_setting(conn, "target_app_url", "http://localhost:4173")
         db.set_setting(conn, "target_app_last_check_at", "2000-01-01T00:00:00+00:00")
         conn.close()
-        target_app_path = client / ".refine" / "instances" / "default" / "target-app.json"
+        target_app_path = client / ".refine" / "nodes" / "default" / "target-app.json"
         before = target_app_path.read_bytes()
 
         calls: list[dict] = []

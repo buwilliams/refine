@@ -4,7 +4,7 @@ SQLite is a disposable per-application cache. Canonical project state lives in
 JSON under .refine/ and is projected into SQLite on startup/app switch. The
 `activity`, `runs`, `preflight`, and `target_app_operations` tables are runtime
 history/observability only; losing index.sqlite loses that history but not
-canonical Gap/settings/instance state.
+canonical Gap/settings/node state.
 
 WAL mode + busy retry to allow concurrent webapp and runner writers.
 """
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     created     TEXT NOT NULL,
     updated     TEXT NOT NULL,
     branch_name TEXT,
-    instance_id TEXT NOT NULL DEFAULT 'default',
+    node_id TEXT NOT NULL DEFAULT 'default',
     json_path   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gaps_status   ON gaps_index(status);
@@ -255,7 +255,7 @@ DEFAULT_SETTINGS = {
     # it to 'todo'. 3600 = 1 h default. Sentinel -1 = never (disabled).
     # 0 = instant (promote on next tick).
     "backlog_promote_after_seconds": "3600",
-    # How often this instance checks the target repo for local HEAD changes or
+    # How often this node checks the target repo for local HEAD changes or
     # upstream commits and refreshes projected state. -1 = never.
     "project_update_pulse_interval_seconds": "60",
     "file_browser_ignore_patterns": "node_modules, .git, .refine",
@@ -412,10 +412,14 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE gaps_index ADD COLUMN reporter TEXT NOT NULL DEFAULT ''"
         )
         _backfill_reporter(conn)
-    if "instance_id" not in cols:
+    if "node_id" not in cols:
         conn.execute(
-            "ALTER TABLE gaps_index ADD COLUMN instance_id TEXT NOT NULL DEFAULT 'default'"
+            "ALTER TABLE gaps_index ADD COLUMN node_id TEXT NOT NULL DEFAULT 'default'"
         )
+        if "instance_id" in cols:
+            conn.execute(
+                "UPDATE gaps_index SET node_id = COALESCE(NULLIF(instance_id, ''), 'default')"
+            )
     run_cols = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
     if "kind" not in run_cols:
         conn.execute(
@@ -431,7 +435,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_gaps_reporter ON gaps_index(reporter)"
     )
     conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_gaps_instance ON gaps_index(instance_id)"
+        "CREATE INDEX IF NOT EXISTS idx_gaps_node ON gaps_index(node_id)"
     )
     _ensure_search_schema(conn)
     _rebuild_activity_search(conn)

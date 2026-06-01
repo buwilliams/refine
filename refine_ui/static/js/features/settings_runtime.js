@@ -1,14 +1,14 @@
 // ---- System / Runtime -------------------------------------------------------
 
-function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
+function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const cliOption = (value, label) =>
     `<option value="${value}" ${cli === value ? "selected" : ""}>${htmlEscape(label)}</option>`;
   return `
     <section class="settings-section">
       <h3>Runtime configuration</h3>
-      <p class="scope-label muted small">Instance: ${htmlEscape(activeInstanceLabel)}</p>
+      <p class="scope-label muted small">Node: ${htmlEscape(activeNodeLabel)}</p>
       <div class="actions settings-section-actions">
-        <button class="secondary" id="s-runtime-copy-instance">Copy from instance</button>
+        <button class="secondary" id="s-runtime-copy-node">Copy from node</button>
       </div>
       <div class="form-row"><label>${renderSettingsGuideLabel("Parallel-run cap", "runtime-parallel-run-cap")}</label>
         <input type="number" id="s-cap" value="${s.parallel_run_cap || 5}"></div>
@@ -89,7 +89,7 @@ function renderInstanceRuntimeConfigSections(s, activeInstanceLabel, cli) {
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Target repo update pulse",
         "runtime-project-update-pulse",
-        "checks for local commits or upstream commits and refreshes this instance's projected state.",
+        "checks for local commits or upstream commits and refreshes this node's projected state.",
       )}</label>
         <select id="s-project-update-pulse">
           ${[
@@ -266,8 +266,8 @@ async function autosaveSettingsRuntime(options = {}) {
   }
 }
 
-function bindInstanceRuntimeConfigControls() {
-  bindCommand("#s-runtime-copy-instance", "settings.runtime.copy_instance");
+function bindNodeRuntimeConfigControls() {
+  bindCommand("#s-runtime-copy-node", "settings.runtime.copy_node");
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,

@@ -85,14 +85,14 @@ def main() -> int:
             sub_mgr=FakeSubprocessManager(),
             on_worktree_merged=rebuilder.queue_for_worktree_merge,
         )
-        other_instance = project_state.create_instance("Remote Recovery Host")
+        other_instance = project_state.create_node("Remote Recovery Host")
         gid_remote_ready = "01MERGEREMOTEREADYAAAAAA"
         create_indexed_gap(
             conn,
             gid_remote_ready,
             status="ready-merge",
             branch="refine/remote-ready",
-            instance_id=other_instance["id"],
+            node_id=other_instance["id"],
         )
         assert merger._find_one_ready() is None  # noqa: SLF001
         assert merger.snapshot()["queued"] == 0
@@ -408,7 +408,7 @@ def main() -> int:
             conn,
             gid_other_instance,
             status="in-progress",
-            instance_id=other_instance["id"],
+            node_id=other_instance["id"],
         )
         conn.execute(
             "INSERT INTO runs "
@@ -455,7 +455,7 @@ def main() -> int:
             conn,
             gid_runtime_remote,
             status="in-progress",
-            instance_id=other_instance["id"],
+            node_id=other_instance["id"],
         )
         conn.execute(
             "INSERT INTO runs "

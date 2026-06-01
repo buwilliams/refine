@@ -66,12 +66,12 @@ function workflowStatuses() {
     : WORKFLOW_STATUSES;
 }
 
-function updateActiveInstanceLabel() {
-  const el = document.getElementById("active-instance-label");
+function updateActiveNodeLabel() {
+  const el = document.getElementById("active-node-label");
   if (!el) return;
   const project = state.project || {};
-  const active = project.active_instance || null;
-  const activeId = project.active_instance_id || "";
+  const active = project.active_node || null;
+  const activeId = project.active_node_id || "";
   const label = active?.display_name || active?.name || activeId || "none";
   el.textContent = project.attached === false ? "none" : label;
   el.title = el.textContent;
@@ -103,7 +103,7 @@ function clearProjectScopedUiState() {
   if (typeof gapsIncludedIds !== "undefined") gapsIncludedIds.clear();
   setLastReporter("");
   populateAllReporterDropdowns();
-  updateActiveInstanceLabel();
+  updateActiveNodeLabel();
   updateNavAppContextLabel("No app");
   if (typeof applyNoTargetAppSnapshot === "function") applyNoTargetAppSnapshot();
   if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
@@ -161,7 +161,7 @@ function enterNoProjectMode(project = null, { openGuidePanel = false } = {}) {
 }
 
 function refreshCurrentSettingsSurface(options = {}) {
-  if (!["settings", "instance", "project"].includes(state.currentRoute || "")) return undefined;
+  if (!["settings", "node", "project"].includes(state.currentRoute || "")) return undefined;
   if (typeof refreshActiveSettingsTab === "function") {
     return refreshActiveSettingsTab(options);
   }
@@ -315,10 +315,16 @@ async function ensureProjectAttached() {
         return false;
       }
       try {
-        const result = await api("POST", "/api/project/attach", {
-          path: snap.client_repo,
-          migrate: true,
-        });
+        const closeMigration = showProjectMigrationDialog();
+        let result;
+        try {
+          result = await api("POST", "/api/project/attach", {
+            path: snap.client_repo,
+            migrate: true,
+          });
+        } finally {
+          closeMigration();
+        }
         await applyProjectAttachResult(result);
         return true;
       } catch (e) {
@@ -344,7 +350,7 @@ async function refreshProjectStatus() {
     return null;
   }
   state.project = snap;
-  updateActiveInstanceLabel();
+  updateActiveNodeLabel();
   if (snap.attached === false) {
     clearProjectScopedUiState();
   }
@@ -444,7 +450,13 @@ function openProjectAttachModal({
           );
           if (migrate) {
             try {
-              const result = await api("POST", "/api/project/attach", { path, migrate: true });
+              const closeMigration = showProjectMigrationDialog();
+              let result;
+              try {
+                result = await api("POST", "/api/project/attach", { path, migrate: true });
+              } finally {
+                closeMigration();
+              }
               if (reloadOnSuccess) {
                 if (typeof loadGuideStateForProject === "function") loadGuideStateForProject(result, { redraw: false });
                 state.project = result;
@@ -490,6 +502,23 @@ function showProjectAttachToast(result) {
   }
 }
 
+function showProjectMigrationDialog(message = "Migrating selected application...") {
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-title">Migrating application</div>
+      <div class="modal-body">
+        <div class="loading-row" style="padding:0">
+          <span class="loading-spinner"></span>
+          <span>${htmlEscape(message)}</span>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(root);
+  return () => root.remove();
+}
+
 async function applyProjectAttachResult(result, options = {}) {
   state.project = result;
   if (typeof loadGuideStateForCurrentApp === "function") {
@@ -497,7 +526,7 @@ async function applyProjectAttachResult(result, options = {}) {
   } else if (typeof resetGuideState === "function") {
     resetGuideState({ redraw: true });
   }
-  updateActiveInstanceLabel();
+  updateActiveNodeLabel();
   state.dashboard = null;
   state.currentGap = null;
   state.underlayHash = "#/project/application";
@@ -506,11 +535,11 @@ async function applyProjectAttachResult(result, options = {}) {
   resetChatForProjectSwitch();
   initSSE();
   await syncProjectUpdates({ silent: true });
-  await refreshInstanceScopedState({ selectReporterFallback: true });
+  await refreshNodeScopedState({ selectReporterFallback: true });
   await refreshTargetAppToggle();
   if (location.hash !== "#/project/application") {
     location.hash = "#/project/application";
-  } else if (["settings", "instance", "project"].includes(state.currentRoute || "")) {
+  } else if (["settings", "node", "project"].includes(state.currentRoute || "")) {
     await refreshSettings();
   } else {
     navigate();
@@ -721,9 +750,9 @@ function modalAlert(message, {
   return _openModal(body, { cancel: null, ok: true }, "[data-ok]");
 }
 
-function isInstanceOwnershipError(err) {
-  return err?.code === "instance_ownership"
-    || (err?.status === 409 && /owned by another instance/i.test(err?.message || ""));
+function isNodeOwnershipError(err) {
+  return err?.code === "node_ownership"
+    || (err?.status === 409 && /owned by another node/i.test(err?.message || ""));
 }
 
 function isBackgroundJobActiveError(err) {
@@ -738,8 +767,8 @@ function backgroundJobActiveMessage(err) {
 }
 
 async function showActionError(err, fallbackPrefix = "") {
-  if (isInstanceOwnershipError(err)) {
-    await modalAlert(err.message || "This action is not allowed because the Gap is owned by another instance.");
+  if (isNodeOwnershipError(err)) {
+    await modalAlert(err.message || "This action is not allowed because the Gap is owned by another node.");
     return;
   }
   if (isBackgroundJobActiveError(err)) {
@@ -954,7 +983,7 @@ async function refreshReporters({ selectFallback = false } = {}) {
   populateAllReporterDropdowns();
 }
 
-async function refreshInstanceScopedState({ selectReporterFallback = false } = {}) {
+async function refreshNodeScopedState({ selectReporterFallback = false } = {}) {
   if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
   state.reporters = [];
   state.dashboard = null;
@@ -1149,7 +1178,7 @@ function initSSE() {
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    if (["settings", "instance", "project"].includes(state.currentRoute || "")) {
+    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
       refreshCurrentSettingsSurface();
     }
     // Changes screen: the Merge agent can land a new merge commit;
@@ -1167,7 +1196,7 @@ function initSSE() {
   });
   sseSource.addEventListener("reporters_changed", async () => {
     await refreshReporters();
-    if (state.currentRoute === "instance"
+    if (state.currentRoute === "node"
         && document.querySelector('[data-tab-pane="reporters"].active')) {
       refreshCurrentSettingsSurface();
     }
@@ -1179,7 +1208,7 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
-    if (["settings", "instance", "project"].includes(state.currentRoute || "")) refreshCurrentSettingsSurface();
+    if (["settings", "node", "project"].includes(state.currentRoute || "")) refreshCurrentSettingsSurface();
     if (state.currentRoute === "changes") loadChanges();
     if (state.currentRoute === "gaps_detail" && state.currentGap) {
       loadGapDetail(state.currentGap);

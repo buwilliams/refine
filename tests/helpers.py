@@ -70,7 +70,7 @@ def init_refine(client: Path):
 def create_indexed_gap(conn, gap_id: str, *, status: str = "todo",
                        branch: str | None = None,
                        priority: str = "medium",
-                       instance_id: str | None = None) -> None:
+                       node_id: str | None = None) -> None:
     from refine_server import gap_writer, gaps
     from refine_server.paths import relative_gap_path
 
@@ -84,12 +84,12 @@ def create_indexed_gap(conn, gap_id: str, *, status: str = "todo",
         ),
         status=status,
         priority=priority,
-        instance_id=instance_id,
+        node_id=node_id,
     )
     conn.execute(
         "INSERT INTO gaps_index "
         "(id, name, status, priority, reporter, created, updated, "
-        "branch_name, instance_id, json_path) "
+        "branch_name, node_id, json_path) "
         "VALUES (?, ?, ?, ?, 'Reporter', ?, ?, ?, ?, ?)",
         (
             gap_id,
@@ -99,7 +99,7 @@ def create_indexed_gap(conn, gap_id: str, *, status: str = "todo",
             gap["created"],
             gap["updated"],
             branch,
-            gap.get("instance_id") or "default",
+            gap.get("node_id") or "default",
             relative_gap_path(gap_id),
         ),
     )

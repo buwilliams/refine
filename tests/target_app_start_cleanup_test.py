@@ -61,18 +61,24 @@ def main() -> int:
         stash_list = git(client, "stash", "list").stdout
         assert "refine target-app start auto-stash" in stash_list
 
-        runner = runtime.ensure_runner()
+        runtime.stop_runner()
+        from refine_server.runner import Runner
+
+        runner = Runner()
         (client / "automatic-wip.txt").write_text("wip\n", encoding="utf-8")
-        sequence = runner._run_target_app_rebuild_sequence(conn, {  # noqa: SLF001
-            "stop_command": "true",
-            "rebuild_command": "true",
-            "start_command": 'test -z "$(git status --porcelain)"',
-            "cwd": "",
-            "env": {},
-            "stop_timeout_seconds": 5,
-            "rebuild_timeout_seconds": 5,
-            "start_timeout_seconds": 5,
-        })
+        try:
+            sequence = runner._run_target_app_rebuild_sequence(conn, {  # noqa: SLF001
+                "stop_command": "true",
+                "rebuild_command": "true",
+                "start_command": 'test -z "$(git status --porcelain)"',
+                "cwd": "",
+                "env": {},
+                "stop_timeout_seconds": 5,
+                "rebuild_timeout_seconds": 5,
+                "start_timeout_seconds": 5,
+            })
+        finally:
+            runner.shutdown()
         assert sequence["ok"] is True, sequence
         assert git(client, "status", "--porcelain").stdout.strip() == ""
     finally:

@@ -1,4 +1,4 @@
-"""Settings instance transfer cancellation behavior tests."""
+"""Settings node transfer cancellation behavior tests."""
 from __future__ import annotations
 
 import sys
@@ -40,13 +40,13 @@ class FakeBackend:
         if method == M_ENFORCE_SCHEDULING:
             return {"ok": True}
         if method == M_CHAT_RESET_ALL:
-            assert params.get("reason") == "instance activated", params
+            assert params.get("reason") == "node activated", params
             return {"stopped": 2}
         raise AssertionError(f"unexpected backend call: {method}")
 
 
 def main() -> int:
-    tmp, client = make_client_repo("refine-instances-transfer-active-")
+    tmp, client = make_client_repo("refine-nodes-transfer-active-")
     conn = init_refine(client)
     original_get_client = None
     try:
@@ -58,18 +58,18 @@ def main() -> int:
         fake = FakeBackend()
         api.get_client = lambda: fake  # type: ignore[assignment]
 
-        source = project_state.active_instance_id()
-        target = project_state.create_instance("Target")
-        other = project_state.create_instance("Other")
+        source = project_state.active_node_id()
+        target = project_state.create_node("Target")
+        other = project_state.create_node("Other")
 
-        def create(gap_id: str, status: str, instance_id: str = source) -> None:
+        def create(gap_id: str, status: str, node_id: str = source) -> None:
             gap_writer.create_gap(
                 gap_id=gap_id,
                 name=gap_id,
                 initial_round=gaps.new_round("Jane", "Actual", "Target"),
                 status=status,
                 priority="medium",
-                instance_id=instance_id,
+                node_id=node_id,
             )
 
         todo = "01INSTANCEACTIVETODOAAAA"
@@ -82,9 +82,9 @@ def main() -> int:
         create(unrelated, "in-progress", other["id"])
         project_state.rebuild_sqlite_cache(conn)
 
-        status, body = api.transfer_instance_gaps({
-            "source_instance_id": source,
-            "target_instance_id": target["id"],
+        status, body = api.transfer_node_gaps({
+            "source_node_id": source,
+            "target_node_id": target["id"],
             "cancel_active": True,
         })
         assert status == 200, body
@@ -102,9 +102,9 @@ def main() -> int:
         assert db.get_setting(conn, "paused") == "0"
 
         rows = {
-            row["id"]: (row["status"], row["instance_id"])
+            row["id"]: (row["status"], row["node_id"])
             for row in conn.execute(
-                "SELECT id, status, instance_id FROM gaps_index WHERE id IN (?, ?, ?, ?)",
+                "SELECT id, status, node_id FROM gaps_index WHERE id IN (?, ?, ?, ?)",
                 (todo, running, ready, unrelated),
             )
         }
@@ -114,9 +114,9 @@ def main() -> int:
         assert rows[unrelated] == ("in-progress", other["id"]), rows
 
         fake.calls.clear()
-        status, body = api.activate_instance({"instance_id": target["id"]})
+        status, body = api.activate_node({"node_id": target["id"]})
         assert status == 200, body
-        assert body["active_instance_id"] == target["id"], body
+        assert body["active_node_id"] == target["id"], body
         methods = [m for m, _ in fake.calls]
         assert M_CHAT_RESET_ALL in methods, methods
         assert M_CANCEL_ALL not in methods, methods
@@ -131,7 +131,7 @@ def main() -> int:
             pass
         cleanup_tmp(tmp)
 
-    print("instance transfer active cancellation tests OK")
+    print("node transfer active cancellation tests OK")
     return 0
 
 

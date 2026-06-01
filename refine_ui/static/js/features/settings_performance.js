@@ -179,7 +179,7 @@ function renderSettingsPerformanceTab(performance, performanceBackend) {
 }
 
 function bindSettingsPerformanceTab(
-  s, diag, reps, feats, gov, dash, instanceData, guidanceData, performanceBackend = null,
+  s, diag, reps, feats, gov, dash, nodeData, guidanceData, performanceBackend = null,
 ) {
   $("#performance-refresh")?.addEventListener("click", async (e) => {
     await withButtonBusy(e.currentTarget, "Refreshing…", async () => {

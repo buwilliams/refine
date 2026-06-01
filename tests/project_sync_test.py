@@ -98,7 +98,7 @@ def main() -> int:
         from refine_server import config, gap_writer, gaps, project_state
 
         config.get(path=peer / ".refine" / "refine.toml", reload=True)
-        peer_instance = project_state.create_instance("Peer Machine")
+        peer_instance = project_state.create_node("Peer Machine")
         peer_gap = "01PROJECTSYNCPEERGAPAAAAA"
         gap_writer.create_gap(
             gap_id=peer_gap,
@@ -106,10 +106,10 @@ def main() -> int:
             initial_round=gaps.new_round("Peer", "Actual", "Target"),
             status="todo",
             priority="high",
-            instance_id=peer_instance["id"],
+            node_id=peer_instance["id"],
         )
         git(peer, "add", ".refine")
-        git(peer, "commit", "-m", "peer instance state update")
+        git(peer, "commit", "-m", "peer node state update")
         git(peer, "push")
 
         config.get(path=client / ".refine" / "refine.toml", reload=True)
@@ -119,18 +119,18 @@ def main() -> int:
         assert result["pulled"] is True, result
         assert any(
             inst["id"] == peer_instance["id"]
-            for inst in project_state.list_instances()
+            for inst in project_state.list_nodes()
         )
-        assert project_state.active_instance_id() == "default"
+        assert project_state.active_node_id() == "default"
         row = conn.execute(
-            "SELECT status, priority, reporter, instance_id "
+            "SELECT status, priority, reporter, node_id "
             "FROM gaps_index WHERE id = ?",
             (peer_gap,),
         ).fetchone()
         assert row["status"] == "todo", dict(row)
         assert row["priority"] == "high", dict(row)
         assert row["reporter"] == "Peer", dict(row)
-        assert row["instance_id"] == peer_instance["id"], dict(row)
+        assert row["node_id"] == peer_instance["id"], dict(row)
 
         marker2 = peer / ".refine" / "pulse-marker.txt"
         marker2.write_text("from pulse\n", encoding="utf-8")
@@ -149,13 +149,13 @@ def main() -> int:
         from refine_server import db
 
         db.set_setting(conn, "project_update_pulse_interval_seconds", "300")
-        runtime_path = client / ".refine" / "instances" / "default" / "runtime.json"
+        runtime_path = client / ".refine" / "nodes" / "default" / "runtime.json"
         runtime_settings = json.loads(runtime_path.read_text(encoding="utf-8"))
         assert runtime_settings["project_update_pulse_interval_seconds"] == "300"
 
         runtime_settings["branch_name_pattern"] = "pulse/{gap_id}"
         runtime_path.write_text(json.dumps(runtime_settings, indent=2), encoding="utf-8")
-        git(client, "add", ".refine/instances/default/runtime.json")
+        git(client, "add", ".refine/nodes/default/runtime.json")
         git(client, "commit", "-m", "local runtime update")
         assert db.get_setting(conn, "branch_name_pattern") != "pulse/{gap_id}"
 

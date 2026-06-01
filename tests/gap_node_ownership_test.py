@@ -1,4 +1,4 @@
-"""Gap mutation ownership tests for multi-instance projects."""
+"""Gap mutation ownership tests for multi-node projects."""
 from __future__ import annotations
 
 import sys
@@ -21,49 +21,49 @@ class FakeSubprocessManager:
 
 
 def main() -> int:
-    tmp, client = make_client_repo("refine-gap-instance-ownership-")
+    tmp, client = make_client_repo("refine-gap-node-ownership-")
     conn = init_refine(client)
     try:
         from refine_server import db, gap_writer, gaps, project_state
         from refine_server.dispatcher import Dispatcher
         from refine_ui import api
 
-        default = project_state.active_instance_id()
-        refine2 = project_state.create_instance("Refine2")
+        default = project_state.active_node_id()
+        refine2 = project_state.create_node("Refine2")
 
-        def create(gap_id: str, status: str, instance_id: str) -> None:
+        def create(gap_id: str, status: str, node_id: str) -> None:
             gap_writer.create_gap(
                 gap_id=gap_id,
                 name=gap_id,
                 initial_round=gaps.new_round("Jane", "Actual", "Target"),
                 status=status,
                 priority="medium",
-                instance_id=instance_id,
+                node_id=node_id,
             )
 
         default_gap = "01OWNERSHIPDEFAULTAAAAAAAA"
         refine2_gap = "01OWNERSHIPREFINE2AAAAAAAA"
         create(default_gap, "backlog", default)
         create(refine2_gap, "backlog", refine2["id"])
-        project_state.set_active_instance(refine2["id"])
+        project_state.set_active_node(refine2["id"])
         project_state.rebuild_sqlite_cache(conn)
 
         status, body = api.update_gap_name(default_gap, {"status": "todo"})
         assert status == 409, body
-        assert body["error"]["code"] == "instance_ownership", body
+        assert body["error"]["code"] == "node_ownership", body
         row = conn.execute(
-            "SELECT status, instance_id FROM gaps_index WHERE id = ?",
+            "SELECT status, node_id FROM gaps_index WHERE id = ?",
             (default_gap,),
         ).fetchone()
         assert row["status"] == "backlog", dict(row)
-        assert row["instance_id"] == default, dict(row)
+        assert row["node_id"] == default, dict(row)
 
         status, body = api.bulk_update_gaps({
-            "filter": {"status": "backlog", "instance": "all"},
+            "filter": {"status": "backlog", "node": "all"},
             "update": {"status": "todo"},
         })
         assert status == 409, body
-        assert body["error"]["code"] == "instance_ownership", body
+        assert body["error"]["code"] == "node_ownership", body
         rows = {
             row["id"]: row["status"]
             for row in conn.execute(
@@ -76,11 +76,11 @@ def main() -> int:
         def assert_ownership_blocked(result: tuple[int, dict]) -> None:
             status_code, payload = result
             assert status_code == 409, payload
-            assert payload["error"]["code"] == "instance_ownership", payload
+            assert payload["error"]["code"] == "node_ownership", payload
 
         assert_ownership_blocked(api.delete_gap(default_gap))
         assert_ownership_blocked(api.bulk_delete_gaps({
-            "filter": {"status": "backlog", "instance": "all"},
+            "filter": {"status": "backlog", "node": "all"},
         }))
         assert_ownership_blocked(api.append_round(default_gap, {
             "reporter": "Jane",
@@ -97,17 +97,17 @@ def main() -> int:
         assert_ownership_blocked(api.retry_merge(default_gap))
         assert_ownership_blocked(api.cancel(default_gap))
 
-        status, body = api.transfer_instance_gaps({
-            "target_instance_id": refine2["id"],
-            "filter": {"instance": default},
+        status, body = api.transfer_node_gaps({
+            "target_node_id": refine2["id"],
+            "filter": {"node": default},
         })
         assert status == 200, body
         assert body["updated"] == 1, body
         row = conn.execute(
-            "SELECT instance_id FROM gaps_index WHERE id = ?",
+            "SELECT node_id FROM gaps_index WHERE id = ?",
             (default_gap,),
         ).fetchone()
-        assert row["instance_id"] == refine2["id"], dict(row)
+        assert row["node_id"] == refine2["id"], dict(row)
 
         db.set_setting(conn, "paused", "1")
         status, body = api.update_gap_name(default_gap, {"status": "todo"})
@@ -155,7 +155,7 @@ def main() -> int:
             root / "refine_ui/static/js/features/gaps-bulk.js"
         ).read_text(encoding="utf-8")
         assert "function modalAlert" in common_js
-        assert "instance_ownership" in common_js
+        assert "node_ownership" in common_js
         assert "function isBackgroundJobActiveError" in common_js
         assert "background_job_active" in common_js
         assert 'title: "Refine is busy"' in common_js
@@ -169,7 +169,7 @@ def main() -> int:
             pass
         cleanup_tmp(tmp)
 
-    print("gap instance ownership tests OK")
+    print("gap node ownership tests OK")
     return 0
 
 

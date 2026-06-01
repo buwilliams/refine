@@ -13,7 +13,7 @@ def _create_gap_for_reporter(conn, gap_id: str, reporter: str) -> None:
     from refine_server import gap_writer, gaps, project_state
     from refine_server.paths import relative_gap_path
 
-    active_instance = project_state.active_instance_id()
+    active_node = project_state.active_node_id()
     gap = gap_writer.create_gap(
         gap_id=gap_id,
         name=gap_id,
@@ -24,12 +24,12 @@ def _create_gap_for_reporter(conn, gap_id: str, reporter: str) -> None:
         ),
         status="todo",
         priority="medium",
-        instance_id=active_instance,
+        node_id=active_node,
     )
     conn.execute(
         "INSERT INTO gaps_index "
         "(id, name, status, priority, reporter, created, updated, "
-        "branch_name, instance_id, json_path) "
+        "branch_name, node_id, json_path) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)",
         (
             gap_id,
@@ -39,7 +39,7 @@ def _create_gap_for_reporter(conn, gap_id: str, reporter: str) -> None:
             reporter,
             gap["created"],
             gap["updated"],
-            active_instance,
+            active_node,
             relative_gap_path(gap_id),
         ),
     )

@@ -23,7 +23,7 @@ async function openBulkModal(field) {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
-    instance: f.instance,
+    node: f.node,
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
@@ -137,7 +137,7 @@ function applyGapsFilterIndicator(f) {
     "search": !!f.q,
     "filter-status": !!f.status,
     "filter-reporter": !!f.reporter,
-    "filter-instance": !!f.instance,
+    "filter-node": !!f.node,
     "gaps-severity": !!f.severity,
     "gaps-category": !!f.category,
     "gaps-actor": !!f.actor,
@@ -156,11 +156,11 @@ function applyGapsFilterIndicator(f) {
   if (tbl) tbl.classList.toggle("results-filtered", anyActive);
 }
 
-async function openBulkTransferInstanceModal() {
+async function openBulkTransferNodeModal() {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
-    instance: f.instance,
+    node: f.node,
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
@@ -171,22 +171,22 @@ async function openBulkTransferInstanceModal() {
   }
   const countText = _selectionCountText("selected");
 
-  let instances = state.project?.instances || [];
+  let nodes = state.project?.nodes || [];
   try {
-    const snap = await api("GET", "/api/instances");
-    instances = snap.instances || [];
+    const snap = await api("GET", "/api/nodes");
+    nodes = snap.nodes || [];
     state.project = {
       ...(state.project || {}),
-      instances,
-      active_instance_id: snap.active_instance_id || state.project?.active_instance_id || "",
+      nodes,
+      active_node_id: snap.active_node_id || state.project?.active_node_id || "",
     };
   } catch {
     // Keep the project-status snapshot. The submit call will surface
     // any real schema or registry error.
   }
-  const choices = instances.filter((inst) => !inst.archived);
+  const choices = nodes.filter((inst) => !inst.archived);
   if (!choices.length) {
-    toast("No active instances available.", "warn");
+    toast("No active nodes available.", "warn");
     return;
   }
   const opts = choices.map((inst) => `
@@ -194,14 +194,14 @@ async function openBulkTransferInstanceModal() {
       ${htmlEscape(inst.display_name || inst.id)}
     </option>`).join("");
   const body = () => `
-    <div class="modal-title">Transfer to instance</div>
+    <div class="modal-title">Transfer to node</div>
     <div class="modal-body">
       <div class="muted small" style="margin-bottom:8px">
         Applies to ${htmlEscape(countText || "all matching")} —
         ${htmlEscape(filterDesc)}.
       </div>
-      <label for="bulk-transfer-instance-value">Target instance</label>
-      <select class="modal-input" id="bulk-transfer-instance-value" style="width:100%">
+      <label for="bulk-transfer-node-value">Target node</label>
+      <select class="modal-input" id="bulk-transfer-node-value" style="width:100%">
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
@@ -217,8 +217,8 @@ async function openBulkTransferInstanceModal() {
   );
   if (target === null) return;
   try {
-    const r = await api("POST", "/api/instances/transfer-gaps", {
-      filter, ...selectionFields, target_instance_id: target,
+    const r = await api("POST", "/api/nodes/transfer-gaps", {
+      filter, ...selectionFields, target_node_id: target,
     });
     toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
     await renderGapsList();
@@ -231,7 +231,7 @@ async function confirmBulkDelete() {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
-    instance: f.instance,
+    node: f.node,
     severity: f.severity, category: f.category, actor: f.actor,
   };
   const filterDesc = describeGapsFilter(filter);
@@ -274,7 +274,7 @@ function describeGapsFilter(filter) {
   const parts = [];
   if (filter.status)   parts.push(`status=${filter.status}`);
   if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
-  if (filter.instance) parts.push(`instance=${filter.instance}`);
+  if (filter.node) parts.push(`node=${filter.node}`);
   if (filter.q)        parts.push(`q="${filter.q}"`);
   if (filter.severity) parts.push(`severity=${filter.severity}`);
   if (filter.category) parts.push(`category=${filter.category}`);
