@@ -439,9 +439,95 @@ def main() -> int:
         shutil.rmtree(root / "instances", ignore_errors=True)
         if (root / "nodes").exists():
             (root / "nodes").rename(root / "instances")
+        legacy_registry = json.loads(
+            (root / "instances.json").read_text(encoding="utf-8")
+        )
+        extra_legacy_ids = {"worker-alpha", "worker-beta"}
+        present = {str(entry.get("id") or "") for entry in legacy_registry["nodes"]}
+        for node_id in sorted(extra_legacy_ids - present):
+            legacy_registry["nodes"].append({
+                "id": node_id,
+                "display_name": node_id.replace("-", " ").title(),
+                "created_at": "2026-06-01T15:00:00Z",
+                "updated_at": "2026-06-01T15:00:00Z",
+                "archived": False,
+            })
+            d = root / "instances" / node_id
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "application.json").write_text(
+                json.dumps({"merge_target_branch": node_id}, indent=2),
+                encoding="utf-8",
+            )
+            (d / "runtime.json").write_text("{}", encoding="utf-8")
+            (d / "target-app.json").write_text(
+                json.dumps({"target_app_cwd": f"apps/{node_id}"}, indent=2),
+                encoding="utf-8",
+            )
+            (d / "reporters.json").write_text('{"reporters": []}', encoding="utf-8")
+        (root / "instances.json").write_text(
+            json.dumps(legacy_registry, indent=2),
+            encoding="utf-8",
+        )
+        legacy_node_ids = {
+            str(entry["id"])
+            for entry in legacy_registry["nodes"]
+            if entry.get("id")
+        }
+        assert {active, *extra_legacy_ids}.issubset(legacy_node_ids)
+        legacy_default_target = root / "instances" / active / "target-app.json"
+        default_target = json.loads(
+            legacy_default_target.read_text(encoding="utf-8")
+        )
+        default_target["target_app_start_command"] = "./linux-docker.sh start"
+        default_target["target_app_rebuild_command"] = "./linux-docker.sh build"
+        legacy_default_target.write_text(
+            json.dumps(default_target, indent=2),
+            encoding="utf-8",
+        )
+        # Simulate an old worker touching v2 node state before the manual
+        # instance-to-node migration. The migration must recover from this
+        # polluted partial v2 layout instead of treating it as authoritative.
+        (root / "nodes").mkdir()
+        (root / "nodes" / active).mkdir()
+        (root / "nodes.json").write_text(
+            json.dumps({
+                "nodes": [{
+                    "id": active,
+                    "display_name": "Default",
+                    "created_at": "2026-06-01T15:59:53Z",
+                    "updated_at": "2026-06-01T15:59:53Z",
+                    "archived": False,
+                }],
+            }, indent=2),
+            encoding="utf-8",
+        )
+        for name in (
+            "application.json",
+            "runtime.json",
+            "target-app.json",
+            "reporters.json",
+        ):
+            (root / "nodes" / active / name).write_text(
+                "{}" if name != "reporters.json" else '{"reporters": []}',
+                encoding="utf-8",
+            )
         status = project_state.schema_status(root)
         assert status["migration_id"] == "instance_to_node_v2"
         assert status["safe_auto"] is False
+        try:
+            project_state.active_node_id(root=root)
+            raise AssertionError("v1 schema should block node state writes")
+        except RuntimeError as e:
+            assert "refine migrate run" in str(e)
+        try:
+            project_state.resume_agents_for_startup(conn)
+            raise AssertionError("v1 schema should block worker startup")
+        except RuntimeError as e:
+            assert "refine migrate run" in str(e)
+        polluted_registry = json.loads(
+            (root / "nodes.json").read_text(encoding="utf-8")
+        )
+        assert [entry["id"] for entry in polluted_registry["nodes"]] == [active]
         project_state.ensure_initialized(conn, migrate=True, root=root)
         assert json.loads(cfg_path.read_text(encoding="utf-8"))["schema_version"] == 1
         try:
@@ -457,6 +543,27 @@ def main() -> int:
         )
         assert (root / "nodes.json").exists()
         assert not (root / "instances.json").exists()
+        assert not (root / "instances").exists()
+        migrated_registry = json.loads(
+            (root / "nodes.json").read_text(encoding="utf-8")
+        )
+        migrated_node_ids = {
+            str(entry["id"])
+            for entry in migrated_registry["nodes"]
+            if entry.get("id")
+        }
+        assert migrated_node_ids == legacy_node_ids
+        migrated_default_target = json.loads(
+            (root / "nodes" / active / "target-app.json").read_text(encoding="utf-8")
+        )
+        assert (
+            migrated_default_target["target_app_start_command"]
+            == "./linux-docker.sh start"
+        )
+        assert (
+            migrated_default_target["target_app_rebuild_command"]
+            == "./linux-docker.sh build"
+        )
         assert json.loads(cfg_path.read_text(encoding="utf-8"))["schema_version"] == 2
     finally:
         try:

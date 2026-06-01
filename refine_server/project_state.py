@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import tempfile
@@ -299,6 +300,12 @@ def migration_block_details(status: dict[str, Any] | None) -> str:
     return str(status.get("operator_instructions") or MANUAL_SCHEMA_MIGRATION_INSTRUCTIONS)
 
 
+def _require_current_schema(root: Path) -> None:
+    status = schema_status(root)
+    if not status.get("compatible"):
+        raise RuntimeError(migration_block_details(status))
+
+
 def read_maintenance(*, root: Path | None = None) -> dict[str, Any] | None:
     path = maintenance_json_path(root)
     if not path.exists():
@@ -368,6 +375,7 @@ def migrate_project_state(*, root: Path | None = None) -> None:
     root = root or volume_root()
     _rename_legacy_node_paths(root)
     _rewrite_nodes_registry(root)
+    _assert_legacy_node_paths_removed(root)
     _rewrite_gap_node_ownership(root)
     cfg = read_project_config(root=root)
     cfg["schema_version"] = CURRENT_SCHEMA_VERSION
@@ -389,6 +397,18 @@ def _rename_legacy_node_paths(root: Path) -> None:
     elif old_dir.exists() and new_dir.exists() and not any(new_dir.iterdir()):
         new_dir.rmdir()
         _git_mv_or_rename(root, old_dir, new_dir)
+    elif old_dir.exists() and new_dir.exists():
+        for src in sorted(p for p in old_dir.iterdir() if p.is_dir()):
+            dst = new_dir / src.name
+            if not dst.exists():
+                _git_mv_or_rename(root, src, dst)
+            elif _node_dir_can_be_replaced(dst):
+                shutil.rmtree(dst)
+                src.rename(dst)
+        try:
+            old_dir.rmdir()
+        except OSError:
+            pass
     new_dir.mkdir(parents=True, exist_ok=True)
 
 
@@ -418,12 +438,107 @@ def _git_mv_or_rename(root: Path, src: Path, dst: Path) -> None:
 def _rewrite_nodes_registry(root: Path) -> None:
     path = nodes_json_path(root)
     data = _read_json(path, {"nodes": []})
-    if "nodes" not in data and isinstance(data.get("instances"), list):
+    nodes = _registry_entries(data)
+    legacy_path = legacy_instances_json_path(root)
+    legacy_data = _read_json(legacy_path, {}) if legacy_path.exists() else {}
+    legacy_nodes = _registry_entries(legacy_data)
+    if legacy_nodes:
+        merged: dict[str, dict[str, Any]] = {}
+        order: list[str] = []
+        for entry in nodes:
+            node_id = str(entry.get("id") or "")
+            if not node_id:
+                continue
+            merged[node_id] = entry
+            order.append(node_id)
+        for entry in legacy_nodes:
+            node_id = str(entry.get("id") or "")
+            if not node_id:
+                continue
+            if node_id not in merged:
+                order.append(node_id)
+            merged[node_id] = entry
+        data["nodes"] = [merged[node_id] for node_id in order if node_id in merged]
+    elif "nodes" not in data and isinstance(data.get("instances"), list):
         data["nodes"] = data.get("instances") or []
     data.pop("instances", None)
     if not isinstance(data.get("nodes"), list):
         data["nodes"] = []
     _write_json(path, data)
+    if legacy_path.exists():
+        legacy_path.unlink()
+
+
+def _registry_entries(data: Any) -> list[dict[str, Any]]:
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("nodes")
+    if raw is None:
+        raw = data.get("instances")
+    if not isinstance(raw, list):
+        return []
+    return [entry for entry in raw if isinstance(entry, dict)]
+
+
+def _node_dir_can_be_replaced(path: Path) -> bool:
+    if not path.exists():
+        return True
+    if not path.is_dir():
+        return False
+    from . import db
+
+    expected = {
+        "application.json": APPLICATION_SETTING_KEYS,
+        "runtime.json": RUNTIME_SETTING_KEYS,
+        "target-app.json": TARGET_APP_CONFIG_SETTING_KEYS,
+    }
+    metadata = {"created_at", "updated_at", "schema_version", "refine"}
+    allowed_files = set(expected) | {"reporters.json"}
+    if any(child.is_dir() or child.name not in allowed_files for child in path.iterdir()):
+        return False
+    for name, keys in expected.items():
+        child = path / name
+        if not child.exists():
+            continue
+        data = _read_json(child, None)
+        if not isinstance(data, dict):
+            return False
+        for key, value in data.items():
+            key = str(key)
+            if key in metadata:
+                continue
+            if key not in keys:
+                return False
+            if str(value) != str(db.DEFAULT_SETTINGS.get(key, "")):
+                return False
+    reporters = path / "reporters.json"
+    if reporters.exists():
+        data = _read_json(reporters, None)
+        if not isinstance(data, dict):
+            return False
+        reporters_list = data.get("reporters") or []
+        if reporters_list:
+            return False
+        if any(str(key) not in {"reporters", *metadata} for key in data):
+            return False
+    return True
+
+
+def _assert_legacy_node_paths_removed(root: Path) -> None:
+    legacy_registry = legacy_instances_json_path(root)
+    legacy_dir = legacy_instances_dir(root)
+    if legacy_dir.exists():
+        try:
+            legacy_dir.rmdir()
+        except OSError:
+            pass
+    remaining = [p for p in (legacy_registry, legacy_dir) if p.exists()]
+    if remaining:
+        rels = ", ".join(p.relative_to(root).as_posix() for p in remaining)
+        raise RuntimeError(
+            "Instance-to-node migration did not finish; legacy state remains: "
+            f"{rels}"
+        )
 
 
 def _rewrite_gap_node_ownership(root: Path) -> None:
@@ -560,6 +675,7 @@ def _migrate_gap_files(rows: dict[str, dict[str, Any]], *, root: Path) -> None:
 
 def ensure_default_node(*, root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
+    _require_current_schema(root)
     registry = read_nodes(root=root)
     entries = registry.get("nodes") or []
     if not entries:
@@ -596,11 +712,14 @@ def read_nodes(*, root: Path | None = None) -> dict[str, Any]:
 
 
 def write_nodes(data: dict[str, Any], *, root: Path | None = None) -> None:
+    root = root or volume_root()
+    _require_current_schema(root)
     _write_json(nodes_json_path(root), data)
 
 
 def ensure_guidance_file(*, root: Path | None = None) -> None:
     root = root or volume_root()
+    _require_current_schema(root)
     if not guidance_json_path(root).exists():
         _write_json(guidance_json_path(root), {
             "guidance": [],
@@ -689,6 +808,7 @@ def node_by_id(node_id: str, *, root: Path | None = None) -> dict[str, Any] | No
 
 def ensure_active_node(*, root: Path | None = None) -> str:
     root = root or volume_root()
+    _require_current_schema(root)
     registry = read_nodes(root=root)
     entries = registry.get("nodes") or []
     active, legacy = _read_active_node_selection(root)
@@ -766,6 +886,7 @@ def _write_active_node_selection(root: Path, node_id: str) -> None:
 
 def set_active_node(node_id: str, *, root: Path | None = None) -> None:
     root = root or volume_root()
+    _require_current_schema(root)
     entry = node_by_id(node_id, root=root)
     if entry is None:
         raise ValueError(f"unknown node_id: {node_id}")
@@ -778,6 +899,7 @@ def set_active_node(node_id: str, *, root: Path | None = None) -> None:
 def create_node(display_name: str, *, node_id: str | None = None,
                 root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
+    _require_current_schema(root)
     name = display_name.strip() or "New node"
     node_id = node_id or _slug_node_id(name)
     existing = {str(e.get("id")) for e in list_nodes(root=root)}
@@ -804,6 +926,7 @@ def update_node(node_id: str, *, display_name: str | None = None,
                     archived: bool | None = None,
                     root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
+    _require_current_schema(root)
     registry = read_nodes(root=root)
     for entry in registry.get("nodes") or []:
         if entry.get("id") != node_id:
@@ -915,6 +1038,7 @@ def set_setting(key: str, value: str) -> None:
         return
     root = volume_root()
     ensure_initialized(migrate=True)
+    _require_current_schema(root)
     if key in PROJECT_SETTING_KEYS:
         cfg = read_project_config(root=root)
         settings = cfg.setdefault("settings", {})
@@ -931,6 +1055,11 @@ def set_setting(key: str, value: str) -> None:
 def resume_agents_for_startup(conn: sqlite3.Connection | None = None) -> bool:
     """Clear the pause flag when Refine starts a configured application."""
     from . import db
+
+    root = volume_root()
+    status = schema_status(root)
+    if not status.get("compatible"):
+        raise RuntimeError(migration_block_details(status))
 
     close_conn = False
     if conn is None:
@@ -960,6 +1089,7 @@ def list_reporters(*, root: Path | None = None) -> list[dict[str, Any]]:
 def write_reporters(reporters: list[dict[str, Any]], *,
                     root: Path | None = None) -> None:
     root = root or volume_root()
+    _require_current_schema(root)
     active = active_node_id(root=root)
     _write_json(node_dir(active, root) / "reporters.json", {
         "reporters": reporters,
@@ -978,6 +1108,7 @@ def list_guidance(*, root: Path | None = None) -> list[dict[str, Any]]:
 def write_guidance(items: list[dict[str, Any]], *,
                    root: Path | None = None) -> list[dict[str, Any]]:
     root = root or volume_root()
+    _require_current_schema(root)
     normalized = [
         item for item in (normalize_guidance_item(raw) for raw in items)
         if item["name"] or item["rule"] or item["instructions"]
@@ -1023,6 +1154,8 @@ def gap_node_display(node_id: str | None) -> str:
 def transfer_gaps(source_node_id: str | None, target_node_id: str,
                   *, statuses: set[str] | None = None,
                   gap_ids: set[str] | None = None) -> dict[str, Any]:
+    root = volume_root()
+    _require_current_schema(root)
     target = node_by_id(target_node_id)
     if target is None:
         raise ValueError(f"unknown target node: {target_node_id}")
@@ -1034,7 +1167,6 @@ def transfer_gaps(source_node_id: str | None, target_node_id: str,
     }
     skipped: list[dict[str, str]] = []
     updated: list[str] = []
-    root = volume_root()
     for path in sorted((root / "gaps").glob("**/gap.json")):
         gap = _read_json(path, {})
         gid = str(gap.get("id") or "")
@@ -1478,6 +1610,7 @@ def _latest_reporter(gap: dict[str, Any]) -> str:
 def _write_node_files(node_id: str, *, settings: dict[str, str],
                           reporters: list[dict[str, Any]],
                           root: Path) -> None:
+    _require_current_schema(root)
     d = node_dir(node_id, root)
     d.mkdir(parents=True, exist_ok=True)
     files = {
@@ -1496,6 +1629,7 @@ def _write_node_files(node_id: str, *, settings: dict[str, str],
 def _ensure_node_files(node_id: str, *, root: Path) -> None:
     from . import db
 
+    _require_current_schema(root)
     d = node_dir(node_id, root)
     d.mkdir(parents=True, exist_ok=True)
     defaults = db.DEFAULT_SETTINGS
@@ -1520,6 +1654,7 @@ def _update_node_file(filename: str, updates: dict[str, str], *,
                           node_id: str | None = None,
                           root: Path | None = None) -> None:
     root = root or volume_root()
+    _require_current_schema(root)
     target = node_id or active_node_id(root=root)
     p = node_dir(target, root) / filename
     data = _read_json(p, {})
