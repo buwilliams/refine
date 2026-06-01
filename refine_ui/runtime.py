@@ -5,17 +5,20 @@ import os
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
 from refine_server import config, db
-from refine_server.backend_protocol import M_RUNNING
+from refine_server.backend_protocol import M_PING, M_RUNNING
+from refine_runtime import identity
 
 from .poller import SqlitePoller
 
 _poller: SqlitePoller | None = None
 _runner = None
 _runner_proc: subprocess.Popen | None = None
+_runner_lock = threading.Lock()
 _loaded_config_path: Path | None = None
 
 
@@ -114,21 +117,27 @@ def stop_poller() -> None:
 
 def ensure_runner():
     global _runner, _runner_proc
-    if _runner is not None:
+    with _runner_lock:
+        if _runner is not None:
+            return _runner
+
+        cfg = config.get(reload=True)
+        socket_path = os.environ.get("REFINE_RUNNER_SOCKET") or str(_runner_socket_path(cfg))
+        os.environ["REFINE_RUNNER_SOCKET"] = socket_path
+        os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
+        socket = Path(socket_path)
+        if socket.exists():
+            if not _can_adopt_runner_socket(socket, _runner_proc):
+                _terminate_workers_for_socket(socket)
+                _unlink_quietly(socket)
+                _runner_proc = _start_external_runner(cfg, socket)
+        elif _runner_proc is not None and _runner_proc.poll() is not None:
+            _runner_proc = _start_external_runner(cfg, socket)
+        else:
+            _runner_proc = _start_external_runner(cfg, socket)
+
+        _runner = _SocketRunnerClient(socket_path)
         return _runner
-
-    cfg = config.get(reload=True)
-    socket_path = os.environ.get("REFINE_RUNNER_SOCKET") or str(_runner_socket_path(cfg))
-    os.environ["REFINE_RUNNER_SOCKET"] = socket_path
-    os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
-    socket = Path(socket_path)
-    if not socket.exists():
-        _runner_proc = _start_external_runner(cfg, socket)
-    elif _runner_proc is not None and _runner_proc.poll() is not None:
-        _runner_proc = _start_external_runner(cfg, socket)
-
-    _runner = _SocketRunnerClient(socket_path)
-    return _runner
 
 
 def stop_runner() -> None:
@@ -145,24 +154,18 @@ def stop_runner() -> None:
     if proc.poll() is not None:
         return
     try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        proc.terminate()
     except OSError:
-        try:
-            proc.terminate()
-        except OSError:
-            return
+        return
     deadline = time.time() + 5
     while time.time() < deadline:
         if proc.poll() is not None:
             return
         time.sleep(0.1)
     try:
-        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        proc.kill()
     except OSError:
-        try:
-            proc.kill()
-        except OSError:
-            pass
+        pass
 
 
 def runner_call(
@@ -183,6 +186,8 @@ def backend_info() -> dict:
         "process_model": "supervisor",
         "transport": "unix_socket",
         "socket_path": socket_path,
+        "source_fingerprint": identity.SOURCE_FINGERPRINT,
+        "refine_version": identity.REFINE_VERSION,
         "in_process_runner_allowed": False,
         "runner_client_loaded": _runner is not None,
         "ui_controls_runner_lifecycle": True,
@@ -204,6 +209,7 @@ def _start_external_runner(cfg: config.Config, socket: Path) -> subprocess.Popen
     env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
     env["REFINE_RUNNER_SOCKET"] = str(socket)
     env["REFINE_NO_INPROCESS_RUNNER"] = "1"
+    env["REFINE_PARENT_PID"] = str(os.getpid())
     env.setdefault("PYTHONUNBUFFERED", "1")
     proc = subprocess.Popen(
         [sys.executable, "-m", "refine_runtime.worker"],
@@ -212,7 +218,6 @@ def _start_external_runner(cfg: config.Config, socket: Path) -> subprocess.Popen
         stdout=None,
         stderr=None,
         env=env,
-        start_new_session=True,
     )
     _wait_for_runner_socket(socket, proc)
     return proc
@@ -221,12 +226,100 @@ def _start_external_runner(cfg: config.Config, socket: Path) -> subprocess.Popen
 def _wait_for_runner_socket(path: Path, proc: subprocess.Popen) -> None:
     deadline = time.time() + 20
     while time.time() < deadline:
-        if path.exists():
+        if path.exists() and _can_adopt_runner_socket(path, proc):
             return
         if proc.poll() is not None:
             raise config.ConfigError("Backend runner exited before opening its socket.")
         time.sleep(0.1)
     raise config.ConfigError(f"Backend runner socket did not appear: {path}")
+
+
+def _can_adopt_runner_socket(
+    path: Path,
+    proc: subprocess.Popen | None,
+) -> bool:
+    try:
+        from refine_runtime import ipc
+
+        ping = ipc.request(path, M_PING, {}, timeout=1.0)
+    except Exception:
+        return False
+    if ping.get("source_fingerprint") != identity.SOURCE_FINGERPRINT:
+        return False
+    if ping.get("refine_version") != identity.REFINE_VERSION:
+        return False
+    pid = _int_or_none(ping.get("pid"))
+    if proc is not None and proc.poll() is None and pid == proc.pid:
+        return True
+    parent_pid = _int_or_none(ping.get("parent_pid"))
+    expected_parent_pid = _int_or_none(ping.get("expected_parent_pid"))
+    return (
+        parent_pid == os.getpid()
+        and expected_parent_pid in (None, os.getpid())
+    )
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _unlink_quietly(path: Path) -> None:
+    try:
+        path.unlink()
+    except FileNotFoundError:
+        pass
+
+
+def _terminate_workers_for_socket(socket: Path) -> None:
+    target = str(socket)
+    pids: list[int] = []
+    proc_root = Path("/proc")
+    if not proc_root.exists():
+        return
+    for path in proc_root.iterdir():
+        if not path.name.isdigit():
+            continue
+        pid = int(path.name)
+        if pid == os.getpid():
+            continue
+        try:
+            raw = (path / "environ").read_bytes()
+        except OSError:
+            continue
+        env = raw.split(b"\0")
+        if f"REFINE_RUNNER_SOCKET={target}".encode("utf-8") in env:
+            pids.append(pid)
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        remaining: list[int] = []
+        for pid in pids:
+            try:
+                os.kill(pid, sig)
+                remaining.append(pid)
+            except ProcessLookupError:
+                continue
+            except OSError:
+                remaining.append(pid)
+        pids = remaining
+        deadline = time.time() + 2
+        while pids and time.time() < deadline:
+            pids = [pid for pid in pids if _pid_alive(pid)]
+            if pids:
+                time.sleep(0.05)
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
 
 
 def runner_status_snapshot() -> dict:

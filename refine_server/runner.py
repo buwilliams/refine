@@ -11,6 +11,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from refine_runtime import identity
 from refine_server import activity, changes_index, config, db, gaps as shared_gaps, governance, perf_metrics, project_state, quality, reporters, round_logs, search_index
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -51,6 +52,13 @@ def _automatic_rebuild_details(result: dict[str, Any]) -> str | None:
     if result.get("checks"):
         parts.append("checks:\n" + json.dumps(result["checks"], indent=2))
     return "\n\n".join(parts) if parts else None
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 class Runner:
@@ -233,7 +241,16 @@ class Runner:
     # ---- handlers ------------------------------------------------------------
 
     def _h_ping(self, _: dict) -> dict:
-        return {"pong": True, "at": now_iso()}
+        return {
+            "pong": True,
+            "at": now_iso(),
+            "pid": os.getpid(),
+            "parent_pid": os.getppid(),
+            "expected_parent_pid": _int_or_none(os.environ.get("REFINE_PARENT_PID")),
+            "refine_version": identity.REFINE_VERSION,
+            "source_fingerprint": identity.SOURCE_FINGERPRINT,
+            "process_started_at": identity.PROCESS_STARTED_AT,
+        }
 
     def _h_preflight(self, _: dict) -> dict:
         ok, msg = preflight.check(self._conn)

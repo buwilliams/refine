@@ -1536,18 +1536,23 @@ class Dispatcher:
 
         branch_name = row["branch_name"]
         active_node = project_state.active_node_id()
+        moved_to_todo = False
         if row["status"] == "in-progress" and row["node_id"] == active_node:
             with db.transaction(conn):
-                conn.execute(
+                cur = conn.execute(
                     "UPDATE gaps_index SET status = 'todo', branch_name = NULL, "
                     "updated = ? WHERE id = ? AND status = 'in-progress' "
                     "AND node_id = ?",
                     (now_iso(), gap_id, active_node),
                 )
+                moved_to_todo = bool(cur.rowcount)
             try:
-                gap_writer.update_fields(gap_id, status="todo", branch_name=None)
+                if moved_to_todo:
+                    gap_writer.update_fields(gap_id, status="todo", branch_name=None)
             except Exception:
                 pass
+        if not moved_to_todo:
+            return
 
         git_ops.remove_worktree(gap_id)
         if branch_name:

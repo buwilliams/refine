@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def main() -> int:
     from refine_runtime import ipc
+    from refine_runtime import identity
     from refine_ui import api
     from refine_ui import runtime
     from refine_ui.backend_client import BackendClient
@@ -54,6 +55,8 @@ def main() -> int:
         assert info["transport"] == "unix_socket"
         assert info["ui_controls_runner_lifecycle"] is True
         assert info["in_process_runner_allowed"] is False
+        assert info["source_fingerprint"] == identity.SOURCE_FINGERPRINT
+        assert info["refine_version"] == identity.REFINE_VERSION
 
         status, body = api.backend_diagnostics()
         assert status == 200

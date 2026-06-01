@@ -86,7 +86,8 @@ def _reconcile_active_agent_states(
         if gid in live_gap_ids:
             continue
         rrow = conn.execute(
-            "SELECT round_idx, finished_at, status, failure_category, pid, kind "
+            "SELECT round_idx, finished_at, status, failure_category, "
+            "pid, worker_pid, kind "
             "FROM runs WHERE gap_id = ? ORDER BY id DESC LIMIT 1",
             (gid,),
         ).fetchone()
@@ -147,6 +148,8 @@ def _reconcile_active_agent_states(
             and not rrow["finished_at"]
             and _pid_may_be_alive(rrow["pid"])
         ):
+            continue
+        if rrow and _pid_may_be_alive(rrow["worker_pid"]):
             continue
         if not startup and _within_runtime_orphan_grace(row["updated"]):
             continue

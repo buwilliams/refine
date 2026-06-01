@@ -396,9 +396,10 @@ class SubprocessManager:
         with db.transaction(conn):
             conn.execute(
                 "INSERT INTO runs "
-                "(gap_id, round_idx, started_at, pid, status, last_output_at, kind) "
-                "VALUES (?, ?, ?, ?, 'running', ?, ?)",
-                (gap_id, round_idx, now_iso(), proc.pid, now_iso(), kind),
+                "(gap_id, round_idx, started_at, pid, worker_pid, status, "
+                "last_output_at, kind) "
+                "VALUES (?, ?, ?, ?, ?, 'running', ?, ?)",
+                (gap_id, round_idx, now_iso(), proc.pid, os.getpid(), now_iso(), kind),
             )
 
         self._write_resource_launch_logs(handle)

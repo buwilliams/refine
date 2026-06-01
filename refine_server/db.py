@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS runs (
     started_at      TEXT NOT NULL,
     finished_at     TEXT,
     pid             INTEGER,
+    worker_pid      INTEGER,
     status          TEXT NOT NULL,
     last_output_at  TEXT,
     failure_category TEXT,
@@ -425,6 +426,8 @@ def _migrate(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE runs ADD COLUMN kind TEXT NOT NULL DEFAULT 'implementation'"
         )
+    if "worker_pid" not in run_cols:
+        conn.execute("ALTER TABLE runs ADD COLUMN worker_pid INTEGER")
     # Always (re-)assert indexes. CREATE INDEX IF NOT EXISTS is a no-op on
     # fresh databases (just after the executescript built the table) and on
     # already-migrated ones — so this is safe to run unconditionally.

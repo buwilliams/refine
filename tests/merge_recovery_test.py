@@ -1,6 +1,7 @@
 """Git merge and runner-recovery tests for user-visible Gap outcomes."""
 from __future__ import annotations
 
+import os
 import sqlite3
 import subprocess
 import sys
@@ -481,6 +482,22 @@ def main() -> int:
         moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
         assert moved == 0
         assert db_status(conn, gid_runtime_fresh) == "in-progress"
+
+        gid_runtime_peer = "01RECOVERYRUNTIMEPEERAAAA"
+        create_indexed_gap(conn, gid_runtime_peer, status="in-progress")
+        conn.execute(
+            "UPDATE gaps_index SET updated = ? WHERE id = ?",
+            (stale_updated, gid_runtime_peer),
+        )
+        conn.execute(
+            "INSERT INTO runs "
+            "(gap_id, round_idx, started_at, pid, worker_pid, status, failure_category) "
+            "VALUES (?, 0, ?, 999995, ?, 'running', NULL)",
+            (gid_runtime_peer, now_iso(), os.getpid()),
+        )
+        moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
+        assert moved == 0
+        assert db_status(conn, gid_runtime_peer) == "in-progress"
     finally:
         try:
             conn.close()

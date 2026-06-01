@@ -319,6 +319,20 @@ def main() -> int:
         assert "higher-priority" in activity_row["message"], activity_row["message"]
 
         reset()
+        insert_gap("already-failed", "failed", "low", "refine/already-failed")
+        dispatcher._on_finished(
+            "already-failed",
+            0,
+            -15,
+            "priority_preempted",
+            "base",
+        )
+        rows = conn.execute(
+            "SELECT message FROM activity WHERE gap_id = 'already-failed'",
+        ).fetchall()
+        assert rows == [], rows
+
+        reset()
         blocked = True
         blocked_dispatcher = Dispatcher(
             get_conn=lambda: conn,
