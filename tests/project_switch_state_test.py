@@ -158,6 +158,9 @@ def test_client_switch_path(root: Path) -> None:
     assert "resetChatForProjectSwitch()" in node_state_body
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
     assert "Migrate and open" in common_js
+    assert "function isManualProjectMigration" in common_js
+    assert "refine migrate run" in common_js
+    assert "Project migration required" in settings_js
     assert 'api("POST", "/api/project/attach", {' in common_js
     assert "migrate: true" in common_js
     assert "function resetChatForProjectSwitch()" in toolbar_js
@@ -693,6 +696,88 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         cleanup_tmp(tmp)
 
 
+def test_manual_node_migration_blocks_project_switch(root: Path) -> None:
+    tmp, client1 = make_client_repo("refine-manual-migrate-")
+    conn = init_refine(client1)
+    conn.close()
+    original_cwd = Path.cwd()
+    binding = root / ".refine-binding"
+    prior_binding = binding.read_text(encoding="utf-8") if binding.exists() else None
+    registry = root / ".refine-apps.json"
+    prior_registry = _read_optional(registry)
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        os.chdir(root)
+        from refine_server import config, project_state
+        from refine_ui import api, runtime
+
+        config.write_binding(root, client1)
+        config.get(reload=True)
+        runtime.load_configured(
+            client1 / ".refine" / "refine.toml",
+            start_runner=False,
+            start_poller=False,
+        )
+
+        legacy = tmp / "v1-client"
+        legacy.mkdir()
+        git(legacy, "init", "-q")
+        git(legacy, "config", "user.email", "t@x")
+        git(legacy, "config", "user.name", "t")
+        (legacy / "app.txt").write_text("base\n", encoding="utf-8")
+        git(legacy, "add", "app.txt")
+        git(legacy, "commit", "-m", "init")
+        config.write_defaults(legacy / ".refine")
+        refine_root = legacy / ".refine"
+        (refine_root / "config.json").write_text(
+            json.dumps({"schema_version": 1, "settings": {}}),
+            encoding="utf-8",
+        )
+        (refine_root / "instances.json").write_text(
+            json.dumps({"instances": [{"id": "default", "display_name": "Default"}]}),
+            encoding="utf-8",
+        )
+
+        schema = project_state.schema_status(refine_root)
+        assert schema["migration_id"] == "instance_to_node_v2"
+        assert schema["safe_auto"] is False
+
+        status, body = api.project_attach({
+            "path": str(legacy),
+            "migrate": True,
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
+
+        assert status == 409, body
+        assert "instance_to_node_v2" in body["error"]["message"]
+        assert "refine migrate run" in body["error"]["details"]
+        assert config.read_binding(binding) == client1.resolve()
+        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert project_state.schema_status(refine_root)["compatible"] is False
+    finally:
+        try:
+            from refine_ui import runtime
+            runtime.stop_all()
+        except Exception:
+            pass
+        if prior_binding is None:
+            try:
+                binding.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            binding.write_text(prior_binding, encoding="utf-8")
+        _restore_optional(registry, prior_registry)
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
 def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
     tmp = Path(tempfile.mkdtemp(prefix="refine-scaffold-template-"))
     clone = tmp / "refine-source"
@@ -1160,6 +1245,7 @@ def main() -> int:
     test_removing_active_project_hot_loads_next_app()
     test_supervised_initial_attach_hot_loads_without_restart(root)
     test_supervised_switch_migrates_target_before_hot_load(root)
+    test_manual_node_migration_blocks_project_switch(root)
     test_empty_project_attach_creates_scaffold_gap(root)
     test_active_node_is_per_application()
     test_active_node_is_checkout_local_for_same_application()

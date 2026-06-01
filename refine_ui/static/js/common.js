@@ -294,6 +294,21 @@ function recordUiError(message, details = {}) {
 
 // ---- Project attach/setup ---------------------------------------------------
 
+function isManualProjectMigration(schema) {
+  return !!(schema && schema.migration_required && schema.safe_auto === false);
+}
+
+function manualMigrationText(source) {
+  return source?.operator_instructions
+    || source?.details
+    || "Stop all old Refine nodes for this app, run `refine migrate run` from one upgraded checkout, push the migrated .refine state, then restart upgraded nodes.";
+}
+
+function isManualMigrationError(err) {
+  const text = `${err?.details || ""}\n${err?.message || ""}`;
+  return /refine migrate run|manual cluster migration/i.test(text);
+}
+
 async function ensureProjectAttached() {
   const snap = await refreshProjectStatus();
   if (!snap) return false;
@@ -304,6 +319,12 @@ async function ensureProjectAttached() {
       return true;
     }
     if (schema.migration_required) {
+      if (isManualProjectMigration(schema)) {
+        $("#main").innerHTML = `
+          <h2>Project migration required</h2>
+          <p class="muted">${htmlEscape(manualMigrationText(schema))}</p>`;
+        return false;
+      }
       const ok = await modalConfirm(
         "This app uses an older Refine schema. Migrate .refine state and open it?",
         { title: "Migrate app", okLabel: "Migrate and open" },
@@ -444,6 +465,13 @@ function openProjectAttachModal({
         resolve(result);
       } catch (err) {
         if (err.status === 409 && /migration required/i.test(err.message || "")) {
+          if (isManualMigrationError(err)) {
+            error.textContent = manualMigrationText(err);
+            error.style.display = "";
+            button.disabled = false;
+            button.textContent = okLabel;
+            return;
+          }
           const migrate = await modalConfirm(
             "This app uses an older Refine schema. Migrate .refine state and open it?",
             { title: "Migrate app", okLabel: "Migrate and open" },

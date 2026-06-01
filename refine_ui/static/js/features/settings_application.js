@@ -296,6 +296,14 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
         await applyProjectAttachResult(result);
       } catch (e) {
         if (e.status === 409 && /migration required/i.test(e.message || "")) {
+          if (typeof isManualMigrationError === "function" && isManualMigrationError(e)) {
+            const text = typeof manualMigrationText === "function" ? manualMigrationText(e) : (e.details || e.message);
+            await modalAlert(text, {
+              title: "Project migration required",
+              okLabel: "OK",
+            });
+            return;
+          }
           const migrate = await modalConfirm(
             "This app uses an older Refine schema. Migrate .refine state and open it?",
             { title: "Migrate app", okLabel: "Migrate and open" },

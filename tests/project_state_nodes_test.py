@@ -421,6 +421,37 @@ def main() -> int:
             (client / rel).write_text("new runtime noise\n", encoding="utf-8")
         _commit_refine_state(client)
         assert git(client, "rev-parse", "HEAD").stdout.strip() == head
+
+        cfg_path = root / "config.json"
+        cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+        cfg["schema_version"] = 1
+        cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+        if (root / "instances.json").exists():
+            (root / "instances.json").unlink()
+        if (root / "nodes.json").exists():
+            (root / "nodes.json").rename(root / "instances.json")
+        shutil.rmtree(root / "instances", ignore_errors=True)
+        if (root / "nodes").exists():
+            (root / "nodes").rename(root / "instances")
+        status = project_state.schema_status(root)
+        assert status["migration_id"] == "instance_to_node_v2"
+        assert status["safe_auto"] is False
+        project_state.ensure_initialized(conn, migrate=True, root=root)
+        assert json.loads(cfg_path.read_text(encoding="utf-8"))["schema_version"] == 1
+        try:
+            project_state.rebuild_sqlite_cache(conn)
+            raise AssertionError("manual migration unexpectedly rebuilt cache")
+        except RuntimeError as e:
+            assert "refine migrate run" in str(e)
+        project_state.ensure_initialized(
+            conn,
+            migrate=True,
+            allow_manual_migrations=True,
+            root=root,
+        )
+        assert (root / "nodes.json").exists()
+        assert not (root / "instances.json").exists()
+        assert json.loads(cfg_path.read_text(encoding="utf-8"))["schema_version"] == 2
     finally:
         try:
             conn.close()

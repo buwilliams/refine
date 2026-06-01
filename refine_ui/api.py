@@ -108,14 +108,28 @@ def _schema_block_response() -> tuple[int, dict] | None:
         cfg = config.get(reload=True)
     except config.ConfigError:
         return None
+    maintenance = project_state.read_maintenance(root=cfg.volume_root)
+    if maintenance is not None:
+        return err(
+            409,
+            "Project maintenance is active.",
+            str(maintenance.get("operator_instructions")
+                or maintenance.get("reason")
+                or "Refine writes are paused while maintenance is active."),
+        )
     schema = project_state.schema_status(cfg.volume_root)
     if schema.get("compatible"):
         return None
     if schema.get("migration_required"):
+        details = (
+            project_state.migration_block_details(schema)
+            if project_state.migration_requires_manual(schema)
+            else "Open this app from the browser and choose Migrate and open."
+        )
         return err(
             409,
-            "Project schema migration required.",
-            "Open this app from the browser and choose Migrate and open.",
+            project_state.migration_block_message(schema),
+            details,
         )
     return err(
         409,
@@ -854,6 +868,7 @@ def project_status() -> tuple[int, dict]:
         "volume_root": str(cfg.volume_root),
         "config_path": str(cfg.config_path),
         "schema": schema,
+        "maintenance": project_state.read_maintenance(root=cfg.volume_root),
         "scaffold_required": _project_needs_scaffold_template(cfg.client_repo),
         **node_summary,
     }
@@ -1925,11 +1940,19 @@ def _validate_target_schema_before_switch(client_repo: Path, body: dict[str, Any
         return
     if (
         schema.get("migration_required")
+        and project_state.migration_requires_manual(schema)
+    ):
+        raise _SwitchBlocked(
+            project_state.migration_block_message(schema),
+            project_state.migration_block_details(schema),
+        )
+    if (
+        schema.get("migration_required")
         and not migrate_requested
         and not project_state.empty_refine_state(existing_refine)
     ):
         raise _SwitchBlocked(
-            "Project schema migration required.",
+            project_state.migration_block_message(schema),
             "Open this app with migrate=true to upgrade .refine state before switching.",
         )
     if not schema.get("migration_required"):

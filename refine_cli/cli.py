@@ -77,8 +77,16 @@ cluster_app = typer.Typer(
     context_settings=_CONTEXT_SETTINGS,
     no_args_is_help=True,
 )
+migrate_app = typer.Typer(
+    name="migrate",
+    help="Manage Refine project-state migrations.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
 app.add_typer(node_app, name="node")
 app.add_typer(cluster_app, name="cluster")
+app.add_typer(migrate_app, name="migrate")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -166,10 +174,126 @@ def _ensure_cli_project(config_path: str | None = None) -> None:
         config.get(reload=True)
     conn = db.connect()
     try:
-        project_state.ensure_initialized(conn, migrate=True)
+        status = project_state.ensure_initialized(conn, migrate=True)
+        if not status.get("compatible"):
+            raise click.ClickException(project_state.migration_block_details(status))
         project_state.rebuild_sqlite_cache(conn)
     finally:
         conn.close()
+
+
+def _migration_config(ctx: typer.Context) -> config.Config:
+    cfg_path = _ctx_config(ctx)
+    return config.get(path=cfg_path, reload=True) if cfg_path else config.get(reload=True)
+
+
+@migrate_app.command("status", help="Show project-state migration status.")
+def migrate_status_command(ctx: typer.Context) -> int:
+    cfg = _migration_config(ctx)
+    payload = {
+        "client_repo": str(cfg.client_repo),
+        "volume_root": str(cfg.volume_root),
+        "schema": project_state.schema_status(cfg.volume_root),
+        "maintenance": project_state.read_maintenance(root=cfg.volume_root),
+    }
+    typer.echo(json.dumps(payload, indent=2))
+    return 0
+
+
+@migrate_app.command("run", help="Run the pending Refine project-state migration.")
+def migrate_run_command(ctx: typer.Context) -> int:
+    cfg = _migration_config(ctx)
+    status = project_state.schema_status(cfg.volume_root)
+    if status.get("compatible"):
+        typer.echo("No migration required.")
+        return 0
+    if not status.get("migration_required"):
+        raise click.ClickException(
+            "Project schema is not supported by this Refine version."
+        )
+    if status.get("migration_id") not in {
+        project_state.INSTANCE_TO_NODE_MIGRATION_ID,
+        project_state.LEGACY_PROJECT_MIGRATION_ID,
+    }:
+        raise click.ClickException(project_state.migration_block_details(status))
+
+    from refine_server import git_ops, push_ops
+
+    stuck = git_ops.in_progress_op(cwd=cfg.client_repo)
+    if stuck is not None:
+        op, hint = stuck
+        raise click.ClickException(
+            f"Cannot migrate while a git {op} is in progress. {hint}"
+        )
+    dirty = git_ops.dirty_paths(cwd=cfg.client_repo)
+    non_refine_dirty = [
+        path for path in dirty
+        if path != ".refine" and not path.startswith(".refine/")
+    ]
+    if non_refine_dirty:
+        raise click.ClickException(
+            "Cannot migrate with non-Refine worktree changes: "
+            + ", ".join(non_refine_dirty[:20])
+        )
+
+    db.init_db(cfg.sqlite_path)
+    conn = db.connect(cfg.sqlite_path)
+    maintenance_written = False
+    try:
+        try:
+            project_state.write_maintenance(
+                {
+                    "migration_id": status.get("migration_id") or "",
+                    "reason": "project_state_migration",
+                    "operator": "refine migrate run",
+                },
+                root=cfg.volume_root,
+            )
+            maintenance_written = True
+            status = project_state.ensure_initialized(
+                conn,
+                migrate=True,
+                allow_manual_migrations=True,
+                root=cfg.volume_root,
+            )
+            if not status.get("compatible"):
+                raise click.ClickException(project_state.migration_block_details(status))
+            project_state.rebuild_sqlite_cache(conn, force=True)
+        finally:
+            if maintenance_written:
+                project_state.clear_maintenance(root=cfg.volume_root)
+
+        paths = git_ops.dirty_paths_under(".refine", cwd=cfg.client_repo)
+        commit = git_ops.commit_refine_sync_state(
+            paths,
+            state_message="refine: migrate project state",
+            cwd=cfg.client_repo,
+        )
+        if not commit.ok:
+            raise click.ClickException(
+                commit.stderr or commit.stdout or "Migration commit failed."
+            )
+        push = push_ops.push_current_after_pull(
+            conn,
+            actor="cli",
+            merge_message="Merge upstream before pushing Refine project migration",
+            prompt_context=(
+                "A pull is in progress before pushing a Refine project-state migration.\n"
+                "Preserve the migrated `.refine/` node-state files and valid JSON."
+            ),
+            cwd=cfg.client_repo,
+        )
+    finally:
+        conn.close()
+    payload = {
+        "ok": bool(push.get("ok", True)),
+        "schema": project_state.schema_status(cfg.volume_root),
+        "committed": commit.stderr != "(nothing to commit)",
+        "commit_output": (commit.stdout or commit.stderr or "").strip(),
+        "push": push,
+    }
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if payload["ok"] else 1
 
 
 @node_app.command("list", help="List nodes.")
@@ -2697,10 +2821,18 @@ def _ensure_sqlite_schema(cfg: "config.Config") -> None:
         db.init_db(cfg.sqlite_path)
         conn = db.connect(cfg.sqlite_path)
         try:
-            project_state.ensure_initialized(conn, migrate=True, root=cfg.volume_root)
+            status = project_state.ensure_initialized(
+                conn,
+                migrate=True,
+                root=cfg.volume_root,
+            )
+            if not status.get("compatible"):
+                raise _InitError(project_state.migration_block_details(status))
             project_state.rebuild_sqlite_cache(conn, force=True)
         finally:
             conn.close()
+    except _InitError:
+        raise
     except Exception as e:
         raise _InitError(f"project migration failed before startup: {e}") from e
 

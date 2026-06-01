@@ -58,13 +58,16 @@ def load_configured(
     if (
         not schema.get("compatible")
         and schema.get("migration_required")
-        and not migrate
-        and not project_state.empty_refine_state(cfg_preview.volume_root)
-    ):
-        raise config.ConfigError(
-            "Project schema migration required. Open the app from Settings "
-            "and choose migrate to upgrade .refine state."
+        and (
+            project_state.migration_requires_manual(schema)
+            or not project_state.empty_refine_state(cfg_preview.volume_root)
         )
+    ):
+        if not migrate or project_state.migration_requires_manual(schema):
+            raise config.ConfigError(
+                f"{project_state.migration_block_message(schema)} "
+                f"{project_state.migration_block_details(schema)}"
+            )
     if not schema.get("compatible") and not schema.get("migration_required"):
         raise config.ConfigError(
             "Project schema is not supported by this Refine version."

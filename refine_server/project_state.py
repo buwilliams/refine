@@ -25,6 +25,14 @@ DEFAULT_NODE_ID = "default"
 CACHE_ACTIVE_NODE_KEY = "__refine_cache_active_node_id"
 LEGACY_CACHE_ACTIVE_INSTANCE_KEY = "__refine_cache_active_instance_id"
 CACHE_STATE_FINGERPRINT_KEY = "__refine_cache_state_fingerprint"
+INSTANCE_TO_NODE_MIGRATION_ID = "instance_to_node_v2"
+LEGACY_PROJECT_MIGRATION_ID = "legacy_project_to_json_v2"
+MANUAL_SCHEMA_MIGRATION_INSTRUCTIONS = (
+    "Manual cluster migration is required. Stop every old Refine node for this "
+    "target app, run `refine migrate run` from one upgraded checkout, commit "
+    "and push the migrated .refine state, then pull and start the upgraded "
+    "nodes."
+)
 
 PROJECT_SETTING_KEYS = {
     "governance_product",
@@ -132,6 +140,10 @@ def cluster_json_path(root: Path | None = None) -> Path:
     return (root or volume_root()) / "cluster.json"
 
 
+def maintenance_json_path(root: Path | None = None) -> Path:
+    return (root or volume_root()) / "maintenance.json"
+
+
 def nodes_dir(root: Path | None = None) -> Path:
     return (root or volume_root()) / "nodes"
 
@@ -173,13 +185,13 @@ def schema_status(root: Path | None = None) -> dict[str, Any]:
     root = root or volume_root()
     cfg_path = config_json_path(root)
     if not cfg_path.exists():
-        return {
+        return _with_migration_metadata({
             "compatible": False,
             "migration_required": True,
             "schema_version": None,
             "current_schema_version": CURRENT_SCHEMA_VERSION,
             "reason": "legacy_project",
-        }
+        })
     try:
         cfg = _read_json(cfg_path, {})
         version = int(cfg.get("schema_version") or 0)
@@ -200,21 +212,21 @@ def schema_status(root: Path | None = None) -> dict[str, Any]:
             "reason": "newer_schema",
         }
     if version < MIN_SUPPORTED_SCHEMA_VERSION:
-        return {
+        return _with_migration_metadata({
             "compatible": False,
             "migration_required": True,
             "schema_version": version,
             "current_schema_version": CURRENT_SCHEMA_VERSION,
             "reason": "outdated_schema",
-        }
+        })
     if version < CURRENT_SCHEMA_VERSION:
-        return {
+        return _with_migration_metadata({
             "compatible": False,
             "migration_required": True,
             "schema_version": version,
             "current_schema_version": CURRENT_SCHEMA_VERSION,
             "reason": "schema_upgrade",
-        }
+        })
     return {
         "compatible": True,
         "migration_required": False,
@@ -222,6 +234,95 @@ def schema_status(root: Path | None = None) -> dict[str, Any]:
         "current_schema_version": CURRENT_SCHEMA_VERSION,
         "reason": "",
     }
+
+
+def _with_migration_metadata(status: dict[str, Any]) -> dict[str, Any]:
+    reason = status.get("reason")
+    schema_version = status.get("schema_version")
+    if reason == "legacy_project":
+        status.update({
+            "migration_id": LEGACY_PROJECT_MIGRATION_ID,
+            "migration_description": (
+                "Create canonical .refine JSON state from an older SQLite-backed "
+                "project."
+            ),
+            "safe_auto": True,
+            "requires_cluster_quiescence": False,
+            "operator_instructions": (
+                "This initialization is safe to run automatically for empty or "
+                "legacy single-node project state."
+            ),
+        })
+    elif reason == "schema_upgrade" and schema_version == 1:
+        status.update({
+            "migration_id": INSTANCE_TO_NODE_MIGRATION_ID,
+            "migration_description": (
+                "Rename Refine instance state to node state for the distributed "
+                "cluster model."
+            ),
+            "safe_auto": False,
+            "requires_cluster_quiescence": True,
+            "operator_instructions": MANUAL_SCHEMA_MIGRATION_INSTRUCTIONS,
+        })
+    else:
+        status.update({
+            "migration_id": "",
+            "migration_description": "Unsupported schema migration.",
+            "safe_auto": False,
+            "requires_cluster_quiescence": True,
+            "operator_instructions": (
+                "Upgrade Refine incrementally or migrate this project with a "
+                "version that supports its current schema."
+            ),
+        })
+    return status
+
+
+def migration_requires_manual(status: dict[str, Any] | None) -> bool:
+    return bool(
+        status
+        and status.get("migration_required")
+        and status.get("safe_auto") is False
+    )
+
+
+def migration_block_message(status: dict[str, Any] | None) -> str:
+    if not status:
+        return "Project schema migration required."
+    migration_id = status.get("migration_id") or "unknown"
+    return f"Project schema migration required: {migration_id}."
+
+
+def migration_block_details(status: dict[str, Any] | None) -> str:
+    if not status:
+        return MANUAL_SCHEMA_MIGRATION_INSTRUCTIONS
+    return str(status.get("operator_instructions") or MANUAL_SCHEMA_MIGRATION_INSTRUCTIONS)
+
+
+def read_maintenance(*, root: Path | None = None) -> dict[str, Any] | None:
+    path = maintenance_json_path(root)
+    if not path.exists():
+        return None
+    data = _read_json(path, {})
+    return data if isinstance(data, dict) else {"reason": "maintenance"}
+
+
+def write_maintenance(data: dict[str, Any], *, root: Path | None = None) -> dict[str, Any]:
+    payload = {
+        "active": True,
+        "created_at": now_iso(),
+        **data,
+        "updated_at": now_iso(),
+    }
+    _write_json(maintenance_json_path(root), payload)
+    return payload
+
+
+def clear_maintenance(*, root: Path | None = None) -> None:
+    try:
+        maintenance_json_path(root).unlink()
+    except FileNotFoundError:
+        pass
 
 
 def empty_refine_state(root: Path | None = None) -> bool:
@@ -233,6 +334,7 @@ def empty_refine_state(root: Path | None = None) -> bool:
 
 def ensure_initialized(conn: sqlite3.Connection | None = None, *,
                        migrate: bool = True,
+                       allow_manual_migrations: bool = False,
                        root: Path | None = None) -> dict[str, Any]:
     """Ensure canonical JSON exists and is compatible for the active app."""
     root = root or volume_root()
@@ -250,10 +352,14 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
         return status
     if not migrate or not status.get("migration_required"):
         return status
+    if migration_requires_manual(status) and not allow_manual_migrations:
+        return status
     if status.get("reason") == "legacy_project":
         migrate_legacy(conn, root=root)
-    else:
+    elif status.get("migration_id") == INSTANCE_TO_NODE_MIGRATION_ID:
         migrate_project_state(root=root)
+    else:
+        return status
     return schema_status(root)
 
 
@@ -976,7 +1082,9 @@ def rebuild_sqlite_cache(
     total_start = perf_metrics.now()
     phase_ms: dict[str, float] = {}
     rows_updated = 0
-    ensure_initialized(conn, migrate=True)
+    status = ensure_initialized(conn, migrate=True)
+    if not status.get("compatible"):
+        raise RuntimeError(migration_block_details(status))
     active = active_node_id()
     settings = list_settings()
     reps = list_reporters()

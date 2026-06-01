@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import subprocess
 import sys
@@ -32,9 +33,16 @@ def main() -> int:
     assert "init" not in out
     assert "install" in out
     assert "update" in out
+    assert "migrate" in out
     assert "runner" not in out
     assert "web" not in out
     assert "supervisor" not in out
+
+    rc, out, err = _run_cli(["migrate", "--help"])
+    assert rc == 0, err
+    assert "Manage Refine project-state migrations" in out
+    assert "status" in out
+    assert "run" in out
 
     rc, out, err = _run_cli(["runner", "--help"])
     assert rc == 0, err
@@ -73,6 +81,67 @@ def main() -> int:
         assert rc == 0, err
         assert (clone / ".refine-binding").exists()
         assert (client / ".refine" / "refine.toml").exists()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    tmp = Path(tempfile.mkdtemp(prefix="refine-migrate-cli-"))
+    try:
+        client = tmp / "target-app"
+        client.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=client, check=True)
+        subprocess.run(["git", "config", "user.email", "t@x"], cwd=client, check=True)
+        subprocess.run(["git", "config", "user.name", "t"], cwd=client, check=True)
+        (client / "app.txt").write_text("base\n", encoding="utf-8")
+        subprocess.run(["git", "add", "app.txt"], cwd=client, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "init"],
+            cwd=client,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        from refine_server import config
+
+        refine_root = client / ".refine"
+        config.write_defaults(refine_root)
+        (refine_root / "config.json").write_text(
+            json.dumps({"schema_version": 1, "settings": {}}),
+            encoding="utf-8",
+        )
+        (refine_root / "instances.json").write_text(
+            json.dumps({"instances": [{"id": "default", "display_name": "Default"}]}),
+            encoding="utf-8",
+        )
+        (refine_root / "instances" / "default").mkdir(parents=True)
+        subprocess.run(["git", "add", ".refine"], cwd=client, check=True)
+        subprocess.run(
+            ["git", "commit", "-m", "legacy refine state"],
+            cwd=client,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        cfg_path = refine_root / "refine.toml"
+        rc, out, err = _run_cli(["--config", str(cfg_path), "migrate", "status"])
+        assert rc == 0, err
+        assert "instance_to_node_v2" in out
+        rc, out, err = _run_cli(["--config", str(cfg_path), "migrate", "run"])
+        assert rc == 0, err
+        result = json.loads(out)
+        assert result["schema"]["compatible"] is True
+        assert result["committed"] is True
+        assert (refine_root / "nodes.json").exists()
+        assert not (refine_root / "instances.json").exists()
+        subject = subprocess.run(
+            ["git", "log", "-1", "--format=%s"],
+            cwd=client,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert subject == "refine: migrate project state"
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

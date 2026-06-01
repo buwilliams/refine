@@ -120,7 +120,11 @@ class Runner:
         return conn
 
     def _automation_blocked(self) -> bool:
-        return self._bulk_update_lock.locked() or mutation_guard.active() is not None
+        return (
+            self._bulk_update_lock.locked()
+            or mutation_guard.active() is not None
+            or project_state.read_maintenance() is not None
+        )
 
     # ---- lifecycle -----------------------------------------------------------
 
