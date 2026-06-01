@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -241,6 +242,55 @@ def main() -> int:
             "memory limit" in msg
             for msg in activity_messages(conn, gid_mem)
         )
+
+        gid_order = "01SUBPROCESSORDERCANCELRUN"
+        create_indexed_gap(conn, gid_order, status="todo")
+        callback_started = threading.Event()
+        release_callback = threading.Event()
+        callback_seen_live = {"value": False}
+        dispatcher._launch_one(conn, gid_order, None)
+        wait_until_running(sub_mgr, gid_order)
+        original_on_finished = dispatcher._on_finished
+
+        def hold_on_finished(
+            gap_id: str,
+            round_idx: int,
+            exit_code: int,
+            killed_reason: str | None,
+            base_ref: str,
+            *,
+            agent_reported_success=None,
+            failure_text: str = "",
+        ) -> None:
+            if gap_id == gid_order:
+                callback_seen_live["value"] = sub_mgr.is_running(gap_id)
+                callback_started.set()
+                release_callback.wait(timeout=5.0)
+            original_on_finished(
+                gap_id,
+                round_idx,
+                exit_code,
+                killed_reason,
+                base_ref,
+                agent_reported_success=agent_reported_success,
+                failure_text=failure_text,
+            )
+
+        dispatcher._on_finished = hold_on_finished  # type: ignore[method-assign]
+        try:
+            assert sub_mgr.cancel(gid_order, reason="priority_preempted") is True
+            assert callback_started.wait(timeout=5.0)
+            assert callback_seen_live["value"] is True
+            assert sub_mgr.is_running(gid_order) is True
+            release_callback.set()
+            assert wait_for_status(conn, gid_order, {"todo"}) == "todo"
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline and sub_mgr.is_running(gid_order):
+                time.sleep(0.05)
+            assert sub_mgr.is_running(gid_order) is False
+        finally:
+            release_callback.set()
+            dispatcher._on_finished = original_on_finished  # type: ignore[method-assign]
 
         gid_cancel = "01SUBPROCESSCANCELRUNAAA"
         db.set_setting(conn, "worker_memory_limit_mb", "0")

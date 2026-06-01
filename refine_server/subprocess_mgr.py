@@ -522,9 +522,11 @@ class SubprocessManager:
 
         reader.join(timeout=2.0)
 
-        # Finalize the run record + remove from active set.
-        with self._lock:
-            self._runs.pop(h.gap_id, None)
+        # Finalize the run record before the dispatcher callback resolves the
+        # Gap state, but keep the handle visible until that callback completes.
+        # Runtime reconciliation treats absence from _runs as "no runner owns
+        # this Gap"; removing it early races with preempt/pause cleanup that
+        # moves in-progress Gaps back to todo.
         conn = self._get_conn()
         with db.transaction(conn):
             conn.execute(
@@ -549,6 +551,8 @@ class SubprocessManager:
                     severity="error", category="cli",
                     gap_id=h.gap_id, actor="runner",
                 )
+        with self._lock:
+            self._runs.pop(h.gap_id, None)
         h.finished.set()
         elapsed = max(0.001, time.monotonic() - h.started_at)
         perf_metrics.record(
