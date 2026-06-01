@@ -435,11 +435,20 @@ def main() -> int:
     assert "function guideReferenceCategories" in guide_js
     assert "function filteredGuideReferenceCategories" in guide_js
     assert "function renderGuideReferenceCategories" in guide_js
+    assert 'const GUIDE_STATE_KEY_PREFIX = "refine_guide_state:"' in guide_js
+    assert "function guideStateStorageKey" in guide_js
+    assert "function readGuideStoredState" in guide_js
+    assert "function saveGuideState" in guide_js
+    assert "function loadGuideStateForProject" in guide_js
+    assert "function loadGuideStateForCurrentApp" in guide_js
     assert "function guideChecklistComplete" in guide_js
     assert "function clearGuideSelection" in guide_js
     assert "function guideCategoryCompleteIcon" in guide_js
     assert "function guideSearchIcon" in guide_js
     assert "nextInput.setSelectionRange(selectionStart, selectionEnd)" in guide_js
+    assert "localStorage.setItem(guideStateStorageKey(), JSON.stringify({" in guide_js
+    assert "localStorage.removeItem(guideStateStorageKey())" in guide_js
+    assert "loadGuideStateForCurrentApp({ redraw: false })" in guide_js
     assert "async function selectGuideItem" in guide_js
     assert "const previousBodyScrollTop = guideBodyScrollTop()" in guide_js
     assert "function guideBodyScrollTop" in guide_js
@@ -551,6 +560,10 @@ def main() -> int:
     assert 'command: "refine.issue.request"' in guide_js
     assert ".guide-resize::after" in guide_css
     assert ".guide-progress" in guide_css
+    assert "background: #fffbea;" in guide_css
+    assert "color: #111827;" in guide_css
+    target_highlight_css = guide_css.split(".guide-target-highlight", 1)[1].split("}", 1)[0]
+    assert "background-color" not in target_highlight_css
     assert ".guide-reference" in guide_css
     assert ".guide-reference-search" in guide_css
     assert ".guide-reference-search input" in guide_css

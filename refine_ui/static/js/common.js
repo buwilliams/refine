@@ -426,7 +426,7 @@ function openProjectAttachModal({
       try {
         const result = await api("POST", "/api/project/attach", { path });
         if (reloadOnSuccess) {
-          if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
+          if (typeof loadGuideStateForProject === "function") loadGuideStateForProject(result, { redraw: false });
           state.project = result;
           showProjectAttachToast(result);
           window.location.reload();
@@ -446,7 +446,7 @@ function openProjectAttachModal({
             try {
               const result = await api("POST", "/api/project/attach", { path, migrate: true });
               if (reloadOnSuccess) {
-                if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
+                if (typeof loadGuideStateForProject === "function") loadGuideStateForProject(result, { redraw: false });
                 state.project = result;
                 showProjectAttachToast(result);
                 window.location.reload();
@@ -491,8 +491,12 @@ function showProjectAttachToast(result) {
 }
 
 async function applyProjectAttachResult(result, options = {}) {
-  if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
   state.project = result;
+  if (typeof loadGuideStateForCurrentApp === "function") {
+    loadGuideStateForCurrentApp({ redraw: true });
+  } else if (typeof resetGuideState === "function") {
+    resetGuideState({ redraw: true });
+  }
   updateActiveInstanceLabel();
   state.dashboard = null;
   state.currentGap = null;

@@ -116,6 +116,8 @@ def test_client_switch_path(root: Path) -> None:
     assert "options.openTarget !== false" in guide_js
     assert "function resetGuideState" in guide_js
     assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
+    assert "function loadGuideStateForCurrentApp" in guide_js
+    assert "function loadGuideStateForProject" in guide_js
     assert "async function loadSettingsSurfaceData()" in settings_surface_js
     assert 'const project = await api("GET", "/api/project/status");' in settings_surface_js
     assert "if (project.attached === false)" in settings_surface_js
@@ -135,8 +137,10 @@ def test_client_switch_path(root: Path) -> None:
     switch_body = common_js.split("async function applyProjectAttachResult(result, options = {})", 1)[1]
     switch_body = switch_body.split("\n}", 1)[0]
     for expected in (
-        'if (typeof resetGuideState === "function") resetGuideState({ redraw: false });',
         "state.project = result",
+        'if (typeof loadGuideStateForCurrentApp === "function")',
+        "loadGuideStateForCurrentApp({ redraw: true })",
+        'resetGuideState({ redraw: true })',
         "resetChatForProjectSwitch()",
         "initSSE()",
         "await syncProjectUpdates({ silent: true })",

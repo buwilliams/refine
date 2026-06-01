@@ -257,7 +257,9 @@ body.guide-open .toolbar-dock {
 }
 
 .guide-item.active {
-  background: var(--color-surface-muted);
+  background: #fffbea;
+  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+  color: #111827;
 }
 
 .guide-item-summary {

@@ -2,6 +2,8 @@
 
 const GUIDE_WIDTH_KEY = "refine_guide_width";
 const GUIDE_CHECKLIST_KEY = "refine_guide_checklist";
+const GUIDE_STATE_KEY_PREFIX = "refine_guide_state:";
+const GUIDE_DETACHED_STATE_KEY = "__detached__";
 const GUIDE_DEFAULT_WIDTH = 360;
 const GUIDE_MIN_WIDTH = 280;
 const GUIDE_MAX_WIDTH = 560;
@@ -420,18 +422,65 @@ function guideItem(id, title, kind, description, defaultText, target, options = 
 }
 
 function readGuideChecklist() {
+  return readGuideStoredState().statuses;
+}
+
+function guideStateStorageKey(project = null) {
+  const projectState = project || (typeof state !== "undefined" ? state.project : null) || {};
+  const path = projectState.client_repo || projectState.path || "";
+  return `${GUIDE_STATE_KEY_PREFIX}${path ? encodeURIComponent(path) : GUIDE_DETACHED_STATE_KEY}`;
+}
+
+function readGuideStoredState(project = null) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(GUIDE_CHECKLIST_KEY) || "{}");
-    return parsed && typeof parsed === "object" ? parsed : {};
+    const raw = localStorage.getItem(guideStateStorageKey(project)) || "{}";
+    const parsed = JSON.parse(raw);
+    const statuses = parsed?.statuses && typeof parsed.statuses === "object"
+      ? parsed.statuses
+      : parsed && typeof parsed === "object"
+        ? parsed
+        : {};
+    const activeItem = typeof parsed?.activeItem === "string" ? parsed.activeItem : "";
+    const activeCategory = typeof parsed?.activeCategory === "string" ? parsed.activeCategory : "";
+    return {
+      statuses,
+      activeCategory,
+      activeItem,
+      referenceQuery: typeof parsed?.referenceQuery === "string" ? parsed.referenceQuery : "",
+    };
   } catch {
-    return {};
+    return { statuses: {}, activeCategory: "", activeItem: "", referenceQuery: "" };
   }
 }
 
 function saveGuideChecklist() {
+  saveGuideState();
+}
+
+function saveGuideState() {
   try {
-    localStorage.setItem(GUIDE_CHECKLIST_KEY, JSON.stringify(guideState.statuses || {}));
+    localStorage.setItem(guideStateStorageKey(), JSON.stringify({
+      statuses: guideState.statuses || {},
+      activeCategory: guideState.activeCategory || "",
+      activeItem: guideState.activeItem || "",
+      referenceQuery: guideState.referenceQuery || "",
+    }));
   } catch {}
+}
+
+function loadGuideStateForProject(project = null, { redraw = true } = {}) {
+  const stored = readGuideStoredState(project);
+  guideState.statuses = stored.statuses || {};
+  guideState.activeCategory = stored.activeCategory || "";
+  guideState.activeItem = stored.activeItem || "";
+  guideState.referenceQuery = stored.referenceQuery || "";
+  guideState.context = "";
+  clearGuideTargetHighlight();
+  if (redraw) drawGuide();
+}
+
+function loadGuideStateForCurrentApp({ redraw = true } = {}) {
+  loadGuideStateForProject(null, { redraw });
 }
 
 function resetGuideState({ redraw = true } = {}) {
@@ -441,6 +490,7 @@ function resetGuideState({ redraw = true } = {}) {
   guideState.activeItem = "";
   guideState.referenceQuery = "";
   clearGuideTargetHighlight();
+  try { localStorage.removeItem(guideStateStorageKey()); } catch {}
   try { localStorage.removeItem(GUIDE_CHECKLIST_KEY); } catch {}
   if (redraw) drawGuide();
 }
@@ -551,9 +601,9 @@ function setGuideItemStatus(id, status, { advance = false } = {}) {
   } else {
     guideState.statuses[id] = status;
   }
-  saveGuideChecklist();
   if (guideChecklistComplete()) {
     clearGuideSelection();
+    saveGuideChecklist();
     return;
   }
   if (advance) {
@@ -561,6 +611,7 @@ function setGuideItemStatus(id, status, { advance = false } = {}) {
   } else if (!guideItemIsIncomplete(guideState.activeItem)) {
     ensureGuideSelection();
   }
+  saveGuideChecklist();
 }
 
 function cycleGuideItemStatus(id) {
@@ -587,6 +638,7 @@ function openPreviousGuideItem(id) {
   const previous = guideItemByOffset(id, -1);
   if (!previous) return;
   activateGuideItem(previous);
+  saveGuideState();
   drawGuide();
   openActiveGuideTarget();
 }
@@ -596,6 +648,7 @@ async function selectGuideItem(id) {
   if (!found) return;
   const previousBodyScrollTop = guideBodyScrollTop();
   activateGuideItem(found);
+  saveGuideState();
   drawGuide();
   restoreGuideBodyScrollTop(previousBodyScrollTop);
   await openGuideItemTarget(found.item);
@@ -616,6 +669,7 @@ function clampGuideWidth(width) {
 }
 
 function initGuide() {
+  loadGuideStateForCurrentApp({ redraw: false });
   setGuideWidth(guideState.width, { persist: false });
   drawGuide();
   window.addEventListener("resize", () => {
@@ -647,6 +701,7 @@ function openGuide(options = {}) {
   } else if (!requested && guideChecklistComplete()) {
     clearGuideSelection();
   }
+  if (requested) saveGuideState();
   setGuideWidth(guideState.width, { persist: false });
   drawGuide();
   if (firstIncomplete && options.openTarget !== false) openActiveGuideTarget();
@@ -761,6 +816,7 @@ function drawGuide() {
     const selectionStart = e.target.selectionStart;
     const selectionEnd = e.target.selectionEnd;
     guideState.referenceQuery = e.target.value || "";
+    saveGuideState();
     drawGuide();
     const nextInput = root.querySelector("[data-guide-reference-search]");
     nextInput?.focus();
