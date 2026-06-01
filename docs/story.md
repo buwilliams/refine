@@ -115,3 +115,43 @@ Effort: Low (4 commits, 2 milestones)
 Milestones started: setup/install polish; legacy installer checkout recovery.
 
 A smaller hardening day: installer output and setup flow became clearer, the splash text was polished, no-op target-app rebuilds became the default, and legacy installer checkouts gained an upgrade repair path.
+
+## Day 16: 2026-05-28 (Thursday)
+
+Effort: High (14 commits, 3 milestones)
+
+Milestones started: management settings simplification; rebuild/quality convergence; runtime setting recovery.
+
+Settings and runtime controls tightened: agent pause returned to the supervisor rows, management surfaces were split and polished, obsolete transfer/sync controls disappeared, file search got more responsive, uv installs gained a pipx fallback, target-app rebuilds moved onto one path, post-rebuild Quality gating landed, and backlog auto-promote settings survived upgrades.
+
+## Day 17: 2026-05-29 (Friday)
+
+Effort: Low (1 commit, 1 milestone)
+
+Milestones started: Guide setup checklist.
+
+Guide became an onboarding surface: the setup checklist introduced ordered configuration steps, progress tracking, default/skip/complete actions, and a persistent panel for first-run setup work.
+
+## Day 18: 2026-05-30 (Saturday)
+
+Effort: Medium (7 commits, 2 milestones)
+
+Milestones started: project app registry cleanup; Guide field actions.
+
+Application switching and setup UX hardened: stale app registry entries were cleaned up, detaching the last app became a real no-app state, Settings surfaces handled detached projects, and Guide affordances moved closer to the fields and navigation they explain.
+
+## Day 19: 2026-05-31 (Sunday)
+
+Effort: Very High (15 commits, 3 milestones)
+
+Milestones started: app scaffold templates; managed target-app wrappers; Guide branch integration.
+
+Guide and target-app setup became more complete: Quick Start structure, settings-field icons, managed `.refine/manage-app.sh` wrappers, scaffold template selection, modal resume after restart, live app switching under the supervisor, refreshed templates, chat activity streaming, and the guide branch merge all landed.
+
+## Day 20: 2026-06-01 (Monday)
+
+Effort: Low (2 commits, 2 milestones)
+
+Milestones started: Logs screen parity; CLI ergonomics.
+
+Logs and CLI ergonomics sharpened: the gap-filtered Logs screen now includes round logs as well as activity rows, long messages moved into readable multiline table rows, the `r` shorthand and `update` command landed, shutdown cleanup uses the background-process API, and Guide state/highlight behavior was refined.
