@@ -276,6 +276,7 @@ class RunHandle:
     resource_backend: str = ""
     resource_isolation: str = ""
     kind: str = "implementation"
+    node_id: str = ""
     killed_reason: str | None = None
     finished: threading.Event = None  # type: ignore[assignment]
     # Set to time.monotonic() when stream-json emits a `result` event.
@@ -327,6 +328,7 @@ class SubprocessManager:
         idle_window: int,
         hard_cap: int,
         kind: str = "implementation",
+        node_id: str = "",
         on_finished: Callable[..., None] | None = None,
     ) -> int:
         """Spawn an agent CLI subprocess in the Gap's worktree.
@@ -384,6 +386,7 @@ class SubprocessManager:
             resource_backend=capabilities.name,
             resource_isolation=capabilities.isolation,
             kind=kind,
+            node_id=node_id,
         )
         with self._lock:
             self._runs[gap_id] = handle
@@ -460,6 +463,7 @@ class SubprocessManager:
             for h in self._runs.values():
                 out.append({
                     "gap_id": h.gap_id,
+                    "node_id": h.node_id,
                     "round_idx": h.round_idx,
                     "pid": h.proc.pid,
                     "kind": h.kind,

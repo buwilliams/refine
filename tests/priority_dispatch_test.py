@@ -17,12 +17,14 @@ from pathlib import Path
 class FakeSubprocessManager:
     def __init__(self) -> None:
         self.running: list[str] = []
+        self.nodes: dict[str, str] = {}
         self.cancel_calls: list[tuple[str, str]] = []
 
     def running_snapshot(self) -> list[dict]:
         return [
             {
                 "gap_id": gid,
+                "node_id": self.nodes.get(gid, ""),
                 "round_idx": 0,
                 "pid": 1000 + idx,
                 "elapsed_seconds": 1,
@@ -79,20 +81,32 @@ def main() -> int:
         def reset() -> None:
             launched.clear()
             fake.running.clear()
+            fake.nodes.clear()
             fake.cancel_calls.clear()
             conn.execute("DELETE FROM activity")
             conn.execute("DELETE FROM runs")
             conn.execute("DELETE FROM gaps_index")
 
         def insert_gap(gid: str, status: str, priority: str,
-                       branch: str | None = None) -> None:
+                       branch: str | None = None,
+                       node_id: str = "default") -> None:
             ts = now_iso()
             conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, "
-                " branch_name, json_path) "
-                "VALUES (?, ?, ?, ?, '', ?, ?, ?, ?)",
-                (gid, gid, status, priority, ts, ts, branch, f"gaps/{gid}.json"),
+                " branch_name, node_id, json_path) "
+                "VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?)",
+                (
+                    gid,
+                    gid,
+                    status,
+                    priority,
+                    ts,
+                    ts,
+                    branch,
+                    node_id,
+                    f"gaps/{gid}.json",
+                ),
             )
 
         def insert_running_run(gid: str, *, kind: str = "implementation") -> None:
@@ -155,6 +169,15 @@ def main() -> int:
             "SELECT status FROM gaps_index WHERE id = 'blocked-by-index-cap'",
         ).fetchone()
         assert row["status"] == "todo", dict(row)
+
+        reset()
+        db.set_setting(conn, "parallel_run_cap", "1")
+        insert_gap("foreign-running", "in-progress", "high", node_id="remote-node")
+        insert_gap("active-todo", "todo", "high")
+        fake.running = ["foreign-running"]
+        assert dispatcher._active_run_count(conn) == 0  # noqa: SLF001
+        dispatcher._tick()
+        assert launched == ["active-todo"], launched
 
         reset()
         db.set_setting(conn, "parallel_run_cap", "1")

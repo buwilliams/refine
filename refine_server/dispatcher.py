@@ -103,9 +103,17 @@ class Dispatcher:
         if self.launch_blocked is not None and self.launch_blocked():
             return
         running_snapshot = self.sub_mgr.running_snapshot()
+        active_node = project_state.active_node_id()
+        active_running_snapshot = self._running_snapshot_for_node(
+            conn,
+            active_node,
+            running_snapshot,
+        )
         recovery.reconcile_runtime_in_progress(
             conn,
-            live_gap_ids={r["gap_id"] for r in running_snapshot if r.get("gap_id")},
+            live_gap_ids={
+                r["gap_id"] for r in active_running_snapshot if r.get("gap_id")
+            },
         )
         self._promote_backlog(conn)
         self._promote_disabled_quality(conn)
@@ -119,7 +127,11 @@ class Dispatcher:
             return
 
         cap = self._parallel_run_cap(conn)
-        running = self._active_run_count(conn, running_snapshot=running_snapshot)
+        running = self._active_run_count(
+            conn,
+            active_node=active_node,
+            running_snapshot=active_running_snapshot,
+        )
         if running >= cap:
             return
         self._launch_ready_lanes(conn, active_rank, cap - running)
@@ -131,9 +143,10 @@ class Dispatcher:
         self,
         conn: sqlite3.Connection,
         *,
+        active_node: str | None = None,
         running_snapshot: list[dict] | None = None,
     ) -> int:
-        active_node = project_state.active_node_id()
+        active_node = active_node or project_state.active_node_id()
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
             "WHERE status = 'in-progress' AND node_id = ?",
@@ -152,12 +165,50 @@ class Dispatcher:
         # The SQLite state is the shared cross-runner reservation source. Keep
         # the local process snapshot in the count as a defensive fallback for
         # any launch window before the index is updated.
-        local = len(
+        local = len(self._running_snapshot_for_node(
+            conn,
+            active_node,
+            running_snapshot,
+        ))
+        return max(indexed, local)
+
+    def _running_snapshot_for_node(
+        self,
+        conn: sqlite3.Connection,
+        active_node: str,
+        running_snapshot: list[dict] | None = None,
+    ) -> list[dict]:
+        snapshot = (
             running_snapshot
             if running_snapshot is not None
             else self.sub_mgr.running_snapshot()
         )
-        return max(indexed, local)
+        if not snapshot:
+            return []
+        scoped: list[dict] = []
+        unknown_node: list[dict] = []
+        for run in snapshot:
+            node_id = str(run.get("node_id") or "")
+            if node_id:
+                if node_id == active_node:
+                    scoped.append(run)
+                continue
+            if run.get("gap_id"):
+                unknown_node.append(run)
+        if not unknown_node:
+            return scoped
+        gap_ids = [str(run["gap_id"]) for run in unknown_node if run.get("gap_id")]
+        placeholders = ",".join("?" * len(gap_ids))
+        rows = conn.execute(
+            f"SELECT id FROM gaps_index WHERE id IN ({placeholders}) AND node_id = ?",
+            (*gap_ids, active_node),
+        ).fetchall()
+        active_gap_ids = {str(row["id"]) for row in rows}
+        scoped.extend(
+            run for run in unknown_node
+            if str(run.get("gap_id") or "") in active_gap_ids
+        )
+        return scoped
 
     def _launch_ready_lanes(
         self,
@@ -236,7 +287,11 @@ class Dispatcher:
 
     def _preempt_lower_priority_runs(self, conn: sqlite3.Connection,
                                      active_rank: int) -> int:
-        running = self.sub_mgr.running_snapshot()
+        running = self._running_snapshot_for_node(
+            conn,
+            project_state.active_node_id(),
+            self.sub_mgr.running_snapshot(),
+        )
         ids = [r["gap_id"] for r in running if r.get("gap_id")]
         if not ids:
             return 0
@@ -633,6 +688,7 @@ class Dispatcher:
                 base_ref=base_commit,
                 idle_window=idle,
                 hard_cap=hard_cap,
+                node_id=project_state.active_node_id(),
                 on_finished=(
                     lambda gid, code, reason, agent_ok, failure_text="": self._on_finished(
                         gid, round_idx, code, reason, base_commit,
@@ -793,6 +849,7 @@ class Dispatcher:
                 idle_window=idle,
                 hard_cap=hard_cap,
                 kind="quality",
+                node_id=project_state.active_node_id(),
                 on_finished=(
                     lambda gid, code, reason, agent_ok, failure_text="": self._on_quality_finished(
                         gid,
@@ -930,6 +987,7 @@ class Dispatcher:
                 idle_window=idle,
                 hard_cap=hard_cap,
                 kind="quality",
+                node_id=project_state.active_node_id(),
                 on_finished=(
                     lambda gid, code, reason, agent_ok, failure_text="": self._finish_post_rebuild_quality(
                         gid,
