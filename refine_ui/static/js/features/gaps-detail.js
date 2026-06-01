@@ -760,9 +760,12 @@ function bindRoundFormSubmit(gap) {
 function computeFailureBanner(gap, latest) {
   if (gap.status === "failed") {
     const lastLog = latest?.latest_log;
+    const errLog = latest?.latest_error_log;
+    const workflowLog = latest?.latest_workflow_log;
+    const fallbackLog = lastLog?.severity && lastLog.severity !== "info" ? lastLog : null;
     return {
       severity: "error",
-      message: lastLog?.message || "Agent run failed",
+      message: errLog?.message || workflowLog?.message || fallbackLog?.message || "Gap failed",
       actionsHtml: "",
     };
   }

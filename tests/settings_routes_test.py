@@ -773,6 +773,8 @@ def main() -> int:
     assert 'id="s-target-app-url"' in settings_js
     assert '<input type="url" id="s-target-app-url"' in settings_js
     assert 'target_app_url: $("#s-target-app-url").value' in settings_js
+    assert 'errLog?.message || workflowLog?.message || fallbackLog?.message || "Gap failed"' in gaps_detail_js
+    assert 'lastLog?.message || "Agent run failed"' not in gaps_detail_js
     assert "async function loadSettingsSurfaceData()" in settings_core_js
     assert 'api("GET", "/api/settings")' in settings_core_js
     assert 'api("GET", "/api/reporters")' in settings_core_js
