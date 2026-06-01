@@ -28,6 +28,9 @@ _LIMIT_PAUSE_UNTIL_KEY = "__refine_agent_limit_pause_until"
 _LIMIT_PAUSE_REASON_KEY = "__refine_agent_limit_pause_reason"
 _DISPATCH_NEXT_LANE_KEY = "__refine_dispatch_next_lane"
 _LANES = ("todo", "qa")
+_DISPATCH_PRIORITY_STATUSES = tuple(
+    status for status in BLOCKING_STATUSES if status != "awaiting-rebuild"
+)
 
 
 @dataclass
@@ -222,12 +225,12 @@ class Dispatcher:
         return "qa" if lane == "todo" else "todo"
 
     def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
-        placeholders = ",".join("?" * len(BLOCKING_STATUSES))
+        placeholders = ",".join("?" * len(_DISPATCH_PRIORITY_STATUSES))
         row = conn.execute(
             f"SELECT {priority_case_sql()} AS rank FROM gaps_index "
             f"WHERE node_id = ? AND status IN ({placeholders}) "
             "ORDER BY rank ASC LIMIT 1",
-            (project_state.active_node_id(), *BLOCKING_STATUSES),
+            (project_state.active_node_id(), *_DISPATCH_PRIORITY_STATUSES),
         ).fetchone()
         return int(row["rank"]) if row else None
 

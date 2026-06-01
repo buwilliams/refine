@@ -117,6 +117,14 @@ def main() -> int:
         dispatcher._tick()
         assert launched == ["01BBBBBBBBBBBBBBBBBBBBBBBB"], launched
 
+        conn.execute("DELETE FROM gaps_index")
+        shutil.rmtree(client / ".refine" / "gaps", ignore_errors=True)
+        launched.clear()
+        insert_gap("01AWAITREBUILDHIGHAAAAAAA", "awaiting-rebuild", "high")
+        insert_gap("01TODOSHOULDRUNLOWAAAAAAA", "todo", "low")
+        dispatcher._tick()
+        assert launched == ["01TODOSHOULDRUNLOWAAAAAAA"], launched
+
         # Governance failure moves todo -> backlog and blocks auto-promotion.
         governance.save_settings(
             conn, product="Product", constitution="Constitution", rules=[],
