@@ -1,3 +1,57 @@
+/* --- Gap actions ----------------------------------------------------- */
+.gap-action-group {
+  display: inline-flex;
+  align-items: stretch;
+  position: relative;
+}
+.gap-action-primary {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+.gap-action-more {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  justify-content: center;
+  border-left-color: rgba(255,255,255,0.35);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.gap-action-more::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.gap-action-panel {
+  left: 0;
+  right: auto;
+  min-width: 180px;
+}
+.gap-action-panel button.nav-menu-item {
+  width: 100%;
+  height: auto;
+  justify-content: flex-start;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  color: var(--fg);
+  font-weight: 550;
+}
+.gap-action-panel button.nav-menu-item:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--fg);
+}
+.gap-action-panel button.nav-menu-item.danger {
+  color: var(--color-danger);
+}
+.gap-action-panel button.nav-menu-item.danger:hover:not(:disabled) {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+
 /* --- Notes ------------------------------------------------------------ */
 .notes-card.card { padding: 0; }
 .notes-card > summary {

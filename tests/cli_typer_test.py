@@ -7,8 +7,9 @@ import subprocess
 import sys
 import tempfile
 from contextlib import redirect_stderr, redirect_stdout
-from io import StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
+from urllib.error import HTTPError
 
 
 def _run_cli(args: list[str]) -> tuple[int, str, str]:
@@ -30,6 +31,7 @@ def main() -> int:
     assert "target" in out
     assert "init" not in out
     assert "install" in out
+    assert "update" in out
     assert "runner" not in out
     assert "web" not in out
     assert "supervisor" not in out
@@ -77,6 +79,25 @@ def main() -> int:
     rc, _out, err = _run_cli(["init", "/tmp/app"])
     assert rc == 2
     assert "No such command 'init'" in err
+
+    calls.clear()
+    old_run = cli.subprocess.run
+    try:
+        cli.subprocess.run = lambda cmd, **_kwargs: calls.append(cmd) or type(
+            "Result",
+            (),
+            {"returncode": 37},
+        )()
+        rc, out, err = _run_cli(["update"])
+    finally:
+        cli.subprocess.run = old_run
+    assert rc == 37, err
+    assert calls == [["bash", "-lc", cli.README_INSTALL_COMMAND]]
+    assert (
+        cli.README_INSTALL_COMMAND
+        == "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash"
+    )
+    assert f"Running: {cli.README_INSTALL_COMMAND}" in out
 
     calls.clear()
     old_start = cli.cmd_start
@@ -175,6 +196,24 @@ def main() -> int:
     assert "_print_upgrade_notice(clone)" in function_source("_start_systemd_ui")
     assert "_print_upgrade_notice(clone)" in function_source("_restart_systemd_ui")
     assert "_print_upgrade_notice(clone)" in function_source("_restart_setup_systemd_ui")
+
+    cleanup_source = function_source("_pause_agents_for_clean_shutdown")
+    assert "/api/processes/background" in cleanup_source
+    assert '{"stopped": True}' in cleanup_source
+    assert 'method="POST"' in cleanup_source
+    assert 'method="PATCH"' not in cleanup_source
+    error = HTTPError(
+        "http://127.0.0.1:8080/api/processes/background",
+        500,
+        "Internal Server Error",
+        {},
+        BytesIO(
+            b'{"error":{"message":"cleanup failed","details":"target still dirty"}}',
+        ),
+    )
+    assert cli._shutdown_cleanup_http_error_message(error) == (
+        "cleanup failed: target still dirty"
+    )
 
     print("[ok] Typer CLI dispatch preserves commands, aliases, and ps options")
     return 0

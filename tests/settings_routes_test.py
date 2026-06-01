@@ -426,6 +426,34 @@ def main() -> int:
     assert '<script src="/static/js/features/guide.js"></script>' in index_html
     assert '<link rel="stylesheet" href="/static/css/guide.css">' in index_html
     assert "const GUIDE_CATEGORIES = [" in guide_js
+    assert 'title: "Get Started"' in guide_js
+    assert 'description: "The minimum steps needed to run refine on this app."' in guide_js
+    assert 'title: "Quick Start"' not in guide_js
+    assert 'Get Started &middot;' in guide_js
+    assert "completed/skipped" not in guide_js
+    assert "function guideChecklistItemsInOrder" in guide_js
+    assert "function guideReferenceCategories" in guide_js
+    assert "function filteredGuideReferenceCategories" in guide_js
+    assert "function renderGuideReferenceCategories" in guide_js
+    assert "function guideChecklistComplete" in guide_js
+    assert "function clearGuideSelection" in guide_js
+    assert "function guideCategoryCompleteIcon" in guide_js
+    assert "function guideSearchIcon" in guide_js
+    assert "nextInput.setSelectionRange(selectionStart, selectionEnd)" in guide_js
+    assert "async function selectGuideItem" in guide_js
+    assert "const previousBodyScrollTop = guideBodyScrollTop()" in guide_js
+    assert "function guideBodyScrollTop" in guide_js
+    assert "function restoreGuideBodyScrollTop" in guide_js
+    assert "restoreGuideBodyScrollTop(previousBodyScrollTop)" in guide_js
+    assert "await openGuideItemTarget(found.item)" in guide_js
+    assert "const searchingReference = !category.checklist && Boolean(guideState.referenceQuery.trim())" in guide_js
+    assert 'class="guide-reference"' in guide_js
+    assert 'class="guide-reference-search"' in guide_js
+    assert 'class="guide-reference-search-icon"' in guide_js
+    assert 'class="guide-category-complete"' in guide_js
+    assert 'data-guide-reference-search' in guide_js
+    assert "Reference" in guide_js
+    assert "Explanations for fields, settings, screens, and daily workflows." in guide_js
     assert 'id: "guide.open"' in guide_js
     assert 'id: "guide.toggle"' in guide_js
     assert 'class="guide-category"' in guide_js
@@ -437,7 +465,7 @@ def main() -> int:
     assert 'data-guide-complete' in guide_js
     assert "canUseDefault: options.canUseDefault !== false" in guide_js
     assert "{ canUseDefault: false }" in guide_js
-    assert "const defaultButton = item.canUseDefault" in guide_js
+    assert "const defaultButton = checklist && item.canUseDefault" in guide_js
     assert 'class="guide-progress"' in guide_js
     assert 'class="guide-status guide-status-' in guide_js
     assert "function firstIncompleteGuideItem" in guide_js
@@ -447,7 +475,7 @@ def main() -> int:
     assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
     assert "function clearGuideTargetHighlight" in guide_js
     assert "setTimeout(() => el.classList.remove(\"guide-target-highlight\")" not in guide_js
-    assert "if (!guideState.activeItem || !findGuideItem(guideState.activeItem))" in guide_js
+    assert "if (active && !(active.category.checklist && guideChecklistComplete()))" in guide_js
     assert 'class="guide-item-kind"' not in guide_js
     assert "Focus in app" not in guide_js
     assert 'hash: "#/instance/application"' in guide_js
@@ -523,6 +551,11 @@ def main() -> int:
     assert 'command: "refine.issue.request"' in guide_js
     assert ".guide-resize::after" in guide_css
     assert ".guide-progress" in guide_css
+    assert ".guide-reference" in guide_css
+    assert ".guide-reference-search" in guide_css
+    assert ".guide-reference-search input" in guide_css
+    assert ".guide-reference-search-icon" in guide_css
+    assert ".guide-category-complete" in guide_css
     assert ".guide-item-open" in guide_css
     assert ".guide-item-actions" in guide_css
     assert ".guide-status-checked" in guide_css
@@ -1003,6 +1036,9 @@ def main() -> int:
     assert 'bindPaginationControls(root, "logs"' in logs_js
     assert "const LOGS_DEFAULT_DIR = {" in logs_js
     assert '<table class="table logs-table mobile-card-table">' in logs_js
+    assert '<td class="logs-entry-cell" colspan="5">' in logs_js
+    assert '<div class="logs-entry-meta">' in logs_js
+    assert '<div class="logs-entry-message logs-message-cell" data-label="Message">' in logs_js
     assert 'data-label="Message"' in logs_js
     assert "$$(\".table th.sortable\", root)" in logs_js
     assert 'renderPaginationControls("logs", pageMeta, entries.length, "entry", { boundaries: true })' in logs_js

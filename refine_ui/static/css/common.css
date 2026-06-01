@@ -651,8 +651,79 @@ select {
 .logs-table {
   table-layout: fixed;
 }
+.logs-entry-cell {
+  padding: 0;
+}
+.logs-entry-meta {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1.2fr)
+    minmax(86px, 0.7fr)
+    minmax(120px, 1fr)
+    minmax(120px, 1fr)
+    minmax(120px, 1fr);
+}
+.logs-entry-meta-item,
+.logs-entry-message {
+  min-width: 0;
+  padding: 10px 12px;
+}
+.logs-entry-meta-label {
+  display: none;
+}
+.logs-entry-meta-value {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.logs-entry-message {
+  display: grid;
+  grid-template-columns: 1fr;
+  border-top: 1px solid var(--color-border-subtle);
+}
 .logs-message-cell {
   overflow-wrap: anywhere;
+}
+.logs-message-body {
+  min-width: 0;
+}
+.logs-message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.logs-message-cell pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .logs-table.mobile-card-table td.logs-entry-cell {
+    display: block;
+    padding: 8px 2px;
+  }
+  .logs-table.mobile-card-table td.logs-entry-cell::before {
+    content: none;
+  }
+  .logs-entry-meta {
+    display: grid;
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+    gap: 6px 10px;
+  }
+  .logs-entry-meta-item {
+    display: contents;
+  }
+  .logs-entry-meta-label {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 750;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .logs-entry-message {
+    grid-template-columns: minmax(92px, 34%) minmax(0, 1fr);
+    gap: 6px 10px;
+    padding: 6px 0;
+  }
 }
 .log-severity {
   display: inline-block;

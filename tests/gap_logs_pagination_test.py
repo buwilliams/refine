@@ -1,4 +1,4 @@
-"""Gap detail log pagination checks."""
+"""Gap log pagination and Logs-screen handoff checks."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -103,6 +103,36 @@ def main() -> int:
         assert last_page["pagination"]["has_more"] is False
         assert [log["message"] for log in last_page["logs"]] == ["round-2"]
 
+        status, logs_page = api.list_activity(
+            gap_id=gap_id,
+            limit=10,
+            offset=0,
+            sort="datetime",
+            direction="asc",
+            include_facets=True,
+        )
+        assert status == 200, logs_page
+        assert logs_page["page"]["total"] == 4
+        assert [log["message"] for log in logs_page["activity"]] == [
+            "round-0",
+            "round-1",
+            "activity-mid",
+            "round-2",
+        ]
+        assert logs_page["activity"][0]["source"] == "round"
+        assert logs_page["activity"][2]["source"] == "activity"
+        assert logs_page["activity"][0]["gap_id"] == gap_id
+        assert logs_page["facets"]["categories"] == ["cli", "state"]
+        assert logs_page["facets"]["actors"] == ["runner"]
+
+        status, detail_match = api.list_activity(gap_id=gap_id, q="latest details", limit=10)
+        assert status == 200, detail_match
+        assert [log["message"] for log in detail_match["activity"]] == ["round-2"]
+
+        status, severity_match = api.list_activity(gap_id=gap_id, severity="error", limit=10)
+        assert status == 200, severity_match
+        assert [log["message"] for log in severity_match["activity"]] == ["round-1"]
+
         matched = None
         path = f"/api/gaps/{gap_id}/logs"
         for method, pattern, handler in server.ROUTES:
@@ -132,29 +162,60 @@ def main() -> int:
         common_js = (
             root / "refine_ui/static/js/common.js"
         ).read_text(encoding="utf-8")
-        assert "renderPaginationControls(" in gaps_detail_js
-        assert "bindPaginationControls(body, pagerId" in gaps_detail_js
-        assert "const GAP_LOG_PAGE_SIZE = 10;" in gaps_detail_js
-        assert "function refreshGapRoundLogs(gapId)" in gaps_detail_js
-        assert "loadRoundLogs(gapId, roundIdx, { page })" in gaps_detail_js
-        assert "total: logState.total" in gaps_detail_js
-        assert "{ boundaries: true }" in gaps_detail_js
-        assert "return `${pager}${loading}${body}`;" in gaps_detail_js
-        assert "data-round-logs-more" not in gaps_detail_js
+        logs_js = (
+            root / "refine_ui/static/js/features/logs.js"
+        ).read_text(encoding="utf-8")
+        gaps_css = (
+            root / "refine_ui/static/css/gaps.css"
+        ).read_text(encoding="utf-8")
+        common_css = (
+            root / "refine_ui/static/css/common.css"
+        ).read_text(encoding="utf-8")
+        assert '<div class="gap-action-group">' in gaps_detail_js
+        assert '<button class="gap-action-primary" id="btn-chat">Open Chat</button>' in gaps_detail_js
+        menu_block = gaps_detail_js.split('<div class="nav-menu-panel gap-action-panel">', 1)[1].split("</div>", 1)[0]
+        expected_menu_order = [
+            'id="btn-view-logs">View Logs</button>',
+            'id="btn-reporter">Reporter</button>',
+            'id="btn-rename">Rename</button>',
+            'id="btn-priority">Change Priority</button>',
+            'id="btn-cancel"',
+            'id="btn-delete">Delete</button>',
+        ]
+        cursor = -1
+        for item in expected_menu_order:
+            next_cursor = menu_block.find(item)
+            assert next_cursor > cursor, item
+            cursor = next_cursor
+        assert 'openGapReporterModal(gap)' in gaps_detail_js
+        assert 'api("POST", "/api/gaps/bulk", {' in gaps_detail_js
+        assert 'location.hash = `#/logs?gap_id=${encodeURIComponent(gap.id)}`;' in gaps_detail_js
+        assert ".gap-action-group" in gaps_css
+        assert ".gap-action-more::after" in gaps_css
+        assert 'hashQs.get("gap_id") || ""' in logs_js
+        assert 'params.set("gap_id", f.gap_id);' in logs_js
+        assert 'value="${htmlEscape(f.gap_id)}"' in logs_js
+        assert '{ key: "message", label: "Message" }' not in logs_js
+        assert '<td class="logs-entry-cell" colspan="5">' in logs_js
+        assert '<div class="logs-entry-meta">' in logs_js
+        assert '<div class="logs-entry-message logs-message-cell" data-label="Message">' in logs_js
+        assert ".logs-entry-meta" in common_css
+        assert ".logs-message-text" in common_css
+        assert "data-role=\"round-logs\"" not in gaps_detail_js
+        assert "function refreshGapRoundLogs" not in gaps_detail_js
+        assert "function loadRoundLogs" not in gaps_detail_js
         assert "Load more" not in gaps_detail_js
-        assert ">First</button>" in common_js
-        assert ">Last</button>" in common_js
         activity_block = common_js.split(
             'sseSource.addEventListener("activity_added"', 1,
         )[1].split('sseSource.addEventListener("status_change"', 1)[0]
         round_log_block = common_js.split(
             'sseSource.addEventListener("round_log_added"', 1,
         )[1].split("sseSource.onerror", 1)[0]
-        assert "refreshGapRoundLogs(state.currentGap)" in activity_block
+        assert "refreshGapRoundLogs" not in activity_block
         assert "loadGapDetail(state.currentGap)" not in activity_block
-        assert "refreshGapRoundLogs(state.currentGap)" in round_log_block
+        assert "refreshGapRoundLogs" not in round_log_block
+        assert 'if (state.currentRoute === "logs") loadLogs();' in round_log_block
         assert "loadGapDetail(state.currentGap)" not in round_log_block
-        assert "invalidateGapRoundLogs(state.currentGap)" not in round_log_block
     finally:
         try:
             conn.close()

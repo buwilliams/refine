@@ -12,8 +12,6 @@ async function renderGapDetail(r) {
 
 let _gapModalRoot = null;
 let _gapRoundFormDraft = null;
-const GAP_LOG_PAGE_SIZE = 10;
-const gapRoundLogState = new Map();
 
 function gapDetailContainer() {
   return _gapModalRoot?.querySelector(".gap-detail-modal-body") || null;
@@ -70,7 +68,6 @@ function closeGapDetailModal({ navigateAway = false } = {}) {
   _gapRoundFormDraft = null;
   state.currentGap = null;
   state.currentGapData = null;
-  gapRoundLogState.clear();
   if (navigateAway) {
     // Restore the URL to whatever was underneath. If we're already there
     // somehow (shouldn't happen), no-op so we don't trigger a redundant
@@ -167,24 +164,17 @@ function drawGapDetail(gap) {
   }
   state.currentGapData = gap;
   renderBanners([]);
-  for (const key of gapRoundLogState.keys()) {
-    if (!key.startsWith(`${gap.id}:`)) gapRoundLogState.delete(key);
-  }
   // Preserve the notes-card open state across re-renders of the same gap so
   // saving a note (or an SSE-driven refresh) doesn't snap it shut.
   const notesOpen = document.querySelector(
     `.notes-card[data-gap-id="${gap.id}"]`,
   )?.open ?? false;
-  // Same idea for the per-round wrapper and its inner Logs disclosure.
-  // Metadata refreshes still redraw the modal; preserve expanded sections
-  // so status or project updates do not collapse the user's working context.
+  // Same idea for the per-round wrapper. Metadata refreshes still redraw the
+  // modal; preserve expanded sections so status or project updates do not
+  // collapse the user's working context.
   const prevRoundOpen = {};
-  const prevLogsOpen = {};
   document.querySelectorAll("details.round[data-round-idx]").forEach((el) => {
     prevRoundOpen[el.dataset.roundIdx] = el.open;
-  });
-  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
-    prevLogsOpen[el.dataset.roundIdx] = el.open;
   });
   const rounds = gap.rounds || [];
   const latest = rounds[rounds.length - 1] || null;
@@ -225,11 +215,20 @@ function drawGapDetail(gap) {
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}
         ${forwardBtn}
-        <button id="btn-chat">Open Chat</button>
-        <button class="warn" id="btn-rename">Rename</button>
-        <button class="warn" id="btn-priority">Change Priority</button>
-        <button class="warn" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel Gap</button>
-        <button class="danger" id="btn-delete">Delete</button>
+        <div class="gap-action-group">
+          <button class="gap-action-primary" id="btn-chat">Open Chat</button>
+          <details class="nav-menu gap-action-menu" id="gap-action-menu">
+            <summary class="btn gap-action-more" aria-label="More Gap actions"></summary>
+            <div class="nav-menu-panel gap-action-panel">
+              <button class="nav-menu-item" type="button" id="btn-view-logs">View Logs</button>
+              <button class="nav-menu-item" type="button" id="btn-reporter">Reporter</button>
+              <button class="nav-menu-item" type="button" id="btn-rename">Rename</button>
+              <button class="nav-menu-item" type="button" id="btn-priority">Change Priority</button>
+              <button class="nav-menu-item" type="button" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel</button>
+              <button class="nav-menu-item danger" type="button" id="btn-delete">Delete</button>
+            </div>
+          </details>
+        </div>
       </div>
       <div class="muted small" style="margin-bottom:14px">
         ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)}
@@ -252,11 +251,9 @@ function drawGapDetail(gap) {
       <h3>Rounds (${rounds.length})</h3>
       ${rounds.length === 0 ? `<p class="muted">No rounds yet.</p>` :
         rounds.map((rnd, idx) => renderRound(
-          gap.id,
           rnd, idx,
           idx === rounds.length - 1,
-          isLatestEditable && idx === rounds.length - 1,
-          prevRoundOpen, prevLogsOpen, gap.id,
+          prevRoundOpen,
         )).join("")}
 
       ${(isLatestEditable || hasPreservedDraft) ? `
@@ -307,6 +304,10 @@ function drawGapDetail(gap) {
   $("#btn-chat")?.addEventListener("click", () => {
     openChatDock({ gapId: gap.id });
   });
+  $("#btn-view-logs")?.addEventListener("click", () => {
+    closeGapActionMenu();
+    location.hash = `#/logs?gap_id=${encodeURIComponent(gap.id)}`;
+  });
 
   // Workflow back / forward buttons. Forward from `review` calls the
   // existing /verify endpoint for approval; every other arrow is a plain
@@ -345,7 +346,12 @@ function drawGapDetail(gap) {
   };
   wireWorkflow("#btn-state-back", workflow.back);
   wireWorkflow("#btn-state-forward", workflow.forward);
+  $("#btn-reporter")?.addEventListener("click", async () => {
+    closeGapActionMenu();
+    await openGapReporterModal(gap);
+  });
   $("#btn-rename")?.addEventListener("click", async () => {
+    closeGapActionMenu();
     const name = await modalPrompt("New name", gap.name,
                                    { title: "Rename Gap" });
     if (!name || !name.trim()) return;
@@ -410,6 +416,7 @@ function drawGapDetail(gap) {
     } catch (err) { await showActionError(err); }
   }));
   $("#btn-priority")?.addEventListener("click", async () => {
+    closeGapActionMenu();
     const current = gap.priority || "low";
     const body = () => `
       <div class="modal-title">Change priority</div>
@@ -438,6 +445,7 @@ function drawGapDetail(gap) {
     }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {
+    closeGapActionMenu();
     const btn = $("#btn-cancel");
     if (btn.disabled) return;
     const ok = await modalConfirm(
@@ -455,6 +463,7 @@ function drawGapDetail(gap) {
     });
   });
   $("#btn-delete")?.addEventListener("click", async () => {
+    closeGapActionMenu();
     const ok = await modalConfirm(
       `Delete Gap "${gap.name}"? This cannot be undone.`,
       { title: "Delete Gap", okLabel: "Delete", danger: true },
@@ -467,9 +476,77 @@ function drawGapDetail(gap) {
   });
 
   bindFailureBannerActions(gap);
-  bindRoundLogLoading(gap);
   bindRoundFormSubmit(gap);
   restoreRoundFormDraftFocus(gap.id);
+}
+
+function closeGapActionMenu() {
+  const menu = $("#gap-action-menu");
+  if (menu) menu.open = false;
+}
+
+async function openGapReporterModal(gap) {
+  if (typeof refreshReporters === "function") {
+    try {
+      await refreshReporters();
+    } catch {}
+  }
+  const latest = (gap.rounds || [])[Math.max(0, (gap.rounds || []).length - 1)] || {};
+  const current = latest.reporter || "";
+  const reporters = state.reporters || [];
+  const options = reporters
+    .map((r) => `<option value="${htmlEscape(r.name)}" ${r.name === current ? "selected" : ""}>${htmlEscape(r.name)}</option>`)
+    .join("");
+  const missingCurrent = current && !reporters.some((r) => r.name === current)
+    ? `<option value="${htmlEscape(current)}" selected>${htmlEscape(current)}</option>`
+    : "";
+  const body = () => `
+    <div class="modal-title">Change reporter</div>
+    <div class="modal-body">
+      <label for="modal-reporter-select">Reporter</label>
+      <select class="modal-input" id="modal-reporter-select" style="width:100%">
+        <option value="">— pick reporter —</option>
+        ${missingCurrent}
+        ${options}
+        <option value="__add__">+ Add new reporter…</option>
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        Rewrites the latest round's reporter. Earlier rounds keep their original reporter.
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>Cancel</button>
+      <button data-ok>Save</button>
+    </div>`;
+  let next = await _openModal(body, { cancel: null, ok: current }, ".modal-input");
+  if (next === null) return;
+  if (next === "__add__") {
+    const name = await modalPrompt("Name for the new reporter:", "", { title: "Add reporter" });
+    next = (name || "").trim();
+    if (!next) return;
+    try {
+      await api("POST", "/api/reporters", { name: next });
+      await refreshReporters();
+    } catch (e) {
+      await showActionError(e, "Could not add reporter");
+      return;
+    }
+  }
+  next = (next || "").trim();
+  if (!next || next === current) return;
+  try {
+    let r = await api("POST", "/api/gaps/bulk", {
+      selected_ids: [gap.id],
+      update: { reporter: next },
+      background: false,
+    });
+    r = await resolveBackgroundJobResponse(r, "Reporter update is running in the background");
+    if (r.updated) toast(`Reporter set to ${next}`, "info");
+    else toast("Reporter was not changed", "warn");
+    await loadGapDetail(gap.id);
+  } catch (e) {
+    await showActionError(e, "Reporter update failed");
+  }
 }
 
 function captureRoundFormDraft(gapId) {
@@ -513,17 +590,12 @@ function restoreRoundFormDraftFocus(gapId) {
   }
 }
 
-function renderRound(gapId, rnd, idx, isLatest, editable,
-                     prevRoundOpen = {}, prevLogsOpen = {}) {
+function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
   // Preserve the user's open/closed choice across re-renders. New rounds
   // (no prior entry in the snapshot) default to "open on latest" — the
-  // historical behavior — and Logs default closed.
+  // historical behavior.
   const key = String(idx);
   const roundOpen = key in prevRoundOpen ? prevRoundOpen[key] : isLatest;
-  const logsOpen = key in prevLogsOpen ? prevLogsOpen[key] : false;
-  const logLabel = typeof rnd.log_count === "number"
-    ? `Logs (${rnd.log_count})`
-    : "Logs";
   return `
     <details class="round" data-round-idx="${idx}" ${roundOpen ? "open" : ""}>
       <summary class="round-head">
@@ -543,166 +615,9 @@ function renderRound(gapId, rnd, idx, isLatest, editable,
           <dt>actual</dt><dd>${htmlEscape(rnd.actual || "").replace(/\n/g, "<br>")}</dd>
           <dt>target</dt><dd>${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
         </dl>
-        <details data-role="round-logs" data-round-idx="${idx}" ${logsOpen ? "open" : ""}>
-          <summary>${logLabel}</summary>
-          <div data-role="round-logs-body" data-round-idx="${idx}">
-            ${renderRoundLogsBody(gapId, idx)}
-          </div>
-        </details>
       </div>
     </details>
   `;
-}
-
-function roundLogKey(gapId, roundIdx) {
-  return `${gapId}:${roundIdx}`;
-}
-
-function invalidateGapRoundLogs(gapId) {
-  for (const key of gapRoundLogState.keys()) {
-    if (key.startsWith(`${gapId}:`)) gapRoundLogState.delete(key);
-  }
-}
-
-function refreshGapRoundLogs(gapId) {
-  if (!gapId || state.currentGap !== gapId) return false;
-  const openRounds = new Set();
-  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
-    const roundIdx = Number(el.dataset.roundIdx);
-    if (!Number.isFinite(roundIdx)) return;
-    if (el.open) openRounds.add(roundIdx);
-  });
-  for (const key of Array.from(gapRoundLogState.keys())) {
-    if (!key.startsWith(`${gapId}:`)) continue;
-    const roundIdx = Number(key.slice(gapId.length + 1));
-    if (!openRounds.has(roundIdx)) gapRoundLogState.delete(key);
-  }
-  for (const roundIdx of openRounds) {
-    const existing = gapRoundLogState.get(roundLogKey(gapId, roundIdx));
-    const limit = existing?.limit || GAP_LOG_PAGE_SIZE;
-    const offset = existing?.offset || 0;
-    const page = Math.floor(offset / limit) + 1;
-    loadRoundLogs(gapId, roundIdx, { page });
-  }
-  return openRounds.size > 0;
-}
-
-function renderRoundLogsBody(gapId, roundIdx) {
-  const logState = gapRoundLogState.get(roundLogKey(gapId, roundIdx));
-  if (!logState || (!logState.loaded && !logState.loading && !logState.error)) {
-    return `<p class="muted small">Open to load logs.</p>`;
-  }
-  if (logState.loading && !logState.loaded) {
-    return `<p class="muted small">Loading logs…</p>`;
-  }
-  if (logState.error) {
-    return `<p class="muted small">Could not load logs: ${htmlEscape(logState.error)}</p>`;
-  }
-  const logs = logState.logs || [];
-  const body = logs.length
-    ? logs.map((l) => renderLogEntry(l)).join("")
-    : `<p class="muted small">No logs.</p>`;
-  const loading = logState.loading && logState.loaded
-    ? `<p class="muted small">Loading page…</p>`
-    : "";
-  const pageMeta = {
-    limit: logState.limit || GAP_LOG_PAGE_SIZE,
-    offset: logState.offset || 0,
-    has_more: !!logState.hasMore,
-    total: logState.total,
-  };
-  const pager = renderPaginationControls(
-    `gap-round-${roundIdx}-logs`,
-    pageMeta,
-    logs.length,
-    "log",
-    { boundaries: true },
-  );
-  return `${pager}${loading}${body}`;
-}
-
-function updateRoundLogsPanel(gapId, roundIdx) {
-  const body = document.querySelector(
-    `[data-role="round-logs-body"][data-round-idx="${roundIdx}"]`,
-  );
-  if (!body) return;
-  body.innerHTML = renderRoundLogsBody(gapId, roundIdx);
-  const logState = gapRoundLogState.get(roundLogKey(gapId, roundIdx));
-  const details = body.closest('details[data-role="round-logs"]');
-  const summary = details?.querySelector("summary");
-  if (summary && logState?.loaded && typeof logState.total === "number") {
-    summary.textContent = `Logs (${logState.total})`;
-  }
-  const pagerId = `gap-round-${roundIdx}-logs`;
-  bindPaginationControls(body, pagerId, (page) =>
-    loadRoundLogs(gapId, roundIdx, { page }));
-  if (logState?.loading) {
-    $$(`#${pagerId}-pagination [data-page]`, body).forEach((btn) => {
-      btn.disabled = true;
-    });
-  }
-}
-
-function bindRoundLogLoading(gap) {
-  document.querySelectorAll('details[data-role="round-logs"][data-round-idx]').forEach((el) => {
-    const roundIdx = Number(el.dataset.roundIdx);
-    const loadIfOpen = () => {
-      if (!el.open) return;
-      const existing = gapRoundLogState.get(roundLogKey(gap.id, roundIdx));
-      if (!existing?.loaded && !existing?.loading) {
-        loadRoundLogs(gap.id, roundIdx);
-      }
-    };
-    el.addEventListener("toggle", loadIfOpen);
-    updateRoundLogsPanel(gap.id, roundIdx);
-    loadIfOpen();
-  });
-}
-
-async function loadRoundLogs(gapId, roundIdx, { page = 1 } = {}) {
-  const key = roundLogKey(gapId, roundIdx);
-  const current = gapRoundLogState.get(key) || {
-    logs: [],
-    loaded: false,
-    loading: false,
-    hasMore: true,
-    total: null,
-    limit: GAP_LOG_PAGE_SIZE,
-    offset: 0,
-  };
-  if (current.loading) return;
-  const limit = current.limit || GAP_LOG_PAGE_SIZE;
-  const targetPage = Math.max(1, parseInt(page, 10) || 1);
-  const offset = (targetPage - 1) * limit;
-  const nextState = { ...current, loading: true, error: "" };
-  gapRoundLogState.set(key, nextState);
-  updateRoundLogsPanel(gapId, roundIdx);
-  try {
-    const data = await api(
-      "GET",
-      `/api/gaps/${gapId}/logs?round_idx=${roundIdx}&limit=${limit}&offset=${offset}`,
-    );
-    const logs = data.logs || [];
-    const pagination = data.pagination || {};
-    gapRoundLogState.set(key, {
-      logs,
-      loaded: true,
-      loading: false,
-      hasMore: !!pagination.has_more,
-      total: typeof pagination.total === "number" ? pagination.total : logs.length,
-      limit: typeof pagination.limit === "number" ? pagination.limit : limit,
-      offset: typeof pagination.offset === "number" ? pagination.offset : offset,
-      error: "",
-    });
-  } catch (e) {
-    gapRoundLogState.set(key, {
-      ...current,
-      loading: false,
-      loaded: current.loaded || false,
-      error: e.message || "Request failed",
-    });
-  }
-  updateRoundLogsPanel(gapId, roundIdx);
 }
 
 function renderGovernanceSummary(round) {
@@ -767,15 +682,6 @@ function renderNote(n) {
         <button class="danger" data-note-delete="${htmlEscape(n.id)}">Delete</button>
       </div>
     </details>`;
-}
-
-function renderLogEntry(l) {
-  return `
-    <div class="log-entry ${l.severity || 'info'}">
-      <div>${htmlEscape(l.message)}</div>
-      <div class="meta">${fmtTime(l.datetime)} · ${htmlEscape(l.category || '')}${l.actor ? ' · ' + htmlEscape(l.actor) : ''}</div>
-      ${l.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(l.details)}</pre></details>` : ''}
-    </div>`;
 }
 
 function renderRoundForm(

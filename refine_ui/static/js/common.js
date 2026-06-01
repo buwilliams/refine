@@ -1137,14 +1137,6 @@ function initSSE() {
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "changes") loadChanges();
-    if (state.currentRoute === "gaps_detail" && state.currentGap) {
-      try {
-        const data = JSON.parse(e.data);
-        if (!data.gap_id || data.gap_id === state.currentGap) {
-          if (typeof refreshGapRoundLogs === "function") refreshGapRoundLogs(state.currentGap);
-        }
-      } catch {}
-    }
   });
   sseSource.addEventListener("status_change", () => {
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
@@ -1189,17 +1181,8 @@ function initSSE() {
       loadGapDetail(state.currentGap);
     }
   });
-  sseSource.addEventListener("round_log_added", (e) => {
-    // Subprocess flushed new stdout to the active round's log file. If the user
-    // is viewing that gap's detail, refresh only the open log panels so the
-    // modal does not repaint on every streamed line.
-    if (state.currentRoute !== "gaps_detail" || !state.currentGap) return;
-    try {
-      const data = JSON.parse(e.data);
-      if (data.gap_id === state.currentGap) {
-        if (typeof refreshGapRoundLogs === "function") refreshGapRoundLogs(state.currentGap);
-      }
-    } catch {}
+  sseSource.addEventListener("round_log_added", () => {
+    if (state.currentRoute === "logs") loadLogs();
   });
   sseSource.onerror = () => {
     // Browser will auto-reconnect.

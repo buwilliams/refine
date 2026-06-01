@@ -203,7 +203,6 @@ function drawLogsList(data, f) {
     { key: "category", label: "Category" },
     { key: "actor", label: "Actor" },
     { key: "gap_id", label: "Gap" },
-    { key: "message", label: "Message" },
   ];
   const sortHeads = columns.map((c) => {
     const isActive = c.key === f.effectiveSort;
@@ -220,17 +219,39 @@ function drawLogsList(data, f) {
       <thead><tr>${sortHeads}</tr></thead>
       <tbody>
         ${entries.map((e) => `
-          <tr>
-            <td class="muted small" data-label="When">${fmtTime(e.datetime)}</td>
-            <td data-label="Severity"><span class="log-severity ${htmlEscape(e.severity || "info")}">${htmlEscape(e.severity || "info")}</span></td>
-            <td class="muted small" data-label="Category">${htmlEscape(e.category || "")}</td>
-            <td class="muted small" data-label="Actor">${htmlEscape(e.actor || "")}</td>
-            <td class="muted small" data-label="Gap">${e.gap_id
-              ? `<a href="#/gaps/${htmlEscape(e.gap_id)}">Gap ${htmlEscape(e.gap_id.slice(0, 8))}...</a>`
-              : "-"}</td>
-            <td class="logs-message-cell" data-label="Message">
-              <div>${htmlEscape(e.message)}</div>
-              ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(e.details)}</pre></details>` : ""}
+          <tr class="logs-entry-row">
+            <td class="logs-entry-cell" colspan="5">
+              <div class="logs-entry-meta">
+                <div class="logs-entry-meta-item">
+                  <span class="logs-entry-meta-label">When</span>
+                  <span class="logs-entry-meta-value muted small">${fmtTime(e.datetime)}</span>
+                </div>
+                <div class="logs-entry-meta-item">
+                  <span class="logs-entry-meta-label">Severity</span>
+                  <span class="logs-entry-meta-value"><span class="log-severity ${htmlEscape(e.severity || "info")}">${htmlEscape(e.severity || "info")}</span></span>
+                </div>
+                <div class="logs-entry-meta-item">
+                  <span class="logs-entry-meta-label">Category</span>
+                  <span class="logs-entry-meta-value muted small">${htmlEscape(e.category || "")}</span>
+                </div>
+                <div class="logs-entry-meta-item">
+                  <span class="logs-entry-meta-label">Actor</span>
+                  <span class="logs-entry-meta-value muted small">${htmlEscape(e.actor || "")}</span>
+                </div>
+                <div class="logs-entry-meta-item">
+                  <span class="logs-entry-meta-label">Gap</span>
+                  <span class="logs-entry-meta-value muted small">${e.gap_id
+                    ? `<a href="#/gaps/${htmlEscape(e.gap_id)}">Gap ${htmlEscape(e.gap_id.slice(0, 8))}...</a>`
+                    : "-"}</span>
+                </div>
+              </div>
+              <div class="logs-entry-message logs-message-cell" data-label="Message">
+                <span class="logs-entry-meta-label">Message</span>
+                <div class="logs-message-body">
+                  <div class="logs-message-text">${htmlEscape(e.message)}</div>
+                  ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(e.details)}</pre></details>` : ""}
+                </div>
+              </div>
             </td>
           </tr>`).join("")}
       </tbody>

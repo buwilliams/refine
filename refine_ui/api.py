@@ -3961,32 +3961,47 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
         return 200, body
     conn = _conn()
     try:
-        entries = activity.recent(
-            conn, limit=page_limit + 1, offset=page_offset,
-            gap_id=gap_id, since_id=since_id,
-            severity=severity, category=category, actor=actor, q=q,
-            sort=sort, direction=direction,
-        )
-        total = activity.count(
-            conn, gap_id=gap_id, since_id=since_id,
-            severity=severity, category=category, actor=actor, q=q,
-        )
-        has_more = len(entries) > page_limit
-        body: dict = {
-            "activity": entries[:page_limit],
-            "page": {
-                "limit": page_limit,
-                "offset": page_offset,
-                "has_more": has_more,
-                "total": total,
-            },
-        }
-        if include_facets:
-            body["facets"] = {
-                "categories": activity.distinct_categories(conn),
-                "actors": activity.distinct_actors(conn),
-                "severities": ["info", "warn", "error"],
+        if gap_id and since_id is None:
+            body = _list_gap_activity_with_round_logs(
+                conn,
+                gap_id=gap_id,
+                page_limit=page_limit,
+                page_offset=page_offset,
+                severity=severity,
+                category=category,
+                actor=actor,
+                q=q,
+                sort=sort,
+                direction=direction,
+                include_facets=include_facets,
+            )
+        else:
+            entries = activity.recent(
+                conn, limit=page_limit + 1, offset=page_offset,
+                gap_id=gap_id, since_id=since_id,
+                severity=severity, category=category, actor=actor, q=q,
+                sort=sort, direction=direction,
+            )
+            total = activity.count(
+                conn, gap_id=gap_id, since_id=since_id,
+                severity=severity, category=category, actor=actor, q=q,
+            )
+            has_more = len(entries) > page_limit
+            body = {
+                "activity": entries[:page_limit],
+                "page": {
+                    "limit": page_limit,
+                    "offset": page_offset,
+                    "has_more": has_more,
+                    "total": total,
+                },
             }
+            if include_facets:
+                body["facets"] = {
+                    "categories": activity.distinct_categories(conn),
+                    "actors": activity.distinct_actors(conn),
+                    "severities": ["info", "warn", "error"],
+                }
         perf_metrics.record(
             "api.list_activity",
             conn=conn,
@@ -4009,6 +4024,226 @@ def list_activity(*, limit: int = 50, gap_id: str | None = None,
     finally:
         conn.close()
     return 200, body
+
+
+_ACTIVITY_SORT_KEYS = {"id", "datetime", "severity", "category", "actor", "gap_id", "message"}
+_ACTIVITY_DEFAULT_DIR = {
+    "id": "desc",
+    "datetime": "desc",
+    "severity": "asc",
+    "category": "asc",
+    "actor": "asc",
+    "gap_id": "asc",
+    "message": "asc",
+}
+
+
+def _list_gap_activity_with_round_logs(
+    conn: sqlite3.Connection,
+    *,
+    gap_id: str,
+    page_limit: int,
+    page_offset: int,
+    severity: str | None,
+    category: str | None,
+    actor: str | None,
+    q: str | None,
+    sort: str | None,
+    direction: str | None,
+    include_facets: bool,
+) -> dict[str, Any]:
+    gap = shared_gaps.read_gap_json(gap_id)
+    if gap is None:
+        return _list_activity_table_page(
+            conn,
+            page_limit=page_limit,
+            page_offset=page_offset,
+            gap_id=gap_id,
+            severity=severity,
+            category=category,
+            actor=actor,
+            q=q,
+            sort=sort,
+            direction=direction,
+            include_facets=include_facets,
+        )
+    rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+    base_entries = [
+        *_mark_log_source(
+            activity.recent(
+                conn,
+                limit=max(
+                    1,
+                    activity.count(conn, gap_id=gap_id),
+                ),
+                offset=0,
+                gap_id=gap_id,
+                sort="datetime",
+                direction="asc",
+            ),
+            "activity",
+        ),
+        *_gap_round_log_entries(gap_id, len(rounds)),
+    ]
+    entries = [
+        item
+        for item in base_entries
+        if _activity_entry_matches(
+            item,
+            severity=severity,
+            category=category,
+            actor=actor,
+            q=q,
+        )
+    ]
+    _sort_activity_entries(entries, sort=sort, direction=direction)
+    page = entries[page_offset:page_offset + page_limit]
+    body: dict[str, Any] = {
+        "activity": page,
+        "page": {
+            "limit": page_limit,
+            "offset": page_offset,
+            "has_more": page_offset + len(page) < len(entries),
+            "total": len(entries),
+        },
+    }
+    if include_facets:
+        body["facets"] = {
+            "categories": sorted({
+                str(item.get("category") or "")
+                for item in base_entries
+                if item.get("category")
+            }, key=str.lower),
+            "actors": sorted({
+                str(item.get("actor") or "")
+                for item in base_entries
+                if item.get("actor")
+            }, key=str.lower),
+            "severities": ["info", "warn", "error"],
+        }
+    return body
+
+
+def _list_activity_table_page(
+    conn: sqlite3.Connection,
+    *,
+    page_limit: int,
+    page_offset: int,
+    gap_id: str | None,
+    severity: str | None,
+    category: str | None,
+    actor: str | None,
+    q: str | None,
+    sort: str | None,
+    direction: str | None,
+    include_facets: bool,
+) -> dict[str, Any]:
+    entries = activity.recent(
+        conn, limit=page_limit + 1, offset=page_offset,
+        gap_id=gap_id, severity=severity, category=category, actor=actor, q=q,
+        sort=sort, direction=direction,
+    )
+    total = activity.count(
+        conn, gap_id=gap_id,
+        severity=severity, category=category, actor=actor, q=q,
+    )
+    body: dict[str, Any] = {
+        "activity": entries[:page_limit],
+        "page": {
+            "limit": page_limit,
+            "offset": page_offset,
+            "has_more": len(entries) > page_limit,
+            "total": total,
+        },
+    }
+    if include_facets:
+        body["facets"] = {
+            "categories": activity.distinct_categories(conn),
+            "actors": activity.distinct_actors(conn),
+            "severities": ["info", "warn", "error"],
+        }
+    return body
+
+
+def _gap_round_log_entries(gap_id: str, round_count: int) -> list[dict[str, Any]]:
+    counts = round_logs.count_by_round(gap_id, round_count)
+    out: list[dict[str, Any]] = []
+    for round_idx in range(round_count):
+        count = counts.get(round_idx, 0)
+        if count <= 0:
+            continue
+        entries, _has_more = round_logs.page_round_logs(
+            gap_id,
+            round_idx,
+            limit=count,
+            offset=0,
+        )
+        for idx, log in enumerate(entries):
+            item = dict(log)
+            item.setdefault("id", f"round:{round_idx}:{idx}")
+            item.setdefault("gap_id", gap_id)
+            item.setdefault("source", "round")
+            item["round_idx"] = round_idx
+            out.append(item)
+    return out
+
+
+def _activity_entry_matches(
+    item: dict[str, Any],
+    *,
+    severity: str | None,
+    category: str | None,
+    actor: str | None,
+    q: str | None,
+) -> bool:
+    if severity and item.get("severity") != severity:
+        return False
+    if category and item.get("category") != category:
+        return False
+    if actor and item.get("actor") != actor:
+        return False
+    if q:
+        needle = q.casefold()
+        haystack = "\n".join(
+            str(item.get(key) or "")
+            for key in ("message", "details")
+        ).casefold()
+        if needle not in haystack:
+            return False
+    return True
+
+
+def _sort_activity_entries(
+    entries: list[dict[str, Any]],
+    *,
+    sort: str | None,
+    direction: str | None,
+) -> None:
+    key = (sort or "datetime").lower()
+    if key not in _ACTIVITY_SORT_KEYS:
+        key = "id"
+    selected_dir = (direction or "").lower()
+    if selected_dir not in ("asc", "desc"):
+        selected_dir = _ACTIVITY_DEFAULT_DIR[key]
+    entries.sort(
+        key=lambda item: (
+            _activity_sort_value(item, key),
+            _activity_sort_value(item, "id"),
+        ),
+        reverse=selected_dir == "desc",
+    )
+
+
+def _activity_sort_value(item: dict[str, Any], key: str) -> tuple[int, Any]:
+    value = item.get(key)
+    if key == "id":
+        if isinstance(value, int):
+            return (0, value)
+        try:
+            return (0, int(str(value)))
+        except (TypeError, ValueError):
+            return (1, str(value or "").casefold())
+    return (0, str(value or "").casefold())
 
 
 def record_ui_error(body: dict) -> tuple[int, dict]:

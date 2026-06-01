@@ -11,6 +11,7 @@ Subcommands:
 - stop    — stop the UI backend.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
+- update  — update Refine to the latest version.
 - ps      — show host process CPU/memory usage for refine.
 - test    — run the repository's script-style test suite.
 - server  — start the server component in the foreground for debugging.
@@ -49,6 +50,10 @@ _LOGIN_PATH_RESOLVED = False
 _Args = SimpleNamespace
 _Command = Callable[[_Args], int]
 _CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
+README_INSTALL_COMMAND = (
+    "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/"
+    "scripts/install.sh | bash"
+)
 
 
 app = typer.Typer(
@@ -286,6 +291,18 @@ def status_command(
 
 
 @app.command(
+    "update",
+    help="Update Refine to the latest version.",
+    epilog=(
+        "Runs the Refine installer in update mode. The installer handles "
+        "fresh setup, repair, and release updates."
+    ),
+)
+def update_command(ctx: typer.Context) -> int:
+    return _run_command(cmd_update, ctx)
+
+
+@app.command(
     "ps",
     help="Show CPU and memory usage for refine processes.",
     epilog=(
@@ -457,6 +474,16 @@ def cmd_test(_args: _Args) -> int:
         return 1
     print("\nALL TESTS OK")
     return 0
+
+
+def cmd_update(_args: _Args) -> int:
+    print(f"Running: {README_INSTALL_COMMAND}", flush=True)
+    try:
+        result = subprocess.run(["bash", "-lc", README_INSTALL_COMMAND])
+    except OSError as e:
+        print(f"refine update: could not launch installer: {e}", file=sys.stderr)
+        return 1
+    return int(result.returncode)
 
 
 def _is_refine_source_dir(p: Path) -> bool:
@@ -1738,27 +1765,51 @@ def _restart_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
 
 
 def _pause_agents_for_clean_shutdown(cfg: "config.Config", port: int) -> bool:
-    """Pause through the UI API before stop/restart tears down agents."""
+    """Stop background work through the UI API before tearing down the backend."""
     host = "127.0.0.1" if cfg.web_host in ("0.0.0.0", "::") else cfg.web_host
-    url = f"http://{host}:{port}/api/settings"
-    body = json.dumps({"paused": "1"}).encode("utf-8")
+    url = f"http://{host}:{port}/api/processes/background"
+    body = json.dumps({"stopped": True}).encode("utf-8")
     req = urllib.request.Request(
         url,
         data=body,
-        method="PATCH",
+        method="POST",
         headers={"Content-Type": "application/json"},
     )
     try:
         with urllib.request.urlopen(req, timeout=30.0):
             return True
     except urllib.error.HTTPError as e:
+        message = _shutdown_cleanup_http_error_message(e)
         print(
-            f"refine: pause cleanup failed before shutdown; continuing: {e}",
+            f"refine: shutdown cleanup failed; continuing: {message}",
             file=sys.stderr,
         )
         return False
     except (OSError, urllib.error.URLError):
         return True
+
+
+def _shutdown_cleanup_http_error_message(e: urllib.error.HTTPError) -> str:
+    try:
+        raw = e.read().decode("utf-8", errors="replace")
+    except Exception:
+        raw = ""
+    if raw:
+        try:
+            data = json.loads(raw)
+            error = data.get("error") if isinstance(data, dict) else None
+            if isinstance(error, dict):
+                message = str(error.get("message") or "").strip()
+                details = str(error.get("details") or "").strip()
+                if message and details:
+                    return f"{message}: {details}"
+                if message:
+                    return message
+        except json.JSONDecodeError:
+            text = raw.strip()
+            if text:
+                return text
+    return str(e)
 
 
 def _refresh_installed_ui_unit_if_stale(
