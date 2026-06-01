@@ -2084,6 +2084,11 @@ def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> 
 def _start_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
     print(f"Starting persistent setup UI backend (systemctl start {ui_unit})...")
+    rc, out = _systemctl("enable", ui_unit)
+    if rc != 0:
+        print(f"refine start: systemctl enable {ui_unit} failed: {out.strip()}",
+              file=sys.stderr)
+        return 1
     rc, out = _systemctl("start", ui_unit)
     if rc != 0:
         print(f"refine start: systemctl start {ui_unit} failed: {out.strip()}",
@@ -2104,7 +2109,12 @@ def _start_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
 
 def _stop_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent setup UI backend (systemctl stop {ui_unit})...")
+    print(f"Stopping persistent setup UI backend (systemctl disable + stop {ui_unit})...")
+    rc, out = _systemctl("disable", ui_unit)
+    if rc != 0:
+        print(f"refine stop: systemctl disable {ui_unit} failed: {out.strip()}",
+              file=sys.stderr)
+        return 1
     rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
         print(f"refine stop: systemctl stop {ui_unit} failed: {out.strip()}",
@@ -2118,6 +2128,13 @@ def _stop_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
 def _restart_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
     print(f"Restarting persistent setup UI backend (systemctl restart {ui_unit})...")
+    rc, out = _systemctl("enable", ui_unit)
+    if rc != 0:
+        print(
+            f"refine restart: systemctl enable {ui_unit} failed: {out.strip()}",
+            file=sys.stderr,
+        )
+        return 1
     rc, out = _systemctl("restart", ui_unit)
     if rc != 0:
         print(
@@ -2228,6 +2245,11 @@ def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -
         return refresh
     ui_unit = _ui_unit_name(unit, port)
     print(f"Starting persistent UI backend (systemctl start {ui_unit})...")
+    rc, out = _systemctl("enable", ui_unit)
+    if rc != 0:
+        print(f"refine start: systemctl enable {ui_unit} failed: {out.strip()}",
+              file=sys.stderr)
+        return 1
     rc, out = _systemctl("start", ui_unit)
     if rc != 0:
         print(f"refine start: systemctl start {ui_unit} failed: {out.strip()}",
@@ -2248,7 +2270,12 @@ def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -
 
 def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent UI backend (systemctl stop {ui_unit})...")
+    print(f"Stopping persistent UI backend (systemctl disable + stop {ui_unit})...")
+    rc, out = _systemctl("disable", ui_unit)
+    if rc != 0:
+        print(f"refine stop: systemctl disable {ui_unit} failed: {out.strip()}",
+              file=sys.stderr)
+        return 1
     rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
         print(f"refine stop: systemctl stop {ui_unit} failed: {out.strip()}",
@@ -2265,6 +2292,13 @@ def _restart_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int)
         return refresh
     ui_unit = _ui_unit_name(unit, port)
     print(f"Restarting persistent UI backend (systemctl restart {ui_unit})...")
+    rc, out = _systemctl("enable", ui_unit)
+    if rc != 0:
+        print(
+            f"refine restart: systemctl enable {ui_unit} failed: {out.strip()}",
+            file=sys.stderr,
+        )
+        return 1
     rc, out = _systemctl("restart", ui_unit)
     if rc != 0:
         print(

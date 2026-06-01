@@ -370,8 +370,12 @@ def main() -> int:
     assert uninstall_rc == 0
     assert "setup mode" in setup_unit_text
     assert "REFINE_CONFIG_PATH" not in setup_unit_text
+    assert ("enable", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
     assert ("start", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
     assert ("restart", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
+    assert setup_systemctl_calls.count(
+        ("disable", "refine-setup-install-clone-19010-ui")
+    ) >= 2
     assert ("stop", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
     assert not setup_unit.exists()
     assert not (setup_install_clone / ".refine-binding").exists()
@@ -580,7 +584,9 @@ def main() -> int:
         refine_cli._start_background_ui = old_start_background
         refine_cli._stop_background_ui = old_stop_background
         refine_cli._pause_agents_for_clean_shutdown = old_pause_for_shutdown
+    assert ("enable", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("start", "refine-unit-clone-18124-ui") in systemctl_calls
+    assert ("disable", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("stop", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("restart", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("status", "refine-unit-clone", "18124") in lifecycle_calls

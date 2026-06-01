@@ -54,6 +54,7 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
             start_runner=False,
         )
         db.set_setting(conn, "paused", "1")
+        db.set_setting(conn, "agents_paused", "1")
         try:
             socket = Path(runtime.backend_info()["socket_path"])
             socket.parent.mkdir(parents=True, exist_ok=True)
@@ -62,6 +63,7 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
             assert runner.socket_path == str(socket)
             assert runtime.backend_info()["in_process_runner_allowed"] is False
             assert project_state.list_settings()["paused"] == "1"
+            assert project_state.list_settings()["agents_paused"] == "1"
         finally:
             runtime.stop_runner()
             try:
@@ -85,6 +87,14 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
 def main() -> int:
     test_configured_app_start_resumes_agents()
     test_lazy_runner_client_preserves_operator_pause()
+    worker_source = (
+        Path(__file__).resolve().parents[1] / "refine_runtime" / "worker.py"
+    ).read_text(encoding="utf-8")
+    server_source = (
+        Path(__file__).resolve().parents[1] / "refine_server" / "__main__.py"
+    ).read_text(encoding="utf-8")
+    assert "resume_agents_for_startup" not in worker_source
+    assert "resume_agents_for_startup" not in server_source
     print("runtime startup tests OK")
     return 0
 

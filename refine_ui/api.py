@@ -4518,6 +4518,10 @@ def process_summary() -> tuple[int, dict]:
         agents_paused = (db.get_setting(conn, "agents_paused") or "0") == "1"
         agent_processes_paused = background_stopped or agents_paused
         target_app = _target_app_snapshot(conn)
+        agent_runs = _active_agent_run_snapshots(
+            conn,
+            runner_snap.get("running") or [],
+        )
     finally:
         conn.close()
     resource_caps = _process_resource_caps(settings)
@@ -4620,7 +4624,7 @@ def process_summary() -> tuple[int, dict]:
             **worker_caps,
         })
 
-    for run in runner_snap.get("running") or []:
+    for run in agent_runs:
         gap_id = str(run.get("gap_id") or "")
         run_kind = str(run.get("kind") or "implementation")
         processes.append({
@@ -4634,7 +4638,8 @@ def process_summary() -> tuple[int, dict]:
             "pid": run.get("pid"),
             "elapsed_seconds": run.get("elapsed_seconds") or 0,
             "idle_seconds": run.get("idle_seconds") or 0,
-            "actions": ["cancel"],
+            "tracked_by_runner": run.get("tracked_by_runner", True),
+            "actions": ["cancel"] if run.get("tracked_by_runner", True) else [],
             **worker_caps,
         })
 
@@ -4646,7 +4651,7 @@ def process_summary() -> tuple[int, dict]:
         "backend": backend,
         "runner_reachable": runner_reachable,
         "processes": processes,
-        "running": runner_snap.get("running") or [],
+        "running": agent_runs,
         "chat": runner_snap.get("chat") or [],
         "runner_work": runner_work,
         "merger": merger,
@@ -4655,6 +4660,102 @@ def process_summary() -> tuple[int, dict]:
         "target_app": target_app,
         "resource_caps": resource_caps,
     }
+
+
+def _active_agent_run_snapshots(
+    conn: sqlite3.Connection,
+    running_snapshot: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    active_node = project_state.active_node_id()
+    active_runs = _running_snapshot_for_node(conn, active_node, running_snapshot)
+    seen = {
+        (str(run.get("gap_id") or ""), str(run.get("kind") or "implementation"))
+        for run in active_runs
+        if run.get("gap_id")
+    }
+    active_runs.extend(_sqlite_running_agent_snapshots(conn, active_node, seen))
+    return active_runs
+
+
+def _running_snapshot_for_node(
+    conn: sqlite3.Connection,
+    active_node: str,
+    running_snapshot: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    scoped: list[dict[str, Any]] = []
+    unknown_node: list[dict[str, Any]] = []
+    for run in running_snapshot:
+        node_id = str(run.get("node_id") or "")
+        if node_id:
+            if _node_owner(node_id) == active_node:
+                scoped.append(run)
+            continue
+        if run.get("gap_id"):
+            unknown_node.append(run)
+    if not unknown_node:
+        return scoped
+    gap_ids = [str(run["gap_id"]) for run in unknown_node if run.get("gap_id")]
+    placeholders = ",".join("?" * len(gap_ids))
+    rows = conn.execute(
+        f"SELECT id, node_id FROM gaps_index WHERE id IN ({placeholders})",
+        gap_ids,
+    ).fetchall()
+    node_by_gap = {str(row["id"]): _node_owner(row["node_id"]) for row in rows}
+    scoped.extend(
+        run for run in unknown_node
+        if node_by_gap.get(str(run.get("gap_id") or "")) == active_node
+    )
+    return scoped
+
+
+def _sqlite_running_agent_snapshots(
+    conn: sqlite3.Connection,
+    active_node: str,
+    seen: set[tuple[str, str]],
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        "SELECT r.gap_id, r.round_idx, r.started_at, r.last_output_at, "
+        "r.pid, r.kind, g.node_id "
+        "FROM runs r "
+        "JOIN gaps_index g ON g.id = r.gap_id "
+        "WHERE r.status = 'running' AND r.finished_at IS NULL "
+        "ORDER BY r.started_at ASC"
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if _node_owner(row["node_id"]) != active_node:
+            continue
+        gap_id = str(row["gap_id"] or "")
+        run_kind = str(row["kind"] or "implementation")
+        if (gap_id, run_kind) in seen:
+            continue
+        pid = _int_or_none(row["pid"])
+        if pid is None or not _pid_may_be_alive(pid):
+            continue
+        seen.add((gap_id, run_kind))
+        out.append({
+            "gap_id": gap_id,
+            "node_id": _node_owner(row["node_id"]),
+            "round_idx": row["round_idx"],
+            "pid": pid,
+            "kind": run_kind,
+            "elapsed_seconds": _elapsed_since(row["started_at"]),
+            "idle_seconds": _elapsed_since(row["last_output_at"]),
+            "tracked_by_runner": False,
+        })
+    return out
+
+
+def _pid_may_be_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
 
 
 def set_background_processes(body: dict | None = None) -> tuple[int, dict]:

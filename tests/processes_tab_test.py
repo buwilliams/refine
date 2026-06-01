@@ -16,10 +16,11 @@ def main() -> int:
     tmp, client = make_client_repo("refine-processes-tab-")
     conn = init_refine(client)
     try:
-        from refine_server import db
+        from refine_server import db, project_state
         from refine_server.backend_protocol import (
             M_BACKGROUND_PROCESSES_SET, M_ENFORCE_SCHEDULING,
         )
+        from refine_server.gaps import now_iso
         from refine_ui import api, background_jobs, runtime
 
         db.set_setting(conn, "paused", "1")
@@ -31,6 +32,43 @@ def main() -> int:
         db.set_setting(conn, "worker_memory_limit_mb", "4096")
         db.set_setting(conn, "worker_cpu_priority", "normal")
         db.set_setting(conn, "ui_memory_limit_mb", "1024")
+        conn.commit()
+        active_node = project_state.active_node_id()
+        foreign_node = "processes-foreign-node"
+        now = now_iso()
+        agent_rows = [
+            (
+                "01PROCESSAGENTGAP0000000002",
+                "SQLite live active one",
+                active_node,
+                "implementation",
+            ),
+            (
+                "01PROCESSAGENTGAP0000000003",
+                "SQLite live active two",
+                active_node,
+                "quality",
+            ),
+            (
+                "01PROCESSAGENTGAP0000000004",
+                "SQLite live foreign",
+                foreign_node,
+                "implementation",
+            ),
+        ]
+        for gid, name, node_id, kind in agent_rows:
+            conn.execute(
+                "INSERT INTO gaps_index "
+                "(id, name, status, priority, reporter, created, updated, branch_name, node_id, json_path) "
+                "VALUES (?, ?, 'in-progress', 'medium', 'Operator', ?, ?, ?, ?, ?)",
+                (gid, name, now, now, f"refine/{gid}", node_id, f"gaps/{gid}/gap.json"),
+            )
+            conn.execute(
+                "INSERT INTO runs "
+                "(gap_id, round_idx, started_at, pid, status, last_output_at, kind) "
+                "VALUES (?, 0, ?, ?, 'running', ?, ?)",
+                (gid, now, os.getpid(), now, kind),
+            )
         conn.commit()
 
         original_snapshot = runtime.runner_status_snapshot
@@ -71,8 +109,18 @@ def main() -> int:
                 }],
                 "running": [{
                     "gap_id": "01PROCESSAGENTGAP0000000001",
+                    "node_id": active_node,
                     "round_idx": 0,
                     "pid": 4242,
+                    "kind": "implementation",
+                    "elapsed_seconds": 12,
+                    "idle_seconds": 3,
+                }, {
+                    "gap_id": "01PROCESSAGENTGAP0000000005",
+                    "node_id": foreign_node,
+                    "round_idx": 0,
+                    "pid": 5252,
+                    "kind": "implementation",
                     "elapsed_seconds": 12,
                     "idle_seconds": 3,
                 }],
@@ -192,6 +240,16 @@ def main() -> int:
         assert "chat" in kinds, kinds
         assert "merger" not in kinds, kinds
         assert "governance" not in kinds, kinds
+        agents = [p for p in body["processes"] if p["kind"] == "agent"]
+        assert [p["gap_id"] for p in agents] == [
+            "01PROCESSAGENTGAP0000000001",
+            "01PROCESSAGENTGAP0000000002",
+            "01PROCESSAGENTGAP0000000003",
+        ], agents
+        assert len([p for p in body["processes"] if p["kind"] == "agent"]) == 3, (
+            body["processes"]
+        )
+        assert len(body["running"]) == 3, body["running"]
         supervisor = next(p for p in body["processes"] if p["kind"] == "supervisor")
         assert supervisor["pid"] == 3030, supervisor
         assert "Supervises the UI and runner worker processes" in supervisor["details"], supervisor
@@ -244,6 +302,9 @@ def main() -> int:
         assert agent["pid"] == 4242, agent
         assert agent["actions"] == ["cancel"], agent
         assert agent["max_memory"]["label"] == "4096 MB", agent
+        fallback_agents = [p for p in agents if not p.get("tracked_by_runner", True)]
+        assert len(fallback_agents) == 2, fallback_agents
+        assert all(p["actions"] == [] for p in fallback_agents), fallback_agents
         chat = next(p for p in body["processes"] if p["kind"] == "chat")
         assert chat["pid"] is None, chat
         assert chat["status"] == "idle", chat
