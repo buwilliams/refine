@@ -150,8 +150,8 @@ Guide and target-app setup became more complete: Quick Start structure, settings
 
 ## Day 20: 2026-06-01 (Monday)
 
-Effort: Low (2 commits, 2 milestones)
+Effort: High (16 commits, 5 milestones)
 
-Milestones started: Logs screen parity; CLI ergonomics.
+Milestones started: Logs screen parity; CLI ergonomics; distributed cluster nodes; template packaging; runtime worker recovery hardening.
 
-Logs and CLI ergonomics sharpened: the gap-filtered Logs screen now includes round logs as well as activity rows, long messages moved into readable multiline table rows, the `r` shorthand and `update` command landed, shutdown cleanup uses the background-process API, and Guide state/highlight behavior was refined.
+Logs and CLI ergonomics sharpened, then the distributed runtime took over: the gap-filtered Logs screen gained round logs and multiline rows, `r` and `update` landed, Guide state/highlight behavior was refined, cluster nodes and distributed project sync shipped, app templates were packaged for deployed installs, node-scoped dispatcher/status accounting was repaired, and runner-worker recovery hardened around stale sockets, orphan workers, and false in-progress Gap failures.
