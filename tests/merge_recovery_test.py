@@ -480,8 +480,8 @@ def main() -> int:
         gid_runtime_fresh = "01RECOVERYRUNTIMEFRESHAAA"
         create_indexed_gap(conn, gid_runtime_fresh, status="in-progress")
         moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
-        assert moved == 0
-        assert db_status(conn, gid_runtime_fresh) == "in-progress"
+        assert moved == 1
+        assert db_status(conn, gid_runtime_fresh) == "failed"
 
         gid_runtime_peer = "01RECOVERYRUNTIMEPEERAAAA"
         create_indexed_gap(conn, gid_runtime_peer, status="in-progress")
@@ -491,13 +491,32 @@ def main() -> int:
         )
         conn.execute(
             "INSERT INTO runs "
-            "(gap_id, round_idx, started_at, pid, worker_pid, status, failure_category) "
-            "VALUES (?, 0, ?, 999995, ?, 'running', NULL)",
-            (gid_runtime_peer, now_iso(), os.getpid()),
+            "(gap_id, round_idx, started_at, pid, worker_pid, worker_node_id, "
+            "status, failure_category) "
+            "VALUES (?, 0, ?, 999995, ?, ?, 'running', NULL)",
+            (
+                gid_runtime_peer,
+                now_iso(),
+                os.getpid(),
+                project_state.active_node_id(),
+            ),
         )
         moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
         assert moved == 0
         assert db_status(conn, gid_runtime_peer) == "in-progress"
+
+        gid_runtime_foreign_owner = "01RECOVERYRUNTIMEOWNERAA"
+        create_indexed_gap(conn, gid_runtime_foreign_owner, status="in-progress")
+        conn.execute(
+            "INSERT INTO runs "
+            "(gap_id, round_idx, started_at, pid, worker_pid, worker_node_id, "
+            "status, failure_category) "
+            "VALUES (?, 0, ?, 999994, 999993, ?, 'running', NULL)",
+            (gid_runtime_foreign_owner, now_iso(), other_instance["id"]),
+        )
+        moved = recovery.reconcile_runtime_in_progress(conn, live_gap_ids=set())
+        assert moved == 0
+        assert db_status(conn, gid_runtime_foreign_owner) == "in-progress"
     finally:
         try:
             conn.close()

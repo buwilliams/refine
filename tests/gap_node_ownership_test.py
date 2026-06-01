@@ -144,6 +144,30 @@ def main() -> int:
         auto_messages = [log["message"] for log in auto_gap["rounds"][-1]["logs"]]
         assert "Auto-promoted from backlog to todo" in auto_messages, auto_messages
 
+        project_state.set_active_node(refine2["id"])
+        automation_default_frozen = "01OWNERSHIPFROZENDEFAULTA"
+        automation_refine2_frozen = "01OWNERSHIPFROZENREFINE2A"
+        create(automation_default_frozen, "backlog", default)
+        create(automation_refine2_frozen, "backlog", refine2["id"])
+        project_state.rebuild_sqlite_cache(conn)
+        frozen_dispatcher = Dispatcher(
+            get_conn=lambda: conn,
+            sub_mgr=FakeSubprocessManager(),
+            node_id=default,
+        )
+        frozen_dispatcher._promote_backlog(conn)
+        rows = {
+            row["id"]: row["status"]
+            for row in conn.execute(
+                "SELECT id, status FROM gaps_index WHERE id IN (?, ?)",
+                (automation_default_frozen, automation_refine2_frozen),
+            )
+        }
+        assert rows == {
+            automation_default_frozen: "todo",
+            automation_refine2_frozen: "backlog",
+        }, rows
+
         root = Path(__file__).resolve().parents[1]
         common_js = (root / "refine_ui/static/js/common.js").read_text(
             encoding="utf-8",

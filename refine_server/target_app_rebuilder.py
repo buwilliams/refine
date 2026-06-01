@@ -20,10 +20,12 @@ class TargetAppRebuilder:
         *,
         get_conn: Callable,
         run_rebuild: Callable[[str], dict],
+        node_id: str | None = None,
         interval: float = 15.0,
     ) -> None:
         self._get_conn = get_conn
         self._run_rebuild = run_rebuild
+        self._node_id = node_id
         self._interval = interval
         self._wake = threading.Event()
         self._stop = threading.Event()
@@ -110,7 +112,7 @@ class TargetAppRebuilder:
         row = self._get_conn().execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
             "WHERE status = 'awaiting-rebuild' AND node_id = ?",
-            (project_state.active_node_id(),),
+            (self._local_node_id(),),
         ).fetchone()
         n = int(row["n"] if row else 0)
         if n <= 0:
@@ -200,6 +202,9 @@ class TargetAppRebuilder:
 
     def _paused(self) -> bool:
         return bool(db.get_setting_int(self._get_conn(), "paused", 0))
+
+    def _local_node_id(self) -> str:
+        return self._node_id or project_state.local_node_id()
 
 
 def _parse_iso(value: str) -> datetime | None:

@@ -75,12 +75,15 @@ class Runner:
         self._conn.execute("PRAGMA synchronous = NORMAL")
         self._conn.execute("PRAGMA foreign_keys = ON")
         db.register_shared_connection(self._conn)
+        project_state.ensure_initialized(self._conn, migrate=True)
+        self.local_node_id = project_state.local_node_id()
         self.sub_mgr = subprocess_mgr.SubprocessManager(self._get_conn)
         self._target_app_lock = threading.Lock()
         self._bulk_update_lock = threading.Lock()
         self.target_app_rebuilder = target_app_rebuilder.TargetAppRebuilder(
             get_conn=self._get_conn,
             run_rebuild=self._run_automatic_target_app_rebuild,
+            node_id=self.local_node_id,
         )
         # The merger owns the host worktree — everything that merges,
         # auto-resolves conflicts, or cleans stale git op state goes
@@ -91,6 +94,7 @@ class Runner:
             queue_rebuild_for_pending=(
                 self.target_app_rebuilder.queue_pending_awaiting_rebuild
             ),
+            node_id=self.local_node_id,
         )
         self.dispatcher = _dispatcher.Dispatcher(
             get_conn=self._get_conn, sub_mgr=self.sub_mgr,
@@ -98,11 +102,13 @@ class Runner:
             launch_blocked=self._automation_blocked,
             on_post_rebuild_quality_failed=self._handle_post_rebuild_quality_failure,
             target_app_lock=self._target_app_lock,
+            node_id=self.local_node_id,
         )
         self.governance_agent = GovernanceAgent(
             get_conn=self._get_governance_conn,
             on_pass=lambda _gid: self.dispatcher.enforce_now(),
             close_conn=True,
+            node_id=self.local_node_id,
         )
         self.chat = ChatManager(
             get_standalone_idle_timeout=lambda: db.get_setting_int(
@@ -119,12 +125,15 @@ class Runner:
         self._closed = False
 
     def _get_conn(self) -> sqlite3.Connection:
-        project_state.ensure_sqlite_cache_current(self._conn)
+        project_state.ensure_sqlite_cache_current(
+            self._conn,
+            node_id=self.local_node_id,
+        )
         return self._conn
 
     def _get_governance_conn(self) -> sqlite3.Connection:
         conn = db.connect()
-        project_state.ensure_sqlite_cache_current(conn)
+        project_state.ensure_sqlite_cache_current(conn, node_id=self.local_node_id)
         return conn
 
     def _automation_blocked(self) -> bool:
@@ -138,8 +147,11 @@ class Runner:
 
     def start(self) -> None:
         db.init_db()
-        project_state.ensure_sqlite_cache_current(self._conn)
-        recovery.reconcile_on_start(self._conn)
+        project_state.ensure_sqlite_cache_current(
+            self._conn,
+            node_id=self.local_node_id,
+        )
+        recovery.reconcile_on_start(self._conn, node_id=self.local_node_id)
         preflight.check(self._conn)
         self.governance_agent.start()
         self.dispatcher.start()
@@ -180,7 +192,10 @@ class Runner:
         with self._diag_lock:
             self._last_call_at = now_iso()
         try:
-            project_state.ensure_sqlite_cache_current(self._conn)
+            project_state.ensure_sqlite_cache_current(
+                self._conn,
+                node_id=self.local_node_id,
+            )
             return self._dispatch_method(method, params or {})
         except Exception as e:
             with self._diag_lock:
@@ -250,6 +265,7 @@ class Runner:
             "refine_version": identity.REFINE_VERSION,
             "source_fingerprint": identity.SOURCE_FINGERPRINT,
             "process_started_at": identity.PROCESS_STARTED_AT,
+            "local_node_id": self.local_node_id,
         }
 
     def _h_preflight(self, _: dict) -> dict:
@@ -295,7 +311,10 @@ class Runner:
             )
         if result.get("ok"):
             try:
-                project_state.rebuild_sqlite_cache(self._conn)
+                project_state.rebuild_sqlite_cache(
+                    self._conn,
+                    node_id=self.local_node_id,
+                )
             except Exception as e:
                 result["cache_rebuild_error"] = repr(e)
             self.dispatcher.enforce_now()
@@ -345,7 +364,7 @@ class Runner:
         ).fetchone()
         if not row:
             raise ValueError("Gap not found")
-        active = project_state.active_node_id()
+        active = self.local_node_id
         owner = str(row["node_id"] or project_state.DEFAULT_NODE_ID)
         if owner != active:
             owner_name = project_state.gap_node_display(owner)
@@ -888,7 +907,7 @@ class Runner:
         gap_id = params["gap_id"]
         name = params.get("name", "Untitled Gap")
         priority = _normalize_priority(params.get("priority"))
-        node_id = str(params.get("node_id") or project_state.active_node_id())
+        node_id = str(params.get("node_id") or self.local_node_id)
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -1062,7 +1081,7 @@ class Runner:
         value: str,
         gap_ids: list[str],
     ) -> dict:
-        active = project_state.active_node_id()
+        active = self.local_node_id
         rows: list[sqlite3.Row] = []
         for chunk in _chunks(gap_ids):
             placeholders = ",".join("?" * len(chunk))
@@ -1447,7 +1466,7 @@ class Runner:
             self._conn,
             old_name,
             new_name,
-            node_id=project_state.active_node_id(),
+            node_id=self.local_node_id,
         )
         activity.append(
             self._conn,
@@ -1487,7 +1506,7 @@ class Runner:
             self._conn,
             old_name,
             new_name,
-            node_id=project_state.active_node_id(),
+            node_id=self.local_node_id,
         )
         reporters.remove(self._conn, rid)
         activity.append(
@@ -1511,7 +1530,7 @@ class Runner:
             self._conn,
             old,
             new,
-            node_id=project_state.active_node_id(),
+            node_id=self.local_node_id,
         )
         activity.append(
             self._conn,
@@ -1693,7 +1712,7 @@ class Runner:
             "SELECT status, node_id FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
         if row:
-            active = project_state.active_node_id()
+            active = self.local_node_id
             owner = str(row["node_id"] or project_state.DEFAULT_NODE_ID)
             if owner != active:
                 owner_name = project_state.gap_node_display(owner)
@@ -2555,7 +2574,7 @@ class Runner:
         *,
         details: str | None,
     ) -> None:
-        active_node = project_state.active_node_id()
+        active_node = self.local_node_id
         rows = conn.execute(
             "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
             "AND node_id = ? ORDER BY updated ASC",
@@ -2576,7 +2595,7 @@ class Runner:
                 pass
 
     def _promote_rebuilt_gaps(self, conn: sqlite3.Connection) -> int:
-        active_node = project_state.active_node_id()
+        active_node = self.local_node_id
         rows = conn.execute(
             "SELECT id FROM gaps_index WHERE status = 'awaiting-rebuild' "
             "AND node_id = ? ORDER BY updated ASC",

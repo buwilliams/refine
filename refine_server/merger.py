@@ -63,11 +63,13 @@ class Merger:
         sub_mgr: subprocess_mgr.SubprocessManager,
         on_worktree_merged: Callable[[str], None] | None = None,
         queue_rebuild_for_pending: Callable[[], bool] | None = None,
+        node_id: str | None = None,
     ) -> None:
         self._get_conn = get_conn
         self._sub_mgr = sub_mgr
         self._on_worktree_merged = on_worktree_merged
         self._queue_rebuild_for_pending = queue_rebuild_for_pending
+        self._node_id = node_id
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -106,6 +108,9 @@ class Merger:
         new round). Just sets the event — the loop scans the next tick."""
         self._wake.set()
 
+    def _local_node_id(self) -> str:
+        return self._node_id or project_state.local_node_id()
+
     def snapshot(self) -> dict:
         """One-shot status view for the Agents screen. Returns the
         Gap currently being merged (if any), how long the merger has
@@ -124,7 +129,7 @@ class Merger:
         # system-owned and only ever set by the dispatcher after a
         # successful agent run, so the count is the merge backlog.
         queued = 0
-        active_node = project_state.active_node_id()
+        active_node = self._local_node_id()
         for row in self._get_conn().execute(
             "SELECT id FROM gaps_index "
             "WHERE status = 'ready-merge' AND node_id = ?",
@@ -221,7 +226,7 @@ class Merger:
             "SELECT id FROM gaps_index "
             "WHERE status = 'ready-merge' AND node_id = ? "
             "ORDER BY updated ASC LIMIT 1",
-            (project_state.active_node_id(),),
+            (self._local_node_id(),),
         ).fetchone()
         return row["id"] if row else None
 
@@ -240,7 +245,7 @@ class Merger:
             row = conn.execute(
                 "SELECT COUNT(*) AS n FROM gaps_index "
                 "WHERE status = 'awaiting-rebuild' AND node_id = ?",
-                (project_state.active_node_id(),),
+                (self._local_node_id(),),
             ).fetchone()
             pending = int(row["n"] if row else 0)
             if pending > 0:
@@ -251,14 +256,14 @@ class Merger:
             row = conn.execute(
                 "SELECT COUNT(*) AS n FROM gaps_index "
                 "WHERE status = 'qa' AND branch_name IS NULL AND node_id = ?",
-                (project_state.active_node_id(),),
+                (self._local_node_id(),),
             ).fetchone()
             return int(row["n"] if row else 0) > 0
         return False
 
     def _merge_one(self, gap_id: str) -> None:
         conn = self._get_conn()
-        active_node = project_state.active_node_id()
+        active_node = self._local_node_id()
         row = conn.execute(
             "SELECT node_id FROM gaps_index WHERE id = ?",
             (gap_id,),

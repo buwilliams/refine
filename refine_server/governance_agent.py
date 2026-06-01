@@ -22,10 +22,18 @@ _POLL_INTERVAL_SECONDS = 5.0
 
 
 class GovernanceAgent:
-    def __init__(self, *, get_conn, on_pass=None, close_conn: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        get_conn,
+        on_pass=None,
+        close_conn: bool = False,
+        node_id: str | None = None,
+    ) -> None:
         self._get_conn = get_conn
         self._close_conn = close_conn
         self._on_pass = on_pass
+        self._node_id = node_id
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -57,6 +65,9 @@ class GovernanceAgent:
 
     def wake(self) -> None:
         self._wake.set()
+
+    def _local_node_id(self) -> str:
+        return self._node_id or project_state.local_node_id()
 
     def snapshot(self) -> dict:
         with self._conn_scope() as conn:
@@ -130,7 +141,7 @@ class GovernanceAgent:
             "  WHEN 'medium' THEN 1 "
             "  ELSE 2 "
             "END, updated ASC LIMIT ?",
-            (project_state.active_node_id(), limit),
+            (self._local_node_id(), limit),
         ).fetchall()
         out = []
         for row in rows:
@@ -146,7 +157,7 @@ class GovernanceAgent:
 
     def _review_one(self, gap_id: str) -> None:
         with self._conn_scope() as conn:
-            active_node = project_state.active_node_id()
+            active_node = self._local_node_id()
             row = conn.execute(
                 "SELECT node_id FROM gaps_index WHERE id = ?",
                 (gap_id,),

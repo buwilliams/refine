@@ -47,11 +47,15 @@ class Dispatcher:
     launch_blocked: callable | None = None  # type: ignore[type-arg]
     on_post_rebuild_quality_failed: callable | None = None  # type: ignore[type-arg]
     target_app_lock: threading.Lock | None = None
+    node_id: str | None = None
     poll_interval: float = 2.0
 
     _stop: threading.Event = None  # type: ignore[assignment]
     _thread: threading.Thread = None  # type: ignore[assignment]
     _tick_lock: threading.Lock = None  # type: ignore[assignment]
+
+    def _node_id(self) -> str:
+        return self.node_id or project_state.local_node_id()
 
     def start(self) -> None:
         self._stop = threading.Event()
@@ -103,7 +107,7 @@ class Dispatcher:
         if self.launch_blocked is not None and self.launch_blocked():
             return
         running_snapshot = self.sub_mgr.running_snapshot()
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         active_running_snapshot = self._running_snapshot_for_node(
             conn,
             active_node,
@@ -114,6 +118,7 @@ class Dispatcher:
             live_gap_ids={
                 r["gap_id"] for r in active_running_snapshot if r.get("gap_id")
             },
+            node_id=active_node,
         )
         self._promote_backlog(conn)
         self._promote_disabled_quality(conn)
@@ -146,7 +151,7 @@ class Dispatcher:
         active_node: str | None = None,
         running_snapshot: list[dict] | None = None,
     ) -> int:
-        active_node = active_node or project_state.active_node_id()
+        active_node = active_node or self._node_id()
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index "
             "WHERE status = 'in-progress' AND node_id = ?",
@@ -218,7 +223,7 @@ class Dispatcher:
     ) -> None:
         if available_slots <= 0:
             return
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         limit = max(1, available_slots * 2)
         pending = {
             lane: list(conn.execute(
@@ -281,7 +286,7 @@ class Dispatcher:
             f"SELECT {priority_case_sql()} AS rank FROM gaps_index "
             f"WHERE node_id = ? AND status IN ({placeholders}) "
             "ORDER BY rank ASC LIMIT 1",
-            (project_state.active_node_id(), *_DISPATCH_PRIORITY_STATUSES),
+            (self._node_id(), *_DISPATCH_PRIORITY_STATUSES),
         ).fetchone()
         return int(row["rank"]) if row else None
 
@@ -289,7 +294,7 @@ class Dispatcher:
                                      active_rank: int) -> int:
         running = self._running_snapshot_for_node(
             conn,
-            project_state.active_node_id(),
+            self._node_id(),
             self.sub_mgr.running_snapshot(),
         )
         ids = [r["gap_id"] for r in running if r.get("gap_id")]
@@ -324,7 +329,7 @@ class Dispatcher:
         n = db.get_setting_int(conn, "backlog_promote_after_seconds", 3600)
         if n < 0:
             return
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         if n == 0:
             rows = conn.execute(
                 "SELECT id FROM gaps_index WHERE status = 'backlog' AND node_id = ?",
@@ -380,7 +385,7 @@ class Dispatcher:
             "SELECT id, branch_name FROM gaps_index "
             "WHERE status = 'qa' AND node_id = ? "
             "ORDER BY updated ASC",
-            (project_state.active_node_id(),),
+            (self._node_id(),),
         ).fetchall()
         for row in rows:
             if self.sub_mgr.is_running(row["id"]):
@@ -391,7 +396,7 @@ class Dispatcher:
                 self._promote_post_rebuild_quality_bypass(conn, row["id"])
 
     def _promote_quality_bypass(self, conn: sqlite3.Connection, gap_id: str) -> None:
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'ready-merge', updated = ? "
@@ -444,7 +449,7 @@ class Dispatcher:
         conn: sqlite3.Connection,
         gap_id: str,
     ) -> None:
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         with db.transaction(conn):
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'review', updated = ? "
@@ -495,7 +500,7 @@ class Dispatcher:
             "WHERE r.status = 'running' AND r.kind = 'quality' "
             "AND g.status = 'qa' AND g.branch_name IS NULL "
             "AND g.node_id = ?",
-            (project_state.active_node_id(),),
+            (self._node_id(),),
         ).fetchone()
         return bool(int(row["n"] if row else 0))
 
@@ -688,7 +693,7 @@ class Dispatcher:
                 base_ref=base_commit,
                 idle_window=idle,
                 hard_cap=hard_cap,
-                node_id=project_state.active_node_id(),
+                node_id=self._node_id(),
                 on_finished=(
                     lambda gid, code, reason, agent_ok, failure_text="": self._on_finished(
                         gid, round_idx, code, reason, base_commit,
@@ -849,7 +854,7 @@ class Dispatcher:
                 idle_window=idle,
                 hard_cap=hard_cap,
                 kind="quality",
-                node_id=project_state.active_node_id(),
+                node_id=self._node_id(),
                 on_finished=(
                     lambda gid, code, reason, agent_ok, failure_text="": self._on_quality_finished(
                         gid,
@@ -987,7 +992,7 @@ class Dispatcher:
                 idle_window=idle,
                 hard_cap=hard_cap,
                 kind="quality",
-                node_id=project_state.active_node_id(),
+                node_id=self._node_id(),
                 on_finished=(
                     lambda gid, code, reason, agent_ok, failure_text="": self._finish_post_rebuild_quality(
                         gid,
@@ -1019,7 +1024,7 @@ class Dispatcher:
         gap_id: str,
         branch_name: str,
     ) -> bool:
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         parallel_cap = self._parallel_run_cap(conn)
         with db.transaction(conn):
             cur = conn.execute(
@@ -1310,7 +1315,7 @@ class Dispatcher:
             cur = conn.execute(
                 "UPDATE gaps_index SET status = ?, updated = ? "
                 "WHERE id = ? AND status = 'qa' AND node_id = ?",
-                (next_status, now_iso(), gap_id, project_state.active_node_id()),
+                (next_status, now_iso(), gap_id, self._node_id()),
             )
         if cur.rowcount == 0:
             return
@@ -1440,7 +1445,7 @@ class Dispatcher:
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'failed', updated = ? "
                 "WHERE id = ? AND status = 'qa' AND node_id = ?",
-                (now_iso(), gap_id, project_state.active_node_id()),
+                (now_iso(), gap_id, self._node_id()),
             )
         if not cur.rowcount:
             return
@@ -1535,7 +1540,7 @@ class Dispatcher:
             return
 
         branch_name = row["branch_name"]
-        active_node = project_state.active_node_id()
+        active_node = self._node_id()
         moved_to_todo = False
         if row["status"] == "in-progress" and row["node_id"] == active_node:
             with db.transaction(conn):

@@ -123,6 +123,7 @@ def test_matching_runner_socket_is_adopted() -> None:
     conn = init_refine(client)
     try:
         from refine_runtime import identity, ipc
+        from refine_server import project_state
         from refine_ui import runtime
 
         original_start_external_runner = runtime._start_external_runner  # type: ignore[attr-defined]
@@ -138,6 +139,7 @@ def test_matching_runner_socket_is_adopted() -> None:
                 "expected_parent_pid": os.getpid(),
                 "refine_version": identity.REFINE_VERSION,
                 "source_fingerprint": identity.SOURCE_FINGERPRINT,
+                "local_node_id": project_state.local_node_id(),
             }
 
         def fail_start(*_args, **_kwargs):  # noqa: ANN002, ANN003, ANN202
@@ -173,10 +175,36 @@ def test_matching_runner_socket_is_adopted() -> None:
         cleanup_tmp(tmp)
 
 
+def test_runtime_local_node_is_stable_after_active_switch() -> None:
+    tmp, client = make_client_repo("refine-runtime-local-node-")
+    conn = init_refine(client)
+    try:
+        from refine_server import project_state
+        from refine_ui import runtime
+
+        runtime.load_configured(
+            client / ".refine" / "refine.toml",
+            start_poller=False,
+            start_runner=False,
+        )
+        initial = runtime.backend_info()["local_node_id"]
+        other = project_state.create_node("Other Node")
+        project_state.set_active_node(other["id"])
+        assert project_state.active_node_id() == other["id"]
+        assert runtime.backend_info()["local_node_id"] == initial
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        cleanup_tmp(tmp)
+
+
 def main() -> int:
     test_configured_app_start_resumes_agents()
     test_lazy_runner_client_preserves_operator_pause()
     test_matching_runner_socket_is_adopted()
+    test_runtime_local_node_is_stable_after_active_switch()
     worker_source = (
         Path(__file__).resolve().parents[1] / "refine_runtime" / "worker.py"
     ).read_text(encoding="utf-8")
@@ -189,6 +217,7 @@ def main() -> int:
     assert "resume_agents_for_startup" not in worker_source
     assert "resume_agents_for_startup" not in server_source
     assert 'env["REFINE_PARENT_PID"] = str(os.getpid())' in runtime_source
+    assert 'env[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id' in runtime_source
     assert "start_new_session=True" not in runtime_source
     print("runtime startup tests OK")
     return 0

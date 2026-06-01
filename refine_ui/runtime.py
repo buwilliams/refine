@@ -9,7 +9,7 @@ import threading
 import time
 from pathlib import Path
 
-from refine_server import config, db
+from refine_server import config, db, project_state
 from refine_server.backend_protocol import M_PING, M_RUNNING
 from refine_runtime import identity
 
@@ -91,6 +91,9 @@ def load_configured(
         project_state.ensure_initialized(conn, migrate=migrate, root=cfg.volume_root)
     finally:
         conn.close()
+    os.environ[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(
+        root=cfg.volume_root,
+    )
     project_state.resume_agents_for_startup()
     if start_poller:
         ensure_poller()
@@ -188,6 +191,7 @@ def backend_info() -> dict:
         "socket_path": socket_path,
         "source_fingerprint": identity.SOURCE_FINGERPRINT,
         "refine_version": identity.REFINE_VERSION,
+        "local_node_id": project_state.local_node_id(),
         "in_process_runner_allowed": False,
         "runner_client_loaded": _runner is not None,
         "ui_controls_runner_lifecycle": True,
@@ -210,6 +214,7 @@ def _start_external_runner(cfg: config.Config, socket: Path) -> subprocess.Popen
     env["REFINE_RUNNER_SOCKET"] = str(socket)
     env["REFINE_NO_INPROCESS_RUNNER"] = "1"
     env["REFINE_PARENT_PID"] = str(os.getpid())
+    env[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(root=cfg.volume_root)
     env.setdefault("PYTHONUNBUFFERED", "1")
     proc = subprocess.Popen(
         [sys.executable, "-m", "refine_runtime.worker"],
@@ -247,6 +252,8 @@ def _can_adopt_runner_socket(
     if ping.get("source_fingerprint") != identity.SOURCE_FINGERPRINT:
         return False
     if ping.get("refine_version") != identity.REFINE_VERSION:
+        return False
+    if ping.get("local_node_id") != project_state.local_node_id():
         return False
     pid = _int_or_none(ping.get("pid"))
     if proc is not None and proc.poll() is None and pid == proc.pid:

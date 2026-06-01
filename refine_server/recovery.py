@@ -12,17 +12,18 @@ from __future__ import annotations
 
 import os
 import sqlite3
-from datetime import datetime, timezone
 
 from refine_server import activity, db, project_state, quality
 from refine_server.gaps import now_iso
 
 from . import gap_writer
 
-_RUNTIME_ORPHAN_GRACE_SECONDS = 60
 
-
-def reconcile_on_start(conn: sqlite3.Connection) -> int:
+def reconcile_on_start(
+    conn: sqlite3.Connection,
+    *,
+    node_id: str | None = None,
+) -> int:
     """Categorize stranded in-progress and qa Gaps at runner startup.
 
     Two possibilities for a Gap left in `in-progress` across a restart:
@@ -48,6 +49,7 @@ def reconcile_on_start(conn: sqlite3.Connection) -> int:
         conn,
         live_gap_ids=set(),
         startup=True,
+        node_id=node_id or project_state.local_node_id(),
     )
 
 
@@ -55,6 +57,7 @@ def reconcile_runtime_in_progress(
     conn: sqlite3.Connection,
     *,
     live_gap_ids: set[str],
+    node_id: str | None = None,
 ) -> int:
     """Clean up in-progress rows that no live tracked agent owns anymore.
 
@@ -66,6 +69,7 @@ def reconcile_runtime_in_progress(
         conn,
         live_gap_ids=live_gap_ids,
         startup=False,
+        node_id=node_id or project_state.local_node_id(),
     )
 
 
@@ -74,11 +78,12 @@ def _reconcile_active_agent_states(
     *,
     live_gap_ids: set[str],
     startup: bool,
+    node_id: str,
 ) -> int:
     rows = conn.execute(
         "SELECT id, status, updated FROM gaps_index "
         "WHERE status IN ('in-progress', 'qa') AND node_id = ?",
-        (project_state.active_node_id(),),
+        (node_id,),
     ).fetchall()
     moved = 0
     for row in rows:
@@ -87,13 +92,15 @@ def _reconcile_active_agent_states(
             continue
         rrow = conn.execute(
             "SELECT round_idx, finished_at, status, failure_category, "
-            "pid, worker_pid, kind "
+            "pid, worker_pid, worker_node_id, kind "
             "FROM runs WHERE gap_id = ? ORDER BY id DESC LIMIT 1",
             (gid,),
         ).fetchone()
         round_idx = rrow["round_idx"] if rrow else 0
         current_status = row["status"]
         run_kind = str(rrow["kind"] or "implementation") if rrow else ""
+        if rrow and _run_owned_by_foreign_node(rrow, node_id):
+            continue
 
         quality_enabled = quality.enabled(conn)
         if current_status == "qa" and not rrow:
@@ -151,8 +158,6 @@ def _reconcile_active_agent_states(
             continue
         if rrow and _pid_may_be_alive(rrow["worker_pid"]):
             continue
-        if not startup and _within_runtime_orphan_grace(row["updated"]):
-            continue
 
         # Orphan agent case — kill the run record + flip to failed.
         failure_category = "runner_restart" if startup else "agent_orphaned"
@@ -203,19 +208,6 @@ def _reconcile_active_agent_states(
     return moved
 
 
-def _within_runtime_orphan_grace(updated: object) -> bool:
-    text = str(updated or "").strip()
-    if not text:
-        return False
-    try:
-        updated_at = datetime.fromisoformat(text.replace("Z", "+00:00"))
-    except ValueError:
-        return False
-    now = datetime.now(updated_at.tzinfo or timezone.utc)
-    age = (now - updated_at).total_seconds()
-    return 0 <= age < _RUNTIME_ORPHAN_GRACE_SECONDS
-
-
 def _pid_may_be_alive(pid: object) -> bool:
     try:
         pid_int = int(pid)
@@ -230,3 +222,8 @@ def _pid_may_be_alive(pid: object) -> bool:
     except PermissionError:
         return True
     return True
+
+
+def _run_owned_by_foreign_node(row: sqlite3.Row, local_node_id: str) -> bool:
+    owner = str(row["worker_node_id"] or "").strip()
+    return bool(owner and owner != local_node_id)

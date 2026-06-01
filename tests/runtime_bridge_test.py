@@ -57,6 +57,7 @@ def main() -> int:
         assert info["in_process_runner_allowed"] is False
         assert info["source_fingerprint"] == identity.SOURCE_FINGERPRINT
         assert info["refine_version"] == identity.REFINE_VERSION
+        assert info["local_node_id"]
 
         status, body = api.backend_diagnostics()
         assert status == 200

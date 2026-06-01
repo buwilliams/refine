@@ -830,6 +830,22 @@ def active_node_id(*, root: Path | None = None) -> str:
     return ensure_active_node(root=root)
 
 
+def local_node_id(*, root: Path | None = None) -> str:
+    """Stable node identity for this local supervisor process.
+
+    UI state may browse or activate another node, but runtime automation owns
+    exactly one local node. Supervisor workers receive this value in the
+    environment at launch and freeze it for their lifetime.
+    """
+    root = root or volume_root()
+    env_node = os.environ.get(config.ENV_LOCAL_NODE_ID, "").strip()
+    if env_node:
+        entry = node_by_id(env_node, root=root)
+        if entry is not None and not entry.get("archived"):
+            return env_node
+    return active_node_id(root=root)
+
+
 def _active_node_selection_key(root: Path) -> str:
     base = str(root.resolve())
     scope = config.runtime_scope()
@@ -946,13 +962,13 @@ def update_node(node_id: str, *, display_name: str | None = None,
     raise ValueError(f"unknown node_id: {node_id}")
 
 
-def list_settings() -> dict[str, str]:
+def list_settings(*, node_id: str | None = None) -> dict[str, str]:
     from . import db
 
     root = volume_root()
     ensure_initialized(migrate=True)
-    active = active_node_id(root=root)
-    return node_settings(active, root=root)
+    selected = node_id or active_node_id(root=root)
+    return node_settings(selected, root=root)
 
 
 def node_settings(node_id: str, *, root: Path | None = None) -> dict[str, str]:
@@ -1079,10 +1095,14 @@ def resume_agents_for_startup(conn: sqlite3.Connection | None = None) -> bool:
             conn.close()
 
 
-def list_reporters(*, root: Path | None = None) -> list[dict[str, Any]]:
+def list_reporters(
+    *,
+    root: Path | None = None,
+    node_id: str | None = None,
+) -> list[dict[str, Any]]:
     root = root or volume_root()
-    active = active_node_id(root=root)
-    data = _read_json(node_dir(active, root) / "reporters.json", {"reporters": []})
+    selected = node_id or active_node_id(root=root)
+    data = _read_json(node_dir(selected, root) / "reporters.json", {"reporters": []})
     return [r for r in data.get("reporters") or [] if isinstance(r, dict)]
 
 
@@ -1199,6 +1219,7 @@ def rebuild_sqlite_cache(
     conn: sqlite3.Connection,
     *,
     force: bool = False,
+    node_id: str | None = None,
     progress: ProgressCallback | None = None,
 ) -> None:
     """Refresh SQLite projection tables from canonical JSON.
@@ -1217,9 +1238,9 @@ def rebuild_sqlite_cache(
     status = ensure_initialized(conn, migrate=True)
     if not status.get("compatible"):
         raise RuntimeError(migration_block_details(status))
-    active = active_node_id()
-    settings = list_settings()
-    reps = list_reporters()
+    active = node_id or active_node_id()
+    settings = list_settings(node_id=active)
+    reps = list_reporters(node_id=active)
     root = volume_root()
     phase_start = perf_metrics.now()
     fingerprint = state_fingerprint(root=root)
@@ -1293,8 +1314,12 @@ def rebuild_sqlite_cache(
     )
 
 
-def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
-    """Ensure SQLite projections are scoped to the active node.
+def ensure_sqlite_cache_current(
+    conn: sqlite3.Connection,
+    *,
+    node_id: str | None = None,
+) -> str:
+    """Ensure SQLite projections are scoped to the selected node.
 
     Routine reads must stay O(1) with respect to the number of Gap JSON files.
     Normal Refine writes update SQLite and canonical JSON together; incremental
@@ -1302,10 +1327,10 @@ def ensure_sqlite_cache_current(conn: sqlite3.Connection) -> str:
     app/node switches. The explicit System > Runtime rebuild action uses
     a forced rebuild instead.
     """
-    active = active_node_id()
+    active = node_id or active_node_id()
     cached = _cached_active_node_id(conn)
     if cached != active:
-        rebuild_sqlite_cache(conn)
+        rebuild_sqlite_cache(conn, node_id=active)
     return active
 
 

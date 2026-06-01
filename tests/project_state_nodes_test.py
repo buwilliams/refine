@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 import shutil
 from pathlib import Path
@@ -122,6 +123,17 @@ def main() -> int:
         reporters.add(conn, "Alex")
 
         laptop = project_state.create_node("Laptop")
+        old_local_node = os.environ.get("REFINE_LOCAL_NODE_ID")
+        try:
+            os.environ["REFINE_LOCAL_NODE_ID"] = laptop["id"]
+            assert project_state.local_node_id() == laptop["id"]
+            os.environ["REFINE_LOCAL_NODE_ID"] = "missing-node"
+            assert project_state.local_node_id() == active
+        finally:
+            if old_local_node is None:
+                os.environ.pop("REFINE_LOCAL_NODE_ID", None)
+            else:
+                os.environ["REFINE_LOCAL_NODE_ID"] = old_local_node
         result = project_state.transfer_gaps(active, laptop["id"])
         assert result["updated"] == 1, result
         project_state.rebuild_sqlite_cache(conn)

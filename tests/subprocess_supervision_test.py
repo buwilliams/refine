@@ -105,7 +105,7 @@ def wait_for_wakeup(wakeups: list[str], gap_id: str, *,
 
 def latest_run(conn, gap_id: str):
     return conn.execute(
-        "SELECT status, failure_category FROM runs WHERE gap_id = ? "
+        "SELECT status, failure_category, worker_node_id FROM runs WHERE gap_id = ? "
         "ORDER BY id DESC LIMIT 1",
         (gap_id,),
     ).fetchone()
@@ -156,7 +156,7 @@ def main() -> int:
         conn.execute("PRAGMA journal_mode = WAL")
         conn.execute("PRAGMA synchronous = NORMAL")
         conn.execute("PRAGMA foreign_keys = ON")
-        from refine_server import chat_mgr, db
+        from refine_server import chat_mgr, db, project_state
         from refine_server.dispatcher import Dispatcher
         from refine_server.subprocess_mgr import SubprocessManager
 
@@ -192,6 +192,7 @@ def main() -> int:
         run = latest_run(conn, gid_success)
         assert run["status"] == "finished"
         assert run["failure_category"] is None
+        assert run["worker_node_id"] == project_state.local_node_id()
         wait_for_log(gid_success, "CPU throttling active")
         assert any(
             "CPU throttling active" in msg
