@@ -28,6 +28,7 @@ from refine_runtime.supervisor_protocol import (
     M_STOP_WORKER,
     M_SWITCH_APP,
     M_TARGET_APP_RUN,
+    WORKER_STARTUP_TIMEOUT_SECONDS,
 )
 from refine_server import config, db, project_state
 from refine_server.backend_protocol import M_PING, M_RUNNING
@@ -247,6 +248,19 @@ class Supervisor:
             raise RuntimeError("No Refine app is attached")
         cfg = config.Config.load(cfg_path)
         socket_path = self._runner_socket_path(str(cfg.config_path))
+        existing_worker: subprocess.Popen | None = None
+        with self._lock:
+            if (
+                self.worker is not None
+                and self.worker.poll() is None
+                and self.worker_socket == socket_path
+            ):
+                existing_worker = self.worker
+        if existing_worker is not None and self._can_ping_worker(socket_path):
+            with self._lock:
+                if self.worker is existing_worker:
+                    return self._worker_result()
+
         with self._lock:
             if (
                 self.worker is not None
@@ -281,7 +295,20 @@ class Supervisor:
                 stdout=None,
                 stderr=None,
             )
-            self._wait_for_worker_socket(socket_path, self.worker)
+            worker = self.worker
+
+        try:
+            self._wait_for_worker_socket(socket_path, worker)
+        except Exception:
+            with self._lock:
+                if self.worker is worker:
+                    self._stop_worker_locked()
+                    self.worker_socket = None
+            raise
+
+        with self._lock:
+            if self.worker is not worker:
+                raise config.ConfigError("Backend runner was replaced before opening its socket.")
             return self._worker_result()
 
     def _h_stop_worker(self, _params: dict[str, Any]) -> dict[str, Any]:
@@ -481,7 +508,7 @@ class Supervisor:
         )
 
     def _wait_for_worker_socket(self, path: Path, proc: subprocess.Popen) -> None:
-        deadline = time.time() + 20
+        deadline = time.time() + WORKER_STARTUP_TIMEOUT_SECONDS
         while time.time() < deadline:
             if path.exists() and self._can_ping_worker(path):
                 return

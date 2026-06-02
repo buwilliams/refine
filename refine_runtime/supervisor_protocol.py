@@ -20,6 +20,8 @@ M_PROCESS_READ = "process_read"
 M_PROCESS_SIGNAL = "process_signal"
 M_PROCESS_WAIT = "process_wait"
 
+WORKER_STARTUP_TIMEOUT_SECONDS = 60.0
+
 
 PROCESS_METHODS = {
     M_PROCESS_LAUNCH,

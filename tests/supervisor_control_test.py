@@ -4,6 +4,8 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -20,7 +22,7 @@ def main() -> int:
         M_STATUS,
         M_SWITCH_APP,
     )
-    from refine_server import config
+    from refine_server import config, project_state
     from tests.helpers import cleanup_tmp, init_refine, make_client_repo
 
     tmp, client = make_client_repo("refine-supervisor-control-")
@@ -57,15 +59,53 @@ def main() -> int:
             switched = supervisor.dispatch(M_SWITCH_APP, {"config_path": str(cfg_path)})
             assert switched["worker_pid"] == 1001, switched
 
+            client2 = tmp / "client-two"
+            client2.mkdir()
+            cfg2_path = config.write_defaults(client2 / ".refine")
+            project_state.ensure_initialized(root=client2 / ".refine")
+            wait_started = threading.Event()
+
+            def slow_wait(_socket_path, _proc):  # noqa: ANN001, ANN202
+                wait_started.set()
+                time.sleep(1.0)
+
+            original_wait = supervisor._wait_for_worker_socket
+            supervisor._wait_for_worker_socket = slow_wait  # type: ignore[method-assign]
+            result_holder: dict[str, object] = {}
+
+            def ensure_worker() -> None:
+                try:
+                    result_holder["result"] = supervisor.dispatch(
+                        M_ENSURE_WORKER,
+                        {"config_path": str(cfg2_path)},
+                    )
+                except Exception as e:  # noqa: BLE001
+                    result_holder["error"] = e
+
+            thread = threading.Thread(target=ensure_worker)
+            thread.start()
+            try:
+                assert wait_started.wait(1.0)
+                t0 = time.monotonic()
+                status_during_start = supervisor.dispatch(M_STATUS, {})
+                assert time.monotonic() - t0 < 0.5
+                assert status_during_start["worker"]["pid"] == 1002
+                thread.join(timeout=2.0)
+            finally:
+                supervisor._wait_for_worker_socket = original_wait  # type: ignore[method-assign]
+            assert not thread.is_alive()
+            assert "error" not in result_holder, result_holder
+            assert result_holder["result"]["worker_pid"] == 1002
+
             proc = supervisor.dispatch(M_PROCESS_LAUNCH, {
                 "args": ["fake", "command"],
                 "cwd": str(client),
                 "env": {},
                 "kind": "agent",
             })
-            assert proc["pid"] == 1002, proc
-            assert supervisor.resources.procs[2].env["REFINE_RUN_DIR"].endswith("/run/19876")
-            assert supervisor.resources.procs[2].env["REFINE_UI_PORT"] == "19876"
+            assert proc["pid"] == 1003, proc
+            assert supervisor.resources.procs[3].env["REFINE_RUN_DIR"].endswith("/run/19876")
+            assert supervisor.resources.procs[3].env["REFINE_UI_PORT"] == "19876"
             read = supervisor.dispatch(M_PROCESS_READ, {
                 "process_id": proc["process_id"],
                 "cursor": 0,

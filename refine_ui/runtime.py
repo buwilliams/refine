@@ -14,6 +14,7 @@ from refine_runtime.supervisor_protocol import (
     M_ENSURE_WORKER,
     M_STATUS,
     M_STOP_WORKER,
+    WORKER_STARTUP_TIMEOUT_SECONDS,
 )
 
 from .poller import SqlitePoller
@@ -161,7 +162,7 @@ def ensure_runner():
             result = _supervisor_request(
                 M_ENSURE_WORKER,
                 {"config_path": str(cfg.config_path)},
-                timeout=30.0,
+                timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
             )
         except config.ConfigError:
             if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") != "1":
