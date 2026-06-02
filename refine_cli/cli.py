@@ -1459,7 +1459,7 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     worker_pid = worker.get("pid") if isinstance(worker, dict) else None
 
     print()
-    print(_bold("refine"))
+    print(_bold(f"refine ({effective_port})"))
     print(f"  checkout: {clone}")
     print(f"  app:      {display_cfg.client_repo}")
     print(f"  ui:       {_dot((process_pid is not None or service_active) and web_up)} "
@@ -1488,7 +1488,7 @@ def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None
     ui = supervisor_status.get("ui") if supervisor_status else {}
     ui_pid = ui.get("pid") if isinstance(ui, dict) else None
     print()
-    print(_bold("refine"))
+    print(_bold(f"refine ({port})"))
     print(f"  checkout: {clone}")
     print("  app:      not attached")
     print(f"  ui:       {_dot((process_pid is not None or service_active) and web_up)} "

@@ -870,6 +870,14 @@ def main() -> int:
         ("status", setup_clone.resolve(), 19003, "refine-setup-refine-clone"),
         ("status", setup_clone.resolve(), 19004, "refine-setup-refine-clone"),
     ]
+    status_out = StringIO()
+    with redirect_stdout(status_out):
+        refine_cli._print_setup_status_block(
+            setup_clone.resolve(),
+            port=19003,
+            unit="refine-setup-refine-clone",
+        )
+    assert "refine (19003)" in status_out.getvalue(), status_out.getvalue()
     print("[ok] no-app start/stop/status honor supplied ports before project attach")
 
     old_clone = tmp / "old-refine-clone"
