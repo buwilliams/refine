@@ -7,6 +7,7 @@
 // per-session deque until the user switches to that tab.
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
+const GAP_CHAT_ROUND_STATUSES = new Set(["review"]);
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
@@ -94,6 +95,7 @@ function saveChatStateToStorage() {
       tabs[id] = {
         gapId: t.gapId, label: t.label,
         mode: t.mode || (t.gapId ? "gap" : id === "plan" ? "plan" : "standalone"),
+        gapStatus: t.gapStatus || "",
         sessionId: t.sessionId,
         output: (t.output || "").slice(-50_000),
         progress: (t.progress || "").slice(-20_000),
@@ -214,7 +216,7 @@ function observeChatDockSize() { observeToolbarSize(); }
 // surviving `#/chat?gap=...` deep links. For gap tabs with no live session,
 // kicks off a chat session immediately so the runner can inject the Gap
 // context into the provider session before the user types.
-function openChatDock({ gapId = null } = {}) {
+function openChatDock({ gapId = null, gapStatus = null } = {}) {
   ensureStandaloneTab();
   if (gapId) {
     if (!chatState.tabs[gapId]) {
@@ -222,9 +224,12 @@ function openChatDock({ gapId = null } = {}) {
         gapId,
         label: `Gap ${gapId.slice(0, 8)}…`,
         mode: "gap",
+        gapStatus: gapStatus || "",
         sessionId: null, output: "", progress: "", showProgress: true,
         closedReason: null, agentResponded: false,
       };
+    } else if (gapStatus) {
+      chatState.tabs[gapId].gapStatus = gapStatus;
     }
     chatState.activeTabId = gapId;
   }
@@ -405,6 +410,7 @@ function drawToolbar() {
   if (chatState.open && !filesActive) {
     const out = $("#chat-output");
     if (out) out.scrollTop = out.scrollHeight;
+    if (active.gapId && !active.gapStatus) refreshGapChatStatus(active.gapId);
   }
 
   $$(".toolbar-tab", root).forEach((el) => {
@@ -472,12 +478,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           <button id="btn-gap-round-extract" class="secondary"
                   ${gapChatCanExtractRound(active) ? "" : "disabled"}>
             Extract Round
-          </button>
-          <a id="chat-gap-link" class="chat-gap-link"
-             href="#/gaps/${encodeURIComponent(active.gapId)}"
-             title="Open Gap ${htmlEscape(active.gapId)}">
-            Gap ${htmlEscape(active.gapId.slice(0, 10))}…
-          </a>` : ""}
+          </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
                 ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>
           Clear history
@@ -486,6 +487,12 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                 ${hasSession || progressText ? "" : "disabled"}>
           ${htmlEscape(progressButtonLabel)}
         </button>
+        ${active.gapId ? `
+          <a id="chat-gap-link" class="chat-gap-link"
+             href="#/gaps/${encodeURIComponent(active.gapId)}"
+             title="Open Gap ${htmlEscape(active.gapId)}">
+            Gap ${htmlEscape(active.gapId.slice(0, 10))}…
+          </a>` : ""}
         <span class="spacer"></span>
         <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
       </div>
@@ -1489,7 +1496,13 @@ function planHasAgentResponse(tab) {
 }
 
 function gapChatCanExtractRound(tab) {
-  return !!(tab && tab.gapId && !tab.pending && gapChatTranscriptText(tab));
+  return !!(
+    tab
+    && tab.gapId
+    && GAP_CHAT_ROUND_STATUSES.has(tab.gapStatus || "")
+    && !tab.pending
+    && gapChatTranscriptText(tab)
+  );
 }
 
 function gapChatTranscriptText(tab) {
@@ -1518,6 +1531,17 @@ async function draftGapsFromPlan() {
 async function extractRoundFromGapChat() {
   const tab = chatState.tabs[chatState.activeTabId];
   if (!tab || !tab.gapId) return;
+  if (!tab.gapStatus) {
+    await refreshGapChatStatus(tab.gapId, { redraw: false });
+  }
+  if (!GAP_CHAT_ROUND_STATUSES.has(tab.gapStatus || "")) {
+    toast(
+      `New rounds may only be appended from review (status=${tab.gapStatus || "unknown"}).`,
+      "error",
+    );
+    syncGapRoundExtractButton(tab);
+    return;
+  }
   const transcript = gapChatTranscriptText(tab);
   if (!transcript) {
     toast("Wait for the agent to respond before extracting a round.", "error");
@@ -1637,6 +1661,7 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
         });
         const tab = chatState.tabs[gapId];
         if (tab) {
+          tab.gapStatus = "todo";
           tab.output = `${tab.output || ""}\n[refine] Extracted this chat into a new Gap round.\n`;
           saveChatStateToStorage();
           drawChat();
@@ -1651,6 +1676,22 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
       }
     });
   });
+}
+
+async function refreshGapChatStatus(gapId, { redraw = true } = {}) {
+  const tab = chatState.tabs[gapId];
+  if (!tab || tab.gapStatusLoading) return;
+  tab.gapStatusLoading = true;
+  try {
+    const { gap } = await api("GET", "/api/gaps/" + encodeURIComponent(gapId));
+    if (gap?.status) tab.gapStatus = gap.status;
+  } catch {
+    if (!tab.gapStatus) tab.gapStatus = "unknown";
+  } finally {
+    tab.gapStatusLoading = false;
+    saveChatStateToStorage();
+    if (redraw && chatState.activeTabId === gapId) drawToolbar();
+  }
 }
 
 async function pollChat() {

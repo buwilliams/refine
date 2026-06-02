@@ -215,7 +215,6 @@ function drawGapDetail(gap) {
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
         <span class="status-pill ${gap.status}">${workflowStatusLabel(gap.status)}</span>
         <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
-        <span class="status-pill gap-node-owner" title="${htmlEscape(nodeOwnerTitle)}">node: ${htmlEscape(nodeDisplayName)}</span>
       </div>
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}
@@ -236,7 +235,7 @@ function drawGapDetail(gap) {
         </div>
       </div>
       <div class="muted small" style="margin-bottom:14px">
-        ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)}
+        ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
         ${gap.branch_name ? ` · branch <code>${gap.branch_name}</code>` : ""}
       </div>
 
@@ -307,7 +306,7 @@ function drawGapDetail(gap) {
   `;
 
   $("#btn-chat")?.addEventListener("click", () => {
-    openChatDock({ gapId: gap.id });
+    openChatDock({ gapId: gap.id, gapStatus: gap.status });
   });
   $("#btn-view-logs")?.addEventListener("click", () => {
     closeGapActionMenu();
