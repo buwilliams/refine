@@ -2,20 +2,20 @@
 
 Subcommands:
 - target  — attach a target app and make it active for this checkout.
-- install — install + start a persistent systemd UI backend.
-- uninstall — stop + remove a persistent systemd UI backend.
+- install — install + start a persistent systemd refine service.
+- uninstall — stop + remove a persistent systemd refine service.
 - reset   — remove the active target binding and persistent units;
             optional --purge also deletes the active app's .refine/ data so
             you can attach a different app.
-- start   — start a detached UI backend process.
-- stop    — stop the UI backend.
+- start   — start refine in a detached supervisor process.
+- stop    — stop refine.
 - restart — stop then start (handy for picking up source changes).
 - status  — show what's running (read-only).
 - update  — update Refine to the latest version.
 - ps      — show host process CPU/memory usage for refine.
 - test    — run the repository's script-style test suite.
 - server  — start the server component in the foreground for debugging.
-- ui      — start the UI backend foreground process (supervised in normal use).
+- ui      — start the UI foreground process (supervised in normal use).
 - doctor  — deeper diagnostic snapshot (config, agent CLI, git).
 """
 from __future__ import annotations
@@ -90,6 +90,7 @@ app.add_typer(migrate_app, name="migrate")
 
 
 def main(argv: list[str] | None = None) -> int:
+    config.load_dotenv()
     raw_args = list(argv) if argv is not None else sys.argv[1:]
     normalized = _normalize_argv(raw_args)
     try:
@@ -517,8 +518,8 @@ def cluster_run_command(
     help="Attach a target app and make it active.",
     epilog=(
         "Attaches a target app: creates or updates <app>/.refine/refine.toml "
-        "+ gaps/, writes the active-app binding, records the app in the "
-        "known-apps list, and prepares the checkout for `refine start` or "
+        "+ gaps/, records the app in the port's known-apps list, and prepares "
+        "the checkout for `refine start` or "
         "`refine install`."
     ),
 )
@@ -530,6 +531,10 @@ def target_command(
             help="Path to the target app repo. Defaults to cwd.",
         ),
     ] = None,
+    port: Annotated[
+        int | None,
+        typer.Option("--port", help="Refine port to attach this app to. Defaults to 8080."),
+    ] = None,
     force: Annotated[
         bool,
         typer.Option(
@@ -538,11 +543,11 @@ def target_command(
         ),
     ] = False,
 ) -> int:
-    return _run_command(cmd_target, ctx, path=path, force=force)
+    return _run_command(cmd_target, ctx, path=path, port=port, force=force)
 
 @app.command(
     "install",
-    help="Install and start a persistent UI backend.",
+    help="Install and start a persistent refine service.",
     epilog=(
         "Writes, enables, and starts a system-level systemd unit for this "
         "checkout. The service runs as the installing user, restarts on "
@@ -560,7 +565,7 @@ def install_command(
     return _run_command(cmd_install, ctx, port=port)
 
 
-@app.command("uninstall", help="Stop and remove a persistent UI backend.")
+@app.command("uninstall", help="Stop and remove a persistent refine service.")
 def uninstall_command(
     ctx: typer.Context,
     port: Annotated[
@@ -573,16 +578,19 @@ def uninstall_command(
 
 @app.command(
     "reset",
-    help="Remove the active target binding so this checkout can attach a different app.",
+    help="Remove local port state so this checkout can attach a different app.",
     epilog=(
-        "Removes the .refine-binding and .refine-apps.json files from this "
-        "checkout, disables + removes persistent systemd UI units, and "
-        "(with --purge) wipes the active app's .refine/ directory. The app "
-        "source tree is never touched."
+        "Removes run/<port>/ state or all local run state, disables + removes "
+        "persistent systemd units, and (with --purge) wipes the active app's "
+        ".refine/ directory. The app source tree is never touched."
     ),
 )
 def reset_command(
     ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Optional port to reset. Omit to reset all local port state."),
+    ] = None,
     purge: Annotated[
         bool,
         typer.Option(
@@ -598,14 +606,14 @@ def reset_command(
         typer.Option("-y", "--yes", help="Skip the confirmation prompt for --purge."),
     ] = False,
 ) -> int:
-    return _run_command(cmd_reset, ctx, purge=purge, yes=yes)
+    return _run_command(cmd_reset, ctx, port=port, purge=purge, yes=yes)
 
 
 @app.command(
     "start",
-    help="Start the UI backend.",
+    help="Start refine.",
     epilog=(
-        "Starts the host-native UI backend, then prints a status block. If "
+        "Starts host-native refine, then prints a status block. If "
         "this checkout has an installed systemd service, the command starts "
         "that service; otherwise it starts a detached background supervisor. "
         "The supervisor keeps the UI/control process separate from the work "
@@ -624,7 +632,7 @@ def start_command(
 
 @app.command(
     "restart",
-    help="Stop the UI backend, then start it again.",
+    help="Stop refine, then start it again.",
     epilog="Equivalent to `refine stop && refine start`.",
 )
 def restart_command(
@@ -637,7 +645,7 @@ def restart_command(
     return _run_command(cmd_restart, ctx, port=port)
 
 
-@app.command("stop", help="Stop the UI backend.")
+@app.command("stop", help="Stop refine.")
 def stop_command(
     ctx: typer.Context,
     port: Annotated[
@@ -747,7 +755,7 @@ def runner_command(ctx: typer.Context) -> int:
     return server_command(ctx)
 
 
-@app.command("ui", help="Start the UI backend in the foreground.")
+@app.command("ui", help="Start the UI in the foreground.")
 def ui_command(ctx: typer.Context) -> int:
     return _run_command(cmd_ui, ctx)
 
@@ -772,11 +780,13 @@ def doctor_command(ctx: typer.Context) -> int:
 def cmd_target(args: _Args) -> int:
     cwd = Path.cwd().resolve()
     client_repo = Path(args.path).expanduser().resolve() if args.path else cwd
+    port = _effective_port(args, None)
 
     try:
         result = bootstrap_client_repo(
             client_repo,
             clone_dir=cwd,
+            port=port,
             force=args.force,
             create=False,
             init_git=False,
@@ -789,20 +799,18 @@ def cmd_target(args: _Args) -> int:
 
     cfg_path = result["config_path"]
     target = result["volume_root"]
-    binding_written = result.get("binding_path")
-    ui_unit_path = result.get("ui_unit_path")
     print(f"Wrote {cfg_path}")
-    print(f"Created directories: {target}/run, {target}/gaps")
-    if binding_written:
+    print(f"Created directories: {target}/gaps")
+    if result.get("registry_path"):
         print(f"Set active target app → {client_repo}")
-        print(f"Wrote {binding_written}")
+        print(f"Wrote {result['registry_path']}")
     print()
     print("Next steps:")
-    if binding_written:
-        print(f"  uv run refine start          # background UI backend + server")
-        print(f"  uv run refine install        # persistent service, auto-restarts")
-        print(f"  uv run refine status         # check it's healthy")
-        print(f"  uv run refine stop           # tear it all down")
+    if result.get("registry_path"):
+        print(f"  uv run refine start {port}    # background refine supervisor")
+        print(f"  uv run refine install {port}  # persistent service, auto-restarts")
+        print(f"  uv run refine status {port}   # check it's healthy")
+        print(f"  uv run refine stop {port}     # tear it all down")
     else:
         print(f"  cd {client_repo}")
         print(f"  refine doctor                 # sanity check the config")
@@ -868,6 +876,7 @@ def bootstrap_client_repo(
     client_repo: Path,
     *,
     clone_dir: Path,
+    port: int | None = None,
     force: bool,
     create: bool,
     init_git: bool,
@@ -918,21 +927,21 @@ def bootstrap_client_repo(
         cfg_path = config.write_defaults(target, force=force)
         config_created = True
 
-    binding_written = None
+    registry_path = None
     ui_unit_path = None
     if _is_refine_source_dir(clone_dir):
-        binding_path = clone_dir / config.BINDING_FILENAME
-        binding_written = config.write_binding(clone_dir, client_repo)
         _remove_legacy_docker_artifacts(clone_dir)
         if install_unit:
-            ui_unit_path = _write_and_enable_ui_unit(clone_dir, client_repo, force=force)
-        project_registry.upsert_app(clone_dir, client_repo, make_current=True)
+            ui_unit_path = _write_and_enable_ui_unit(clone_dir, None, force=force, port=port or config.DEFAULT_UI_PORT)
+        project_registry.upsert_app(clone_dir, client_repo, make_current=True, port=port)
+        registry_path = project_registry.registry_path(clone_dir, port=port)
 
     return {
         "client_repo": client_repo,
         "volume_root": target,
         "config_path": cfg_path,
-        "binding_path": binding_written,
+        "binding_path": None,
+        "registry_path": registry_path,
         "ui_unit_path": ui_unit_path,
         "git_initialized": git_initialized,
         "config_created": config_created,
@@ -948,7 +957,7 @@ def _write_and_enable_ui_unit(
     host: str = "0.0.0.0",
     port: int = 8080,
 ) -> Path:
-    """Write the UI backend systemd system unit, daemon-reload, and enable it.
+    """Write the refine systemd system unit, daemon-reload, and enable it.
 
     Refuses if a unit by the same name already points at a different checkout,
     unless --force is given (in which case it's overwritten).
@@ -985,12 +994,11 @@ def _write_and_enable_ui_unit(
             captured_env["PATH"] = login_path
     service_user = _service_user()
 
-    target_label = str(client_repo) if client_repo is not None else "setup mode"
     ui_body = (
         "# Auto-generated by `refine install` / `refine target`. Do not edit by hand — re-run\n"
         "# the setup command with --force to regenerate.\n"
         "[Unit]\n"
-        f"Description=refine UI backend — {clone_dir} → {target_label}\n"
+        f"Description=refine — {clone_dir} — port {port}\n"
         "After=network-online.target\n"
         "Wants=network-online.target\n"
         "\n"
@@ -1032,107 +1040,49 @@ def _grep_first(text: str, prefix: str) -> str | None:
 # ----- start / stop / status -------------------------------------------------
 
 def cmd_install(args: _Args) -> int:
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        port = _effective_port(args, None)
-        try:
-            ui_unit_path = _write_and_enable_ui_unit(
-                setup_clone,
-                None,
-                force=True,
-                runner_unit_name=unit,
-                host=SETUP_UI_HOST,
-                port=port,
-            )
-        except _InitError as e:
-            print(f"refine install: {e}", file=sys.stderr)
-            return 1
-        ui_unit = _ui_unit_name(unit, port)
-        print(f"Installed setup UI backend unit: {ui_unit_path}")
-        print(f"Starting persistent setup UI backend (systemctl start {ui_unit})...")
-        rc, out = _systemctl("start", ui_unit)
-        if rc != 0:
-            print(f"refine install: {out.strip()}", file=sys.stderr)
-            return 1
-        if not _wait_for_port(SETUP_UI_HOST, port, timeout=20.0):
-            print(
-                f"refine install: setup UI backend did not start listening on "
-                f"{SETUP_UI_HOST}:{port} within 20s. "
-                f"Check `journalctl -u {ui_unit} -n 200`.",
-                file=sys.stderr,
-            )
-            return 1
-        _print_setup_status_block(setup_clone, port=port, unit=unit)
-        return 0
-
     clone, unit = _resolve_clone_and_unit_or_exit()
-    _load_config_or_exit(args)
-    cfg = config.get()
-    port = _effective_port(args, cfg)
-    _sync_bound_project_registry(clone, cfg)
+    port = _effective_port(args, None)
+    cfg = _config_for_port(args, clone, port)
+    host = cfg.web_host if cfg is not None else SETUP_UI_HOST
     try:
         ui_unit_path = _write_and_enable_ui_unit(
             clone,
-            cfg.client_repo,
+            None,
             force=True,
             runner_unit_name=unit,
-            host=cfg.web_host,
+            host=host,
             port=port,
         )
     except _InitError as e:
         print(f"refine install: {e}", file=sys.stderr)
         return 1
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Installed UI backend unit: {ui_unit_path}")
-    print(f"Starting persistent UI backend (systemctl start {ui_unit})...")
+    print(f"Installed refine unit: {ui_unit_path}")
+    print(f"Starting persistent refine (systemctl start {ui_unit})...")
     rc, out = _systemctl("start", ui_unit)
     if rc != 0:
         print(f"refine install: {out.strip()}", file=sys.stderr)
         return 1
-    if not _wait_for_port(cfg.web_host, port, timeout=20.0):
+    if not _wait_for_port(host, port, timeout=20.0):
         print(
-            f"refine install: UI backend did not start listening on "
-            f"{cfg.web_host}:{port} within 20s. "
+            f"refine install: refine did not start listening on "
+            f"{host}:{port} within 20s. "
             f"Check `journalctl -u {ui_unit} -n 200`.",
             file=sys.stderr,
         )
         return 1
-    _print_status_block(clone, unit, cfg, port=port)
+    if cfg is not None:
+        _print_status_block(clone, unit, cfg, port=port)
+    else:
+        _print_setup_status_block(clone, port=port, unit=unit)
     return 0
 
 
 def cmd_uninstall(args: _Args) -> int:
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        port = _runtime_action_port(args, setup_clone, None, unit)
-        ui_unit = _ui_unit_name(unit, port)
-        print(f"Stopping persistent setup UI backend (systemctl stop {ui_unit})...")
-        rc, out = _systemctl("stop", ui_unit)
-        if rc != 0:
-            print(f"  (systemctl: {out.strip()})", file=sys.stderr)
-        rc, out = _systemctl("disable", ui_unit)
-        if rc != 0:
-            print(f"  (systemctl disable {ui_unit}: {out.strip()})", file=sys.stderr)
-        unit_path = SYSTEMD_SYSTEM_DIR / f"{ui_unit}.service"
-        if _unit_file_exists(unit_path):
-            if _remove_system_unit(unit_path):
-                print(f"Removed {unit_path}")
-                _systemctl("daemon-reload")
-            else:
-                print(f"Could not remove {unit_path}", file=sys.stderr)
-        else:
-            print(f"No unit file found at {unit_path}")
-        _remove_legacy_runtime_units(unit)
-        return 0
-
     clone, unit = _resolve_clone_and_unit_or_exit()
-    _load_config_or_exit(args)
-    cfg = config.get()
-    port = _effective_port(args, cfg)
+    port = _runtime_action_port(args, clone, None, unit)
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent UI backend (systemctl stop {ui_unit})...")
+    print(f"Stopping persistent refine (systemctl stop {ui_unit})...")
     rc, out = _systemctl("stop", ui_unit)
     if rc != 0:
         print(f"  (systemctl: {out.strip()})", file=sys.stderr)
@@ -1156,55 +1106,50 @@ def cmd_uninstall(args: _Args) -> int:
 
 
 def cmd_start(args: _Args) -> int:
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        port = _runtime_action_port(args, setup_clone, None, unit)
+    clone, unit = _resolve_clone_and_unit_or_exit()
+    port = _runtime_action_port(args, clone, None, unit)
+    cfg = _config_for_port(args, clone, port)
+    if cfg is None:
         print("No refine project is attached yet.")
         print(
-            "Starting the host-native setup UI at "
+            "Starting refine at "
             f"http://{_displayable_host(SETUP_UI_HOST)}:{port}"
         )
         print("Use the browser to create or attach a target app path.")
         if _installed_ui_unit(unit, port) is not None:
-            return _start_setup_systemd_ui(setup_clone, unit, port)
+            return _start_setup_systemd_ui(clone, unit, port)
         if _port_open(SETUP_UI_HOST, port):
-            print("Setup UI is already reachable.")
-            _print_setup_status_block(setup_clone, port=port, unit=unit)
-            _print_upgrade_notice(setup_clone)
+            print(f"Refine is already reachable on port {port}.")
+            _print_setup_status_block(clone, port=port, unit=unit)
+            _print_upgrade_notice(clone)
             return 0
         try:
-            pid = _start_background_ui(setup_clone, None, host=SETUP_UI_HOST, port=port)
+            pid = _start_background_ui(clone, None, host=SETUP_UI_HOST, port=port)
         except _InitError as e:
             print(f"refine start: {e}", file=sys.stderr)
             return 1
         if not _wait_for_port(SETUP_UI_HOST, port, timeout=20.0):
             print(
-                f"refine start: setup UI did not start listening on "
+                f"refine start: refine did not start listening on "
                 f"{SETUP_UI_HOST}:{port} within 20s.",
                 file=sys.stderr,
             )
             return 1
-        print(f"Started setup UI in background (pid {pid}).")
-        _print_setup_status_block(setup_clone, port=port, unit=unit)
-        _print_upgrade_notice(setup_clone)
+        print(f"Started refine on port {port} (pid {pid}).")
+        _print_setup_status_block(clone, port=port, unit=unit)
+        _print_upgrade_notice(clone)
         return 0
 
-    clone, unit = _resolve_clone_and_unit_or_exit()
-    _load_config_or_exit(args)
-    cfg = config.get()
     try:
         _ensure_sqlite_schema(cfg)
     except _InitError as e:
         print(f"refine start: {e}", file=sys.stderr)
         return 1
-    port = _runtime_action_port(args, clone, cfg, unit)
-    _sync_bound_project_registry(clone, cfg)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
         return _start_systemd_ui(clone, unit, cfg, port)
     if _port_open(cfg.web_host, port):
-        print(f"UI backend is already reachable on port {port}.")
+        print(f"Refine is already reachable on port {port}.")
         _print_status_block(clone, unit, cfg, port=port)
         _print_upgrade_notice(clone)
         return 0
@@ -1214,11 +1159,11 @@ def cmd_start(args: _Args) -> int:
         print(f"refine start: {e}", file=sys.stderr)
         return 1
 
-    print(f"Starting UI backend in background on port {port} (pid {pid})...")
+    print(f"Starting refine on port {port} (pid {pid})...")
     if not _wait_for_port(cfg.web_host, port, timeout=20.0):
         log_path = _runtime_log_path(clone, cfg, port)
         print(
-            f"refine start: UI backend did not start listening on "
+            f"refine start: refine did not start listening on "
             f"{cfg.web_host}:{port} within 20s. "
             f"Check `{log_path}`.",
             file=sys.stderr,
@@ -1231,23 +1176,19 @@ def cmd_start(args: _Args) -> int:
 
 
 def cmd_stop(args: _Args) -> int:
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        port = _runtime_action_port(args, setup_clone, None, unit)
+    clone, unit = _resolve_clone_and_unit_or_exit()
+    port = _runtime_action_port(args, clone, None, unit)
+    cfg = _config_for_port(args, clone, port)
+    if cfg is None:
         if _installed_ui_unit(unit, port) is not None:
-            return _stop_setup_systemd_ui(setup_clone, unit, port)
-        stopped = _stop_background_ui(setup_clone, None, port)
+            return _stop_setup_systemd_ui(clone, unit, port)
+        stopped = _stop_background_ui(clone, None, port)
         if stopped:
-            print(f"Stopped setup UI backend on port {port}.")
+            print(f"Stopped refine on port {port}.")
         else:
-            print(f"No background setup UI backend was running on port {port}.")
+            print(f"No refine process was running on port {port}.")
         return 0
 
-    clone, unit = _resolve_clone_and_unit_or_exit()
-    _load_config_or_exit(args)
-    cfg = config.get()
-    port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
         _pause_agents_for_clean_shutdown(cfg, port)
@@ -1255,9 +1196,9 @@ def cmd_stop(args: _Args) -> int:
     _pause_agents_for_clean_shutdown(cfg, port)
     stopped = _stop_background_ui(clone, cfg, port)
     if stopped:
-        print(f"Stopped UI backend on port {port}.")
+        print(f"Stopped refine on port {port}.")
     else:
-        print(f"No background UI backend was running on port {port}.")
+        print(f"No refine process was running on port {port}.")
     return 0
 
 
@@ -1265,12 +1206,12 @@ def cmd_restart(args: _Args) -> int:
     """`refine stop && refine start` — picks up source changes the
     running host processes haven't loaded yet without forcing the operator
     to run two commands."""
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        port = _runtime_action_port(args, setup_clone, None, unit)
+    clone, unit = _resolve_clone_and_unit_or_exit()
+    port = _runtime_action_port(args, clone, None, unit)
+    cfg = _config_for_port(args, clone, port)
+    if cfg is None:
         if _installed_ui_unit(unit, port) is not None:
-            return _restart_setup_systemd_ui(setup_clone, unit, port)
+            return _restart_setup_systemd_ui(clone, unit, port)
         restart_args = _Args(**vars(args))
         restart_args.port = port
         rc = cmd_stop(restart_args)
@@ -1279,15 +1220,11 @@ def cmd_restart(args: _Args) -> int:
         print()
         return cmd_start(restart_args)
 
-    clone, unit = _resolve_clone_and_unit_or_exit()
-    _load_config_or_exit(args)
-    cfg = config.get()
     try:
         _ensure_sqlite_schema(cfg)
     except _InitError as e:
         print(f"refine restart: {e}", file=sys.stderr)
         return 1
-    port = _runtime_action_port(args, clone, cfg, unit)
     ui_unit = _installed_ui_unit(unit, port)
     if ui_unit is not None:
         _pause_agents_for_clean_shutdown(cfg, port)
@@ -1302,31 +1239,15 @@ def cmd_restart(args: _Args) -> int:
 
 
 def cmd_reset(args: _Args) -> int:
-    """Remove this checkout's active target binding.
-
-    Remove persistent systemd UI units, delete
-    `.refine-binding` and `.refine-apps.json` from the checkout, and optionally
-    purge the active app's `.refine/` directory. Leaves the app source tree
-    untouched.
-
-    After this, the checkout is fresh and can be attached to any other
-    target app.
-    """
+    """Remove this checkout's local port state."""
     cwd = Path.cwd().resolve()
-    binding_path = cwd / config.BINDING_FILENAME
-    if not binding_path.exists():
-        print(
-            f"refine reset: no {config.BINDING_FILENAME} in {cwd} — nothing to reset.\n"
-            f"  (run this from a refine source dir with an active target)",
-            file=sys.stderr,
-        )
+    if not _is_refine_source_dir(cwd):
+        print("refine reset: run this from a Refine source checkout.", file=sys.stderr)
         return 1
 
-    unit = config.read_binding_unit(binding_path) or config.unit_name_for(cwd)
-    try:
-        client_repo = config.read_binding(binding_path)
-    except config.ConfigError:
-        client_repo = None
+    unit = config.unit_name_for(cwd)
+    port = getattr(args, "port", None)
+    client_repo = project_registry.active_app(cwd, port=port) if port is not None else None
     client_refine_dir = (client_repo / ".refine") if client_repo else None
 
     # Purge confirmation up front (refuse to silently delete data).
@@ -1345,9 +1266,10 @@ def cmd_reset(args: _Args) -> int:
                 return 1
 
     # 1. Stop + remove persistent units (best-effort — keep going if already down).
-    print("Stopping persistent UI backend units...")
+    print("Stopping persistent refine units...")
     removed_units = False
-    for unit_name in _unit_names_for_reset(unit):
+    unit_names = [_ui_unit_name(unit, int(port))] if port is not None else _unit_names_for_reset(unit)
+    for unit_name in unit_names:
         rc, out = _systemctl("stop", unit_name)
         if rc != 0:
             print(f"  (systemctl stop {unit_name}: {out.strip()})", file=sys.stderr)
@@ -1371,14 +1293,26 @@ def cmd_reset(args: _Args) -> int:
         _systemctl("daemon-reload")
         _systemctl_user("daemon-reload")
 
-    # 3. Remove binding + known-app registry from the checkout.
-    binding_path.unlink()
-    print(f"Removed {binding_path}")
+    # 3. Remove port-local run state and legacy checkout state.
+    if port is not None:
+        run_dir = config.local_run_dir(cwd, port=port)
+        if run_dir.exists():
+            shutil.rmtree(run_dir)
+            print(f"Removed {run_dir}")
+    else:
+        run_root = config.local_run_root(cwd)
+        if run_root.exists():
+            shutil.rmtree(run_root)
+            print(f"Removed {run_root}")
+    legacy_binding = cwd / config.BINDING_FILENAME
+    if legacy_binding.exists():
+        legacy_binding.unlink()
+        print(f"Removed legacy {legacy_binding}")
     _remove_legacy_docker_artifacts(cwd, verbose=True)
-    registry_path = project_registry.registry_path(cwd)
-    if registry_path.exists():
-        registry_path.unlink()
-        print(f"Removed {registry_path}")
+    legacy_registry = cwd / project_registry.LEGACY_REGISTRY_FILENAME
+    if legacy_registry.exists():
+        legacy_registry.unlink()
+        print(f"Removed legacy {legacy_registry}")
 
     # 4. Optional: purge the target app's .refine/ directory.
     if args.purge and client_refine_dir and client_refine_dir.is_dir():
@@ -1388,7 +1322,8 @@ def cmd_reset(args: _Args) -> int:
     print()
     print("Reset complete. To attach a target app:")
     print(f"  cd {cwd}")
-    print(f"  uv run refine target <path/to/target-app>")
+    suffix = f" --port {port}" if port is not None else ""
+    print(f"  uv run refine target{suffix} <path/to/target-app>")
     if client_refine_dir and client_refine_dir.is_dir() and not args.purge:
         print()
         print(f"The previous app's refine data is preserved at:")
@@ -1398,22 +1333,13 @@ def cmd_reset(args: _Args) -> int:
 
 
 def cmd_status(args: _Args) -> int:
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        for port in _status_ports(args, setup_clone, None, unit):
-            _print_setup_status_block(setup_clone, port=port, unit=unit)
-        return 0
-
     clone, unit = _resolve_clone_and_unit_or_exit()
-    try:
-        cfg = config.get(path=args.config) if args.config else config.get()
-    except config.ConfigError as e:
-        print(f"refine status: {e}", file=sys.stderr)
-        return 1
-    _sync_bound_project_registry(clone, cfg)
-    for port in _status_ports(args, clone, cfg, unit):
-        _print_status_block(clone, unit, cfg, port=port)
+    for port in _status_ports(args, clone, None, unit):
+        cfg = _config_for_port(args, clone, port)
+        if cfg is None:
+            _print_setup_status_block(clone, port=port, unit=unit)
+        else:
+            _print_status_block(clone, unit, cfg, port=port)
     return 0
 
 
@@ -1458,24 +1384,9 @@ def cmd_ps(args: _Args) -> int:
 
 
 def _print_performance_snapshot(args: _Args) -> int:
-    setup_clone = _setup_source_dir()
-    if setup_clone is not None:
-        unit = config.unit_name_for(setup_clone)
-        for port in _status_ports(args, setup_clone, None, unit):
-            _print_performance_block(
-                setup_clone, None, unit, port=port,
-                sample_seconds=args.sample, limit=args.limit,
-            )
-        return 0
-
     clone, unit = _resolve_clone_and_unit_or_exit()
-    try:
-        cfg = config.get(path=args.config) if args.config else config.get()
-    except config.ConfigError as e:
-        print(f"refine ps: {e}", file=sys.stderr)
-        return 1
-    _sync_bound_project_registry(clone, cfg)
-    for port in _status_ports(args, clone, cfg, unit):
+    for port in _status_ports(args, clone, None, unit):
+        cfg = _config_for_port(args, clone, port)
         _print_performance_block(
             clone, cfg, unit, port=port,
             sample_seconds=args.sample, limit=args.limit,
@@ -1578,7 +1489,7 @@ def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None
     print()
     print(_bold("refine"))
     print(f"  checkout: {clone}")
-    print("  app:      setup mode")
+    print("  app:      not attached")
     print(f"  ui:       {_dot((process_pid is not None or service_active) and web_up)} "
           f"http {'reachable' if web_up else 'unreachable'} at "
           f"http://{_displayable_host(SETUP_UI_HOST)}:{port}")
@@ -1629,7 +1540,7 @@ def _print_performance_block(
     print()
     print(_bold("refine ps"))
     print(f"  checkout: {clone}")
-    print(f"  app:      {display_cfg.client_repo if display_cfg is not None else 'setup mode'}")
+    print(f"  app:      {display_cfg.client_repo if display_cfg is not None else 'not attached'}")
     print(f"  port:     {port}")
     print(f"  roots:    {_format_pid_list(root_pids) if root_pids else 'none'}")
     print(
@@ -1984,7 +1895,7 @@ def cmd_doctor(args: _Args) -> int:
 # ----- helpers ----------------------------------------------------------------
 
 def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
-    """Migrate an old single-app binding into the clone-local app registry."""
+    """Migrate an old single-app binding into the port-local app registry."""
     if not _is_refine_source_dir(clone):
         return
     try:
@@ -1993,6 +1904,27 @@ def _sync_bound_project_registry(clone: Path, cfg: "config.Config") -> None:
         # Registry migration is best-effort; startup/status should not fail
         # because the source checkout is unexpectedly read-only.
         pass
+
+
+def _config_for_port(args: _Args, clone: Path, port: int) -> config.Config | None:
+    try:
+        cfg_path = getattr(args, "config", None)
+        if cfg_path:
+            return config.Config.load(cfg_path)
+        return config.get(reload=True, port=port)
+    except config.ConfigError:
+        return None
+
+
+def _require_config_for_port(args: _Args, clone: Path, port: int, command: str) -> config.Config | None:
+    cfg = _config_for_port(args, clone, port)
+    if cfg is None:
+        print(
+            f"refine {command}: no app is attached on port {port}. "
+            f"Run `refine target --port {port} <target-app>` first.",
+            file=sys.stderr,
+        )
+    return cfg
 
 
 def _effective_port(args: _Args, cfg: "config.Config | None") -> int:
@@ -2102,7 +2034,7 @@ def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> 
 
 def _start_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Starting persistent setup UI backend (systemctl start {ui_unit})...")
+    print(f"Starting persistent refine (systemctl start {ui_unit})...")
     rc, out = _systemctl("enable", ui_unit)
     if rc != 0:
         print(f"refine start: systemctl enable {ui_unit} failed: {out.strip()}",
@@ -2128,7 +2060,7 @@ def _start_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
 
 def _stop_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent setup UI backend (systemctl disable + stop {ui_unit})...")
+    print(f"Stopping persistent refine (systemctl disable + stop {ui_unit})...")
     rc, out = _systemctl("disable", ui_unit)
     if rc != 0:
         print(f"refine stop: systemctl disable {ui_unit} failed: {out.strip()}",
@@ -2140,13 +2072,13 @@ def _stop_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
               file=sys.stderr)
         return 1
     _unlink_quietly(_runtime_pid_path(clone, None, port))
-    print(f"Stopped persistent setup UI backend on port {port}.")
+    print(f"Stopped refine on port {port}.")
     return 0
 
 
 def _restart_setup_systemd_ui(clone: Path, unit: str, port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Restarting persistent setup UI backend (systemctl restart {ui_unit})...")
+    print(f"Restarting persistent refine (systemctl restart {ui_unit})...")
     rc, out = _systemctl("enable", ui_unit)
     if rc != 0:
         print(
@@ -2263,7 +2195,7 @@ def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -
     if refresh != 0:
         return refresh
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Starting persistent UI backend (systemctl start {ui_unit})...")
+    print(f"Starting persistent refine (systemctl start {ui_unit})...")
     rc, out = _systemctl("enable", ui_unit)
     if rc != 0:
         print(f"refine start: systemctl enable {ui_unit} failed: {out.strip()}",
@@ -2289,7 +2221,7 @@ def _start_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -
 
 def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) -> int:
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Stopping persistent UI backend (systemctl disable + stop {ui_unit})...")
+    print(f"Stopping persistent refine (systemctl disable + stop {ui_unit})...")
     rc, out = _systemctl("disable", ui_unit)
     if rc != 0:
         print(f"refine stop: systemctl disable {ui_unit} failed: {out.strip()}",
@@ -2301,7 +2233,7 @@ def _stop_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int) ->
               file=sys.stderr)
         return 1
     _unlink_quietly(_runtime_pid_path(clone, cfg, port))
-    print(f"Stopped persistent UI backend on port {port}.")
+    print(f"Stopped refine on port {port}.")
     return 0
 
 
@@ -2310,7 +2242,7 @@ def _restart_systemd_ui(clone: Path, unit: str, cfg: "config.Config", port: int)
     if refresh != 0:
         return refresh
     ui_unit = _ui_unit_name(unit, port)
-    print(f"Restarting persistent UI backend (systemctl restart {ui_unit})...")
+    print(f"Restarting persistent refine (systemctl restart {ui_unit})...")
     rc, out = _systemctl("enable", ui_unit)
     if rc != 0:
         print(
@@ -2345,6 +2277,12 @@ def _running_pid(clone: Path, cfg: "config.Config | None", port: int) -> int | N
         return pid
     if pid is not None:
         _unlink_quietly(pid_path)
+    legacy_pid_path = config.local_run_root(clone) / f"ui-{port}.pid"
+    legacy_pid = _read_pid(legacy_pid_path)
+    if legacy_pid is not None and _pid_alive(legacy_pid):
+        return legacy_pid
+    if legacy_pid is not None:
+        _unlink_quietly(legacy_pid_path)
 
     host = cfg.web_host if cfg is not None else SETUP_UI_HOST
     listener = _refine_ui_listener_pid(clone, host, port)
@@ -2354,11 +2292,11 @@ def _running_pid(clone: Path, cfg: "config.Config | None", port: int) -> int | N
 
 
 def _runtime_pid_path(clone: Path, cfg: "config.Config | None", port: int) -> Path:
-    return _runtime_dir(clone, cfg) / f"ui-{port}.pid"
+    return _runtime_dir(clone, cfg, port) / "supervisor.pid"
 
 
 def _runtime_log_path(clone: Path, cfg: "config.Config | None", port: int) -> Path:
-    return _runtime_dir(clone, cfg) / f"ui-{port}.log"
+    return _runtime_dir(clone, cfg, port) / "supervisor.log"
 
 
 def _supervisor_socket_path(clone: Path, cfg: "config.Config | None", port: int) -> Path:
@@ -2406,8 +2344,8 @@ def _request_supervisor_shutdown(
         return False
 
 
-def _runtime_dir(clone: Path, cfg: "config.Config | None") -> Path:
-    return config.local_run_dir(clone)
+def _runtime_dir(clone: Path, cfg: "config.Config | None", port: int) -> Path:
+    return config.local_run_dir(clone, port=port)
 
 
 def _read_pid(path: Path) -> int | None:
@@ -2502,6 +2440,7 @@ def _status_ports(args: _Args, clone: Path,
     if getattr(args, "port", None) is not None:
         return [_effective_port(args, cfg)]
     ports = set(_runtime_pid_ports(clone, cfg))
+    ports.update(_runtime_app_ports(clone))
     ports.update(_owned_refine_ui_ports(clone))
     if unit is not None:
         ports.update(_installed_ui_unit_ports(unit))
@@ -2511,19 +2450,42 @@ def _status_ports(args: _Args, clone: Path,
 
 
 def _runtime_pid_ports(clone: Path, cfg: "config.Config | None") -> list[int]:
-    run_dir = _runtime_dir(clone, cfg)
+    run_root = config.local_run_root(clone)
     ports: set[int] = set()
     try:
-        entries = list(run_dir.glob("ui-*.pid"))
+        entries = list(run_root.glob("*/supervisor.pid"))
     except OSError:
-        return []
+        entries = []
     for path in entries:
+        if path.parent.name.isdigit():
+            port = int(path.parent.name)
+            if 0 < port <= 65535:
+                ports.add(port)
+    try:
+        legacy_entries = list(run_root.glob("ui-*.pid"))
+    except OSError:
+        legacy_entries = []
+    for path in legacy_entries:
         m = re.fullmatch(r"ui-(\d+)\.pid", path.name)
         if not m:
             continue
         port = int(m.group(1))
         if 0 < port <= 65535:
             ports.add(port)
+    return sorted(ports)
+
+
+def _runtime_app_ports(clone: Path) -> list[int]:
+    ports: set[int] = set()
+    try:
+        entries = list(config.local_run_root(clone).glob("*/apps.json"))
+    except OSError:
+        return []
+    for path in entries:
+        if path.parent.name.isdigit():
+            port = int(path.parent.name)
+            if 0 < port <= 65535:
+                ports.add(port)
     return sorted(ports)
 
 
@@ -2588,6 +2550,9 @@ def _runtime_action_port(args: _Args, clone: Path,
     live_ports = [p for p in _owned_refine_ui_ports(clone) if p != configured]
     if len(live_ports) == 1:
         return live_ports[0]
+    app_ports = [p for p in _runtime_app_ports(clone) if p != configured]
+    if len(app_ports) == 1:
+        return app_ports[0]
     if unit is not None:
         installed_ports = [p for p in _installed_ui_unit_ports(unit) if p != configured]
         if len(installed_ports) == 1:
@@ -2637,11 +2602,7 @@ def _pid_env_value(pid: int, key: str) -> str | None:
 
 def _setup_source_dir() -> Path | None:
     cwd = Path.cwd().resolve()
-    if (
-        config.find_binding(cwd) is None
-        and config.find_config(cwd) is None
-        and _is_refine_source_dir(cwd)
-    ):
+    if _is_refine_source_dir(cwd) and config.find_config(cwd) is None:
         return cwd
     return None
 
@@ -2860,7 +2821,7 @@ def _user_login_path() -> str | None:
 
     systemd services run with a minimal PATH that may miss uv installs in
     ~/.local/bin, ~/.cargo/bin, asdf/mise shims, Homebrew, etc. Project setup
-    may run inside the host-native UI service, so resolving uv must match the
+    may run inside the host-native refine service, so resolving uv must match the
     operator's terminal rather than systemd's stripped env.
     """
     global _LOGIN_PATH_CACHE, _LOGIN_PATH_RESOLVED
@@ -2937,9 +2898,18 @@ def _remove_legacy_docker_artifacts(clone: Path, *, verbose: bool = False) -> No
     except OSError:
         text = ""
     if text and "REFINE_CLIENT_REFINE_DIR=" in text:
-        env_path.unlink()
-        if verbose:
-            print(f"Removed legacy {env_path}")
+        remaining = [
+            line for line in text.splitlines()
+            if not line.strip().startswith("REFINE_CLIENT_REFINE_DIR=")
+        ]
+        if any(line.strip() for line in remaining):
+            env_path.write_text("\n".join(remaining).rstrip() + "\n", encoding="utf-8")
+            if verbose:
+                print(f"Removed legacy REFINE_CLIENT_REFINE_DIR from {env_path}")
+        else:
+            env_path.unlink()
+            if verbose:
+                print(f"Removed legacy {env_path}")
     current_link = clone / ".refine-current"
     if current_link.is_symlink() or current_link.exists():
         current_link.unlink()
@@ -2960,7 +2930,7 @@ def _load_config_or_exit(args: _Args) -> None:
 def _ensure_sqlite_schema(cfg: "config.Config") -> None:
     """Apply blocking project-state and SQLite migrations before runtime handoff.
 
-    The UI backend initializes SQLite too, but start/restart can delegate to a
+    The supervisor initializes SQLite too, but start/restart can delegate to a
     systemd unit that was installed from a different checkout. Running schema
     setup from the invoking CLI makes project-state/cache migrations complete
     before the service process starts serving requests.
@@ -2988,21 +2958,20 @@ def _ensure_sqlite_schema(cfg: "config.Config") -> None:
 
 
 def _resolve_clone_and_unit_or_exit() -> tuple[Path, str]:
-    """Find the binding for the current cwd and return (clone_dir, unit_name).
-
-    start/stop/status only make sense when run from a bound refine source dir.
-    """
+    """Find the Refine checkout for runtime commands."""
+    cwd = Path.cwd().resolve()
+    if _is_refine_source_dir(cwd):
+        return cwd, config.unit_name_for(cwd)
     binding = config.find_binding()
-    if binding is None:
-        print(
-            "refine: no .refine-binding in scope. Run `refine target <target-app>` "
-            "from a refine source dir first.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    clone = binding.parent.resolve()
-    unit = config.read_binding_unit(binding) or config.unit_name_for(clone)
-    return clone, unit
+    if binding is not None:
+        clone = binding.parent.resolve()
+        unit = config.read_binding_unit(binding) or config.unit_name_for(clone)
+        return clone, unit
+    print(
+        "refine: run this command from a Refine source checkout.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def _systemctl(*args: str) -> tuple[int, str]:

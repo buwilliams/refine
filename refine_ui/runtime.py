@@ -80,6 +80,8 @@ def load_configured(
     global _loaded_config_path
     requested_path = Path(path).resolve() if path is not None else config.find_config()
     cfg_preview = config.Config.load(path)
+    os.environ.setdefault(config.ENV_UI_PORT, str(cfg_preview.web_port))
+    os.environ.setdefault(config.ENV_UI_SCOPE, str(cfg_preview.web_port))
     from refine_server import project_state
 
     schema = project_state.schema_status(cfg_preview.volume_root)
@@ -331,7 +333,7 @@ def stop_all() -> None:
 
 
 def detach_configured() -> None:
-    """Stop project-scoped services and return this process to setup mode."""
+    """Stop project-scoped services and return this process to no-app state."""
     global _loaded_config_path
     try:
         _supervisor_request(M_DETACH_APP, {}, timeout=10.0)

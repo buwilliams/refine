@@ -513,6 +513,7 @@ class Supervisor:
 
 
 def main() -> int:
+    config.load_dotenv()
     host = os.environ.get("REFINE_UI_HOST", "0.0.0.0")
     port = int(os.environ.get("REFINE_UI_PORT", "8080"))
     supervisor = Supervisor(host=host, port=port, cfg_path=_supervisor_config_path())

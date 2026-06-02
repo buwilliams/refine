@@ -6,5 +6,5 @@ Provides the Typer-backed `refine` command suite, including `target`, `install`,
 
 Components live in the sibling packages:
 - refine_server: storage + backend method names + config + friendly summaries
-- refine_ui:    host-native UI backend
+- refine_ui:    host-native UI control surface
 """

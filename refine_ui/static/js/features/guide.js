@@ -229,7 +229,7 @@ const GUIDE_CATEGORIES = [
         { hash: "#/node/runtime", selector: "#s-project-update-pulse" }),
       guideItem("runtime-file-browser-ignore", "File browser ignore patterns", "Educate and configure",
         "File browser ignore patterns hide noisy files and directories during normal browsing without changing git state.",
-        "Default: node_modules, .git, .refine.",
+        "Default: node_modules, .git, .refine, run.",
         { hash: "#/node/runtime", selector: "#s-file-browser-ignore" }),
       guideItem("runtime-ai-provider", "AI provider", "Educate and configure",
         "AI provider chooses which local CLI Refine drives for agents, chat, imports, conflict resolution, and pre-flight checks.",

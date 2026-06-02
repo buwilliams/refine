@@ -12,9 +12,9 @@ function renderProjectApplicationsSection({
       </p>
       ${projectRegistryEnabled ? "" : `
         <p class="muted small" style="color:var(--warn)">
-          App switching requires the host-native setup UI. Start from the refine
-          source checkout with <code>uv run refine start</code> before a project
-          is attached.
+          App switching requires the host-native Refine supervisor. Start from
+          the refine source checkout with <code>uv run refine start</code>
+          before a project is attached.
         </p>`}
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Known apps",

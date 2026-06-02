@@ -276,7 +276,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         conn = init_refine(client1)
         conn.close()
         os.chdir(root)
-        from refine_server import config
+        from refine_server import config, project_registry
         from refine_ui import api, runtime
 
         config.write_binding(root, client1)
@@ -404,9 +404,11 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
     prior_registry = _read_optional(registry)
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
     try:
         os.chdir(root)
-        from refine_server import config
+        from refine_server import config, project_registry
         from refine_ui import api, runtime
 
         config.write_binding(root, client1)
@@ -432,6 +434,7 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
             api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
             api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
             os.environ["REFINE_UI_PORT"] = "18181"
+            os.environ["REFINE_UI_SCOPE"] = "18181"
 
             status, body = api.project_attach({
                 "path": str(client2),
@@ -446,7 +449,7 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
         assert status == 200, body
         assert "restart_pending" not in body
         assert body["client_repo"] == str(client2.resolve())
-        assert config.read_binding(binding) == client2.resolve()
+        assert project_registry.active_app(root, port=18181) == client2.resolve()
         assert runtime._loaded_config_path == client2 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
@@ -470,6 +473,10 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
             os.environ.pop("REFINE_UI_PORT", None)
         else:
             os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
@@ -538,14 +545,14 @@ def test_removing_active_project_hot_loads_next_app() -> None:
         assert body["attached"] is True
         assert body["auto_attached"] is True
         assert body["removed_path"] == str(app_two.resolve())
-        assert body["client_repo"] == str(app_three.resolve())
+        assert body["client_repo"] == str(app_one.resolve())
         assert [app["path"] for app in body["apps"]] == [
             str(app_one.resolve()),
             str(app_three.resolve()),
         ]
-        assert config.get(reload=True).client_repo == app_three.resolve()
-        assert config.read_binding(clone / ".refine-binding") == app_three.resolve()
-        assert runtime._loaded_config_path == app_three / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert config.get(reload=True).client_repo == app_one.resolve()
+        assert project_registry.active_app(clone, port=8080) == app_one.resolve()
+        assert runtime._loaded_config_path == app_one / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
             from refine_ui import runtime
@@ -572,11 +579,14 @@ def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None
     original_cwd = Path.cwd()
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
     try:
         os.chdir(clone)
         os.environ.pop("REFINE_CONFIG_PATH", None)
         os.environ["REFINE_UI_PORT"] = "18182"
+        os.environ["REFINE_UI_SCOPE"] = "18182"
         reset_refine_imports()
+        from refine_server import project_registry
         from refine_ui import api, runtime
 
         status, body = api.project_attach({
@@ -589,7 +599,7 @@ def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None
         assert status == 200, body
         assert "restart_pending" not in body
         assert body["client_repo"] == str(client.resolve())
-        assert (clone / ".refine-binding").is_file()
+        assert project_registry.active_app(clone, port=18182) == client.resolve()
         assert runtime._loaded_config_path == client / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         os.chdir(original_cwd)
@@ -601,6 +611,10 @@ def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None
             os.environ.pop("REFINE_UI_PORT", None)
         else:
             os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
         cleanup_tmp(tmp)
 
 
@@ -615,9 +629,10 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
     prior_registry = _read_optional(registry)
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
     try:
         os.chdir(root)
-        from refine_server import config, db, project_state
+        from refine_server import config, db, project_registry, project_state
         from refine_ui import api, runtime
 
         config.write_binding(root, client1)
@@ -658,6 +673,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
                 else old_git_stdout(repo, args)
             )
             os.environ["REFINE_UI_PORT"] = "18182"
+            os.environ["REFINE_UI_SCOPE"] = "18182"
 
             status, body = api.project_attach({
                 "path": str(legacy),
@@ -676,7 +692,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         migrated = json.loads((legacy / ".refine" / "config.json").read_text(encoding="utf-8"))
         assert migrated["settings"]["governance_product"] == "Legacy app"
         assert git(legacy, "status", "--porcelain").stdout.strip() == ""
-        assert config.read_binding(binding) == legacy.resolve()
+        assert project_registry.active_app(root, port=18182) == legacy.resolve()
         assert runtime._loaded_config_path == legacy / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
@@ -700,6 +716,10 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
             os.environ.pop("REFINE_UI_PORT", None)
         else:
             os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
@@ -716,7 +736,7 @@ def test_manual_node_migration_blocks_project_switch(root: Path) -> None:
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
     try:
         os.chdir(root)
-        from refine_server import config, project_state
+        from refine_server import config, project_registry, project_state
         from refine_ui import api, runtime
 
         config.write_binding(root, client1)
@@ -761,7 +781,7 @@ def test_manual_node_migration_blocks_project_switch(root: Path) -> None:
         assert status == 409, body
         assert "instance_to_node_v2" in body["error"]["message"]
         assert "refine migrate run" in body["error"]["details"]
-        assert config.read_binding(binding) == client1.resolve()
+        assert project_registry.active_app(root, port=8080) == client1.resolve()
         assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
         assert project_state.schema_status(refine_root)["compatible"] is False
     finally:
@@ -881,11 +901,16 @@ def test_active_node_is_per_application() -> None:
     tmp, client1 = make_client_repo("refine-active-node-")
     conn = init_refine(client1)
     conn.close()
+    original_cwd = Path.cwd()
     try:
+        checkout = tmp / "refine-checkout"
+        checkout.mkdir()
+        os.chdir(checkout)
         from refine_server import project_state as ps1
 
-        laptop = ps1.create_node("Laptop")
-        ps1.set_active_node(laptop["id"])
+        root1 = client1 / ".refine"
+        laptop = ps1.create_node("Laptop", root=root1)
+        ps1.set_active_node(laptop["id"], root=root1)
 
         client2 = tmp / "client-two"
         client2.mkdir()
@@ -897,11 +922,13 @@ def test_active_node_is_per_application() -> None:
         git(client2, "commit", "-m", "init")
         conn2 = init_refine(client2)
         conn2.close()
+        os.chdir(checkout)
         from refine_server import project_state as ps2
         from refine_ui import runtime
 
-        desktop = ps2.create_node("Desktop")
-        ps2.set_active_node(desktop["id"])
+        root2 = client2 / ".refine"
+        desktop = ps2.create_node("Desktop", root=root2)
+        ps2.set_active_node(desktop["id"], root=root2)
 
         runtime.load_configured(
             client1 / ".refine" / "refine.toml",
@@ -909,22 +936,23 @@ def test_active_node_is_per_application() -> None:
             start_runner=False,
         )
         from refine_server import project_state
-        assert project_state.active_node_id() == laptop["id"]
+        assert project_state.active_node_id(root=root1) == laptop["id"]
 
         runtime.load_configured(
             client2 / ".refine" / "refine.toml",
             start_poller=False,
             start_runner=False,
         )
-        assert project_state.active_node_id() == desktop["id"]
+        assert project_state.active_node_id(root=root2) == desktop["id"]
 
         runtime.load_configured(
             client1 / ".refine" / "refine.toml",
             start_poller=False,
             start_runner=False,
         )
-        assert project_state.active_node_id() == laptop["id"]
+        assert project_state.active_node_id(root=root1) == laptop["id"]
     finally:
+        os.chdir(original_cwd)
         try:
             runtime.stop_all()  # type: ignore[name-defined]
         except Exception:
@@ -938,10 +966,11 @@ def test_active_node_is_checkout_local_for_same_application() -> None:
     conn.close()
     original_cwd = Path.cwd()
     try:
-        from refine_server import config, project_state
+        from refine_server import config, project_registry, project_state
 
-        laptop = project_state.create_node("Laptop")
-        desktop = project_state.create_node("Desktop")
+        volume_root = client / ".refine"
+        laptop = project_state.create_node("Laptop", root=volume_root)
+        desktop = project_state.create_node("Desktop", root=volume_root)
         clone1 = tmp / "refine-one"
         clone2 = tmp / "refine-two"
         clone1.mkdir()
@@ -957,24 +986,24 @@ def test_active_node_is_checkout_local_for_same_application() -> None:
 
         os.chdir(clone1)
         config.get(reload=True)
-        assert project_state.active_node_id() == laptop["id"]
+        assert project_state.active_node_id(root=volume_root) == laptop["id"]
         assert not legacy_active.exists()
 
         os.chdir(clone2)
         config.get(reload=True)
-        project_state.set_active_node(desktop["id"])
-        assert project_state.active_node_id() == desktop["id"]
+        project_state.set_active_node(desktop["id"], root=volume_root)
+        assert project_state.active_node_id(root=volume_root) == desktop["id"]
 
         os.chdir(clone1)
         config.get(reload=True)
-        assert project_state.active_node_id() == laptop["id"]
+        assert project_state.active_node_id(root=volume_root) == laptop["id"]
 
         os.chdir(clone2)
         config.get(reload=True)
-        assert project_state.active_node_id() == desktop["id"]
+        assert project_state.active_node_id(root=volume_root) == desktop["id"]
 
-        assert (clone1 / "run" / "active-nodes.json").is_file()
-        assert (clone2 / "run" / "active-nodes.json").is_file()
+        assert (clone1 / "run" / "8080" / "active-nodes.json").is_file()
+        assert (clone2 / "run" / "8080" / "active-nodes.json").is_file()
         assert not (client / ".refine" / "run" / "active-node.json").exists()
     finally:
         os.chdir(original_cwd)
@@ -990,13 +1019,14 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
     old_port = os.environ.get("REFINE_UI_PORT")
     old_cfg = os.environ.get("REFINE_CONFIG_PATH")
     try:
-        from refine_server import config, project_state
+        from refine_server import config, project_registry, project_state
 
         laptop = project_state.create_node("Laptop")
         desktop = project_state.create_node("Desktop")
         clone = tmp / "refine-one"
         clone.mkdir()
         config.write_binding(clone, client)
+        project_registry.set_active_app(clone, client, port=8081)
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
         os.environ.pop("REFINE_UI_PORT", None)
@@ -1023,8 +1053,8 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
         assert project_state.active_node_id() == desktop["id"]
 
         assert sqlite8080 != sqlite8081
-        assert sqlite8080.parent == clone / "run" / "cache"
-        assert sqlite8081.parent == clone / "run" / "cache"
+        assert sqlite8080.parent == clone / "run" / "8080" / "cache"
+        assert sqlite8081.parent == clone / "run" / "8081" / "cache"
     finally:
         if old_scope is None:
             os.environ.pop("REFINE_UI_SCOPE", None)
@@ -1137,7 +1167,7 @@ def test_settings_are_scoped_to_active_node_files() -> None:
             "agent_subpath": "frontend",
             "project_update_pulse_interval_seconds": "300",
             "agent_limit_pause_seconds": "3600",
-            "file_browser_ignore_patterns": "node_modules, .git, .refine",
+            "file_browser_ignore_patterns": "node_modules, .git, .refine, run",
             "target_app_auto_rebuild": "hourly",
         })
         assert status == 200, body
@@ -1150,7 +1180,7 @@ def test_settings_are_scoped_to_active_node_files() -> None:
         assert settings["agent_subpath"] != "frontend"
         assert settings["project_update_pulse_interval_seconds"] != "300"
         assert settings["agent_limit_pause_seconds"] != "3600"
-        assert settings["file_browser_ignore_patterns"] == "node_modules, .git, .refine"
+        assert settings["file_browser_ignore_patterns"] == "node_modules, .git, .refine, run"
         assert settings["target_app_auto_rebuild"] != "hourly"
 
         status, body = api.update_settings({
@@ -1188,7 +1218,7 @@ def test_settings_are_scoped_to_active_node_files() -> None:
         assert settings["agent_subpath"] == "frontend"
         assert settings["project_update_pulse_interval_seconds"] == "300"
         assert settings["agent_limit_pause_seconds"] == "3600"
-        assert settings["file_browser_ignore_patterns"] == "node_modules, .git, .refine"
+        assert settings["file_browser_ignore_patterns"] == "node_modules, .git, .refine, run"
         assert settings["target_app_auto_rebuild"] == "hourly"
         assert settings["target_app_url"] != "http://localhost:3001"
         assert settings["target_app_start_command"] != "npm run dev"
@@ -1219,7 +1249,7 @@ def test_settings_are_scoped_to_active_node_files() -> None:
         assert default_app["agent_subpath"] == "frontend"
         assert default_runtime["project_update_pulse_interval_seconds"] == "300"
         assert default_runtime["agent_limit_pause_seconds"] == "3600"
-        assert default_runtime["file_browser_ignore_patterns"] == "node_modules, .git, .refine"
+        assert default_runtime["file_browser_ignore_patterns"] == "node_modules, .git, .refine, run"
         assert default_target["target_app_auto_rebuild"] == "hourly"
         assert other_app["agent_subpath"] == "backend"
         assert other_runtime["project_update_pulse_interval_seconds"] == "900"

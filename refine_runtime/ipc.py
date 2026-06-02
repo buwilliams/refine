@@ -19,8 +19,8 @@ from refine_server import config
 RequestHandler = Callable[[str, dict[str, Any]], dict[str, Any]]
 
 
-def run_dir(start: Path | None = None) -> Path:
-    path = config.local_run_dir(start)
+def run_dir(start: Path | None = None, *, port: int | str | None = None) -> Path:
+    path = config.local_run_dir(start, port=port)
     path.mkdir(mode=0o700, parents=True, exist_ok=True)
     try:
         os.chmod(path, 0o700)
@@ -41,12 +41,12 @@ def config_hash(config_path: Path | str | None = None) -> str:
 def runner_socket_path(*, port: int, config_path: Path | str | None = None,
                        start: Path | None = None) -> Path:
     # Keep the filename short: sockaddr_un paths are small on many platforms.
-    return run_dir(start) / f"r-{port}-{config_hash(config_path)}.sock"
+    return run_dir(start, port=port) / f"r-{config_hash(config_path)}.sock"
 
 
 def supervisor_socket_path(port: int, start: Path | None = None) -> Path:
     # One supervisor owns all local process lifecycle for a checkout/port.
-    return run_dir(start) / f"s-{port}.sock"
+    return run_dir(start, port=port) / "s.sock"
 
 
 def request(path: Path | str, method: str, params: dict[str, Any] | None = None,

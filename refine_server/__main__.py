@@ -15,6 +15,7 @@ from .runner import Runner
 
 
 def main() -> int:
+    config.load_dotenv()
     config.get()  # ensure refine.toml is found early; surfaces a clean error
     runner = Runner()
     stop_event = threading.Event()

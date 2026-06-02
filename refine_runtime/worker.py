@@ -49,6 +49,7 @@ def _start_parent_monitor(stop_event: threading.Event) -> None:
 
 
 def main() -> int:
+    config.load_dotenv()
     sock = os.environ.get("REFINE_RUNNER_SOCKET")
     if not sock:
         print("REFINE_RUNNER_SOCKET is required", file=sys.stderr)

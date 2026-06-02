@@ -2,7 +2,9 @@
 
 Discovery order:
 1. Explicit path passed via `--config` (or `Config.load(path=...)`).
-2. Walking up from cwd: each ancestor's `refine.toml` or `refine/refine.toml`.
+2. Port-local app binding in the Refine checkout's `run/<port>/apps.json`.
+3. Direct target-app cwd fallback for developer/test commands already inside a
+   target repo.
 
 The volume root is the directory containing `refine.toml`. Paths in the file
 are resolved relative to that directory (unless absolute).
@@ -36,6 +38,8 @@ ENV_CONFIG_PATH = "REFINE_CONFIG_PATH"
 ENV_LOCAL_NODE_ID = "REFINE_LOCAL_NODE_ID"
 ENV_UI_SCOPE = "REFINE_UI_SCOPE"
 ENV_UI_PORT = "REFINE_UI_PORT"
+DEFAULT_UI_PORT = 8080
+DOTENV_FILENAME = ".env"
 
 # Marker line in the binding file recording the systemd service base name
 # associated with this refine checkout, so `refine start/stop/status` don't
@@ -79,6 +83,123 @@ class ConfigError(Exception):
     """Raised when no config can be found or it is malformed."""
 
 
+def load_dotenv(
+    start: Path | str | None = None,
+    *,
+    override: bool = False,
+) -> dict[str, str]:
+    """Load checkout-local `.env` values into `os.environ`.
+
+    Refine intentionally keeps this small and dependency-free. The loader
+    accepts ordinary `KEY=value` lines, optional `export KEY=value`, comments,
+    and quoted values. Existing exported environment variables win unless
+    `override=True` is passed.
+    """
+    path = find_dotenv(Path(start) if start is not None else None)
+    if path is None:
+        return {}
+    loaded: dict[str, str] = {}
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return {}
+    for line in lines:
+        parsed = _parse_dotenv_line(line)
+        if parsed is None:
+            continue
+        key, value = parsed
+        if not _valid_env_name(key):
+            continue
+        if override or key not in os.environ:
+            os.environ[key] = value
+            loaded[key] = value
+    return loaded
+
+
+def find_dotenv(start: Path | None = None) -> Path | None:
+    """Return the `.env` file for the Refine checkout in scope, if any."""
+    if start is None:
+        try:
+            start = Path.cwd()
+        except FileNotFoundError:
+            return None
+    start = start.resolve()
+    if start.is_file():
+        start = start.parent
+
+    binding = find_binding(start)
+    if binding is not None:
+        candidate = binding.parent / DOTENV_FILENAME
+        return candidate if candidate.is_file() else None
+
+    for d in [start, *start.parents]:
+        if _looks_like_refine_checkout(d):
+            candidate = d / DOTENV_FILENAME
+            return candidate if candidate.is_file() else None
+    candidate = start / DOTENV_FILENAME
+    return candidate if candidate.is_file() else None
+
+
+def _looks_like_refine_checkout(path: Path) -> bool:
+    return (path / "pyproject.toml").is_file() and (path / "refine_cli").is_dir()
+
+
+def _has_refine_checkout_ancestor(path: Path) -> bool:
+    return any(_looks_like_refine_checkout(d) for d in [path, *path.parents])
+
+
+def _parse_dotenv_line(line: str) -> tuple[str, str] | None:
+    text = line.strip()
+    if not text or text.startswith("#"):
+        return None
+    if text.startswith("export "):
+        text = text[len("export "):].lstrip()
+    if "=" not in text:
+        return None
+    key, raw_value = text.split("=", 1)
+    key = key.strip()
+    value = _strip_dotenv_value(raw_value.strip())
+    return key, value
+
+
+def _strip_dotenv_value(value: str) -> str:
+    if not value:
+        return ""
+    if value[0] in {"'", '"'}:
+        quote = value[0]
+        out: list[str] = []
+        escaped = False
+        for ch in value[1:]:
+            if escaped:
+                out.append(_dotenv_escape(ch) if quote == '"' else ch)
+                escaped = False
+                continue
+            if ch == "\\" and quote == '"':
+                escaped = True
+                continue
+            if ch == quote:
+                return "".join(out)
+            out.append(ch)
+        return "".join(out)
+    hash_at = value.find("#")
+    if hash_at > 0 and value[hash_at - 1].isspace():
+        value = value[:hash_at].rstrip()
+    return value
+
+
+def _dotenv_escape(ch: str) -> str:
+    return {"n": "\n", "r": "\r", "t": "\t", "\\": "\\", '"': '"'}.get(ch, ch)
+
+
+def _valid_env_name(name: str) -> bool:
+    if not name:
+        return False
+    first = name[0]
+    if not (first.isalpha() or first == "_"):
+        return False
+    return all(ch.isalnum() or ch == "_" for ch in name)
+
+
 @dataclass(frozen=True)
 class Config:
     config_path: Path        # absolute path to refine.toml
@@ -96,8 +217,14 @@ class Config:
         return self.volume_root / "gaps"
 
     @classmethod
-    def load(cls, path: Path | str | None = None) -> "Config":
-        cp = Path(path) if path else find_config()
+    def load(cls, path: Path | str | None = None, *, port: int | str | None = None) -> "Config":
+        allow_walk = (
+            path is None
+            and port is None
+            and not os.environ.get(ENV_UI_SCOPE)
+            and not os.environ.get(ENV_UI_PORT)
+        )
+        cp = Path(path) if path else find_config(port=port, allow_walk=allow_walk)
         if cp is None or not cp.is_file():
             raise ConfigError(
                 f"No {CONFIG_FILENAME} found. Run `refine init <app-path>` "
@@ -132,14 +259,17 @@ def _resolve(base: Path, p: str) -> Path:
     return pp if pp.is_absolute() else (base / pp).resolve()
 
 
-def find_config(start: Path | None = None) -> Path | None:
-    """Discover refine.toml. Tries, in order:
+def find_config(
+    start: Path | None = None,
+    *,
+    port: int | str | None = None,
+    allow_walk: bool = False,
+) -> Path | None:
+    """Discover refine.toml for the current port.
 
-    1. A `.refine-binding` file in cwd or any ancestor — its target app's
-       `.refine/refine.toml`. This is the "run from /opt/refine targeting
-       /srv/clients/<x>" workflow.
-    2. Walking up from cwd looking for `refine.toml` or `.refine/refine.toml`.
-       This is the "run from inside the target app repo" workflow.
+    Runtime discovery is intentionally port-scoped: the selected app lives in
+    `run/<port>/apps.json`. Explicit paths via REFINE_CONFIG_PATH still win for
+    child-process handoff and tests.
     """
     start = (start or Path.cwd()).resolve()
 
@@ -151,18 +281,27 @@ def find_config(start: Path | None = None) -> Path | None:
         if cfg.is_file():
             return cfg
 
-    # 1. Binding file
-    binding = find_binding(start)
-    if binding is not None:
-        try:
-            client_repo = read_binding(binding)
+    try:
+        from refine_server import project_registry
+
+        client_repo = project_registry.active_app(start, port=port)
+        if client_repo is not None:
             cfg = client_repo / ".refine" / CONFIG_FILENAME
             if cfg.is_file():
                 return cfg
-        except (ConfigError, OSError):
-            pass
+    except Exception:
+        pass
 
-    # 2. Walk up
+    if not allow_walk and _has_refine_checkout_ancestor(start):
+        return None
+
+    for c in _walk_config_candidates(start):
+        if c.is_file():
+            return c
+    return None
+
+
+def _walk_config_candidates(start: Path) -> list[Path]:
     candidates: list[Path] = []
     seen: set[Path] = set()
     for d in [start, *start.parents]:
@@ -172,11 +311,7 @@ def find_config(start: Path | None = None) -> Path | None:
                 continue
             seen.add(key)
             candidates.append(c)
-
-    for c in candidates:
-        if c.is_file():
-            return c
-    return None
+    return candidates
 
 
 # ---- Binding ----------------------------------------------------------------
@@ -196,45 +331,46 @@ def find_binding(start: Path | None = None) -> Path | None:
     return None
 
 
-def local_run_dir(start: Path | None = None) -> Path:
-    """Checkout-local runtime directory for process/session state.
-
-    Bound Refine checkouts keep local state next to `.refine-binding`, so it
-    survives target-app switching without writing host state into the target
-    app's `.refine/` directory. If no binding is in scope, fall back to cwd/run
-    for setup/debug flows that do not have a target app attached yet.
-    """
-    binding = find_binding(start)
-    if binding is not None:
-        return binding.parent.resolve() / "run"
+def local_run_root(start: Path | None = None) -> Path:
+    """Checkout-local runtime root for host state."""
     if start is not None:
         return start.resolve() / "run"
-    cached = globals().get("_cached")
-    if cached is not None:
-        return cached.client_repo / "run"
     try:
         return Path.cwd().resolve() / "run"
     except FileNotFoundError:
-        return Path(tempfile.gettempdir()) / "refine-run"
+        pass
+    cached = globals().get("_cached")
+    if cached is not None:
+        return cached.client_repo / "run"
+    return Path(tempfile.gettempdir()) / "refine-run"
+
+
+def runtime_port(default: int = DEFAULT_UI_PORT) -> int:
+    raw = os.environ.get(ENV_UI_SCOPE) or os.environ.get(ENV_UI_PORT) or ""
+    try:
+        port = int(str(raw).strip()) if str(raw).strip() else int(default)
+    except (TypeError, ValueError):
+        port = int(default)
+    if port <= 0 or port > 65535:
+        return int(default)
+    return port
+
+
+def local_run_dir(start: Path | None = None, *, port: int | str | None = None) -> Path:
+    """Port-scoped checkout-local runtime directory."""
+    raw_port = runtime_port() if port is None else int(port)
+    return local_run_root(start) / str(raw_port)
 
 
 def runtime_scope() -> str:
-    """Stable local scope for one UI backend process.
-
-    Detached UI backends set this from the port they serve. Without a scope,
-    CLI/test/foreground paths keep the historical shared cache behavior.
-    """
-    raw = os.environ.get(ENV_UI_SCOPE) or os.environ.get(ENV_UI_PORT) or ""
-    return "".join(ch if ch.isalnum() or ch in "._-" else "-" for ch in raw.strip())
+    """Stable local scope for one Refine supervisor process."""
+    return str(runtime_port())
 
 
 def sqlite_path_for(volume_root: Path) -> Path:
-    scope = runtime_scope()
-    if not scope:
-        return volume_root / "index.sqlite"
     digest = hashlib.sha1(str(volume_root.resolve()).encode("utf-8")).hexdigest()[:12]
     cache_dir = local_run_dir() / "cache"
-    return cache_dir / f"index-{scope}-{digest}.sqlite"
+    return cache_dir / f"index-{digest}.sqlite"
 
 
 def read_binding(binding_path: Path) -> Path:
@@ -256,25 +392,12 @@ def read_binding(binding_path: Path) -> Path:
 
 
 def write_binding(refine_source_dir: Path, client_repo: Path) -> Path:
-    """Write `.refine-binding` in the refine source dir pointing at the active app.
-
-    Also records the systemd service base name so `refine start/stop/status`
-    can look it up without re-deriving from the directory basename (which
-    might drift if the checkout is later renamed).
-
-    Returns the absolute path to the written binding file.
-    """
+    """Compatibility helper: write this port's active app state."""
     refine_source_dir = refine_source_dir.resolve()
-    binding = refine_source_dir / BINDING_FILENAME
-    unit = unit_name_for(refine_source_dir)
-    binding.write_text(
-        f"# refine binding — this checkout's active target app.\n"
-        f"# Created by `refine init`. Use Settings > Project or `refine init <path> --force` to switch.\n"
-        f"{_BINDING_UNIT_MARKER} {unit}\n"
-        f"{client_repo.resolve()}\n",
-        encoding="utf-8",
-    )
-    return binding
+    from refine_server import project_registry
+
+    project_registry.set_active_app(refine_source_dir, client_repo)
+    return project_registry.registry_path(refine_source_dir)
 
 DEFAULT_TOML = """# refine — per-project configuration. Commit this file alongside the
 # target app's source. See README + docs/spec.md for the conceptual model.
@@ -363,10 +486,15 @@ def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
 _cached: Config | None = None
 
 
-def get(*, path: Path | str | None = None, reload: bool = False) -> Config:
+def get(
+    *,
+    path: Path | str | None = None,
+    reload: bool = False,
+    port: int | str | None = None,
+) -> Config:
     global _cached
-    if _cached is None or reload or path is not None:
-        _cached = Config.load(path)
+    if _cached is None or reload or path is not None or port is not None:
+        _cached = Config.load(path, port=port)
     return _cached
 
 

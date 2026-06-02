@@ -79,7 +79,7 @@ def main() -> int:
         finally:
             os.chdir(old_cwd)
         assert rc == 0, err
-        assert (clone / ".refine-binding").exists()
+        assert not (clone / ".refine-binding").exists()
         assert (client / ".refine" / "refine.toml").exists()
         other = tmp / "other-target-app"
         other.mkdir()
@@ -97,9 +97,9 @@ def main() -> int:
         finally:
             os.chdir(old_cwd)
         assert rc == 0, err
-        assert config.read_binding(clone / ".refine-binding") == other.resolve()
         assert "# sentinel: keep me" in other_cfg.read_text(encoding="utf-8")
-        assert [app["path"] for app in project_registry.list_apps(clone)] == [
+        assert project_registry.active_app(clone, port=8080) == other.resolve()
+        assert [app["path"] for app in project_registry.list_apps(clone, port=8080)] == [
             str(client.resolve()),
             str(other.resolve()),
         ]
@@ -283,7 +283,6 @@ def main() -> int:
         return cli_source[start:] if end == -1 else cli_source[start:end]
 
     start_source = function_source("cmd_start")
-    assert "_print_upgrade_notice(setup_clone)" in start_source
     assert "_print_upgrade_notice(clone)" in start_source
     assert "_print_upgrade_notice(clone)" in function_source("_start_systemd_ui")
     assert "_print_upgrade_notice(clone)" in function_source("_restart_systemd_ui")

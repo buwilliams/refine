@@ -65,7 +65,8 @@ IMAGE_PREVIEW_MAX_BYTES = 5_000_000
 FILES_TREE_MAX_DEPTH = 3
 FILES_TREE_MAX_ENTRIES = 200
 FILES_SEARCH_MAX_SCAN = 20_000
-FILE_BROWSER_IGNORE_DEFAULT = "node_modules, .git, .refine"
+FILE_BROWSER_IGNORE_DEFAULT = "node_modules, .git, .refine, run"
+FILE_BROWSER_ALWAYS_IGNORE = ["run"]
 IMAGE_MIME_BY_EXT = {
     ".gif": "image/gif",
     ".jpg": "image/jpeg",
@@ -84,10 +85,11 @@ def _conn(*, ensure_cache: bool = True) -> sqlite3.Connection:
 
 
 def _project_attached() -> bool:
-    if config.find_config() is None:
+    port = _current_port()
+    if config.find_config(port=port) is None:
         return False
     try:
-        config.get(reload=True)
+        config.get(reload=True, port=port)
     except config.ConfigError:
         return False
     return True
@@ -105,7 +107,7 @@ def _empty_page(limit: int, offset: int) -> dict[str, Any]:
 
 def _schema_block_response(*, block_maintenance: bool = True) -> tuple[int, dict] | None:
     try:
-        cfg = config.get(reload=True)
+        cfg = config.get(reload=True, port=_current_port())
     except config.ConfigError:
         return None
     maintenance = project_state.read_maintenance(root=cfg.volume_root)
@@ -220,7 +222,7 @@ def _exclusive_mutation(
 # --- Files --------------------------------------------------------------------
 
 def _target_repo_root() -> Path:
-    return config.get(reload=True).client_repo.resolve()
+    return config.get(reload=True, port=_current_port()).client_repo.resolve()
 
 
 def _resolve_repo_path(raw_path: str | None) -> tuple[Path, Path, str] | tuple[None, None, tuple[int, dict]]:
@@ -312,11 +314,15 @@ def _file_browser_ignore_patterns() -> list[str]:
             conn.close()
     except Exception:
         pass
-    return [
+    patterns = [
         item.strip().replace("\\", "/").strip("/")
         for item in str(raw or "").split(",")
         if item.strip().strip("/")
     ]
+    for item in FILE_BROWSER_ALWAYS_IGNORE:
+        if item not in patterns:
+            patterns.append(item)
+    return patterns
 
 
 def _rel_matches_file_browser_ignore(rel_path: str, patterns: list[str]) -> bool:
@@ -832,12 +838,17 @@ def _append_gap_workflow_log(
 
 # --- Project attach/setup -----------------------------------------------------
 
+def _current_port() -> int:
+    return config.runtime_port()
+
+
 def project_status() -> tuple[int, dict]:
     """Return whether this UI process is attached to a refine project."""
     clone_dir = Path.cwd().resolve()
+    port = _current_port()
     registry_enabled = _project_registry_enabled(clone_dir)
-    apps = project_registry.list_apps(clone_dir) if registry_enabled else []
-    cfg_path = config.find_config()
+    apps = project_registry.list_apps(clone_dir, port=port) if registry_enabled else []
+    cfg_path = config.find_config(port=port)
     if cfg_path is None:
         return 200, {
             "attached": False,
@@ -846,7 +857,7 @@ def project_status() -> tuple[int, dict]:
             "message": "No refine project is attached.",
         }
     try:
-        cfg = config.get(reload=True)
+        cfg = config.get(reload=True, port=port)
     except config.ConfigError as e:
         return 200, {
             "attached": False,
@@ -856,7 +867,7 @@ def project_status() -> tuple[int, dict]:
             "message": str(e),
         }
     if registry_enabled:
-        apps = project_registry.upsert_app(clone_dir, cfg.client_repo, make_current=True)
+        apps = project_registry.upsert_app(clone_dir, cfg.client_repo, make_current=True, port=port)
     else:
         apps = _ensure_current_app(apps, cfg.client_repo)
     schema = project_state.schema_status(cfg.volume_root)
@@ -880,10 +891,11 @@ def project_status() -> tuple[int, dict]:
 
 def project_list() -> tuple[int, dict]:
     clone_dir = Path.cwd().resolve()
+    port = _current_port()
     current = ""
-    apps = project_registry.list_apps(clone_dir) if _project_registry_enabled(clone_dir) else []
+    apps = project_registry.list_apps(clone_dir, port=port) if _project_registry_enabled(clone_dir) else []
     try:
-        current_repo = config.get(reload=True).client_repo
+        current_repo = config.get(reload=True, port=port).client_repo
         current = str(current_repo)
         apps = _ensure_current_app(apps, current_repo)
     except config.ConfigError:
@@ -899,12 +911,13 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     if not raw_path:
         return err(400, "Choose an app to remove.")
     clone_dir = Path.cwd().resolve()
+    port = _current_port()
     if not _project_registry_enabled(clone_dir):
         return err(409, "Known-apps list is only available from the host refine source checkout.")
     target = Path(raw_path).expanduser().resolve()
-    apps_before = project_registry.list_apps(clone_dir)
+    apps_before = project_registry.list_apps(clone_dir, port=port)
     try:
-        current = config.get(reload=True).client_repo
+        current = config.get(reload=True, port=port).client_repo
     except config.ConfigError:
         current = None
     if current is not None and current == target:
@@ -929,17 +942,17 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
             status, attached = project_attach(attach_body)
             if status != 200:
                 return status, attached
-            apps = project_registry.remove_app(clone_dir, target)
+            apps = project_registry.remove_app(clone_dir, target, port=port)
             attached["apps"] = apps
             attached["removed_path"] = str(target)
             attached["auto_attached"] = True
             return status, attached
-        apps = project_registry.remove_app(clone_dir, target)
-        _detach_current_project(clone_dir, target)
+        apps = project_registry.remove_app(clone_dir, target, port=port)
+        _detach_current_project(clone_dir, target, port=port)
         status, body = project_status()
         body["removed_path"] = str(target)
         return status, body
-    apps = project_registry.remove_app(clone_dir, target)
+    apps = project_registry.remove_app(clone_dir, target, port=port)
     return 200, {"apps": apps}
 
 
@@ -1474,7 +1487,7 @@ def _rebuild_sqlite_cache_sync(
 ) -> tuple[int, dict]:
     """Force-rebuild SQLite projections from canonical .refine JSON."""
     restart_services = body.get("restart_services") is not False
-    cfg = config.get(reload=True)
+    cfg = config.get(reload=True, port=_current_port())
     sqlite_file = cfg.sqlite_path
     backend = runtime.backend_info()
     controls_runner_lifecycle = bool(backend.get("ui_controls_runner_lifecycle"))
@@ -1549,6 +1562,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         return err(400, "Enter a project path or Git remote.")
 
     clone_dir = Path.cwd().resolve()
+    port = _current_port()
 
     try:
         from refine_cli.cli import (
@@ -1562,7 +1576,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
                 (
                     f"The UI process is running in {clone_dir}. Start refine from "
                     "the source checkout with `uv run refine start` so it can "
-                    "create host directories and write the binding."
+                    "create host directories and manage port-local app state."
                 ),
         )
 
@@ -1584,6 +1598,7 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         result = bootstrap_client_repo(
             client_repo,
             clone_dir=clone_dir,
+            port=port,
             force=True,
             create=True,
             init_git=True,
@@ -1613,11 +1628,12 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
         "volume_root": str(cfg.volume_root),
         "config_path": str(cfg.config_path),
         "binding_path": str(result["binding_path"]) if result.get("binding_path") else "",
+        "registry_path": str(result["registry_path"]) if result.get("registry_path") else "",
         "unit_path": str(result["unit_path"]) if result.get("unit_path") else "",
         "ui_unit_path": str(result["ui_unit_path"]) if result.get("ui_unit_path") else "",
         "git_initialized": bool(result.get("git_initialized")),
         "config_created": bool(result.get("config_created")),
-        "apps": project_registry.list_apps(clone_dir),
+        "apps": project_registry.list_apps(clone_dir, port=port),
         "registry_enabled": True,
         "schema": project_state.schema_status(cfg.volume_root),
         **_node_summary(),
@@ -1999,18 +2015,8 @@ def _ensure_current_app(apps: list[dict[str, str]], client_repo: Path) -> list[d
     ]
 
 
-def _detach_current_project(clone_dir: Path, target: Path) -> None:
-    binding = clone_dir / config.BINDING_FILENAME
-    if binding.exists():
-        try:
-            bound = config.read_binding(binding)
-        except config.ConfigError:
-            bound = None
-        if bound is None or bound == target.resolve():
-            try:
-                binding.unlink()
-            except FileNotFoundError:
-                pass
+def _detach_current_project(clone_dir: Path, target: Path, *, port: int | None = None) -> None:
+    project_registry.detach_port(clone_dir, port=port)
     runtime.detach_configured()
 
 
@@ -2052,7 +2058,7 @@ class _SwitchBlocked(Exception):
 
 def _current_client_repo() -> Path | None:
     try:
-        return config.get(reload=True).client_repo
+        return config.get(reload=True, port=_current_port()).client_repo
     except config.ConfigError:
         return None
 
@@ -2060,7 +2066,7 @@ def _current_client_repo() -> Path | None:
 def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
     """Stop active agents and leave the current target app clean before switching."""
     warnings: list[str] = []
-    cfg = config.get(reload=True)
+    cfg = config.get(reload=True, port=_current_port())
     runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)

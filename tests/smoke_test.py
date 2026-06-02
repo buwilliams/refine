@@ -14,6 +14,7 @@ Validates:
 from __future__ import annotations
 
 import os
+import json
 import shutil
 import sqlite3
 import subprocess
@@ -293,15 +294,18 @@ def main() -> int:
     assert (ui_client / ".refine" / "refine.toml").is_file()
     assert not (ui_client / ".refine" / "run").exists()
     assert (ui_client / ".refine" / "gaps").is_dir()
-    assert (clone / ".refine-binding").read_text(encoding="utf-8").strip().endswith(str(ui_client))
-    assert str(ui_client) in (clone / ".refine-apps.json").read_text(encoding="utf-8")
+    port_registry = clone / "run" / "8080" / "apps.json"
+    assert not (clone / ".refine-binding").exists()
+    assert not (clone / ".refine-apps.json").exists()
+    assert str(ui_client) in port_registry.read_text(encoding="utf-8")
+    assert json.loads(port_registry.read_text(encoding="utf-8"))["active_app"] == str(ui_client)
     assert "/run/" in (Path(__file__).resolve().parents[1] / ".gitignore").read_text(encoding="utf-8")
     assert "run/" not in (ui_client / ".refine" / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert not (clone / ".env").exists()
     assert not (clone / ".refine-current").exists()
     assert boot["git_initialized"] is True
     assert boot["config_created"] is True
-    print("[ok] UI project bootstrap creates git repo + host-native refine binding")
+    print("[ok] UI project bootstrap creates git repo + port-local app binding")
 
     setup_install_clone = tmp / "setup-install-clone"
     (setup_install_clone / "refine_cli").mkdir(parents=True)
@@ -376,7 +380,7 @@ def main() -> int:
     assert status_rc == 0
     assert stop_rc == 0
     assert uninstall_rc == 0
-    assert "setup mode" in setup_unit_text
+    assert "port 19010" in setup_unit_text
     assert "REFINE_CONFIG_PATH" not in setup_unit_text
     assert ("enable", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
     assert ("start", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
@@ -387,7 +391,7 @@ def main() -> int:
     assert ("stop", "refine-setup-install-clone-19010-ui") in setup_systemctl_calls
     assert not setup_unit.exists()
     assert not (setup_install_clone / ".refine-binding").exists()
-    print("[ok] persistent setup UI works before a target app is attached")
+    print("[ok] persistent refine works before a target app is attached")
 
     unit_clone = tmp / "refine-unit-clone"
     (unit_clone / "refine_cli").mkdir(parents=True)
@@ -522,7 +526,7 @@ def main() -> int:
             os.environ.pop("SUDO_USER", None)
         else:
             os.environ["SUDO_USER"] = old_sudo_user
-    print("[ok] refine install writes per-port host-native UI backend systemd unit")
+    print("[ok] refine install writes per-port host-native supervisor systemd unit")
 
     unit_name = "refine-unit-clone"
     unit_cfg_path = unit_client / ".refine" / "refine.toml"
@@ -563,7 +567,10 @@ def main() -> int:
 
         assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 18124
         assert refine_cli.cmd_start(no_port_args) == 0
-        assert refine_cli.cmd_stop(no_port_args) == 0
+        stop_out = StringIO()
+        with redirect_stdout(stop_out):
+            assert refine_cli.cmd_stop(no_port_args) == 0
+        assert "Stopped refine on port 18124." in stop_out.getvalue()
         schema_conn = sqlite3.connect(str(unit_cfg.sqlite_path))
         try:
             schema_conn.execute("DROP TABLE IF EXISTS performance_events")
@@ -599,7 +606,7 @@ def main() -> int:
     assert ("restart", "refine-unit-clone-18124-ui") in systemctl_calls
     assert ("status", "refine-unit-clone", "18124") in lifecycle_calls
     assert lifecycle_calls.count(("pause", "18124")) == 2, lifecycle_calls
-    print("[ok] refine start/stop/restart route installed UI units through systemd")
+    print("[ok] refine start/stop/restart route installed supervisor units through systemd")
 
     bg_cfg = config.Config.load(ui_client / ".refine" / "refine.toml")
     old_find_host_command = refine_cli._find_host_command
@@ -623,8 +630,8 @@ def main() -> int:
         refine_cli._listener_pids = old_listener_pids
         refine_cli.subprocess.Popen = old_popen
     assert pid == 43210
-    assert (clone / "run" / "ui-18111.pid").read_text(encoding="utf-8").strip() == "43210"
-    assert not (bg_cfg.volume_root / "run" / "ui-18111.pid").exists()
+    assert (clone / "run" / "18111" / "supervisor.pid").read_text(encoding="utf-8").strip() == "43210"
+    assert not (bg_cfg.volume_root / "run" / "18111" / "supervisor.pid").exists()
     assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "supervisor"]
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
@@ -633,7 +640,7 @@ def main() -> int:
         raise AssertionError("port 0 should be rejected")
     except SystemExit as e:
         assert "invalid port 0" in str(e)
-    print("[ok] refine start launches a detached per-port UI backend process")
+    print("[ok] refine start launches a detached per-port supervisor process")
 
     old_listener_pids = refine_cli._listener_pids
     old_listener_port_pids = refine_cli._listener_port_pids
@@ -676,22 +683,24 @@ def main() -> int:
         refine_cli.os.getpgid = old_getpgid
         refine_cli.os.killpg = old_killpg
     assert killed == [(24000, refine_cli.signal.SIGTERM)]
-    print("[ok] refine stop recovers a missing pid file from the listening UI backend")
+    print("[ok] refine stop recovers a missing pid file from the listening supervisor")
 
-    (clone / "run" / "ui-18120.pid").write_text("111\n", encoding="utf-8")
-    (clone / "run" / "ui-18121.pid").write_text("222\n", encoding="utf-8")
+    (clone / "run" / "18120").mkdir(parents=True, exist_ok=True)
+    (clone / "run" / "18121").mkdir(parents=True, exist_ok=True)
+    (clone / "run" / "18120" / "supervisor.pid").write_text("111\n", encoding="utf-8")
+    (clone / "run" / "18121" / "supervisor.pid").write_text("222\n", encoding="utf-8")
     old_owned_ports = refine_cli._owned_refine_ui_ports
     try:
         refine_cli._owned_refine_ui_ports = lambda clone_arg: [18122] if clone_arg == clone else []
         assert refine_cli._status_ports(type("Args", (), {"port": None})(), clone, bg_cfg) == [
-            18111, 18120, 18121, 18122,
+            8080, 18111, 18120, 18121, 18122,
         ]
         assert refine_cli._status_ports(type("Args", (), {"port": 18123})(), clone, bg_cfg) == [18123]
     finally:
         refine_cli._owned_refine_ui_ports = old_owned_ports
-        for p in (clone / "run").glob("ui-1812*.pid"):
+        for p in (clone / "run").glob("1812*/supervisor.pid"):
             p.unlink(missing_ok=True)
-    print("[ok] refine status lists every checkout-local UI backend")
+    print("[ok] refine status lists every checkout-local supervisor port")
 
     old_print_performance = refine_cli._print_performance_block
     perf_calls: list[tuple[str, int, float, int]] = []
@@ -719,7 +728,7 @@ def main() -> int:
         refine_cli._print_performance_block = old_print_performance
     assert (str(clone), 18111, 0.0, 5) in perf_calls
     assert (str(clone), 18122, 0.0, 5) in perf_calls
-    print("[ok] refine ps lists checkout-local UI backend ports")
+    print("[ok] refine ps lists checkout-local supervisor ports")
 
     old_print_performance_snapshot = refine_cli._print_performance_snapshot
     old_sleep = refine_cli.time.sleep
@@ -838,9 +847,10 @@ def main() -> int:
         assert refine_cli.cmd_start(type("Args", (), {"port": 19000})()) == 0
         assert refine_cli.cmd_stop(type("Args", (), {"port": 19001})()) == 0
         assert refine_cli.cmd_status(type("Args", (), {"config": None, "port": 19002})()) == 0
-        (setup_clone / "run").mkdir(exist_ok=True)
-        (setup_clone / "run" / "ui-19003.pid").write_text("333\n", encoding="utf-8")
-        (setup_clone / "run" / "ui-19004.pid").write_text("444\n", encoding="utf-8")
+        (setup_clone / "run" / "19003").mkdir(parents=True, exist_ok=True)
+        (setup_clone / "run" / "19004").mkdir(parents=True, exist_ok=True)
+        (setup_clone / "run" / "19003" / "supervisor.pid").write_text("333\n", encoding="utf-8")
+        (setup_clone / "run" / "19004" / "supervisor.pid").write_text("444\n", encoding="utf-8")
         assert refine_cli.cmd_status(type("Args", (), {"config": None, "port": None})()) == 0
     finally:
         os.chdir(old_cwd)
@@ -858,7 +868,7 @@ def main() -> int:
         ("status", setup_clone.resolve(), 19003, "refine-setup-refine-clone"),
         ("status", setup_clone.resolve(), 19004, "refine-setup-refine-clone"),
     ]
-    print("[ok] setup-mode start/stop/status honor supplied ports before project attach")
+    print("[ok] no-app start/stop/status honor supplied ports before project attach")
 
     old_clone = tmp / "old-refine-clone"
     (old_clone / "refine_cli").mkdir(parents=True)
@@ -868,11 +878,15 @@ def main() -> int:
     old_client.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=old_client, check=True)
     old_cfg_path = config.write_defaults(old_client / ".refine")
-    config.write_binding(old_clone, old_client)
+    (old_clone / ".refine-binding").write_text(
+        f"# unit: {config.unit_name_for(old_clone)}\n{old_client}\n",
+        encoding="utf-8",
+    )
     assert not (old_clone / ".refine-apps.json").exists()
     _sync_bound_project_registry(old_clone, config.Config.load(old_cfg_path))
-    assert str(old_client) in (old_clone / ".refine-apps.json").read_text(encoding="utf-8")
-    print("[ok] old single-app binding migrates into known-app registry")
+    migrated_registry = old_clone / "run" / "8080" / "apps.json"
+    assert str(old_client) in migrated_registry.read_text(encoding="utf-8")
+    print("[ok] old single-app binding migrates into port-local registry")
 
     # --- Reporters -----------------------------------------------------------
     jane = reporters.add(conn, "Jane Doe")

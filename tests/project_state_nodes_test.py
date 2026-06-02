@@ -26,7 +26,7 @@ def main() -> int:
     tmp, client = make_client_repo("refine-project-state-")
     conn = init_refine(client)
     try:
-        from refine_server import db, gap_writer, gaps, project_state, reporters
+        from refine_server import config, db, gap_writer, gaps, project_state, reporters
         from refine_ui import api
 
         root = client / ".refine"
@@ -364,10 +364,12 @@ def main() -> int:
             project_state._read_gap_cache_bytes = original_read_cache_bytes
 
         conn.close()
-        (root / "index.sqlite").write_bytes(b"not a sqlite database")
+        cfg = config.get(reload=True)
+        cfg.sqlite_path.parent.mkdir(parents=True, exist_ok=True)
+        cfg.sqlite_path.write_bytes(b"not a sqlite database")
         for suffix in ("-wal", "-shm"):
             try:
-                (root / f"index.sqlite{suffix}").unlink()
+                Path(f"{cfg.sqlite_path}{suffix}").unlink()
             except FileNotFoundError:
                 pass
         status, body = api.rebuild_sqlite_cache({"restart_services": False})

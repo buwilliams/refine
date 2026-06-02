@@ -158,7 +158,7 @@ def main() -> int:
     assert "project_update_pulse_interval_seconds" in settings_js
     assert 'id="s-file-browser-ignore"' in settings_js
     assert "file_browser_ignore_patterns" in settings_js
-    assert "node_modules, .git, .refine" in settings_js
+    assert "node_modules, .git, .refine, run" in settings_js
     assert 'id="s-worker-memory"' in settings_js
     assert 'id="s-ui-memory"' in settings_js
     assert 'id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 2000}"' in settings_js

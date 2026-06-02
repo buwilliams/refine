@@ -105,7 +105,8 @@ def main() -> int:
         assert len(attached["apps"]) == 1
         assert (client / ".git").exists()
         assert (client / ".refine" / "refine.toml").is_file()
-        assert (clone / ".refine-binding").is_file()
+        assert not (clone / ".refine-binding").exists()
+        assert (clone / "run" / "18123" / "apps.json").is_file()
         assert not (clone / ".refine-current").exists()
         print("[ok] project attach creates repo + refine target artifacts")
 

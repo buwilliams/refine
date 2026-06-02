@@ -108,7 +108,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         "comma-delimited file or directory patterns hidden during normal browsing.",
       )}</label>
         <input type="text" id="s-file-browser-ignore"
-               value="${htmlEscape(s.file_browser_ignore_patterns || "node_modules, .git, .refine")}"></div>
+               value="${htmlEscape(s.file_browser_ignore_patterns || "node_modules, .git, .refine, run")}"></div>
     </section>
 
     <section class="settings-section">
