@@ -444,7 +444,7 @@ function drawToolbar() {
     $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
     $("#btn-gap-round-extract")?.addEventListener("click", extractRoundFromGapChat);
     $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
-    $("#btn-chat-progress-toggle")?.addEventListener("click", toggleChatProgress);
+    $("#chat-activity-toggle")?.addEventListener("click", toggleChatProgress);
     $("#chat-input")?.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
@@ -465,7 +465,10 @@ function drawChatDock() { drawToolbar(); }
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
   const progressText = active.progress || "";
   const showProgress = active.showProgress !== false;
-  const progressButtonLabel = showProgress ? "Hide activity" : "Show activity";
+  const hasActivityToggle = hasSession || progressText;
+  const showActivityPanel = showProgress && hasActivityToggle;
+  const activityLabel = active.pending ? "Agent is thinking..." : "Agent activity";
+  const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
   return `
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
@@ -483,10 +486,6 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                 ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>
           Clear history
         </button>
-        <button id="btn-chat-progress-toggle" class="secondary"
-                ${hasSession || progressText ? "" : "disabled"}>
-          ${htmlEscape(progressButtonLabel)}
-        </button>
         ${active.gapId ? `
           <a id="chat-gap-link" class="chat-gap-link"
              href="#/gaps/${encodeURIComponent(active.gapId)}"
@@ -498,13 +497,22 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
       </div>
       <div class="chat-output-box">
         <div id="chat-output" class="chat-output">${mdToHtml(active.output || "")}</div>
-        <div id="chat-progress-panel" class="chat-progress-panel" ${showProgress ? "" : "hidden"}>
-          <div class="chat-progress-title">Agent activity</div>
+        <button type="button"
+                id="chat-activity-toggle"
+                class="chat-activity-toggle"
+                aria-expanded="${showProgress ? "true" : "false"}"
+                title="${htmlEscape(progressToggleLabel)}"
+                ${hasActivityToggle ? "" : "hidden"}>
+          <span class="chat-pending-dots" ${active.pending ? "" : "hidden"}>
+            <span></span><span></span><span></span>
+          </span>
+          <span id="chat-activity-label">${htmlEscape(activityLabel)}</span>
+          <span class="chat-activity-chevron" aria-hidden="true">
+            ${toolbarIcon(showProgress ? "collapse" : "expand")}
+          </span>
+        </button>
+        <div id="chat-progress-panel" class="chat-progress-panel" ${showActivityPanel ? "" : "hidden"}>
           <div id="chat-progress" class="chat-progress">${renderChatProgress(progressText)}</div>
-        </div>
-        <div id="chat-pending" class="chat-pending" hidden>
-          <span class="chat-pending-dots"><span></span><span></span><span></span></span>
-          Agent is thinking…
         </div>
       </div>
       <div class="actions" style="margin-top:8px">
@@ -1340,9 +1348,17 @@ function refreshProcessesTabForChatChange() {
 }
 
 function applyPendingIndicator(tab) {
-  const ind = $("#chat-pending");
+  const toggle = $("#chat-activity-toggle");
+  const dots = toggle?.querySelector(".chat-pending-dots");
+  const label = $("#chat-activity-label");
   const input = $("#chat-input");
-  if (ind) ind.hidden = !tab || !tab.pending;
+  if (toggle) {
+    toggle.hidden = !tab || !(tab.sessionId || tab.progress);
+    toggle.setAttribute("aria-expanded", tab?.showProgress === false ? "false" : "true");
+    toggle.title = tab?.showProgress === false ? "Expand activity" : "Collapse activity";
+  }
+  if (dots) dots.hidden = !tab || !tab.pending;
+  if (label) label.textContent = tab?.pending ? "Agent is thinking..." : "Agent activity";
   if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
   syncChatActionButtons(tab);
 }
