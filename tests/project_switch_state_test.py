@@ -159,7 +159,7 @@ def test_client_switch_path(root: Path) -> None:
     assert "localStorage.removeItem(\"refine_last_reporter\")" in common_js
     assert "Migrate and open" in common_js
     assert "function isManualProjectMigration" in common_js
-    assert "refine migrate run" in common_js
+    assert "refine migrate run [port]" in common_js
     assert "Project migration required" in settings_js
     assert 'api("POST", "/api/project/attach", {' in common_js
     assert "migrate: true" in common_js
@@ -322,7 +322,8 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         assert "migration required" in body["error"]["message"].lower()
         assert fake_runner.stopped is False
         assert fake_poller.stopped is False
-        assert config.get(reload=True).client_repo == client1
+        assert project_registry.active_app(root, port=8080) == client2.resolve()
+        assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
         config.write_binding(root, client2)
@@ -635,6 +636,8 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         from refine_server import config, db, project_registry, project_state
         from refine_ui import api, runtime
 
+        os.environ["REFINE_UI_PORT"] = "18182"
+        os.environ["REFINE_UI_SCOPE"] = "18182"
         config.write_binding(root, client1)
         config.get(reload=True)
         runtime.load_configured(
@@ -666,14 +669,25 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         assert project_state.schema_status(legacy / ".refine")["migration_required"] is True
 
         old_git_stdout = api._git_stdout  # type: ignore[attr-defined]
+        checked_repos: list[tuple[Path, tuple[str, ...]]] = []
+
+        def fake_git_stdout(repo: Path, args: list[str]) -> str:
+            if repo.resolve() == client1.resolve():
+                checked_repos.append((repo.resolve(), tuple(args)))
+                return ""
+            return old_git_stdout(repo, args)
+
         try:
-            api._git_stdout = (  # type: ignore[assignment]
-                lambda repo, args: ""
-                if repo.resolve() == client1.resolve()
-                else old_git_stdout(repo, args)
-            )
-            os.environ["REFINE_UI_PORT"] = "18182"
-            os.environ["REFINE_UI_SCOPE"] = "18182"
+            api._git_stdout = fake_git_stdout  # type: ignore[assignment]
+            status, body = api.project_attach({
+                "path": str(legacy),
+                "install_unit": False,
+                "start_runner": False,
+                "start_poller": False,
+            })
+            assert status == 409, body
+            assert project_registry.active_app(root, port=18182) == legacy.resolve()
+            assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
 
             status, body = api.project_attach({
                 "path": str(legacy),
@@ -694,6 +708,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         assert git(legacy, "status", "--porcelain").stdout.strip() == ""
         assert project_registry.active_app(root, port=18182) == legacy.resolve()
         assert runtime._loaded_config_path == legacy / ".refine" / "refine.toml"  # type: ignore[attr-defined]
+        assert (client1.resolve(), ("status", "--porcelain")) in checked_repos
     finally:
         try:
             from refine_ui import runtime
@@ -780,8 +795,8 @@ def test_manual_node_migration_blocks_project_switch(root: Path) -> None:
 
         assert status == 409, body
         assert "instance_to_node_v2" in body["error"]["message"]
-        assert "refine migrate run" in body["error"]["details"]
-        assert project_registry.active_app(root, port=8080) == client1.resolve()
+        assert "refine migrate run [port]" in body["error"]["details"]
+        assert project_registry.active_app(root, port=8080) == legacy.resolve()
         assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
         assert project_state.schema_status(refine_root)["compatible"] is False
     finally:

@@ -44,6 +44,10 @@ def main() -> int:
     assert "status" in out
     assert "run" in out
 
+    rc, out, err = _run_cli(["migrate", "run", "--help"])
+    assert rc == 0, err
+    assert "[PORT]" in out
+
     rc, out, err = _run_cli(["runner", "--help"])
     assert rc == 0, err
     assert "Usage: refine runner" in out
@@ -103,12 +107,44 @@ def main() -> int:
             str(client.resolve()),
             str(other.resolve()),
         ]
+        legacy = tmp / "legacy-target-app"
+        legacy.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=legacy, check=True)
+        legacy_cfg = config.write_defaults(legacy / ".refine")
+        legacy_root = legacy / ".refine"
+        (legacy_root / "config.json").write_text(
+            json.dumps({"schema_version": 1, "settings": {}}),
+            encoding="utf-8",
+        )
+        (legacy_root / "instances.json").write_text(
+            json.dumps({"instances": [{"id": "default", "display_name": "Default"}]}),
+            encoding="utf-8",
+        )
+        os.chdir(clone)
+        try:
+            rc, _out, err = _run_cli(["target", str(legacy), "--port", "18184"])
+            assert rc == 0, err
+            rc, out, err = _run_cli(["migrate", "status", "18184"])
+            assert rc == 0, err
+        finally:
+            os.chdir(old_cwd)
+        assert legacy_cfg.exists()
+        assert "instance_to_node_v2" in out
+        assert '"port": 18184' in out
+        assert project_registry.active_app(clone, port=18184) == legacy.resolve()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
     tmp = Path(tempfile.mkdtemp(prefix="refine-migrate-cli-"))
     try:
+        clone = tmp / "refine-source"
         client = tmp / "target-app"
+        (clone / "refine_cli").mkdir(parents=True)
+        (clone / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
         client.mkdir()
         subprocess.run(["git", "init", "-q"], cwd=client, check=True)
         subprocess.run(["git", "config", "user.email", "t@x"], cwd=client, check=True)
@@ -123,7 +159,7 @@ def main() -> int:
             text=True,
         )
 
-        from refine_server import config
+        from refine_server import config, project_registry
 
         refine_root = client / ".refine"
         config.write_defaults(refine_root)
@@ -146,11 +182,18 @@ def main() -> int:
         )
 
         cfg_path = refine_root / "refine.toml"
-        rc, out, err = _run_cli(["--config", str(cfg_path), "migrate", "status"])
-        assert rc == 0, err
-        assert "instance_to_node_v2" in out
-        rc, out, err = _run_cli(["--config", str(cfg_path), "migrate", "run"])
-        assert rc == 0, err
+        project_registry.upsert_app(clone, client, make_current=True, port=18183)
+        old_cwd = Path.cwd()
+        os.chdir(clone)
+        try:
+            rc, out, err = _run_cli(["migrate", "status", "18183"])
+            assert rc == 0, err
+            assert "instance_to_node_v2" in out
+            assert '"port": 18183' in out
+            rc, out, err = _run_cli(["migrate", "run", "18183"])
+            assert rc == 0, err
+        finally:
+            os.chdir(old_cwd)
         result = json.loads(out)
         assert result["schema"]["compatible"] is True
         assert result["lock_sync"]["committed_state"] is True
@@ -165,6 +208,9 @@ def main() -> int:
             text=True,
         ).stdout.strip()
         assert subject == "refine: migrate project state"
+        rc, out, err = _run_cli(["--config", str(cfg_path), "migrate", "status"])
+        assert rc == 0, err
+        assert '"port": 8080' in out
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

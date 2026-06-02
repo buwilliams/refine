@@ -301,7 +301,7 @@ function isManualProjectMigration(schema) {
 function manualMigrationText(source) {
   return source?.operator_instructions
     || source?.details
-    || "Stop all old Refine nodes for this app, run `refine migrate run` from one upgraded checkout, push the migrated .refine state, then restart upgraded nodes.";
+    || "Stop all old Refine nodes for this app, run `refine migrate run [port]` from one upgraded checkout, push the migrated .refine state, then restart upgraded nodes.";
 }
 
 function isManualMigrationError(err) {

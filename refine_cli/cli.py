@@ -183,9 +183,23 @@ def _ensure_cli_project(config_path: str | None = None) -> None:
         conn.close()
 
 
-def _migration_config(ctx: typer.Context) -> config.Config:
+def _migration_config(ctx: typer.Context, port: int | None = None) -> config.Config:
     cfg_path = _ctx_config(ctx)
-    return config.get(path=cfg_path, reload=True) if cfg_path else config.get(reload=True)
+    if cfg_path:
+        return config.get(path=cfg_path, reload=True)
+    try:
+        return config.get(reload=True, port=port)
+    except config.ConfigError as e:
+        if port is not None:
+            raise click.ClickException(
+                f"refine migrate: no app is attached on port {port}. "
+                f"Run `refine target --port {port} <target-app>` first."
+            ) from e
+        raise click.ClickException(str(e)) from e
+
+
+def _migration_operator(port: int | None) -> str:
+    return f"refine migrate run {port}" if port is not None else "refine migrate run [port]"
 
 
 def _sync_cli_refine_state(
@@ -214,11 +228,18 @@ def _sync_cli_refine_state(
 
 
 @migrate_app.command("status", help="Show project-state migration status.")
-def migrate_status_command(ctx: typer.Context) -> int:
-    cfg = _migration_config(ctx)
+def migrate_status_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Refine port whose attached app should be inspected."),
+    ] = None,
+) -> int:
+    cfg = _migration_config(ctx, port)
     payload = {
         "client_repo": str(cfg.client_repo),
         "volume_root": str(cfg.volume_root),
+        "port": int(port if port is not None else cfg.web_port),
         "schema": project_state.schema_status(cfg.volume_root),
         "maintenance": project_state.read_maintenance(root=cfg.volume_root),
     }
@@ -227,8 +248,15 @@ def migrate_status_command(ctx: typer.Context) -> int:
 
 
 @migrate_app.command("run", help="Run the pending Refine project-state migration.")
-def migrate_run_command(ctx: typer.Context) -> int:
-    cfg = _migration_config(ctx)
+def migrate_run_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Refine port whose attached app should be migrated."),
+    ] = None,
+) -> int:
+    cfg = _migration_config(ctx, port)
+    operator = _migration_operator(int(port if port is not None else cfg.web_port))
     status = project_state.schema_status(cfg.volume_root)
     if status.get("compatible"):
         if project_state.read_maintenance(root=cfg.volume_root) is not None:
@@ -278,7 +306,7 @@ def migrate_run_command(ctx: typer.Context) -> int:
             {
                 "migration_id": status.get("migration_id") or "",
                 "reason": "project_state_migration",
-                "operator": "refine migrate run",
+                "operator": operator,
                 "operator_instructions": project_state.migration_block_details(status),
             },
             root=cfg.volume_root,
@@ -316,10 +344,10 @@ def migrate_run_command(ctx: typer.Context) -> int:
                 {
                     "migration_id": status.get("migration_id") or "",
                     "reason": "project_state_migration_push_failed",
-                    "operator": "refine migrate run",
+                    "operator": operator,
                     "operator_instructions": (
                         "Migration completed locally, but pushing the migrated "
-                        "state failed. Resolve Git sync, then rerun `refine migrate run` "
+                        f"state failed. Resolve Git sync, then rerun `{operator}` "
                         "or push the migration commit before restarting nodes."
                     ),
                 },

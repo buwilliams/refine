@@ -1586,11 +1586,12 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
             else Path(raw_path).expanduser()
         )
         scaffold_required = _project_needs_scaffold_template(client_repo)
-        current_before = _current_client_repo()
+        current_before = _loaded_client_repo() or _current_client_repo()
         switching = current_before is not None and current_before != client_repo.resolve()
+        _record_migration_candidate_app(clone_dir, client_repo.resolve(), port)
         _validate_target_schema_before_switch(client_repo.resolve(), body)
         prep = (
-            _prepare_current_project_for_switch(clone_dir)
+            _prepare_current_project_for_switch(current_before)
             if switching else {"warnings": []}
         )
 
@@ -1999,6 +2000,17 @@ def _validate_target_schema_before_switch(client_repo: Path, body: dict[str, Any
         )
 
 
+def _record_migration_candidate_app(clone_dir: Path, client_repo: Path, port: int) -> None:
+    existing_refine = client_repo / ".refine"
+    existing_cfg = existing_refine / config.CONFIG_FILENAME
+    if not existing_cfg.exists():
+        return
+    schema = project_state.schema_status(existing_refine)
+    if not schema.get("migration_required"):
+        return
+    project_registry.upsert_app(clone_dir, client_repo, make_current=True, port=port)
+
+
 def _ensure_current_app(apps: list[dict[str, str]], client_repo: Path) -> list[dict[str, str]]:
     """Always include the active app, even when the clone-local registry is unavailable."""
     current = str(client_repo.resolve())
@@ -2063,10 +2075,23 @@ def _current_client_repo() -> Path | None:
         return None
 
 
-def _prepare_current_project_for_switch(clone_dir: Path) -> dict[str, Any]:
+def _loaded_client_repo() -> Path | None:
+    loaded_path = getattr(runtime, "_loaded_config_path", None)
+    if loaded_path is None:
+        return None
+    try:
+        return config.Config.load(loaded_path).client_repo
+    except (OSError, config.ConfigError):
+        return None
+
+
+def _prepare_current_project_for_switch(current_repo: Path | None = None) -> dict[str, Any]:
     """Stop active agents and leave the current target app clean before switching."""
     warnings: list[str] = []
-    cfg = config.get(reload=True, port=_current_port())
+    if current_repo is not None:
+        cfg = config.Config.load(current_repo / ".refine" / config.CONFIG_FILENAME)
+    else:
+        cfg = config.get(reload=True, port=_current_port())
     runtime.stop_runner()
 
     _commit_refine_state(cfg.client_repo)

@@ -30,7 +30,7 @@ INSTANCE_TO_NODE_MIGRATION_ID = "instance_to_node_v2"
 LEGACY_PROJECT_MIGRATION_ID = "legacy_project_to_json_v2"
 MANUAL_SCHEMA_MIGRATION_INSTRUCTIONS = (
     "Manual cluster migration is required. Stop every old Refine node for this "
-    "target app, run `refine migrate run` from one upgraded checkout, commit "
+    "target app, run `refine migrate run [port]` from one upgraded checkout, commit "
     "and push the migrated .refine state, then pull and start the upgraded "
     "nodes."
 )

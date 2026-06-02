@@ -532,12 +532,12 @@ def main() -> int:
             project_state.active_node_id(root=root)
             raise AssertionError("v1 schema should block node state writes")
         except RuntimeError as e:
-            assert "refine migrate run" in str(e)
+            assert "refine migrate run [port]" in str(e)
         try:
             project_state.resume_agents_for_startup(conn)
             raise AssertionError("v1 schema should block worker startup")
         except RuntimeError as e:
-            assert "refine migrate run" in str(e)
+            assert "refine migrate run [port]" in str(e)
         polluted_registry = json.loads(
             (root / "nodes.json").read_text(encoding="utf-8")
         )
@@ -548,7 +548,7 @@ def main() -> int:
             project_state.rebuild_sqlite_cache(conn)
             raise AssertionError("manual migration unexpectedly rebuilt cache")
         except RuntimeError as e:
-            assert "refine migrate run" in str(e)
+            assert "refine migrate run [port]" in str(e)
         project_state.ensure_initialized(
             conn,
             migrate=True,
