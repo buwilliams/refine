@@ -481,7 +481,6 @@ def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     (volume_root / "gaps").mkdir(exist_ok=True)
 
     ensure_refine_gitignore(volume_root)
-    ensure_runtime_gitignore(volume_root.parent)
     return cfg
 
 

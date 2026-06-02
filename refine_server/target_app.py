@@ -84,6 +84,7 @@ Rules for the bash snippets:
   targets, pyproject.toml, Dockerfile, compose files, Procfile, or the README.
 - Refine sets REFINE_RUN_DIR to its checkout-local `run/<port>` directory.
   Use it for generated app PID files, logs, sockets, and other local runtime state.
+  Do not create or default to a target-app `run/` directory.
 - For `start`, never block forever: use a process manager, `docker compose up -d`,
   or background the process (e.g. `nohup ... > "$REFINE_RUN_DIR/target-app.log" 2>&1 &`).
 - Reference paths relative to the repository root.
@@ -738,7 +739,7 @@ run()  { log "RUN: $*"; "$@"; local rc=$?; log "EXIT ${rc}: $*"; return "$rc"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 cd "$APP_DIR" || { log "FATAL: cannot cd to $APP_DIR"; exit 1; }
-REFINE_RUN_DIR="${REFINE_RUN_DIR:-$APP_DIR/run/refine}"
+: "${REFINE_RUN_DIR:?REFINE_RUN_DIR must be set by Refine}"
 
 CMD="${1:-}"
 log "begin: cmd='${CMD}' app_dir='${APP_DIR}' user='$(id -un 2>/dev/null || echo '?')'"

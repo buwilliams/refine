@@ -350,7 +350,6 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
     config.ensure_refine_gitignore(root)
-    config.ensure_runtime_gitignore(root.parent)
     status = schema_status(root)
     if status["compatible"]:
         ensure_default_node(root=root)

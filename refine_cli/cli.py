@@ -950,7 +950,6 @@ def bootstrap_client_repo(
     if cfg_path.exists() and reuse_existing_config:
         (target / "gaps").mkdir(parents=True, exist_ok=True)
         config.ensure_refine_gitignore(target)
-        config.ensure_runtime_gitignore(client_repo)
     else:
         cfg_path = config.write_defaults(target, force=force)
         config_created = True

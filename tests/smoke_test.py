@@ -49,6 +49,8 @@ def main() -> int:
     # Equivalent of `refine target`
     cfg_path = config.write_defaults(client / ".refine")
     print(f"wrote config: {cfg_path}")
+    assert not (client / ".gitignore").exists()
+    assert "run/" not in (client / ".refine" / ".gitignore").read_text(encoding="utf-8").splitlines()
     cfg = config.get()
     print(f"volume root:  {cfg.volume_root}")
     print(f"client repo:  {cfg.client_repo}")
@@ -247,6 +249,9 @@ def main() -> int:
     assert gen["start_command"] == "./.refine/manage-app.sh start"
     assert gen["rebuild_command"] == "./.refine/manage-app.sh rebuild"
     assert gen["env"]["PORT"] == "3000"
+    script = target_app.build_manage_script({"summary": "npm app"})
+    assert 'REFINE_RUN_DIR must be set by Refine' in script
+    assert "$APP_DIR/run/refine" not in script
     ready_file = client / ".refine" / "ready"
     delayed_cfg = {
         "start_command": (
@@ -299,7 +304,7 @@ def main() -> int:
     assert not (clone / ".refine-apps.json").exists()
     assert str(ui_client) in port_registry.read_text(encoding="utf-8")
     assert json.loads(port_registry.read_text(encoding="utf-8"))["active_app"] == str(ui_client)
-    assert "/run/" in (Path(__file__).resolve().parents[1] / ".gitignore").read_text(encoding="utf-8")
+    assert not (ui_client / ".gitignore").exists()
     assert "run/" not in (ui_client / ".refine" / ".gitignore").read_text(encoding="utf-8").splitlines()
     assert not (clone / ".env").exists()
     assert not (clone / ".refine-current").exists()
