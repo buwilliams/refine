@@ -1017,6 +1017,7 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
     original_cwd = Path.cwd()
     old_scope = os.environ.get("REFINE_UI_SCOPE")
     old_port = os.environ.get("REFINE_UI_PORT")
+    old_run_dir = os.environ.get("REFINE_RUN_DIR")
     old_cfg = os.environ.get("REFINE_CONFIG_PATH")
     try:
         from refine_server import config, project_registry, project_state
@@ -1030,6 +1031,7 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
         os.environ.pop("REFINE_UI_PORT", None)
+        os.environ.pop("REFINE_RUN_DIR", None)
         os.chdir(clone)
 
         os.environ["REFINE_UI_SCOPE"] = "8080"
@@ -1064,6 +1066,10 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
             os.environ.pop("REFINE_UI_PORT", None)
         else:
             os.environ["REFINE_UI_PORT"] = old_port
+        if old_run_dir is None:
+            os.environ.pop("REFINE_RUN_DIR", None)
+        else:
+            os.environ["REFINE_RUN_DIR"] = old_run_dir
         if old_cfg is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:

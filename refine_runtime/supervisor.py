@@ -57,6 +57,7 @@ class Supervisor:
         self.host = host
         self.port = port
         self.cfg_path = cfg_path
+        self.run_dir = ipc.run_dir(port=port)
         self.socket_path = ipc.supervisor_socket_path(port)
         self.runner_socket = self._runner_socket_path(cfg_path)
         self.resource_settings = _load_resource_settings(cfg_path)
@@ -147,6 +148,8 @@ class Supervisor:
                 app = {"config_path": cfg_path}
         return {
             "supervisor_pid": os.getpid(),
+            "port": self.port,
+            "run_dir": str(self.run_dir),
             "supervisor_socket": str(self.socket_path),
             "active_config_path": cfg_path or "",
             "active_app": app,
@@ -191,6 +194,10 @@ class Supervisor:
         env = os.environ.copy()
         if self.cfg_path:
             env[config.ENV_CONFIG_PATH] = self.cfg_path
+        env["REFINE_UI_HOST"] = self.host
+        env["REFINE_UI_PORT"] = str(self.port)
+        env["REFINE_UI_SCOPE"] = str(self.port)
+        env[config.ENV_RUN_DIR] = str(self.run_dir)
         env["REFINE_SUPERVISOR_PID"] = str(os.getpid())
         env["REFINE_SUPERVISOR_SOCKET"] = str(self.socket_path)
         env["REFINE_RUNNER_SOCKET"] = str(self.runner_socket)
@@ -251,6 +258,9 @@ class Supervisor:
             self._stop_worker_locked()
             env = os.environ.copy()
             env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
+            env["REFINE_UI_PORT"] = str(self.port)
+            env["REFINE_UI_SCOPE"] = str(self.port)
+            env[config.ENV_RUN_DIR] = str(self.run_dir)
             env["REFINE_SUPERVISOR_SOCKET"] = str(self.socket_path)
             env["REFINE_RUNNER_SOCKET"] = str(socket_path)
             env["REFINE_NO_INPROCESS_RUNNER"] = "1"
@@ -301,6 +311,9 @@ class Supervisor:
         cwd = Path(str(params.get("cwd") or Path.cwd()))
         env_raw = params.get("env") if isinstance(params.get("env"), dict) else {}
         env = {str(k): str(v) for k, v in env_raw.items()}
+        env.setdefault("REFINE_UI_PORT", str(self.port))
+        env.setdefault("REFINE_UI_SCOPE", str(self.port))
+        env.setdefault(config.ENV_RUN_DIR, str(self.run_dir))
         kind = str(params.get("kind") or "process")
         stdin = subprocess.PIPE if params.get("stdin") == "pipe" else subprocess.DEVNULL
         stdout = subprocess.PIPE if params.get("stdout") != "inherit" else None

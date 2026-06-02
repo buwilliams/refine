@@ -154,6 +154,8 @@ def legacy_instances_dir(root: Path | None = None) -> Path:
 
 
 def run_dir(root: Path | None = None) -> Path:
+    if root is not None:
+        return config.local_run_dir(Path.cwd())
     return config.local_run_dir()
 
 
@@ -161,12 +163,12 @@ def legacy_run_dir(root: Path | None = None) -> Path:
     return (root or volume_root()) / "run"
 
 
-def active_nodes_path() -> Path:
-    return run_dir() / "active-nodes.json"
+def active_nodes_path(root: Path | None = None) -> Path:
+    return run_dir(root) / "active-nodes.json"
 
 
-def legacy_active_instances_path() -> Path:
-    return run_dir() / "active-instances.json"
+def legacy_active_instances_path(root: Path | None = None) -> Path:
+    return run_dir(root) / "active-instances.json"
 
 
 def active_node_path(root: Path | None = None) -> Path:
@@ -858,7 +860,7 @@ def _legacy_active_node_selection_key(root: Path) -> str:
 
 def _read_active_node_selection(root: Path) -> tuple[str | None, bool]:
     key = _active_node_selection_key(root)
-    data = _read_json(active_nodes_path(), {"selections": {}})
+    data = _read_json(active_nodes_path(root), {"selections": {}})
     selections = data.get("selections") or {}
     selection = selections.get(key) or {}
     active = selection.get("active_node_id")
@@ -868,7 +870,7 @@ def _read_active_node_selection(root: Path) -> tuple[str | None, bool]:
     active = legacy_selection.get("active_node_id")
     if active:
         return str(active), False
-    legacy_data = _read_json(legacy_active_instances_path(), {"selections": {}})
+    legacy_data = _read_json(legacy_active_instances_path(root), {"selections": {}})
     legacy_selections = legacy_data.get("selections") or {}
     legacy_selection = legacy_selections.get(key) or {}
     active = legacy_selection.get("active_instance_id")
@@ -888,7 +890,7 @@ def _read_active_node_selection(root: Path) -> tuple[str | None, bool]:
 
 
 def _write_active_node_selection(root: Path, node_id: str) -> None:
-    path = active_nodes_path()
+    path = active_nodes_path(root)
     data = _read_json(path, {"selections": {}})
     selections = data.setdefault("selections", {})
     selections[_active_node_selection_key(root)] = {

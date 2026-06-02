@@ -60,7 +60,7 @@ this project actually uses; the most common stacks are:
 Return ONLY a JSON object with these keys:
 {
   "summary": "one short line naming the detected stack and chosen approach",
-  "helpers": "optional bash run once before the command: shared variables or functions (e.g. PORT=3000; PIDFILE=.refine/run/app.pid). Empty string if none.",
+  "helpers": "optional bash run once before the command: shared variables or functions (e.g. PORT=3000; PIDFILE=\"$REFINE_RUN_DIR/target-app.pid\"). Empty string if none.",
   "start": "bash that starts the app and returns promptly; background long-running servers and redirect their logs, do not block",
   "stop": "bash that stops the app and is idempotent (succeeds even if nothing is running)",
   "rebuild": "bash that rebuilds or prepares generated artifacts for review without starting a long-running dev server",
@@ -82,8 +82,10 @@ Rules for the bash snippets:
   already timestamps and captures STDOUT.
 - Prefer project-native commands discovered from package.json scripts, Makefile
   targets, pyproject.toml, Dockerfile, compose files, Procfile, or the README.
+- Refine sets REFINE_RUN_DIR to its checkout-local `run/<port>` directory.
+  Use it for generated app PID files, logs, sockets, and other local runtime state.
 - For `start`, never block forever: use a process manager, `docker compose up -d`,
-  or background the process (e.g. `nohup ... > .refine/run/app.log 2>&1 &`).
+  or background the process (e.g. `nohup ... > "$REFINE_RUN_DIR/target-app.log" 2>&1 &`).
 - Reference paths relative to the repository root.
 - Do not add a shebang and do not redefine the start|stop|rebuild|status
   dispatch — only provide the command bodies.
@@ -736,6 +738,7 @@ run()  { log "RUN: $*"; "$@"; local rc=$?; log "EXIT ${rc}: $*"; return "$rc"; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" >/dev/null 2>&1 && pwd)"
 APP_DIR="$(cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 cd "$APP_DIR" || { log "FATAL: cannot cd to $APP_DIR"; exit 1; }
+REFINE_RUN_DIR="${REFINE_RUN_DIR:-$APP_DIR/run/refine}"
 
 CMD="${1:-}"
 log "begin: cmd='${CMD}' app_dir='${APP_DIR}' user='$(id -un 2>/dev/null || echo '?')'"

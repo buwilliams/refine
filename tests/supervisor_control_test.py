@@ -28,6 +28,7 @@ def main() -> int:
     conn.close()
     old_socket = os.environ.get("REFINE_SUPERVISOR_SOCKET")
     old_runner_socket = os.environ.get("REFINE_RUNNER_SOCKET")
+    old_run_dir = os.environ.get(config.ENV_RUN_DIR)
     old_config = os.environ.get(config.ENV_CONFIG_PATH)
     try:
         cfg_path = client / ".refine" / "refine.toml"
@@ -39,12 +40,19 @@ def main() -> int:
         try:
             status = supervisor.dispatch(M_STATUS, {})
             assert status["supervisor_pid"] == os.getpid()
+            assert status["port"] == 19876
+            assert status["run_dir"].endswith("/run/19876"), status
+            assert status["supervisor_socket"].endswith("/run/19876/s.sock"), status
             assert status["ui"]["pid"] == 1000
             assert status["worker"]["pid"] is None
+            assert supervisor.resources.procs[0].env["REFINE_RUN_DIR"].endswith("/run/19876")
+            assert supervisor.resources.procs[0].env["REFINE_UI_PORT"] == "19876"
 
             worker = supervisor.dispatch(M_ENSURE_WORKER, {"config_path": str(cfg_path)})
             assert worker["worker_pid"] == 1001, worker
             assert supervisor.dispatch(M_STATUS, {})["worker"]["pid"] == 1001
+            assert supervisor.resources.procs[1].env["REFINE_RUN_DIR"].endswith("/run/19876")
+            assert supervisor.resources.procs[1].env["REFINE_UI_PORT"] == "19876"
 
             switched = supervisor.dispatch(M_SWITCH_APP, {"config_path": str(cfg_path)})
             assert switched["worker_pid"] == 1001, switched
@@ -56,6 +64,8 @@ def main() -> int:
                 "kind": "agent",
             })
             assert proc["pid"] == 1002, proc
+            assert supervisor.resources.procs[2].env["REFINE_RUN_DIR"].endswith("/run/19876")
+            assert supervisor.resources.procs[2].env["REFINE_UI_PORT"] == "19876"
             read = supervisor.dispatch(M_PROCESS_READ, {
                 "process_id": proc["process_id"],
                 "cursor": 0,
@@ -82,6 +92,10 @@ def main() -> int:
             os.environ.pop("REFINE_RUNNER_SOCKET", None)
         else:
             os.environ["REFINE_RUNNER_SOCKET"] = old_runner_socket
+        if old_run_dir is None:
+            os.environ.pop(config.ENV_RUN_DIR, None)
+        else:
+            os.environ[config.ENV_RUN_DIR] = old_run_dir
         if old_config is None:
             os.environ.pop(config.ENV_CONFIG_PATH, None)
         else:
@@ -117,7 +131,7 @@ class FakeResourceManager:
         )()
 
     def popen(self, args, *, cwd, env, kind, stdin, stdout, stderr, text=True, bufsize=1):  # noqa: ANN001
-        proc = FakeProc(self._next_pid, kind=kind)
+        proc = FakeProc(self._next_pid, kind=kind, cwd=cwd, env=env)
         self._next_pid += 1
         self.procs.append(proc)
         if kind == "worker":
@@ -137,9 +151,11 @@ class FakeStdout:
 
 
 class FakeProc:
-    def __init__(self, pid: int, *, kind: str) -> None:
+    def __init__(self, pid: int, *, kind: str, cwd, env) -> None:  # noqa: ANN001
         self.pid = pid
         self.kind = kind
+        self.cwd = Path(cwd)
+        self.env = dict(env)
         self.returncode = None if kind in {"ui", "worker"} else 0
         self.stdout = None if kind in {"ui", "worker"} else FakeStdout(["fake output\n"])
         self.stderr = None

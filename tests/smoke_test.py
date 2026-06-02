@@ -506,6 +506,7 @@ def main() -> int:
     assert 'Environment="CLAUDE_CODE_USE_FOUNDRY=1"' in unit_text
     assert 'Environment="ANTHROPIC_FOUNDRY_RESOURCE=refine-foundry"' in unit_text
     assert "Environment=REFINE_UI_PORT=8080" in unit_text
+    assert f"Environment=REFINE_RUN_DIR={unit_clone / 'run' / '8080'}" in unit_text
     assert "Environment=REFINE_CONFIG_PATH=" not in unit_text
     assert "User=installing-user" in unit_text
     assert f"ExecStart={fake_uv} run refine supervisor" in unit_text
@@ -635,6 +636,7 @@ def main() -> int:
     assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "supervisor"]
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
+    assert popen_calls[0]["env"]["REFINE_RUN_DIR"] == str(clone / "run" / "18111")
     try:
         refine_cli._effective_port(type("Args", (), {"port": 0})(), bg_cfg)
         raise AssertionError("port 0 should be rejected")

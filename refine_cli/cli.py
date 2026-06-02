@@ -1010,6 +1010,7 @@ def _write_and_enable_ui_unit(
         f"Environment=REFINE_UI_HOST={host}\n"
         f"Environment=REFINE_UI_PORT={port}\n"
         f"Environment=REFINE_UI_SCOPE={port}\n"
+        f"Environment={config.ENV_RUN_DIR}={config.local_run_dir(clone_dir, port=port)}\n"
         f"ExecStart={uv} run refine supervisor\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
@@ -1962,6 +1963,7 @@ def _start_background_ui(
     env["REFINE_UI_HOST"] = host
     env["REFINE_UI_PORT"] = str(port)
     env["REFINE_UI_SCOPE"] = str(port)
+    env[config.ENV_RUN_DIR] = str(config.local_run_dir(clone, port=port))
     env["REFINE_SUPERVISOR_SOCKET"] = str(_supervisor_socket_path(clone, cfg, port))
     if cfg is not None:
         env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
@@ -2680,6 +2682,7 @@ _SYSTEMD_ENV_BLOCKLIST = {
     config.ENV_CONFIG_PATH,
     "REFINE_NO_INPROCESS_RUNNER",
     "REFINE_RUNNER_SOCKET",
+    config.ENV_RUN_DIR,
     "REFINE_SUPERVISOR_PID",
     "REFINE_UI_HOST",
     "REFINE_UI_PORT",

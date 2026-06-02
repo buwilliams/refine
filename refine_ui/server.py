@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import parse_qs, urlparse
 
+from refine_server import config
+
 from . import api, sse
 
 
@@ -698,6 +700,7 @@ def _guess_type(path: Path) -> str:
 def run(host: str = "0.0.0.0", port: int = 8080) -> None:
     os.environ["REFINE_UI_PORT"] = str(port)
     os.environ["REFINE_UI_SCOPE"] = str(port)
+    os.environ.setdefault(config.ENV_RUN_DIR, str(config.local_run_dir(Path.cwd(), port=port)))
     httpd = ThreadingHTTPServer((host, port), RefineHandler)
     sys.stderr.write(f"[refine-ui] listening on http://{host}:{port}\n")
     httpd.serve_forever()

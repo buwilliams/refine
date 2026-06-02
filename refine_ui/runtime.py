@@ -82,6 +82,10 @@ def load_configured(
     cfg_preview = config.Config.load(path)
     os.environ.setdefault(config.ENV_UI_PORT, str(cfg_preview.web_port))
     os.environ.setdefault(config.ENV_UI_SCOPE, str(cfg_preview.web_port))
+    os.environ.setdefault(
+        config.ENV_RUN_DIR,
+        str(config.local_run_dir(Path.cwd(), port=cfg_preview.web_port)),
+    )
     from refine_server import project_state
 
     schema = project_state.schema_status(cfg_preview.volume_root)

@@ -36,6 +36,7 @@ CONFIG_FILENAME = "refine.toml"
 BINDING_FILENAME = ".refine-binding"
 ENV_CONFIG_PATH = "REFINE_CONFIG_PATH"
 ENV_LOCAL_NODE_ID = "REFINE_LOCAL_NODE_ID"
+ENV_RUN_DIR = "REFINE_RUN_DIR"
 ENV_UI_SCOPE = "REFINE_UI_SCOPE"
 ENV_UI_PORT = "REFINE_UI_PORT"
 DEFAULT_UI_PORT = 8080
@@ -358,6 +359,10 @@ def runtime_port(default: int = DEFAULT_UI_PORT) -> int:
 
 def local_run_dir(start: Path | None = None, *, port: int | str | None = None) -> Path:
     """Port-scoped checkout-local runtime directory."""
+    if start is None and port is None:
+        raw_run_dir = os.environ.get(ENV_RUN_DIR)
+        if raw_run_dir:
+            return Path(raw_run_dir).expanduser().resolve()
     raw_port = runtime_port() if port is None else int(port)
     return local_run_root(start) / str(raw_port)
 
