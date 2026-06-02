@@ -1329,6 +1329,10 @@ def ensure_sqlite_cache_current(
     app/node switches. The explicit System > Runtime rebuild action uses
     a forced rebuild instead.
     """
+    from . import db
+
+    if not db.schema_ready(conn):
+        db.ensure_schema(conn)
     active = node_id or active_node_id()
     cached = _cached_active_node_id(conn)
     if cached != active:

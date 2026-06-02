@@ -382,12 +382,7 @@ def init_db(path: Path | None = None) -> None:
     """Create schema and seed defaults if missing."""
     conn = connect(path)
     try:
-        conn.executescript(SCHEMA)
-        _migrate(conn)
-        for k, v in DEFAULT_SETTINGS.items():
-            conn.execute(
-                "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v)
-            )
+        ensure_schema(conn)
         if path is None:
             from . import project_state
 
@@ -399,6 +394,28 @@ def init_db(path: Path | None = None) -> None:
                 _REBUILDING_CACHE = False
     finally:
         conn.close()
+
+
+def schema_ready(conn: sqlite3.Connection) -> bool:
+    required = {"gaps_index", "gap_cache_meta", "settings", "reporters"}
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table'"
+    ).fetchall()
+    existing = {
+        str(row["name"] if isinstance(row, sqlite3.Row) else row[0])
+        for row in rows
+    }
+    return required.issubset(existing)
+
+
+def ensure_schema(conn: sqlite3.Connection) -> None:
+    """Create/migrate cache schema on an existing connection."""
+    conn.executescript(SCHEMA)
+    _migrate(conn)
+    for k, v in DEFAULT_SETTINGS.items():
+        conn.execute(
+            "INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v)
+        )
 
 
 def _migrate(conn: sqlite3.Connection) -> None:

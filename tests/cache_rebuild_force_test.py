@@ -13,7 +13,7 @@ def main() -> int:
     tmp, client = make_client_repo("refine-cache-rebuild-force-")
     conn = init_refine(client)
     try:
-        from refine_server import db, gap_writer, project_state
+        from refine_server import config, db, gap_writer, project_state
         from refine_ui import api, background_jobs
 
         gids = [
@@ -95,6 +95,26 @@ def main() -> int:
         ).fetchone()
         assert decision is not None
         assert "Force rebuild" in decision["accepted_json"], decision["accepted_json"]
+
+        conn.close()
+        cfg = config.get(reload=True)
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                Path(f"{cfg.sqlite_path}{suffix}").unlink()
+            except FileNotFoundError:
+                pass
+        conn = db.connect(cfg.sqlite_path)
+        assert db.schema_ready(conn) is False
+        assert (
+            project_state.ensure_sqlite_cache_current(conn)
+            == project_state.active_node_id()
+        )
+        assert db.schema_ready(conn) is True
+        gap_count = conn.execute(
+            "SELECT COUNT(*) AS n FROM gaps_index WHERE id IN (?, ?, ?)",
+            gids,
+        ).fetchone()["n"]
+        assert gap_count == len(gids), gap_count
 
         status, body = api.rebuild_sqlite_cache({
             "restart_services": False,
