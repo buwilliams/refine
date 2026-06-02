@@ -597,14 +597,17 @@ def main() -> int:
             lifecycle_calls.append(("pause", str(port_arg))) or False
         )
         no_port_args = type("Args", (), {"port": None, "config": str(unit_cfg_path)})()
+        explicit_unit_args = type("Args", (), {"port": 18124, "config": str(unit_cfg_path)})()
 
-        assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 18124
-        assert refine_cli.cmd_start(no_port_args) == 0
+        assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 8080
+        assert refine_cli._runtime_action_port(explicit_unit_args, unit_clone, unit_cfg, unit_name) == 18124
+        assert refine_cli.cmd_start(explicit_unit_args) == 0
         stop_out = StringIO()
         with redirect_stdout(stop_out):
-            assert refine_cli.cmd_stop(no_port_args) == 0
+            assert refine_cli.cmd_stop(explicit_unit_args) == 0
         assert "Stopped refine on port 18124." in stop_out.getvalue()
-        schema_conn = sqlite3.connect(str(unit_cfg.sqlite_path))
+        unit_cfg_18124 = config.Config.load(unit_cfg_path, port=18124)
+        schema_conn = sqlite3.connect(str(unit_cfg_18124.sqlite_path))
         try:
             schema_conn.execute("DROP TABLE IF EXISTS performance_events")
             schema_conn.commit()
@@ -614,8 +617,8 @@ def main() -> int:
             ).fetchone() is None
         finally:
             schema_conn.close()
-        assert refine_cli.cmd_restart(no_port_args) == 0
-        schema_conn = sqlite3.connect(str(unit_cfg.sqlite_path))
+        assert refine_cli.cmd_restart(explicit_unit_args) == 0
+        schema_conn = sqlite3.connect(str(unit_cfg_18124.sqlite_path))
         try:
             assert schema_conn.execute(
                 "SELECT name FROM sqlite_master WHERE type = 'table' "
@@ -705,7 +708,8 @@ def main() -> int:
         other_clone.mkdir()
         assert refine_cli._running_pid(other_clone, bg_cfg, 18112) is None
         no_port_args = type("Args", (), {"port": None})()
-        assert refine_cli._runtime_action_port(no_port_args, clone, bg_cfg) == 18112
+        assert refine_cli._runtime_action_port(no_port_args, clone, bg_cfg) == 8080
+        assert refine_cli._runtime_action_port(type("Args", (), {"port": 18112})(), clone, bg_cfg) == 18112
         assert refine_cli._stop_background_ui(clone, bg_cfg, 18112) is True
     finally:
         refine_cli._listener_pids = old_listener_pids
@@ -721,20 +725,24 @@ def main() -> int:
 
     (clone / "run" / "18120").mkdir(parents=True, exist_ok=True)
     (clone / "run" / "18121").mkdir(parents=True, exist_ok=True)
+    (clone / "run" / "18113").mkdir(parents=True, exist_ok=True)
     (clone / "run" / "18120" / "supervisor.pid").write_text("111\n", encoding="utf-8")
     (clone / "run" / "18121" / "supervisor.pid").write_text("222\n", encoding="utf-8")
+    (clone / "run" / "18113" / "apps.json").write_text(
+        json.dumps({"version": 1, "active_app": str(ui_client), "apps": []}),
+        encoding="utf-8",
+    )
     old_owned_ports = refine_cli._owned_refine_ui_ports
     try:
         refine_cli._owned_refine_ui_ports = lambda clone_arg: [18122] if clone_arg == clone else []
-        assert refine_cli._status_ports(type("Args", (), {"port": None})(), clone, bg_cfg) == [
-            8080, 18111, 18120, 18121, 18122,
-        ]
+        assert refine_cli._status_ports(type("Args", (), {"port": None})(), clone, bg_cfg) == [8080]
         assert refine_cli._status_ports(type("Args", (), {"port": 18123})(), clone, bg_cfg) == [18123]
+        assert refine_cli._runtime_action_port(type("Args", (), {"port": None})(), clone, bg_cfg) == 8080
     finally:
         refine_cli._owned_refine_ui_ports = old_owned_ports
         for p in (clone / "run").glob("1812*/supervisor.pid"):
             p.unlink(missing_ok=True)
-    print("[ok] refine status lists every checkout-local supervisor port")
+    print("[ok] refine status defaults to configured port")
 
     old_print_performance = refine_cli._print_performance_block
     perf_calls: list[tuple[str, int, float, int]] = []
@@ -760,9 +768,8 @@ def main() -> int:
         os.chdir(old_cwd)
         refine_cli._owned_refine_ui_ports = old_owned_ports
         refine_cli._print_performance_block = old_print_performance
-    assert (str(clone), 18111, 0.0, 5) in perf_calls
-    assert (str(clone), 18122, 0.0, 5) in perf_calls
-    print("[ok] refine ps lists checkout-local supervisor ports")
+    assert perf_calls == [(str(clone), 8080, 0.0, 5)], perf_calls
+    print("[ok] refine ps defaults to configured port")
 
     old_print_performance_snapshot = refine_cli._print_performance_snapshot
     old_sleep = refine_cli.time.sleep
@@ -899,8 +906,7 @@ def main() -> int:
         ("status", setup_clone.resolve(), 19000, "refine-setup-refine-clone"),
         ("stop", setup_clone.resolve(), None, 19001),
         ("status", setup_clone.resolve(), 19002, "refine-setup-refine-clone"),
-        ("status", setup_clone.resolve(), 19003, "refine-setup-refine-clone"),
-        ("status", setup_clone.resolve(), 19004, "refine-setup-refine-clone"),
+        ("status", setup_clone.resolve(), 8080, "refine-setup-refine-clone"),
     ]
     status_out = StringIO()
     with redirect_stdout(status_out):

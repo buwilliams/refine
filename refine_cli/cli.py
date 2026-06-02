@@ -4013,7 +4013,7 @@ def _config_for_port(args: _Args, clone: Path, port: int) -> config.Config | Non
     try:
         cfg_path = getattr(args, "config", None)
         if cfg_path:
-            return config.Config.load(cfg_path)
+            return config.Config.load(cfg_path, port=port)
         return config.get(reload=True, port=port)
     except config.ConfigError:
         return None
@@ -4541,16 +4541,7 @@ def _owned_refine_ui_ports(clone: Path) -> list[int]:
 def _status_ports(args: _Args, clone: Path,
                   cfg: "config.Config | None",
                   unit: str | None = None) -> list[int]:
-    if getattr(args, "port", None) is not None:
-        return [_effective_port(args, cfg)]
-    ports = set(_runtime_pid_ports(clone, cfg))
-    ports.update(_runtime_app_ports(clone))
-    ports.update(_owned_refine_ui_ports(clone))
-    if unit is not None:
-        ports.update(_installed_ui_unit_ports(unit))
-    if not ports:
-        ports.add(_effective_port(args, cfg))
-    return sorted(ports)
+    return [_effective_port(args, cfg)]
 
 
 def _runtime_pid_ports(clone: Path, cfg: "config.Config | None") -> list[int]:
@@ -4644,24 +4635,7 @@ def _listener_port_pids() -> list[tuple[int, int]]:
 def _runtime_action_port(args: _Args, clone: Path,
                          cfg: "config.Config | None",
                          unit: str | None = None) -> int:
-    configured = _effective_port(args, cfg)
-    if getattr(args, "port", None) is not None:
-        return configured
-    if _running_pid(clone, cfg, configured) is not None:
-        return configured
-    if unit is not None and _installed_ui_unit(unit, configured) is not None:
-        return configured
-    live_ports = [p for p in _owned_refine_ui_ports(clone) if p != configured]
-    if len(live_ports) == 1:
-        return live_ports[0]
-    app_ports = [p for p in _runtime_app_ports(clone) if p != configured]
-    if len(app_ports) == 1:
-        return app_ports[0]
-    if unit is not None:
-        installed_ports = [p for p in _installed_ui_unit_ports(unit) if p != configured]
-        if len(installed_ports) == 1:
-            return installed_ports[0]
-    return configured
+    return _effective_port(args, cfg)
 
 
 def _pid_cmdline(pid: int) -> str:
