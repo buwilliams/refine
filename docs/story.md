@@ -155,3 +155,11 @@ Effort: High (16 commits, 5 milestones)
 Milestones started: Logs screen parity; CLI ergonomics; distributed cluster nodes; template packaging; runtime worker recovery hardening.
 
 Logs and CLI ergonomics sharpened, then the distributed runtime took over: the gap-filtered Logs screen gained round logs and multiline rows, `r` and `update` landed, Guide state/highlight behavior was refined, cluster nodes and distributed project sync shipped, app templates were packaged for deployed installs, node-scoped dispatcher/status accounting was repaired, and runner-worker recovery hardened around stale sockets, orphan workers, and false in-progress Gap failures.
+
+## Day 21: 2026-06-02 (Tuesday)
+
+Effort: Very High (22 commits, 5 milestones)
+
+Milestones started: supervisor-owned app switching; CLI/API operation centralization; port-scoped runtime correctness; black-box harness isolation; Gap chat workflow polish.
+
+Runtime ownership became much stricter: app state moved under checkout-local `run/<port>`, legacy runtime state was quarantined during migration, target apps stopped needing `/run/` ignores, status output listed every runtime port, and restart handling stopped letting old supervisors unlink newer sockets. The CLI and API also converged on shared operation logic with configured-port defaults, while the black-box harness stopped disturbing live supervisors. Product work kept pace with round extraction from Gap chat, round-count filters, owner labels, inline Gap metadata, and a chevron-driven activity panel in the Chat dock.
