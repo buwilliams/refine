@@ -735,14 +735,17 @@ def main() -> int:
     old_owned_ports = refine_cli._owned_refine_ui_ports
     try:
         refine_cli._owned_refine_ui_ports = lambda clone_arg: [18122] if clone_arg == clone else []
-        assert refine_cli._status_ports(type("Args", (), {"port": None})(), clone, bg_cfg) == [8080]
+        assert refine_cli._status_ports(type("Args", (), {"port": None})(), clone, bg_cfg) == [
+            8080, 18111, 18112, 18113, 18120, 18121, 18122,
+        ]
         assert refine_cli._status_ports(type("Args", (), {"port": 18123})(), clone, bg_cfg) == [18123]
         assert refine_cli._runtime_action_port(type("Args", (), {"port": None})(), clone, bg_cfg) == 8080
+        assert refine_cli._performance_ports(type("Args", (), {"port": None})(), bg_cfg) == [8080]
     finally:
         refine_cli._owned_refine_ui_ports = old_owned_ports
         for p in (clone / "run").glob("1812*/supervisor.pid"):
             p.unlink(missing_ok=True)
-    print("[ok] refine status defaults to configured port")
+    print("[ok] refine status lists checkout-local runtime ports")
 
     old_print_performance = refine_cli._print_performance_block
     perf_calls: list[tuple[str, int, float, int]] = []
@@ -906,7 +909,8 @@ def main() -> int:
         ("status", setup_clone.resolve(), 19000, "refine-setup-refine-clone"),
         ("stop", setup_clone.resolve(), None, 19001),
         ("status", setup_clone.resolve(), 19002, "refine-setup-refine-clone"),
-        ("status", setup_clone.resolve(), 8080, "refine-setup-refine-clone"),
+        ("status", setup_clone.resolve(), 19003, "refine-setup-refine-clone"),
+        ("status", setup_clone.resolve(), 19004, "refine-setup-refine-clone"),
     ]
     status_out = StringIO()
     with redirect_stdout(status_out):

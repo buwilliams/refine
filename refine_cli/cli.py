@@ -3488,7 +3488,7 @@ def cmd_ps(args: _Args) -> int:
 
 def _print_performance_snapshot(args: _Args) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
-    for port in _status_ports(args, clone, None, unit):
+    for port in _performance_ports(args, None):
         cfg = _config_for_port(args, clone, port)
         _print_performance_block(
             clone, cfg, unit, port=port,
@@ -4541,7 +4541,36 @@ def _owned_refine_ui_ports(clone: Path) -> list[int]:
 def _status_ports(args: _Args, clone: Path,
                   cfg: "config.Config | None",
                   unit: str | None = None) -> list[int]:
+    if getattr(args, "port", None) is not None:
+        return [_effective_port(args, cfg)]
+    ports = set(_runtime_dir_ports(clone))
+    ports.update(_runtime_pid_ports(clone, cfg))
+    ports.update(_runtime_app_ports(clone))
+    ports.update(_owned_refine_ui_ports(clone))
+    if unit is not None:
+        ports.update(_installed_ui_unit_ports(unit))
+    if not ports:
+        ports.add(_effective_port(args, cfg))
+    return sorted(ports)
+
+
+def _performance_ports(args: _Args, cfg: "config.Config | None") -> list[int]:
     return [_effective_port(args, cfg)]
+
+
+def _runtime_dir_ports(clone: Path) -> list[int]:
+    run_root = config.local_run_root(clone)
+    ports: set[int] = set()
+    try:
+        entries = list(run_root.iterdir())
+    except OSError:
+        entries = []
+    for path in entries:
+        if path.is_dir() and path.name.isdigit():
+            port = int(path.name)
+            if 0 < port <= 65535:
+                ports.add(port)
+    return sorted(ports)
 
 
 def _runtime_pid_ports(clone: Path, cfg: "config.Config | None") -> list[int]:

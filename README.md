@@ -24,6 +24,8 @@ refine has a robust CLI:
 uv run refine --help
 ```
 
+The external interface test app lives at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
+
 ### Windows Users
 
 Open PowerShell as Administrator:
