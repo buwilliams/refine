@@ -1,0 +1,171 @@
+"""Supervisor control-plane unit tests."""
+from __future__ import annotations
+
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+
+def main() -> int:
+    from refine_runtime.supervisor import Supervisor
+    from refine_runtime.supervisor_protocol import (
+        M_ENSURE_WORKER,
+        M_PROCESS_LAUNCH,
+        M_PROCESS_READ,
+        M_PROCESS_WAIT,
+        M_SHUTDOWN,
+        M_STATUS,
+        M_SWITCH_APP,
+    )
+    from refine_server import config
+    from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+
+    tmp, client = make_client_repo("refine-supervisor-control-")
+    conn = init_refine(client)
+    conn.close()
+    old_socket = os.environ.get("REFINE_SUPERVISOR_SOCKET")
+    old_runner_socket = os.environ.get("REFINE_RUNNER_SOCKET")
+    old_config = os.environ.get(config.ENV_CONFIG_PATH)
+    try:
+        cfg_path = client / ".refine" / "refine.toml"
+        os.environ[config.ENV_CONFIG_PATH] = str(cfg_path)
+        supervisor = Supervisor(host="127.0.0.1", port=19876, cfg_path=str(cfg_path))
+        supervisor.resources = FakeResourceManager()
+        supervisor._can_ping_worker = lambda _path: True  # type: ignore[method-assign]
+        supervisor.start()
+        try:
+            status = supervisor.dispatch(M_STATUS, {})
+            assert status["supervisor_pid"] == os.getpid()
+            assert status["ui"]["pid"] == 1000
+            assert status["worker"]["pid"] is None
+
+            worker = supervisor.dispatch(M_ENSURE_WORKER, {"config_path": str(cfg_path)})
+            assert worker["worker_pid"] == 1001, worker
+            assert supervisor.dispatch(M_STATUS, {})["worker"]["pid"] == 1001
+
+            switched = supervisor.dispatch(M_SWITCH_APP, {"config_path": str(cfg_path)})
+            assert switched["worker_pid"] == 1001, switched
+
+            proc = supervisor.dispatch(M_PROCESS_LAUNCH, {
+                "args": ["fake", "command"],
+                "cwd": str(client),
+                "env": {},
+                "kind": "agent",
+            })
+            assert proc["pid"] == 1002, proc
+            read = supervisor.dispatch(M_PROCESS_READ, {
+                "process_id": proc["process_id"],
+                "cursor": 0,
+                "timeout": 1,
+            })
+            assert "fake output" in read["data"], read
+            waited = supervisor.dispatch(M_PROCESS_WAIT, {
+                "process_id": proc["process_id"],
+                "timeout": 0,
+            })
+            assert waited["exited"] is True
+            assert waited["returncode"] == 0
+
+            supervisor.dispatch(M_SHUTDOWN, {})
+        finally:
+            supervisor.shutdown()
+        assert all(p.terminated or p.returncode is not None for p in supervisor.resources.procs)
+    finally:
+        if old_socket is None:
+            os.environ.pop("REFINE_SUPERVISOR_SOCKET", None)
+        else:
+            os.environ["REFINE_SUPERVISOR_SOCKET"] = old_socket
+        if old_runner_socket is None:
+            os.environ.pop("REFINE_RUNNER_SOCKET", None)
+        else:
+            os.environ["REFINE_RUNNER_SOCKET"] = old_runner_socket
+        if old_config is None:
+            os.environ.pop(config.ENV_CONFIG_PATH, None)
+        else:
+            os.environ[config.ENV_CONFIG_PATH] = old_config
+        cleanup_tmp(tmp)
+    root = Path(__file__).resolve().parents[1]
+    runtime_source = (root / "refine_ui" / "runtime.py").read_text(encoding="utf-8")
+    api_source = (root / "refine_ui" / "api.py").read_text(encoding="utf-8")
+    assert "subprocess.Popen" not in runtime_source
+    assert "_start_external_runner" not in runtime_source
+    assert "_terminate_workers_for_socket" not in runtime_source
+    assert "os.kill(" not in runtime_source
+    assert "subprocess.Popen" not in api_source
+    print("supervisor control tests OK")
+    return 0
+
+
+class FakeResourceManager:
+    def __init__(self) -> None:
+        self.procs: list[FakeProc] = []
+        self._next_pid = 1000
+
+    def capabilities(self):
+        return type(
+            "Capabilities",
+            (),
+            {
+                "name": "fake",
+                "isolation": "best_effort",
+                "enforced": False,
+                "details": "fake resource backend",
+            },
+        )()
+
+    def popen(self, args, *, cwd, env, kind, stdin, stdout, stderr, text=True, bufsize=1):  # noqa: ANN001
+        proc = FakeProc(self._next_pid, kind=kind)
+        self._next_pid += 1
+        self.procs.append(proc)
+        if kind == "worker":
+            Path(env["REFINE_RUNNER_SOCKET"]).parent.mkdir(parents=True, exist_ok=True)
+            Path(env["REFINE_RUNNER_SOCKET"]).touch()
+        return proc
+
+
+class FakeStdout:
+    def __init__(self, chunks: list[str]) -> None:
+        self._chunks = chunks
+
+    def read(self, _size: int = -1) -> str:
+        if not self._chunks:
+            return ""
+        return self._chunks.pop(0)
+
+
+class FakeProc:
+    def __init__(self, pid: int, *, kind: str) -> None:
+        self.pid = pid
+        self.kind = kind
+        self.returncode = None if kind in {"ui", "worker"} else 0
+        self.stdout = None if kind in {"ui", "worker"} else FakeStdout(["fake output\n"])
+        self.stderr = None
+        self.stdin = None
+        self.terminated = False
+
+    def poll(self):
+        return self.returncode
+
+    def wait(self, timeout=None):  # noqa: ANN001
+        if self.returncode is None and timeout == 0:
+            raise subprocess.TimeoutExpired(str(self.pid), timeout)
+        if self.returncode is None:
+            self.returncode = -15
+        return self.returncode
+
+    def send_signal(self, sig: int) -> None:
+        self.terminated = True
+        self.returncode = -int(sig)
+
+    def terminate(self) -> None:
+        self.send_signal(15)
+
+    def kill(self) -> None:
+        self.send_signal(9)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

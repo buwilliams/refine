@@ -45,25 +45,38 @@ def main() -> int:
         stuck = git_ops.in_progress_op()
         assert stuck and stuck[0] == "unmerged-index", stuck
 
-        status, body = api.target_app_start({})
-        assert status == 200, body
-        assert body["ok"] is True, body
+        from refine_server.runner import Runner
+
+        old_get_client = api.get_client
+        route_runner = Runner()
+        try:
+            api.get_client = lambda: RunnerClient(route_runner)  # type: ignore[assignment]
+            status, body = api.target_app_start({})
+            assert status == 200, body
+            assert body["ok"] is True, body
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+            route_runner.shutdown()
         assert git_ops.in_progress_op() is None
         assert git(client, "status", "--porcelain").stdout.strip() == ""
         stash_list = git(client, "stash", "list").stdout
         assert "refine cleanup auto-stash (pre-target-app start cleanup)" in stash_list
 
         (client / "ordinary-wip.txt").write_text("wip\n", encoding="utf-8")
-        status, body = api.target_app_start({})
-        assert status == 200, body
-        assert body["ok"] is True, body
+        route_runner = Runner()
+        try:
+            api.get_client = lambda: RunnerClient(route_runner)  # type: ignore[assignment]
+            status, body = api.target_app_start({})
+            assert status == 200, body
+            assert body["ok"] is True, body
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+            route_runner.shutdown()
         assert git(client, "status", "--porcelain").stdout.strip() == ""
         stash_list = git(client, "stash", "list").stdout
         assert "refine target-app start auto-stash" in stash_list
 
         runtime.stop_runner()
-        from refine_server.runner import Runner
-
         runner = Runner()
         (client / "automatic-wip.txt").write_text("wip\n", encoding="utf-8")
         try:
@@ -94,6 +107,14 @@ def main() -> int:
 
     print("target-app start cleanup tests OK")
     return 0
+
+
+class RunnerClient:
+    def __init__(self, runner):
+        self.runner = runner
+
+    def call(self, method, params=None, *, timeout=30.0):  # noqa: ANN001, ARG002
+        return self.runner.call(method, params or {})
 
 
 if __name__ == "__main__":

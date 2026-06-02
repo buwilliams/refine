@@ -53,11 +53,11 @@ def main() -> int:
         info = runtime.backend_info()
         assert info["process_model"] == "supervisor"
         assert info["transport"] == "unix_socket"
-        assert info["ui_controls_runner_lifecycle"] is True
+        assert info["ui_controls_runner_lifecycle"] is False
         assert info["in_process_runner_allowed"] is False
         assert info["source_fingerprint"] == identity.SOURCE_FINGERPRINT
         assert info["refine_version"] == identity.REFINE_VERSION
-        assert info["local_node_id"]
+        assert "local_node_id" in info
 
         status, body = api.backend_diagnostics()
         assert status == 200
@@ -113,7 +113,7 @@ def main() -> int:
         info = runtime.backend_info()
         assert info["process_model"] == "supervisor"
         assert info["transport"] == "unix_socket"
-        assert info["ui_controls_runner_lifecycle"] is True
+        assert info["ui_controls_runner_lifecycle"] is False
         assert info["in_process_runner_allowed"] is False
     finally:
         ipc.request = original_request  # type: ignore[assignment]

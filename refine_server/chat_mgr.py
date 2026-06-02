@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import signal
 import subprocess
 import threading
 import time
@@ -28,6 +27,7 @@ from typing import Callable, Deque
 
 from refine_runtime.manager import ResourceManager
 from refine_runtime.resources import ResourceSettings
+from refine_runtime.supervised_process import supervised_popen
 
 from . import agent_cli
 
@@ -360,7 +360,8 @@ class ChatManager:
             spec, binary = _resolve_agent(s.provider, env)
             args = spec.chat_args(binary, priming_text, cwd=s.cwd)
             try:
-                proc = _resource_manager_for_chat().popen(
+                manager = _resource_manager_for_chat()
+                proc = supervised_popen(
                     args,
                     cwd=s.cwd,
                     env=env,
@@ -370,6 +371,7 @@ class ChatManager:
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
+                    fallback_manager=manager,
                 )
             except (OSError, FileNotFoundError) as e:
                 context_label = "Plan" if s.mode == "plan" else "Gap"
@@ -469,7 +471,8 @@ class ChatManager:
                 cwd=s.cwd,
             )
             try:
-                s.proc = _resource_manager_for_chat().popen(
+                manager = _resource_manager_for_chat()
+                s.proc = supervised_popen(
                     args,
                     cwd=s.cwd,
                     env=env,
@@ -479,6 +482,7 @@ class ChatManager:
                     stderr=subprocess.STDOUT,
                     text=True,
                     bufsize=1,
+                    fallback_manager=manager,
                 )
             except (OSError, FileNotFoundError) as e:
                 with s.out_lock:
@@ -920,27 +924,16 @@ class ChatManager:
 
     @staticmethod
     def _terminate_process_group(proc: subprocess.Popen) -> None:
-        def signal_group(sig: signal.Signals) -> None:
-            try:
-                os.killpg(proc.pid, sig)
-                return
-            except ProcessLookupError:
-                pass
-            try:
-                os.killpg(os.getpgid(proc.pid), sig)
-            except (ProcessLookupError, PermissionError):
-                pass
-
         try:
-            signal_group(signal.SIGTERM)
-        except PermissionError:
+            proc.terminate()
+        except (OSError, PermissionError):
             pass
         try:
             proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             try:
-                signal_group(signal.SIGKILL)
-            except PermissionError:
+                proc.kill()
+            except (OSError, PermissionError):
                 pass
 
     def _supervise(self) -> None:

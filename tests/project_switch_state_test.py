@@ -235,19 +235,27 @@ def test_runtime_switch_resets_services() -> None:
 
         fake_poller = FakePoller()
         fake_runner = FakeRunner()
+        supervisor_calls: list[str] = []
+        original_supervisor_request = runtime._supervisor_request  # type: ignore[attr-defined]
+        runtime._supervisor_request = (  # type: ignore[attr-defined]
+            lambda method, params=None, *, timeout=30.0:
+            supervisor_calls.append(method) or {"stopped": True}
+        )
         runtime._poller = fake_poller  # type: ignore[attr-defined]
         runtime._runner = fake_runner  # type: ignore[attr-defined]
+        try:
+            runtime.load_configured(
+                boot["config_path"],
+                start_poller=False,
+                start_runner=False,
+            )
 
-        runtime.load_configured(
-            boot["config_path"],
-            start_poller=False,
-            start_runner=False,
-        )
-
-        assert fake_poller.stopped is True
-        assert fake_runner.stopped is True
-        assert runtime._poller is None  # type: ignore[attr-defined]
-        assert runtime._runner is None  # type: ignore[attr-defined]
+            assert fake_poller.stopped is True
+            assert "stop_worker" in supervisor_calls
+            assert runtime._poller is None  # type: ignore[attr-defined]
+            assert runtime._runner is None  # type: ignore[attr-defined]
+        finally:
+            runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
     finally:
         try:
             runtime.stop_all()  # type: ignore[name-defined]

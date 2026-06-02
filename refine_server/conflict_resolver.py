@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import os
-import signal
 import sqlite3
 import subprocess
 import threading
@@ -26,6 +25,7 @@ from pathlib import Path
 from refine_server import db
 from refine_runtime.manager import ResourceManager
 from refine_runtime.resources import ResourceSettings
+from refine_runtime.supervised_process import supervised_popen
 
 from . import agent_cli, git_ops
 from .chat_mgr import _chat_env
@@ -83,7 +83,7 @@ def attempt_auto_resolve(
         severity="info", category="git")
     try:
         manager = ResourceManager(ResourceSettings.from_settings(db.list_settings(conn)))
-        proc = manager.popen(
+        proc = supervised_popen(
             spec.agent_args(bin_path, prompt, cwd=repo),
             cwd=repo,
             env=env,
@@ -93,6 +93,7 @@ def attempt_auto_resolve(
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
+            fallback_manager=manager,
         )
     except (OSError, FileNotFoundError) as e:
         return {"ok": False,
@@ -202,15 +203,15 @@ def _stream_and_supervise(proc: subprocess.Popen, log, *,
         log(f"Auto-resolve agent killed: {killed}",
             severity="warn", category="git")
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
+            proc.terminate()
+        except (ProcessLookupError, PermissionError, OSError):
             pass
         try:
             proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
+                proc.kill()
+            except (ProcessLookupError, PermissionError, OSError):
                 pass
     try:
         proc.wait(timeout=5.0)

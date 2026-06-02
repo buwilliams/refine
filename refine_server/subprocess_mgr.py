@@ -25,6 +25,7 @@ from refine_server import activity, db, perf_metrics
 from refine_server.gaps import now_iso
 from refine_runtime.manager import ResourceManager
 from refine_runtime.resources import ResourceSettings, memory_limit_mb
+from refine_runtime.supervised_process import supervised_popen
 
 from . import gap_writer  # local module; sole owner of gap.json writes
 
@@ -357,7 +358,7 @@ class SubprocessManager:
         resource_settings = ResourceSettings.from_settings(settings)
         manager = ResourceManager(resource_settings)
         capabilities = manager.capabilities()
-        proc = manager.popen(
+        proc = supervised_popen(
             args,
             cwd=cwd,
             env=env,
@@ -367,6 +368,7 @@ class SubprocessManager:
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,  # line-buffered
+            fallback_manager=manager,
         )
         now = time.monotonic()
         handle = RunHandle(
@@ -837,15 +839,14 @@ class SubprocessManager:
     def _kill(self, h: RunHandle, reason: str) -> None:
         h.killed_reason = reason
         try:
-            # Kill the whole process group created by the resource backend.
-            os.killpg(os.getpgid(h.proc.pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
+            h.proc.terminate()
+        except (ProcessLookupError, PermissionError, OSError):
             pass
         # Give it 5s, then SIGKILL
         try:
             h.proc.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             try:
-                os.killpg(os.getpgid(h.proc.pid), signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
+                h.proc.kill()
+            except (ProcessLookupError, PermissionError, OSError):
                 pass

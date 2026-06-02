@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import os
-import signal
+import shutil
 import socket
 import subprocess
 import time
@@ -22,6 +22,7 @@ from typing import Any
 from . import git_ops, perf_metrics
 from .agent_cli import extract_final_text, get_spec, resolve_binary
 from .chat_mgr import _chat_env, _merge_paths, _user_login_path
+from refine_runtime.supervised_process import supervised_popen
 
 
 _TAIL_LIMIT = 8000
@@ -345,15 +346,17 @@ def run_command(command: str, *, config: dict[str, Any],
     if _cancel_requested(cancel_event):
         return _cancelled_command(command, str(cwd))
     try:
-        proc = subprocess.Popen(
-            ["bash", "-lc", command],
+        shell = _shell_path()
+        proc = supervised_popen(
+            [shell, "-lc", command],
             cwd=str(cwd),
             env=env,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             text=True,
-            start_new_session=True,
+            kind="target-app",
+            fallback_manager=_DirectProcessManager(),
         )
         deadline = time.monotonic() + max(1, timeout)
         while True:
@@ -444,25 +447,40 @@ def _terminate_command(proc: subprocess.Popen) -> tuple[str, str]:
     try:
         if proc.poll() is None:
             try:
-                os.killpg(proc.pid, signal.SIGTERM)
-            except ProcessLookupError:
-                pass
-            except OSError:
                 proc.terminate()
+            except (ProcessLookupError, OSError):
+                pass
         try:
             stdout, stderr = proc.communicate(timeout=3.0)
         except subprocess.TimeoutExpired:
             if proc.poll() is None:
                 try:
-                    os.killpg(proc.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                except OSError:
                     proc.kill()
+                except (ProcessLookupError, OSError):
+                    pass
             stdout, stderr = proc.communicate(timeout=1.0)
         return stdout or "", stderr or ""
     except Exception:
         return "", ""
+
+
+class _DirectProcessManager:
+    def popen(self, args, *, cwd, env, kind, stdin, stdout, stderr, text, bufsize):  # noqa: ANN001, ARG002
+        return subprocess.Popen(
+            list(args),
+            cwd=str(cwd),
+            env=dict(env),
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            text=text,
+            bufsize=bufsize,
+            start_new_session=True,
+        )
+
+
+def _shell_path() -> str:
+    return shutil.which("bash") or "/bin/bash"
 
 
 def resolve_cwd(cwd_setting: str) -> Path:

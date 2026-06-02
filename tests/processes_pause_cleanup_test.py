@@ -42,9 +42,18 @@ def main() -> int:
         assert stuck and stuck[0] == "merge", stuck
         assert git(client, "status", "--porcelain").stdout.strip()
 
-        status, body = api.update_settings({"paused": "1"})
-        assert status == 200, body
-        assert body["ok"] is True, body
+        from refine_server.runner import Runner
+
+        old_get_client = api.get_client
+        route_runner = Runner()
+        try:
+            api.get_client = lambda: RunnerClient(route_runner)  # type: ignore[assignment]
+            status, body = api.update_settings({"paused": "1"})
+            assert status == 200, body
+            assert body["ok"] is True, body
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+            route_runner.shutdown()
         assert git_ops.in_progress_op() is None
         assert git(client, "status", "--porcelain").stdout.strip() == ""
         assert git(client, "log", "-1", "--format=%s").stdout.strip() == (
@@ -53,9 +62,15 @@ def main() -> int:
 
         (client / "app.txt").write_text("operator wip\n", encoding="utf-8")
         assert git(client, "status", "--porcelain").stdout.strip()
-        status, body = api.update_settings({"paused": "1"})
-        assert status == 200, body
-        assert body["ok"] is True, body
+        route_runner = Runner()
+        try:
+            api.get_client = lambda: RunnerClient(route_runner)  # type: ignore[assignment]
+            status, body = api.update_settings({"paused": "1"})
+            assert status == 200, body
+            assert body["ok"] is True, body
+        finally:
+            api.get_client = old_get_client  # type: ignore[assignment]
+            route_runner.shutdown()
         assert git(client, "status", "--porcelain").stdout.strip() == ""
         assert "refine pause cleanup auto-stash" in git(
             client, "stash", "list",
@@ -75,6 +90,14 @@ def main() -> int:
 
     print("processes pause cleanup tests OK")
     return 0
+
+
+class RunnerClient:
+    def __init__(self, runner):
+        self.runner = runner
+
+    def call(self, method, params=None, *, timeout=30.0):  # noqa: ANN001, ARG002
+        return self.runner.call(method, params or {})
 
 
 if __name__ == "__main__":

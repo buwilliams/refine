@@ -45,6 +45,7 @@ def main() -> int:
         encoding="utf-8",
     )
     cfg = config.get(reload=True)
+    os.environ["REFINE_TEST_INPROCESS_BACKEND"] = "1"
 
     from refine_server.backend_protocol import M_PING
     from refine_ui import runtime

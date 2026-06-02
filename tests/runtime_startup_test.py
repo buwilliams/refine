@@ -47,35 +47,10 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
     conn = init_refine(client)
     try:
         from refine_server import db, project_state
-        from refine_runtime import ipc
         from refine_ui import runtime
 
-        original_start_external_runner = runtime._start_external_runner  # type: ignore[attr-defined]
-        original_request = ipc.request
-        socket: Path | None = None
-        starts: list[Path] = []
-
-        class FakeProc:
-            pid = 43210
-            exited = False
-
-            def poll(self):  # noqa: ANN202
-                return 0 if self.exited else None
-
-            def terminate(self) -> None:
-                self.exited = True
-
-            def kill(self) -> None:
-                self.exited = True
-
-        def stale_request(*_args, **_kwargs):  # noqa: ANN002, ANN003, ANN202
-            raise TimeoutError("stale socket")
-
-        def fake_start(_cfg, socket: Path):  # noqa: ANN001, ANN202
-            starts.append(socket)
-            assert not socket.exists()
-            socket.touch()
-            return FakeProc()
+        original_supervisor_request = runtime._supervisor_request  # type: ignore[attr-defined]
+        calls: list[tuple[str, dict]] = []
 
         runtime.load_configured(
             client / ".refine" / "refine.toml",
@@ -86,24 +61,25 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
         db.set_setting(conn, "agents_paused", "1")
         try:
             socket = Path(runtime.backend_info()["socket_path"])
-            socket.parent.mkdir(parents=True, exist_ok=True)
-            socket.touch()
-            ipc.request = stale_request  # type: ignore[assignment]
-            runtime._start_external_runner = fake_start  # type: ignore[attr-defined]
+
+            def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+                calls.append((method, params or {}))
+                return {
+                    "worker_socket": str(socket),
+                    "worker_pid": 43210,
+                    "started": True,
+                }
+
+            runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
             runner = runtime.ensure_runner()
             assert runner.socket_path == str(socket)
-            assert starts == [socket]
+            assert calls and calls[0][0] == "ensure_worker", calls
             assert runtime.backend_info()["in_process_runner_allowed"] is False
             assert project_state.list_settings()["paused"] == "1"
             assert project_state.list_settings()["agents_paused"] == "1"
         finally:
-            ipc.request = original_request  # type: ignore[assignment]
-            runtime._start_external_runner = original_start_external_runner  # type: ignore[attr-defined]
+            runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
             runtime.stop_runner()
-            try:
-                socket.unlink()
-            except FileNotFoundError:
-                pass
     finally:
         try:
             from refine_ui import runtime
@@ -118,32 +94,14 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
         cleanup_tmp(tmp)
 
 
-def test_matching_runner_socket_is_adopted() -> None:
-    tmp, client = make_client_repo("refine-runtime-adopt-runner-")
+def test_runner_socket_comes_from_supervisor() -> None:
+    tmp, client = make_client_repo("refine-runtime-supervisor-runner-")
     conn = init_refine(client)
     try:
-        from refine_runtime import identity, ipc
-        from refine_server import project_state
         from refine_ui import runtime
 
-        original_start_external_runner = runtime._start_external_runner  # type: ignore[attr-defined]
-        original_request = ipc.request
-        socket: Path | None = None
-
-        def matching_request(_path, method, _params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
-            assert method == "ping"
-            return {
-                "pong": True,
-                "pid": 98765,
-                "parent_pid": os.getpid(),
-                "expected_parent_pid": os.getpid(),
-                "refine_version": identity.REFINE_VERSION,
-                "source_fingerprint": identity.SOURCE_FINGERPRINT,
-                "local_node_id": project_state.local_node_id(),
-            }
-
-        def fail_start(*_args, **_kwargs):  # noqa: ANN002, ANN003, ANN202
-            raise AssertionError("matching runner socket should be adopted")
+        original_supervisor_request = runtime._supervisor_request  # type: ignore[attr-defined]
+        calls: list[tuple[str, dict]] = []
 
         try:
             runtime.load_configured(
@@ -152,21 +110,18 @@ def test_matching_runner_socket_is_adopted() -> None:
                 start_runner=False,
             )
             socket = Path(runtime.backend_info()["socket_path"])
-            socket.parent.mkdir(parents=True, exist_ok=True)
-            socket.touch()
-            ipc.request = matching_request  # type: ignore[assignment]
-            runtime._start_external_runner = fail_start  # type: ignore[attr-defined]
+
+            def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+                calls.append((method, params or {}))
+                return {"worker_socket": str(socket), "worker_pid": 98765}
+
+            runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
             runner = runtime.ensure_runner()
             assert runner.socket_path == str(socket)
+            assert calls == [("ensure_worker", {"config_path": str(client / ".refine" / "refine.toml")})]
         finally:
-            ipc.request = original_request  # type: ignore[assignment]
-            runtime._start_external_runner = original_start_external_runner  # type: ignore[attr-defined]
+            runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
             runtime.stop_all()
-            if socket is not None:
-                try:
-                    socket.unlink()
-                except Exception:
-                    pass
     finally:
         try:
             conn.close()
@@ -203,7 +158,7 @@ def test_runtime_local_node_is_stable_after_active_switch() -> None:
 def main() -> int:
     test_configured_app_start_resumes_agents()
     test_lazy_runner_client_preserves_operator_pause()
-    test_matching_runner_socket_is_adopted()
+    test_runner_socket_comes_from_supervisor()
     test_runtime_local_node_is_stable_after_active_switch()
     worker_source = (
         Path(__file__).resolve().parents[1] / "refine_runtime" / "worker.py"
@@ -216,9 +171,11 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     assert "resume_agents_for_startup" not in worker_source
     assert "resume_agents_for_startup" not in server_source
-    assert 'env["REFINE_PARENT_PID"] = str(os.getpid())' in runtime_source
-    assert 'env[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id' in runtime_source
-    assert "start_new_session=True" not in runtime_source
+    assert "subprocess.Popen" not in runtime_source
+    assert "_start_external_runner" not in runtime_source
+    assert "_terminate_workers_for_socket" not in runtime_source
+    assert "os.kill" not in runtime_source
+    assert 'M_ENSURE_WORKER' in runtime_source
     print("runtime startup tests OK")
     return 0
 

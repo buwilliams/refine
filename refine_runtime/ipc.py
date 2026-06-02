@@ -44,6 +44,11 @@ def runner_socket_path(*, port: int, config_path: Path | str | None = None,
     return run_dir(start) / f"r-{port}-{config_hash(config_path)}.sock"
 
 
+def supervisor_socket_path(port: int, start: Path | None = None) -> Path:
+    # One supervisor owns all local process lifecycle for a checkout/port.
+    return run_dir(start) / f"s-{port}.sock"
+
+
 def request(path: Path | str, method: str, params: dict[str, Any] | None = None,
             *, timeout: float = 30.0) -> dict[str, Any]:
     payload = {
@@ -214,10 +219,11 @@ class IpcServer:
         self._thread.start()
 
     def stop(self) -> None:
-        if self._server is not None:
-            self._server.shutdown()
-            self._server.server_close()
+        server = self._server
+        if server is not None:
             self._server = None
+            server.shutdown()
+            server.server_close()
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=2.0)
         self._thread = None

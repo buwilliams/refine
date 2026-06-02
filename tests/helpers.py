@@ -59,6 +59,7 @@ def cleanup_tmp(tmp: Path) -> None:
 def init_refine(client: Path):
     os.chdir(client)
     reset_refine_imports()
+    os.environ["REFINE_TEST_INPROCESS_BACKEND"] = "1"
     from refine_server import config, db
 
     config.write_defaults(client / ".refine")

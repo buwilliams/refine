@@ -1538,8 +1538,13 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     ui_unit = _ui_unit_name(unit, effective_port)
     web_up = _port_open(cfg.web_host, effective_port)
     process_pid = _running_pid(clone, cfg, effective_port)
+    supervisor_status = _supervisor_status(clone, cfg, effective_port)
     display_cfg = _running_config(process_pid) or cfg
     service_active = _systemctl_is_active(ui_unit)
+    ui = supervisor_status.get("ui") if supervisor_status else {}
+    worker = supervisor_status.get("worker") if supervisor_status else {}
+    ui_pid = ui.get("pid") if isinstance(ui, dict) else None
+    worker_pid = worker.get("pid") if isinstance(worker, dict) else None
 
     print()
     print(_bold("refine"))
@@ -1548,8 +1553,10 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     print(f"  ui:       {_dot((process_pid is not None or service_active) and web_up)} "
           f"http {'reachable' if web_up else 'unreachable'} at "
           f"http://{_displayable_host(cfg.web_host)}:{effective_port}")
-    print(f"  process:  {_dot(process_pid is not None)} "
+    print(f"  supervisor: {_dot(process_pid is not None)} "
           f"{'pid ' + str(process_pid) if process_pid is not None else 'not running'}")
+    print(f"  ui pid:   {ui_pid if ui_pid is not None else 'unknown'}")
+    print(f"  worker:   {worker_pid if worker_pid is not None else 'not running'}")
     print(f"  service:  {_dot(service_active)} systemd unit `{ui_unit}` "
           f"({'active' if service_active else 'inactive'})")
     print(f"  server:   {_dot((process_pid is not None or service_active) and web_up)} "
@@ -1564,7 +1571,10 @@ def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None
     ui_unit = _ui_unit_name(unit, port) if unit is not None else ""
     web_up = _port_open(SETUP_UI_HOST, port)
     process_pid = _running_pid(clone, None, port)
+    supervisor_status = _supervisor_status(clone, None, port)
     service_active = _systemctl_is_active(ui_unit) if ui_unit else False
+    ui = supervisor_status.get("ui") if supervisor_status else {}
+    ui_pid = ui.get("pid") if isinstance(ui, dict) else None
     print()
     print(_bold("refine"))
     print(f"  checkout: {clone}")
@@ -1572,8 +1582,9 @@ def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None
     print(f"  ui:       {_dot((process_pid is not None or service_active) and web_up)} "
           f"http {'reachable' if web_up else 'unreachable'} at "
           f"http://{_displayable_host(SETUP_UI_HOST)}:{port}")
-    print(f"  process:  {_dot(process_pid is not None)} "
+    print(f"  supervisor: {_dot(process_pid is not None)} "
           f"{'pid ' + str(process_pid) if process_pid is not None else 'not running'}")
+    print(f"  ui pid:   {ui_pid if ui_pid is not None else 'unknown'}")
     if ui_unit:
         print(f"  service:  {_dot(service_active)} systemd unit `{ui_unit}` "
               f"({'active' if service_active else 'inactive'})")
@@ -2019,6 +2030,7 @@ def _start_background_ui(
     env["REFINE_UI_HOST"] = host
     env["REFINE_UI_PORT"] = str(port)
     env["REFINE_UI_SCOPE"] = str(port)
+    env["REFINE_SUPERVISOR_SOCKET"] = str(_supervisor_socket_path(clone, cfg, port))
     if cfg is not None:
         env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
     env.setdefault("PYTHONUNBUFFERED", "1")
@@ -2048,6 +2060,13 @@ def _stop_background_ui(clone: Path, cfg: "config.Config | None", port: int) -> 
     pid = _running_pid(clone, cfg, port)
     if pid is None:
         return False
+    if _request_supervisor_shutdown(clone, cfg, port):
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if not _pid_alive(pid):
+                _unlink_quietly(pid_path)
+                return True
+            time.sleep(0.2)
     try:
         pgid = os.getpgid(pid)
     except ProcessLookupError:
@@ -2340,6 +2359,51 @@ def _runtime_pid_path(clone: Path, cfg: "config.Config | None", port: int) -> Pa
 
 def _runtime_log_path(clone: Path, cfg: "config.Config | None", port: int) -> Path:
     return _runtime_dir(clone, cfg) / f"ui-{port}.log"
+
+
+def _supervisor_socket_path(clone: Path, cfg: "config.Config | None", port: int) -> Path:
+    from refine_runtime import ipc
+
+    return ipc.supervisor_socket_path(port, start=clone)
+
+
+def _supervisor_status(
+    clone: Path,
+    cfg: "config.Config | None",
+    port: int,
+) -> dict | None:
+    from refine_runtime import ipc
+    from refine_runtime.supervisor_protocol import M_STATUS
+
+    try:
+        return ipc.request(
+            _supervisor_socket_path(clone, cfg, port),
+            M_STATUS,
+            {},
+            timeout=2.0,
+        )
+    except Exception:
+        return None
+
+
+def _request_supervisor_shutdown(
+    clone: Path,
+    cfg: "config.Config | None",
+    port: int,
+) -> bool:
+    from refine_runtime import ipc
+    from refine_runtime.supervisor_protocol import M_SHUTDOWN
+
+    try:
+        ipc.request(
+            _supervisor_socket_path(clone, cfg, port),
+            M_SHUTDOWN,
+            {},
+            timeout=2.0,
+        )
+        return True
+    except Exception:
+        return False
 
 
 def _runtime_dir(clone: Path, cfg: "config.Config | None") -> Path:

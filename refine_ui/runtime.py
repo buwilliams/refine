@@ -2,24 +2,27 @@
 from __future__ import annotations
 
 import os
-import signal
-import subprocess
-import sys
 import threading
 import time
 from pathlib import Path
 
 from refine_server import config, db, project_state
-from refine_server.backend_protocol import M_PING, M_RUNNING
+from refine_server.backend_protocol import M_RUNNING
 from refine_runtime import identity
+from refine_runtime.supervisor_protocol import (
+    M_DETACH_APP,
+    M_ENSURE_WORKER,
+    M_STATUS,
+    M_STOP_WORKER,
+)
 
 from .poller import SqlitePoller
 
 _poller: SqlitePoller | None = None
 _runner = None
-_runner_proc: subprocess.Popen | None = None
 _runner_lock = threading.Lock()
 _loaded_config_path: Path | None = None
+_worker_pid: int | None = None
 
 
 class _SocketRunnerClient:
@@ -42,6 +45,28 @@ class _SocketRunnerClient:
 
     def shutdown(self) -> None:
         return None
+
+
+class _InProcessRunnerClient:
+    def __init__(self) -> None:
+        from refine_server.runner import Runner
+
+        self.runner = Runner()
+
+    def call(
+        self,
+        method: str,
+        params: dict | None = None,
+        *,
+        timeout: float = 30.0,  # noqa: ARG002
+    ) -> dict:
+        return self.runner.call(method, params or {})
+
+    def status_snapshot(self) -> dict:
+        return self.runner.call(M_RUNNING, {})
+
+    def shutdown(self) -> None:
+        self.runner.shutdown()
 
 
 def load_configured(
@@ -119,56 +144,53 @@ def stop_poller() -> None:
 
 
 def ensure_runner():
-    global _runner, _runner_proc
+    global _runner, _worker_pid
     with _runner_lock:
         if _runner is not None:
             return _runner
 
         cfg = config.get(reload=True)
-        socket_path = os.environ.get("REFINE_RUNNER_SOCKET") or str(_runner_socket_path(cfg))
+        supervisor_socket = _supervisor_socket_path(cfg)
+        try:
+            result = _supervisor_request(
+                M_ENSURE_WORKER,
+                {"config_path": str(cfg.config_path)},
+                timeout=30.0,
+            )
+        except config.ConfigError:
+            if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") != "1":
+                raise
+            _runner = _InProcessRunnerClient()
+            _worker_pid = os.getpid()
+            return _runner
+        socket_path = str(
+            result.get("worker_socket")
+            or result.get("socket_path")
+            or os.environ.get("REFINE_RUNNER_SOCKET")
+            or _runner_socket_path(cfg)
+        )
         os.environ["REFINE_RUNNER_SOCKET"] = socket_path
+        os.environ["REFINE_SUPERVISOR_SOCKET"] = str(supervisor_socket)
         os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
-        socket = Path(socket_path)
-        if socket.exists():
-            if not _can_adopt_runner_socket(socket, _runner_proc):
-                _terminate_workers_for_socket(socket)
-                _unlink_quietly(socket)
-                _runner_proc = _start_external_runner(cfg, socket)
-        elif _runner_proc is not None and _runner_proc.poll() is not None:
-            _runner_proc = _start_external_runner(cfg, socket)
-        else:
-            _runner_proc = _start_external_runner(cfg, socket)
-
+        _worker_pid = _int_or_none(result.get("worker_pid"))
         _runner = _SocketRunnerClient(socket_path)
         return _runner
 
 
 def stop_runner() -> None:
-    global _runner, _runner_proc
-    if _runner is None:
-        proc = _runner_proc
-    else:
-        _runner.shutdown()
-        proc = _runner_proc
+    global _runner, _worker_pid
+    runner = _runner
     _runner = None
-    if proc is None:
-        return
-    _runner_proc = None
-    if proc.poll() is not None:
-        return
+    if runner is not None:
+        try:
+            runner.shutdown()
+        except Exception:
+            pass
     try:
-        proc.terminate()
-    except OSError:
-        return
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        if proc.poll() is not None:
-            return
-        time.sleep(0.1)
-    try:
-        proc.kill()
-    except OSError:
+        _supervisor_request(M_STOP_WORKER, {}, timeout=10.0)
+    except Exception:
         pass
+    _worker_pid = None
 
 
 def runner_call(
@@ -185,16 +207,32 @@ def runner_call(
 
 def backend_info() -> dict:
     socket_path = os.environ.get("REFINE_RUNNER_SOCKET") or ""
+    try:
+        cfg = config.get(reload=False)
+    except config.ConfigError:
+        cfg = None
+    supervisor_socket = str(_supervisor_socket_path(cfg))
+    worker_pid = _worker_pid
+    try:
+        status = _supervisor_request(M_STATUS, {}, timeout=2.0)
+        worker = status.get("worker") if isinstance(status.get("worker"), dict) else {}
+        worker_pid = _int_or_none(worker.get("pid")) or worker_pid
+        socket_path = str(worker.get("socket_path") or socket_path)
+    except Exception:
+        pass
     return {
         "process_model": "supervisor",
         "transport": "unix_socket",
         "socket_path": socket_path,
+        "worker_socket_path": socket_path,
+        "supervisor_socket_path": supervisor_socket,
+        "worker_pid": worker_pid,
         "source_fingerprint": identity.SOURCE_FINGERPRINT,
         "refine_version": identity.REFINE_VERSION,
-        "local_node_id": project_state.local_node_id(),
+        "local_node_id": _local_node_id_or_empty(),
         "in_process_runner_allowed": False,
         "runner_client_loaded": _runner is not None,
-        "ui_controls_runner_lifecycle": True,
+        "ui_controls_runner_lifecycle": False,
     }
 
 
@@ -208,62 +246,34 @@ def _runner_socket_path(cfg: config.Config) -> Path:
     return ipc.runner_socket_path(port=port, config_path=cfg.config_path)
 
 
-def _start_external_runner(cfg: config.Config, socket: Path) -> subprocess.Popen:
-    env = os.environ.copy()
-    env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
-    env["REFINE_RUNNER_SOCKET"] = str(socket)
-    env["REFINE_NO_INPROCESS_RUNNER"] = "1"
-    env["REFINE_PARENT_PID"] = str(os.getpid())
-    env[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(root=cfg.volume_root)
-    env.setdefault("PYTHONUNBUFFERED", "1")
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "refine_runtime.worker"],
-        cwd=str(Path.cwd()),
-        stdin=subprocess.DEVNULL,
-        stdout=None,
-        stderr=None,
-        env=env,
-    )
-    _wait_for_runner_socket(socket, proc)
-    return proc
+def _supervisor_socket_path(cfg: config.Config | None) -> Path:
+    from refine_runtime import ipc
 
-
-def _wait_for_runner_socket(path: Path, proc: subprocess.Popen) -> None:
-    deadline = time.time() + 20
-    while time.time() < deadline:
-        if path.exists() and _can_adopt_runner_socket(path, proc):
-            return
-        if proc.poll() is not None:
-            raise config.ConfigError("Backend runner exited before opening its socket.")
-        time.sleep(0.1)
-    raise config.ConfigError(f"Backend runner socket did not appear: {path}")
-
-
-def _can_adopt_runner_socket(
-    path: Path,
-    proc: subprocess.Popen | None,
-) -> bool:
     try:
-        from refine_runtime import ipc
+        port = int(os.environ.get("REFINE_UI_PORT") or (cfg.web_port if cfg else 8080))
+    except ValueError:
+        port = cfg.web_port if cfg else 8080
+    raw = os.environ.get("REFINE_SUPERVISOR_SOCKET")
+    return Path(raw) if raw else ipc.supervisor_socket_path(port)
 
-        ping = ipc.request(path, M_PING, {}, timeout=1.0)
-    except Exception:
-        return False
-    if ping.get("source_fingerprint") != identity.SOURCE_FINGERPRINT:
-        return False
-    if ping.get("refine_version") != identity.REFINE_VERSION:
-        return False
-    if ping.get("local_node_id") != project_state.local_node_id():
-        return False
-    pid = _int_or_none(ping.get("pid"))
-    if proc is not None and proc.poll() is None and pid == proc.pid:
-        return True
-    parent_pid = _int_or_none(ping.get("parent_pid"))
-    expected_parent_pid = _int_or_none(ping.get("expected_parent_pid"))
-    return (
-        parent_pid == os.getpid()
-        and expected_parent_pid in (None, os.getpid())
-    )
+
+def _supervisor_request(
+    method: str,
+    params: dict | None = None,
+    *,
+    timeout: float = 30.0,
+) -> dict:
+    from refine_runtime import ipc
+
+    cfg = config.get(reload=True)
+    socket_path = _supervisor_socket_path(cfg)
+    os.environ["REFINE_SUPERVISOR_SOCKET"] = str(socket_path)
+    try:
+        return ipc.request(socket_path, method, params or {}, timeout=timeout)
+    except Exception as e:
+        raise config.ConfigError(
+            f"Refine supervisor is not reachable at {socket_path}: {e}"
+        ) from e
 
 
 def _int_or_none(value: object) -> int | None:
@@ -273,60 +283,11 @@ def _int_or_none(value: object) -> int | None:
         return None
 
 
-def _unlink_quietly(path: Path) -> None:
+def _local_node_id_or_empty() -> str:
     try:
-        path.unlink()
-    except FileNotFoundError:
-        pass
-
-
-def _terminate_workers_for_socket(socket: Path) -> None:
-    target = str(socket)
-    pids: list[int] = []
-    proc_root = Path("/proc")
-    if not proc_root.exists():
-        return
-    for path in proc_root.iterdir():
-        if not path.name.isdigit():
-            continue
-        pid = int(path.name)
-        if pid == os.getpid():
-            continue
-        try:
-            raw = (path / "environ").read_bytes()
-        except OSError:
-            continue
-        env = raw.split(b"\0")
-        if f"REFINE_RUNNER_SOCKET={target}".encode("utf-8") in env:
-            pids.append(pid)
-    for sig in (signal.SIGTERM, signal.SIGKILL):
-        remaining: list[int] = []
-        for pid in pids:
-            try:
-                os.kill(pid, sig)
-                remaining.append(pid)
-            except ProcessLookupError:
-                continue
-            except OSError:
-                remaining.append(pid)
-        pids = remaining
-        deadline = time.time() + 2
-        while pids and time.time() < deadline:
-            pids = [pid for pid in pids if _pid_alive(pid)]
-            if pids:
-                time.sleep(0.05)
-
-
-def _pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    except OSError:
-        return False
+        return project_state.local_node_id()
+    except Exception:
+        return ""
 
 
 def runner_status_snapshot() -> dict:
@@ -372,7 +333,12 @@ def stop_all() -> None:
 def detach_configured() -> None:
     """Stop project-scoped services and return this process to setup mode."""
     global _loaded_config_path
-    stop_all()
+    try:
+        _supervisor_request(M_DETACH_APP, {}, timeout=10.0)
+    except Exception:
+        stop_all()
+    else:
+        stop_poller()
     os.environ.pop(config.ENV_CONFIG_PATH, None)
     config.clear_cache()
     _loaded_config_path = None
