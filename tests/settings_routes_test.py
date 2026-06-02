@@ -493,6 +493,15 @@ def main() -> int:
     assert 'hash: "#/node/application"' in guide_js
     assert 'hash: "#/project/quality"' in guide_js
     assert 'hash: "#/system/processes"' in guide_js
+    no_app_guide_request = re.compile(
+        r'context: "no-app",\s+'
+        r'categoryId: "get-started",\s+'
+        r'itemId: "quickstart-add-app",'
+    )
+    assert len(no_app_guide_request.findall(common_js)) == 2
+    assert no_app_guide_request.search(settings_core_js)
+    assert 'guideItem("quickstart-add-app", "Add app"' in guide_js
+    assert 'guideItem("project-application", "App selection and creation"' in guide_js
     settings_guide_field_ids = [
         "node-manage",
         "reporter-manage",

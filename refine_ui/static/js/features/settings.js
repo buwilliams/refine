@@ -793,8 +793,8 @@ function bindSettingsNoProjectTab() {
       if (typeof openGuide === "function") {
         openGuide({
           context: "no-app",
-          categoryId: "project",
-          itemId: "project-application",
+          categoryId: "get-started",
+          itemId: "quickstart-add-app",
           openTarget: false,
         });
       }
