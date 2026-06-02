@@ -19,7 +19,7 @@ def main() -> int:
     try:
         from refine_server import (
             db, gap_writer, gaps, runner as runner_mod,
-            project_state, target_app, target_app_rebuilder,
+            project_state, target_app, target_app_ops, target_app_rebuilder,
         )
         from refine_server.backend_protocol import (
             M_TARGET_APP_REBUILD_PENDING,
@@ -438,7 +438,7 @@ def main() -> int:
 
         gid = "01TARGETAPPREBUILDGATEAAA"
         create_indexed_gap(conn, gid, status="awaiting-rebuild", branch=None)
-        assert api._promote_rebuilt_gaps(conn) == 2  # noqa: SLF001
+        assert target_app_ops.promote_rebuilt_gaps(conn) == 2
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = ?", (gid,),
         ).fetchone()
@@ -461,7 +461,7 @@ def main() -> int:
         db.set_setting(conn, "quality_timing", "post_rebuild")
         gid_qa = "01TARGETAPPPOSTREBUILDQAAA"
         create_indexed_gap(conn, gid_qa, status="awaiting-rebuild", branch=None)
-        assert api._promote_rebuilt_gaps(conn) == 1  # noqa: SLF001
+        assert target_app_ops.promote_rebuilt_gaps(conn) == 1
         row = conn.execute(
             "SELECT status, branch_name FROM gaps_index WHERE id = ?", (gid_qa,),
         ).fetchone()
@@ -475,7 +475,7 @@ def main() -> int:
         db.set_setting(conn, "quality_enabled", "0")
         gid_bypass = "01TARGETAPPPOSTQABYPASSAAA"
         create_indexed_gap(conn, gid_bypass, status="awaiting-rebuild", branch=None)
-        assert api._promote_rebuilt_gaps(conn) == 1  # noqa: SLF001
+        assert target_app_ops.promote_rebuilt_gaps(conn) == 1
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = ?", (gid_bypass,),
         ).fetchone()

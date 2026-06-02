@@ -14,6 +14,7 @@ def main() -> int:
     ).read_text(encoding="utf-8")
     server_py = (root / "refine_ui/server.py").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
+    import_ops_py = (root / "refine_server/import_ops.py").read_text(encoding="utf-8")
     common_css = (
         root / "refine_ui/static/css/common.css"
     ).read_text(encoding="utf-8")
@@ -143,18 +144,25 @@ def main() -> int:
     assert "def import_parse_csv(body: dict)" in api_py
     assert 'background_jobs.start(\n            "import_prepare"' in api_py
     assert "def _import_prepare_progress(completed: int, total: int, message: str)" in api_py
-    assert "Parsed {idx} of {total} Gaps" in api_py
-    assert "Checked duplicates for {idx} of {total} Gaps" in api_py
-    assert "csv.Sniffer().sniff" in api_py
+    assert "Parsed {idx} of {total} Gaps" in import_ops_py
+    assert "Checked duplicates for {idx} of {total} Gaps" in import_ops_py
+    assert "csv.Sniffer().sniff" in import_ops_py
     assert '@route("POST", r"/api/import/dedup")' in server_py
     assert "def import_dedup(body: dict)" in api_py
-    assert "def _find_import_duplicate(" in api_py
-    assert "def _move_duplicate_original_to_backlog(" in api_py
-    assert "def _update_duplicate_original_from_draft(" in api_py
-    assert "_DUPLICATE_UPDATE_FIELDS = {\"actual\", \"target\", \"reporter\", \"priority\"}" in api_py
-    assert '"awaiting-rebuild",' in api_py
-    assert '"awaiting-review",' in api_py
-    assert "IMPORT_DEDUP_THRESHOLD = 0.62" in api_py
+    assert "_find_import_duplicate = import_ops.find_import_duplicate" in api_py
+    assert (
+        "_move_duplicate_original_to_backlog = import_ops.move_duplicate_original_to_backlog"
+        in api_py
+    )
+    assert (
+        "_update_duplicate_original_from_draft = import_ops.update_duplicate_original_from_draft"
+        in api_py
+    )
+    assert 'DUPLICATE_UPDATE_FIELDS = {"actual", "target", "reporter", "priority"}' in import_ops_py
+    assert '"awaiting-rebuild",' in import_ops_py
+    assert '"awaiting-review",' in import_ops_py
+    assert "IMPORT_DEDUP_THRESHOLD = import_ops.IMPORT_DEDUP_THRESHOLD" in api_py
+    assert "IMPORT_DEDUP_THRESHOLD = 0.62" in import_ops_py
     assert "const IMPORT_SESSION_KEY" in import_js
     assert "function recoverImportSessionOnLoad()" in import_js
     assert "localStorage.setItem(IMPORT_SESSION_KEY" in import_js
@@ -170,7 +178,7 @@ def main() -> int:
     assert "await waitForImportJobCancellation(session.jobId, root, close, saveSession)" in import_js
     assert "Refine will stop the save job and roll back Gaps created by this import." in import_js
     assert "def _import_persist_progress(completed: int, total: int, message: str)" in api_py
-    assert "Importing Gap {idx} of {total}" in api_py
+    assert "Importing Gap {idx} of {total}" in import_ops_py
     assert '@route("POST", r"/api/jobs/([0-9a-fA-F]+)/cancel")' in server_py
     assert "def cancel_background_job(job_id: str)" in api_py
     assert 'await showActionError(e, "Import failed");' in import_js

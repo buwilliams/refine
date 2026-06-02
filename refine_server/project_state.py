@@ -154,8 +154,6 @@ def legacy_instances_dir(root: Path | None = None) -> Path:
 
 
 def run_dir(root: Path | None = None) -> Path:
-    if root is not None:
-        return config.local_run_dir(Path.cwd())
     return config.local_run_dir()
 
 

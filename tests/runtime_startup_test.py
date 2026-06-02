@@ -10,7 +10,38 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tests.helpers import cleanup_tmp, init_refine, make_client_repo
 
 
+_RUNTIME_ENV_KEYS = (
+    "REFINE_CONFIG_PATH",
+    "REFINE_UI_PORT",
+    "REFINE_UI_SCOPE",
+    "REFINE_RUN_DIR",
+    "REFINE_LOCAL_NODE_ID",
+    "REFINE_RUNNER_SOCKET",
+    "REFINE_SUPERVISOR_SOCKET",
+    "REFINE_NO_INPROCESS_RUNNER",
+)
+
+
+def _save_runtime_env() -> dict[str, str | None]:
+    return {key: os.environ.get(key) for key in _RUNTIME_ENV_KEYS}
+
+
+def _clear_runtime_env() -> None:
+    for key in _RUNTIME_ENV_KEYS:
+        os.environ.pop(key, None)
+
+
+def _restore_runtime_env(saved: dict[str, str | None]) -> None:
+    for key, value in saved.items():
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
+
+
 def test_configured_app_start_resumes_agents() -> None:
+    saved_env = _save_runtime_env()
+    _clear_runtime_env()
     tmp, client = make_client_repo("refine-runtime-startup-")
     conn = init_refine(client)
     try:
@@ -40,9 +71,12 @@ def test_configured_app_start_resumes_agents() -> None:
         except Exception:
             pass
         cleanup_tmp(tmp)
+        _restore_runtime_env(saved_env)
 
 
 def test_lazy_runner_client_preserves_operator_pause() -> None:
+    saved_env = _save_runtime_env()
+    _clear_runtime_env()
     tmp, client = make_client_repo("refine-runtime-lazy-pause-")
     conn = init_refine(client)
     try:
@@ -92,9 +126,12 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
         except Exception:
             pass
         cleanup_tmp(tmp)
+        _restore_runtime_env(saved_env)
 
 
 def test_runner_socket_comes_from_supervisor() -> None:
+    saved_env = _save_runtime_env()
+    _clear_runtime_env()
     tmp, client = make_client_repo("refine-runtime-supervisor-runner-")
     conn = init_refine(client)
     try:
@@ -128,9 +165,12 @@ def test_runner_socket_comes_from_supervisor() -> None:
         except Exception:
             pass
         cleanup_tmp(tmp)
+        _restore_runtime_env(saved_env)
 
 
 def test_runtime_local_node_is_stable_after_active_switch() -> None:
+    saved_env = _save_runtime_env()
+    _clear_runtime_env()
     tmp, client = make_client_repo("refine-runtime-local-node-")
     conn = init_refine(client)
     try:
@@ -153,6 +193,7 @@ def test_runtime_local_node_is_stable_after_active_switch() -> None:
         except Exception:
             pass
         cleanup_tmp(tmp)
+        _restore_runtime_env(saved_env)
 
 
 def main() -> int:

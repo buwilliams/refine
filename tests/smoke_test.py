@@ -310,6 +310,33 @@ def main() -> int:
     assert not (clone / ".refine-current").exists()
     assert boot["git_initialized"] is True
     assert boot["config_created"] is True
+
+    old_cwd = Path.cwd()
+    try:
+        os.chdir(clone)
+        buf = StringIO()
+        with redirect_stdout(buf):
+            assert refine_cli.main(["app", "list", "--port", "8080"]) == 0
+        listed = json.loads(buf.getvalue())
+        assert listed["current"] == str(ui_client)
+        assert listed["apps"][0]["path"] == str(ui_client)
+        buf = StringIO()
+        with redirect_stdout(buf):
+            assert refine_cli.main(["app", "status", "--port", "8080"]) == 0
+        app_status = json.loads(buf.getvalue())
+        assert app_status["attached"] is True
+        assert app_status["client_repo"] == str(ui_client)
+        buf = StringIO()
+        with redirect_stdout(buf):
+            assert refine_cli.main([
+                "app", "remove", str(ui_client), "--port", "8080",
+            ]) == 0
+        removed = json.loads(buf.getvalue())
+        assert removed["removed_path"] == str(ui_client)
+        assert removed["detached"] is True
+        assert json.loads(port_registry.read_text(encoding="utf-8"))["active_app"] == ""
+    finally:
+        os.chdir(old_cwd)
     print("[ok] UI project bootstrap creates git repo + port-local app binding")
 
     setup_install_clone = tmp / "setup-install-clone"

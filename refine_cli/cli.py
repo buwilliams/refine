@@ -39,7 +39,8 @@ from typing import Annotated, Callable
 
 import click
 import typer
-from refine_server import cluster, config, db, project_registry, project_state, project_sync, upgrade
+from refine_server import chat_ops, cluster, cluster_ops, config, dashboard_ops, db, diagnostics_ops, file_ops, gap_ops, import_ops, node_ops, observability_ops, process_ops, project_apps, project_config_ops, project_registry, project_state, project_sync, reporter_ops, settings_ops, target_app_ops, upgrade
+from refine_server.backend_protocol import M_PREFLIGHT, M_PROJECT_SYNC
 
 
 SYSTEMD_SYSTEM_DIR = Path("/etc/systemd/system")
@@ -77,6 +78,140 @@ cluster_app = typer.Typer(
     context_settings=_CONTEXT_SETTINGS,
     no_args_is_help=True,
 )
+apps_app = typer.Typer(
+    name="app",
+    help="Manage known target apps for this Refine checkout.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+reporter_app = typer.Typer(
+    name="reporter",
+    help="Manage Gap reporters.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+guidance_app = typer.Typer(
+    name="guidance",
+    help="Manage project guidance.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+governance_app = typer.Typer(
+    name="governance",
+    help="Manage Governance settings and rules.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+quality_app = typer.Typer(
+    name="quality",
+    help="Manage Quality settings and regressions.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+quality_regression_app = typer.Typer(
+    name="regression",
+    help="Manage Quality regression checks.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+quality_app.add_typer(quality_regression_app, name="regression")
+activity_app = typer.Typer(
+    name="activity",
+    help="Inspect and clean activity logs.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+performance_app = typer.Typer(
+    name="performance",
+    help="Inspect and clean performance telemetry.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+upgrade_app = typer.Typer(
+    name="upgrade",
+    help="Inspect Refine upgrade availability.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+job_app = typer.Typer(
+    name="job",
+    help="Inspect and cancel background jobs.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+files_app = typer.Typer(
+    name="files",
+    help="Inspect target-app files.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+gaps_app = typer.Typer(
+    name="gaps",
+    help="Inspect Gaps.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+changes_app = typer.Typer(
+    name="changes",
+    help="Inspect merged Refine changes.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+chat_app = typer.Typer(
+    name="chat",
+    help="Manage chat sessions.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+settings_app = typer.Typer(
+    name="settings",
+    help="Manage project settings.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+diagnostics_app = typer.Typer(
+    name="diagnostics",
+    help="Inspect machine-readable diagnostics.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+processes_app = typer.Typer(
+    name="processes",
+    help="Control managed processes.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+dashboard_app = typer.Typer(
+    name="dashboard",
+    help="Inspect dashboard data.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
+import_app = typer.Typer(
+    name="import",
+    help="Prepare and persist Gap imports.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
 migrate_app = typer.Typer(
     name="migrate",
     help="Manage Refine project-state migrations.",
@@ -86,6 +221,24 @@ migrate_app = typer.Typer(
 )
 app.add_typer(node_app, name="node")
 app.add_typer(cluster_app, name="cluster")
+app.add_typer(apps_app, name="app")
+app.add_typer(reporter_app, name="reporter")
+app.add_typer(guidance_app, name="guidance")
+app.add_typer(governance_app, name="governance")
+app.add_typer(quality_app, name="quality")
+app.add_typer(activity_app, name="activity")
+app.add_typer(performance_app, name="performance")
+app.add_typer(upgrade_app, name="upgrade")
+app.add_typer(job_app, name="job")
+app.add_typer(files_app, name="files")
+app.add_typer(gaps_app, name="gaps")
+app.add_typer(changes_app, name="changes")
+app.add_typer(chat_app, name="chat")
+app.add_typer(settings_app, name="settings")
+app.add_typer(diagnostics_app, name="diagnostics")
+app.add_typer(processes_app, name="processes")
+app.add_typer(dashboard_app, name="dashboard")
+app.add_typer(import_app, name="import")
 app.add_typer(migrate_app, name="migrate")
 
 
@@ -225,6 +378,86 @@ def _sync_cli_refine_state(
             str(result.get("details") or result.get("message") or "Refine state sync failed")
         )
     return result
+
+
+def _cli_project_config(ctx: typer.Context) -> config.Config:
+    _ensure_cli_project(_ctx_config(ctx))
+    return config.get(reload=True)
+
+
+def _load_json_value(value: str) -> object:
+    source = str(value or "").strip()
+    if source == "-":
+        text = sys.stdin.read()
+    else:
+        path = Path(source).expanduser()
+        if path.is_file():
+            text = path.read_text(encoding="utf-8")
+        else:
+            text = source
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise click.ClickException(f"invalid JSON: {e}") from e
+
+
+def _load_text_value(value: str) -> str:
+    source = str(value or "")
+    if source.strip() == "-":
+        return sys.stdin.read()
+    path = Path(source).expanduser()
+    if path.is_file():
+        return path.read_text(encoding="utf-8")
+    return source
+
+
+def _runner_call_for_cli(
+    ctx: typer.Context,
+    port: int | None,
+) -> tuple[config.Config, project_config_ops.RunnerCall]:
+    cfg, effective_port = _target_app_cli_config(ctx, port)
+    return cfg, _target_app_cli_runner_call(cfg, effective_port)
+
+
+def _backend_runner_for_cli(
+    ctx: typer.Context,
+    port: int | None,
+) -> tuple[config.Config, chat_ops.RunnerCall]:
+    cfg = _cli_project_config(ctx)
+    effective_port = _effective_port(_Args(port=port), cfg)
+    return cfg, _backend_cli_runner_call(cfg, effective_port)
+
+
+def _backend_cli_runner_call(
+    cfg: config.Config,
+    port: int,
+) -> chat_ops.RunnerCall:
+    from refine_runtime import ipc
+    from refine_runtime.supervisor_protocol import (
+        M_ENSURE_WORKER,
+        WORKER_STARTUP_TIMEOUT_SECONDS,
+    )
+
+    def call(method: str, params: dict[str, object], timeout: float) -> dict:
+        supervisor_socket = ipc.supervisor_socket_path(port)
+        worker = ipc.request(
+            supervisor_socket,
+            M_ENSURE_WORKER,
+            {"config_path": str(cfg.config_path)},
+            timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
+        )
+        worker_socket = str(
+            worker.get("worker_socket")
+            or worker.get("socket_path")
+            or ipc.runner_socket_path(port=port, config_path=cfg.config_path),
+        )
+        return ipc.request(worker_socket, method, params, timeout=timeout)
+
+    return call
+
+
+def _print_json(payload: object) -> None:
+    typer.echo(json.dumps(payload, indent=2))
 
 
 @migrate_app.command("status", help="Show project-state migration status.")
@@ -371,11 +604,7 @@ def migrate_run_command(
 @node_app.command("list", help="List nodes.")
 def node_list_command(ctx: typer.Context) -> int:
     _ensure_cli_project(_ctx_config(ctx))
-    payload = {
-        "nodes": project_state.list_nodes(),
-        "active_node_id": project_state.active_node_id(),
-    }
-    typer.echo(json.dumps(payload, indent=2))
+    typer.echo(json.dumps(node_ops.summary(), indent=2))
     return 0
 
 
@@ -386,7 +615,7 @@ def node_create_command(
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
     cfg = config.get(reload=True)
-    node = project_state.create_node(name)
+    node = node_ops.create(name)
     sync = _sync_cli_refine_state(cfg, message="refine: create node")
     typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
@@ -398,12 +627,7 @@ def node_activate_command(
     node_id: Annotated[str, typer.Argument(help="Node ID.")],
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
-    project_state.set_active_node(node_id)
-    conn = db.connect()
-    try:
-        project_state.rebuild_sqlite_cache(conn)
-    finally:
-        conn.close()
+    node_ops.activate(node_id)
     typer.echo(f"Activated node {node_id}.")
     return 0
 
@@ -416,7 +640,7 @@ def node_rename_command(
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
     cfg = config.get(reload=True)
-    node = project_state.update_node(node_id, display_name=name)
+    node = node_ops.update(node_id, display_name=name)
     sync = _sync_cli_refine_state(cfg, message="refine: update node")
     typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
@@ -429,7 +653,7 @@ def node_archive_command(
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
     cfg = config.get(reload=True)
-    node = project_state.update_node(node_id, archived=True)
+    node = node_ops.update(node_id, archived=True)
     sync = _sync_cli_refine_state(cfg, message="refine: update node")
     typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
     return 0
@@ -446,8 +670,23 @@ def node_transfer_gaps_command(
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
     cfg = config.get(reload=True)
-    result = project_state.transfer_gaps(source_node_id, target_node_id)
+    result = node_ops.transfer_gaps(source_node_id, target_node_id)
     sync = _sync_cli_refine_state(cfg, message="refine: transfer node gaps")
+    result["sync"] = sync
+    typer.echo(json.dumps(result, indent=2))
+    return 0
+
+
+@node_app.command("copy-settings", help="Copy Application or Runtime settings from another node.")
+def node_copy_settings_command(
+    ctx: typer.Context,
+    source_node_id: Annotated[str, typer.Argument(help="Source node ID.")],
+    section: Annotated[str, typer.Argument(help="Settings section: application or runtime.")],
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    cfg = config.get(reload=True)
+    result = node_ops.copy_settings(source_node_id, section)
+    sync = _sync_cli_refine_state(cfg, message="refine: copy node settings")
     result["sync"] = sync
     typer.echo(json.dumps(result, indent=2))
     return 0
@@ -456,8 +695,9 @@ def node_transfer_gaps_command(
 @cluster_app.command("list", help="List cluster nodes.")
 def cluster_list_command(ctx: typer.Context) -> int:
     _ensure_cli_project(_ctx_config(ctx))
-    typer.echo(json.dumps(cluster.read_cluster(), indent=2))
-    return 0
+    status, payload = cluster_ops.list_cluster()
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if status < 400 else 1
 
 
 @cluster_app.command("register", help="Register or update a cluster node.")
@@ -482,8 +722,8 @@ def cluster_register_command(
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
     cfg = config.get(reload=True)
-    try:
-        node = cluster.upsert_node({
+    status, payload = cluster_ops.upsert_node(
+        {
             "id": node_id,
             "display_name": display_name or node_id,
             "ssh_host": ssh_host,
@@ -491,11 +731,67 @@ def cluster_register_command(
             "refine_checkout": refine_checkout,
             "target_app_path": target_app_path,
             "refine_port": refine_port,
-        })
-    except ValueError as e:
-        raise click.ClickException(str(e)) from e
-    sync = _sync_cli_refine_state(cfg, message="refine: update cluster node")
-    typer.echo(json.dumps({"node": node, "sync": sync}, indent=2))
+        },
+        lambda message: _sync_cli_refine_state(cfg, message=message),
+    )
+    if status >= 400:
+        raise click.ClickException(payload["error"]["message"])
+    typer.echo(json.dumps(payload, indent=2))
+    return 0
+
+
+@cluster_app.command("update", help="Update a registered cluster node.")
+def cluster_update_command(
+    ctx: typer.Context,
+    node_id: Annotated[str, typer.Argument(help="Cluster node ID.")],
+    display_name: Annotated[
+        str | None,
+        typer.Option("--name", help="Display name."),
+    ] = None,
+    ssh_host: Annotated[
+        str | None,
+        typer.Option("--ssh-host", help="SSH host. Current user is assumed."),
+    ] = None,
+    ssh_port: Annotated[int | None, typer.Option("--ssh-port", help="SSH port.")] = None,
+    refine_checkout: Annotated[
+        str | None,
+        typer.Option("--refine-checkout", help="Remote Refine checkout path."),
+    ] = None,
+    target_app_path: Annotated[
+        str | None,
+        typer.Option("--target-app", help="Remote target app path."),
+    ] = None,
+    refine_port: Annotated[int | None, typer.Option("--refine-port", help="Remote Refine UI port.")] = None,
+    enabled: Annotated[
+        bool | None,
+        typer.Option("--enabled/--disabled", help="Enable or disable the cluster node."),
+    ] = None,
+) -> int:
+    _ensure_cli_project(_ctx_config(ctx))
+    cfg = config.get(reload=True)
+    body: dict[str, object] = {}
+    if display_name is not None:
+        body["display_name"] = display_name
+    if ssh_host is not None:
+        body["ssh_host"] = ssh_host
+    if ssh_port is not None:
+        body["ssh_port"] = ssh_port
+    if refine_checkout is not None:
+        body["refine_checkout"] = refine_checkout
+    if target_app_path is not None:
+        body["target_app_path"] = target_app_path
+    if refine_port is not None:
+        body["refine_port"] = refine_port
+    if enabled is not None:
+        body["enabled"] = enabled
+    status, payload = cluster_ops.update_node(
+        node_id,
+        body,
+        lambda message: _sync_cli_refine_state(cfg, message=message),
+    )
+    if status >= 400:
+        raise click.ClickException(payload["error"]["message"])
+    typer.echo(json.dumps(payload, indent=2))
     return 0
 
 
@@ -506,16 +802,16 @@ def cluster_bootstrap_command(
 ) -> int:
     _ensure_cli_project(_ctx_config(ctx))
     cfg = config.get(reload=True)
-    try:
-        result = cluster.bootstrap(node_id)
-    except (ValueError, subprocess.SubprocessError, OSError) as e:
-        raise click.ClickException(str(e)) from e
-    sync = _sync_cli_refine_state(cfg, message="refine: update cluster node health")
-    result["sync"] = sync
-    typer.echo(result.get("stdout") or "", nl=False)
-    if result.get("stderr"):
-        typer.echo(result["stderr"], err=True, nl=False)
-    return 0 if result.get("ok") else int(result.get("exit_code") or 1)
+    status, payload = cluster_ops.bootstrap_node(
+        node_id,
+        lambda message: _sync_cli_refine_state(cfg, message=message),
+    )
+    if status == 400:
+        raise click.ClickException(payload["error"]["message"])
+    typer.echo(payload.get("stdout") or "", nl=False)
+    if payload.get("stderr"):
+        typer.echo(payload["stderr"], err=True, nl=False)
+    return 0 if status < 400 and payload.get("ok") else int(payload.get("exit_code") or 1)
 
 
 @cluster_app.command(
@@ -531,14 +827,1719 @@ def cluster_run_command(
     args = list(ctx.args)
     if args and args[0] == "--":
         args = args[1:]
+    status, payload = cluster_ops.run_node(node_id, {"args": args})
+    if status == 400:
+        raise click.ClickException(payload["error"]["message"])
+    typer.echo(payload.get("stdout") or "", nl=False)
+    if payload.get("stderr"):
+        typer.echo(payload["stderr"], err=True, nl=False)
+    return 0 if status < 400 and payload.get("ok") else int(payload.get("exit_code") or 1)
+
+
+@reporter_app.command("list", help="List reporters.")
+def reporter_list_command(ctx: typer.Context) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
     try:
-        result = cluster.run_remote(node_id, args)
-    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        _print_json(reporter_ops.list_reporters(conn))
+    finally:
+        conn.close()
+    return 0
+
+
+@reporter_app.command("add", help="Add a reporter.")
+def reporter_add_command(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Argument(help="Reporter name.")],
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = reporter_ops.create_reporter(conn, name)
+    except ValueError as e:
         raise click.ClickException(str(e)) from e
-    typer.echo(result.get("stdout") or "", nl=False)
-    if result.get("stderr"):
-        typer.echo(result["stderr"], err=True, nl=False)
-    return 0 if result.get("ok") else int(result.get("exit_code") or 1)
+    finally:
+        conn.close()
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update reporters")
+    _print_json(payload)
+    return 0
+
+
+@reporter_app.command("delete", help="Delete a reporter from the dropdown.")
+def reporter_delete_command(
+    ctx: typer.Context,
+    reporter_id: Annotated[int, typer.Argument(help="Reporter ID.")],
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = reporter_ops.delete_reporter(conn, reporter_id)
+    finally:
+        conn.close()
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update reporters")
+    _print_json(payload)
+    return 0
+
+
+@reporter_app.command("rename", help="Rename a reporter and cascade Gap rounds.")
+def reporter_rename_command(
+    ctx: typer.Context,
+    reporter_id: Annotated[int, typer.Argument(help="Reporter ID.")],
+    name: Annotated[str, typer.Argument(help="New reporter name.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    cfg, runner_call = _runner_call_for_cli(ctx, port)
+    try:
+        payload = reporter_ops.rename_reporter(runner_call, reporter_id, name)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: rename reporter")
+    _print_json(payload)
+    return 0
+
+
+@reporter_app.command("merge", help="Merge one reporter into another and cascade Gap rounds.")
+def reporter_merge_command(
+    ctx: typer.Context,
+    reporter_id: Annotated[int, typer.Argument(help="Source reporter ID.")],
+    target_id: Annotated[int, typer.Argument(help="Target reporter ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    cfg, runner_call = _runner_call_for_cli(ctx, port)
+    try:
+        payload = reporter_ops.merge_reporter(runner_call, reporter_id, target_id)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: merge reporter")
+    _print_json(payload)
+    return 0
+
+
+@guidance_app.command("list", help="List project guidance.")
+def guidance_list_command(ctx: typer.Context) -> int:
+    _cli_project_config(ctx)
+    _print_json(project_config_ops.list_guidance())
+    return 0
+
+
+@guidance_app.command("replace", help="Replace guidance from a JSON array, file, or stdin.")
+def guidance_replace_command(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="JSON array, JSON file path, or '-' for stdin.")],
+) -> int:
+    cfg = _cli_project_config(ctx)
+    raw = _load_json_value(source)
+    items = raw.get("guidance") if isinstance(raw, dict) else raw
+    try:
+        payload = project_config_ops.update_guidance(items)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update guidance")
+    _print_json(payload)
+    return 0
+
+
+@settings_app.command("get", help="Show project settings.")
+def settings_get_command(ctx: typer.Context) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = settings_ops.list_settings(conn)
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@settings_app.command("save", help="Update project settings from a JSON object, file, or stdin.")
+def settings_save_command(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="JSON object, JSON file path, or '-' for stdin.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port for backend side effects.")] = None,
+) -> int:
+    raw = _load_json_value(source)
+    if not isinstance(raw, dict):
+        raise click.ClickException("settings payload must be a JSON object")
+    return _settings_save_payload(ctx, raw, port=port)
+
+
+@settings_app.command("set", help="Update one project setting.")
+def settings_set_command(
+    ctx: typer.Context,
+    key: Annotated[str, typer.Argument(help="Setting key.")],
+    value: Annotated[str, typer.Argument(help="Setting value.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port for backend side effects.")] = None,
+) -> int:
+    return _settings_save_payload(ctx, {key: value}, port=port)
+
+
+@settings_app.command("recheck-auth", help="Run the backend provider auth preflight check.")
+def settings_recheck_auth_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        payload = runner_call(M_PREFLIGHT, {}, 30.0)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if payload.get("ok") else 1
+
+
+def _settings_save_payload(
+    ctx: typer.Context,
+    body: dict[str, object],
+    *,
+    port: int | None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        try:
+            status, payload = settings_ops.update_settings(
+                conn,
+                body,
+                runner_call=runner_call,
+            )
+        except ValueError as e:
+            raise click.ClickException(str(e)) from e
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    if status < 400 and payload.get("ok", True) is not False:
+        payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update settings")
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@diagnostics_app.command("backend", help="Show backend runner diagnostics.")
+def diagnostics_backend_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    effective_port = _effective_port(_Args(port=port), cfg)
+    backend = {
+        "process_model": "supervisor",
+        "config_path": str(cfg.config_path),
+        "web_port": effective_port,
+    }
+    try:
+        payload = diagnostics_ops.backend_diagnostics(
+            runner_call,
+            backend=backend,
+        )
+    except Exception as e:
+        payload = diagnostics_ops.unreachable(
+            backend=backend,
+            message=str(e),
+            code=e.__class__.__name__,
+        )
+    _print_json(payload)
+    return 0 if payload.get("reachable") else 1
+
+
+@processes_app.command("list", help="List managed processes and runner work.")
+def processes_list_command(
+    ctx: typer.Context,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    from refine_ui import runtime
+
+    runner_snapshot = runtime.runner_status_snapshot()
+    backend = runner_snapshot.get("backend") or runtime.backend_info()
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = process_ops.summary(
+            conn,
+            runner_snapshot=runner_snapshot,
+            backend=backend,
+            ui_pid=None,
+            supervisor_pid=_int_or_none(os.environ.get("REFINE_SUPERVISOR_PID")),
+            active_background_job=_active_background_job_for_cli,
+        )
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+def _active_background_job_for_cli(kind: str) -> dict[str, object] | None:
+    try:
+        conn = db.connect()
+        try:
+            rows = conn.execute(
+                "SELECT id FROM background_jobs "
+                "WHERE kind = ? AND status IN ('queued', 'running') "
+                "ORDER BY started_at DESC LIMIT 5",
+                (kind,),
+            ).fetchall()
+        finally:
+            conn.close()
+    except Exception:
+        return None
+    from refine_ui import background_jobs
+
+    for row in rows:
+        snap = background_jobs.snapshot(str(row["id"]))
+        if snap and snap.get("status") in {"queued", "running"}:
+            return snap
+    return None
+
+
+def _int_or_none(value: object) -> int | None:
+    return process_ops.int_or_none(value)
+
+
+@processes_app.command("background", help="Start, stop, or toggle background processes.")
+def processes_background_command(
+    ctx: typer.Context,
+    stopped: Annotated[
+        bool | None,
+        typer.Option("--stopped/--running", help="Stop or start background processes."),
+    ] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    body: dict[str, object] = {}
+    if stopped is not None:
+        body["stopped"] = stopped
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        try:
+            status, payload = process_ops.set_background_processes(
+                conn,
+                body,
+                runner_call=runner_call,
+            )
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("runner", {}).get("ok", True) is not False else 1
+
+
+@processes_app.command("agents", help="Pause, unpause, or toggle agent processes.")
+def processes_agents_command(
+    ctx: typer.Context,
+    paused: Annotated[
+        bool | None,
+        typer.Option("--paused/--running", help="Pause or unpause agent processes."),
+    ] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    body: dict[str, object] = {}
+    if paused is not None:
+        body["paused"] = paused
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        try:
+            status, payload = process_ops.set_agent_processes(
+                conn,
+                body,
+                runner_call=runner_call,
+            )
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("runner", {}).get("ok", True) is not False else 1
+
+
+@dashboard_app.command("summary", help="Show dashboard summary data.")
+def dashboard_summary_command(
+    ctx: typer.Context,
+    node: Annotated[
+        str,
+        typer.Option("--node", help="Node scope: current or all."),
+    ] = "current",
+) -> int:
+    cfg = _cli_project_config(ctx)
+    from refine_ui import runtime
+
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = dashboard_ops.summary(
+            conn,
+            node=node,
+            runner_snapshot=runtime.runner_status_snapshot(),
+        )
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@governance_app.command("get", help="Show Governance settings.")
+def governance_get_command(ctx: typer.Context) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        _print_json(project_config_ops.governance_get(conn))
+    finally:
+        conn.close()
+    return 0
+
+
+@governance_app.command("save", help="Update Governance settings.")
+def governance_save_command(
+    ctx: typer.Context,
+    product: Annotated[str | None, typer.Option("--product", help="Product description.")] = None,
+    constitution: Annotated[str | None, typer.Option("--constitution", help="Constitution text.")] = None,
+    rules: Annotated[str | None, typer.Option("--rules", help="Rules JSON array, file path, or '-' for stdin.")] = None,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    body: dict[str, object] = {}
+    if product is not None:
+        body["product"] = product
+    if constitution is not None:
+        body["constitution"] = constitution
+    if rules is not None:
+        raw_rules = _load_json_value(rules)
+        body["rules"] = raw_rules.get("rules") if isinstance(raw_rules, dict) else raw_rules
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = project_config_ops.governance_save(conn, body)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update governance")
+    _print_json(payload)
+    return 0
+
+
+@governance_app.command("generate-rules", help="Generate Governance rules through the runner.")
+def governance_generate_rules_command(
+    ctx: typer.Context,
+    product: Annotated[str, typer.Argument(help="Product description.")],
+    constitution: Annotated[str, typer.Argument(help="Constitution text.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    _cfg, runner_call = _runner_call_for_cli(ctx, port)
+    try:
+        payload = project_config_ops.governance_generate_rules(
+            runner_call,
+            {"product": product, "constitution": constitution},
+        )
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if payload.get("ok", True) is not False else 1
+
+
+@quality_app.command("get", help="Show Quality settings and regressions.")
+def quality_get_command(ctx: typer.Context) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        _print_json(project_config_ops.quality_get(conn))
+    finally:
+        conn.close()
+    return 0
+
+
+@quality_app.command("save", help="Update Quality settings.")
+def quality_save_command(
+    ctx: typer.Context,
+    enabled: Annotated[
+        bool | None,
+        typer.Option("--enabled/--disabled", help="Enable or disable Quality."),
+    ] = None,
+    timing: Annotated[
+        str | None,
+        typer.Option("--timing", help="Quality timing: pre_merge or post_rebuild."),
+    ] = None,
+    business_requirements: Annotated[
+        str | None,
+        typer.Option("--business-requirements", help="Business requirements text."),
+    ] = None,
+    instructions: Annotated[
+        str | None,
+        typer.Option("--instructions", help="Quality instructions text."),
+    ] = None,
+    regressions_enabled: Annotated[
+        bool | None,
+        typer.Option("--regressions-enabled/--regressions-disabled", help="Enable managed regressions."),
+    ] = None,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    body: dict[str, object] = {}
+    if enabled is not None:
+        body["enabled"] = enabled
+    if timing is not None:
+        body["timing"] = timing
+    if business_requirements is not None:
+        body["business_requirements"] = business_requirements
+    if instructions is not None:
+        body["instructions"] = instructions
+    if regressions_enabled is not None:
+        body["regressions_enabled"] = regressions_enabled
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = project_config_ops.quality_save(conn, body)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update quality")
+    _print_json(payload)
+    return 0
+
+
+@quality_regression_app.command("list", help="List Quality regression checks.")
+def quality_regression_list_command(ctx: typer.Context) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = {"regressions": project_config_ops.quality_get(conn)["regressions"]}
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@quality_regression_app.command("create", help="Create a Quality regression check.")
+def quality_regression_create_command(
+    ctx: typer.Context,
+    title: Annotated[str | None, typer.Option("--title", help="Regression title.")] = None,
+    description: Annotated[str, typer.Option("--description", help="Regression description.")] = "",
+    prompt: Annotated[str, typer.Option("--prompt", help="Prompt used to seed the spec.")] = "",
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = project_config_ops.regression_create(
+            conn,
+            {"title": title, "description": description, "prompt": prompt},
+        )
+    finally:
+        conn.close()
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update quality regressions")
+    _print_json(payload)
+    return 0
+
+
+@quality_regression_app.command("update", help="Update a Quality regression check.")
+def quality_regression_update_command(
+    ctx: typer.Context,
+    regression_id: Annotated[str, typer.Argument(help="Regression ID.")],
+    title: Annotated[str | None, typer.Option("--title", help="Regression title.")] = None,
+    description: Annotated[str | None, typer.Option("--description", help="Regression description.")] = None,
+    enabled: Annotated[
+        bool | None,
+        typer.Option("--enabled/--disabled", help="Enable or disable this regression."),
+    ] = None,
+    timeout_seconds: Annotated[int | None, typer.Option("--timeout", help="Timeout seconds.")] = None,
+    wait_until: Annotated[str | None, typer.Option("--wait-until", help="Playwright wait state.")] = None,
+    viewport: Annotated[
+        str | None,
+        typer.Option("--viewport", help="Viewport JSON object, file path, or '-' for stdin."),
+    ] = None,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    body: dict[str, object] = {}
+    if title is not None:
+        body["title"] = title
+    if description is not None:
+        body["description"] = description
+    if enabled is not None:
+        body["enabled"] = enabled
+    if timeout_seconds is not None:
+        body["timeout_seconds"] = timeout_seconds
+    if wait_until is not None:
+        body["wait_until"] = wait_until
+    if viewport is not None:
+        body["viewport"] = _load_json_value(viewport)
+    try:
+        payload = project_config_ops.regression_update(regression_id, body)
+    except LookupError as e:
+        raise click.ClickException(str(e)) from e
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update quality regressions")
+    _print_json(payload)
+    return 0
+
+
+@quality_regression_app.command("delete", help="Delete a Quality regression check.")
+def quality_regression_delete_command(
+    ctx: typer.Context,
+    regression_id: Annotated[str, typer.Argument(help="Regression ID.")],
+) -> int:
+    cfg = _cli_project_config(ctx)
+    try:
+        payload = project_config_ops.regression_delete(regression_id)
+    except LookupError as e:
+        raise click.ClickException(str(e)) from e
+    payload["sync"] = _sync_cli_refine_state(cfg, message="refine: update quality regressions")
+    _print_json(payload)
+    return 0
+
+
+@quality_regression_app.command("run", help="Run enabled Quality regression checks through the runner.")
+def quality_regression_run_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    _cfg, runner_call = _runner_call_for_cli(ctx, port)
+    payload = project_config_ops.regression_run(runner_call)
+    _print_json(payload)
+    return 0 if payload.get("ok", True) is not False else 1
+
+
+@activity_app.command("list", help="List activity entries.")
+def activity_list_command(
+    ctx: typer.Context,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum rows.")] = 50,
+    offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
+    gap_id: Annotated[str | None, typer.Option("--gap-id", help="Filter by Gap ID.")] = None,
+    since_id: Annotated[int | None, typer.Option("--since-id", help="Only entries after this activity ID.")] = None,
+    severity: Annotated[str | None, typer.Option("--severity", help="Filter severity.")] = None,
+    category: Annotated[str | None, typer.Option("--category", help="Filter category.")] = None,
+    actor: Annotated[str | None, typer.Option("--actor", help="Filter actor.")] = None,
+    q: Annotated[str | None, typer.Option("--query", "-q", help="Search message/details.")] = None,
+    sort: Annotated[str | None, typer.Option("--sort", help="Sort key.")] = None,
+    direction: Annotated[str | None, typer.Option("--direction", help="asc or desc.")] = None,
+    facets: Annotated[bool, typer.Option("--facets", help="Include facets.")] = False,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = observability_ops.list_activity(
+            conn,
+            limit=limit,
+            offset=offset,
+            gap_id=gap_id,
+            since_id=since_id,
+            severity=severity,
+            category=category,
+            actor=actor,
+            q=q,
+            sort=sort,
+            direction=direction,
+            include_facets=facets,
+            metric_operation="cli.list_activity",
+        )
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@activity_app.command("cleanup", help="Delete old activity entries.")
+def activity_cleanup_command(
+    ctx: typer.Context,
+    days: Annotated[int, typer.Option("--days", help="Days to keep; 0 clears all.")] = 30,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = observability_ops.cleanup_logs(conn, days)
+    except ValueError as e:
+        raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@performance_app.command("summary", help="Show performance telemetry.")
+def performance_summary_command(
+    ctx: typer.Context,
+    operation: Annotated[str | None, typer.Option("--operation", help="Filter operation.")] = None,
+    success: Annotated[str | None, typer.Option("--success", help="Filter success/failure.")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum recent rows.")] = 50,
+    offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = observability_ops.performance_summary(
+            conn,
+            operation=operation,
+            success=success,
+            limit=limit,
+            offset=offset,
+        )
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@performance_app.command("cleanup", help="Prune or clear performance telemetry.")
+def performance_cleanup_command(
+    ctx: typer.Context,
+    clear: Annotated[bool, typer.Option("--clear", help="Clear all telemetry.")] = False,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        payload = observability_ops.performance_cleanup(conn, clear=clear)
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0
+
+
+@performance_app.command("rebuild-cache", help="Rebuild the SQLite cache from canonical Refine JSON.")
+def performance_rebuild_cache_command(
+    ctx: typer.Context,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    payload = observability_ops.rebuild_sqlite_cache(
+        cfg.sqlite_path,
+        restart_services=False,
+    )
+    _print_json(payload)
+    return 0
+
+
+@upgrade_app.command("status", help="Show Refine upgrade availability.")
+def upgrade_status_command() -> int:
+    _print_json({"upgrade": upgrade.status(Path.cwd()).as_dict()})
+    return 0
+
+
+@job_app.command("get", help="Show a background job snapshot.")
+def job_get_command(
+    _ctx: typer.Context,
+    job_id: Annotated[str, typer.Argument(help="Job ID.")],
+) -> int:
+    from refine_ui import background_jobs
+
+    try:
+        payload = observability_ops.background_job(job_id, background_jobs.snapshot)
+    except LookupError as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0
+
+
+@job_app.command("cancel", help="Cancel a background job.")
+def job_cancel_command(
+    _ctx: typer.Context,
+    job_id: Annotated[str, typer.Argument(help="Job ID.")],
+) -> int:
+    from refine_ui import background_jobs
+
+    try:
+        payload = observability_ops.cancel_background_job(job_id, background_jobs.cancel)
+    except LookupError as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0
+
+
+@files_app.command("tree", help="List target-app directory entries.")
+def files_tree_command(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Target-app relative path.")] = "",
+    recursive: Annotated[bool, typer.Option("--recursive", help="Include nested directories.")] = False,
+    max_depth: Annotated[int, typer.Option("--max-depth", help="Maximum recursive depth.")] = file_ops.FILES_TREE_MAX_DEPTH,
+    max_entries: Annotated[int, typer.Option("--max-entries", help="Maximum entries.")] = file_ops.FILES_TREE_MAX_ENTRIES,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        status, payload = file_ops.tree(
+            cfg.client_repo,
+            path,
+            recursive=recursive,
+            max_depth=max_depth,
+            max_entries=max_entries,
+            ignore_patterns=file_ops.file_browser_ignore_patterns(conn),
+        )
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@files_app.command("search", help="Search target-app paths.")
+def files_search_command(
+    ctx: typer.Context,
+    query: Annotated[str, typer.Argument(help="Path search query.")],
+    max_entries: Annotated[int, typer.Option("--max-entries", help="Maximum matches.")] = file_ops.FILES_TREE_MAX_ENTRIES,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        status, payload = file_ops.search(
+            cfg.client_repo,
+            query,
+            max_entries=max_entries,
+            ignore_patterns=file_ops.file_browser_ignore_patterns(conn),
+        )
+    finally:
+        conn.close()
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@files_app.command("read", help="Read a target-app file preview.")
+def files_read_command(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Target-app relative file path.")],
+    offset: Annotated[int, typer.Option("--offset", help="Byte offset.")] = 0,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum bytes.")] = file_ops.FILE_TEXT_CHUNK_BYTES,
+) -> int:
+    cfg = _cli_project_config(ctx)
+    status, payload = file_ops.read(
+        cfg.client_repo,
+        path,
+        offset=offset,
+        limit=limit,
+    )
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@gaps_app.command("list", help="List Gaps.")
+def gaps_list_command(
+    ctx: typer.Context,
+    status: Annotated[str | None, typer.Option("--status", help="Filter by workflow status.")] = None,
+    q: Annotated[str | None, typer.Option("--q", help="Search query.")] = None,
+    severity: Annotated[str | None, typer.Option("--severity", help="Filter by activity severity.")] = None,
+    category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
+    actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
+    reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum rows.")] = 50,
+    offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
+    sort: Annotated[str | None, typer.Option("--sort", help="Sort key.")] = None,
+    direction: Annotated[str | None, typer.Option("--dir", help="Sort direction.")] = None,
+    facets: Annotated[bool, typer.Option("--facets", help="Include filter facets.")] = False,
+) -> int:
+    _cli_project_config(ctx)
+    status_code, payload = gap_ops.list_gaps(
+        status=status,
+        q=q,
+        severity=severity,
+        category=category,
+        actor=actor,
+        reporter=reporter,
+        node=node,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        direction=direction,
+        include_facets=facets,
+    )
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@gaps_app.command("get", help="Show a Gap detail payload.")
+def gaps_get_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+) -> int:
+    _cli_project_config(ctx)
+    status_code, payload = gap_ops.get_gap(gap_id.upper())
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@gaps_app.command("logs", help="List logs for a Gap round.")
+def gaps_logs_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    round_idx: Annotated[int, typer.Option("--round-idx", help="Round index.")] = 0,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum rows.")] = 50,
+    offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
+) -> int:
+    _cli_project_config(ctx)
+    status_code, payload = gap_ops.get_gap_logs(
+        gap_id.upper(),
+        round_idx=round_idx,
+        limit=limit,
+        offset=offset,
+    )
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@gaps_app.command("create", help="Create a Gap.")
+def gaps_create_command(
+    ctx: typer.Context,
+    reporter: Annotated[str, typer.Option("--reporter", help="Reporter name.")],
+    actual: Annotated[str, typer.Option("--actual", help="Current behavior.")] = "",
+    target: Annotated[str, typer.Option("--target", help="Target behavior.")] = "",
+    name: Annotated[str | None, typer.Option("--name", help="Gap name.")] = None,
+    priority: Annotated[str, typer.Option("--priority", help="low, medium, or high.")] = "low",
+    duplicate_decision: Annotated[
+        str | None,
+        typer.Option("--duplicate-decision", help="duplicate, original, or move_original_to_backlog."),
+    ] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    body = {
+        "reporter": reporter,
+        "actual": actual,
+        "target": target,
+        "priority": priority,
+    }
+    if name is not None:
+        body["name"] = name
+    if duplicate_decision is not None:
+        body["duplicate_decision"] = duplicate_decision
+    try:
+        status_code, payload = import_ops.create_gap(runner_call, body)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _sync_gap_cli_mutation(cfg, payload, status_code, "refine: create gap")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@gaps_app.command("update", help="Update Gap metadata or notes.")
+def gaps_update_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    name: Annotated[str | None, typer.Option("--name", help="Gap name.")] = None,
+    priority: Annotated[str | None, typer.Option("--priority", help="low, medium, or high.")] = None,
+    status: Annotated[str | None, typer.Option("--status", help="Workflow status.")] = None,
+    notes: Annotated[str | None, typer.Option("--notes", help="Notes JSON, file path, or '-' for stdin.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    body: dict[str, object] = {}
+    if name is not None:
+        body["name"] = name
+    if priority is not None:
+        body["priority"] = priority
+    if status is not None:
+        body["status"] = status
+    if notes is not None:
+        body["notes"] = _load_json_value(notes)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        try:
+            status_code, payload = gap_ops.update_gap(
+                conn,
+                runner_call,
+                gap_id.upper(),
+                body,
+                background_processes_stopped=(
+                    process_ops._truthy(db.get_setting(conn, "paused"))
+                    or process_ops._truthy(db.get_setting(conn, "agents_paused"))
+                ),
+            )
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    _sync_gap_cli_mutation(cfg, payload, status_code, "refine: update gap")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@gaps_app.command("delete", help="Delete a Gap.")
+def gaps_delete_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: delete gap",
+        lambda conn, runner_call: gap_ops.delete_gap(conn, runner_call, gap_id.upper()),
+    )
+
+
+@gaps_app.command("append-round", help="Append a review round.")
+def gaps_append_round_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    reporter: Annotated[str, typer.Option("--reporter", help="Reporter name.")],
+    actual: Annotated[str, typer.Option("--actual", help="Current behavior.")] = "",
+    target: Annotated[str, typer.Option("--target", help="Target behavior.")] = "",
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: append gap round",
+        lambda conn, runner_call: gap_ops.append_round(
+            conn,
+            runner_call,
+            gap_id.upper(),
+            {"reporter": reporter, "actual": actual, "target": target},
+        ),
+    )
+
+
+@gaps_app.command("edit-round", help="Edit the latest unaddressed Gap round.")
+def gaps_edit_round_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    reporter: Annotated[str | None, typer.Option("--reporter", help="Reporter name.")] = None,
+    actual: Annotated[str | None, typer.Option("--actual", help="Current behavior.")] = None,
+    target: Annotated[str | None, typer.Option("--target", help="Target behavior.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: edit gap round",
+        lambda conn, runner_call: gap_ops.edit_latest_round(
+            conn,
+            runner_call,
+            gap_id.upper(),
+            {"reporter": reporter, "actual": actual, "target": target},
+        ),
+    )
+
+
+@gaps_app.command("verify", help="Approve a Gap in review.")
+def gaps_verify_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: verify gap",
+        lambda conn, runner_call: gap_ops.verify(conn, runner_call, gap_id.upper()),
+    )
+
+
+@gaps_app.command("retry", help="Reopen a terminal Gap.")
+def gaps_retry_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: retry gap",
+        lambda conn, runner_call: gap_ops.retry(conn, runner_call, gap_id.upper()),
+    )
+
+
+@gaps_app.command("retry-merge", help="Retry a failed merge.")
+def gaps_retry_merge_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: retry gap merge",
+        lambda conn, runner_call: gap_ops.retry_merge(conn, runner_call, gap_id.upper()),
+    )
+
+
+@gaps_app.command("retry-quality", help="Retry a failed Quality run.")
+def gaps_retry_quality_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: retry gap quality",
+        lambda conn, runner_call: gap_ops.retry_qa(conn, runner_call, gap_id.upper()),
+    )
+
+
+@gaps_app.command("cancel", help="Cancel a Gap.")
+def gaps_cancel_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: cancel gap",
+        lambda conn, runner_call: gap_ops.cancel(conn, runner_call, gap_id.upper()),
+    )
+
+
+@gaps_app.command("bulk-update", help="Bulk update Gap priority, status, or reporter.")
+def gaps_bulk_update_command(
+    ctx: typer.Context,
+    priority: Annotated[str | None, typer.Option("--priority", help="Set priority to low, medium, or high.")] = None,
+    status_update: Annotated[str | None, typer.Option("--status-update", help="Set workflow status.")] = None,
+    set_reporter: Annotated[str | None, typer.Option("--set-reporter", help="Set reporter name.")] = None,
+    filter_json: Annotated[str | None, typer.Option("--filter", help="Filter JSON, file path, or '-' for stdin.")] = None,
+    selected_ids: Annotated[str | None, typer.Option("--selected-ids", help="Selected Gap ids as JSON array or comma list.")] = None,
+    exclude_ids: Annotated[str | None, typer.Option("--exclude-ids", help="Excluded Gap ids as JSON array or comma list.")] = None,
+    status: Annotated[str | None, typer.Option("--status", help="Filter by workflow status.")] = None,
+    q: Annotated[str | None, typer.Option("--q", help="Search query.")] = None,
+    severity: Annotated[str | None, typer.Option("--severity", help="Filter by activity severity.")] = None,
+    category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
+    actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
+    reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    update = {
+        key: value
+        for key, value in {
+            "priority": priority,
+            "status": status_update,
+            "reporter": set_reporter,
+        }.items()
+        if value is not None
+    }
+    body = _bulk_gap_body(
+        update=update,
+        filter_json=filter_json,
+        selected_ids=selected_ids,
+        exclude_ids=exclude_ids,
+        status=status,
+        q=q,
+        severity=severity,
+        category=category,
+        actor=actor,
+        reporter=reporter,
+        node=node,
+    )
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: bulk update gaps",
+        lambda conn, runner_call: gap_ops.bulk_update_gaps(conn, runner_call, body),
+    )
+
+
+@gaps_app.command("bulk-delete", help="Bulk delete Gaps.")
+def gaps_bulk_delete_command(
+    ctx: typer.Context,
+    filter_json: Annotated[str | None, typer.Option("--filter", help="Filter JSON, file path, or '-' for stdin.")] = None,
+    selected_ids: Annotated[str | None, typer.Option("--selected-ids", help="Selected Gap ids as JSON array or comma list.")] = None,
+    exclude_ids: Annotated[str | None, typer.Option("--exclude-ids", help="Excluded Gap ids as JSON array or comma list.")] = None,
+    status: Annotated[str | None, typer.Option("--status", help="Filter by workflow status.")] = None,
+    q: Annotated[str | None, typer.Option("--q", help="Search query.")] = None,
+    severity: Annotated[str | None, typer.Option("--severity", help="Filter by activity severity.")] = None,
+    category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
+    actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
+    reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    body = _bulk_gap_body(
+        update={},
+        filter_json=filter_json,
+        selected_ids=selected_ids,
+        exclude_ids=exclude_ids,
+        status=status,
+        q=q,
+        severity=severity,
+        category=category,
+        actor=actor,
+        reporter=reporter,
+        node=node,
+    )
+    body.pop("update", None)
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: bulk delete gaps",
+        lambda conn, runner_call: gap_ops.bulk_delete_gaps(conn, runner_call, body),
+    )
+
+
+def _bulk_gap_body(
+    *,
+    update: dict[str, str],
+    filter_json: str | None,
+    selected_ids: str | None,
+    exclude_ids: str | None,
+    status: str | None,
+    q: str | None,
+    severity: str | None,
+    category: str | None,
+    actor: str | None,
+    reporter: str | None,
+    node: str | None,
+) -> dict[str, object]:
+    filt: dict[str, object] = {}
+    if filter_json is not None:
+        raw_filter = _load_json_value(filter_json)
+        if not isinstance(raw_filter, dict):
+            raise click.ClickException("filter must be a JSON object")
+        filt.update(raw_filter)
+    for key, value in {
+        "status": status,
+        "q": q,
+        "severity": severity,
+        "category": category,
+        "actor": actor,
+        "reporter": reporter,
+        "node": node,
+    }.items():
+        if value is not None:
+            filt[key] = value
+    body: dict[str, object] = {"filter": filt, "update": update}
+    if selected_ids is not None:
+        body["selected_ids"] = _load_id_list(selected_ids)
+    if exclude_ids is not None:
+        body["exclude_ids"] = _load_id_list(exclude_ids)
+    return body
+
+
+def _load_id_list(value: str) -> list[str]:
+    source = str(value or "").strip()
+    if not source:
+        return []
+    try:
+        raw = _load_json_value(source)
+    except click.ClickException:
+        raw = [part.strip() for part in source.split(",")]
+    if not isinstance(raw, list):
+        raise click.ClickException("Gap id list must be a JSON array or comma list")
+    return [str(item or "").strip().upper() for item in raw if str(item or "").strip()]
+
+
+def _run_gap_conn_mutation(
+    ctx: typer.Context,
+    port: int | None,
+    message: str,
+    operation: Callable[[object, object], tuple[int, dict]],
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        try:
+            status_code, payload = operation(conn, runner_call)
+        except Exception as e:
+            raise click.ClickException(str(e)) from e
+    finally:
+        conn.close()
+    _sync_gap_cli_mutation(cfg, payload, status_code, message)
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+def _sync_gap_cli_mutation(
+    cfg: config.Config,
+    payload: dict,
+    status_code: int,
+    message: str,
+) -> None:
+    if status_code >= 400:
+        return
+    if payload.get("created") is False:
+        return
+    payload["sync"] = _sync_cli_refine_state(cfg, message=message)
+
+
+@changes_app.command("list", help="List merged Refine changes.")
+def changes_list_command(
+    ctx: typer.Context,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum rows.")] = 50,
+    offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
+    q: Annotated[str | None, typer.Option("--q", help="Search query.")] = None,
+    status: Annotated[str | None, typer.Option("--status", help="Filter by Gap status.")] = None,
+    priority: Annotated[str | None, typer.Option("--priority", help="Filter by Gap priority.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        status_code, payload = gap_ops.list_changes(
+            runner_call,
+            limit=limit,
+            offset=offset,
+            q=q,
+            status=status,
+            priority=priority,
+        )
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@changes_app.command("undo", help="Undo a merged Refine change.")
+def changes_undo_command(
+    ctx: typer.Context,
+    commit: Annotated[str, typer.Argument(help="Commit SHA to undo.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    return _run_gap_conn_mutation(
+        ctx,
+        port,
+        "refine: undo change",
+        lambda conn, runner_call: gap_ops.undo_change(
+            conn,
+            runner_call,
+            {"commit": commit},
+        ),
+    )
+
+
+@import_app.command("extract", help="Extract Gap drafts from raw text.")
+def import_extract_command(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="Text, file path, or '-' for stdin.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        status, payload = import_ops.extract(
+            runner_call,
+            {"text": _load_text_value(source)},
+        )
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@import_app.command("parse-csv", help="Parse CSV into Gap import drafts.")
+def import_parse_csv_command(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="CSV text, file path, or '-' for stdin.")],
+    dedup: Annotated[bool, typer.Option("--dedup", help="Annotate possible duplicates.")] = False,
+    distribute: Annotated[bool, typer.Option("--distribute", help="Assign drafts across enabled nodes.")] = False,
+) -> int:
+    _cli_project_config(ctx)
+    status, payload = import_ops.parse_csv({
+        "text": _load_text_value(source),
+        "dedup": dedup,
+        "distribute": distribute,
+    })
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@import_app.command("dedup", help="Check Gap import drafts for duplicates.")
+def import_dedup_command(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="Draft JSON, file path, or '-' for stdin.")],
+) -> int:
+    _cli_project_config(ctx)
+    value = _load_json_value(source)
+    body = {"drafts": value} if isinstance(value, list) else value
+    if not isinstance(body, dict):
+        raise click.ClickException("dedup input must be a JSON object or draft list")
+    status, payload = import_ops.dedup(body)
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@import_app.command("persist", help="Persist reviewed Gap import drafts.")
+def import_persist_command(
+    ctx: typer.Context,
+    source: Annotated[str, typer.Argument(help="Import JSON, file path, or '-' for stdin.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    value = _load_json_value(source)
+    body = {"drafts": value} if isinstance(value, list) else value
+    if not isinstance(body, dict):
+        raise click.ClickException("persist input must be a JSON object or draft list")
+    try:
+        status, payload = import_ops.persist(runner_call, body)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    if status < 400 and _import_persist_changed(payload):
+        payload["sync"] = _sync_cli_refine_state(cfg, message="refine: import gaps")
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+def _import_persist_changed(payload: dict[str, object]) -> bool:
+    if int(payload.get("count") or 0) > 0:
+        return True
+    actions = payload.get("duplicate_actions")
+    if not isinstance(actions, dict):
+        return False
+    return any(
+        int(actions.get(key) or 0) > 0
+        for key in ("moved_to_backlog", "updated_original")
+    )
+
+
+@chat_app.command("start", help="Start a chat session.")
+def chat_start_command(
+    ctx: typer.Context,
+    gap_id: Annotated[str | None, typer.Option("--gap-id", help="Gap ID to discuss.")] = None,
+    purpose: Annotated[str | None, typer.Option("--purpose", help="Chat purpose.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        status, payload = chat_ops.start(
+            runner_call,
+            {"gap_id": gap_id, "purpose": purpose},
+        )
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@chat_app.command("input", help="Send input to a chat session.")
+def chat_input_command(
+    ctx: typer.Context,
+    session_id: Annotated[str, typer.Argument(help="Chat session ID.")],
+    text: Annotated[str, typer.Argument(help="Text to send.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        status, payload = chat_ops.input(runner_call, session_id, {"text": text})
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@chat_app.command("read", help="Read a chat session snapshot.")
+def chat_read_command(
+    ctx: typer.Context,
+    session_id: Annotated[str, typer.Argument(help="Chat session ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        status, payload = chat_ops.read(runner_call, session_id)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@chat_app.command("stop", help="Stop a chat session.")
+def chat_stop_command(
+    ctx: typer.Context,
+    session_id: Annotated[str, typer.Argument(help="Chat session ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        status, payload = chat_ops.stop(runner_call, session_id)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@apps_app.command("status", help="Show the active target app for a port.")
+def app_status_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Option("--port", help="Refine port. Defaults to 8080."),
+    ] = None,
+) -> int:
+    clone = Path.cwd().resolve()
+    payload = project_apps.status(
+        clone,
+        port=_effective_port(_Args(port=port), None),
+        include_nodes=True,
+    )
+    typer.echo(json.dumps(payload, indent=2))
+    return 0
+
+
+@apps_app.command("list", help="List known target apps for a port.")
+def app_list_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Option("--port", help="Refine port. Defaults to 8080."),
+    ] = None,
+) -> int:
+    clone = Path.cwd().resolve()
+    payload = project_apps.list_apps(
+        clone,
+        port=_effective_port(_Args(port=port), None),
+    )
+    typer.echo(json.dumps(payload, indent=2))
+    return 0
+
+
+@apps_app.command("templates", help="List app scaffold templates.")
+def app_templates_command(
+    _ctx: typer.Context,
+) -> int:
+    _print_json(project_apps.list_project_templates())
+    return 0
+
+
+@apps_app.command("sync", help="Sync the active target app through the backend runner.")
+def app_sync_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    try:
+        payload = runner_call(M_PROJECT_SYNC, {}, 120.0)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    _print_json(payload)
+    return 0 if payload.get("ok") else 1
+
+
+@apps_app.command("scaffold", help="Create a high-priority scaffold Gap from an app template.")
+def app_scaffold_command(
+    ctx: typer.Context,
+    template: Annotated[str, typer.Argument(help="Template id.")],
+    reporter: Annotated[str, typer.Option("--reporter", help="Reporter name.")] = "Refine",
+) -> int:
+    cfg = _cli_project_config(ctx)
+    status, payload = project_apps.create_project_scaffold_gap(
+        lambda: db.connect(cfg.sqlite_path),
+        {"template": template, "reporter": reporter},
+    )
+    if status < 400:
+        payload["sync"] = _sync_cli_refine_state(
+            cfg,
+            message="refine: create scaffold gap",
+        )
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@apps_app.command("attach", help="Create or attach a target app path and make it active.")
+def app_attach_command(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Path or Git remote for the target app.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+    migrate: Annotated[bool, typer.Option("--migrate", help="Run a pending Refine state migration.")] = False,
+) -> int:
+    clone_dir = Path.cwd().resolve()
+    effective_port = _effective_port(_Args(port=port), None)
+    status, payload = _cli_attach_project_payload(
+        {
+            "path": path,
+            "migrate": migrate,
+            "start_poller": False,
+            "start_runner": False,
+        },
+        clone_dir=clone_dir,
+        port=effective_port,
+    )
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@apps_app.command("switch", help="Attach an existing target app and make it active.")
+def app_switch_command(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Path to the target app repo.")],
+    port: Annotated[
+        int | None,
+        typer.Option("--port", help="Refine port. Defaults to 8080."),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Overwrite an existing refine.toml."),
+    ] = False,
+) -> int:
+    return _run_command(cmd_target, ctx, path=path, port=port, force=force)
+
+
+@apps_app.command("remove", help="Remove a target app from the known-apps list.")
+def app_remove_command(
+    ctx: typer.Context,
+    path: Annotated[str, typer.Argument(help="Path to remove.")],
+    port: Annotated[
+        int | None,
+        typer.Option("--port", help="Refine port. Defaults to 8080."),
+    ] = None,
+) -> int:
+    clone = Path.cwd().resolve()
+    effective_port = _effective_port(_Args(port=port), None)
+    status, payload = project_apps.remove_project(
+        {"path": path, "start_runner": False, "start_poller": False},
+        clone_dir=clone,
+        port=effective_port,
+        attach_next=lambda body: _cli_attach_project_payload(
+            {**body, "start_runner": False, "start_poller": False},
+            clone_dir=clone,
+            port=effective_port,
+        ),
+        detach_current=_cli_detach_current_project,
+        project_status=lambda: (
+            200,
+            project_apps.status(clone, port=effective_port, include_nodes=True),
+        ),
+    )
+    _print_json(payload)
+    return 0 if status < 400 else 1
+
+
+@apps_app.command("start", help="Run the configured target-app start command.")
+def app_start_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    return _run_target_app_cli_operation(ctx, port, "start")
+
+
+@apps_app.command("stop", help="Run the configured target-app stop command.")
+def app_stop_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    return _run_target_app_cli_operation(ctx, port, "stop")
+
+
+@apps_app.command("rebuild", help="Queue the target-app rebuild worker.")
+def app_rebuild_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    cfg, effective_port = _target_app_cli_config(ctx, port)
+    runner_call = _target_app_cli_runner_call(cfg, effective_port)
+    try:
+        status, payload = target_app_ops.queue_rebuild(runner_call)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if status < 400 else 1
+
+
+@apps_app.command("check", help="Run an immediate target-app status check.")
+def app_check_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", help="Do not persist status transitions.")] = False,
+) -> int:
+    cfg, effective_port = _target_app_cli_config(ctx, port)
+    runner_call = _target_app_cli_runner_call(cfg, effective_port)
+    try:
+        status, payload = target_app_ops.check(
+            lambda: db.connect(cfg.sqlite_path),
+            runner_call,
+            quiet=quiet,
+        )
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@apps_app.command("hard-reset", help="Hard reset the target app worktree through the runner.")
+def app_hard_reset_command(
+    ctx: typer.Context,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    cfg, effective_port = _target_app_cli_config(ctx, port)
+    runner_call = _target_app_cli_runner_call(cfg, effective_port)
+    try:
+        status, payload = target_app_ops.hard_reset(runner_call)
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+@apps_app.command("generate", help="Generate target-app command configuration.")
+def app_generate_command(
+    ctx: typer.Context,
+    kind: Annotated[
+        str,
+        typer.Option("--kind", help="One of all, start, stop, rebuild, status."),
+    ] = "all",
+    port: Annotated[int | None, typer.Option("--port", help="Refine port. Defaults to 8080.")] = None,
+) -> int:
+    cfg, effective_port = _target_app_cli_config(ctx, port)
+    runner_call = _target_app_cli_runner_call(cfg, effective_port)
+    try:
+        status, payload = target_app_ops.generate(runner_call, {"kind": kind})
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+def _run_target_app_cli_operation(
+    ctx: typer.Context,
+    port: int | None,
+    kind: str,
+) -> int:
+    cfg, effective_port = _target_app_cli_config(ctx, port)
+    runner_call = _target_app_cli_runner_call(cfg, effective_port)
+    try:
+        status, payload = target_app_ops.run(
+            lambda: db.connect(cfg.sqlite_path),
+            runner_call,
+            kind,
+        )
+    except Exception as e:
+        raise click.ClickException(str(e)) from e
+    typer.echo(json.dumps(payload, indent=2))
+    return 0 if status < 400 and payload.get("ok", True) is not False else 1
+
+
+def _target_app_cli_config(
+    ctx: typer.Context,
+    port: int | None,
+) -> tuple[config.Config, int]:
+    clone = Path.cwd().resolve()
+    if not project_apps.is_refine_source_dir(clone):
+        raise click.ClickException(
+            "target-app lifecycle commands must run from the Refine source checkout."
+        )
+    effective_port = _effective_port(_Args(port=port), None)
+    cfg = _require_config_for_port(
+        _Args(config=_ctx_config(ctx)),
+        clone,
+        effective_port,
+        "app",
+    )
+    if cfg is None:
+        raise click.ClickException(f"no app is attached on port {effective_port}")
+    _ensure_config_initialized(cfg)
+    return cfg, effective_port
+
+
+def _ensure_config_initialized(cfg: config.Config) -> None:
+    db.init_db(cfg.sqlite_path)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        status = project_state.ensure_initialized(conn, migrate=True, root=cfg.volume_root)
+        if not status.get("compatible"):
+            raise click.ClickException(project_state.migration_block_details(status))
+        project_state.rebuild_sqlite_cache(conn)
+    finally:
+        conn.close()
+
+
+def _target_app_cli_runner_call(
+    cfg: config.Config,
+    port: int,
+) -> target_app_ops.RunnerCall:
+    from refine_runtime import ipc
+    from refine_runtime.supervisor_protocol import (
+        M_ENSURE_WORKER,
+        WORKER_STARTUP_TIMEOUT_SECONDS,
+    )
+
+    def call(method: str, params: dict[str, object], timeout: float) -> dict:
+        supervisor_socket = ipc.supervisor_socket_path(port, start=Path.cwd())
+        worker = ipc.request(
+            supervisor_socket,
+            M_ENSURE_WORKER,
+            {"config_path": str(cfg.config_path)},
+            timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
+        )
+        worker_socket = str(
+            worker.get("worker_socket")
+            or worker.get("socket_path")
+            or ipc.runner_socket_path(port=port, config_path=cfg.config_path),
+        )
+        return ipc.request(worker_socket, method, params, timeout=timeout)
+
+    return call
 
 
 @app.command(
@@ -849,6 +2850,120 @@ def cmd_target(args: _Args) -> int:
     return 0
 
 
+def _cli_load_project_attach_configured(
+    config_path: Path,
+    _start_poller: bool,
+    _start_runner: bool,
+    _migrate: bool,
+) -> config.Config:
+    cfg = config.get(path=str(config_path), reload=True)
+    db.init_db(cfg.sqlite_path)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        status = project_state.ensure_initialized(conn, migrate=True)
+        if not status.get("compatible"):
+            raise config.ConfigError(project_state.migration_block_details(status))
+        project_state.rebuild_sqlite_cache(conn)
+    finally:
+        conn.close()
+    return cfg
+
+
+def _cli_attach_project_payload(
+    body: dict[str, object],
+    *,
+    clone_dir: Path,
+    port: int,
+) -> tuple[int, dict[str, object]]:
+    return project_apps.attach_project(
+        body,
+        clone_dir=clone_dir,
+        port=port,
+        load_configured=_cli_load_project_attach_configured,
+        current_client_repo=lambda: _cli_current_client_repo(port),
+        loaded_client_repo=lambda: None,
+        prepare_current_project_for_switch=_cli_prepare_current_project_for_switch,
+        commit_refine_state=_cli_commit_refine_state,
+        node_summary=_cli_node_summary,
+    )
+
+
+def _cli_detach_current_project(clone_dir: Path, _target: Path, port: int | None) -> None:
+    project_registry.detach_port(clone_dir, port=port)
+
+
+def _cli_current_client_repo(port: int) -> Path | None:
+    try:
+        return config.get(reload=True, port=port).client_repo
+    except config.ConfigError:
+        return None
+
+
+def _cli_prepare_current_project_for_switch(current_repo: Path | None) -> dict[str, object]:
+    warnings: list[str] = []
+    if current_repo is None:
+        return {"warnings": warnings}
+    _cli_commit_refine_state(current_repo)
+    dirty = _git_stdout_for_cli(current_repo, ["status", "--porcelain"])
+    if dirty.strip():
+        raise project_apps.SwitchBlocked(
+            "Current app has uncommitted changes.",
+            (
+                "Commit, stash, or discard changes in the current app before switching:\n"
+                + dirty.strip()
+            ),
+        )
+    return {"warnings": warnings}
+
+
+def _cli_commit_refine_state(repo: Path) -> None:
+    config.ensure_refine_gitignore(repo / ".refine")
+    dirty_refine = _git_stdout_for_cli(repo, ["status", "--porcelain", "--", ".refine"])
+    if not dirty_refine.strip():
+        return
+    repo_cfg = config.Config.load(repo / ".refine" / config.CONFIG_FILENAME)
+    db.init_db(repo_cfg.sqlite_path)
+    conn = db.connect(repo_cfg.sqlite_path)
+    try:
+        result = project_sync.commit_and_push_refine_state(
+            conn,
+            actor="cli",
+            cwd=repo,
+            state_message="refine: sync project state before switch",
+        )
+    finally:
+        conn.close()
+    if result.get("ok"):
+        return
+    raise project_apps.SwitchBlocked(
+        "Could not commit current app Refine state.",
+        str(result.get("details") or result.get("message") or "git commit failed").strip(),
+    )
+
+
+def _git_stdout_for_cli(repo: Path, args: list[str]) -> str:
+    out = subprocess.run(
+        ["git", *args],
+        cwd=str(repo),
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    if out.returncode != 0:
+        raise project_apps.SwitchBlocked(
+            "Could not inspect current app git state.",
+            (out.stderr or out.stdout or f"git {' '.join(args)} failed").strip(),
+        )
+    return out.stdout
+
+
+def _cli_node_summary() -> dict[str, object]:
+    try:
+        return node_ops.summary()
+    except Exception:
+        return {"nodes": [], "active_node_id": ""}
+
+
 def cmd_test(_args: _Args) -> int:
     root = Path(__file__).resolve().parents[1]
     tests_dir = root / "tests"
@@ -892,12 +3007,10 @@ def cmd_update(_args: _Args) -> int:
 
 
 def _is_refine_source_dir(p: Path) -> bool:
-    """Heuristic: cwd is a refine source dir if it has pyproject.toml and refine_cli."""
-    return (p / "pyproject.toml").is_file() and (p / "refine_cli" / "cli.py").is_file()
+    return project_apps.is_refine_source_dir(p)
 
 
-class _InitError(Exception):
-    """Surface a clean error message from init helpers."""
+_InitError = project_apps.InitError
 
 
 def bootstrap_client_repo(
@@ -911,68 +3024,26 @@ def bootstrap_client_repo(
     reuse_existing_config: bool,
     install_unit: bool,
 ) -> dict[str, Path | bool | None]:
-    """Create or attach a target app using the same files as `refine target`.
-
-    `refine target` calls this with strict preconditions. The web UI calls it
-    with `create=True` and `init_git=True` so a first-run user can point refine
-    at a new path without preparing the repo manually.
-    """
-    clone_dir = clone_dir.resolve()
-    client_repo = client_repo.expanduser().resolve()
-
-    if client_repo.exists() and not client_repo.is_dir():
-        raise config.ConfigError(f"not a directory: {client_repo}")
-    if not client_repo.exists():
-        if not create:
-            raise config.ConfigError(f"not a directory: {client_repo}")
-        client_repo.mkdir(parents=True)
-
-    git_dir = client_repo / ".git"
-    git_initialized = False
-    if not git_dir.exists():
-        if not init_git:
-            raise config.ConfigError(
-                f"not a git repository: {client_repo}\n"
-                "  Run `git init` inside it first, or pass a path to an existing git repo."
+    """Create or attach a target app using the shared project-app operation."""
+    return project_apps.bootstrap_client_repo(
+        client_repo,
+        clone_dir=clone_dir,
+        port=port,
+        force=force,
+        create=create,
+        init_git=init_git,
+        reuse_existing_config=reuse_existing_config,
+        install_unit=install_unit,
+        prepare_clone=lambda clone: _remove_legacy_docker_artifacts(clone),
+        install_ui_unit=(
+            lambda clone, _client: _write_and_enable_ui_unit(
+                clone,
+                None,
+                force=force,
+                port=port or config.DEFAULT_UI_PORT,
             )
-        git = shutil.which("git")
-        if git is None:
-            raise _InitError("could not find `git` on PATH; install git or choose an existing git repo")
-        out = subprocess.run([git, "init", "-q"], cwd=str(client_repo),
-                             capture_output=True, text=True, timeout=30)
-        if out.returncode != 0:
-            raise _InitError((out.stderr or out.stdout or "git init failed").strip())
-        git_initialized = True
-
-    target = client_repo / ".refine"
-    cfg_path = target / config.CONFIG_FILENAME
-    config_created = False
-    if cfg_path.exists() and reuse_existing_config:
-        (target / "gaps").mkdir(parents=True, exist_ok=True)
-        config.ensure_refine_gitignore(target)
-    else:
-        cfg_path = config.write_defaults(target, force=force)
-        config_created = True
-
-    registry_path = None
-    ui_unit_path = None
-    if _is_refine_source_dir(clone_dir):
-        _remove_legacy_docker_artifacts(clone_dir)
-        if install_unit:
-            ui_unit_path = _write_and_enable_ui_unit(clone_dir, None, force=force, port=port or config.DEFAULT_UI_PORT)
-        project_registry.upsert_app(clone_dir, client_repo, make_current=True, port=port)
-        registry_path = project_registry.registry_path(clone_dir, port=port)
-
-    return {
-        "client_repo": client_repo,
-        "volume_root": target,
-        "config_path": cfg_path,
-        "binding_path": None,
-        "registry_path": registry_path,
-        "ui_unit_path": ui_unit_path,
-        "git_initialized": git_initialized,
-        "config_created": config_created,
-    }
+        ),
+    )
 
 
 def _write_and_enable_ui_unit(

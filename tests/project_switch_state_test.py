@@ -52,6 +52,8 @@ def test_client_switch_path(root: Path) -> None:
     target_app_js = (root / "refine_ui/static/js/target-app.js").read_text(encoding="utf-8")
     guide_js = (root / "refine_ui/static/js/features/guide.js").read_text(encoding="utf-8")
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
+    gap_ops_py = (root / "refine_server/gap_ops.py").read_text(encoding="utf-8")
+    project_apps_py = (root / "refine_server/project_apps.py").read_text(encoding="utf-8")
 
     assert 'id="active-node-label"' in index_html
     assert ".brand-node" in base_css
@@ -131,7 +133,7 @@ def test_client_switch_path(root: Path) -> None:
     assert "return renderSettingsApplicationTab({" in no_app_tab_body
     assert "return renderSettingsNoProjectTab(surface.title);" in no_app_tab_body
     assert "_project_attached()" in api_py
-    assert '"attached": False' in api_py
+    assert '"attached": False' in gap_ops_py
 
     assert "async function applyProjectAttachResult(result, options = {})" in common_js
     switch_body = common_js.split("async function applyProjectAttachResult(result, options = {})", 1)[1]
@@ -181,8 +183,9 @@ def test_client_switch_path(root: Path) -> None:
     assert "window.location.reload()" not in settings_js
     assert "restart_pending" not in api_py
     assert "_schedule_supervisor_restart" not in api_py
-    assert '"scaffold_required": scaffold_required' in api_py
-    assert '"scaffold_required": _project_needs_scaffold_template(cfg.client_repo)' in api_py
+    assert '"scaffold_required": scaffold_required' in project_apps_py
+    assert "payload = project_apps.status(clone_dir, port=port, include_nodes=True)" in api_py
+    assert 'payload["scaffold_required"] = _project_needs_scaffold_template' in api_py
     assert "PROJECT_TEMPLATE_DIR" in api_py
     assert "def list_project_templates()" in api_py
     assert "def create_project_scaffold_gap" in api_py
@@ -833,6 +836,9 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
     origin = tmp / "empty-origin.git"
     original_cwd = Path.cwd()
     old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    old_run_dir = os.environ.get("REFINE_RUN_DIR")
     try:
         git(tmp, "init", "--bare", str(origin))
         os.chdir(clone)
@@ -909,6 +915,18 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
             os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
+        if old_run_dir is None:
+            os.environ.pop("REFINE_RUN_DIR", None)
+        else:
+            os.environ["REFINE_RUN_DIR"] = old_run_dir
         cleanup_tmp(tmp)
 
 
@@ -917,6 +935,10 @@ def test_active_node_is_per_application() -> None:
     conn = init_refine(client1)
     conn.close()
     original_cwd = Path.cwd()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    old_run_dir = os.environ.get("REFINE_RUN_DIR")
     try:
         checkout = tmp / "refine-checkout"
         checkout.mkdir()
@@ -972,6 +994,22 @@ def test_active_node_is_per_application() -> None:
             runtime.stop_all()  # type: ignore[name-defined]
         except Exception:
             pass
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
+        if old_run_dir is None:
+            os.environ.pop("REFINE_RUN_DIR", None)
+        else:
+            os.environ["REFINE_RUN_DIR"] = old_run_dir
         cleanup_tmp(tmp)
 
 
@@ -980,9 +1018,17 @@ def test_active_node_is_checkout_local_for_same_application() -> None:
     conn = init_refine(client)
     conn.close()
     original_cwd = Path.cwd()
+    old_cfg_env = os.environ.get("REFINE_CONFIG_PATH")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    old_run_dir = os.environ.get("REFINE_RUN_DIR")
     try:
         from refine_server import config, project_registry, project_state
 
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        os.environ.pop("REFINE_UI_PORT", None)
+        os.environ.pop("REFINE_UI_SCOPE", None)
+        os.environ.pop("REFINE_RUN_DIR", None)
         volume_root = client / ".refine"
         laptop = project_state.create_node("Laptop", root=volume_root)
         desktop = project_state.create_node("Desktop", root=volume_root)
@@ -1021,6 +1067,22 @@ def test_active_node_is_checkout_local_for_same_application() -> None:
         assert (clone2 / "run" / "8080" / "active-nodes.json").is_file()
         assert not (client / ".refine" / "run" / "active-node.json").exists()
     finally:
+        if old_cfg_env is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg_env
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
+        if old_run_dir is None:
+            os.environ.pop("REFINE_RUN_DIR", None)
+        else:
+            os.environ["REFINE_RUN_DIR"] = old_run_dir
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 

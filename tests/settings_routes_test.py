@@ -28,6 +28,8 @@ def main() -> int:
         )
     }
     settings_js = settings_core_js + "\n".join(settings_tab_files.values())
+    settings_ops_py = (root / "refine_server/settings_ops.py").read_text(encoding="utf-8")
+    dashboard_ops_py = (root / "refine_server/dashboard_ops.py").read_text(encoding="utf-8")
     router_js = (root / "refine_ui/static/js/router.js").read_text(
         encoding="utf-8",
     )
@@ -182,6 +184,11 @@ def main() -> int:
     assert "def process_summary" in api_py
     assert "def set_background_processes" in api_py
     assert "def set_agent_processes" in api_py
+    process_ops_py = (root / "refine_server/process_ops.py").read_text(encoding="utf-8")
+    assert "process_ops.set_background_processes(" in api_py
+    assert "process_ops.set_agent_processes(" in api_py
+    assert "M_BACKGROUND_PROCESSES_SET" in process_ops_py
+    assert "M_ENFORCE_SCHEDULING" in process_ops_py
     assert "def _background_processes_stopped_response" in api_py
     assert "background_processes_stopped" in api_py
     assert 'allow_busy_when=lambda _owner: _background_processes_stopped()' in api_py
@@ -196,7 +203,8 @@ def main() -> int:
     assert "def performance_summary" in api_py
     assert "offset: int = 0" in api_py
     assert "offset=offset" in api_py
-    assert "snapshot[\"backend\"] = runtime.backend_info()" in api_py
+    assert "observability_ops.performance_summary(" in api_py
+    assert "backend=runtime.backend_info()" in api_py
     assert "def backend_info" in (root / "refine_ui/runtime.py").read_text(encoding="utf-8")
     assert "function backendProcessLabel" in settings_js
     assert "function performanceResourceLabel" in settings_js
@@ -225,13 +233,13 @@ def main() -> int:
     assert '"60",    "1 minute"' in settings_js
     assert '"3600",  "1 hour"' in settings_js
     assert '"10800", "3 hours"' in settings_js
-    assert "project_update_pulse_interval_seconds" in api_py
-    assert "file_browser_ignore_patterns" in api_py
+    assert "project_update_pulse_interval_seconds" in settings_ops_py
+    assert "file_browser_ignore_patterns" in settings_ops_py
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
     assert '${cliOption("smoke-ai", "Smoke AI (deterministic testing)")}' in settings_js
     assert "REFINE_SMOKE_AI_PATH" in settings_js
-    assert '"copilot": "copilot login"' in api_py
-    assert '"smoke-ai": "REFINE_SMOKE_AI_PATH"' in api_py
+    assert '"copilot": "copilot login"' in dashboard_ops_py
+    assert '"smoke-ai": "REFINE_SMOKE_AI_PATH"' in dashboard_ops_py
     assert 'id="runtime-upgrade-banner"' in settings_js
     assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index('renderSettingsGuideLabel("Process management", "process-management")')
     assert 'api("GET", "/api/upgrade")' in settings_js
@@ -607,7 +615,8 @@ def main() -> int:
     assert "renderSettingsReportersTab(data.reps, data.activeNodeLabel)" in settings_js
     assert "bindSettingsReportersTab();" in settings_js
     assert 'def merge_reporter(rid: int, body: dict)' in api_py
-    assert 'M_MERGE_REPORTER' in api_py
+    assert 'reporter_ops.merge_reporter(_backend_runner_call, rid, target_rid)' in api_py
+    assert 'M_MERGE_REPORTER' in (root / "refine_server/reporter_ops.py").read_text(encoding="utf-8")
     assert '@route("POST", r"/api/reporters/(\\d+)/merge")' in server_py
     for name in settings_tab_files:
         assert f'<script src="/static/js/features/{name}.js"></script>' in index_html
@@ -789,6 +798,10 @@ def main() -> int:
     assert 'lastLog?.message || "Agent run failed"' not in gaps_detail_js
     assert "async function loadSettingsSurfaceData()" in settings_core_js
     assert 'api("GET", "/api/settings")' in settings_core_js
+    assert "return 200, settings_ops.list_settings(conn)" in api_py
+    assert "settings_ops.update_settings(" in api_py
+    assert "ALLOWED_SETTINGS = {" in settings_ops_py
+    assert '"target_app_env_json"' in settings_ops_py
     assert 'api("GET", "/api/reporters")' in settings_core_js
     assert "renderSettingsNodesTab({" in settings_js
     assert "renderSettingsReportersTab(data.reps, data.activeNodeLabel)" in settings_js
@@ -832,10 +845,12 @@ def main() -> int:
     assert 'btn.classList.toggle("warn", !enabled);' in settings_js
     assert 'btn.textContent = enabled ? "QA enabled" : "QA disabled";' in settings_js
     assert ".toggle-button.on" not in common_css
-    assert '"enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"' in api_py
-    assert '"regressions_enabled"] = (' in api_py
+    project_config_ops_py = (root / "refine_server/project_config_ops.py").read_text(encoding="utf-8")
+    assert "return 200, project_config_ops.quality_get(conn)" in api_py
+    assert '"enabled"] = db.get_setting(conn, "quality_enabled", "0") or "0"' in project_config_ops_py
+    assert '"regressions_enabled"] = (' in project_config_ops_py
     assert "quality_regression_create" in api_py
-    assert 'M_REGRESSION_RUN' in api_py
+    assert 'M_REGRESSION_RUN' in project_config_ops_py
     assert 'api("GET", "/api/quality")' in settings_js
     assert 'api("PATCH", "/api/quality"' in settings_js
     assert 'api("POST", "/api/quality/regressions"' in settings_js
@@ -854,9 +869,11 @@ def main() -> int:
     assert '"nightly", "Nightly (midnight)"' in settings_js
     assert "Nightly (12 PM)" not in settings_js
     api_source = (root / "refine_ui/api.py").read_text(encoding="utf-8")
-    assert "target_app_auto_rebuild" in api_source
-    assert '"target_app_url"' in api_source
-    assert '"app_url": settings.get("target_app_url") or ""' in api_source
+    target_app_ops_source = (root / "refine_server/target_app_ops.py").read_text(encoding="utf-8")
+    assert "target_app_auto_rebuild" in settings_ops_py
+    assert '"target_app_url"' in settings_ops_py
+    assert "return target_app_ops.snapshot(conn)" in api_source
+    assert '"app_url": settings.get("target_app_url") or ""' in target_app_ops_source
     assert 'set("#s-target-rebuild-command", cfg.rebuild_command || "")' in settings_js
     assert "function applyGeneratedTargetAppConfig(cfg)" in settings_js
     generated_body = settings_js.split("function applyGeneratedTargetAppConfig(cfg)", 1)[1]
@@ -900,6 +917,9 @@ def main() -> int:
     assert "function dashboardScopeFromHash()" in dashboard_js
     assert "function dashboardHash(scope)" in dashboard_js
     assert "`/api/dashboard?node=${nodeParam}`" in dashboard_js
+    assert "dashboard_ops.summary(" in api_py
+    assert "dashboard_ops.empty_dashboard(" in api_py
+    assert "def compute_reporter_stats(" in dashboard_ops_py
     assert "`&node=${nodeParam}&limit=200`" in dashboard_js
     assert "dashboard-title-row" in dashboard_js
     assert "dashboard-scope-switch" in dashboard_js
@@ -1034,14 +1054,28 @@ def main() -> int:
     assert '@route("GET", r"/api/files/tree")' in server_py
     assert '@route("GET", r"/api/files/read")' in server_py
     assert '@route("GET", r"/api/files/search")' in server_py
+    assert '@route("GET", r"/api/diagnostics")' in server_py
+    assert "diagnostics_ops.backend_diagnostics(" in api_py
+    assert '@route("POST", r"/api/chat/start")' in server_py
+    assert '@route("POST", r"/api/chat/([0-9A-Za-z]+)/input")' in server_py
+    assert '@route("GET", r"/api/chat/([0-9A-Za-z]+)/read")' in server_py
+    assert '@route("POST", r"/api/chat/([0-9A-Za-z]+)/stop")' in server_py
+    assert "chat_ops.start(_backend_runner_call, body)" in api_py
+    assert "chat_ops.input(_backend_runner_call, sid, body)" in api_py
+    assert "chat_ops.read(_backend_runner_call, sid)" in api_py
+    assert "chat_ops.stop(_backend_runner_call, sid)" in api_py
     assert "offset=int(_get_one(q, \"offset\", \"0\"))" in server_py
     assert "recursive = _get_one(q, \"recursive\", \"0\")" in server_py
-    assert "FILE_TEXT_CHUNK_BYTES = 128_000" in api_py
-    assert "IMAGE_MIME_BY_EXT" in api_py
-    assert "def _fuzzy_path_score(" in api_py
-    assert "matches.sort(key=lambda item:" in api_py
-    assert "FILES_TREE_MAX_DEPTH = 3" in api_py
-    assert "FILES_TREE_MAX_ENTRIES = 200" in api_py
+    file_ops_py = (root / "refine_server/file_ops.py").read_text(encoding="utf-8")
+    assert "FILE_TEXT_CHUNK_BYTES = 128_000" in file_ops_py
+    assert "IMAGE_MIME_BY_EXT" in file_ops_py
+    assert "def _fuzzy_path_score(" in file_ops_py
+    assert "matches.sort(key=lambda item:" in file_ops_py
+    assert "FILES_TREE_MAX_DEPTH = 3" in file_ops_py
+    assert "FILES_TREE_MAX_ENTRIES = 200" in file_ops_py
+    assert "return file_ops.tree(" in api_py
+    assert "return file_ops.read(" in api_py
+    assert "return file_ops.search(" in api_py
     assert "def files_tree(" in api_py
     assert "def files_read(" in api_py
     assert "def files_search(" in api_py

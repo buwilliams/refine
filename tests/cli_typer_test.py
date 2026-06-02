@@ -34,6 +34,24 @@ def main() -> int:
     assert "install" in out
     assert "update" in out
     assert "migrate" in out
+    assert "app" in out
+    assert "reporter" in out
+    assert "guidance" in out
+    assert "governance" in out
+    assert "quality" in out
+    assert "activity" in out
+    assert "performance" in out
+    assert "upgrade" in out
+    assert "job" in out
+    assert "files" in out
+    assert "gaps" in out
+    assert "changes" in out
+    assert "chat" in out
+    assert "settings" in out
+    assert "diagnostics" in out
+    assert "processes" in out
+    assert "dashboard" in out
+    assert "import" in out
     assert "runner" not in out
     assert "web" not in out
     assert "supervisor" not in out
@@ -43,6 +61,166 @@ def main() -> int:
     assert "Manage Refine project-state migrations" in out
     assert "status" in out
     assert "run" in out
+
+    rc, out, err = _run_cli(["app", "--help"])
+    assert rc == 0, err
+    for expected in (
+        "status",
+        "list",
+        "templates",
+        "sync",
+        "scaffold",
+        "attach",
+        "switch",
+        "remove",
+        "start",
+        "stop",
+        "rebuild",
+        "check",
+        "hard-reset",
+        "generate",
+    ):
+        assert expected in out
+
+    rc, out, err = _run_cli(["node", "--help"])
+    assert rc == 0, err
+    for expected in (
+        "list",
+        "create",
+        "activate",
+        "rename",
+        "archive",
+        "transfer-gaps",
+        "copy-settings",
+    ):
+        assert expected in out
+
+    rc, out, err = _run_cli(["cluster", "--help"])
+    assert rc == 0, err
+    for expected in (
+        "list",
+        "register",
+        "update",
+        "bootstrap",
+        "run",
+    ):
+        assert expected in out
+
+    rc, out, err = _run_cli(["reporter", "--help"])
+    assert rc == 0, err
+    for expected in ("list", "add", "delete", "rename", "merge"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["guidance", "--help"])
+    assert rc == 0, err
+    for expected in ("list", "replace"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["governance", "--help"])
+    assert rc == 0, err
+    for expected in ("get", "save", "generate-rules"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["quality", "--help"])
+    assert rc == 0, err
+    for expected in ("get", "save", "regression"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["quality", "regression", "--help"])
+    assert rc == 0, err
+    for expected in ("list", "create", "update", "delete", "run"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["activity", "--help"])
+    assert rc == 0, err
+    for expected in ("list", "cleanup"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["performance", "--help"])
+    assert rc == 0, err
+    for expected in ("summary", "cleanup", "rebuild-cache"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["upgrade", "--help"])
+    assert rc == 0, err
+    assert "status" in out
+
+    class UpgradeStatus:
+        def as_dict(self) -> dict[str, object]:
+            return {"current_version": "1.0.0", "latest_version": "1.2.0"}
+
+    old_upgrade_status_command = cli.upgrade.status
+    try:
+        cli.upgrade.status = lambda _repo: UpgradeStatus()
+        rc, out, err = _run_cli(["upgrade", "status"])
+    finally:
+        cli.upgrade.status = old_upgrade_status_command
+    assert rc == 0, err
+    assert json.loads(out)["upgrade"]["latest_version"] == "1.2.0"
+
+    rc, out, err = _run_cli(["job", "--help"])
+    assert rc == 0, err
+    for expected in ("get", "cancel"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["files", "--help"])
+    assert rc == 0, err
+    for expected in ("tree", "search", "read"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["gaps", "--help"])
+    assert rc == 0, err
+    for expected in (
+        "list",
+        "get",
+        "logs",
+        "create",
+        "update",
+        "delete",
+        "append-round",
+        "edit-round",
+        "verify",
+        "retry",
+        "retry-merge",
+        "retry-quality",
+        "cancel",
+        "bulk-update",
+        "bulk-delete",
+    ):
+        assert expected in out
+
+    rc, out, err = _run_cli(["changes", "--help"])
+    assert rc == 0, err
+    assert "list" in out
+    assert "undo" in out
+
+    rc, out, err = _run_cli(["chat", "--help"])
+    assert rc == 0, err
+    for expected in ("start", "input", "read", "stop"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["settings", "--help"])
+    assert rc == 0, err
+    for expected in ("get", "save", "set", "recheck-auth"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["diagnostics", "--help"])
+    assert rc == 0, err
+    assert "backend" in out
+
+    rc, out, err = _run_cli(["processes", "--help"])
+    assert rc == 0, err
+    for expected in ("list", "background", "agents"):
+        assert expected in out
+
+    rc, out, err = _run_cli(["dashboard", "--help"])
+    assert rc == 0, err
+    assert "summary" in out
+
+    rc, out, err = _run_cli(["import", "--help"])
+    assert rc == 0, err
+    for expected in ("extract", "parse-csv", "dedup", "persist"):
+        assert expected in out
 
     rc, out, err = _run_cli(["migrate", "run", "--help"])
     assert rc == 0, err
@@ -63,6 +241,29 @@ def main() -> int:
     assert len(calls) == 1
     assert getattr(calls[0], "path") == "/tmp/app"
     assert getattr(calls[0], "force") is True
+
+    from refine_server.backend_protocol import M_HARD_RESET_WORKTREE
+
+    runner_calls: list[tuple[str, dict[str, object], float]] = []
+    old_target_app_config = cli._target_app_cli_config
+    old_target_app_runner = cli._target_app_cli_runner_call
+    try:
+        cli._target_app_cli_config = lambda _ctx, _port: (object(), 8080)
+
+        def fake_target_runner(_cfg, _port):
+            def call(method: str, params: dict[str, object], timeout: float) -> dict:
+                runner_calls.append((method, params, timeout))
+                return {"ok": True}
+            return call
+
+        cli._target_app_cli_runner_call = fake_target_runner
+        rc, out, err = _run_cli(["app", "hard-reset"])
+    finally:
+        cli._target_app_cli_config = old_target_app_config
+        cli._target_app_cli_runner_call = old_target_app_runner
+    assert rc == 0, err
+    assert json.loads(out)["ok"] is True
+    assert runner_calls == [(M_HARD_RESET_WORKTREE, {}, 300.0)], runner_calls
 
     tmp = Path(tempfile.mkdtemp(prefix="refine-target-cli-"))
     try:

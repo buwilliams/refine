@@ -149,6 +149,11 @@ def _has_refine_checkout_ancestor(path: Path) -> bool:
     return any(_looks_like_refine_checkout(d) for d in [path, *path.parents])
 
 
+def _refine_source_checkout() -> Path | None:
+    root = Path(__file__).resolve().parents[1]
+    return root if _looks_like_refine_checkout(root) else None
+
+
 def _parse_dotenv_line(line: str) -> tuple[str, str] | None:
     text = line.strip()
     if not text or text.startswith("#"):
@@ -336,13 +341,23 @@ def local_run_root(start: Path | None = None) -> Path:
     """Checkout-local runtime root for host state."""
     if start is not None:
         return start.resolve() / "run"
+    binding = find_binding()
+    if binding is not None:
+        return binding.parent.resolve() / "run"
     try:
-        return Path.cwd().resolve() / "run"
+        cwd = Path.cwd().resolve()
     except FileNotFoundError:
-        pass
-    cached = globals().get("_cached")
-    if cached is not None:
-        return cached.client_repo / "run"
+        cwd = None
+    if cwd is not None:
+        registry = cwd / "run" / str(runtime_port()) / "apps.json"
+        if registry.is_file():
+            return cwd / "run"
+        for d in [cwd, *cwd.parents]:
+            if _looks_like_refine_checkout(d):
+                return d / "run"
+    source = _refine_source_checkout()
+    if source is not None:
+        return source / "run"
     return Path(tempfile.gettempdir()) / "refine-run"
 
 

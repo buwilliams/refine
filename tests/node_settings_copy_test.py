@@ -1,12 +1,25 @@
 """Copying Application and Runtime settings between nodes."""
 from __future__ import annotations
 
+import json
 import sys
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+
+
+def _run_cli(args: list[str]) -> tuple[int, str, str]:
+    from refine_cli import cli
+
+    stdout = StringIO()
+    stderr = StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        rc = cli.main(args)
+    return rc, stdout.getvalue(), stderr.getvalue()
 
 
 def main() -> int:
@@ -78,6 +91,17 @@ def main() -> int:
         })
         assert status == 400, body
         assert "different from the active node" in body["error"]["message"]
+
+        db.set_setting(conn, "parallel_run_cap", "12")
+        rc, out, err = _run_cli(["node", "copy-settings", source["id"], "runtime"])
+        assert rc == 0, err
+        payload = json.loads(out)
+        assert payload["source_node_id"] == source["id"], payload
+        assert payload["target_node_id"] == default, payload
+        assert payload["section"] == "runtime", payload
+        assert payload["sync"]["ok"] is True, payload
+        settings = db.list_settings(conn)
+        assert settings["parallel_run_cap"] == "3", settings
     finally:
         try:
             conn.close()
