@@ -158,6 +158,10 @@ def ensure_runner():
             return _runner
 
         cfg = config.get(reload=True)
+        if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") == "1":
+            _runner = _InProcessRunnerClient()
+            _worker_pid = os.getpid()
+            return _runner
         supervisor_socket = _supervisor_socket_path(cfg)
         try:
             result = _supervisor_request(
@@ -166,11 +170,7 @@ def ensure_runner():
                 timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
             )
         except config.ConfigError:
-            if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") != "1":
-                raise
-            _runner = _InProcessRunnerClient()
-            _worker_pid = os.getpid()
-            return _runner
+            raise
         socket_path = str(
             result.get("worker_socket")
             or result.get("socket_path")

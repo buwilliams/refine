@@ -19,6 +19,7 @@ _RUNTIME_ENV_KEYS = (
     "REFINE_RUNNER_SOCKET",
     "REFINE_SUPERVISOR_SOCKET",
     "REFINE_NO_INPROCESS_RUNNER",
+    "REFINE_TEST_INPROCESS_BACKEND",
 )
 
 
@@ -91,6 +92,7 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
             start_poller=False,
             start_runner=False,
         )
+        os.environ.pop("REFINE_TEST_INPROCESS_BACKEND", None)
         db.set_setting(conn, "paused", "1")
         db.set_setting(conn, "agents_paused", "1")
         try:
@@ -146,6 +148,7 @@ def test_runner_socket_comes_from_supervisor() -> None:
                 start_poller=False,
                 start_runner=False,
             )
+            os.environ.pop("REFINE_TEST_INPROCESS_BACKEND", None)
             socket = Path(runtime.backend_info()["socket_path"])
 
             def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
