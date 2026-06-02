@@ -1611,6 +1611,8 @@ def gaps_list_command(
     category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
     actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
     reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    rounds_gte: Annotated[int | None, typer.Option("--rounds-gte", help="Minimum number of rounds, inclusive.")] = None,
+    rounds_lte: Annotated[int | None, typer.Option("--rounds-lte", help="Maximum number of rounds, inclusive.")] = None,
     node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
     limit: Annotated[int, typer.Option("--limit", help="Maximum rows.")] = 50,
     offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
@@ -1626,6 +1628,8 @@ def gaps_list_command(
         category=category,
         actor=actor,
         reporter=reporter,
+        rounds_gte=rounds_gte,
+        rounds_lte=rounds_lte,
         node=node,
         limit=limit,
         offset=offset,
@@ -1886,6 +1890,8 @@ def gaps_bulk_update_command(
     category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
     actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
     reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    rounds_gte: Annotated[int | None, typer.Option("--rounds-gte", help="Minimum number of rounds, inclusive.")] = None,
+    rounds_lte: Annotated[int | None, typer.Option("--rounds-lte", help="Maximum number of rounds, inclusive.")] = None,
     node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
     port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
 ) -> int:
@@ -1909,6 +1915,8 @@ def gaps_bulk_update_command(
         category=category,
         actor=actor,
         reporter=reporter,
+        rounds_gte=rounds_gte,
+        rounds_lte=rounds_lte,
         node=node,
     )
     return _run_gap_conn_mutation(
@@ -1931,6 +1939,8 @@ def gaps_bulk_delete_command(
     category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
     actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
     reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    rounds_gte: Annotated[int | None, typer.Option("--rounds-gte", help="Minimum number of rounds, inclusive.")] = None,
+    rounds_lte: Annotated[int | None, typer.Option("--rounds-lte", help="Maximum number of rounds, inclusive.")] = None,
     node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
     port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
 ) -> int:
@@ -1945,6 +1955,8 @@ def gaps_bulk_delete_command(
         category=category,
         actor=actor,
         reporter=reporter,
+        rounds_gte=rounds_gte,
+        rounds_lte=rounds_lte,
         node=node,
     )
     body.pop("update", None)
@@ -1968,6 +1980,8 @@ def _bulk_gap_body(
     category: str | None,
     actor: str | None,
     reporter: str | None,
+    rounds_gte: int | None,
+    rounds_lte: int | None,
     node: str | None,
 ) -> dict[str, object]:
     filt: dict[str, object] = {}
@@ -1983,6 +1997,8 @@ def _bulk_gap_body(
         "category": category,
         "actor": actor,
         "reporter": reporter,
+        "rounds_gte": rounds_gte,
+        "rounds_lte": rounds_lte,
         "node": node,
     }.items():
         if value is not None:

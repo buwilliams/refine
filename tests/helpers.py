@@ -89,14 +89,15 @@ def create_indexed_gap(conn, gap_id: str, *, status: str = "todo",
     )
     conn.execute(
         "INSERT INTO gaps_index "
-        "(id, name, status, priority, reporter, created, updated, "
+        "(id, name, status, priority, reporter, round_count, created, updated, "
         "branch_name, node_id, json_path) "
-        "VALUES (?, ?, ?, ?, 'Reporter', ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, 'Reporter', ?, ?, ?, ?, ?, ?)",
         (
             gap_id,
             gap_id,
             status,
             priority,
+            len(gap.get("rounds") or []),
             gap["created"],
             gap["updated"],
             branch,

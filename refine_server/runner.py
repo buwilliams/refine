@@ -922,19 +922,21 @@ class Runner:
         with db.transaction(self._conn):
             self._conn.execute(
                 "INSERT INTO gaps_index "
-                "(id, name, status, priority, reporter, created, updated, node_id, json_path) "
-                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?) "
+                "(id, name, status, priority, reporter, round_count, created, updated, node_id, json_path) "
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET "
                 "name = excluded.name, "
                 "status = excluded.status, "
                 "priority = excluded.priority, "
                 "reporter = excluded.reporter, "
+                "round_count = excluded.round_count, "
                 "created = excluded.created, "
                 "updated = excluded.updated, "
                 "node_id = excluded.node_id, "
                 "json_path = excluded.json_path",
                 (gap_id, name, priority, params["reporter"],
-                 gap["created"], gap["updated"], node_id, relative_gap_path(gap_id)),
+                 len(gap.get("rounds") or []), gap["created"], gap["updated"],
+                 node_id, relative_gap_path(gap_id)),
             )
             search_index.upsert_gap(self._conn, gap)
         # ensure reporter exists in dropdown list
@@ -970,9 +972,10 @@ class Runner:
         # the index column.
         with db.transaction(self._conn):
             self._conn.execute(
-                "UPDATE gaps_index SET status = 'todo', reporter = ?, updated = ? "
+                "UPDATE gaps_index SET status = 'todo', reporter = ?, "
+                "round_count = ?, updated = ? "
                 "WHERE id = ?",
-                (params["reporter"], now_iso(), gap_id),
+                (params["reporter"], len(gap.get("rounds") or []), now_iso(), gap_id),
             )
             search_index.upsert_gap(self._conn, gap)
         try:

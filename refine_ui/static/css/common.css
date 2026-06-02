@@ -958,6 +958,7 @@ select {
 }
 .filter-row select { width: auto; }
 .filter-row input[type="text"] { width: auto; }
+.filter-row input[type="number"].filter-number { width: 112px; }
 .filter-row .filter-grow { flex: 1; min-width: 240px; }
 .filter-row .filter-gap-id { width: 220px; }
 .pagination {

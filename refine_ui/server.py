@@ -49,6 +49,8 @@ def _h_list_gaps(_h, _m, _b, q):
         category=_get_one(q, "category"),
         actor=_get_one(q, "actor"),
         reporter=_get_one(q, "reporter"),
+        rounds_gte=_get_one(q, "rounds_gte"),
+        rounds_lte=_get_one(q, "rounds_lte"),
         node=_get_one(q, "node"),
         limit=int(_get_one(q, "limit", "50")),
         offset=int(_get_one(q, "offset", "0")),

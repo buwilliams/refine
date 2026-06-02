@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     status      TEXT NOT NULL,
     priority    TEXT NOT NULL DEFAULT 'low',
     reporter    TEXT NOT NULL DEFAULT '',
+    round_count INTEGER NOT NULL DEFAULT 0,
     created     TEXT NOT NULL,
     updated     TEXT NOT NULL,
     branch_name TEXT,
@@ -431,6 +432,11 @@ def _migrate(conn: sqlite3.Connection) -> None:
             "ALTER TABLE gaps_index ADD COLUMN reporter TEXT NOT NULL DEFAULT ''"
         )
         _backfill_reporter(conn)
+    if "round_count" not in cols:
+        conn.execute(
+            "ALTER TABLE gaps_index ADD COLUMN round_count INTEGER NOT NULL DEFAULT 0"
+        )
+        _backfill_round_count(conn)
     if "node_id" not in cols:
         conn.execute(
             "ALTER TABLE gaps_index ADD COLUMN node_id TEXT NOT NULL DEFAULT 'default'"
@@ -456,6 +462,9 @@ def _migrate(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_reporter ON gaps_index(reporter)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gaps_round_count ON gaps_index(round_count)"
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_node ON gaps_index(node_id)"
@@ -657,6 +666,22 @@ def _backfill_reporter(conn: sqlite3.Connection) -> None:
                 "UPDATE gaps_index SET reporter = ? WHERE id = ?",
                 (rep, gap_id),
             )
+
+
+def _backfill_round_count(conn: sqlite3.Connection) -> None:
+    """One-time backfill for existing cache rows after adding round_count."""
+    from . import gaps as shared_gaps
+    rows = conn.execute("SELECT id FROM gaps_index").fetchall()
+    for row in rows:
+        gap_id = row["id"]
+        gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
+        if not gap:
+            continue
+        rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
+        conn.execute(
+            "UPDATE gaps_index SET round_count = ? WHERE id = ?",
+            (len(rounds), gap_id),
+        )
 
 
 @contextmanager

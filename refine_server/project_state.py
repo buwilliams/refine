@@ -1595,15 +1595,16 @@ def _upsert_gap_index_row(conn: sqlite3.Connection,
                           rel_path: str) -> None:
     conn.execute(
         "INSERT OR REPLACE INTO gaps_index "
-        "(id, name, status, priority, reporter, created, updated, "
+        "(id, name, status, priority, reporter, round_count, created, updated, "
         "branch_name, node_id, json_path) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(gap.get("id") or ""),
             str(gap.get("name") or "Untitled Gap"),
             str(gap.get("status") or "backlog"),
             str(gap.get("priority") or "low"),
             _latest_reporter(gap),
+            _round_count(gap),
             str(gap.get("created") or now_iso()),
             str(gap.get("updated") or gap.get("created") or now_iso()),
             gap.get("branch_name"),
@@ -1633,6 +1634,10 @@ def _latest_reporter(gap: dict[str, Any]) -> str:
     if rounds and isinstance(rounds[-1], dict):
         return str(rounds[-1].get("reporter") or "")
     return ""
+
+
+def _round_count(gap: dict[str, Any]) -> int:
+    return len([r for r in (gap.get("rounds") or []) if isinstance(r, dict)])
 
 
 def _write_node_files(node_id: str, *, settings: dict[str, str],

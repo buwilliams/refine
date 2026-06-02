@@ -2,7 +2,7 @@
 
 const GAPS_DEFAULT_DIR = {
   name: "asc", status: "asc", priority: "asc",
-  reporter: "asc", node: "asc", updated: "desc", id: "desc",
+  reporter: "asc", rounds: "asc", node: "asc", updated: "desc", id: "desc",
 };
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
@@ -14,6 +14,12 @@ function gapsHash(parts) {
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
   if (parts.reporter) next.set("reporter", parts.reporter);
+  if (parts.rounds_gte !== undefined && parts.rounds_gte !== "") {
+    next.set("rounds_gte", parts.rounds_gte);
+  }
+  if (parts.rounds_lte !== undefined && parts.rounds_lte !== "") {
+    next.set("rounds_lte", parts.rounds_lte);
+  }
   if (parts.node) next.set("node", parts.node);
   if (parts.severity) next.set("severity", parts.severity);
   if (parts.category) next.set("category", parts.category);
@@ -69,6 +75,12 @@ async function renderGapsList() {
           ${(state.project?.nodes || []).map((inst) =>
             `<option value="${htmlEscape(inst.id)}" ${inst.id === f.node ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
         </select>
+        <input type="number" id="filter-rounds-gte" class="filter-number"
+               min="0" step="1" inputmode="numeric"
+               placeholder="Rounds ≥" value="${htmlEscape(f.rounds_gte)}">
+        <input type="number" id="filter-rounds-lte" class="filter-number"
+               min="0" step="1" inputmode="numeric"
+               placeholder="Rounds ≤" value="${htmlEscape(f.rounds_lte)}">
         <select id="gaps-severity">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
           <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
@@ -113,6 +125,10 @@ async function renderGapsList() {
     updateGapsFilter({ reporter: e.target.value, page: 1 }));
   $("#filter-node").addEventListener("change", (e) =>
     updateGapsFilter({ node: e.target.value, page: 1 }));
+  $("#filter-rounds-gte").addEventListener("input", debounce((e) =>
+    updateGapsFilter({ rounds_gte: e.target.value, page: 1 }), 250));
+  $("#filter-rounds-lte").addEventListener("input", debounce((e) =>
+    updateGapsFilter({ rounds_lte: e.target.value, page: 1 }), 250));
   $("#gaps-severity").addEventListener("change", (e) =>
     updateGapsFilter({ severity: e.target.value, page: 1 }));
   $("#gaps-category").addEventListener("change", (e) =>
@@ -159,6 +175,8 @@ function gapsFilterFromHash() {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
     reporter: hashQs.get("reporter") || "",
+    rounds_gte: hashQs.get("rounds_gte") || "",
+    rounds_lte: hashQs.get("rounds_lte") || "",
     node: hashQs.get("node") || "",
     severity: hashQs.get("severity") || "",
     category: hashQs.get("category") || "",
@@ -180,6 +198,8 @@ function updateGapsFilter(patch) {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
     reporter: "reporter" in patch ? patch.reporter : current.reporter,
+    rounds_gte: "rounds_gte" in patch ? patch.rounds_gte : current.rounds_gte,
+    rounds_lte: "rounds_lte" in patch ? patch.rounds_lte : current.rounds_lte,
     node: "node" in patch ? patch.node : current.node,
     severity: "severity" in patch ? patch.severity : current.severity,
     category: "category" in patch ? patch.category : current.category,
@@ -201,6 +221,8 @@ async function refreshGapsTable() {
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
   if (f.reporter) params.set("reporter", f.reporter);
+  if (f.rounds_gte) params.set("rounds_gte", f.rounds_gte);
+  if (f.rounds_lte) params.set("rounds_lte", f.rounds_lte);
   if (f.node) params.set("node", f.node);
   if (f.severity) params.set("severity", f.severity);
   if (f.category) params.set("category", f.category);
@@ -236,6 +258,7 @@ async function refreshGapsTable() {
     applyGapsFilterIndicator(f);
     const renderState = {
       q: f.q, status: f.status,
+      rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
       sort: f.effectiveSort, dir: f.effectiveDir,
       page: data.page || {
         limit: f.limit,

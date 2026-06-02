@@ -54,6 +54,7 @@ GAPS_SORT_EXPRESSIONS: dict[str, str] = {
     "status": "status",
     "priority": "CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END",
     "reporter": "reporter COLLATE NOCASE",
+    "rounds": "round_count",
     "node": "node_id COLLATE NOCASE",
     "updated": "updated",
     "created": "created",
@@ -65,6 +66,7 @@ GAPS_DEFAULT_DIR: dict[str, str] = {
     "status": "ASC",
     "priority": "ASC",
     "reporter": "ASC",
+    "rounds": "ASC",
     "node": "ASC",
     "updated": "DESC",
     "created": "DESC",
@@ -116,6 +118,30 @@ def gaps_order_clause(sort: str | None, direction: str | None) -> str:
     return f"{expr} {order_dir}{tiebreaker}"
 
 
+def round_count_bounds(
+    rounds_gte: Any | None,
+    rounds_lte: Any | None,
+) -> tuple[int | None, int | None, tuple[int, dict] | None]:
+    lower, lower_err = _parse_round_bound(rounds_gte, "rounds_gte")
+    if lower_err is not None:
+        return None, None, lower_err
+    upper, upper_err = _parse_round_bound(rounds_lte, "rounds_lte")
+    if upper_err is not None:
+        return None, None, upper_err
+    return lower, upper, None
+
+
+def _parse_round_bound(value: Any | None, name: str) -> tuple[int | None, tuple[int, dict] | None]:
+    if value is None:
+        return None, None
+    text = str(value).strip()
+    if not text:
+        return None, None
+    if not re.fullmatch(r"\d+", text):
+        return None, _err(400, f"{name} must be a non-negative integer")
+    return int(text), None
+
+
 def list_gaps(
     *,
     attached: bool = True,
@@ -125,6 +151,8 @@ def list_gaps(
     category: str | None = None,
     actor: str | None = None,
     reporter: str | None = None,
+    rounds_gte: Any | None = None,
+    rounds_lte: Any | None = None,
     node: str | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -143,10 +171,13 @@ def list_gaps(
         return 200, body
     metric_start = perf_metrics.now()
     page_limit, page_offset = page_bounds(limit, offset)
+    min_rounds, max_rounds, bounds_err = round_count_bounds(rounds_gte, rounds_lte)
+    if bounds_err is not None:
+        return bounds_err
     fts_match = search_index.fts_query(q)
     sql = [
         "SELECT id, name, status, priority, reporter, "
-        "created, updated, branch_name, node_id "
+        "round_count, created, updated, branch_name, node_id "
         "FROM gaps_index"
     ]
     args: list[Any] = []
@@ -176,6 +207,12 @@ def list_gaps(
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
+    if min_rounds is not None:
+        where.append("round_count >= ?")
+        args.append(min_rounds)
+    if max_rounds is not None:
+        where.append("round_count <= ?")
+        args.append(max_rounds)
     if node:
         if node == "current":
             where.append("node_id = ?")
@@ -252,6 +289,8 @@ def list_gaps(
             "category": category or "",
             "actor": actor or "",
             "reporter": reporter or "",
+            "rounds_gte": "" if min_rounds is None else min_rounds,
+            "rounds_lte": "" if max_rounds is None else max_rounds,
             "node": node or "",
             "limit": page_limit,
             "offset": page_offset,
@@ -490,7 +529,7 @@ def select_bulk_update_candidates(
             placeholders = ",".join("?" * len(chunk))
             rows = conn.execute(
                 "SELECT id, name, status, priority, reporter, "
-                "created, updated, branch_name, node_id "
+                "round_count, created, updated, branch_name, node_id "
                 f"FROM gaps_index WHERE id IN ({placeholders})",
                 chunk,
             ).fetchall()
@@ -505,9 +544,15 @@ def select_bulk_update_candidates(
     category = filt.get("category") or None
     actor = filt.get("actor") or None
     reporter = filt.get("reporter") or None
+    min_rounds, max_rounds, bounds_err = round_count_bounds(
+        filt.get("rounds_gte"),
+        filt.get("rounds_lte"),
+    )
+    if bounds_err is not None:
+        return bounds_err
     sql = [
         "SELECT id, name, status, priority, reporter, "
-        "created, updated, branch_name, node_id "
+        "round_count, created, updated, branch_name, node_id "
         "FROM gaps_index"
     ]
     args: list[Any] = []
@@ -531,6 +576,12 @@ def select_bulk_update_candidates(
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
+    if min_rounds is not None:
+        where.append("round_count >= ?")
+        args.append(min_rounds)
+    if max_rounds is not None:
+        where.append("round_count <= ?")
+        args.append(max_rounds)
     node = filt.get("node") or None
     if node:
         if node == "current":
