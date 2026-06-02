@@ -41,6 +41,8 @@ def main() -> int:
         supervisor._can_ping_worker = lambda _path: True  # type: ignore[method-assign]
         supervisor.start()
         try:
+            pid_path = Path(__file__).resolve().parents[1] / "run" / "19876" / "supervisor.pid"
+            assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())
             status = supervisor.dispatch(M_STATUS, {})
             assert status["supervisor_pid"] == os.getpid()
             assert status["port"] == 19876
@@ -124,6 +126,7 @@ def main() -> int:
         finally:
             supervisor.shutdown()
         assert all(p.terminated or p.returncode is not None for p in supervisor.resources.procs)
+        assert not pid_path.exists()
     finally:
         if old_socket is None:
             os.environ.pop("REFINE_SUPERVISOR_SOCKET", None)
@@ -143,6 +146,7 @@ def main() -> int:
             os.environ[config.ENV_CONFIG_PATH] = old_config
         shutil.rmtree(Path(__file__).resolve().parents[1] / "run" / "19876", ignore_errors=True)
         cleanup_tmp(tmp)
+    exercise_ipc_server_does_not_unlink_replacement_socket()
     root = Path(__file__).resolve().parents[1]
     runtime_source = (root / "refine_ui" / "runtime.py").read_text(encoding="utf-8")
     api_source = (root / "refine_ui" / "api.py").read_text(encoding="utf-8")
@@ -153,6 +157,36 @@ def main() -> int:
     assert "subprocess.Popen" not in api_source
     print("supervisor control tests OK")
     return 0
+
+
+def exercise_ipc_server_does_not_unlink_replacement_socket() -> None:
+    from refine_runtime import ipc
+
+    path = Path(__file__).resolve().parents[1] / "run" / "19877" / "s.sock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    def dispatcher(_method, _params):  # noqa: ANN001, ANN202
+        return {"ok": True}
+
+    first = ipc.IpcServer(path, dispatcher)
+    second = ipc.IpcServer(path, dispatcher)
+    first.start()
+    try:
+        first_stat = path.stat()
+        second.start()
+        try:
+            second_stat = path.stat()
+            assert (first_stat.st_dev, first_stat.st_ino) != (
+                second_stat.st_dev,
+                second_stat.st_ino,
+            )
+            first.stop()
+            assert path.exists(), "old IPC server removed replacement socket"
+        finally:
+            second.stop()
+    finally:
+        first.stop()
+        shutil.rmtree(path.parent, ignore_errors=True)
 
 
 class FakeResourceManager:

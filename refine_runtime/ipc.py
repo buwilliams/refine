@@ -194,6 +194,7 @@ class IpcServer:
         self.dispatcher = dispatcher
         self._server: ThreadingUnixServer | None = None
         self._thread: threading.Thread | None = None
+        self._socket_stat: os.stat_result | None = None
 
     def start(self) -> None:
         self.path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -211,6 +212,10 @@ class IpcServer:
             os.chmod(self.path, 0o600)
         except OSError:
             pass
+        try:
+            self._socket_stat = self.path.stat()
+        except OSError:
+            self._socket_stat = None
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="refine-ipc-server",
@@ -228,6 +233,14 @@ class IpcServer:
             self._thread.join(timeout=2.0)
         self._thread = None
         try:
-            self.path.unlink()
+            current = self.path.stat()
+            if (
+                self._socket_stat is not None
+                and current.st_ino == self._socket_stat.st_ino
+                and current.st_dev == self._socket_stat.st_dev
+            ):
+                self.path.unlink()
         except FileNotFoundError:
             pass
+        finally:
+            self._socket_stat = None

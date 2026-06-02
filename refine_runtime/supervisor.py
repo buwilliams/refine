@@ -54,12 +54,20 @@ class ManagedProcess:
 
 
 class Supervisor:
-    def __init__(self, *, host: str, port: int, cfg_path: str | None) -> None:
+    def __init__(
+        self,
+        *,
+        host: str,
+        port: int,
+        cfg_path: str | None,
+        pid_path: Path | str | None = None,
+    ) -> None:
         self.host = host
         self.port = port
         self.cfg_path = cfg_path
         self.run_dir = ipc.run_dir(port=port)
         self.socket_path = ipc.supervisor_socket_path(port)
+        self.pid_path = Path(pid_path) if pid_path is not None else self.run_dir / "supervisor.pid"
         self.runner_socket = self._runner_socket_path(cfg_path)
         self.resource_settings = _load_resource_settings(cfg_path)
         self.resources = ResourceManager(self.resource_settings)
@@ -74,6 +82,7 @@ class Supervisor:
 
     def start(self) -> None:
         self._server.start()
+        self._write_pid_file()
         self._start_ui()
 
     def run(self) -> int:
@@ -190,6 +199,22 @@ class Supervisor:
         self._kill(worker)
         self._kill(ui)
         self._server.stop()
+        self._unlink_pid_file()
+
+    def _write_pid_file(self) -> None:
+        self.pid_path.parent.mkdir(parents=True, exist_ok=True)
+        self.pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+
+    def _unlink_pid_file(self) -> None:
+        try:
+            raw = self.pid_path.read_text(encoding="utf-8").strip()
+        except OSError:
+            return
+        if raw == str(os.getpid()):
+            try:
+                self.pid_path.unlink()
+            except FileNotFoundError:
+                pass
 
     def _start_ui(self) -> None:
         env = os.environ.copy()
