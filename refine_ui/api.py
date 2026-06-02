@@ -835,9 +835,11 @@ def _load_project_attach_configured(
     start_poller: bool,
     start_runner: bool,
     migrate: bool,
+    port: int,
 ) -> config.Config:
     return runtime.load_configured(
         config_path,
+        port=port,
         start_poller=start_poller,
         start_runner=start_runner,
         migrate=migrate,

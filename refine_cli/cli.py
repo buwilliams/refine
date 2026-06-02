@@ -321,11 +321,11 @@ def _run_command(command: _Command, ctx: typer.Context, **kwargs: object) -> int
     return command(_Args(config=_ctx_config(ctx), **kwargs))
 
 
-def _ensure_cli_project(config_path: str | None = None) -> None:
+def _ensure_cli_project(config_path: str | None = None, *, port: int | None = None) -> None:
     if config_path:
-        config.get(path=config_path, reload=True)
+        config.get(path=config_path, reload=True, port=port)
     else:
-        config.get(reload=True)
+        config.get(reload=True, port=port)
     conn = db.connect()
     try:
         status = project_state.ensure_initialized(conn, migrate=True)
@@ -380,9 +380,12 @@ def _sync_cli_refine_state(
     return result
 
 
-def _cli_project_config(ctx: typer.Context) -> config.Config:
-    _ensure_cli_project(_ctx_config(ctx))
-    return config.get(reload=True)
+def _cli_project_config(ctx: typer.Context, *, port: int | None = None) -> config.Config:
+    _ensure_cli_project(_ctx_config(ctx), port=port)
+    cfg_path = _ctx_config(ctx)
+    if cfg_path:
+        return config.get(path=cfg_path, reload=True, port=port)
+    return config.get(reload=True, port=port)
 
 
 def _load_json_value(value: str) -> object:
@@ -423,7 +426,7 @@ def _backend_runner_for_cli(
     ctx: typer.Context,
     port: int | None,
 ) -> tuple[config.Config, chat_ops.RunnerCall]:
-    cfg = _cli_project_config(ctx)
+    cfg = _cli_project_config(ctx, port=port)
     effective_port = _effective_port(_Args(port=port), cfg)
     return cfg, _backend_cli_runner_call(cfg, effective_port)
 
@@ -2855,8 +2858,9 @@ def _cli_load_project_attach_configured(
     _start_poller: bool,
     _start_runner: bool,
     _migrate: bool,
+    port: int,
 ) -> config.Config:
-    cfg = config.get(path=str(config_path), reload=True)
+    cfg = config.get(path=str(config_path), reload=True, port=port)
     db.init_db(cfg.sqlite_path)
     conn = db.connect(cfg.sqlite_path)
     try:
@@ -3040,7 +3044,7 @@ def bootstrap_client_repo(
                 clone,
                 None,
                 force=force,
-                port=port or config.DEFAULT_UI_PORT,
+                port=port or config.runtime_port(),
             )
         ),
     )
@@ -4027,7 +4031,7 @@ def _require_config_for_port(args: _Args, clone: Path, port: int, command: str) 
 
 
 def _effective_port(args: _Args, cfg: "config.Config | None") -> int:
-    default_port = cfg.web_port if cfg is not None else 8080
+    default_port = cfg.web_port if cfg is not None else config.runtime_port()
     raw_port = getattr(args, "port", None)
     port = int(raw_port if raw_port is not None else default_port)
     if port <= 0 or port > 65535:

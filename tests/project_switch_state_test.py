@@ -1134,6 +1134,8 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
         assert sqlite8080 != sqlite8081
         assert sqlite8080.parent == clone / "run" / "8080" / "cache"
         assert sqlite8081.parent == clone / "run" / "8081" / "cache"
+        assert cfg8080.web_port == 8080
+        assert cfg8081.web_port == 8081
     finally:
         if old_scope is None:
             os.environ.pop("REFINE_UI_SCOPE", None)
@@ -1187,6 +1189,53 @@ def test_process_config_path_is_not_shared_through_binding() -> None:
         os.environ["REFINE_CONFIG_PATH"] = str(client2 / ".refine" / "refine.toml")
         assert config.get(reload=True).client_repo == client2
     finally:
+        if old_cfg is None:
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+        else:
+            os.environ["REFINE_CONFIG_PATH"] = old_cfg
+        os.chdir(original_cwd)
+        cleanup_tmp(tmp)
+
+
+def test_config_web_port_follows_env_ui_port() -> None:
+    tmp, client = make_client_repo("refine-config-env-port-")
+    conn = init_refine(client)
+    conn.close()
+    original_cwd = Path.cwd()
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    old_port = os.environ.get("REFINE_UI_PORT")
+    old_run_dir = os.environ.get("REFINE_RUN_DIR")
+    old_cfg = os.environ.get("REFINE_CONFIG_PATH")
+    try:
+        from refine_server import config, project_registry
+
+        clone = tmp / "refine-one"
+        clone.mkdir()
+        project_registry.set_active_app(clone, client, port=18183)
+
+        os.environ.pop("REFINE_CONFIG_PATH", None)
+        os.environ.pop("REFINE_UI_SCOPE", None)
+        os.environ.pop("REFINE_RUN_DIR", None)
+        os.environ["REFINE_UI_PORT"] = "18183"
+        os.chdir(clone)
+
+        cfg = config.get(reload=True)
+        assert cfg.web_port == 18183
+        assert cfg.client_repo == client.resolve()
+        assert cfg.sqlite_path.parent == clone / "run" / "18183" / "cache"
+    finally:
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        if old_run_dir is None:
+            os.environ.pop("REFINE_RUN_DIR", None)
+        else:
+            os.environ["REFINE_RUN_DIR"] = old_run_dir
         if old_cfg is None:
             os.environ.pop("REFINE_CONFIG_PATH", None)
         else:
@@ -1371,6 +1420,7 @@ def main() -> int:
     test_active_node_is_per_application()
     test_active_node_is_checkout_local_for_same_application()
     test_active_node_is_port_scoped_for_same_checkout()
+    test_config_web_port_follows_env_ui_port()
     test_process_config_path_is_not_shared_through_binding()
     test_node_switch_refreshes_reporter_cache()
     test_settings_are_scoped_to_active_node_files()

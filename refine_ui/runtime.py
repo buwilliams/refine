@@ -73,14 +73,15 @@ class _InProcessRunnerClient:
 def load_configured(
     path: Path | str | None = None,
     *,
+    port: int | str | None = None,
     start_poller: bool = True,
     start_runner: bool = True,
     migrate: bool = False,
 ) -> config.Config:
     """Load config, initialize SQLite, and ensure background services run."""
     global _loaded_config_path
-    requested_path = Path(path).resolve() if path is not None else config.find_config()
-    cfg_preview = config.Config.load(path)
+    requested_path = Path(path).resolve() if path is not None else config.find_config(port=port)
+    cfg_preview = config.Config.load(path, port=port)
     os.environ.setdefault(config.ENV_UI_PORT, str(cfg_preview.web_port))
     os.environ.setdefault(config.ENV_UI_SCOPE, str(cfg_preview.web_port))
     os.environ.setdefault(
@@ -112,7 +113,7 @@ def load_configured(
     if (_loaded_config_path is not None and requested_path is not None
             and requested_path.resolve() != _loaded_config_path):
         stop_all()
-    cfg = config.get(path=path, reload=True)
+    cfg = config.get(path=path, reload=True, port=port)
     os.environ[config.ENV_CONFIG_PATH] = str(cfg.config_path)
     os.environ["REFINE_RUNNER_SOCKET"] = str(_runner_socket_path(cfg))
     os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"

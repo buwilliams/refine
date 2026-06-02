@@ -29,7 +29,7 @@ class SwitchBlocked(Exception):
 PrepareClone = Callable[[Path], None]
 InstallUnit = Callable[[Path, Path | None], Path]
 ConnFactory = Callable[[], Any]
-LoadConfigured = Callable[[Path, bool, bool, bool], Any]
+LoadConfigured = Callable[[Path, bool, bool, bool, int], Any]
 PathCallback = Callable[[Path], None]
 OptionalPathCallback = Callable[[], Path | None]
 PrepareSwitch = Callable[[Path | None], dict[str, Any]]
@@ -304,6 +304,7 @@ def attach_project(
             body.get("start_poller") is not False,
             body.get("start_runner") is not False,
             bool(body.get("migrate")),
+            port,
         )
         if body.get("migrate"):
             commit_refine_state(cfg.client_repo)
@@ -766,7 +767,7 @@ def bootstrap_client_repo(
         (target / "gaps").mkdir(parents=True, exist_ok=True)
         config.ensure_refine_gitignore(target)
     else:
-        cfg_path = config.write_defaults(target, force=force)
+        cfg_path = config.write_defaults(target, force=force, port=port)
         config_created = True
 
     registry_path = None

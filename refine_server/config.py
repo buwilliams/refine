@@ -216,7 +216,7 @@ class Config:
 
     @property
     def sqlite_path(self) -> Path:
-        return sqlite_path_for(self.volume_root)
+        return sqlite_path_for(self.volume_root, port=self.web_port)
 
     @property
     def gaps_dir(self) -> Path:
@@ -242,15 +242,15 @@ class Config:
             raw = _parse_toml(text)
         except ValueError as e:
             raise ConfigError(f"Could not parse {cp}: {e}") from e
-        return cls._from_raw(cp, raw)
+        return cls._from_raw(cp, raw, port=port)
 
     @classmethod
-    def _from_raw(cls, path: Path, raw: dict) -> "Config":
+    def _from_raw(cls, path: Path, raw: dict, *, port: int | str | None = None) -> "Config":
         volume_root = path.parent
         client_repo_rel = raw.get("client_repo", "..")
         web = raw.get("web") or {}
         web_host = str(web.get("host", "0.0.0.0"))
-        web_port = int(web.get("port", 8080))
+        web_port = _config_runtime_port(port, int(web.get("port", DEFAULT_UI_PORT)))
         return cls(
             config_path=path,
             volume_root=volume_root,
@@ -372,6 +372,20 @@ def runtime_port(default: int = DEFAULT_UI_PORT) -> int:
     return port
 
 
+def _config_runtime_port(port: int | str | None, default: int = DEFAULT_UI_PORT) -> int:
+    if port is not None:
+        raw = port
+    else:
+        raw = os.environ.get(ENV_UI_SCOPE) or os.environ.get(ENV_UI_PORT) or ""
+    try:
+        selected = int(str(raw).strip()) if str(raw).strip() else int(default)
+    except (TypeError, ValueError):
+        selected = int(default)
+    if selected <= 0 or selected > 65535:
+        return int(default)
+    return selected
+
+
 def local_run_dir(start: Path | None = None, *, port: int | str | None = None) -> Path:
     """Port-scoped checkout-local runtime directory."""
     if start is None and port is None:
@@ -387,9 +401,9 @@ def runtime_scope() -> str:
     return str(runtime_port())
 
 
-def sqlite_path_for(volume_root: Path) -> Path:
+def sqlite_path_for(volume_root: Path, *, port: int | str | None = None) -> Path:
     digest = hashlib.sha1(str(volume_root.resolve()).encode("utf-8")).hexdigest()[:12]
-    cache_dir = local_run_dir() / "cache"
+    cache_dir = local_run_dir(port=port) / "cache"
     return cache_dir / f"index-{digest}.sqlite"
 
 
@@ -430,6 +444,11 @@ client_repo = ".."
 host = "0.0.0.0"
 port = 8080
 """
+
+
+def default_toml(*, port: int | str | None = None) -> str:
+    selected = _config_runtime_port(port, DEFAULT_UI_PORT)
+    return DEFAULT_TOML.replace("port = 8080", f"port = {selected}", 1)
 
 REFINE_GITIGNORE_LINES = [
     "# refine runtime state - local, derived, or high-churn.",
@@ -478,7 +497,12 @@ def ensure_runtime_gitignore(client_repo: Path) -> Path:
     return path
 
 
-def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
+def write_defaults(
+    volume_root: Path,
+    *,
+    force: bool = False,
+    port: int | str | None = None,
+) -> Path:
     """Write a default refine.toml to `volume_root` (creating the directory).
 
     Also creates the gaps directory. Adds a `.gitignore` next to the config
@@ -492,7 +516,7 @@ def write_defaults(volume_root: Path, *, force: bool = False) -> Path:
     cfg = volume_root / CONFIG_FILENAME
     if cfg.exists() and not force:
         raise ConfigError(f"{cfg} already exists. Use --force to overwrite.")
-    cfg.write_text(DEFAULT_TOML, encoding="utf-8")
+    cfg.write_text(default_toml(port=port), encoding="utf-8")
     (volume_root / "gaps").mkdir(exist_ok=True)
 
     ensure_refine_gitignore(volume_root)

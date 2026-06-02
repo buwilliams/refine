@@ -144,6 +144,65 @@ def main() -> int:
         assert payload["auto_attached"] is True, payload
         assert payload["client_repo"] == str(new_app.resolve()), payload
         assert payload["removed_path"] == str(second_app.resolve()), payload
+
+        old_env_port = os.environ.get("REFINE_UI_PORT")
+        old_env_scope = os.environ.get("REFINE_UI_SCOPE")
+        old_env_run_dir = os.environ.get("REFINE_RUN_DIR")
+        old_env_config = os.environ.get("REFINE_CONFIG_PATH")
+        try:
+            os.environ["REFINE_UI_PORT"] = "18123"
+            os.environ.pop("REFINE_UI_SCOPE", None)
+            os.environ.pop("REFINE_RUN_DIR", None)
+            os.environ.pop("REFINE_CONFIG_PATH", None)
+
+            env_app = tmp / "env-port-app"
+            os.chdir(refine_source)
+            try:
+                rc, out, err = _run_cli(["app", "attach", str(env_app)])
+                assert rc == 0, err
+                payload = _json(out)
+                assert payload["client_repo"] == str(env_app.resolve()), payload
+                assert str(refine_source / "run" / "18123" / "apps.json") == payload["registry_path"]
+
+                rc, out, err = _run_cli(["app", "status"])
+                assert rc == 0, err
+                payload = _json(out)
+                assert payload["client_repo"] == str(env_app.resolve()), payload
+
+                rc, out, err = _run_cli(["app", "list"])
+                assert rc == 0, err
+                payload = _json(out)
+                assert payload["current"] == str(env_app.resolve()), payload
+
+                switched_app = tmp / "env-port-switched"
+                switched_app.mkdir()
+                subprocess.run(["git", "init", "-q"], cwd=switched_app, check=True)
+                subprocess.run(["git", "config", "user.email", "t@x"], cwd=switched_app, check=True)
+                subprocess.run(["git", "config", "user.name", "t"], cwd=switched_app, check=True)
+                rc, out, err = _run_cli(["app", "switch", str(switched_app), "--force"])
+                assert rc == 0, err
+                text = (switched_app / ".refine" / "refine.toml").read_text(encoding="utf-8")
+                assert "port = 18123" in text
+                assert "port = 8080" not in text
+            finally:
+                os.chdir(old_cwd)
+        finally:
+            if old_env_port is None:
+                os.environ.pop("REFINE_UI_PORT", None)
+            else:
+                os.environ["REFINE_UI_PORT"] = old_env_port
+            if old_env_scope is None:
+                os.environ.pop("REFINE_UI_SCOPE", None)
+            else:
+                os.environ["REFINE_UI_SCOPE"] = old_env_scope
+            if old_env_run_dir is None:
+                os.environ.pop("REFINE_RUN_DIR", None)
+            else:
+                os.environ["REFINE_RUN_DIR"] = old_env_run_dir
+            if old_env_config is None:
+                os.environ.pop("REFINE_CONFIG_PATH", None)
+            else:
+                os.environ["REFINE_CONFIG_PATH"] = old_env_config
     finally:
         conn.close()
         cleanup_tmp(tmp)
