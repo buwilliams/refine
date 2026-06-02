@@ -472,7 +472,12 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           <button id="btn-gap-round-extract" class="secondary"
                   ${gapChatCanExtractRound(active) ? "" : "disabled"}>
             Extract Round
-          </button>` : ""}
+          </button>
+          <a id="chat-gap-link" class="chat-gap-link"
+             href="#/gaps/${encodeURIComponent(active.gapId)}"
+             title="Open Gap ${htmlEscape(active.gapId)}">
+            Gap ${htmlEscape(active.gapId.slice(0, 10))}…
+          </a>` : ""}
         <button id="btn-chat-clear" class="secondary"
                 ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>
           Clear history

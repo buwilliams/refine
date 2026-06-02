@@ -81,6 +81,8 @@ def main() -> int:
 
         status, detail = api.get_gap(gap_id)
         assert status == 200, detail
+        assert detail["gap"]["node_id"], detail
+        assert detail["gap"]["node_display_name"], detail
         returned_round = detail["gap"]["rounds"][0]
         assert "logs" not in returned_round
         assert returned_round["log_count"] == 3
@@ -173,6 +175,9 @@ def main() -> int:
         ).read_text(encoding="utf-8")
         assert '<div class="gap-action-group">' in gaps_detail_js
         assert '<button class="gap-action-primary" id="btn-chat">Open Chat</button>' in gaps_detail_js
+        assert 'const nodeDisplayName = gap.node_display_name || gap.node_id || "Unknown";' in gaps_detail_js
+        assert 'class="status-pill gap-node-owner"' in gaps_detail_js
+        assert 'node: ${htmlEscape(nodeDisplayName)}' in gaps_detail_js
         menu_block = gaps_detail_js.split('<div class="nav-menu-panel gap-action-panel">', 1)[1].split("</div>", 1)[0]
         expected_menu_order = [
             'id="btn-view-logs">View Logs</button>',
@@ -191,6 +196,7 @@ def main() -> int:
         assert 'api("POST", "/api/gaps/bulk", {' in gaps_detail_js
         assert 'location.hash = `#/logs?gap_id=${encodeURIComponent(gap.id)}`;' in gaps_detail_js
         assert ".gap-action-group" in gaps_css
+        assert ".gap-node-owner" in gaps_css
         assert ".gap-action-more::after" in gaps_css
         assert 'hashQs.get("gap_id") || ""' in logs_js
         assert 'params.set("gap_id", f.gap_id);' in logs_js

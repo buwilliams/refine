@@ -180,6 +180,10 @@ function drawGapDetail(gap) {
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
   const governanceBanner = computeGovernanceBanner(gap, latest);
+  const nodeDisplayName = gap.node_display_name || gap.node_id || "Unknown";
+  const nodeOwnerTitle = gap.node_id
+    ? `Node owner: ${nodeDisplayName} (${gap.node_id})`
+    : `Node owner: ${nodeDisplayName}`;
 
   const isLatestEditable = (gap.status === "backlog" ||
                             gap.status === "todo" ||
@@ -211,6 +215,7 @@ function drawGapDetail(gap) {
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
         <span class="status-pill ${gap.status}">${workflowStatusLabel(gap.status)}</span>
         <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
+        <span class="status-pill gap-node-owner" title="${htmlEscape(nodeOwnerTitle)}">node: ${htmlEscape(nodeDisplayName)}</span>
       </div>
       <div class="actions" style="margin-bottom:10px">
         ${backBtn}

@@ -51,6 +51,12 @@
   background: var(--color-danger-soft);
   color: var(--color-danger);
 }
+.gap-node-owner {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* --- Notes ------------------------------------------------------------ */
 .notes-card.card { padding: 0; }

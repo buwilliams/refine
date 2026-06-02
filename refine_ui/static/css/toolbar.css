@@ -236,6 +236,14 @@ button.toolbar-tab:hover:not(:disabled),
 .chat-output a { color: var(--accent); }
 .chat-output a:hover { text-decoration: underline; }
 
+.chat-gap-link {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--accent);
+  text-decoration: none;
+}
+.chat-gap-link:hover { text-decoration: underline; }
+
 .chat-progress-panel {
   border-top: 1px solid var(--color-border-subtle);
   background: #f8fafc;

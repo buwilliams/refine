@@ -28,6 +28,7 @@ def main() -> int:
     toolbar_js = (root / "refine_ui/static/js/features/toolbar.js").read_text(
         encoding="utf-8",
     )
+    router_js = (root / "refine_ui/static/js/router.js").read_text(encoding="utf-8")
     toolbar_css = (root / "refine_ui/static/css/toolbar.css").read_text(
         encoding="utf-8",
     )
@@ -234,6 +235,11 @@ def main() -> int:
     assert "function planHasAgentResponse(tab)" in toolbar_js
     assert "btn-gap-round-extract" in toolbar_js
     assert "Extract Round" in toolbar_js
+    assert 'id="chat-gap-link"' in toolbar_js
+    assert 'href="#/gaps/${encodeURIComponent(active.gapId)}"' in toolbar_js
+    assert ".chat-gap-link" in toolbar_css
+    assert 'if (r.route === "gaps_detail")' in router_js
+    assert "openGapDetailModal(r.id);" in router_js
     assert "async function extractRoundFromGapChat()" in toolbar_js
     assert "function openGapRoundExtractModal(gapId, transcript)" in toolbar_js
     assert "extractImportDrafts(transcript, bodyRoot, signal)" in toolbar_js
