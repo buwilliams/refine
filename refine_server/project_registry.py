@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -120,21 +121,12 @@ def _load_state(clone_dir: Path, *, port: int | str | None = None) -> dict[str, 
             "active_app": str(raw.get("active_app") or ""),
             "apps": _normalize_apps(raw.get("apps")),
         }
-        if not state["active_app"]:
-            legacy = _legacy_state(clone_dir)
-            if legacy["active_app"]:
-                apps_by_path = {app["path"]: app for app in state["apps"]}
-                for app in legacy["apps"]:
-                    apps_by_path.setdefault(app["path"], app)
-                state = {
-                    "version": 1,
-                    "active_app": legacy["active_app"],
-                    "apps": list(apps_by_path.values()),
-                }
-                _write_state(clone_dir, state["apps"], state["active_app"], port=port)
         return state
+    if not _legacy_run_has_state(clone_dir, port=port):
+        return {"version": 1, "active_app": "", "apps": []}
     migrated = _legacy_state(clone_dir)
     if migrated["active_app"] or migrated["apps"]:
+        _quarantine_legacy_run_dir(clone_dir, port=port)
         _write_state(clone_dir, migrated["apps"], migrated["active_app"], port=port)
     return migrated
 
@@ -166,6 +158,62 @@ def _legacy_state(clone_dir: Path) -> dict[str, Any]:
         except (OSError, config.ConfigError):
             pass
     return {"version": 1, "active_app": active, "apps": apps}
+
+
+def _legacy_run_has_state(
+    clone_dir: Path,
+    *,
+    port: int | str | None = None,
+) -> bool:
+    run_root = config.local_run_root(clone_dir)
+    if not run_root.is_dir():
+        return False
+    if registry_path(clone_dir, port=port).exists():
+        return False
+    try:
+        entries = list(run_root.iterdir())
+    except OSError:
+        return False
+    return any(not _is_port_scoped_run_entry(entry) for entry in entries)
+
+
+def _is_port_scoped_run_entry(path: Path) -> bool:
+    return path.is_dir() and path.name.isdigit() and 0 < int(path.name) <= 65535
+
+
+def _quarantine_legacy_run_dir(
+    clone_dir: Path,
+    *,
+    port: int | str | None = None,
+) -> Path | None:
+    """Move legacy checkout-level run state aside before first port migration."""
+    run_root = config.local_run_root(clone_dir)
+    if not run_root.exists():
+        return None
+    if registry_path(clone_dir, port=port).exists():
+        return None
+    backup = _next_run_backup_path(clone_dir)
+    try:
+        run_root.rename(backup)
+    except OSError:
+        try:
+            shutil.move(str(run_root), str(backup))
+        except OSError:
+            return None
+    return backup
+
+
+def _next_run_backup_path(clone_dir: Path) -> Path:
+    clone = clone_dir.resolve()
+    base = clone / "run.bak"
+    if not base.exists():
+        return base
+    idx = 1
+    while True:
+        candidate = clone / f"run.bak.{idx}"
+        if not candidate.exists():
+            return candidate
+        idx += 1
 
 
 def _normalize_apps(raw_apps: Any) -> list[dict[str, str]]:

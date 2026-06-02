@@ -16,6 +16,7 @@ dist/
 
 # Host runner state (pidfile + log) for this clone. Host-specific; do not commit.
 /run/
+/run.bak*/
 
 # Local investigation artifacts and copied production logs.
 /debug/

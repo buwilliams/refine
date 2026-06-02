@@ -880,6 +880,8 @@ def main() -> int:
     old_client.mkdir()
     subprocess.run(["git", "init", "-q"], cwd=old_client, check=True)
     old_cfg_path = config.write_defaults(old_client / ".refine")
+    (old_clone / "run").mkdir()
+    (old_clone / "run" / "ui-8080.pid").write_text("777\n", encoding="utf-8")
     (old_clone / ".refine-binding").write_text(
         f"# unit: {config.unit_name_for(old_clone)}\n{old_client}\n",
         encoding="utf-8",
@@ -888,6 +890,7 @@ def main() -> int:
     _sync_bound_project_registry(old_clone, config.Config.load(old_cfg_path))
     migrated_registry = old_clone / "run" / "8080" / "apps.json"
     assert str(old_client) in migrated_registry.read_text(encoding="utf-8")
+    assert (old_clone / "run.bak" / "ui-8080.pid").read_text(encoding="utf-8") == "777\n"
     print("[ok] old single-app binding migrates into port-local registry")
 
     # --- Reporters -----------------------------------------------------------
