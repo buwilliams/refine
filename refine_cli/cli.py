@@ -1941,7 +1941,7 @@ def cmd_doctor(args: _Args) -> int:
 
     print(_section("Agent CLI"))
     agent_cli = _configured_agent_cli(cfg.sqlite_path)
-    cli_path = shutil.which(agent_cli) or "(not on PATH)"
+    cli_path = _agent_cli_path(agent_cli)
     _kv("provider", agent_cli)
     _kv(f"{agent_cli} path", cli_path)
     ok, msg = _cli_version(cli_path, agent_cli)
@@ -3014,9 +3014,18 @@ def _configured_agent_cli(sqlite_path: Path) -> str:
         conn.close()
         value = (row[0] if row else "claude") or "claude"
         value = str(value).strip().lower()
-        return value if value in ("claude", "codex", "gemini", "copilot") else "claude"
+        valid = ("claude", "codex", "gemini", "copilot", "smoke-ai")
+        return value if value in valid else "claude"
     except Exception:
         return "claude"
+
+
+def _agent_cli_path(agent_cli: str) -> str:
+    if agent_cli == "smoke-ai":
+        smoke_ai_path = (os.environ.get("REFINE_SMOKE_AI_PATH") or "").strip()
+        if smoke_ai_path:
+            return smoke_ai_path
+    return shutil.which(agent_cli) or "(not on PATH)"
 
 
 def _cli_version(cli_path: str, binary: str) -> tuple[bool, str | None]:

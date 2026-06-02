@@ -113,6 +113,14 @@ def main() -> int:
     assert "--resume=abc" in copilot.chat_args(
         "/bin/copilot", "hi", session_id="abc",
     )
+    smoke_ai = agent_cli.get_spec("smoke-ai")
+    assert smoke_ai.agent_args("/tmp/smoke-ai", "do it", cwd=client) == [
+        "/tmp/smoke-ai", "do it",
+    ]
+    assert agent_cli.resolve_binary(
+        smoke_ai,
+        {"REFINE_SMOKE_AI_PATH": "/tmp/smoke-ai", "PATH": ""},
+    ) == "/tmp/smoke-ai"
     from refine_server.llm import _extract_final_text
     from refine_server.subprocess_mgr import (
         _summarize_codex_event, _summarize_copilot_event,

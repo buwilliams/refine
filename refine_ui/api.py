@@ -3575,7 +3575,7 @@ def update_settings(body: dict) -> tuple[int, dict]:
         "target_app_process_check_command",
         "target_app_auto_rebuild",
     }
-    valid_agent_clis = ("claude", "codex", "gemini", "copilot")
+    valid_agent_clis = ("claude", "codex", "gemini", "copilot", "smoke-ai")
     normalized: dict[str, str] = {}
     for k, v in body.items():
         if k not in allowed:
@@ -5158,10 +5158,16 @@ def _compute_needs_attention(counts: dict, preflight: dict | None,
             "codex": "codex login",
             "gemini": "gemini auth login",
             "copilot": "copilot login",
+            "smoke-ai": "REFINE_SMOKE_AI_PATH",
         }.get(provider, f"{provider} login")
+        action = (
+            f"set `{login_hint}` on the host"
+            if provider == "smoke-ai"
+            else f"run `{login_hint}` on the host"
+        )
         items.append({
             "kind": "banner", "severity": "error",
-            "message": f"Refine cannot reach {provider} — run `{login_hint}` on the host",
+            "message": f"Refine cannot reach {provider} — {action}",
         })
     if counts.get("failed", 0):
         items.append({

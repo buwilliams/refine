@@ -123,6 +123,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
           ${cliOption("codex", "OpenAI Codex")}
           ${cliOption("gemini", "Gemini")}
           ${cliOption("copilot", "GitHub Copilot")}
+          ${cliOption("smoke-ai", "Smoke AI (deterministic testing)")}
         </select></div>
       <p class="muted small" style="margin-top:6px">
         After switching: re-check auth below to confirm the chosen provider is
@@ -130,7 +131,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         Code, Codex, and Copilot where their CLIs expose machine-readable
         events; Gemini falls back to plain stdout passthrough.
       </p>
-      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>).</p>
+      <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>), or after setting <code>REFINE_SMOKE_AI_PATH</code> for Smoke AI.</p>
       <button id="s-recheck">Re-check auth</button>
     </section>`;
 }

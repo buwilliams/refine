@@ -16,7 +16,7 @@ REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
 REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"
 REFINE_INSTALL_LOG="${REFINE_INSTALL_LOG:-}"
-REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
+REFINE_PROVIDER_OPTIONS="claude codex gemini copilot smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -758,6 +758,7 @@ provider_binary() {
     codex) printf '%s\n' "codex" ;;
     gemini) printf '%s\n' "gemini" ;;
     copilot) printf '%s\n' "copilot" ;;
+    smoke-ai) printf '%s\n' "${REFINE_SMOKE_AI_PATH:-smoke-ai}" ;;
     *) printf '%s\n' "$1" ;;
   esac
 }
@@ -836,10 +837,17 @@ ensure_provider_cli() {
       install_cmd="curl -fsSL https://gh.io/copilot-install | bash"
       login_cmd="copilot login"
       ;;
+    smoke-ai)
+      binary="$(provider_binary "$provider")"
+      install_cmd="set REFINE_SMOKE_AI_PATH to the smoke-ai executable path"
+      login_cmd="REFINE_SMOKE_AI_PATH=/path/to/smoke-ai"
+      ;;
   esac
 
   if have "$binary"; then
     ok "$binary found: $(command -v "$binary")"
+  elif [ "$provider" = "smoke-ai" ]; then
+    warn "smoke-ai is not configured"
   else
     warn "$binary is not installed"
     if [ "$provider" = "copilot" ]; then
@@ -856,6 +864,10 @@ ensure_provider_cli() {
 
   if have "$binary"; then
     ok "$binary ready"
+    if [ "$provider" = "smoke-ai" ]; then
+      info "Smoke AI is configured from REFINE_SMOKE_AI_PATH"
+      return 0
+    fi
     if confirm "Run provider login/check now: $login_cmd" "n"; then
       run_shell "$login_cmd" || warn_issue \
         "$provider login/check" \
@@ -1404,12 +1416,12 @@ provider_flow() {
   if [ -n "$REFINE_INSTALL_PROVIDER" ]; then
     SELECTED_PROVIDER="$(printf '%s' "$REFINE_INSTALL_PROVIDER" | tr '[:upper:]' '[:lower:]')"
     case "$SELECTED_PROVIDER" in
-      claude|codex|gemini|copilot) ;;
-      *) die "REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot" ;;
+      claude|codex|gemini|copilot|smoke-ai) ;;
+      *) die "REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot smoke-ai" ;;
     esac
     info "Using provider from REFINE_INSTALL_PROVIDER: $SELECTED_PROVIDER"
   else
-    SELECTED_PROVIDER="$(choice "Provider" "$(first_provider_or_default "$installed_providers")" claude codex gemini copilot)"
+    SELECTED_PROVIDER="$(choice "Provider" "$(first_provider_or_default "$installed_providers")" claude codex gemini copilot smoke-ai)"
   fi
   ensure_provider_cli "$SELECTED_PROVIDER" || true
 }

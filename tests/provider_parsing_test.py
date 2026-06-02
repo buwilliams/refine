@@ -25,7 +25,7 @@ def main() -> int:
     assert agent_cli.get_spec(None).name == "claude"
     assert agent_cli.get_spec("unknown").name == "claude"
     assert [s.name for s in agent_cli.all_specs()] == [
-        "claude", "codex", "gemini", "copilot",
+        "claude", "codex", "gemini", "copilot", "smoke-ai",
     ]
 
     codex = agent_cli.get_spec("codex")
@@ -88,6 +88,19 @@ def main() -> int:
     )
     assert "--resume=077b8993" in copilot_chat
     assert copilot_chat[-2:] == ["-p", "continue"]
+
+    smoke_ai = agent_cli.get_spec("smoke-ai")
+    assert smoke_ai.display_name == "Smoke AI (deterministic testing)"
+    assert smoke_ai.agent_args("/tmp/smoke-ai", "fix it", cwd=cwd) == [
+        "/tmp/smoke-ai", "fix it",
+    ]
+    assert smoke_ai.chat_args("/tmp/smoke-ai", "continue", session_id="abc", cwd=cwd) == [
+        "/tmp/smoke-ai", "continue",
+    ]
+    assert agent_cli.resolve_binary(
+        smoke_ai,
+        {"REFINE_SMOKE_AI_PATH": "/opt/refine/smoke-ai", "PATH": ""},
+    ) == "/opt/refine/smoke-ai"
 
     assert preflight._is_hello_response("hello\n")
     assert preflight._is_hello_response('"hello"')

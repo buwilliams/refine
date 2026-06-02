@@ -560,8 +560,8 @@ def main() -> int:
         assert code == 0, output
         assert "Refine checkout path" in output
         assert "Installed provider CLIs: codex" in output
-        assert "Missing provider CLIs: claude gemini copilot" in output
-        assert "Provider (claude codex gemini copilot) [codex]" in output
+        assert "Missing provider CLIs: claude gemini copilot smoke-ai" in output
+        assert "Provider (claude codex gemini copilot smoke-ai) [codex]" in output
         assert "Target app path or Git remote" not in output
         assert "No target app attached" in output
         assert "Target app:       not attached yet" in output

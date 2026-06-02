@@ -265,7 +265,7 @@ DEFAULT_SETTINGS = {
     "paused": "0",
     # Which agent CLI refine drives for Gap runs, conflict resolution,
     # chat, import extraction, target-app actions, and pre-flight.
-    # One of: claude | codex | gemini | copilot.
+    # One of: claude | codex | gemini | copilot | smoke-ai.
     "agent_cli": "claude",
     # Subdirectory of the client repo (and per-Gap worktree) used as the cwd
     # for agent + chat subprocesses. Lets a monorepo host agent

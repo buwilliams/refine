@@ -2,9 +2,9 @@
 
 Refine drives an AI coding agent CLI on the host. Originally that was
 Claude Code only; this module lets the operator pick between
-`claude`, `codex` (OpenAI Codex CLI), `gemini` (Google Gemini CLI), and
-`copilot` (GitHub Copilot CLI) via the `agent_cli` setting. Default is
-`claude`.
+`claude`, `codex` (OpenAI Codex CLI), `gemini` (Google Gemini CLI),
+`copilot` (GitHub Copilot CLI), and `smoke-ai` (deterministic testing) via
+the `agent_cli` setting. Default is `claude`.
 
 The abstraction covers provider-specific subprocess construction for:
 
@@ -27,7 +27,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-CLI_NAMES = ("claude", "codex", "gemini", "copilot")
+CLI_NAMES = ("claude", "codex", "gemini", "copilot", "smoke-ai")
 DEFAULT_CLI = "claude"
 
 
@@ -36,6 +36,7 @@ class CliSpec:
     name: str            # canonical setting value: one of CLI_NAMES
     display_name: str    # human-facing label for the Settings dropdown
     binary: str          # name to look up on PATH
+    binary_env: str | None = None  # optional env var containing executable path
 
     # Output format parser known by refine:
     #   claude_json = Claude Code stream-json
@@ -241,11 +242,31 @@ class _CopilotSpec(CliSpec):
         ]
 
 
+class _SmokeAISpec(CliSpec):
+    def __init__(self) -> None:
+        super().__init__(
+            name="smoke-ai",
+            display_name="Smoke AI (deterministic testing)",
+            binary="smoke-ai",
+            binary_env="REFINE_SMOKE_AI_PATH",
+        )
+
+    def agent_args(self, binary_path: str, prompt: str, *,
+                   cwd: Path | None = None) -> list[str]:
+        return [binary_path, prompt]
+
+    def chat_args(self, binary_path: str, prompt: str, *,
+                  session_id: str | None = None,
+                  cwd: Path | None = None) -> list[str]:
+        return self.agent_args(binary_path, prompt, cwd=cwd)
+
+
 _SPECS: dict[str, CliSpec] = {
     "claude": _ClaudeSpec(),
     "codex":  _CodexSpec(),
     "gemini": _GeminiSpec(),
     "copilot": _CopilotSpec(),
+    "smoke-ai": _SmokeAISpec(),
 }
 
 
@@ -266,6 +287,10 @@ def resolve_binary(spec: CliSpec, env: dict[str, str]) -> str:
     interactive-login PATH, captured once in chat_mgr). Falls back to
     the bare name so the resulting subprocess.Popen produces a
     `FileNotFoundError` with a useful message."""
+    if spec.binary_env:
+        configured = (env.get(spec.binary_env) or "").strip()
+        if configured:
+            return configured
     return shutil.which(spec.binary, path=env.get("PATH")) or spec.binary
 
 

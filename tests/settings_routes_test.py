@@ -228,7 +228,10 @@ def main() -> int:
     assert "project_update_pulse_interval_seconds" in api_py
     assert "file_browser_ignore_patterns" in api_py
     assert '${cliOption("copilot", "GitHub Copilot")}' in settings_js
+    assert '${cliOption("smoke-ai", "Smoke AI (deterministic testing)")}' in settings_js
+    assert "REFINE_SMOKE_AI_PATH" in settings_js
     assert '"copilot": "copilot login"' in api_py
+    assert '"smoke-ai": "REFINE_SMOKE_AI_PATH"' in api_py
     assert 'id="runtime-upgrade-banner"' in settings_js
     assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index('renderSettingsGuideLabel("Process management", "process-management")')
     assert 'api("GET", "/api/upgrade")' in settings_js
