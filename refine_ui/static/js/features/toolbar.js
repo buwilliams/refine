@@ -436,6 +436,7 @@ function drawToolbar() {
   if (!filesActive) {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
     $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
+    $("#btn-gap-round-extract")?.addEventListener("click", extractRoundFromGapChat);
     $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
     $("#btn-chat-progress-toggle")?.addEventListener("click", toggleChatProgress);
     $("#chat-input")?.addEventListener("keydown", (e) => {
@@ -466,6 +467,11 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           <button id="btn-plan-draft" class="secondary"
                   ${planHasAgentResponse(active) ? "" : "disabled"}>
             Draft Gaps
+          </button>` : ""}
+        ${active.gapId ? `
+          <button id="btn-gap-round-extract" class="secondary"
+                  ${gapChatCanExtractRound(active) ? "" : "disabled"}>
+            Extract Round
           </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
                 ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>
@@ -1326,13 +1332,24 @@ function applyPendingIndicator(tab) {
   const input = $("#chat-input");
   if (ind) ind.hidden = !tab || !tab.pending;
   if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
+  syncChatActionButtons(tab);
+}
+
+function syncChatActionButtons(tab) {
   syncPlanDraftButton(tab);
+  syncGapRoundExtractButton(tab);
 }
 
 function syncPlanDraftButton(tab) {
   const btn = $("#btn-plan-draft");
   if (!btn || !tab || tab.mode !== "plan") return;
   btn.disabled = !planHasAgentResponse(tab);
+}
+
+function syncGapRoundExtractButton(tab) {
+  const btn = $("#btn-gap-round-extract");
+  if (!btn || !tab || !tab.gapId) return;
+  btn.disabled = !gapChatCanExtractRound(tab);
 }
 
 function restartPollForActiveTab() {
@@ -1466,6 +1483,18 @@ function planHasAgentResponse(tab) {
     });
 }
 
+function gapChatCanExtractRound(tab) {
+  return !!(tab && tab.gapId && !tab.pending && gapChatTranscriptText(tab));
+}
+
+function gapChatTranscriptText(tab) {
+  const lines = String(tab?.output || "")
+    .split(/\r?\n/)
+    .filter((line) => !line.startsWith("[refine]"));
+  if (!chatLinesIncludeAgentResponse(lines)) return "";
+  return lines.join("\n").trim();
+}
+
 async function draftGapsFromPlan() {
   const t = chatState.tabs.plan;
   if (!t) return;
@@ -1479,6 +1508,144 @@ async function draftGapsFromPlan() {
     return;
   }
   openPlanDraftModalFromText(transcript);
+}
+
+async function extractRoundFromGapChat() {
+  const tab = chatState.tabs[chatState.activeTabId];
+  if (!tab || !tab.gapId) return;
+  const transcript = gapChatTranscriptText(tab);
+  if (!transcript) {
+    toast("Wait for the agent to respond before extracting a round.", "error");
+    return;
+  }
+  if (typeof extractImportDrafts !== "function") {
+    toast("Round extraction is unavailable.", "error");
+    return;
+  }
+  openGapRoundExtractModal(tab.gapId, transcript);
+}
+
+function openGapRoundExtractModal(gapId, transcript) {
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal import-modal" role="dialog" aria-modal="true"
+         aria-labelledby="gap-round-extract-title">
+      <div class="modal-title" id="gap-round-extract-title">Extract round</div>
+      <div class="modal-body" style="max-height:72vh;overflow:auto">
+        <div class="muted small" style="margin-bottom:8px">
+          Review the extracted round before adding it to this Gap.
+        </div>
+        <div id="gap-round-extract-body"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel>Cancel</button>
+        <button id="btn-add-extracted-round" disabled>Add round</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(root);
+  let closed = false;
+  const abort = new AbortController();
+  function close() {
+    if (closed) return;
+    closed = true;
+    abort.abort();
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    }
+  }
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close();
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", close);
+  const bodyRoot = root.querySelector("#gap-round-extract-body");
+  const addButton = root.querySelector("#btn-add-extracted-round");
+  loadExtractedRoundDraft({
+    gapId,
+    transcript,
+    root,
+    bodyRoot,
+    addButton,
+    close,
+    signal: abort.signal,
+  }).catch(async (e) => {
+    if (e.name === "AbortError") return;
+    if (bodyRoot) {
+      bodyRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message || "Round extraction failed")}</p>`;
+    }
+  });
+}
+
+async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addButton, close, signal }) {
+  const drafts = await extractImportDrafts(transcript, bodyRoot, signal);
+  if (signal.aborted) return;
+  const draft = (drafts || []).find((item) => {
+    return String(item?.actual || item?.target || "").trim();
+  });
+  if (!draft) {
+    bodyRoot.innerHTML = `<p class="muted">No round draft extracted.</p>`;
+    return;
+  }
+  const reporter = draft.reporter || state.lastReporter || "Refine";
+  bodyRoot.innerHTML = `
+    ${(drafts || []).length > 1
+      ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
+      : ""}
+    <form id="gap-round-extract-form" class="round-form">
+      <div class="form-row">
+        <label>Reporter</label>
+        <input name="reporter" value="${htmlEscape(reporter)}">
+      </div>
+      <div class="form-row">
+        <label>Actual (current behavior)</label>
+        <textarea name="actual">${htmlEscape(draft.actual || "")}</textarea>
+      </div>
+      <div class="form-row">
+        <label>Target (desired behavior)</label>
+        <textarea name="target">${htmlEscape(draft.target || "")}</textarea>
+      </div>
+    </form>
+  `;
+  addButton.disabled = false;
+  addButton.addEventListener("click", async () => {
+    const form = root.querySelector("#gap-round-extract-form");
+    if (!form) return;
+    const fd = new FormData(form);
+    const nextReporter = String(fd.get("reporter") || "").trim();
+    const actual = String(fd.get("actual") || "").trim();
+    const target = String(fd.get("target") || "").trim();
+    if (!nextReporter) return toast("Reporter is required", "error");
+    if (!actual && !target) return toast("Provide actual or target", "error");
+    await withButtonBusy(addButton, "Adding…", async () => {
+      try {
+        await api("POST", `/api/gaps/${gapId}/rounds`, {
+          reporter: nextReporter,
+          actual,
+          target,
+        });
+        const tab = chatState.tabs[gapId];
+        if (tab) {
+          tab.output = `${tab.output || ""}\n[refine] Extracted this chat into a new Gap round.\n`;
+          saveChatStateToStorage();
+          drawChat();
+        }
+        toast("New round submitted", "info");
+        close();
+        if (state.currentGap === gapId && typeof loadGapDetail === "function") {
+          await loadGapDetail(gapId);
+        }
+      } catch (err) {
+        await showActionError(err, "Could not add extracted round");
+      }
+    });
+  });
 }
 
 async function pollChat() {
@@ -1525,7 +1692,7 @@ async function pollChat() {
     const wasPending = !!t.pending;
     t.pending = !!r.in_flight;
     if (wasPending !== t.pending) applyPendingIndicator(t);
-    syncPlanDraftButton(t);
+    syncChatActionButtons(t);
     if (wasPending !== t.pending) refreshProcessesTabForChatChange();
     if (r.alive === false) {
       t.closedReason = r.closed_reason || "session ended";

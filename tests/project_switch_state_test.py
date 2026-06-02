@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sqlite3
 import sys
 import tempfile
@@ -28,6 +29,10 @@ def _restore_optional(path: Path, data: bytes | None) -> None:
             pass
         return
     path.write_bytes(data)
+
+
+def _remove_run_port(root: Path, port: int | str) -> None:
+    shutil.rmtree(root / "run" / str(port), ignore_errors=True)
 
 
 def test_client_switch_path(root: Path) -> None:
@@ -481,6 +486,7 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
             os.environ.pop("REFINE_UI_SCOPE", None)
         else:
             os.environ["REFINE_UI_SCOPE"] = old_scope
+        _remove_run_port(root, 18181)
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
@@ -738,6 +744,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
             os.environ.pop("REFINE_UI_SCOPE", None)
         else:
             os.environ["REFINE_UI_SCOPE"] = old_scope
+        _remove_run_port(root, 18182)
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 

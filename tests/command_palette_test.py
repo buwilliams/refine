@@ -232,6 +232,12 @@ def main() -> int:
     assert "/api/files/read?path=${encodeURIComponent(path)}&offset=0&limit=${FILE_TEXT_CHUNK_BYTES}" in toolbar_js
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
+    assert "btn-gap-round-extract" in toolbar_js
+    assert "Extract Round" in toolbar_js
+    assert "async function extractRoundFromGapChat()" in toolbar_js
+    assert "function openGapRoundExtractModal(gapId, transcript)" in toolbar_js
+    assert "extractImportDrafts(transcript, bodyRoot, signal)" in toolbar_js
+    assert 'api("POST", `/api/gaps/${gapId}/rounds`, {' in toolbar_js
     assert "function renderChatProgress(text)" in toolbar_js
     assert "function toggleChatProgress()" in toolbar_js
     assert "r.progress_lines && r.progress_lines.length" in toolbar_js

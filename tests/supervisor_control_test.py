@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -140,6 +141,7 @@ def main() -> int:
             os.environ.pop(config.ENV_CONFIG_PATH, None)
         else:
             os.environ[config.ENV_CONFIG_PATH] = old_config
+        shutil.rmtree(Path(__file__).resolve().parents[1] / "run" / "19876", ignore_errors=True)
         cleanup_tmp(tmp)
     root = Path(__file__).resolve().parents[1]
     runtime_source = (root / "refine_ui" / "runtime.py").read_text(encoding="utf-8")

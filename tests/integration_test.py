@@ -155,6 +155,7 @@ def main() -> int:
     finally:
         runtime.stop_all()
         time.sleep(0.2)
+        shutil.rmtree(Path(__file__).resolve().parents[1] / "run" / "18099", ignore_errors=True)
         os.chdir(tempfile.gettempdir())
         shutil.rmtree(tmp, ignore_errors=True)
 
