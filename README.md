@@ -1,4 +1,4 @@
-# Refine – Agentic Software Delivery
+# Refine – Your Team's Agentic Software Delivery System
 
 <img src="refine_ui/static/images/refine_logo_transparent.png" alt="refine" style="width: 100%; height: auto;">
 
