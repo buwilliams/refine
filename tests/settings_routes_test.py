@@ -241,19 +241,26 @@ def main() -> int:
     assert '"copilot": "copilot login"' in dashboard_ops_py
     assert '"smoke-ai": "REFINE_SMOKE_AI_PATH"' in dashboard_ops_py
     assert 'id="runtime-upgrade-banner"' in settings_js
-    assert settings_tab_files["settings_processes"].index('id="runtime-upgrade-banner"') < settings_tab_files["settings_processes"].index('renderSettingsGuideLabel("Process management", "process-management")')
+    assert 'class="settings-release-status" aria-live="polite"' in settings_core_js
+    assert 'id="runtime-upgrade-banner"' not in settings_tab_files["settings_processes"]
+    assert "bindRuntimeUpgradeBanner();" in settings_core_js
+    assert "refreshRuntimeUpgradeBanner();" in settings_core_js
     assert 'api("GET", "/api/upgrade")' in settings_js
     assert "function renderRuntimeUpgradeBanner" in settings_js
-    assert "Refine is up to date" in settings_js
-    assert "Running latest published release" in settings_js
-    assert "Local development checkout" in settings_js
-    assert "Version status unavailable" in settings_js
+    assert "Upgrade available ${htmlEscape(latest || current)}" in settings_js
+    assert "Running latest ${htmlEscape(current)}" in settings_js
+    assert "Running latest ${htmlEscape(latest)}" in settings_js
+    assert "Local development checkout" not in settings_js
+    assert "Version status unavailable" not in settings_js
+    assert 'const command = "./r update";' in settings_js
     assert "data-runtime-copy-upgrade" in settings_js
     assert "function copyRuntimeUpgradeCommand" in settings_js
     assert "navigator.clipboard.writeText" in settings_js
+    assert ".settings-tabs-row" in common_css
+    assert ".settings-release-status" in common_css
     assert ".runtime-version-status" in common_css
     assert ".runtime-version-status-upgrade" in common_css
-    assert ".runtime-upgrade-command" in common_css
+    assert ".runtime-upgrade-command" not in common_css
     assert ".runtime-copy-upgrade-command" in common_css
     assert '@route("GET", r"/api/upgrade")' in server_py
     assert "def upgrade_status" in api_py

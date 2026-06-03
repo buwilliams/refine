@@ -505,7 +505,7 @@ def main() -> int:
         current_version = "1.0.0"
         latest_version = "1.2.0"
         upgrade_available = True
-        command = "curl install.sh | bash -s -- --yes"
+        command = "./r update"
 
     old_upgrade_status = cli.upgrade.status
     try:
@@ -518,9 +518,7 @@ def main() -> int:
     upgrade_notice = stdout.getvalue()
     assert "Upgrade available" in upgrade_notice
     assert "Refine 1.2.0 is available (current 1.0.0)." in upgrade_notice
-    assert "curl install.sh | bash -s -- --yes" in upgrade_notice
-    assert "--yes" in upgrade_notice
-    assert "--upgrade" not in upgrade_notice
+    assert "./r update" in upgrade_notice
 
     cli_source = Path(cli.__file__).read_text(encoding="utf-8")
 

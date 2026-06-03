@@ -141,65 +141,36 @@ function renderRuntimeUpgradeBanner(upgrade) {
   const current = upgrade.current_version || "unknown";
   const latest = upgrade.latest_version || "";
   if (upgrade.upgrade_available) {
-    const command = upgrade.command || "";
+    const command = "./r update";
     return `
       <div class="runtime-version-status runtime-version-status-upgrade">
-        <h3>Upgrade available</h3>
-        <p class="muted small" style="margin-top:0">
-          Refine ${htmlEscape(latest)} is available.
-          Current version: ${htmlEscape(current)}.
-        </p>
-        <div class="runtime-upgrade-command muted small">
-          <code>${htmlEscape(command)}</code>
-          <button
-            class="secondary runtime-copy-upgrade-command"
-            type="button"
-            title="Copy upgrade command"
-            aria-label="Copy upgrade command"
-            data-runtime-copy-upgrade="${htmlEscape(command)}">
-            <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-              <rect x="9" y="9" width="10" height="10" rx="2"></rect>
-              <path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
-            </svg>
-          </button>
-        </div>
+        <span>Upgrade available ${htmlEscape(latest || current)}</span>
+        <button
+          class="secondary runtime-copy-upgrade-command"
+          type="button"
+          title="Copy ./r update"
+          aria-label="Copy ./r update"
+          data-runtime-copy-upgrade="${htmlEscape(command)}">
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+            <path d="M5 15V7a2 2 0 0 1 2-2h8"></path>
+          </svg>
+        </button>
       </div>`;
   }
   if (upgrade.local_development) {
-    return `
+    return latest ? `
       <div class="runtime-version-status">
-        <h3>Local development checkout</h3>
-        <p class="muted small" style="margin:0">
-          This checkout is ahead of release ${htmlEscape(current)}.
-          ${latest ? `Latest published release: ${htmlEscape(latest)}.` : ""}
-        </p>
-      </div>`;
+        <span>Running latest ${htmlEscape(latest)}</span>
+      </div>` : "";
   }
   if (current && latest && current === latest) {
     return `
       <div class="runtime-version-status">
-        <h3>Refine is up to date</h3>
-        <p class="muted small" style="margin:0">
-          Running latest published release: ${htmlEscape(current)}.
-        </p>
+        <span>Running latest ${htmlEscape(current)}</span>
       </div>`;
   }
-  if (upgrade.error) {
-    return `
-      <div class="runtime-version-status runtime-version-status-unknown">
-        <h3>Version status unavailable</h3>
-        <p class="muted small" style="margin:0">
-          ${htmlEscape(upgrade.error)}
-        </p>
-      </div>`;
-  }
-  return `
-    <div class="runtime-version-status runtime-version-status-unknown">
-      <h3>Version status unavailable</h3>
-      <p class="muted small" style="margin:0">
-        Refine could not determine the latest published release.
-      </p>
-    </div>`;
+  return "";
 }
 
 function fallbackCopyText(text) {
@@ -284,7 +255,7 @@ function bindNodeRuntimeConfigControls() {
   return autosaveRuntime;
 }
 
-function bindRuntimeUpgradeBanner(rootSelector = '[data-tab-pane="processes"]') {
+function bindRuntimeUpgradeBanner(rootSelector = ".settings-tabs-row") {
   const root = document.querySelector(rootSelector);
   root?.addEventListener("click", (e) => {
     const button = e.target.closest("[data-runtime-copy-upgrade]");

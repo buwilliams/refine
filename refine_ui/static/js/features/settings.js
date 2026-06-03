@@ -641,13 +641,19 @@ function setSettingsTab(slug) {
 
 
 function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute()) {
+  const releaseStatus = surface === SETTINGS_SURFACES.settings
+    ? '<div id="runtime-upgrade-banner" class="settings-release-status" aria-live="polite"></div>'
+    : "";
   return `
-    <nav class="settings-tabs" id="settings-tabs">
-      ${surface.tabs.map((t) => `
-        <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
-           href="${surface.basePath}/${t.slug}"
-           data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
-    </nav>`;
+    <div class="settings-tabs-row">
+      <nav class="settings-tabs" id="settings-tabs">
+        ${surface.tabs.map((t) => `
+          <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
+             href="${surface.basePath}/${t.slug}"
+             data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
+      </nav>
+      ${releaseStatus}
+    </div>`;
 }
 
 function renderSettingsPane(slug, body, activeSlug) {
@@ -664,6 +670,8 @@ function bindSettingsTabHandlers() {
       setSettingsTab(btn.dataset.tabTarget);
     });
   });
+  bindRuntimeUpgradeBanner();
+  refreshRuntimeUpgradeBanner();
 }
 
 function renderSqliteCacheSection(error = null) {

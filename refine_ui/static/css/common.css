@@ -41,11 +41,18 @@
 
 /* System screen tab strip. Mirrors the Toolbar dock tabs so Settings
    sections read as tabs instead of plain text links. */
+.settings-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
 .settings-tabs {
   display: flex;
   gap: 2px;
   padding: 3px;
-  margin-bottom: 14px;
   flex-wrap: wrap;
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
@@ -773,42 +780,41 @@ select {
   border-radius: 6px;
 }
 .runtime-version-status {
-  margin-bottom: 14px;
-  padding: 10px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.settings-release-status {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
 }
 .runtime-version-status-upgrade {
   border: 1px solid var(--warn);
   background: var(--warn-bg);
+  color: var(--color-text);
 }
 .runtime-version-status-unknown {
   background: var(--bg);
 }
-.runtime-version-status h3 {
-  margin-top: 0;
-}
-.runtime-upgrade-command {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 0;
-  margin-bottom: 0;
-  flex-wrap: wrap;
-}
-.runtime-upgrade-command code {
-  overflow-wrap: anywhere;
-}
 .runtime-copy-upgrade-command {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   flex: 0 0 auto;
 }
 .runtime-copy-upgrade-command svg {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.8;
