@@ -189,15 +189,17 @@ def stop_runner() -> None:
     global _runner, _worker_pid
     runner = _runner
     _runner = None
+    worker_pid = _worker_pid
     if runner is not None:
         try:
             runner.shutdown()
         except Exception:
             pass
-    try:
-        _supervisor_request(M_STOP_WORKER, {}, timeout=10.0)
-    except Exception:
-        pass
+    if runner is not None or worker_pid is not None:
+        try:
+            _supervisor_request(M_STOP_WORKER, {}, timeout=10.0)
+        except Exception:
+            pass
     _worker_pid = None
 
 
@@ -209,8 +211,22 @@ def runner_call(
 ) -> dict:
     runner = ensure_runner()
     if isinstance(runner, _SocketRunnerClient):
-        return runner.call(method, params or {}, timeout=timeout)
+        try:
+            return runner.call(method, params or {}, timeout=timeout)
+        except (FileNotFoundError, ConnectionRefusedError):
+            _forget_runner_client(runner)
+            runner = ensure_runner()
+            if isinstance(runner, _SocketRunnerClient):
+                return runner.call(method, params or {}, timeout=timeout)
     return runner.call(method, params or {})
+
+
+def _forget_runner_client(runner: object) -> None:
+    global _runner, _worker_pid
+    with _runner_lock:
+        if _runner is runner:
+            _runner = None
+            _worker_pid = None
 
 
 def backend_info() -> dict:

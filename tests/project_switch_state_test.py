@@ -14,6 +14,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tests.helpers import cleanup_tmp, git, init_refine, make_client_repo, reset_refine_imports
 
 
+PROJECT_SWITCH_TEST_PORT = 19080
+PROJECT_SWITCH_TEST_ALT_PORT = 19081
+
+
 def _read_optional(path: Path) -> bytes | None:
     try:
         return path.read_bytes()
@@ -358,7 +362,7 @@ def test_blocked_switch_does_not_stop_current_app(root: Path) -> None:
         assert "migration required" in body["error"]["message"].lower()
         assert fake_runner.stopped is False
         assert fake_poller.stopped is False
-        assert project_registry.active_app(root, port=8080) == client2.resolve()
+        assert project_registry.active_app(root, port=PROJECT_SWITCH_TEST_PORT) == client2.resolve()
         assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
@@ -470,8 +474,8 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
         try:
             api._commit_refine_state = lambda _repo: None  # type: ignore[assignment]
             api._git_stdout = lambda _repo, _args: ""  # type: ignore[assignment]
-            os.environ["REFINE_UI_PORT"] = "18181"
-            os.environ["REFINE_UI_SCOPE"] = "18181"
+            os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
+            os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
 
             status, body = api.project_attach({
                 "path": str(client2),
@@ -486,7 +490,7 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
         assert status == 200, body
         assert "restart_pending" not in body
         assert body["client_repo"] == str(client2.resolve())
-        assert project_registry.active_app(root, port=18181) == client2.resolve()
+        assert project_registry.active_app(root, port=PROJECT_SWITCH_TEST_PORT) == client2.resolve()
         assert runtime._loaded_config_path == client2 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
@@ -514,7 +518,7 @@ def test_supervised_switch_hot_loads_without_restart(root: Path) -> None:
             os.environ.pop("REFINE_UI_SCOPE", None)
         else:
             os.environ["REFINE_UI_SCOPE"] = old_scope
-        _remove_run_port(root, 18181)
+        _remove_run_port(root, PROJECT_SWITCH_TEST_PORT)
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
@@ -589,7 +593,7 @@ def test_removing_active_project_hot_loads_next_app() -> None:
             str(app_three.resolve()),
         ]
         assert config.get(reload=True).client_repo == app_one.resolve()
-        assert project_registry.active_app(clone, port=8080) == app_one.resolve()
+        assert project_registry.active_app(clone, port=PROJECT_SWITCH_TEST_PORT) == app_one.resolve()
         assert runtime._loaded_config_path == app_one / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         try:
@@ -621,8 +625,8 @@ def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None
     try:
         os.chdir(clone)
         os.environ.pop("REFINE_CONFIG_PATH", None)
-        os.environ["REFINE_UI_PORT"] = "18182"
-        os.environ["REFINE_UI_SCOPE"] = "18182"
+        os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
         reset_refine_imports()
         from refine_server import project_registry
         from refine_ui import api, runtime
@@ -637,7 +641,7 @@ def test_supervised_initial_attach_hot_loads_without_restart(root: Path) -> None
         assert status == 200, body
         assert "restart_pending" not in body
         assert body["client_repo"] == str(client.resolve())
-        assert project_registry.active_app(clone, port=18182) == client.resolve()
+        assert project_registry.active_app(clone, port=PROJECT_SWITCH_TEST_PORT) == client.resolve()
         assert runtime._loaded_config_path == client / ".refine" / "refine.toml"  # type: ignore[attr-defined]
     finally:
         os.chdir(original_cwd)
@@ -673,8 +677,8 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         from refine_server import config, db, project_registry, project_state
         from refine_ui import api, runtime
 
-        os.environ["REFINE_UI_PORT"] = "18182"
-        os.environ["REFINE_UI_SCOPE"] = "18182"
+        os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
         config.write_binding(root, client1)
         config.get(reload=True)
         runtime.load_configured(
@@ -723,7 +727,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
                 "start_poller": False,
             })
             assert status == 409, body
-            assert project_registry.active_app(root, port=18182) == legacy.resolve()
+            assert project_registry.active_app(root, port=PROJECT_SWITCH_TEST_PORT) == legacy.resolve()
             assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
 
             status, body = api.project_attach({
@@ -743,7 +747,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
         migrated = json.loads((legacy / ".refine" / "config.json").read_text(encoding="utf-8"))
         assert migrated["settings"]["governance_product"] == "Legacy app"
         assert git(legacy, "status", "--porcelain").stdout.strip() == ""
-        assert project_registry.active_app(root, port=18182) == legacy.resolve()
+        assert project_registry.active_app(root, port=PROJECT_SWITCH_TEST_PORT) == legacy.resolve()
         assert runtime._loaded_config_path == legacy / ".refine" / "refine.toml"  # type: ignore[attr-defined]
         assert (client1.resolve(), ("status", "--porcelain")) in checked_repos
     finally:
@@ -772,7 +776,7 @@ def test_supervised_switch_migrates_target_before_hot_load(root: Path) -> None:
             os.environ.pop("REFINE_UI_SCOPE", None)
         else:
             os.environ["REFINE_UI_SCOPE"] = old_scope
-        _remove_run_port(root, 18182)
+        _remove_run_port(root, PROJECT_SWITCH_TEST_PORT)
         os.chdir(original_cwd)
         cleanup_tmp(tmp)
 
@@ -834,7 +838,7 @@ def test_manual_node_migration_blocks_project_switch(root: Path) -> None:
         assert status == 409, body
         assert "instance_to_node_v2" in body["error"]["message"]
         assert "refine migrate run [port]" in body["error"]["details"]
-        assert project_registry.active_app(root, port=8080) == legacy.resolve()
+        assert project_registry.active_app(root, port=PROJECT_SWITCH_TEST_PORT) == legacy.resolve()
         assert runtime._loaded_config_path == client1 / ".refine" / "refine.toml"  # type: ignore[attr-defined]
         assert project_state.schema_status(refine_root)["compatible"] is False
     finally:
@@ -1089,8 +1093,8 @@ def test_active_node_is_checkout_local_for_same_application() -> None:
         from refine_server import config, project_registry, project_state
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
-        os.environ.pop("REFINE_UI_PORT", None)
-        os.environ.pop("REFINE_UI_SCOPE", None)
+        os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
         os.environ.pop("REFINE_RUN_DIR", None)
         volume_root = client / ".refine"
         laptop = project_state.create_node("Laptop", root=volume_root)
@@ -1126,8 +1130,8 @@ def test_active_node_is_checkout_local_for_same_application() -> None:
         config.get(reload=True)
         assert project_state.active_node_id(root=volume_root) == desktop["id"]
 
-        assert (clone1 / "run" / "8080" / "active-nodes.json").is_file()
-        assert (clone2 / "run" / "8080" / "active-nodes.json").is_file()
+        assert (clone1 / "run" / str(PROJECT_SWITCH_TEST_PORT) / "active-nodes.json").is_file()
+        assert (clone2 / "run" / str(PROJECT_SWITCH_TEST_PORT) / "active-nodes.json").is_file()
         assert not (client / ".refine" / "run" / "active-node.json").exists()
     finally:
         if old_cfg_env is None:
@@ -1167,38 +1171,38 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
         clone = tmp / "refine-one"
         clone.mkdir()
         config.write_binding(clone, client)
-        project_registry.set_active_app(clone, client, port=8081)
+        project_registry.set_active_app(clone, client, port=PROJECT_SWITCH_TEST_ALT_PORT)
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
         os.environ.pop("REFINE_UI_PORT", None)
         os.environ.pop("REFINE_RUN_DIR", None)
         os.chdir(clone)
 
-        os.environ["REFINE_UI_SCOPE"] = "8080"
-        cfg8080 = config.get(reload=True)
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
+        cfg_primary = config.get(reload=True)
         project_state.set_active_node(laptop["id"])
         assert project_state.active_node_id() == laptop["id"]
-        sqlite8080 = cfg8080.sqlite_path
+        sqlite_primary = cfg_primary.sqlite_path
 
-        os.environ["REFINE_UI_SCOPE"] = "8081"
-        cfg8081 = config.get(reload=True)
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_ALT_PORT)
+        cfg_alt = config.get(reload=True)
         project_state.set_active_node(desktop["id"])
         assert project_state.active_node_id() == desktop["id"]
-        sqlite8081 = cfg8081.sqlite_path
+        sqlite_alt = cfg_alt.sqlite_path
 
-        os.environ["REFINE_UI_SCOPE"] = "8080"
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
         config.get(reload=True)
         assert project_state.active_node_id() == laptop["id"]
 
-        os.environ["REFINE_UI_SCOPE"] = "8081"
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_ALT_PORT)
         config.get(reload=True)
         assert project_state.active_node_id() == desktop["id"]
 
-        assert sqlite8080 != sqlite8081
-        assert sqlite8080.parent == clone / "run" / "8080" / "cache"
-        assert sqlite8081.parent == clone / "run" / "8081" / "cache"
-        assert cfg8080.web_port == 8080
-        assert cfg8081.web_port == 8081
+        assert sqlite_primary != sqlite_alt
+        assert sqlite_primary.parent == clone / "run" / str(PROJECT_SWITCH_TEST_PORT) / "cache"
+        assert sqlite_alt.parent == clone / "run" / str(PROJECT_SWITCH_TEST_ALT_PORT) / "cache"
+        assert cfg_primary.web_port == PROJECT_SWITCH_TEST_PORT
+        assert cfg_alt.web_port == PROJECT_SWITCH_TEST_ALT_PORT
     finally:
         if old_scope is None:
             os.environ.pop("REFINE_UI_SCOPE", None)
@@ -1274,18 +1278,18 @@ def test_config_web_port_follows_env_ui_port() -> None:
 
         clone = tmp / "refine-one"
         clone.mkdir()
-        project_registry.set_active_app(clone, client, port=18183)
+        project_registry.set_active_app(clone, client, port=PROJECT_SWITCH_TEST_PORT)
 
         os.environ.pop("REFINE_CONFIG_PATH", None)
         os.environ.pop("REFINE_UI_SCOPE", None)
         os.environ.pop("REFINE_RUN_DIR", None)
-        os.environ["REFINE_UI_PORT"] = "18183"
+        os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
         os.chdir(clone)
 
         cfg = config.get(reload=True)
-        assert cfg.web_port == 18183
+        assert cfg.web_port == PROJECT_SWITCH_TEST_PORT
         assert cfg.client_repo == client.resolve()
-        assert cfg.sqlite_path.parent == clone / "run" / "18183" / "cache"
+        assert cfg.sqlite_path.parent == clone / "run" / str(PROJECT_SWITCH_TEST_PORT) / "cache"
     finally:
         if old_scope is None:
             os.environ.pop("REFINE_UI_SCOPE", None)
@@ -1471,22 +1475,38 @@ def test_settings_are_scoped_to_active_node_files() -> None:
 
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
-    test_client_switch_path(root)
-    test_runtime_switch_resets_services()
-    test_blocked_switch_does_not_stop_current_app(root)
-    test_supervised_switch_hot_loads_without_restart(root)
-    test_removing_active_project_hot_loads_next_app()
-    test_supervised_initial_attach_hot_loads_without_restart(root)
-    test_supervised_switch_migrates_target_before_hot_load(root)
-    test_manual_node_migration_blocks_project_switch(root)
-    test_empty_project_attach_creates_scaffold_gap(root)
-    test_active_node_is_per_application()
-    test_active_node_is_checkout_local_for_same_application()
-    test_active_node_is_port_scoped_for_same_checkout()
-    test_config_web_port_follows_env_ui_port()
-    test_process_config_path_is_not_shared_through_binding()
-    test_node_switch_refreshes_reporter_cache()
-    test_settings_are_scoped_to_active_node_files()
+    old_port = os.environ.get("REFINE_UI_PORT")
+    old_scope = os.environ.get("REFINE_UI_SCOPE")
+    try:
+        os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
+        os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
+        test_client_switch_path(root)
+        test_runtime_switch_resets_services()
+        test_blocked_switch_does_not_stop_current_app(root)
+        test_supervised_switch_hot_loads_without_restart(root)
+        test_removing_active_project_hot_loads_next_app()
+        test_supervised_initial_attach_hot_loads_without_restart(root)
+        test_supervised_switch_migrates_target_before_hot_load(root)
+        test_manual_node_migration_blocks_project_switch(root)
+        test_empty_project_attach_creates_scaffold_gap(root)
+        test_active_node_is_per_application()
+        test_active_node_is_checkout_local_for_same_application()
+        test_active_node_is_port_scoped_for_same_checkout()
+        test_config_web_port_follows_env_ui_port()
+        test_process_config_path_is_not_shared_through_binding()
+        test_node_switch_refreshes_reporter_cache()
+        test_settings_are_scoped_to_active_node_files()
+    finally:
+        if old_port is None:
+            os.environ.pop("REFINE_UI_PORT", None)
+        else:
+            os.environ["REFINE_UI_PORT"] = old_port
+        if old_scope is None:
+            os.environ.pop("REFINE_UI_SCOPE", None)
+        else:
+            os.environ["REFINE_UI_SCOPE"] = old_scope
+        _remove_run_port(root, PROJECT_SWITCH_TEST_PORT)
+        _remove_run_port(root, PROJECT_SWITCH_TEST_ALT_PORT)
     print("project switch state tests OK")
     return 0
 
