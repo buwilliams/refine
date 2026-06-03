@@ -61,7 +61,13 @@ def test_client_switch_path(root: Path) -> None:
     project_apps_py = (root / "refine_server/project_apps.py").read_text(encoding="utf-8")
 
     assert 'id="active-node-label"' in index_html
+    assert '<a class="brand" href="#/" data-route="dashboard" aria-label="Refine dashboard">' in index_html
     assert ".brand-node" in base_css
+    assert "text-decoration: none;" in base_css
+    assert 'class="brand-logo" src="/static/images/refine_logo_transparent.png" alt="refine"' in index_html
+    assert "width: 82px;" in base_css
+    assert "height: 25px;" in base_css
+    assert "object-fit: contain;" in base_css
     assert "function updateActiveNodeLabel()" in common_js
     assert "updateActiveNodeLabel()" in common_js
 
