@@ -911,6 +911,9 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
         assert attached["scaffold_required"] is True
         assert {t["id"] for t in attached["scaffold_templates"]} == template_ids
         assert attached["client_repo"] == str(cloned.resolve())
+        assert attached["schema"]["compatible"] is True
+        assert (cloned / ".refine" / "config.json").is_file()
+        assert (cloned / ".refine" / "nodes" / "default" / "application.json").is_file()
         assert (cloned / ".git").exists()
 
         status, preview = api.project_setup_path(

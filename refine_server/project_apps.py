@@ -306,14 +306,18 @@ def attach_project(
             prepare_clone=prepare_clone,
             install_ui_unit=install_ui_unit,
         )
+        effective_migrate = _should_auto_migrate_attached_project(
+            body,
+            Path(str(result["volume_root"])),
+        )
         cfg = load_configured(
             Path(str(result["config_path"])),
             body.get("start_poller") is not False,
             body.get("start_runner") is not False,
-            bool(body.get("migrate")),
+            effective_migrate,
             port,
         )
-        if body.get("migrate"):
+        if effective_migrate:
             commit_refine_state(cfg.client_repo)
     except (config.ConfigError, InitError, OSError, TimeoutError) as e:
         return _err(400, str(e))
@@ -344,6 +348,17 @@ def attach_project(
         "scaffold_templates": list_project_templates()["templates"],
         "runner": runner,
     }
+
+
+def _should_auto_migrate_attached_project(body: dict[str, Any], volume_root: Path) -> bool:
+    if body.get("migrate"):
+        return True
+    schema = project_state.schema_status(volume_root)
+    return bool(
+        schema.get("migration_required")
+        and schema.get("safe_auto") is True
+        and project_state.empty_refine_state(volume_root)
+    )
 
 
 def validate_target_schema_before_switch(client_repo: Path, body: dict[str, Any]) -> None:
