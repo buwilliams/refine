@@ -176,6 +176,7 @@ def main() -> int:
         shutil.rmtree(Path(__file__).resolve().parents[1] / "run" / "19876", ignore_errors=True)
         cleanup_tmp(tmp)
     exercise_ipc_server_does_not_unlink_replacement_socket()
+    exercise_ipc_server_rebinds_deleted_socket()
     root = Path(__file__).resolve().parents[1]
     runtime_source = (root / "refine_ui" / "runtime.py").read_text(encoding="utf-8")
     api_source = (root / "refine_ui" / "api.py").read_text(encoding="utf-8")
@@ -215,6 +216,32 @@ def exercise_ipc_server_does_not_unlink_replacement_socket() -> None:
             second.stop()
     finally:
         first.stop()
+        shutil.rmtree(path.parent, ignore_errors=True)
+
+
+def exercise_ipc_server_rebinds_deleted_socket() -> None:
+    from refine_runtime import ipc
+
+    path = Path(__file__).resolve().parents[1] / "run" / "19878" / "s.sock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    def dispatcher(method, _params):  # noqa: ANN001, ANN202
+        return {"method": method}
+
+    server = ipc.IpcServer(path, dispatcher)
+    server.start()
+    try:
+        assert ipc.request(path, "first") == {"method": "first"}
+        path.unlink()
+        try:
+            ipc.request(path, "missing", timeout=0.1)
+            raise AssertionError("request should fail while socket pathname is missing")
+        except OSError:
+            pass
+        assert server.ensure_available() is True
+        assert ipc.request(path, "second") == {"method": "second"}
+    finally:
+        server.stop()
         shutil.rmtree(path.parent, ignore_errors=True)
 
 

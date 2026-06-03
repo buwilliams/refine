@@ -90,6 +90,7 @@ class Supervisor:
     def run(self) -> int:
         try:
             while not self._stopping.is_set():
+                self._repair_runtime_namespace()
                 with self._lock:
                     ui = self.ui
                 if ui is not None and ui.poll() is not None:
@@ -99,6 +100,38 @@ class Supervisor:
         finally:
             self.shutdown()
         return 0
+
+    def _repair_runtime_namespace(self) -> None:
+        if not self._server.ensure_available():
+            sys.stderr.write(
+                "[refine-supervisor] supervisor IPC socket missing or replaced; "
+                "could not restore it\n"
+            )
+        try:
+            self._write_pid_file_if_missing()
+        except OSError as e:
+            sys.stderr.write(f"[refine-supervisor] could not restore pid file: {e}\n")
+
+        restart_cfg: str | None = None
+        with self._lock:
+            if (
+                self.worker is not None
+                and self.worker.poll() is None
+                and self.worker_socket is not None
+                and not self.worker_socket.exists()
+            ):
+                restart_cfg = self.cfg_path
+                self._stop_worker_locked()
+                self.worker_socket = None
+        if restart_cfg:
+            sys.stderr.write(
+                "[refine-supervisor] worker IPC socket disappeared; "
+                "restarting worker\n"
+            )
+            try:
+                self._h_ensure_worker({"config_path": restart_cfg})
+            except Exception as e:  # noqa: BLE001 - keep supervisor alive.
+                sys.stderr.write(f"[refine-supervisor] worker restart failed: {e}\n")
 
     def dispatch(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         handlers = {
@@ -208,6 +241,15 @@ class Supervisor:
     def _write_pid_file(self) -> None:
         self.pid_path.parent.mkdir(parents=True, exist_ok=True)
         self.pid_path.write_text(f"{os.getpid()}\n", encoding="utf-8")
+
+    def _write_pid_file_if_missing(self) -> None:
+        try:
+            raw = self.pid_path.read_text(encoding="utf-8").strip()
+            if raw:
+                return
+        except FileNotFoundError:
+            pass
+        self._write_pid_file()
 
     def _unlink_pid_file(self) -> None:
         try:

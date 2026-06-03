@@ -223,6 +223,33 @@ class IpcServer:
         )
         self._thread.start()
 
+    def path_current(self) -> bool:
+        if self._server is None or self._socket_stat is None:
+            return False
+        try:
+            current = self.path.stat()
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
+        return (
+            current.st_ino == self._socket_stat.st_ino
+            and current.st_dev == self._socket_stat.st_dev
+        )
+
+    def ensure_available(self) -> bool:
+        """Rebind when our Unix-socket pathname was removed externally."""
+        if self._server is None:
+            return False
+        if self.path_current():
+            return True
+        if self.path.exists():
+            # Another process replaced the pathname. Do not unlink it here.
+            return False
+        self.stop()
+        self.start()
+        return self.path_current()
+
     def stop(self) -> None:
         server = self._server
         if server is not None:
