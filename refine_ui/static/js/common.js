@@ -294,6 +294,154 @@ function recordUiError(message, details = {}) {
 
 // ---- Project attach/setup ---------------------------------------------------
 
+function looksLikeGitRemoteInput(value) {
+  const text = String(value || "").trim();
+  if (text.startsWith("git@") || text.startsWith("ssh://") || text.startsWith("git://")) return true;
+  if (text.startsWith("file://")) return true;
+  try {
+    const parsed = new URL(text);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch (_) {
+    return false;
+  }
+}
+
+function projectSetupFolderIcon() {
+  return `
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path d="M3 6.5A2.5 2.5 0 0 1 5.5 4h4.2l2 2H18.5A2.5 2.5 0 0 1 21 8.5v8A2.5 2.5 0 0 1 18.5 19h-13A2.5 2.5 0 0 1 3 16.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+    </svg>`;
+}
+
+async function resolveProjectSetupPath(path, { kind = "app", remote = "" } = {}) {
+  const query = new URLSearchParams({ kind, path: path || "" });
+  if (remote) query.set("remote", remote);
+  return api("GET", `/api/project/path?${query.toString()}`);
+}
+
+function updateProjectSetupPreview(el, text) {
+  if (!el) return;
+  el.textContent = text;
+  el.title = text;
+}
+
+async function openProjectDirectoryPicker({
+  title = "Choose folder",
+  value = "",
+  kind = "app",
+  remote = "",
+} = {}) {
+  return new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop project-directory-backdrop";
+    root.innerHTML = `
+      <div class="modal project-directory-modal" role="dialog" aria-modal="true" aria-labelledby="project-directory-title">
+        <div class="modal-title" id="project-directory-title">${htmlEscape(title)}</div>
+        <div class="modal-body">
+          <div class="project-directory-path-row">
+            <input id="project-directory-path" type="text" class="modal-input"
+                   autocomplete="off" value="${htmlEscape(value)}">
+            <button type="button" class="secondary project-setup-icon-btn" id="project-directory-load" title="Open path" aria-label="Open path">
+              ${projectSetupFolderIcon()}
+            </button>
+          </div>
+          <div class="project-setup-path-preview" id="project-directory-preview"></div>
+          <div class="project-directory-browser" id="project-directory-browser"></div>
+          <div class="form-error" id="project-directory-error" style="display:none"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="secondary" type="button" id="project-directory-cancel">Cancel</button>
+          <button class="secondary" type="button" id="project-directory-up">Up</button>
+          <button type="button" id="project-directory-choose">Choose folder</button>
+        </div>
+      </div>`;
+    document.body.appendChild(root);
+
+    const input = root.querySelector("#project-directory-path");
+    const preview = root.querySelector("#project-directory-preview");
+    const browser = root.querySelector("#project-directory-browser");
+    const error = root.querySelector("#project-directory-error");
+    const upButton = root.querySelector("#project-directory-up");
+    const chooseButton = root.querySelector("#project-directory-choose");
+    let currentPath = "";
+    let selectedPath = "";
+
+    const close = (result) => {
+      root.remove();
+      resolve(result);
+    };
+
+    const load = async (pathValue = input.value.trim()) => {
+      const query = new URLSearchParams({
+        kind,
+        path: pathValue || "",
+        max_entries: "200",
+      });
+      if (remote) query.set("remote", remote);
+      error.style.display = "none";
+      browser.innerHTML = `<div class="project-directory-empty">Loading...</div>`;
+      try {
+        const result = await api("GET", `/api/project/directories?${query.toString()}`);
+        currentPath = result.path || "";
+        selectedPath = result.selected_path || currentPath;
+        input.value = selectedPath;
+        updateProjectSetupPreview(preview, `Selected path: ${selectedPath}`);
+        upButton.disabled = !result.parent;
+        upButton.dataset.parent = result.parent || "";
+        const entries = Array.isArray(result.entries) ? result.entries : [];
+        if (!entries.length) {
+          browser.innerHTML = `<div class="project-directory-empty">No folders</div>`;
+          return;
+        }
+        browser.innerHTML = entries.map((entry) => `
+          <button type="button" class="project-directory-entry" data-path="${htmlEscape(entry.path)}">
+            ${projectSetupFolderIcon()}
+            <span>${htmlEscape(entry.name)}</span>
+          </button>
+        `).join("");
+        if (result.truncated) {
+          browser.insertAdjacentHTML("beforeend", `<div class="project-directory-empty">Folder list truncated</div>`);
+        }
+        browser.querySelectorAll(".project-directory-entry").forEach((btn) => {
+          btn.addEventListener("click", () => load(btn.dataset.path || ""));
+        });
+      } catch (err) {
+        browser.innerHTML = "";
+        error.textContent = err.details || err.message || "Could not open folder";
+        error.style.display = "";
+      }
+    };
+
+    root.querySelector("#project-directory-cancel").addEventListener("click", () => close(null));
+    root.querySelector("#project-directory-load").addEventListener("click", () => load());
+    upButton.addEventListener("click", () => {
+      if (upButton.dataset.parent) load(upButton.dataset.parent);
+    });
+    chooseButton.addEventListener("click", async () => {
+      const typed = input.value.trim();
+      try {
+        const resolved = await resolveProjectSetupPath(typed, { kind, remote });
+        close(resolved.path || typed || selectedPath || currentPath);
+      } catch (_) {
+        close(typed || selectedPath || currentPath);
+      }
+    });
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        load();
+      }
+    });
+    input.addEventListener("input", () => {
+      const typed = input.value.trim();
+      updateProjectSetupPreview(preview, `Selected path: ${typed || selectedPath || currentPath}`);
+    });
+    load(value);
+    input.focus();
+    input.select();
+  });
+}
+
 function isManualProjectMigration(schema) {
   return !!(schema && schema.migration_required && schema.safe_auto === false);
 }
@@ -413,10 +561,31 @@ function openProjectAttachModal({
           <div class="modal-title" id="project-setup-title">${htmlEscape(title)}</div>
           <div class="modal-body">
             <p class="muted">${htmlEscape(message)}</p>
-            <label for="project-setup-path">Project path or Git remote</label>
-            <input id="project-setup-path" name="path" type="text" class="modal-input"
-                   placeholder="/path/to/app or git@github.com:org/app.git" autocomplete="off" required
-                   value="${htmlEscape(defaultPath)}">
+            <div class="project-setup-field">
+              <label for="project-setup-path">Project path or Git remote</label>
+              <div class="project-setup-input-row">
+                <input id="project-setup-path" name="path" type="text" class="modal-input"
+                       placeholder="/path/to/app or git@github.com:org/app.git" autocomplete="off" required
+                       value="${htmlEscape(defaultPath)}">
+                <button type="button" class="secondary project-setup-icon-btn" id="project-setup-path-browse"
+                        title="Browse local folders" aria-label="Browse local folders">
+                  ${projectSetupFolderIcon()}
+                </button>
+              </div>
+              <div class="project-setup-path-preview" id="project-setup-path-preview"></div>
+            </div>
+            <div class="project-setup-field">
+              <label for="project-setup-clone-path">Local destination</label>
+              <div class="project-setup-input-row">
+                <input id="project-setup-clone-path" name="clone_path" type="text" class="modal-input"
+                       placeholder="Default: next to the Refine checkout" autocomplete="off" disabled>
+                <button type="button" class="secondary project-setup-icon-btn" id="project-setup-clone-browse"
+                        title="Browse clone destination" aria-label="Browse clone destination" disabled>
+                  ${projectSetupFolderIcon()}
+                </button>
+              </div>
+              <div class="project-setup-path-preview" id="project-setup-clone-preview"></div>
+            </div>
             <p class="muted small">
               If the directory does not exist, refine will create it and run git init.
               If you paste a Git remote, refine will clone it first; private repos
@@ -434,12 +603,84 @@ function openProjectAttachModal({
 
     const form = root.querySelector("#project-setup-form");
     const input = root.querySelector("#project-setup-path");
+    const cloneInput = root.querySelector("#project-setup-clone-path");
+    const pathPreview = root.querySelector("#project-setup-path-preview");
+    const clonePreview = root.querySelector("#project-setup-clone-preview");
+    const pathBrowse = root.querySelector("#project-setup-path-browse");
+    const cloneBrowse = root.querySelector("#project-setup-clone-browse");
     const error = root.querySelector("#project-setup-error");
     const button = root.querySelector("#project-setup-submit");
+    let previewTimer = 0;
+    const refreshPathPreviews = async () => {
+      const path = input.value.trim();
+      const remote = looksLikeGitRemoteInput(path);
+      if (!path) {
+        updateProjectSetupPreview(pathPreview, "Final path: enter a local path or Git remote");
+      } else if (remote) {
+        updateProjectSetupPreview(pathPreview, `Git remote: ${path}`);
+      } else {
+        try {
+          const resolved = await resolveProjectSetupPath(path, { kind: "app" });
+          updateProjectSetupPreview(pathPreview, `Final path: ${resolved.path}`);
+        } catch (_) {
+          updateProjectSetupPreview(pathPreview, `Final path: ${path}`);
+        }
+      }
+      if (!remote) {
+        updateProjectSetupPreview(clonePreview, "Available when project path is a Git remote.");
+        return;
+      }
+      const clonePath = cloneInput.value.trim();
+      try {
+        const resolved = await resolveProjectSetupPath(clonePath, { kind: "clone", remote: path });
+        updateProjectSetupPreview(clonePreview, `Final path: ${resolved.path}`);
+      } catch (_) {
+        updateProjectSetupPreview(clonePreview, clonePath ? `Final path: ${clonePath}` : "Final path: default clone location from remote name");
+      }
+    };
+    const schedulePathPreviews = () => {
+      clearTimeout(previewTimer);
+      previewTimer = setTimeout(refreshPathPreviews, 120);
+    };
+    const updateCloneInput = () => {
+      const remote = looksLikeGitRemoteInput(input.value);
+      cloneInput.disabled = !remote;
+      cloneBrowse.disabled = !remote;
+      if (!remote) cloneInput.value = "";
+      schedulePathPreviews();
+    };
     root.querySelector("#project-setup-cancel").addEventListener("click", () => {
+      clearTimeout(previewTimer);
       root.remove();
       resolve(null);
     });
+    input.addEventListener("input", updateCloneInput);
+    cloneInput.addEventListener("input", schedulePathPreviews);
+    pathBrowse.addEventListener("click", async () => {
+      const selected = await openProjectDirectoryPicker({
+        title: "Choose app folder",
+        value: looksLikeGitRemoteInput(input.value) ? "" : input.value.trim(),
+        kind: "app",
+      });
+      if (selected) {
+        input.value = selected;
+        updateCloneInput();
+      }
+    });
+    cloneBrowse.addEventListener("click", async () => {
+      if (cloneInput.disabled) return;
+      const selected = await openProjectDirectoryPicker({
+        title: "Choose clone destination",
+        value: cloneInput.value.trim(),
+        kind: "clone",
+        remote: input.value.trim(),
+      });
+      if (selected) {
+        cloneInput.value = selected;
+        schedulePathPreviews();
+      }
+    });
+    updateCloneInput();
     input.focus();
     input.select();
 
@@ -447,11 +688,16 @@ function openProjectAttachModal({
       e.preventDefault();
       const path = input.value.trim();
       if (!path) return;
+      const attachBody = { path };
+      if (looksLikeGitRemoteInput(path)) {
+        const clonePath = cloneInput.value.trim();
+        if (clonePath) attachBody.clone_path = clonePath;
+      }
       error.style.display = "none";
       button.disabled = true;
       button.textContent = "Attaching...";
       try {
-        const result = await api("POST", "/api/project/attach", { path });
+        const result = await api("POST", "/api/project/attach", attachBody);
         if (reloadOnSuccess) {
           if (typeof loadGuideStateForProject === "function") loadGuideStateForProject(result, { redraw: false });
           state.project = result;
@@ -481,7 +727,7 @@ function openProjectAttachModal({
               const closeMigration = showProjectMigrationDialog();
               let result;
               try {
-                result = await api("POST", "/api/project/attach", { path, migrate: true });
+                result = await api("POST", "/api/project/attach", { ...attachBody, migrate: true });
               } finally {
                 closeMigration();
               }

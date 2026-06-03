@@ -190,6 +190,14 @@ def test_runtime_local_node_is_stable_after_active_switch() -> None:
         project_state.set_active_node(other["id"])
         assert project_state.active_node_id() == other["id"]
         assert runtime.backend_info()["local_node_id"] == initial
+        runtime.stop_all()
+        os.environ.pop("REFINE_LOCAL_NODE_ID", None)
+        runtime.load_configured(
+            client / ".refine" / "refine.toml",
+            start_poller=False,
+            start_runner=False,
+        )
+        assert runtime.backend_info()["local_node_id"] == other["id"]
     finally:
         try:
             conn.close()

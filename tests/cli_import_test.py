@@ -106,10 +106,19 @@ def main() -> int:
                 "persist",
                 json.dumps(persist_body),
             ])
+            rc_long, _out_long, err_long = _run_cli([
+                *prefix,
+                "import",
+                "persist",
+                "{" + ("x" * 300),
+            ])
         finally:
             cli._backend_runner_for_cli = old_runner_for_cli
             cli._sync_cli_refine_state = old_sync
 
+        assert rc_long != 0
+        assert "invalid JSON" in err_long, err_long
+        assert "File name too long" not in err_long, err_long
         assert rc == 0, err
         payload = _json(out)
         assert payload["count"] == 1, payload

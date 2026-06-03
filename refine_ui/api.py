@@ -832,6 +832,99 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     )
 
 
+def _resolve_project_setup_path(
+    raw_path: str | None,
+    *,
+    kind: str = "app",
+    remote: str | None = None,
+) -> Path:
+    clone_dir = Path.cwd().resolve()
+    text = str(raw_path or "").strip()
+    if kind == "clone" and not text and remote and project_apps.looks_like_git_remote(remote):
+        return project_apps.default_project_clone_path(remote, clone_dir).resolve()
+    if not text:
+        return clone_dir.parent.resolve()
+    target = Path(text).expanduser()
+    if not target.is_absolute():
+        base = clone_dir.parent if kind == "clone" else clone_dir
+        target = base / target
+    return target.resolve()
+
+
+def project_setup_path(
+    path: str | None = None,
+    *,
+    kind: str = "app",
+    remote: str | None = None,
+) -> tuple[int, dict]:
+    """Resolve a user-facing app setup path the same way attach will use it."""
+    if kind not in {"app", "clone"}:
+        return err(400, "unknown project path kind")
+    try:
+        resolved = _resolve_project_setup_path(path, kind=kind, remote=remote)
+    except OSError as e:
+        return err(400, "could not resolve project path", str(e))
+    return 200, {
+        "path": str(resolved),
+        "exists": resolved.exists(),
+        "is_directory": resolved.is_dir(),
+    }
+
+
+def project_directories(
+    path: str | None = None,
+    *,
+    kind: str = "app",
+    remote: str | None = None,
+    max_entries: int = 200,
+) -> tuple[int, dict]:
+    """List host directories for the project attach picker."""
+    if kind not in {"app", "clone"}:
+        return err(400, "unknown project path kind")
+    try:
+        selected = _resolve_project_setup_path(path, kind=kind, remote=remote)
+    except OSError as e:
+        return err(400, "could not resolve project path", str(e))
+    browse_root = selected if selected.is_dir() else selected.parent
+    while not browse_root.exists() and browse_root != browse_root.parent:
+        browse_root = browse_root.parent
+    if not browse_root.exists() or not browse_root.is_dir():
+        browse_root = Path.cwd().resolve().parent
+    max_entries = max(1, min(500, int(max_entries)))
+    entries: list[dict[str, Any]] = []
+    truncated = False
+    try:
+        children = sorted(
+            browse_root.iterdir(),
+            key=lambda item: (not item.is_dir(), item.name.lower()),
+        )
+        for child in children:
+            if not child.is_dir():
+                continue
+            if len(entries) >= max_entries:
+                truncated = True
+                break
+            entries.append({
+                "name": child.name,
+                "path": str(child.resolve()),
+                "type": "directory",
+            })
+    except PermissionError as e:
+        return err(403, "directory cannot be read", str(e))
+    except OSError as e:
+        return err(400, "directory cannot be read", str(e))
+    return 200, {
+        "path": str(browse_root.resolve()),
+        "selected_path": str(selected),
+        "exists": selected.exists(),
+        "is_directory": selected.is_dir(),
+        "parent": str(browse_root.parent.resolve()) if browse_root != browse_root.parent else "",
+        "entries": entries,
+        "truncated": truncated,
+        "max_entries": max_entries,
+    }
+
+
 def _load_project_attach_configured(
     config_path: Path,
     start_poller: bool,

@@ -59,6 +59,31 @@ def main() -> int:
         assert payload["gaps"][0]["id"] == gap_id, payload
         assert payload["gaps"][0]["priority"] == "high", payload
 
+        from refine_cli import cli
+
+        list_ports: list[int | None] = []
+        old_cli_project_config = cli._cli_project_config
+        cli._cli_project_config = (
+            lambda _ctx, *, port=None:
+            list_ports.append(port) or old_cli_project_config(_ctx, port=None)
+        )
+        try:
+            rc, out, err = _run_cli([
+                *prefix,
+                "gaps",
+                "list",
+                "--status",
+                "todo",
+                "--port",
+                "19042",
+            ])
+        finally:
+            cli._cli_project_config = old_cli_project_config
+        assert rc == 0, err
+        assert list_ports == [19042], list_ports
+        payload = _json(out)
+        assert payload["gaps"][0]["id"] == gap_id, payload
+
         rc, out, err = _run_cli([*prefix, "gaps", "get", gap_id.lower()])
         assert rc == 0, err
         payload = _json(out)
@@ -70,8 +95,6 @@ def main() -> int:
         payload = _json(out)
         assert payload["round_log_count"] == 1, payload
         assert payload["logs"][0]["message"] == "CLI-visible round log", payload
-
-        from refine_cli import cli
 
         calls: list[tuple[str, dict[str, object], float]] = []
 

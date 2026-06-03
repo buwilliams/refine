@@ -33,7 +33,9 @@ def main() -> int:
             (client / rel).write_text("changed runtime noise\n", encoding="utf-8")
         result = project_sync.sync_latest(conn)
         assert result["ok"], result
+        assert result["stage"] == "synced", result
         assert result["committed_state"] is True, result
+        assert result["pushed_state"] is True, result
         assert git(client, "log", "-1", "--format=%s").stdout.strip() == (
             "refine: stop tracking runtime state"
         )
@@ -53,6 +55,7 @@ def main() -> int:
         os.chdir(client)
         result = project_sync.sync_latest(conn)
         assert result["ok"], result
+        assert result["stage"] == "synced", result
         assert result["pulled"] is True, result
         assert (client / ".refine" / "sync-marker.txt").read_text(
             encoding="utf-8",
@@ -67,6 +70,7 @@ def main() -> int:
         local_marker.write_text("local before push\n", encoding="utf-8")
         result = project_sync.sync_latest(conn)
         assert result["ok"], result
+        assert result["stage"] == "synced", result
         assert result["committed_state"] is True, result
         assert result["pushed_state"] is True, result
         assert peer_marker2.relative_to(peer).as_posix() in git(
@@ -88,6 +92,7 @@ def main() -> int:
         git(peer, "push")
         result = project_sync.sync_latest(conn)
         assert result["ok"], result
+        assert result["stage"] == "synced", result
         assert result["pulled"] is True, result
         assert result["pushed_state"] is True, result
         origin_tree = git(client, "ls-tree", "-r", "--name-only", "origin/main").stdout
@@ -116,6 +121,7 @@ def main() -> int:
         os.chdir(client)
         result = project_sync.sync_latest(conn)
         assert result["ok"], result
+        assert result["stage"] == "synced", result
         assert result["pulled"] is True, result
         assert any(
             inst["id"] == peer_instance["id"]

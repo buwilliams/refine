@@ -407,6 +407,25 @@ def _h_project_attach(_h, _m, body, _q):
     return api.project_attach(body or {})
 
 
+@route("GET", r"/api/project/path")
+def _h_project_path(_h, _m, _b, q):
+    return api.project_setup_path(
+        _get_one(q, "path"),
+        kind=_get_one(q, "kind", "app"),
+        remote=_get_one(q, "remote"),
+    )
+
+
+@route("GET", r"/api/project/directories")
+def _h_project_directories(_h, _m, _b, q):
+    return api.project_directories(
+        _get_one(q, "path"),
+        kind=_get_one(q, "kind", "app"),
+        remote=_get_one(q, "remote"),
+        max_entries=int(_get_one(q, "max_entries", "200")),
+    )
+
+
 @route("GET", r"/api/project/templates")
 def _h_project_templates(_h, _m, _b, _q):
     return api.list_project_templates()

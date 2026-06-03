@@ -271,9 +271,16 @@ def attach_project(
                 "Run `uv run refine install` from the Refine checkout.",
             )
 
+        is_remote = looks_like_git_remote(raw_path)
+        raw_clone_path = str(body.get("clone_path") or "").strip()
+        if raw_clone_path and not is_remote:
+            return _err(
+                400,
+                "Clone destination is only available when attaching a Git remote.",
+            )
         client_repo = (
-            clone_project_remote(raw_path, clone_dir)
-            if looks_like_git_remote(raw_path)
+            clone_project_remote(raw_path, clone_dir, clone_path=raw_clone_path or None)
+            if is_remote
             else Path(raw_path).expanduser()
         )
         client_repo = client_repo.resolve()
@@ -594,11 +601,26 @@ def default_project_clone_path(remote: str, clone_dir: Path) -> Path:
         i += 1
 
 
-def clone_project_remote(remote: str, clone_dir: Path) -> Path:
+def resolve_project_clone_path(raw_path: str, clone_dir: Path) -> Path:
+    target = Path(raw_path).expanduser()
+    if not target.is_absolute():
+        target = clone_dir.parent / target
+    return target.resolve()
+
+
+def clone_project_remote(
+    remote: str,
+    clone_dir: Path,
+    *,
+    clone_path: str | None = None,
+) -> Path:
     git = shutil.which("git")
     if git is None:
         raise config.ConfigError("could not find `git` on PATH; install git or use a local app path")
-    target = default_project_clone_path(remote, clone_dir)
+    target = (
+        resolve_project_clone_path(clone_path, clone_dir)
+        if clone_path else default_project_clone_path(remote, clone_dir)
+    )
     if target.exists():
         if (target / ".git").exists():
             return target

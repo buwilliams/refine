@@ -66,6 +66,28 @@ def test_client_switch_path(root: Path) -> None:
     assert "updateActiveNodeLabel()" in common_js
 
     assert "function openAddAppModal(options = {})" in common_js
+    assert "function openProjectDirectoryPicker" in common_js
+    assert "function resolveProjectSetupPath" in common_js
+    assert "function looksLikeGitRemoteInput" in common_js
+    assert 'id="project-setup-path-browse"' in common_js
+    assert 'id="project-setup-clone-browse"' in common_js
+    assert 'id="project-setup-path-preview"' in common_js
+    assert 'id="project-setup-clone-preview"' in common_js
+    assert 'id="project-setup-clone-path"' in common_js
+    assert 'name="clone_path"' in common_js
+    assert "attachBody.clone_path = clonePath" in common_js
+    assert 'api("GET", `/api/project/path?${query.toString()}`)' in common_js
+    assert 'api("GET", `/api/project/directories?${query.toString()}`)' in common_js
+    assert "cloneBrowse.disabled = !remote" in common_js
+    assert "Available when project path is a Git remote." in common_js
+    assert ".project-setup-input-row" in modals_css
+    assert ".project-setup-path-preview" in modals_css
+    assert ".project-directory-browser" in modals_css
+    assert ".project-directory-entry" in modals_css
+    assert 'r"/api/project/path"' in (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    assert 'r"/api/project/directories"' in (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    assert "def project_setup_path" in api_py
+    assert "def project_directories" in api_py
     assert "async function maybeOpenProjectTemplateModal(project)" in common_js
     assert "async function openProjectTemplateSelector()" in common_js
     assert "async function loadProjectTemplates()" in common_js
@@ -867,8 +889,10 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
             "sveltekit-webapp",
         } <= template_ids
 
+        cloned = tmp / "custom-empty-origin"
         status, attached = api.project_attach({
             "path": origin.as_uri(),
+            "clone_path": str(cloned),
             "install_unit": False,
             "start_runner": False,
             "start_poller": False,
@@ -876,9 +900,35 @@ def test_empty_project_attach_creates_scaffold_gap(root: Path) -> None:
         assert status == 200, attached
         assert attached["scaffold_required"] is True
         assert {t["id"] for t in attached["scaffold_templates"]} == template_ids
-        cloned = tmp / "empty-origin"
         assert attached["client_repo"] == str(cloned.resolve())
         assert (cloned / ".git").exists()
+
+        status, preview = api.project_setup_path(
+            "",
+            kind="clone",
+            remote=origin.as_uri(),
+        )
+        assert status == 200, preview
+        assert preview["path"].endswith("empty-origin")
+
+        status, dirs = api.project_directories(
+            str(tmp / "does-not-exist" / "new-app"),
+            kind="app",
+        )
+        assert status == 200, dirs
+        assert dirs["selected_path"] == str((tmp / "does-not-exist" / "new-app").resolve())
+        assert dirs["path"] == str(tmp.resolve())
+        assert any(entry["name"] == "custom-empty-origin" for entry in dirs["entries"])
+
+        status, rejected = api.project_attach({
+            "path": str(tmp / "local-app"),
+            "clone_path": str(tmp / "ignored"),
+            "install_unit": False,
+            "start_runner": False,
+            "start_poller": False,
+        })
+        assert status == 400, rejected
+        assert "Clone destination is only available" in rejected["error"]["message"]
 
         status, snap = api.project_status()
         assert status == 200, snap

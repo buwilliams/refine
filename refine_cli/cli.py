@@ -394,9 +394,9 @@ def _load_json_value(value: str) -> object:
         text = sys.stdin.read()
     else:
         path = Path(source).expanduser()
-        if path.is_file():
-            text = path.read_text(encoding="utf-8")
-        else:
+        try:
+            text = path.read_text(encoding="utf-8") if path.is_file() else source
+        except OSError:
             text = source
     try:
         return json.loads(text)
@@ -409,8 +409,11 @@ def _load_text_value(value: str) -> str:
     if source.strip() == "-":
         return sys.stdin.read()
     path = Path(source).expanduser()
-    if path.is_file():
-        return path.read_text(encoding="utf-8")
+    try:
+        if path.is_file():
+            return path.read_text(encoding="utf-8")
+    except OSError:
+        pass
     return source
 
 
@@ -1619,8 +1622,9 @@ def gaps_list_command(
     sort: Annotated[str | None, typer.Option("--sort", help="Sort key.")] = None,
     direction: Annotated[str | None, typer.Option("--dir", help="Sort direction.")] = None,
     facets: Annotated[bool, typer.Option("--facets", help="Include filter facets.")] = False,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
 ) -> int:
-    _cli_project_config(ctx)
+    _cli_project_config(ctx, port=port)
     status_code, payload = gap_ops.list_gaps(
         status=status,
         q=q,

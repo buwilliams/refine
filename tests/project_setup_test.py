@@ -117,7 +117,7 @@ def main() -> int:
         assert snap["apps"][0]["path"] == str(client)
         print("[ok] attached project is visible to the UI status check")
 
-        from refine_server import config
+        from refine_server import config, project_apps
 
         existing = tmp / "existing-client"
         existing.mkdir()
@@ -145,6 +145,20 @@ def main() -> int:
         ).stdout.strip()
         assert dirty == "", dirty
         print("[ok] switching preserves existing .refine and cleans previous app")
+
+        forced = project_apps.bootstrap_client_repo(
+            existing,
+            clone_dir=clone,
+            port=port,
+            force=True,
+            create=False,
+            init_git=False,
+            reuse_existing_config=False,
+            install_unit=False,
+        )
+        assert forced["config_created"] is True
+        assert "# sentinel: keep me" not in cfg_path.read_text(encoding="utf-8")
+        print("[ok] --force overwrites existing .refine target config")
 
         status, removed = delete_json("/api/projects", {"path": str(client)})
         assert status == 200, removed
