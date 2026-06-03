@@ -258,17 +258,35 @@ def main() -> int:
     assert 'fd.get("reporter")' not in extract_round_body
     assert "function renderChatProgress(text)" in toolbar_js
     assert "function toggleChatProgress()" in toolbar_js
+    poll_chat_body = toolbar_js.split("async function pollChat()", 1)[1].split("async function sendChatLine()", 1)[0]
+    assert 'const sid = t.sessionId;' in poll_chat_body
+    assert '|| chatState.tabs[chatState.activeTabId] !== t' in poll_chat_body
+    assert '|| t.sessionId !== sid' in poll_chat_body
+    assert poll_chat_body.index('const r = await api("GET", `/api/chat/${sid}/read`);') < poll_chat_body.index('|| t.sessionId !== sid')
+    assert poll_chat_body.index('|| t.sessionId !== sid') < poll_chat_body.index("t.pending = !!r.in_flight;")
     assert "r.progress_lines && r.progress_lines.length" in toolbar_js
     assert "chat-activity-toggle" in toolbar_js
     assert "chat-progress-panel" in toolbar_js
     assert "function chatActivityLabel(tab)" in toolbar_js
-    assert 'return "Waiting on you";' in toolbar_js
+    assert 'return "Activity panel";' in toolbar_js
+    assert "function chatInputPlaceholder(tab)" in toolbar_js
+    assert 'return "Waiting on agent...";' in toolbar_js
+    assert 'return "Type and press enter.";' in toolbar_js
+    assert "Waiting on you" not in toolbar_js
+    assert "Agent is thinking" not in toolbar_js
     assert "function chatActivityIsPulsing(tab)" in toolbar_js
     assert "return !!tab?.pending;" in toolbar_js
+    assert 'id="chat-input-pending-dots"' in toolbar_js
+    assert 'class="chat-pending-dots chat-input-pending-dots"' in toolbar_js
+    assert 'input.placeholder = chatInputPlaceholder(tab);' in toolbar_js
+    assert 'input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));' in toolbar_js
     assert "Agent activity" not in toolbar_js
     assert ".chat-progress-panel" in toolbar_css
     assert ".chat-progress-line::before" in toolbar_css
     assert ".chat-pending-dots[hidden] { display: none; }" in toolbar_css
+    assert ".chat-input-wrap" in toolbar_css
+    assert ".chat-input-pending-dots" in toolbar_css
+    assert "#chat-input.chat-input-waiting" in toolbar_css
 
     assert ".nav-command-button" in base_css
     assert ".nav-issue-button" in base_css

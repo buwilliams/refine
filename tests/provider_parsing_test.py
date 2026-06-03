@@ -453,6 +453,9 @@ def main() -> int:
                 time.sleep(0.01)
             assert visible_session.provider_session_id == "thread-visible"
             assert visible_session.pending_priming_text is None
+            post_prime = visible_manager.read(visible_sid)
+            assert post_prime["alive"] is True, post_prime
+            assert post_prime["in_flight"] is False, post_prime
         finally:
             visible_manager.shutdown()
             chat_mgr._chat_env = original_chat_env

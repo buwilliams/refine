@@ -347,6 +347,28 @@ button.chat-activity-toggle:hover:not(:disabled) {
   0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
   40%           { transform: scale(1);   opacity: 1; }
 }
+.chat-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+.chat-input-wrap #chat-input {
+  width: 100%;
+}
+.chat-input-pending-dots {
+  position: absolute;
+  left: 10px;
+  top: calc(50% + 1px);
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+  z-index: 1;
+}
+#chat-input.chat-input-waiting {
+  padding-left: 44px;
+}
 
 /* --- System tab -------------------------------------------------------- */
 .system-panel {

@@ -519,8 +519,9 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
   const hasActivityToggle = hasSession || progressText;
   const showActivityPanel = showProgress && hasActivityToggle;
   const activityLabel = chatActivityLabel(active);
-  const showActivityDots = chatActivityIsPulsing(active);
+  const showInputDots = chatActivityIsPulsing(active);
   const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
+  const inputPlaceholder = chatInputPlaceholder(active);
   return `
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
@@ -555,9 +556,6 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                 aria-expanded="${showProgress ? "true" : "false"}"
                 title="${htmlEscape(progressToggleLabel)}"
                 ${hasActivityToggle ? "" : "hidden"}>
-          <span class="chat-pending-dots" ${showActivityDots ? "" : "hidden"}>
-            <span></span><span></span><span></span>
-          </span>
           <span id="chat-activity-label">${htmlEscape(activityLabel)}</span>
           <span class="chat-activity-chevron" aria-hidden="true">
             ${toolbarIcon(showProgress ? "collapse" : "expand")}
@@ -568,11 +566,17 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
         </div>
       </div>
       <div class="actions" style="margin-top:8px">
-        <input type="text" id="chat-input"
-               placeholder="${hasSession
-                 ? "Type and press Enter…"
-                 : "Click Start to begin session before sending messages is enabled."}"
-               ${hasSession && !active.pending ? "" : "disabled"}>
+        <div class="chat-input-wrap">
+          <span id="chat-input-pending-dots"
+                class="chat-pending-dots chat-input-pending-dots"
+                ${showInputDots ? "" : "hidden"}>
+            <span></span><span></span><span></span>
+          </span>
+          <input type="text" id="chat-input"
+                 class="${showInputDots ? "chat-input-waiting" : ""}"
+                 placeholder="${htmlEscape(inputPlaceholder)}"
+                 ${hasSession && !active.pending ? "" : "disabled"}>
+        </div>
       </div>
     `;
 }
@@ -1523,7 +1527,7 @@ function refreshProcessesTabForChatChange() {
 
 function applyPendingIndicator(tab) {
   const toggle = $("#chat-activity-toggle");
-  const dots = toggle?.querySelector(".chat-pending-dots");
+  const dots = $("#chat-input-pending-dots");
   const label = $("#chat-activity-label");
   const input = $("#chat-input");
   if (toggle) {
@@ -1533,7 +1537,11 @@ function applyPendingIndicator(tab) {
   }
   if (dots) dots.hidden = !chatActivityIsPulsing(tab);
   if (label) label.textContent = chatActivityLabel(tab);
-  if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
+  if (input) {
+    input.disabled = !tab || !tab.sessionId || tab.pending;
+    input.placeholder = chatInputPlaceholder(tab);
+    input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));
+  }
   syncChatActionButtons(tab);
 }
 
@@ -1547,8 +1555,15 @@ function chatActivityIsPulsing(tab) {
 }
 
 function chatActivityLabel(tab) {
-  if (tab?.pending) return "Agent is thinking...";
-  return "Waiting on you";
+  return "Activity panel";
+}
+
+function chatInputPlaceholder(tab) {
+  if (!tab?.sessionId) {
+    return "Click Start to begin session before sending messages is enabled.";
+  }
+  if (tab.pending) return "Waiting on agent...";
+  return "Type and press enter.";
 }
 
 function syncChatActionButtons(tab) {
@@ -1905,6 +1920,11 @@ async function pollChat() {
   const sid = t.sessionId;
   try {
     const r = await api("GET", `/api/chat/${sid}/read`);
+    if (!chatState.tabs[chatState.activeTabId]
+        || chatState.tabs[chatState.activeTabId] !== t
+        || t.sessionId !== sid) {
+      return;
+    }
     if (r.lines && r.lines.length) {
       markChatActivityPulse(t);
       if (chatLinesIncludeAgentResponse(r.lines)) {
