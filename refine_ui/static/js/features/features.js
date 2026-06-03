@@ -49,7 +49,6 @@ async function renderFeaturesList() {
   $("#main").innerHTML = `
     <div class="page-title-row">
       <h2>Features</h2>
-      <button id="features-new">New Feature</button>
     </div>
     <details class="filter-shell" id="features-filter-shell">
       <summary>
@@ -94,7 +93,6 @@ async function renderFeaturesList() {
     </details>
     <div id="features-table"><p class="muted">Loading...</p></div>
   `;
-  $("#features-new")?.addEventListener("click", () => openFeatureModal());
   $("#features-search")?.addEventListener("input", debounce((e) =>
     updateFeaturesFilter({ q: e.target.value, page: 1 }), 250));
   $("#features-status")?.addEventListener("change", (e) =>
@@ -305,22 +303,18 @@ function openFeatureModal(feature = null, options = {}) {
         <input type="text" id="feature-name" class="modal-input" value="${htmlEscape(feature?.name || "")}">
         <label>Description</label>
         <textarea id="feature-description">${htmlEscape(feature?.description || "")}</textarea>
-        <label>Reporter</label>
-        <input type="text" id="feature-reporter" value="${htmlEscape(feature?.reporter || state.lastReporter || "")}">
-        <div class="feature-modal-gap-heading">
+        ${feature ? `<div class="feature-modal-gap-heading">
           <div class="modal-title compact">Ordered Gaps</div>
-          ${feature ? `<div class="actions">
+          <div class="actions">
             <button type="button" class="secondary small" data-feature-new-gap>New Gap</button>
             <button type="button" class="secondary small" data-feature-assign-gap>Assign existing</button>
-          </div>` : ""}
+          </div>
         </div>
-        ${feature
-          ? renderFeatureGapTable(gaps, {
-              actions: true,
-              page: gapPage,
-              pageSize: FEATURE_MODAL_GAP_PAGE_SIZE,
-            })
-          : `<p class="muted small">Create the Feature before adding ordered Gaps.</p>`}
+        ${renderFeatureGapTable(gaps, {
+          actions: true,
+          page: gapPage,
+          pageSize: FEATURE_MODAL_GAP_PAGE_SIZE,
+        })}` : ""}
       </div>
       <div class="modal-actions">
         <button class="secondary" data-cancel>Cancel</button>
@@ -337,7 +331,7 @@ function openFeatureModal(feature = null, options = {}) {
     const body = {
       name: root.querySelector("#feature-name")?.value.trim() || "",
       description: root.querySelector("#feature-description")?.value.trim() || "",
-      reporter: root.querySelector("#feature-reporter")?.value.trim() || "",
+      reporter: feature ? (feature.reporter || "") : (state.lastReporter || ""),
     };
     if (!body.name) {
       toast("Feature name is required", "error");

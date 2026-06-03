@@ -333,9 +333,17 @@ def main() -> int:
     assert 'if (parts[0] === "features")' in router_js
     assert '<a href="#/features" data-route="features">Features</a>' in index_html
     assert 'id="btn-new-feature">New Feature</a>' in index_html
+    assert index_html.index('data-route="dashboard">Dashboard') < index_html.index('data-route="features">Features')
+    assert index_html.index('data-route="features">Features') < index_html.index('data-route="gaps">Gaps')
+    assert index_html.index('data-route="gaps">Gaps') < index_html.index('data-route="changes">Changes')
+    assert index_html.index('data-route="changes">Changes') < index_html.index('data-route="logs">Logs')
     assert '<script src="/static/js/features/features.js"></script>' in index_html
     assert "function renderFeatureDetail" in features_js
     assert "function openFeatureModal" in features_js
+    assert 'id="features-new"' not in features_js
+    assert 'id="feature-reporter"' not in features_js
+    assert 'reporter: feature ? (feature.reporter || "") : (state.lastReporter || "")' in features_js
+    assert "Create the Feature before adding ordered Gaps." not in features_js
     assert "function bindFeatureGapActions" in features_js
     assert "openFeatureAssignGapModal" in features_js
     assert "openFeatureNewGapFlow" in features_js

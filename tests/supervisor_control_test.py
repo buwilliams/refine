@@ -98,6 +98,7 @@ def main() -> int:
             wait_started = threading.Event()
 
             def slow_wait(_socket_path, _proc):  # noqa: ANN001, ANN202
+                Path(_socket_path).unlink(missing_ok=True)
                 wait_started.set()
                 time.sleep(1.0)
 
@@ -122,6 +123,9 @@ def main() -> int:
                 status_during_start = supervisor.dispatch(M_STATUS, {})
                 assert time.monotonic() - t0 < 0.5
                 assert status_during_start["worker"]["pid"] == 1002
+                supervisor._repair_runtime_namespace()  # noqa: SLF001
+                worker_procs = [p for p in supervisor.resources.procs if p.kind == "worker"]
+                assert [p.pid for p in worker_procs] == [1001, 1002]
                 thread.join(timeout=2.0)
             finally:
                 supervisor._wait_for_worker_socket = original_wait  # type: ignore[method-assign]

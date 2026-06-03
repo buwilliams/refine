@@ -77,6 +77,7 @@ class Supervisor:
         self.ui: subprocess.Popen | None = None
         self.worker: subprocess.Popen | None = None
         self.worker_socket: Path | None = None
+        self._worker_starting = False
         self._stopping = threading.Event()
         self._lock = threading.RLock()
         self._processes: dict[str, ManagedProcess] = {}
@@ -118,6 +119,7 @@ class Supervisor:
                 self.worker is not None
                 and self.worker.poll() is None
                 and self.worker_socket is not None
+                and not self._worker_starting
                 and not self.worker_socket.exists()
             ):
                 restart_cfg = self.cfg_path
@@ -403,6 +405,7 @@ class Supervisor:
             self.cfg_path = str(cfg.config_path)
             self.runner_socket = socket_path
             self.worker_socket = socket_path
+            self._worker_starting = True
             self.worker = self.resources.popen(
                 [sys.executable, "-m", "refine_runtime.worker"],
                 cwd=Path.cwd(),
@@ -419,6 +422,7 @@ class Supervisor:
         except Exception:
             with self._lock:
                 if self.worker is worker:
+                    self._worker_starting = False
                     self._stop_worker_locked()
                     self.worker_socket = None
             raise
@@ -426,6 +430,7 @@ class Supervisor:
         with self._lock:
             if self.worker is not worker:
                 raise config.ConfigError("Backend runner was replaced before opening its socket.")
+            self._worker_starting = False
             return self._worker_result()
 
     def _h_stop_worker(self, _params: dict[str, Any]) -> dict[str, Any]:
@@ -752,6 +757,7 @@ class Supervisor:
     def _stop_worker_locked(self) -> bool:
         worker = self.worker
         self.worker = None
+        self._worker_starting = False
         if worker is None:
             return False
         self._terminate(worker)
