@@ -244,10 +244,16 @@ def main() -> int:
     assert "function openGapRoundExtractModal(gapId, transcript)" in toolbar_js
     assert "extractImportDrafts(transcript, bodyRoot, signal)" in toolbar_js
     assert 'api("POST", `/api/gaps/${gapId}/rounds`, {' in toolbar_js
+    assert 'toast("Pick a reporter in the top-right selector", "error")' in toolbar_js
+    extract_round_body = toolbar_js.split("async function loadExtractedRoundDraft", 1)[1].split("async function refreshGapChatStatus", 1)[0]
+    assert 'const reporter = state.lastReporter || "";' in extract_round_body
+    assert 'const nextReporter = String(state.lastReporter || "").trim();' in extract_round_body
+    assert 'name="reporter"' not in extract_round_body
+    assert 'fd.get("reporter")' not in extract_round_body
     assert "function renderChatProgress(text)" in toolbar_js
     assert "function toggleChatProgress()" in toolbar_js
     assert "r.progress_lines && r.progress_lines.length" in toolbar_js
-    assert "btn-chat-progress-toggle" in toolbar_js
+    assert "chat-activity-toggle" in toolbar_js
     assert "chat-progress-panel" in toolbar_js
     assert ".chat-progress-panel" in toolbar_css
     assert ".chat-progress-line::before" in toolbar_css

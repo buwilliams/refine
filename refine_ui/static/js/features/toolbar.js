@@ -1578,6 +1578,10 @@ async function extractRoundFromGapChat() {
     toast("Round extraction is unavailable.", "error");
     return;
   }
+  if (!state.lastReporter) {
+    toast("Pick a reporter in the top-right selector", "error");
+    return;
+  }
   openGapRoundExtractModal(tab.gapId, transcript);
 }
 
@@ -1649,16 +1653,13 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
     bodyRoot.innerHTML = `<p class="muted">No round draft extracted.</p>`;
     return;
   }
-  const reporter = draft.reporter || state.lastReporter || "Refine";
+  const reporter = state.lastReporter || "";
   bodyRoot.innerHTML = `
     ${(drafts || []).length > 1
       ? `<p class="muted small">Using the first extracted draft from ${(drafts || []).length} candidates.</p>`
       : ""}
+    <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
     <form id="gap-round-extract-form" class="round-form">
-      <div class="form-row">
-        <label>Reporter</label>
-        <input name="reporter" value="${htmlEscape(reporter)}">
-      </div>
       <div class="form-row">
         <label>Actual (current behavior)</label>
         <textarea name="actual">${htmlEscape(draft.actual || "")}</textarea>
@@ -1674,10 +1675,10 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
     const form = root.querySelector("#gap-round-extract-form");
     if (!form) return;
     const fd = new FormData(form);
-    const nextReporter = String(fd.get("reporter") || "").trim();
+    const nextReporter = String(state.lastReporter || "").trim();
     const actual = String(fd.get("actual") || "").trim();
     const target = String(fd.get("target") || "").trim();
-    if (!nextReporter) return toast("Reporter is required", "error");
+    if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
     if (!actual && !target) return toast("Provide actual or target", "error");
     await withButtonBusy(addButton, "Adding…", async () => {
       try {
