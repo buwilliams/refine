@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 def main() -> int:
     from refine_runtime.supervisor import Supervisor
+    import refine_runtime.supervisor as supervisor_mod
     from refine_runtime.supervisor_protocol import (
+        M_BACKEND_CALL,
         M_ENSURE_WORKER,
         M_PROCESS_LAUNCH,
         M_PROCESS_READ,
@@ -52,12 +54,39 @@ def main() -> int:
             assert status["worker"]["pid"] is None
             assert supervisor.resources.procs[0].env["REFINE_RUN_DIR"].endswith("/run/19876")
             assert supervisor.resources.procs[0].env["REFINE_UI_PORT"] == "19876"
+            assert "REFINE_RUNNER_SOCKET" not in supervisor.resources.procs[0].env
 
             worker = supervisor.dispatch(M_ENSURE_WORKER, {"config_path": str(cfg_path)})
             assert worker["worker_pid"] == 1001, worker
             assert supervisor.dispatch(M_STATUS, {})["worker"]["pid"] == 1001
             assert supervisor.resources.procs[1].env["REFINE_RUN_DIR"].endswith("/run/19876")
             assert supervisor.resources.procs[1].env["REFINE_UI_PORT"] == "19876"
+
+            backend_requests: list[tuple[str, str, dict, float]] = []
+            old_ipc_request = supervisor_mod.ipc.request
+
+            def fake_ipc_request(path, method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+                backend_requests.append((str(path), method, params or {}, timeout))
+                if method == "running":
+                    return {"runner_reachable": True}
+                return {"proxied": True, "method": method, "params": params or {}}
+
+            try:
+                supervisor_mod.ipc.request = fake_ipc_request  # type: ignore[assignment]
+                proxied = supervisor.dispatch(M_BACKEND_CALL, {
+                    "config_path": str(cfg_path),
+                    "method": "example_method",
+                    "params": {"x": 1},
+                    "timeout": 12.0,
+                })
+            finally:
+                supervisor_mod.ipc.request = old_ipc_request  # type: ignore[assignment]
+            assert proxied == {
+                "proxied": True,
+                "method": "example_method",
+                "params": {"x": 1},
+            }
+            assert backend_requests[-1][1:] == ("example_method", {"x": 1}, 12.0)
 
             switched = supervisor.dispatch(M_SWITCH_APP, {"config_path": str(cfg_path)})
             assert switched["worker_pid"] == 1001, switched

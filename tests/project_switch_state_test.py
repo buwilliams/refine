@@ -291,7 +291,7 @@ def test_runtime_switch_resets_services() -> None:
             )
 
             assert fake_poller.stopped is True
-            assert "stop_worker" in supervisor_calls
+            assert supervisor_calls == []
             assert runtime._poller is None  # type: ignore[attr-defined]
             assert runtime._runner is None  # type: ignore[attr-defined]
         finally:
@@ -1477,7 +1477,28 @@ def main() -> int:
     root = Path(__file__).resolve().parents[1]
     old_port = os.environ.get("REFINE_UI_PORT")
     old_scope = os.environ.get("REFINE_UI_SCOPE")
+    from refine_ui import api, runtime
+    old_attach_via_supervisor = runtime.attach_project_via_supervisor
+    old_api_attach_via_supervisor = api.runtime.attach_project_via_supervisor
+
+    def fake_attach_via_supervisor(body, *, clone_dir, port):  # noqa: ANN001, ANN202
+        from refine_server import project_apps
+
+        return project_apps.attach_project(
+            body,
+            clone_dir=clone_dir,
+            port=port,
+            load_configured=api._load_project_attach_configured,
+            current_client_repo=api._current_client_repo,
+            loaded_client_repo=api._loaded_client_repo,
+            prepare_current_project_for_switch=api._prepare_current_project_for_switch,
+            commit_refine_state=api._commit_refine_state,
+            node_summary=api._node_summary,
+        )
+
     try:
+        runtime.attach_project_via_supervisor = fake_attach_via_supervisor
+        api.runtime.attach_project_via_supervisor = fake_attach_via_supervisor
         os.environ["REFINE_UI_PORT"] = str(PROJECT_SWITCH_TEST_PORT)
         os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
         test_client_switch_path(root)
@@ -1505,6 +1526,8 @@ def main() -> int:
             os.environ.pop("REFINE_UI_SCOPE", None)
         else:
             os.environ["REFINE_UI_SCOPE"] = old_scope
+        runtime.attach_project_via_supervisor = old_attach_via_supervisor
+        api.runtime.attach_project_via_supervisor = old_api_attach_via_supervisor
         _remove_run_port(root, PROJECT_SWITCH_TEST_PORT)
         _remove_run_port(root, PROJECT_SWITCH_TEST_ALT_PORT)
     print("project switch state tests OK")

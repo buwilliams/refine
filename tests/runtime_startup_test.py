@@ -105,21 +105,19 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
         db.set_setting(conn, "paused", "1")
         db.set_setting(conn, "agents_paused", "1")
         try:
-            socket = Path(runtime.backend_info()["socket_path"])
-
             def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
                 calls.append((method, params or {}))
                 return {
-                    "worker_socket": str(socket),
                     "worker_pid": 43210,
                     "started": True,
                 }
 
             runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
             runner = runtime.ensure_runner()
-            assert runner.socket_path == str(socket)
+            assert runner.worker_pid == 43210
             assert calls and calls[0][0] == "ensure_worker", calls
             assert runtime.backend_info()["in_process_runner_allowed"] is False
+            assert "REFINE_RUNNER_SOCKET" not in os.environ
             assert project_state.list_settings()["paused"] == "1"
             assert project_state.list_settings()["agents_paused"] == "1"
         finally:
@@ -140,7 +138,7 @@ def test_lazy_runner_client_preserves_operator_pause() -> None:
         _restore_runtime_env(saved_env)
 
 
-def test_runner_socket_comes_from_supervisor() -> None:
+def test_runner_client_uses_supervisor_only() -> None:
     saved_env = _save_runtime_env()
     _clear_runtime_env()
     tmp, client = make_client_repo("refine-runtime-supervisor-runner-")
@@ -158,16 +156,15 @@ def test_runner_socket_comes_from_supervisor() -> None:
                 start_runner=False,
             )
             os.environ.pop("REFINE_TEST_INPROCESS_BACKEND", None)
-            socket = Path(runtime.backend_info()["socket_path"])
-
             def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
                 calls.append((method, params or {}))
-                return {"worker_socket": str(socket), "worker_pid": 98765}
+                return {"worker_pid": 98765}
 
             runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
             runner = runtime.ensure_runner()
-            assert runner.socket_path == str(socket)
+            assert runner.worker_pid == 98765
             assert calls == [("ensure_worker", {"config_path": str(client / ".refine" / "refine.toml")})]
+            assert "REFINE_RUNNER_SOCKET" not in os.environ
         finally:
             runtime.stop_all()
             runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
@@ -217,7 +214,7 @@ def test_stop_all_without_runner_does_not_stop_supervisor_worker() -> None:
         _restore_runtime_env(saved_env)
 
 
-def test_stale_runner_socket_is_recreated() -> None:
+def test_backend_call_routes_through_supervisor() -> None:
     saved_env = _save_runtime_env()
     _clear_runtime_env()
     tmp, client = make_client_repo("refine-runtime-stale-runner-")
@@ -231,39 +228,31 @@ def test_stale_runner_socket_is_recreated() -> None:
             start_runner=False,
         )
         os.environ.pop("REFINE_TEST_INPROCESS_BACKEND", None)
-        stale_socket = str(tmp / "missing-runner.sock")
-        recovered_socket = str(tmp / "recovered-runner.sock")
-        runtime._runner = runtime._SocketRunnerClient(stale_socket)  # type: ignore[attr-defined]
-        runtime._worker_pid = 111  # type: ignore[attr-defined]
-
         supervisor_calls: list[tuple[str, dict]] = []
-        runner_calls: list[str] = []
         original_supervisor_request = runtime._supervisor_request  # type: ignore[attr-defined]
-        original_call = runtime._SocketRunnerClient.call  # type: ignore[attr-defined]
 
         def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
             supervisor_calls.append((method, params or {}))
-            return {"worker_socket": recovered_socket, "worker_pid": 222}
-
-        def fake_socket_call(self, method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
-            runner_calls.append(self.socket_path)
-            if self.socket_path == stale_socket:
-                raise FileNotFoundError(2, "No such file or directory")
-            return {"recovered": True, "method": method}
+            return {"proxied": True, "method": (params or {}).get("method")}
 
         try:
             runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
-            runtime._SocketRunnerClient.call = fake_socket_call  # type: ignore[attr-defined]
             result = runtime.runner_call("test_method", {}, timeout=1.0)
-            assert result == {"recovered": True, "method": "test_method"}
-            assert runner_calls == [stale_socket, recovered_socket]
+            assert result == {"proxied": True, "method": "test_method"}
             assert supervisor_calls == [
-                ("ensure_worker", {"config_path": str(client / ".refine" / "refine.toml")}),
+                (
+                    "backend_call",
+                    {
+                        "config_path": str(client / ".refine" / "refine.toml"),
+                        "method": "test_method",
+                        "params": {},
+                        "timeout": 1.0,
+                    },
+                ),
             ]
-            assert runtime.backend_info()["worker_pid"] == 222
+            assert "REFINE_RUNNER_SOCKET" not in os.environ
         finally:
             runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
-            runtime._SocketRunnerClient.call = original_call  # type: ignore[attr-defined]
             runtime._runner = None  # type: ignore[attr-defined]
             runtime._worker_pid = None  # type: ignore[attr-defined]
     finally:
@@ -315,9 +304,9 @@ def main() -> int:
     try:
         test_configured_app_start_resumes_agents()
         test_lazy_runner_client_preserves_operator_pause()
-        test_runner_socket_comes_from_supervisor()
+        test_runner_client_uses_supervisor_only()
         test_stop_all_without_runner_does_not_stop_supervisor_worker()
-        test_stale_runner_socket_is_recreated()
+        test_backend_call_routes_through_supervisor()
         test_runtime_local_node_is_stable_after_active_switch()
         worker_source = (
             Path(__file__).resolve().parents[1] / "refine_runtime" / "worker.py"
@@ -334,7 +323,8 @@ def main() -> int:
         assert "_start_external_runner" not in runtime_source
         assert "_terminate_workers_for_socket" not in runtime_source
         assert "os.kill" not in runtime_source
-        assert 'M_ENSURE_WORKER' in runtime_source
+        assert 'M_BACKEND_CALL' in runtime_source
+        assert '_SocketRunnerClient' not in runtime_source
     finally:
         _remove_run_port(RUNTIME_STARTUP_TEST_PORT)
     print("runtime startup tests OK")

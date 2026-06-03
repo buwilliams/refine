@@ -439,27 +439,33 @@ def _backend_cli_runner_call(
     port: int,
 ) -> chat_ops.RunnerCall:
     from refine_runtime import ipc
-    from refine_runtime.supervisor_protocol import (
-        M_ENSURE_WORKER,
-        WORKER_STARTUP_TIMEOUT_SECONDS,
-    )
+    from refine_runtime.supervisor_protocol import M_BACKEND_CALL, WORKER_STARTUP_TIMEOUT_SECONDS
 
     def call(method: str, params: dict[str, object], timeout: float) -> dict:
-        supervisor_socket = ipc.supervisor_socket_path(port)
-        worker = ipc.request(
-            supervisor_socket,
-            M_ENSURE_WORKER,
-            {"config_path": str(cfg.config_path)},
-            timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
-        )
-        worker_socket = str(
-            worker.get("worker_socket")
-            or worker.get("socket_path")
-            or ipc.runner_socket_path(port=port, config_path=cfg.config_path),
-        )
-        return ipc.request(worker_socket, method, params, timeout=timeout)
+        supervisor_socket = ipc.supervisor_socket_path(port, start=Path.cwd())
+        try:
+            return ipc.request(
+                supervisor_socket,
+                M_BACKEND_CALL,
+                {
+                    "config_path": str(cfg.config_path),
+                    "method": method,
+                    "params": params,
+                    "timeout": timeout,
+                },
+                timeout=timeout + WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
+            )
+        except OSError as e:
+            raise RuntimeError(_supervisor_required_message(port, supervisor_socket, e)) from e
 
     return call
+
+
+def _supervisor_required_message(port: int, socket_path: Path, error: BaseException) -> str:
+    return (
+        f"Refine supervisor is not reachable at {socket_path}: {error}. "
+        f"Run `uv run refine start {port}` first."
+    )
 
 
 def _print_json(payload: object) -> None:
@@ -2542,25 +2548,24 @@ def _target_app_cli_runner_call(
     port: int,
 ) -> target_app_ops.RunnerCall:
     from refine_runtime import ipc
-    from refine_runtime.supervisor_protocol import (
-        M_ENSURE_WORKER,
-        WORKER_STARTUP_TIMEOUT_SECONDS,
-    )
+    from refine_runtime.supervisor_protocol import M_BACKEND_CALL, WORKER_STARTUP_TIMEOUT_SECONDS
 
     def call(method: str, params: dict[str, object], timeout: float) -> dict:
         supervisor_socket = ipc.supervisor_socket_path(port, start=Path.cwd())
-        worker = ipc.request(
-            supervisor_socket,
-            M_ENSURE_WORKER,
-            {"config_path": str(cfg.config_path)},
-            timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
-        )
-        worker_socket = str(
-            worker.get("worker_socket")
-            or worker.get("socket_path")
-            or ipc.runner_socket_path(port=port, config_path=cfg.config_path),
-        )
-        return ipc.request(worker_socket, method, params, timeout=timeout)
+        try:
+            return ipc.request(
+                supervisor_socket,
+                M_BACKEND_CALL,
+                {
+                    "config_path": str(cfg.config_path),
+                    "method": method,
+                    "params": params,
+                    "timeout": timeout,
+                },
+                timeout=timeout + WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
+            )
+        except OSError as e:
+            raise RuntimeError(_supervisor_required_message(port, supervisor_socket, e)) from e
 
     return call
 
@@ -2899,17 +2904,24 @@ def _cli_attach_project_payload(
     clone_dir: Path,
     port: int,
 ) -> tuple[int, dict[str, object]]:
-    return project_apps.attach_project(
-        body,
-        clone_dir=clone_dir,
-        port=port,
-        load_configured=_cli_load_project_attach_configured,
-        current_client_repo=lambda: _cli_current_client_repo(port),
-        loaded_client_repo=lambda: None,
-        prepare_current_project_for_switch=_cli_prepare_current_project_for_switch,
-        commit_refine_state=_cli_commit_refine_state,
-        node_summary=_cli_node_summary,
-    )
+    from refine_runtime import ipc
+    from refine_runtime.supervisor_protocol import M_ATTACH_APP, WORKER_STARTUP_TIMEOUT_SECONDS
+
+    supervisor_socket = ipc.supervisor_socket_path(port, start=clone_dir)
+    try:
+        result = ipc.request(
+            supervisor_socket,
+            M_ATTACH_APP,
+            {"body": body, "clone_dir": str(clone_dir)},
+            timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 120.0,
+        )
+    except OSError as e:
+        raise click.ClickException(
+            _supervisor_required_message(port, supervisor_socket, e)
+        ) from e
+    status = int(result.get("http_status") or 500)
+    payload = result.get("body") if isinstance(result.get("body"), dict) else {}
+    return status, payload
 
 
 def _cli_detach_current_project(clone_dir: Path, _target: Path, port: int | None) -> None:

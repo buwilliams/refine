@@ -23,8 +23,10 @@ def main() -> int:
             }
 
     original_get_client = api.get_client
+    original_stopped = api._background_processes_stopped_response
     try:
         api.get_client = lambda: FakeClient()
+        api._background_processes_stopped_response = lambda: None
         text = "\n".join(
             [f"line {idx}" for idx in range(1, 24)]
             + [""]
@@ -33,6 +35,7 @@ def main() -> int:
         status, body = api.import_extract({"text": text})
     finally:
         api.get_client = original_get_client
+        api._background_processes_stopped_response = original_stopped
 
     assert status == 200, body
     assert len(calls) == 1, calls
@@ -42,9 +45,11 @@ def main() -> int:
     calls.clear()
     try:
         api.get_client = lambda: FakeClient()
+        api._background_processes_stopped_response = lambda: None
         status, body = api.import_extract({"text": "short\ntext"})
     finally:
         api.get_client = original_get_client
+        api._background_processes_stopped_response = original_stopped
 
     assert status == 200, body
     assert len(calls) == 1, calls

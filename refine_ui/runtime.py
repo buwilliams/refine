@@ -7,9 +7,10 @@ import time
 from pathlib import Path
 
 from refine_server import config, db, project_state
-from refine_server.backend_protocol import M_RUNNING
 from refine_runtime import identity
 from refine_runtime.supervisor_protocol import (
+    M_ATTACH_APP,
+    M_BACKEND_CALL,
     M_DETACH_APP,
     M_ENSURE_WORKER,
     M_STATUS,
@@ -26,9 +27,9 @@ _loaded_config_path: Path | None = None
 _worker_pid: int | None = None
 
 
-class _SocketRunnerClient:
-    def __init__(self, socket_path: str) -> None:
-        self.socket_path = socket_path
+class _SupervisorRunnerClient:
+    def __init__(self, worker_pid: int | None = None) -> None:
+        self.worker_pid = worker_pid
 
     def call(
         self,
@@ -37,12 +38,10 @@ class _SocketRunnerClient:
         *,
         timeout: float = 30.0,
     ) -> dict:
-        from refine_runtime import ipc
-
-        return ipc.request(self.socket_path, method, params or {}, timeout=timeout)
+        return runner_call(method, params or {}, timeout=timeout)
 
     def status_snapshot(self) -> dict:
-        return self.call(M_RUNNING, {}, timeout=5.0)
+        return _supervisor_worker_snapshot()
 
     def shutdown(self) -> None:
         return None
@@ -115,7 +114,7 @@ def load_configured(
         stop_all()
     cfg = config.get(path=path, reload=True, port=port)
     os.environ[config.ENV_CONFIG_PATH] = str(cfg.config_path)
-    os.environ["REFINE_RUNNER_SOCKET"] = str(_runner_socket_path(cfg))
+    os.environ.pop("REFINE_RUNNER_SOCKET", None)
     os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
     _loaded_config_path = cfg.config_path
     db.init_db()
@@ -171,17 +170,10 @@ def ensure_runner():
             )
         except config.ConfigError:
             raise
-        socket_path = str(
-            result.get("worker_socket")
-            or result.get("socket_path")
-            or os.environ.get("REFINE_RUNNER_SOCKET")
-            or _runner_socket_path(cfg)
-        )
-        os.environ["REFINE_RUNNER_SOCKET"] = socket_path
         os.environ["REFINE_SUPERVISOR_SOCKET"] = str(supervisor_socket)
         os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
         _worker_pid = _int_or_none(result.get("worker_pid"))
-        _runner = _SocketRunnerClient(socket_path)
+        _runner = _SupervisorRunnerClient(_worker_pid)
         return _runner
 
 
@@ -195,6 +187,9 @@ def stop_runner() -> None:
             runner.shutdown()
         except Exception:
             pass
+    if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") == "1":
+        _worker_pid = None
+        return
     if runner is not None or worker_pid is not None:
         try:
             _supervisor_request(M_STOP_WORKER, {}, timeout=10.0)
@@ -209,34 +204,33 @@ def runner_call(
     *,
     timeout: float = 30.0,
 ) -> dict:
-    runner = ensure_runner()
-    if isinstance(runner, _SocketRunnerClient):
-        try:
-            return runner.call(method, params or {}, timeout=timeout)
-        except (FileNotFoundError, ConnectionRefusedError):
-            _forget_runner_client(runner)
-            runner = ensure_runner()
-            if isinstance(runner, _SocketRunnerClient):
-                return runner.call(method, params or {}, timeout=timeout)
-    return runner.call(method, params or {})
-
-
-def _forget_runner_client(runner: object) -> None:
-    global _runner, _worker_pid
-    with _runner_lock:
-        if _runner is runner:
-            _runner = None
-            _worker_pid = None
+    global _worker_pid
+    if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") == "1":
+        runner = ensure_runner()
+        return runner.call(method, params or {})
+    cfg = config.get(reload=True)
+    result = _supervisor_request(
+        M_BACKEND_CALL,
+        {
+            "config_path": str(cfg.config_path),
+            "method": method,
+            "params": params or {},
+            "timeout": timeout,
+        },
+        timeout=timeout + WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
+    )
+    _worker_pid = _int_or_none(result.get("worker_pid")) or _worker_pid
+    return result
 
 
 def backend_info() -> dict:
-    socket_path = os.environ.get("REFINE_RUNNER_SOCKET") or ""
     try:
         cfg = config.get(reload=False)
     except config.ConfigError:
         cfg = None
     supervisor_socket = str(_supervisor_socket_path(cfg))
     worker_pid = _worker_pid
+    socket_path = ""
     try:
         status = _supervisor_request(M_STATUS, {}, timeout=2.0)
         worker = status.get("worker") if isinstance(status.get("worker"), dict) else {}
@@ -260,16 +254,6 @@ def backend_info() -> dict:
     }
 
 
-def _runner_socket_path(cfg: config.Config) -> Path:
-    from refine_runtime import ipc
-
-    try:
-        port = int(os.environ.get("REFINE_UI_PORT") or cfg.web_port)
-    except ValueError:
-        port = cfg.web_port
-    return ipc.runner_socket_path(port=port, config_path=cfg.config_path)
-
-
 def _supervisor_socket_path(cfg: config.Config | None) -> Path:
     from refine_runtime import ipc
 
@@ -289,7 +273,10 @@ def _supervisor_request(
 ) -> dict:
     from refine_runtime import ipc
 
-    cfg = config.get(reload=True)
+    try:
+        cfg = config.get(reload=True)
+    except config.ConfigError:
+        cfg = None
     socket_path = _supervisor_socket_path(cfg)
     os.environ["REFINE_SUPERVISOR_SOCKET"] = str(socket_path)
     try:
@@ -321,21 +308,14 @@ def runner_status_snapshot() -> dict:
     through the backend dispatcher/cache check. The dashboard can still render
     cached SQLite data quickly when the runner is busy or unavailable.
     """
-    runner = _runner
-    if runner is None:
-        return {
-            "runner_reachable": False,
-            "backend": backend_info(),
-            "pid": None,
-            "running": [],
-            "chat": [],
-            "merger": None,
-            "governance": None,
-            "target_app_rebuild": None,
-        }
-    try:
-        snap = runner.status_snapshot()
-    except Exception:
+    if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") == "1" and _runner is not None:
+        try:
+            snap = _runner.status_snapshot()
+        except Exception:
+            snap = {}
+        return {"runner_reachable": bool(snap), "backend": backend_info(), **snap}
+    snap = _supervisor_worker_snapshot()
+    if not snap.get("runner_reachable"):
         return {
             "runner_reachable": False,
             "backend": backend_info(),
@@ -350,8 +330,71 @@ def runner_status_snapshot() -> dict:
 
 
 def stop_all() -> None:
-    stop_runner()
+    global _runner, _worker_pid
+    if isinstance(_runner, _InProcessRunnerClient):
+        try:
+            _runner.shutdown()
+        except Exception:
+            pass
+    _runner = None
+    _worker_pid = None
     stop_poller()
+
+
+def _supervisor_worker_snapshot() -> dict:
+    try:
+        status = _supervisor_request(M_STATUS, {}, timeout=2.0)
+    except Exception:
+        return {"runner_reachable": False}
+    worker = status.get("worker") if isinstance(status.get("worker"), dict) else {}
+    snapshot = status.get("worker_snapshot") if isinstance(status.get("worker_snapshot"), dict) else {}
+    pid = _int_or_none(worker.get("pid"))
+    if pid is not None:
+        global _worker_pid
+        _worker_pid = pid
+    return {"pid": pid, **snapshot}
+
+
+def attach_project_via_supervisor(body: dict, *, clone_dir: Path, port: int) -> tuple[int, dict]:
+    result = _supervisor_request(
+        M_ATTACH_APP,
+        {"body": body, "clone_dir": str(clone_dir)},
+        timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 120.0,
+    )
+    code = int(result.get("http_status") or 500)
+    payload = result.get("body") if isinstance(result.get("body"), dict) else {}
+    if code == 200 and payload.get("config_path"):
+        adopt_supervisor_config(
+            payload["config_path"],
+            port=port,
+            start_poller=body.get("start_poller") is not False,
+        )
+    return code, payload
+
+
+def adopt_supervisor_config(
+    path: Path | str,
+    *,
+    port: int | str | None = None,
+    start_poller: bool = True,
+) -> config.Config:
+    global _loaded_config_path
+    cfg = config.get(path=str(path), reload=True, port=port)
+    os.environ[config.ENV_CONFIG_PATH] = str(cfg.config_path)
+    os.environ[config.ENV_UI_PORT] = str(cfg.web_port)
+    os.environ[config.ENV_UI_SCOPE] = str(cfg.web_port)
+    os.environ[config.ENV_RUN_DIR] = str(config.local_run_dir(port=cfg.web_port))
+    os.environ.pop("REFINE_RUNNER_SOCKET", None)
+    os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
+    os.environ[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(
+        root=cfg.volume_root,
+    )
+    _loaded_config_path = cfg.config_path
+    db.init_db(cfg.sqlite_path)
+    if start_poller:
+        stop_poller()
+        ensure_poller()
+    return cfg
 
 
 def detach_configured() -> None:

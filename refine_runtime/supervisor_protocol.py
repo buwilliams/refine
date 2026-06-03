@@ -9,6 +9,8 @@ from __future__ import annotations
 
 M_STATUS = "status"
 M_SHUTDOWN = "shutdown"
+M_BACKEND_CALL = "backend_call"
+M_ATTACH_APP = "attach_app"
 M_SWITCH_APP = "switch_app"
 M_DETACH_APP = "detach_app"
 M_ENSURE_WORKER = "ensure_worker"

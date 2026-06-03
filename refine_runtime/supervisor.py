@@ -16,6 +16,8 @@ from refine_runtime import identity, ipc
 from refine_runtime.manager import ResourceManager
 from refine_runtime.resources import ResourceSettings, memory_limit_mb
 from refine_runtime.supervisor_protocol import (
+    M_ATTACH_APP,
+    M_BACKEND_CALL,
     M_DETACH_APP,
     M_ENSURE_WORKER,
     M_PROCESS_LAUNCH,
@@ -30,8 +32,8 @@ from refine_runtime.supervisor_protocol import (
     M_TARGET_APP_RUN,
     WORKER_STARTUP_TIMEOUT_SECONDS,
 )
-from refine_server import config, db, project_state
-from refine_server.backend_protocol import M_PING, M_RUNNING
+from refine_server import config, db, node_ops, project_apps, project_state, project_sync
+from refine_server.backend_protocol import M_PING, M_RUNNING, M_TARGET_APP_RUN
 
 
 @dataclass
@@ -102,6 +104,8 @@ class Supervisor:
         handlers = {
             M_STATUS: self.status,
             M_SHUTDOWN: self._h_shutdown,
+            M_BACKEND_CALL: self._h_backend_call,
+            M_ATTACH_APP: self._h_attach_app,
             M_SWITCH_APP: self._h_switch_app,
             M_DETACH_APP: self._h_detach_app,
             M_ENSURE_WORKER: self._h_ensure_worker,
@@ -226,7 +230,7 @@ class Supervisor:
         env[config.ENV_RUN_DIR] = str(self.run_dir)
         env["REFINE_SUPERVISOR_PID"] = str(os.getpid())
         env["REFINE_SUPERVISOR_SOCKET"] = str(self.socket_path)
-        env["REFINE_RUNNER_SOCKET"] = str(self.runner_socket)
+        env.pop("REFINE_RUNNER_SOCKET", None)
         env["REFINE_NO_INPROCESS_RUNNER"] = "1"
         env.setdefault("PYTHONUNBUFFERED", "1")
         self.ui = self.resources.popen(
@@ -242,6 +246,52 @@ class Supervisor:
     def _h_shutdown(self, _params: dict[str, Any]) -> dict[str, Any]:
         threading.Thread(target=self.shutdown, name="refine-supervisor-shutdown", daemon=True).start()
         return {"shutting_down": True, "supervisor_pid": os.getpid()}
+
+    def _h_backend_call(self, params: dict[str, Any]) -> dict[str, Any]:
+        method = str(params.get("method") or "").strip()
+        if not method:
+            raise ValueError("method is required")
+        call_params = params.get("params") if isinstance(params.get("params"), dict) else {}
+        timeout = float(params.get("timeout") or 30.0)
+        if method == M_TARGET_APP_RUN:
+            return self._h_target_app_run(call_params)
+        self._h_ensure_worker({
+            "config_path": str(params.get("config_path") or self.cfg_path or ""),
+        })
+        with self._lock:
+            worker_socket = self.worker_socket
+        if worker_socket is None:
+            raise config.ConfigError("Backend runner is not available.")
+        try:
+            return ipc.request(worker_socket, method, call_params, timeout=timeout)
+        except (FileNotFoundError, ConnectionRefusedError, RuntimeError):
+            with self._lock:
+                self._stop_worker_locked()
+                self.worker_socket = None
+            self._h_ensure_worker({
+                "config_path": str(params.get("config_path") or self.cfg_path or ""),
+            })
+            with self._lock:
+                worker_socket = self.worker_socket
+            if worker_socket is None:
+                raise config.ConfigError("Backend runner is not available.")
+            return ipc.request(worker_socket, method, call_params, timeout=timeout)
+
+    def _h_attach_app(self, params: dict[str, Any]) -> dict[str, Any]:
+        body = params.get("body") if isinstance(params.get("body"), dict) else {}
+        clone_dir = Path(str(params.get("clone_dir") or Path.cwd())).resolve()
+        code, payload = project_apps.attach_project(
+            body,
+            clone_dir=clone_dir,
+            port=self.port,
+            load_configured=self._load_project_attach_configured,
+            current_client_repo=self._current_client_repo,
+            loaded_client_repo=self._loaded_client_repo,
+            prepare_current_project_for_switch=self._prepare_current_project_for_switch,
+            commit_refine_state=self._commit_refine_state,
+            node_summary=self._node_summary,
+        )
+        return {"http_status": code, "body": payload}
 
     def _h_switch_app(self, params: dict[str, Any]) -> dict[str, Any]:
         cfg_path = str(params.get("config_path") or "").strip()
@@ -340,6 +390,121 @@ class Supervisor:
         with self._lock:
             stopped = self._stop_worker_locked()
         return {"stopped": stopped}
+
+    def _load_project_attach_configured(
+        self,
+        config_path: Path,
+        _start_poller: bool,
+        start_runner: bool,
+        migrate: bool,
+        port: int,
+    ) -> config.Config:
+        cfg = config.get(path=str(config_path), reload=True, port=port)
+        db.init_db(cfg.sqlite_path)
+        conn = db.connect(cfg.sqlite_path)
+        try:
+            status = project_state.ensure_initialized(
+                conn,
+                migrate=migrate,
+                root=cfg.volume_root,
+            )
+            if not status.get("compatible"):
+                raise config.ConfigError(project_state.migration_block_details(status))
+            project_state.rebuild_sqlite_cache(conn)
+        finally:
+            conn.close()
+        project_state.resume_agents_for_startup()
+        with self._lock:
+            changed = self.cfg_path != str(cfg.config_path)
+            if changed:
+                self._stop_worker_locked()
+            self.cfg_path = str(cfg.config_path)
+            self.runner_socket = self._runner_socket_path(str(cfg.config_path))
+            self.resource_settings = _load_resource_settings(str(cfg.config_path))
+            self.resources = ResourceManager(self.resource_settings)
+            self.capabilities = self.resources.capabilities()
+        if start_runner:
+            self._h_ensure_worker({"config_path": str(cfg.config_path)})
+        return cfg
+
+    def _current_client_repo(self) -> Path | None:
+        try:
+            return config.get(reload=True, port=self.port).client_repo
+        except config.ConfigError:
+            return None
+
+    def _loaded_client_repo(self) -> Path | None:
+        if not self.cfg_path:
+            return None
+        try:
+            return config.Config.load(self.cfg_path).client_repo
+        except (OSError, config.ConfigError):
+            return None
+
+    def _prepare_current_project_for_switch(self, current_repo: Path | None) -> dict[str, Any]:
+        warnings: list[str] = []
+        if current_repo is None:
+            return {"warnings": warnings}
+        with self._lock:
+            self._stop_worker_locked()
+            self.worker_socket = None
+        self._commit_refine_state(current_repo)
+        dirty = self._git_stdout(current_repo, ["status", "--porcelain"])
+        if dirty.strip():
+            raise project_apps.SwitchBlocked(
+                "Current app has uncommitted changes.",
+                (
+                    "Commit, stash, or discard changes in the current app before switching:\n"
+                    + dirty.strip()
+                ),
+            )
+        return {"warnings": warnings}
+
+    def _commit_refine_state(self, repo: Path) -> None:
+        config.ensure_refine_gitignore(repo / ".refine")
+        dirty_refine = self._git_stdout(repo, ["status", "--porcelain", "--", ".refine"])
+        if not dirty_refine.strip():
+            return
+        repo_cfg = config.Config.load(repo / ".refine" / config.CONFIG_FILENAME)
+        db.init_db(repo_cfg.sqlite_path)
+        conn = db.connect(repo_cfg.sqlite_path)
+        try:
+            result = project_sync.commit_and_push_refine_state(
+                conn,
+                actor="refine",
+                cwd=repo,
+                state_message="refine: sync project state before switch",
+                rebuild_cache=True,
+            )
+        finally:
+            conn.close()
+        if result.get("ok"):
+            return
+        raise project_apps.SwitchBlocked(
+            "Could not commit current app Refine state.",
+            str(result.get("details") or result.get("message") or "git commit failed").strip(),
+        )
+
+    def _git_stdout(self, repo: Path, args: list[str]) -> str:
+        out = subprocess.run(
+            ["git", *args],
+            cwd=str(repo),
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if out.returncode != 0:
+            raise project_apps.SwitchBlocked(
+                "Could not inspect current app git state.",
+                (out.stderr or out.stdout or f"git {' '.join(args)} failed").strip(),
+            )
+        return out.stdout
+
+    def _node_summary(self) -> dict[str, Any]:
+        try:
+            return node_ops.summary()
+        except Exception:
+            return {"nodes": [], "active_node_id": ""}
 
     def _h_target_app_run(self, params: dict[str, Any]) -> dict[str, Any]:
         from refine_server import target_app

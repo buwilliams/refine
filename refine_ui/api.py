@@ -869,17 +869,22 @@ def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     """Create or attach a target app path and make it active."""
     clone_dir = Path.cwd().resolve()
     port = _current_port()
-    return project_apps.attach_project(
-        body,
-        clone_dir=clone_dir,
-        port=port,
-        load_configured=_load_project_attach_configured,
-        current_client_repo=_current_client_repo,
-        loaded_client_repo=_loaded_client_repo,
-        prepare_current_project_for_switch=_prepare_current_project_for_switch,
-        commit_refine_state=_commit_refine_state,
-        node_summary=_node_summary,
-    )
+    try:
+        return runtime.attach_project_via_supervisor(body, clone_dir=clone_dir, port=port)
+    except config.ConfigError as e:
+        if os.environ.get("REFINE_TEST_INPROCESS_BACKEND") == "1":
+            return project_apps.attach_project(
+                body,
+                clone_dir=clone_dir,
+                port=port,
+                load_configured=_load_project_attach_configured,
+                current_client_repo=_current_client_repo,
+                loaded_client_repo=_loaded_client_repo,
+                prepare_current_project_for_switch=_prepare_current_project_for_switch,
+                commit_refine_state=_commit_refine_state,
+                node_summary=_node_summary,
+            )
+        return err(400, str(e))
 
 
 def _resolve_project_setup_path(

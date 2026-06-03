@@ -107,6 +107,33 @@ def main() -> int:
         (refine_source / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
         new_app = tmp / "attached-from-cli"
         old_cwd = Path.cwd()
+        from refine_runtime import ipc
+        from refine_runtime.supervisor_protocol import M_ATTACH_APP
+        from refine_server import project_apps
+
+        old_ipc_request = ipc.request
+
+        def fake_supervisor_request(_path, method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+            assert method == M_ATTACH_APP
+            params = params or {}
+            clone_dir = Path(str(params["clone_dir"]))
+            body = params.get("body") if isinstance(params.get("body"), dict) else {}
+            status, payload = project_apps.attach_project(
+                body,
+                clone_dir=clone_dir,
+                port=int(os.environ.get("REFINE_UI_PORT") or 8080),
+                load_configured=cli._cli_load_project_attach_configured,
+                current_client_repo=lambda: cli._cli_current_client_repo(
+                    int(os.environ.get("REFINE_UI_PORT") or 8080),
+                ),
+                loaded_client_repo=lambda: None,
+                prepare_current_project_for_switch=cli._cli_prepare_current_project_for_switch,
+                commit_refine_state=cli._cli_commit_refine_state,
+                node_summary=cli._cli_node_summary,
+            )
+            return {"http_status": status, "body": payload}
+
+        ipc.request = fake_supervisor_request  # type: ignore[assignment]
         os.chdir(refine_source)
         try:
             rc, out, err = _run_cli(["app", "attach", str(new_app)])
@@ -203,6 +230,7 @@ def main() -> int:
                 os.environ.pop("REFINE_CONFIG_PATH", None)
             else:
                 os.environ["REFINE_CONFIG_PATH"] = old_env_config
+            ipc.request = old_ipc_request  # type: ignore[assignment]
     finally:
         conn.close()
         cleanup_tmp(tmp)

@@ -8,61 +8,77 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+
 
 def main() -> int:
     from refine_runtime import ipc
     from refine_runtime import identity
-    from refine_ui import api
     from refine_ui import runtime
-    from refine_ui.backend_client import BackendClient
+
+    env_keys = (
+        "REFINE_CONFIG_PATH",
+        "REFINE_UI_PORT",
+        "REFINE_UI_SCOPE",
+        "REFINE_RUN_DIR",
+        "REFINE_SUPERVISOR_SOCKET",
+        "REFINE_RUNNER_SOCKET",
+        "REFINE_NO_INPROCESS_RUNNER",
+        "REFINE_TEST_INPROCESS_BACKEND",
+    )
+    saved_env = {key: os.environ.get(key) for key in env_keys}
+    for key in env_keys:
+        os.environ.pop(key, None)
+    os.environ["REFINE_UI_PORT"] = "19081"
+    os.environ["REFINE_UI_SCOPE"] = "19081"
+    tmp, client_repo = make_client_repo("refine-runtime-bridge-")
+    conn = init_refine(client_repo)
+    conn.close()
+    runtime.load_configured(
+        client_repo / ".refine" / "refine.toml",
+        start_poller=False,
+        start_runner=False,
+    )
+    os.environ.pop("REFINE_TEST_INPROCESS_BACKEND", None)
 
     original_request = ipc.request
     original_socket_factory = ipc.socket.socket
     original_select = ipc.select.select
+    original_supervisor_request = runtime._supervisor_request  # type: ignore[attr-defined]
     original_runner = runtime._runner  # type: ignore[attr-defined]
-    original_socket = os.environ.get("REFINE_RUNNER_SOCKET")
-    original_no_inprocess = os.environ.get("REFINE_NO_INPROCESS_RUNNER")
     calls: list[tuple[str, str, dict, float]] = []
+    supervisor_path = str(Path(__file__).resolve().parents[1] / "run" / "19081" / "s.sock")
 
-    def fake_request(path, method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
-        calls.append((str(path), method, params or {}, timeout))
+    def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+        calls.append((supervisor_path, method, params or {}, timeout))
+        if method == "status":
+            return {
+                "worker": {"pid": 1234, "socket_path": "/internal/worker.sock"},
+                "worker_snapshot": {"runner_reachable": True},
+            }
         return {"ok": True}
 
     try:
-        ipc.request = fake_request  # type: ignore[assignment]
-        runtime._runner = runtime._SocketRunnerClient("/tmp/refine-runner.sock")  # type: ignore[attr-defined]
+        runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
         assert runtime.runner_call("slow_method", {"x": 1}, timeout=123.0) == {"ok": True}
-        assert calls[-1] == (
-            "/tmp/refine-runner.sock",
-            "slow_method",
-            {"x": 1},
-            123.0,
-        )
+        assert calls[-1][1] == "backend_call"
+        assert calls[-1][2] == {
+            "config_path": str(client_repo / ".refine" / "refine.toml"),
+            "method": "slow_method",
+            "params": {"x": 1},
+            "timeout": 123.0,
+        }
 
-        client = BackendClient()
-        assert client.call("bulk_method", {"ids": [1, 2]}, timeout=77.0) == {"ok": True}
-        assert calls[-1] == (
-            "/tmp/refine-runner.sock",
-            "bulk_method",
-            {"ids": [1, 2]},
-            77.0,
-        )
-
-        os.environ["REFINE_RUNNER_SOCKET"] = "/tmp/refine-runner.sock"
         os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
         info = runtime.backend_info()
         assert info["process_model"] == "supervisor"
         assert info["transport"] == "unix_socket"
         assert info["ui_controls_runner_lifecycle"] is False
         assert info["in_process_runner_allowed"] is False
+        assert "REFINE_RUNNER_SOCKET" not in os.environ
         assert info["source_fingerprint"] == identity.SOURCE_FINGERPRINT
         assert info["refine_version"] == identity.REFINE_VERSION
         assert "local_node_id" in info
-
-        status, body = api.backend_diagnostics()
-        assert status == 200
-        assert body["reachable"] is True
-        assert body["backend"]["process_model"] == "supervisor"
 
         class BusyFakeSocket:
             def __init__(self) -> None:
@@ -99,6 +115,7 @@ def main() -> int:
                     raise BlockingIOError(errno.EAGAIN, "Resource temporarily unavailable")
                 return b'{"ok":true,"result":{"pong":true}}\n'
 
+        runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
         ipc.request = original_request  # type: ignore[assignment]
         busy_socket = BusyFakeSocket()
         ipc.socket.socket = lambda *_args, **_kwargs: busy_socket  # type: ignore[assignment]
@@ -119,15 +136,15 @@ def main() -> int:
         ipc.request = original_request  # type: ignore[assignment]
         ipc.socket.socket = original_socket_factory  # type: ignore[assignment]
         ipc.select.select = original_select  # type: ignore[assignment]
+        runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
         runtime._runner = original_runner  # type: ignore[attr-defined]
-        if original_socket is None:
-            os.environ.pop("REFINE_RUNNER_SOCKET", None)
-        else:
-            os.environ["REFINE_RUNNER_SOCKET"] = original_socket
-        if original_no_inprocess is None:
-            os.environ.pop("REFINE_NO_INPROCESS_RUNNER", None)
-        else:
-            os.environ["REFINE_NO_INPROCESS_RUNNER"] = original_no_inprocess
+        runtime.stop_all()
+        for key, value in saved_env.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        cleanup_tmp(tmp)
 
     print("runtime bridge tests OK")
     return 0

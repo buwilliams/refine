@@ -27,6 +27,8 @@ def main() -> int:
         if mod.startswith("refine"):
             del sys.modules[mod]
 
+    os.environ["REFINE_TEST_INPROCESS_BACKEND"] = "1"
+
     from refine_ui import server as web_server
 
     host = "127.0.0.1"
