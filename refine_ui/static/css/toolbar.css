@@ -283,21 +283,31 @@ button.toolbar-tab:hover:not(:disabled),
 .chat-activity-toggle {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 8px;
   width: 100%;
+  height: auto;
   padding: 8px 12px;
   border-top: 1px solid var(--border);
   border-right: 0;
   border-bottom: 0;
   border-left: 0;
+  border-radius: 0;
   background: var(--code-bg);
+  box-shadow: none;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1.2;
   color: var(--muted);
   text-align: left;
+  white-space: normal;
   cursor: pointer;
 }
-.chat-activity-toggle:hover { background: #eef2f7; }
+button.chat-activity-toggle:hover:not(:disabled) {
+  border-top-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+  color: white;
+}
 .chat-activity-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -308,7 +318,7 @@ button.toolbar-tab:hover:not(:disabled),
   align-items: center;
   justify-content: center;
   margin-left: auto;
-  color: var(--muted);
+  color: currentColor;
 }
 .chat-activity-chevron svg {
   width: 16px;
@@ -327,7 +337,7 @@ button.toolbar-tab:hover:not(:disabled),
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--muted);
+  background: currentColor;
   animation: chat-dot-bounce 1.2s infinite ease-in-out both;
 }
 .chat-pending-dots span:nth-child(1) { animation-delay: -0.32s; }

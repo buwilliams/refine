@@ -13,6 +13,7 @@ const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
 const FILES_SEARCH_DEBOUNCE_MS = 250;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
+const CHAT_ACTIVITY_PULSE_MS = 1800;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
 let filesSearchAbortController = null;
@@ -468,6 +469,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
   const hasActivityToggle = hasSession || progressText;
   const showActivityPanel = showProgress && hasActivityToggle;
   const activityLabel = active.pending ? "Agent is thinking..." : "Agent activity";
+  const showActivityDots = chatActivityIsPulsing(active);
   const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
   return `
       <div class="actions" style="margin-bottom:10px">
@@ -503,7 +505,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                 aria-expanded="${showProgress ? "true" : "false"}"
                 title="${htmlEscape(progressToggleLabel)}"
                 ${hasActivityToggle ? "" : "hidden"}>
-          <span class="chat-pending-dots" ${active.pending ? "" : "hidden"}>
+          <span class="chat-pending-dots" ${showActivityDots ? "" : "hidden"}>
             <span></span><span></span><span></span>
           </span>
           <span id="chat-activity-label">${htmlEscape(activityLabel)}</span>
@@ -1357,10 +1359,19 @@ function applyPendingIndicator(tab) {
     toggle.setAttribute("aria-expanded", tab?.showProgress === false ? "false" : "true");
     toggle.title = tab?.showProgress === false ? "Expand activity" : "Collapse activity";
   }
-  if (dots) dots.hidden = !tab || !tab.pending;
+  if (dots) dots.hidden = !chatActivityIsPulsing(tab);
   if (label) label.textContent = tab?.pending ? "Agent is thinking..." : "Agent activity";
   if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
   syncChatActionButtons(tab);
+}
+
+function markChatActivityPulse(tab) {
+  if (!tab) return;
+  tab.activityPulseUntil = Date.now() + CHAT_ACTIVITY_PULSE_MS;
+}
+
+function chatActivityIsPulsing(tab) {
+  return !!tab?.pending && Number(tab.activityPulseUntil || 0) > Date.now();
 }
 
 function syncChatActionButtons(tab) {
@@ -1717,6 +1728,7 @@ async function pollChat() {
   try {
     const r = await api("GET", `/api/chat/${sid}/read`);
     if (r.lines && r.lines.length) {
+      markChatActivityPulse(t);
       if (chatLinesIncludeAgentResponse(r.lines)) {
         t.agentResponded = true;
       }
@@ -1737,6 +1749,7 @@ async function pollChat() {
       saveChatStateToStorage();
     }
     if (r.progress_lines && r.progress_lines.length) {
+      markChatActivityPulse(t);
       t.progress = (t.progress || "") + r.progress_lines.join("\n") + "\n";
       if (chatState.activeTabId in chatState.tabs &&
           chatState.tabs[chatState.activeTabId].sessionId === sid) {
@@ -1753,7 +1766,7 @@ async function pollChat() {
     // while an agent CLI subprocess is running for this session.
     const wasPending = !!t.pending;
     t.pending = !!r.in_flight;
-    if (wasPending !== t.pending) applyPendingIndicator(t);
+    applyPendingIndicator(t);
     syncChatActionButtons(t);
     if (wasPending !== t.pending) refreshProcessesTabForChatChange();
     if (r.alive === false) {
