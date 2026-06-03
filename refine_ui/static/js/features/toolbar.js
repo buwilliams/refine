@@ -8,7 +8,15 @@
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const SYSTEM_TAB_ID = "system";
-const SYSTEM_OPERATION_LOG_LIMIT = 100;
+const STANDARD_TOOLBAR_TAB_ORDER = [SYSTEM_TAB_ID, FILES_TAB_ID, "standalone"];
+const SYSTEM_OPERATION_LOG_LIMIT = 250;
+const SYSTEM_LOG_FILTERS = [
+  { status: "info", label: "Info" },
+  { status: "start", label: "Started" },
+  { status: "queued", label: "Queued" },
+  { status: "complete", label: "Completed" },
+  { status: "error", label: "Errors" },
+];
 const GAP_CHAT_ROUND_STATUSES = new Set(["review"]);
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
@@ -29,6 +37,7 @@ const chatState = {
 };
 const systemOperationState = {
   messages: [],
+  filters: new Set(),
 };
 const filesState = {
   path: "",
@@ -59,6 +68,7 @@ function ensureStandaloneTab() {
   }
   ensureFilesTab();
   ensureSystemTab();
+  reorderStandardToolbarTabs();
 }
 
 function ensureFilesTab() {
@@ -79,6 +89,18 @@ function ensureSystemTab() {
       agentResponded: false, progress: "", showProgress: true,
     };
   }
+}
+
+function reorderStandardToolbarTabs() {
+  const existing = chatState.tabs || {};
+  const ordered = {};
+  for (const id of STANDARD_TOOLBAR_TAB_ORDER) {
+    if (existing[id]) ordered[id] = existing[id];
+  }
+  for (const [id, tab] of Object.entries(existing)) {
+    if (!STANDARD_TOOLBAR_TAB_ORDER.includes(id)) ordered[id] = tab;
+  }
+  chatState.tabs = ordered;
 }
 
 function loadChatStateFromStorage() {
@@ -428,6 +450,7 @@ function drawToolbar() {
   `;
   if (!filesActive && !systemActive) applyPendingIndicator(active);
   if (filesActive) bindFilesPanel(root);
+  if (systemActive) bindSystemPanel(root);
 
   if (chatState.open && !filesActive && !systemActive) {
     const out = $("#chat-output");
@@ -587,18 +610,88 @@ function recordSystemOperation(payload) {
 
 function renderSystemPanel() {
   const messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
+  const activeFilters = activeSystemLogFilters(messages);
+  const visibleMessages = !activeFilters.size
+    ? messages
+    : messages.filter((item) => activeFilters.has(item.status));
+  const countLabel = !activeFilters.size
+    ? `${messages.length} / ${SYSTEM_OPERATION_LOG_LIMIT}`
+    : `${visibleMessages.length} of ${messages.length}`;
   return `
     <div class="system-panel">
       <div class="system-panel-header">
         <span>System operations</span>
-        <span class="muted small">${messages.length} / ${SYSTEM_OPERATION_LOG_LIMIT}</span>
+        ${renderSystemLogFilters(messages, activeFilters)}
+        <span class="muted small">${countLabel}</span>
       </div>
       <div class="system-log" role="log" aria-live="polite" aria-label="Recent system operations">
-        ${messages.length
-          ? messages.map(renderSystemLogLine).join("")
-          : `<div class="system-log-empty">Waiting for system activity.</div>`}
+        ${visibleMessages.length
+          ? visibleMessages.map(renderSystemLogLine).join("")
+          : `<div class="system-log-empty">${messages.length ? "No system activity matches this filter." : "Waiting for system activity."}</div>`}
       </div>
     </div>`;
+}
+
+function renderSystemLogFilters(messages, activeFilters) {
+  const options = systemLogFilterOptions(messages);
+  return `
+    <div class="system-log-filters" aria-label="Filter system operations">
+      <label class="system-log-filter${!activeFilters.size ? " active" : ""}">
+        <input type="checkbox"
+               data-system-log-filter="all"
+               ${!activeFilters.size ? "checked" : ""}
+               aria-label="Show all system operations">
+        <span>All</span>
+      </label>
+      ${options.map((option) => `
+        <label class="system-log-filter system-log-filter-${option.status}${activeFilters.has(option.status) ? " active" : ""}">
+          <input type="checkbox"
+                 data-system-log-filter="${htmlEscape(option.status)}"
+                 ${activeFilters.has(option.status) ? "checked" : ""}
+                 aria-label="Show ${htmlEscape(option.label.toLowerCase())} system operations">
+          <span>${htmlEscape(option.label)}</span>
+        </label>`).join("")}
+    </div>`;
+}
+
+function systemLogFilterOptions(messages) {
+  const options = [...SYSTEM_LOG_FILTERS];
+  const knownStatuses = new Set(options.map((option) => option.status));
+  for (const item of messages) {
+    if (knownStatuses.has(item.status)) continue;
+    knownStatuses.add(item.status);
+    options.push({ status: item.status, label: systemLogStatusLabel(item.status) });
+  }
+  return options;
+}
+
+function activeSystemLogFilters(messages) {
+  const knownStatuses = new Set(systemLogFilterOptions(messages).map((option) => option.status));
+  return new Set([...systemOperationState.filters].filter((status) => knownStatuses.has(status)));
+}
+
+function bindSystemPanel(root) {
+  $$("[data-system-log-filter]", root).forEach((el) => {
+    el.addEventListener("change", () => {
+      const filter = el.dataset.systemLogFilter || "all";
+      if (filter === "all") {
+        systemOperationState.filters.clear();
+      } else if (systemOperationState.filters.has(filter)) {
+        systemOperationState.filters.delete(filter);
+      } else {
+        systemOperationState.filters.add(filter);
+      }
+      drawToolbar();
+    });
+  });
+}
+
+function systemLogStatusLabel(status) {
+  return String(status || "info")
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Info";
 }
 
 function renderSystemLogLine(item) {

@@ -140,6 +140,9 @@ def main() -> int:
     assert 'await withButtonBusy(e.currentTarget, "Refreshing…", async () => {' in system_tab_js["settings_performance"]
     assert 'withButtonBusy($("#' not in "\n".join(system_tab_js.values())
     assert "async function openPlanChatDock(options = {})" in toolbar_js
+    assert 'const STANDARD_TOOLBAR_TAB_ORDER = [SYSTEM_TAB_ID, FILES_TAB_ID, "standalone"];' in toolbar_js
+    assert "function reorderStandardToolbarTabs()" in toolbar_js
+    assert "reorderStandardToolbarTabs();" in toolbar_js.split("function ensureStandaloneTab()", 1)[1].split("function ensureFilesTab()", 1)[0]
     assert 'label: "Files", mode: "files"' in toolbar_js
     assert '<span class="toolbar-dock-label">TOOLBAR</span>' in toolbar_js
     assert 'for="files-path-input" class="files-path-label">Path</label>' in toolbar_js

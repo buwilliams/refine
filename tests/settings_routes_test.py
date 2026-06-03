@@ -707,14 +707,31 @@ def main() -> int:
     assert "sse.publish(SYSTEM_OPERATION_EVENT, payload)" in system_events_py
     assert "system_operation" in sse_py
     assert "const SYSTEM_TAB_ID = \"system\";" in toolbar_js
-    assert "const SYSTEM_OPERATION_LOG_LIMIT = 100;" in toolbar_js
+    assert "const SYSTEM_OPERATION_LOG_LIMIT = 250;" in toolbar_js
+    assert "const SYSTEM_LOG_FILTERS = [" in toolbar_js
+    assert '{ status: "complete", label: "Completed" }' in toolbar_js
+    assert '{ status: "error", label: "Errors" }' in toolbar_js
+    assert "filters: new Set()" in toolbar_js
     assert 'label: "System", mode: "system"' in toolbar_js
     assert "function recordSystemOperation(payload)" in toolbar_js
     assert "function normalizeSystemLogStatus(status)" in toolbar_js
     assert "systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT)" in toolbar_js
     assert "function renderSystemPanel()" in toolbar_js
+    assert "function renderSystemLogFilters(messages, activeFilters)" in toolbar_js
+    assert "messages.filter((item) => activeFilters.has(item.status))" in toolbar_js
+    assert "function bindSystemPanel(root)" in toolbar_js
+    assert '<label class="system-log-filter${!activeFilters.size ? " active" : ""}">' in toolbar_js
+    assert 'type="checkbox"' in toolbar_js
+    assert "data-system-log-filter" in toolbar_js
+    assert "systemOperationState.filters.add(filter)" in toolbar_js
+    assert "No system activity matches this filter." in toolbar_js
     assert "Waiting for system activity." in toolbar_js
     assert ".system-panel" in toolbar_css
+    assert ".system-panel-header .muted.small" in toolbar_css
+    assert ".system-log-filters" in toolbar_css
+    assert "border-radius: 999px;" in toolbar_css
+    assert ".system-log-filter-complete.active" in toolbar_css
+    assert ".system-log-filter-error.active" in toolbar_css
     assert ".system-log-line" in toolbar_css
     assert "refreshActiveSettingsTab({ force: true })" in processes_body
     assert "function refreshProcessesSettingsTab(options = {})" in processes_body
