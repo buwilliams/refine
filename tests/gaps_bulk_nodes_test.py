@@ -109,6 +109,9 @@ def main() -> int:
         assert "selectCurrentGapsPage" in gaps_list
         assert "openBulkAssignFeatureModal" in gaps_bulk
         assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/bulk`' in gaps_bulk
+        assert "async function refreshGapsListIfCurrent()" in gaps_bulk
+        assert gaps_bulk.count("await refreshGapsListIfCurrent();") >= 4
+        assert 'if (state.currentRoute === "gaps") await renderGapsList();' in gaps_bulk
         assert "openBulkTransferNodeModal" in gaps_bulk
         assert 'api("POST", "/api/nodes/transfer-gaps"' in gaps_bulk
         assert "filter, ...selectionFields" in gaps_bulk

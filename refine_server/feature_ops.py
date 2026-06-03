@@ -332,17 +332,12 @@ def bulk_assign_gaps(feature_id: str, body: dict[str, Any]) -> tuple[int, dict[s
                     old_features.add(old_feature)
             for old_feature in sorted(old_features):
                 _compact_feature_orders(conn, old_feature)
-            if moved_ids:
-                _compact_feature_orders(conn, feature_id)
-        status, detail = get_feature(feature_id)
-        feature_body = detail.get("feature") if status == 200 else None
         return 200, {
             "feature_id": feature_id,
             "updated": len(moved_ids),
             "ids": moved_ids,
             "skipped": len(skipped_details),
             "skipped_details": skipped_details,
-            "feature": feature_body,
         }
     finally:
         conn.close()

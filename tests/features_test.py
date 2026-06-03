@@ -204,6 +204,9 @@ def main() -> int:
             "id": bulk_already,
             "reason": "already-assigned",
         }], body
+        assert "feature" not in body, body
+        status, body = feature_ops.get_feature(bulk_target)
+        assert status == 200, body
         assert [g["id"] for g in body["feature"]["gaps"]] == [
             bulk_already,
             bulk_free,

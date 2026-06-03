@@ -96,7 +96,7 @@ async function openBulkModal(field) {
       `Bulk ${label.toLowerCase()} update is running in the background`,
     );
     toast(`Updated ${r.updated} gap${r.updated === 1 ? "" : "s"}`, "info");
-    await renderGapsList();
+    await refreshGapsListIfCurrent();
   } catch (e) {
     await showActionError(e, "Bulk update failed");
   }
@@ -228,7 +228,7 @@ async function openBulkTransferNodeModal() {
       filter, ...selectionFields, target_node_id: target,
     });
     toast(`Transferred ${r.updated}; skipped ${r.skipped}.`, "info");
-    await renderGapsList();
+    await refreshGapsListIfCurrent();
   } catch (e) {
     toast(`Transfer failed: ${e.message}`, "error");
   }
@@ -303,7 +303,7 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
       filter, ...selectionFields,
     });
     toast(`Assigned ${r.updated}; skipped ${r.skipped}.`, "info");
-    await renderGapsList();
+    await refreshGapsListIfCurrent();
   });
 }
 
@@ -346,10 +346,14 @@ async function confirmBulkDelete() {
     } else {
       toast(`Deleted ${r.deleted} gap${r.deleted === 1 ? "" : "s"}.`, "info");
     }
-    await renderGapsList();
+    await refreshGapsListIfCurrent();
   } catch (e) {
     await showActionError(e, "Bulk delete failed");
   }
+}
+
+async function refreshGapsListIfCurrent() {
+  if (state.currentRoute === "gaps") await renderGapsList();
 }
 
 function describeGapsFilter(filter) {
