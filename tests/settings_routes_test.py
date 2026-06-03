@@ -80,6 +80,8 @@ def main() -> int:
     )
     api_py = (root / "refine_ui/api.py").read_text(encoding="utf-8")
     server_py = (root / "refine_ui/server.py").read_text(encoding="utf-8")
+    sse_py = (root / "refine_ui/sse.py").read_text(encoding="utf-8")
+    system_events_py = (root / "refine_ui/system_events.py").read_text(encoding="utf-8")
     runner_py = (root / "refine_server/runner.py").read_text(encoding="utf-8")
     project_state_py = (root / "refine_server/project_state.py").read_text(
         encoding="utf-8",
@@ -184,6 +186,36 @@ def main() -> int:
     assert "def process_summary" in api_py
     assert "def set_background_processes" in api_py
     assert "def set_agent_processes" in api_py
+    assert "def _system_operation(label: str)" in api_py
+    for label in (
+        "Start app",
+        "Stop app",
+        "Rebuild app",
+        "Check app",
+        "Sync app",
+        "Transfer Gaps between nodes",
+        "Bulk update Gaps",
+        "Bulk delete Gaps",
+        "Import Gaps",
+        "Extract Gaps from import text",
+        "Prepare CSV import",
+        "Deduplicate import drafts",
+        "Pause or unpause agents",
+        "Clean up logs",
+        "Attach or switch app",
+        "Remove app",
+        "Create scaffold Gap",
+        "Retry Gap merge",
+        "Merge reporters",
+        "Run quality regressions",
+        "Generate governance rules",
+        "Recheck provider auth",
+        "Generate app configuration",
+        "Hard reset worktree",
+        "Clean up performance data",
+        "Cancel background job",
+    ):
+        assert f'@_system_operation("{label}")' in api_py
     process_ops_py = (root / "refine_server/process_ops.py").read_text(encoding="utf-8")
     assert "process_ops.set_background_processes(" in api_py
     assert "process_ops.set_agent_processes(" in api_py
@@ -667,6 +699,23 @@ def main() -> int:
     assert '[data-tab-pane="processes"].active' in processes_body
     assert "refreshCurrentSettingsSurface()" in common_js
     assert '["settings", "node", "project"].includes(state.currentRoute || "")' in common_js
+    assert 'sseSource.addEventListener("system_operation"' in common_js
+    assert 'sseSource.addEventListener("activity_added"' in common_js
+    assert "message: entry.message" in common_js
+    assert "recordSystemOperation(payload)" in common_js
+    assert "SYSTEM_OPERATION_EVENT = \"system_operation\"" in system_events_py
+    assert "sse.publish(SYSTEM_OPERATION_EVENT, payload)" in system_events_py
+    assert "system_operation" in sse_py
+    assert "const SYSTEM_TAB_ID = \"system\";" in toolbar_js
+    assert "const SYSTEM_OPERATION_LOG_LIMIT = 100;" in toolbar_js
+    assert 'label: "System", mode: "system"' in toolbar_js
+    assert "function recordSystemOperation(payload)" in toolbar_js
+    assert "function normalizeSystemLogStatus(status)" in toolbar_js
+    assert "systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT)" in toolbar_js
+    assert "function renderSystemPanel()" in toolbar_js
+    assert "Waiting for system activity." in toolbar_js
+    assert ".system-panel" in toolbar_css
+    assert ".system-log-line" in toolbar_css
     assert "refreshActiveSettingsTab({ force: true })" in processes_body
     assert "function refreshProcessesSettingsTab(options = {})" in processes_body
     assert 'data-cancel-agent="' in processes_body

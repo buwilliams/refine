@@ -28,7 +28,7 @@ from refine_server.backend_protocol import (
 )
 from refine_server.ulid import new_ulid
 from .backend_client import BackendError, get_client
-from . import background_jobs, runtime
+from . import background_jobs, runtime, system_events
 
 
 # --- error helpers ------------------------------------------------------------
@@ -197,6 +197,49 @@ def _exclusive_mutation(
     return decorator
 
 
+def _system_operation(label: str) -> Callable:
+    def decorator(fn: Callable) -> Callable:
+        @wraps(fn)
+        def wrapped(*args, **kwargs):
+            system_events.publish(f"{label} started", status="start", category="operation")
+            try:
+                code, body = fn(*args, **kwargs)
+            except Exception as e:
+                system_events.publish(
+                    f"{label} failed: {e}",
+                    status="error",
+                    category="operation",
+                )
+                raise
+            if int(code) >= 400:
+                error = body.get("error") if isinstance(body, dict) else {}
+                message = error.get("message") if isinstance(error, dict) else ""
+                detail = f": {message}" if message else ""
+                system_events.publish(
+                    f"{label} failed{detail}",
+                    status="error",
+                    category="operation",
+                    http_status=code,
+                )
+            elif isinstance(body, dict) and body.get("queued"):
+                system_events.publish(
+                    f"{label} queued",
+                    status="queued",
+                    category="operation",
+                    http_status=code,
+                )
+            else:
+                system_events.publish(
+                    f"{label} completed",
+                    status="complete",
+                    category="operation",
+                    http_status=code,
+                )
+            return code, body
+        return wrapped
+    return decorator
+
+
 # --- Files --------------------------------------------------------------------
 
 def _target_repo_root() -> Path:
@@ -356,6 +399,7 @@ def project_list() -> tuple[int, dict]:
     return 200, project_apps.list_apps(clone_dir, port=port)
 
 
+@_system_operation("Remove app")
 def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     clone_dir = Path.cwd().resolve()
     port = _current_port()
@@ -369,6 +413,7 @@ def project_remove(body: dict[str, Any]) -> tuple[int, dict]:
     )
 
 
+@_system_operation("Sync app")
 @_exclusive_mutation("Sync project", block_maintenance=False)
 def project_sync(_: dict[str, Any] | None = None) -> tuple[int, dict]:
     block = _schema_block_response(block_maintenance=False)
@@ -471,6 +516,7 @@ def activate_node(body: dict[str, Any]) -> tuple[int, dict]:
     return 200, payload
 
 
+@_system_operation("Transfer Gaps between nodes")
 @_exclusive_mutation("Transfer Gaps between nodes")
 def transfer_node_gaps(body: dict[str, Any]) -> tuple[int, dict]:
     target = (body.get("target_node_id") or "").strip()
@@ -692,6 +738,7 @@ def background_job(job_id: str) -> tuple[int, dict]:
         return err(404, "Background job not found")
 
 
+@_system_operation("Cancel background job")
 def cancel_background_job(job_id: str) -> tuple[int, dict]:
     try:
         return 200, observability_ops.cancel_background_job(job_id, background_jobs.cancel)
@@ -743,6 +790,7 @@ def performance_summary(*, operation: str | None = None,
         conn.close()
 
 
+@_system_operation("Clean up performance data")
 def performance_cleanup(body: dict | None = None) -> tuple[int, dict]:
     body = body or {}
     conn = _conn()
@@ -755,6 +803,7 @@ def performance_cleanup(body: dict | None = None) -> tuple[int, dict]:
         conn.close()
 
 
+@_system_operation("Rebuild SQLite cache")
 @_exclusive_mutation("Rebuild SQLite cache")
 def rebuild_sqlite_cache(body: dict | None = None) -> tuple[int, dict]:
     """Operator recovery path for a stale or corrupted SQLite cache."""
@@ -815,6 +864,7 @@ def _rebuild_sqlite_cache_sync(
     )
 
 
+@_system_operation("Attach or switch app")
 def project_attach(body: dict[str, Any]) -> tuple[int, dict]:
     """Create or attach a target app path and make it active."""
     clone_dir = Path.cwd().resolve()
@@ -973,6 +1023,7 @@ def _load_project_template(template_id: str) -> tuple[dict[str, str], str] | Non
     return project_apps.load_project_template(template_id)
 
 
+@_system_operation("Create scaffold Gap")
 @_exclusive_mutation(
     "Create Scaffold Gap",
     allow_busy_when=lambda _owner: _background_processes_stopped(),
@@ -1392,6 +1443,7 @@ def delete_gap(gap_id: str) -> tuple[int, dict]:
         conn.close()
 
 
+@_system_operation("Bulk update Gaps")
 def bulk_update_gaps(body: dict) -> tuple[int, dict]:
     allow_active_kinds = {"target_app_rebuild"}
     if _is_last_workflow_bulk_update(body):
@@ -1503,6 +1555,7 @@ def _bulk_update_selected_gaps(
     )
 
 
+@_system_operation("Bulk delete Gaps")
 @_exclusive_mutation("Bulk delete Gaps")
 def bulk_delete_gaps(body: dict) -> tuple[int, dict]:
     """Delete every Gap matching the supplied filter.
@@ -1610,6 +1663,7 @@ def retry(gap_id: str) -> tuple[int, dict]:
         conn.close()
 
 
+@_system_operation("Retry Gap merge")
 @_exclusive_mutation("Retry Merge", allow_active_kinds={"merge_agent"})
 def retry_merge(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
@@ -1677,6 +1731,7 @@ def rename_reporter(rid: int, body: dict) -> tuple[int, dict]:
     return 200, payload
 
 
+@_system_operation("Merge reporters")
 def merge_reporter(rid: int, body: dict) -> tuple[int, dict]:
     try:
         target_rid = int(body.get("target_id"))
@@ -1806,6 +1861,7 @@ def quality_regression_delete(regression_id: str) -> tuple[int, dict]:
     return 200, payload
 
 
+@_system_operation("Run quality regressions")
 def quality_regression_run(_body: dict | None = None) -> tuple[int, dict]:
     stopped = _background_processes_stopped_response()
     if stopped is not None:
@@ -1817,6 +1873,7 @@ def quality_regression_run(_body: dict | None = None) -> tuple[int, dict]:
     return 200, result
 
 
+@_system_operation("Generate governance rules")
 def governance_generate_rules(body: dict) -> tuple[int, dict]:
     stopped = _background_processes_stopped_response()
     if stopped is not None:
@@ -1830,6 +1887,7 @@ def governance_generate_rules(body: dict) -> tuple[int, dict]:
     return 200, result
 
 
+@_system_operation("Recheck provider auth")
 def recheck_auth() -> tuple[int, dict]:
     try:
         result = get_client().call(M_PREFLIGHT, {}, timeout=30.0)
@@ -1907,6 +1965,7 @@ def record_ui_error(body: dict) -> tuple[int, dict]:
 _LOG_RETENTION_OPTIONS = observability_ops.LOG_RETENTION_OPTIONS
 
 
+@_system_operation("Clean up logs")
 def cleanup_logs(body: dict) -> tuple[int, dict]:
     """Delete activity entries older than `days` days.
 
@@ -1994,6 +2053,7 @@ def _pid_may_be_alive(pid: int) -> bool:
     return process_ops.pid_may_be_alive(pid)
 
 
+@_system_operation("Toggle background processes")
 def set_background_processes(body: dict | None = None) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
@@ -2013,6 +2073,7 @@ def set_background_processes(body: dict | None = None) -> tuple[int, dict]:
         conn.close()
 
 
+@_system_operation("Pause or unpause agents")
 def set_agent_processes(body: dict | None = None) -> tuple[int, dict]:
     blocked = _schema_block_response()
     if blocked is not None:
@@ -2121,6 +2182,7 @@ def _cpu_priority_label(priority: str, weight: int) -> str:
 IMPORT_DEDUP_THRESHOLD = import_ops.IMPORT_DEDUP_THRESHOLD
 
 
+@_system_operation("Extract Gaps from import text")
 def import_extract(body: dict) -> tuple[int, dict]:
     stopped = _background_processes_stopped_response()
     if stopped is not None:
@@ -2131,6 +2193,7 @@ def import_extract(body: dict) -> tuple[int, dict]:
         return _backend_err(e)
 
 
+@_system_operation("Prepare CSV import")
 def import_parse_csv(body: dict) -> tuple[int, dict]:
     raw = str(body.get("text") or "")
     if not raw.strip():
@@ -2180,6 +2243,7 @@ def _import_prepare_progress(completed: int, total: int, message: str) -> None:
     )
 
 
+@_system_operation("Deduplicate import drafts")
 def import_dedup(body: dict) -> tuple[int, dict]:
     return import_ops.dedup(
         body,
@@ -2188,6 +2252,7 @@ def import_dedup(body: dict) -> tuple[int, dict]:
     )
 
 
+@_system_operation("Import Gaps")
 @_exclusive_mutation("Import Gaps")
 def import_persist(body: dict) -> tuple[int, dict]:
     drafts = body.get("drafts") or []
@@ -2363,12 +2428,14 @@ def _has_status_checks(cfg: dict[str, Any]) -> bool:
     return target_app_ops.has_status_checks(cfg)
 
 
+@_system_operation("Start app")
 @_exclusive_mutation("Start target app")
 def target_app_start(_body: dict | None = None) -> tuple[int, dict]:
     """Run the configured start command via the host runner."""
     return _target_app_run("start")
 
 
+@_system_operation("Stop app")
 @_exclusive_mutation("Stop target app")
 def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
     """Run the configured stop command via the host runner."""
@@ -2381,6 +2448,7 @@ def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
     return target_app_rebuild_queue(_body)
 
 
+@_system_operation("Rebuild app")
 def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:
     """Queue the persistent target-app rebuilder worker."""
     stopped = _background_processes_stopped_response()
@@ -2392,6 +2460,7 @@ def target_app_rebuild_queue(_body: dict | None = None) -> tuple[int, dict]:
         return _backend_err(e)
 
 
+@_system_operation("Hard reset worktree")
 def hard_reset_worktree(_body: dict | None = None) -> tuple[int, dict]:
     """Destructively reset the host target worktree through the runner."""
     stopped = _background_processes_stopped_response()
@@ -2438,6 +2507,7 @@ def target_app_check(_body: dict | None = None) -> tuple[int, dict]:
         return _backend_err(e)
 
 
+@_system_operation("Check app")
 def target_app_health(_body: dict | None = None) -> tuple[int, dict]:
     """Back-compatible route name for a target-app status check."""
     return target_app_check(_body)
@@ -2449,6 +2519,7 @@ def _target_app_run_health_check() -> dict:
     return snap if status == 200 else {"state": "unknown", "last_check_ok": False}
 
 
+@_system_operation("Generate app configuration")
 def target_app_generate(body: dict) -> tuple[int, dict]:
     """Use the agent to draft structured target-app config for this codebase."""
     stopped = _background_processes_stopped_response()

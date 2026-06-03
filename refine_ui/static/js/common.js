@@ -1437,6 +1437,17 @@ function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
   sseSource.addEventListener("activity_added", (e) => {
+    try {
+      const entry = JSON.parse(e.data || "{}");
+      if (typeof recordSystemOperation === "function") {
+        recordSystemOperation({
+          message: entry.message,
+          status: entry.severity || "info",
+          category: entry.category || "activity",
+          timestamp: entry.datetime,
+        });
+      }
+    } catch {}
     // Refresh dashboard activity if visible; refresh current gap if relevant.
     // Route through the silent `refresh*` paths — not `render*` — so the
     // screen doesn't blink back to `Loading…` on every event.
@@ -1490,6 +1501,14 @@ function initSSE() {
   });
   sseSource.addEventListener("round_log_added", () => {
     if (state.currentRoute === "logs") loadLogs();
+  });
+  sseSource.addEventListener("system_operation", (e) => {
+    try {
+      const payload = JSON.parse(e.data || "{}");
+      if (typeof recordSystemOperation === "function") {
+        recordSystemOperation(payload);
+      }
+    } catch {}
   });
   sseSource.onerror = () => {
     // Browser will auto-reconnect.

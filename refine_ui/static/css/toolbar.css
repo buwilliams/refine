@@ -347,6 +347,65 @@ button.chat-activity-toggle:hover:not(:disabled) {
   40%           { transform: scale(1);   opacity: 1; }
 }
 
+/* --- System tab -------------------------------------------------------- */
+.system-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.system-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.system-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.system-log-line {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 8px;
+  padding: 2px 0;
+  color: var(--color-text-muted);
+}
+.system-log-time {
+  color: var(--muted);
+  white-space: nowrap;
+}
+.system-log-message {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.system-log-start .system-log-message,
+.system-log-queued .system-log-message {
+  color: var(--accent);
+}
+.system-log-complete .system-log-message {
+  color: #0f766e;
+}
+.system-log-error .system-log-message {
+  color: var(--error);
+}
+.system-log-empty {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 /* --- Files tab -------------------------------------------------------- */
 .files-panel {
   min-height: 0;

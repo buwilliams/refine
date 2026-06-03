@@ -7,6 +7,8 @@
 // per-session deque until the user switches to that tab.
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
+const SYSTEM_TAB_ID = "system";
+const SYSTEM_OPERATION_LOG_LIMIT = 100;
 const GAP_CHAT_ROUND_STATUSES = new Set(["review"]);
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
@@ -24,6 +26,9 @@ const chatState = {
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
   fullscreen: false,       // when true, panel fills viewport below the topbar
+};
+const systemOperationState = {
+  messages: [],
 };
 const filesState = {
   path: "",
@@ -53,12 +58,23 @@ function ensureStandaloneTab() {
     };
   }
   ensureFilesTab();
+  ensureSystemTab();
 }
 
 function ensureFilesTab() {
   if (!chatState.tabs[FILES_TAB_ID]) {
     chatState.tabs[FILES_TAB_ID] = {
       gapId: null, label: "Files", mode: "files",
+      sessionId: null, output: "", closedReason: null,
+      agentResponded: false, progress: "", showProgress: true,
+    };
+  }
+}
+
+function ensureSystemTab() {
+  if (!chatState.tabs[SYSTEM_TAB_ID]) {
+    chatState.tabs[SYSTEM_TAB_ID] = {
+      gapId: null, label: "System", mode: "system",
       sessionId: null, output: "", closedReason: null,
       agentResponded: false, progress: "", showProgress: true,
     };
@@ -341,11 +357,12 @@ function toggleChatFullscreen() { toggleToolbarFullscreen(); }
 function drawToolbar() {
   const root = $("#toolbar-dock");
   if (!root) return;
-  ensureFilesTab();
+  ensureStandaloneTab();
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
   const active = tabs[activeId] || tabs.standalone;
   const filesActive = active.mode === "files";
+  const systemActive = active.mode === "system";
   const hasSession = !!active.sessionId;
 
   const startLabel = active.gapId
@@ -381,9 +398,9 @@ function drawToolbar() {
         ${Object.entries(tabs).map(([id, t]) => `
           <button class="toolbar-tab ${id === activeId ? "active" : ""}"
                   data-tab-id="${htmlEscape(id)}"
-                  title="${htmlEscape(t.mode === "files" ? "File browser" : t.gapId || "Standalone chat")}">
+                  title="${htmlEscape(toolbarTabTitle(t))}">
             ${htmlEscape(t.label)}${t.sessionId ? ` <span class="toolbar-tab-dot" title="active session"></span>` : ""}
-            ${id === "standalone" || id === FILES_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
+            ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
           </button>`).join("")}
       </div>
       <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
@@ -397,18 +414,22 @@ function drawToolbar() {
     </div>
     <div class="toolbar-dock-body"
          style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
-      ${filesActive ? renderFilesPanel() : renderChatPanel(active, {
-        toggleClass,
-        toggleLabel,
-        statusLine,
-        hasSession,
-      })}
+      ${filesActive
+        ? renderFilesPanel()
+        : systemActive
+          ? renderSystemPanel()
+          : renderChatPanel(active, {
+              toggleClass,
+              toggleLabel,
+              statusLine,
+              hasSession,
+            })}
     </div>
   `;
-  if (!filesActive) applyPendingIndicator(active);
+  if (!filesActive && !systemActive) applyPendingIndicator(active);
   if (filesActive) bindFilesPanel(root);
 
-  if (chatState.open && !filesActive) {
+  if (chatState.open && !filesActive && !systemActive) {
     const out = $("#chat-output");
     if (out) out.scrollTop = out.scrollHeight;
     if (active.gapId && !active.gapStatus) refreshGapChatStatus(active.gapId);
@@ -440,7 +461,7 @@ function drawToolbar() {
   });
   $("#btn-dock-toggle")?.addEventListener("click", toggleToolbar);
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
-  if (!filesActive) {
+  if (!filesActive && !systemActive) {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
     $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
     $("#btn-gap-round-extract")?.addEventListener("click", extractRoundFromGapChat);
@@ -462,6 +483,12 @@ function drawToolbar() {
 }
 
 function drawChatDock() { drawToolbar(); }
+
+function toolbarTabTitle(tab) {
+  if (tab.mode === "files") return "File browser";
+  if (tab.mode === "system") return "System operations";
+  return tab.gapId || "Standalone chat";
+}
 
 function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSession }) {
   const progressText = active.progress || "";
@@ -539,6 +566,58 @@ function renderChatProgress(text) {
   return lines.map((line) => `
     <div class="chat-progress-line">${htmlEscape(line)}</div>
   `).join("");
+}
+
+function recordSystemOperation(payload) {
+  const item = {
+    message: String(payload?.message || "").trim(),
+    status: normalizeSystemLogStatus(payload?.status),
+    category: String(payload?.category || "system"),
+    timestamp: String(payload?.timestamp || new Date().toISOString()),
+  };
+  if (!item.message) return;
+  systemOperationState.messages.push(item);
+  if (systemOperationState.messages.length > SYSTEM_OPERATION_LOG_LIMIT) {
+    systemOperationState.messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
+  }
+  if (chatState.tabs[SYSTEM_TAB_ID] && chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
+    drawToolbar();
+  }
+}
+
+function renderSystemPanel() {
+  const messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
+  return `
+    <div class="system-panel">
+      <div class="system-panel-header">
+        <span>System operations</span>
+        <span class="muted small">${messages.length} / ${SYSTEM_OPERATION_LOG_LIMIT}</span>
+      </div>
+      <div class="system-log" role="log" aria-live="polite" aria-label="Recent system operations">
+        ${messages.length
+          ? messages.map(renderSystemLogLine).join("")
+          : `<div class="system-log-empty">Waiting for system activity.</div>`}
+      </div>
+    </div>`;
+}
+
+function renderSystemLogLine(item) {
+  const time = formatSystemLogTime(item.timestamp);
+  return `
+    <div class="system-log-line system-log-${item.status}">
+      <span class="system-log-time">${htmlEscape(time)}</span>
+      <span class="system-log-message">${htmlEscape(item.message)}</span>
+    </div>`;
+}
+
+function normalizeSystemLogStatus(status) {
+  return String(status || "info").toLowerCase().replace(/[^a-z0-9_-]+/g, "-") || "info";
+}
+
+function formatSystemLogTime(raw) {
+  const date = new Date(raw || "");
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function toolbarIcon(name) {
@@ -1397,7 +1476,7 @@ function restartPollForActiveTab() {
     chatState.pollTimer = null;
   }
   const t = chatState.tabs[chatState.activeTabId];
-  if (!t || t.mode === "files" || !t.sessionId) return;
+  if (!t || t.mode === "files" || t.mode === "system" || !t.sessionId) return;
   chatState.pollTimer = setInterval(pollChat, 800);
   // Fire an immediate poll so the user doesn't wait 800ms for the first read.
   pollChat();
@@ -1411,7 +1490,7 @@ function switchChatTab(tabId) {
 }
 
 async function closeChatTab(tabId) {
-  if (tabId === "standalone" || tabId === FILES_TAB_ID) return;
+  if (tabId === "standalone" || tabId === FILES_TAB_ID || tabId === SYSTEM_TAB_ID) return;
   const t = chatState.tabs[tabId];
   if (!t) return;
   if (t.sessionId) {

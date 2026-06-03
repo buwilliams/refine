@@ -4,7 +4,7 @@ Subscribers register and pull events; publishers call `publish(event_type, data)
 The webapp's HTTP handler reads from a queue assigned at subscribe-time.
 
 Event types: status_change, round_added, run_started, run_finished,
-log_appended, activity_added, reporters_changed.
+log_appended, activity_added, reporters_changed, system_operation.
 """
 from __future__ import annotations
 
