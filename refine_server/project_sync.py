@@ -122,6 +122,78 @@ def commit_and_push_refine_state(
     }
 
 
+def commit_refine_transition_state(
+    conn: sqlite3.Connection,
+    *,
+    actor: str = "refine",
+    state_message: str = "refine: persist workflow state",
+) -> dict:
+    """Commit local `.refine/**` workflow state at owned transition points.
+
+    Unlike `commit_and_push_refine_state`, this is intentionally local-only.
+    Merge/rebuild paths call it while they already own the host-worktree
+    mutation, making the JSON state durable before later cleanup can reset the
+    worktree back to stale metadata.
+    """
+    repo = git_ops.client_repo_path()
+    config.ensure_refine_gitignore(repo / ".refine")
+    dirty_refine = git_ops.dirty_paths_under(".refine", cwd=repo)
+    syncable_refine = git_ops.syncable_refine_paths(dirty_refine)
+    if not syncable_refine:
+        return {
+            "ok": True,
+            "stage": "clean",
+            "committed_state": False,
+            "dirty_refine_count": len(dirty_refine),
+            "syncable_refine_count": 0,
+            "message": "No syncable Refine workflow state to commit.",
+        }
+    commit = git_ops.commit_refine_sync_state(
+        dirty_refine,
+        state_message=state_message,
+        cwd=repo,
+    )
+    committed_state = commit.stderr != "(nothing to commit)"
+    if not commit.ok:
+        activity.append(
+            conn,
+            message="Could not commit durable Refine workflow state.",
+            severity="error",
+            category="git",
+            actor=actor,
+            details=commit.stderr or commit.stdout,
+        )
+        return {
+            "ok": False,
+            "stage": "commit",
+            "committed_state": False,
+            "dirty_refine_count": len(dirty_refine),
+            "syncable_refine_count": len(syncable_refine),
+            "message": "Could not commit durable Refine workflow state.",
+            "details": commit.stderr or commit.stdout,
+        }
+    if committed_state:
+        activity.append(
+            conn,
+            message="Committed durable Refine workflow state.",
+            severity="info",
+            category="git",
+            actor=actor,
+        )
+    return {
+        "ok": True,
+        "stage": "committed" if committed_state else "clean",
+        "committed_state": committed_state,
+        "dirty_refine_count": len(dirty_refine),
+        "syncable_refine_count": len(syncable_refine),
+        "message": (
+            "Committed durable Refine workflow state."
+            if committed_state
+            else "No Refine workflow state changes to commit."
+        ),
+    }
+
+
 def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
     """Fetch/pull the active app branch and rebuild SQLite from JSON state."""
     metric_start = perf_metrics.now()

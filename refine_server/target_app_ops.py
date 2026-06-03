@@ -5,7 +5,7 @@ import json
 import sqlite3
 from typing import Any, Callable
 
-from . import activity, db, gap_writer, project_state, quality, target_app
+from . import activity, db, gap_writer, project_state, project_sync, quality, target_app
 from .backend_protocol import (
     M_HARD_RESET_WORKTREE,
     M_TARGET_APP_GENERATE,
@@ -331,6 +331,11 @@ def promote_rebuilt_gaps(conn: sqlite3.Connection) -> int:
             message=message,
             severity="info", category="state", gap_id=gap_id, actor="refine",
         )
+    project_sync.commit_refine_transition_state(
+        conn,
+        actor="refine",
+        state_message="refine: persist rebuilt Gap state",
+    )
     return len(rows)
 
 

@@ -786,6 +786,36 @@ class Runner:
                 "message": "Retry merge needs the Gap branch to still exist.",
             }
         if not git_ops.local_branch_exists(branch):
+            target = (db.get_setting(self._conn, "merge_target_branch") or "").strip()
+            if not target:
+                target = git_ops.current_branch() or ""
+            if target and git_ops.count_refine_merges_for_gap(gap_id, target) > 0:
+                with db.transaction(self._conn):
+                    self._conn.execute(
+                        "UPDATE gaps_index SET status = 'ready-merge', updated = ? "
+                        "WHERE id = ?",
+                        (now_iso(), gap_id),
+                    )
+                try:
+                    gap_writer.update_fields(gap_id, status="ready-merge")
+                except Exception:
+                    pass
+                result = verify_op.perform_verify(
+                    self._conn,
+                    gap_id,
+                    actor="refine",
+                    final_status="awaiting-rebuild",
+                )
+                if result.get("ok"):
+                    self.target_app_rebuilder.queue_for_worktree_merge(gap_id)
+                    return {
+                        "ok": True,
+                        "message": result.get("message") or "Recovered merged Gap",
+                    }
+                return {
+                    "ok": False,
+                    "message": result.get("message") or f"Retry merge needs local branch `{branch}`.",
+                }
             return {
                 "ok": False,
                 "message": f"Retry merge needs local branch `{branch}`.",
@@ -1304,6 +1334,11 @@ class Runner:
                 if not branch_name:
                     return None, "missing-branch"
                 if not git_ops.local_branch_exists(branch_name):
+                    target = (db.get_setting(self._conn, "merge_target_branch") or "").strip()
+                    if not target:
+                        target = git_ops.current_branch() or ""
+                    if target and git_ops.count_refine_merges_for_gap(gap_id, target) > 0:
+                        return "ready-merge", "failed-from-ready-merge"
                     return None, f"missing-branch:{branch_name}"
                 return "ready-merge", "failed-from-ready-merge"
             if previous == "qa":
@@ -2638,6 +2673,11 @@ class Runner:
                 message=message,
                 severity="info", category="state", gap_id=gid, actor="runner",
             )
+        project_sync.commit_refine_transition_state(
+            conn,
+            actor="runner",
+            state_message="refine: persist rebuilt Gap state",
+        )
         return len(rows)
 
     def _record_target_app_operation(self, conn: sqlite3.Connection, kind: str,

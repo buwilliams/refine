@@ -1,6 +1,7 @@
 """Git merge and runner-recovery tests for user-visible Gap outcomes."""
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -42,6 +43,14 @@ def make_ready_branch(conn, gap_id: str, branch: str, filename: str,
     (wt / filename).write_text(contents, encoding="utf-8")
     git(wt, "add", filename)
     git(wt, "commit", "-m", f"gap {gap_id}")
+
+
+def gap_json_path(gap_id: str) -> str:
+    return f".refine/gaps/{gap_id[:2]}/{gap_id[2:]}/gap.json"
+
+
+def gap_json_at(client: Path, ref: str, gap_id: str) -> dict:
+    return json.loads(git(client, "show", f"{ref}:{gap_json_path(gap_id)}").stdout)
 
 
 def latest_messages(gap_id: str) -> list[str]:
@@ -120,6 +129,97 @@ def main() -> int:
             "transitioned to `awaiting-rebuild`" in msg
             for msg in success_messages
         ), success_messages
+        head_success_gap = gap_json_at(client, "HEAD", gid_success)
+        assert head_success_gap["status"] == "awaiting-rebuild", head_success_gap
+        assert head_success_gap["branch_name"] is None, head_success_gap
+
+        # If host WIP conflicts while popping the auto-stash after a successful
+        # merge, the Gap's merged state must remain durable. The failed pop
+        # keeps the WIP in git stash, while Refine resets the partial apply
+        # instead of leaving an unmerged index that can roll the Gap back into
+        # ready-merge and retry a deleted branch.
+        (client / "stash-pop-conflict.txt").write_text("base\n", encoding="utf-8")
+        git(client, "add", "stash-pop-conflict.txt")
+        git(client, "commit", "-m", "stash pop conflict base")
+        git(client, "push")
+        gid_pop_conflict = "01MERGEPOPFAILAAAAAAAAAA"
+        branch_pop_conflict = "refine/stash-pop-conflict"
+        make_ready_branch(
+            conn,
+            gid_pop_conflict,
+            branch_pop_conflict,
+            "stash-pop-conflict.txt",
+            "branch\n",
+        )
+        (client / "stash-pop-conflict.txt").write_text("dirty\n", encoding="utf-8")
+        merger._merge_one(gid_pop_conflict)
+        assert db_status(conn, gid_pop_conflict) == "awaiting-rebuild"
+        assert not git_ops.local_branch_exists(branch_pop_conflict)
+        assert git_ops.in_progress_op() is None
+        assert git_ops.unmerged_paths() == []
+        assert git(client, "status", "--short").stdout.strip() == ""
+        head_pop_gap = gap_json_at(client, "HEAD", gid_pop_conflict)
+        assert head_pop_gap["status"] == "awaiting-rebuild", head_pop_gap
+        assert head_pop_gap["branch_name"] is None, head_pop_gap
+        stash_list = git(client, "stash", "list").stdout
+        assert f"refine auto-stash for {gid_pop_conflict}" in stash_list, stash_list
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'ready-merge', branch_name = ? "
+                "WHERE id = ?",
+                (branch_pop_conflict, gid_pop_conflict),
+            )
+        gap_writer.update_fields(
+            gid_pop_conflict,
+            status="ready-merge",
+            branch_name=branch_pop_conflict,
+        )
+        recovered = verify_op.perform_verify(conn, gid_pop_conflict, actor="test")
+        assert recovered["ok"], recovered
+        assert recovered["stage"] == "recovered", recovered
+        assert db_status(conn, gid_pop_conflict) == "awaiting-rebuild"
+        head_recovered_gap = gap_json_at(client, "HEAD", gid_pop_conflict)
+        assert head_recovered_gap["status"] == "awaiting-rebuild", head_recovered_gap
+        assert head_recovered_gap["branch_name"] is None, head_recovered_gap
+        with db.transaction(conn):
+            conn.execute(
+                "UPDATE gaps_index SET status = 'failed', branch_name = ? "
+                "WHERE id = ?",
+                (branch_pop_conflict, gid_pop_conflict),
+            )
+        gap_writer.update_fields(
+            gid_pop_conflict,
+            status="failed",
+            branch_name=branch_pop_conflict,
+        )
+        gap_writer.append_latest_round_log(
+            gap_id=gid_pop_conflict,
+            severity="warn",
+            category="state",
+            actor="runner",
+            message=(
+                "Workflow status changed: ready-merge → failed; "
+                "git merge failed"
+            ),
+        )
+        from refine_server.runner import Runner
+
+        retry_runner = Runner()
+        queued_recoveries: list[str] = []
+
+        class QueueOnlyRebuilder:
+            def queue_for_worktree_merge(self, gap_id: str) -> bool:
+                queued_recoveries.append(gap_id)
+                return True
+
+        retry_runner.target_app_rebuilder = QueueOnlyRebuilder()  # type: ignore[assignment]
+        try:
+            retry_result = retry_runner._h_retry_merge({"gap_id": gid_pop_conflict})  # noqa: SLF001
+        finally:
+            retry_runner._conn.close()  # noqa: SLF001
+        assert retry_result["ok"], retry_result
+        assert queued_recoveries == [gid_pop_conflict], queued_recoveries
+        assert db_status(conn, gid_pop_conflict) == "awaiting-rebuild"
 
         # On-worktree-merge rebuild mode gates the host-worktree merge queue
         # while already-merged work is waiting to be rebuilt. Agent work can
@@ -139,6 +239,7 @@ def main() -> int:
             queue_rebuild_for_pending=(
                 lambda: queued_rebuilds.append("queued") or True
             ),
+            node_id=project_state.DEFAULT_NODE_ID,
         )
         gated_merger._tick()  # noqa: SLF001
         assert queued_rebuilds == ["queued"], queued_rebuilds
@@ -148,10 +249,11 @@ def main() -> int:
             client, "ls-tree", "-r", "--name-only", "origin/main",
         ).stdout
         conn.execute(
-            "UPDATE gaps_index SET status = 'review' WHERE id = ?",
-            (gid_success,),
+            "UPDATE gaps_index SET status = 'review' WHERE id IN (?, ?)",
+            (gid_success, gid_pop_conflict),
         )
         gap_writer.update_fields(gid_success, status="review")
+        gap_writer.update_fields(gid_pop_conflict, status="review")
         gated_merger._tick()  # noqa: SLF001
         assert db_status(conn, gid_blocked) == "awaiting-rebuild"
         assert "blocked-rebuild.txt" in git(

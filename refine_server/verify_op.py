@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from refine_server import activity, changes_index, db
+from refine_server import activity, changes_index, db, project_sync
 from refine_server.gaps import now_iso
 
 from . import conflict_resolver, gap_writer, git_ops, push_ops
@@ -60,6 +60,20 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
             _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
             return {"ok": False, "stage": "precheck", "message": msg}
         target = host_branch
+    if not git_ops.local_branch_exists(branch):
+        merged_count = git_ops.count_refine_merges_for_gap(gap_id, target)
+        if merged_count > 0:
+            return _recover_already_merged_missing_branch(
+                conn,
+                gap_id,
+                branch,
+                target,
+                actor=actor,
+                final_status=final_status,
+            )
+        msg = f"Gap branch `{branch}` does not exist locally"
+        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "precheck", "message": msg}
     # An upstream is nice-to-have, not required. With one, the Merge
     # agent runs the full fetch → pull → merge → push pipeline. Without one, it
     # falls back to a local-only merge (no fetch, no pull, no push) so
@@ -185,10 +199,12 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
         _log(conn, gap_id, "Auto-stashed remaining uncommitted changes before merge",
              severity="info", category="git", actor=actor)
 
+    result: dict | None = None
     try:
-        return _verify_body(conn, gap_id, target, branch,
+        result = _verify_body(conn, gap_id, target, branch,
                               has_upstream=has_upstream, actor=actor,
                               final_status=final_status)
+        return result
     finally:
         if stashed:
             pop = git_ops.stash_pop()
@@ -200,6 +216,20 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
                     details=pop.stderr,
                     severity="warn", category="git", actor=actor,
                 )
+                if result and result.get("ok"):
+                    reset = git_ops.reset_hard("HEAD")
+                    _log(
+                        conn,
+                        gap_id,
+                        (
+                            "Reset partial auto-stash apply after successful "
+                            "merge; the uncommitted changes remain in `git stash`"
+                        ),
+                        details=reset.stderr or reset.stdout,
+                        severity="info" if reset.ok else "warn",
+                        category="git",
+                        actor=actor,
+                    )
         if switched_from:
             back = git_ops.checkout_branch(switched_from)
             if not back.ok:
@@ -242,6 +272,46 @@ def _restore_host_branch_and_return(conn, gap_id, switched_from,
                      details=pop.stderr,
                      severity="warn", category="git", actor=actor)
     return ret
+
+
+def _recover_already_merged_missing_branch(
+    conn: sqlite3.Connection,
+    gap_id: str,
+    branch: str,
+    target: str,
+    *,
+    actor: str,
+    final_status: str,
+) -> dict:
+    message = (
+        f"Gap branch `{branch}` is gone, but `{target}` already contains "
+        f"a Refine merge for this Gap; recovered to `{final_status}`"
+    )
+    with db.transaction(conn):
+        conn.execute(
+            "UPDATE gaps_index SET status = ?, branch_name = NULL, updated = ? "
+            "WHERE id = ?",
+            (final_status, now_iso(), gap_id),
+        )
+    try:
+        gap_writer.update_fields(gap_id, status=final_status, branch_name=None)
+    except Exception:
+        pass
+    changes_index.rebuild_branch(conn, target)
+    project_sync.commit_refine_transition_state(
+        conn,
+        actor=actor,
+        state_message=f"refine: persist recovered merge state ({gap_id})",
+    )
+    changes_index.advance_branch_head(conn, target)
+    _log(conn, gap_id, message, severity="info", category="git", actor=actor)
+    return {
+        "ok": True,
+        "stage": "recovered",
+        "message": message,
+        "pushed": False,
+        "final_status": final_status,
+    }
 
 
 def _reconcile_target_before_local_commits(
@@ -457,6 +527,12 @@ def _verify_body(conn: sqlite3.Connection, gap_id: str, current: str,
     except Exception:
         pass
     changes_index.upsert_head_merge(conn, current)
+    project_sync.commit_refine_transition_state(
+        conn,
+        actor=actor,
+        state_message=f"refine: persist merged Gap state ({gap_id})",
+    )
+    changes_index.advance_branch_head(conn, current)
     git_ops.remove_worktree(gap_id)
     git_ops.delete_branch(branch)
     pushed_part = "merged + pushed" if pushed else (

@@ -10,7 +10,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from tests.helpers import cleanup_tmp, create_indexed_gap, init_refine, make_client_repo
+from tests.helpers import cleanup_tmp, create_indexed_gap, git, init_refine, make_client_repo
+
+
+def gap_json_path(gap_id: str) -> str:
+    return f".refine/gaps/{gap_id[:2]}/{gap_id[2:]}/gap.json"
+
+
+def gap_json_at(client: Path, ref: str, gap_id: str) -> dict:
+    return json.loads(git(client, "show", f"{ref}:{gap_json_path(gap_id)}").stdout)
 
 
 def main() -> int:
@@ -454,6 +462,9 @@ def main() -> int:
         gap = gaps.read_gap_json(gid)
         assert gap["status"] == "review"
         assert gap.get("branch_name") is None
+        head_gap = gap_json_at(client, "HEAD", gid)
+        assert head_gap["status"] == "review", head_gap
+        assert head_gap.get("branch_name") is None, head_gap
         messages = [log["message"] for log in gap["rounds"][-1]["logs"]]
         assert "Target application rebuilt; Gap is ready for review" in messages, messages
 
