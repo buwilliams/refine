@@ -150,6 +150,16 @@ function isMergeRetryGap(latest) {
          message.includes("failed");
 }
 
+function currentRoundLog(log, workflowLog) {
+  if (!log) return null;
+  const logDatetime = String(log.datetime || "");
+  const workflowDatetime = String(workflowLog?.datetime || "");
+  if (logDatetime && workflowDatetime && logDatetime < workflowDatetime) {
+    return null;
+  }
+  return log;
+}
+
 function drawGapDetail(gap) {
   if (!gap) return;
   if (_gapRoundFormDraft && _gapRoundFormDraft.gapId !== gap.id) {
@@ -762,11 +772,14 @@ function bindRoundFormSubmit(gap) {
 }
 
 function computeFailureBanner(gap, latest) {
+  const workflowLog = latest?.latest_workflow_log;
   if (gap.status === "failed") {
     const lastLog = latest?.latest_log;
-    const errLog = latest?.latest_error_log;
-    const workflowLog = latest?.latest_workflow_log;
-    const fallbackLog = lastLog?.severity && lastLog.severity !== "info" ? lastLog : null;
+    const errLog = currentRoundLog(latest?.latest_error_log, workflowLog);
+    const fallbackLog = currentRoundLog(
+      lastLog?.severity && lastLog.severity !== "info" ? lastLog : null,
+      workflowLog,
+    );
     return {
       severity: "error",
       message: errLog?.message || workflowLog?.message || fallbackLog?.message || "Gap failed",
@@ -775,7 +788,7 @@ function computeFailureBanner(gap, latest) {
   }
   if (gap.status === "review") {
     // Was there a recent error? Then we treat it as a stuck-review state.
-    const errLog = latest?.latest_error_log;
+    const errLog = currentRoundLog(latest?.latest_error_log, workflowLog);
     if (errLog) {
       return {
         severity: "error",
