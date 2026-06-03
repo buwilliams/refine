@@ -21,8 +21,9 @@ The installer checks the host, installs or repairs missing tools when you approv
 refine has a robust CLI:
 
 ```bash
-uv run refine --help
+./r --help
 ```
+(./r is a shell script that executes 'uv run refine [args]' for convenience)
 
 For development of Refine, there is an independent app used to test Refine surfaces (UI and CLI) at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
 
