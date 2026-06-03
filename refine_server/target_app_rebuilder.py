@@ -9,9 +9,9 @@ from typing import Callable
 from refine_server import db, project_state
 
 
-AUTO_REBUILD_MODES = ("never", "on_worktree_merge", "hourly", "nightly")
+AUTO_REBUILD_MODES = ("never", "on_worktree_merge", "hourly", "daily")
 DEFAULT_AUTO_REBUILD_MODE = "on_worktree_merge"
-NIGHTLY_REBUILD_HOUR = 0
+DEFAULT_DAILY_REBUILD_HOUR_UTC = 0
 
 
 class TargetAppRebuilder:
@@ -171,34 +171,49 @@ class TargetAppRebuilder:
         if mode == "on_worktree_merge":
             self.queue_pending_awaiting_rebuild()
             return
-        if mode not in ("hourly", "nightly"):
+        if mode not in ("hourly", "daily"):
             return
-        now = now or datetime.now().astimezone()
+        now = now or datetime.now(timezone.utc)
+        now_utc = now.astimezone(timezone.utc)
         last = _parse_iso(db.get_setting(
             self._get_conn(), "target_app_auto_rebuild_last_started_at", "",
         ) or "")
         if mode == "hourly":
             elapsed = (
                 None if last is None
-                else (now.astimezone(timezone.utc) - last).total_seconds()
+                else (now_utc - last).total_seconds()
             )
             if elapsed is None or elapsed >= 3600:
                 self.queue_rebuild("hourly automatic rebuild", mode="hourly")
             return
-        # Run once per local day as soon as the scheduler sees the local date
-        # roll over during the midnight hour. If Refine starts later in the
-        # day, wait for the next nightly window instead of rebuilding on boot.
-        if now.hour != NIGHTLY_REBUILD_HOUR:
+        # Run once per UTC day as soon as the scheduler sees the configured
+        # whole-hour UTC window. If Refine starts later in the day, wait for the
+        # next daily window instead of rebuilding on boot.
+        rebuild_hour = self._daily_rebuild_hour_utc()
+        if now_utc.hour != rebuild_hour:
             return
-        if last is not None and last.astimezone().date() == now.date():
+        if last is not None and last.date() == now_utc.date():
             return
-        self.queue_rebuild("nightly automatic rebuild", mode="nightly")
+        self.queue_rebuild(
+            f"daily automatic rebuild ({rebuild_hour:02d}:00 UTC)",
+            mode="daily",
+        )
 
     def _mode(self) -> str:
         mode = (db.get_setting(
             self._get_conn(), "target_app_auto_rebuild", DEFAULT_AUTO_REBUILD_MODE,
         ) or DEFAULT_AUTO_REBUILD_MODE).strip()
+        if mode == "nightly":
+            return "daily"
         return mode if mode in AUTO_REBUILD_MODES else DEFAULT_AUTO_REBUILD_MODE
+
+    def _daily_rebuild_hour_utc(self) -> int:
+        value = db.get_setting_int(
+            self._get_conn(),
+            "target_app_auto_rebuild_hour_utc",
+            DEFAULT_DAILY_REBUILD_HOUR_UTC,
+        )
+        return value if 0 <= value <= 23 else DEFAULT_DAILY_REBUILD_HOUR_UTC
 
     def _paused(self) -> bool:
         return bool(db.get_setting_int(self._get_conn(), "paused", 0))

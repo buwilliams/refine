@@ -91,6 +91,7 @@ TARGET_APP_CONFIG_SETTING_KEYS = {
     "target_app_tcp_check_port",
     "target_app_process_check_command",
     "target_app_auto_rebuild",
+    "target_app_auto_rebuild_hour_utc",
 }
 
 TARGET_APP_RUNTIME_SETTING_KEYS = {

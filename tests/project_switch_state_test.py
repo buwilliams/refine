@@ -1387,7 +1387,8 @@ def test_settings_are_scoped_to_active_node_files() -> None:
             "project_update_pulse_interval_seconds": "900",
             "agent_limit_pause_seconds": "10800",
             "file_browser_ignore_patterns": "vendor_cache",
-            "target_app_auto_rebuild": "nightly",
+            "target_app_auto_rebuild": "daily",
+            "target_app_auto_rebuild_hour_utc": "17",
             "target_app_url": "http://localhost:3001",
             "target_app_start_command": "npm run dev",
             "target_app_stop_command": "pkill -f 'npm run dev' || true",
@@ -1408,6 +1409,7 @@ def test_settings_are_scoped_to_active_node_files() -> None:
         assert settings["target_app_cwd"] == "apps/web"
         assert settings["target_app_env_json"] == '{"PORT": "3001"}'
         assert settings["target_app_process_check_command"] == "pgrep -f node"
+        assert settings["target_app_auto_rebuild_hour_utc"] == "17"
 
         project_state.set_active_node(default)
         status, body = api.list_settings()
@@ -1454,7 +1456,8 @@ def test_settings_are_scoped_to_active_node_files() -> None:
         assert other_runtime["project_update_pulse_interval_seconds"] == "900"
         assert other_runtime["agent_limit_pause_seconds"] == "10800"
         assert other_runtime["file_browser_ignore_patterns"] == "vendor_cache"
-        assert other_target["target_app_auto_rebuild"] == "nightly"
+        assert other_target["target_app_auto_rebuild"] == "daily"
+        assert other_target["target_app_auto_rebuild_hour_utc"] == "17"
         assert other_target["target_app_url"] == "http://localhost:3001"
         assert other_target["target_app_start_command"] == "npm run dev"
         assert other_target["target_app_stop_command"] == "pkill -f 'npm run dev' || true"

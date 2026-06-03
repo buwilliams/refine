@@ -45,6 +45,8 @@ function renderSettingsApplicationTab({
 }
 
 function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
+  const rawAutoRebuildMode = String(s.target_app_auto_rebuild || "on_worktree_merge");
+  const autoRebuildMode = rawAutoRebuildMode === "nightly" ? "daily" : rawAutoRebuildMode;
   return `
     <section class="settings-section">
       <h3>Application</h3>
@@ -138,8 +140,21 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
             ["never", "Never"],
             ["on_worktree_merge", "On worktree merge"],
             ["hourly", "Hourly"],
-            ["nightly", "Nightly (midnight)"],
-          ].map(([v, lbl]) => `<option value="${v}" ${String(s.target_app_auto_rebuild || "on_worktree_merge") === v ? "selected" : ""}>${lbl}</option>`).join("")}
+            ["daily", "Daily (time)"],
+          ].map(([v, lbl]) => `<option value="${v}" ${autoRebuildMode === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select></div>
+      <div class="form-row"><label>${renderSettingsGuideLabel(
+        "Daily rebuild time",
+        "application-auto-rebuild-time",
+        "UTC whole-hour time used when automatic rebuild is Daily.",
+      )}</label>
+        <select id="s-target-auto-rebuild-hour-utc"
+                ${autoRebuildMode === "daily" ? "" : "disabled"}>
+          ${Array.from({ length: 24 }, (_, hour) => {
+            const value = String(hour);
+            const label = `${String(hour).padStart(2, "0")}:00 UTC`;
+            return `<option value="${value}" ${String(s.target_app_auto_rebuild_hour_utc || "0") === value ? "selected" : ""}>${label}</option>`;
+          }).join("")}
         </select></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Status command",
@@ -211,6 +226,7 @@ function collectSettingsApplicationPayload() {
     target_app_stop_command: $("#s-target-stop-command").value,
     target_app_rebuild_command: $("#s-target-rebuild-command").value,
     target_app_auto_rebuild: $("#s-target-auto-rebuild").value,
+    target_app_auto_rebuild_hour_utc: $("#s-target-auto-rebuild-hour-utc").value,
     target_app_status_command: $("#s-target-status-command").value,
     target_app_cwd: $("#s-target-cwd").value,
     target_app_env_json: $("#s-target-env").value,
@@ -384,9 +400,16 @@ function bindNodeApplicationConfigControls() {
   bindCommand("#s-application-copy-node", "settings.application.copy_node");
   bindCommand("#s-target-generate-ai", "target_app.generate");
   const root = document.querySelector('[data-tab-pane="application"]');
+  const autoRebuild = $("#s-target-auto-rebuild");
+  const autoRebuildHour = $("#s-target-auto-rebuild-hour-utc");
+  if (autoRebuild && autoRebuildHour) {
+    autoRebuild.addEventListener("change", () => {
+      autoRebuildHour.disabled = autoRebuild.value !== "daily";
+    });
+  }
   bindSettingsAutosave(
     root,
-    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-rebuild-command, #s-target-auto-rebuild, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-rebuild-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
+    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-rebuild-command, #s-target-auto-rebuild, #s-target-auto-rebuild-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-rebuild-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
     autosaveSettingsApplication,
   );
 }

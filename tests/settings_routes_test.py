@@ -995,14 +995,18 @@ def main() -> int:
     assert "def quality_save" in api_py
     assert 'target_app_rebuild_command: $("#s-target-rebuild-command").value' in settings_js
     assert 'target_app_auto_rebuild: $("#s-target-auto-rebuild").value' in settings_js
+    assert 'target_app_auto_rebuild_hour_utc: $("#s-target-auto-rebuild-hour-utc").value' in settings_js
     assert '"on_worktree_merge", "On worktree merge"' in settings_js
     assert 's.target_app_auto_rebuild || "on_worktree_merge"' in settings_js
     assert 's.parallel_run_cap || 5' in settings_js
-    assert '"nightly", "Nightly (midnight)"' in settings_js
-    assert "Nightly (12 PM)" not in settings_js
+    assert '"daily", "Daily (time)"' in settings_js
+    assert 'id="s-target-auto-rebuild-hour-utc"' in settings_js
+    assert 'Daily (${String(snap.auto_rebuild_hour_utc || "0").padStart(2, "0")}:00 UTC)' in settings_js
+    assert "Nightly (midnight)" not in settings_js
     api_source = (root / "refine_ui/api.py").read_text(encoding="utf-8")
     target_app_ops_source = (root / "refine_server/target_app_ops.py").read_text(encoding="utf-8")
     assert "target_app_auto_rebuild" in settings_ops_py
+    assert "target_app_auto_rebuild_hour_utc" in settings_ops_py
     assert '"target_app_url"' in settings_ops_py
     assert "return target_app_ops.snapshot(conn)" in api_source
     assert '"app_url": settings.get("target_app_url") or ""' in target_app_ops_source

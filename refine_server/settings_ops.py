@@ -57,6 +57,7 @@ ALLOWED_SETTINGS = {
     "target_app_tcp_check_port",
     "target_app_process_check_command",
     "target_app_auto_rebuild",
+    "target_app_auto_rebuild_hour_utc",
 }
 VALID_AGENT_CLIS = ("claude", "codex", "gemini", "copilot", "smoke-ai")
 
@@ -222,13 +223,20 @@ def _normalize_setting(key: str, value: Any) -> str:
         return str(number)
     if key == "target_app_auto_rebuild":
         choice = str(value or "").strip()
-        allowed_modes = {"never", "on_worktree_merge", "hourly", "nightly"}
+        if choice == "nightly":
+            return "daily"
+        allowed_modes = {"never", "on_worktree_merge", "hourly", "daily"}
         if choice not in allowed_modes:
             raise ValueError(
                 "target_app_auto_rebuild must be one of never, "
-                "on_worktree_merge, hourly, nightly"
+                "on_worktree_merge, hourly, daily"
             )
         return choice
+    if key == "target_app_auto_rebuild_hour_utc":
+        number = _int_setting(value, key)
+        if number < 0 or number > 23:
+            raise ValueError("target_app_auto_rebuild_hour_utc must be between 0 and 23")
+        return str(number)
     if key == "target_app_tcp_check_port":
         port = str(value or "").strip()
         if port:

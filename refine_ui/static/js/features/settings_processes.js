@@ -606,12 +606,13 @@ function drawTargetAppStatusBlock(snap) {
   const op = snap.last_operation
     ? `<p class="muted small" style="margin-top:6px">Last operation: ${htmlEscape(snap.last_operation.kind)} → ${htmlEscape(snap.last_operation.state)} · ${fmtTime(snap.last_operation.finished_at)}</p>`
     : "";
+  const autoRebuildMode = snap.auto_rebuild === "nightly" ? "daily" : snap.auto_rebuild;
   const autoRebuildLabel = {
     never: "Never",
     on_worktree_merge: "On worktree merge",
     hourly: "Hourly",
-    nightly: "Nightly (midnight)",
-  }[snap.auto_rebuild || "never"] || "Never";
+    daily: `Daily (${String(snap.auto_rebuild_hour_utc || "0").padStart(2, "0")}:00 UTC)`,
+  }[autoRebuildMode || "never"] || "Never";
   const autoRebuild = `<p class="muted small" style="margin-top:6px">Automatic rebuild: ${htmlEscape(autoRebuildLabel)}${
     snap.auto_rebuild_last_finished_at
       ? ` · last ${snap.auto_rebuild_last_ok ? "OK" : "failed"} at ${fmtTime(snap.auto_rebuild_last_finished_at)}`

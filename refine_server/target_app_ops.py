@@ -29,6 +29,9 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
     cleanup_legacy_settings(conn)
     settings = db.list_settings(conn)
     cfg = target_app.config_from_settings(settings)
+    auto_rebuild = settings.get("target_app_auto_rebuild") or "on_worktree_merge"
+    if auto_rebuild == "nightly":
+        auto_rebuild = "daily"
     last_op = conn.execute(
         "SELECT id, kind, state, started_at, finished_at, exit_code, message "
         "FROM target_app_operations ORDER BY id DESC LIMIT 1"
@@ -54,7 +57,8 @@ def snapshot(conn: sqlite3.Connection) -> dict[str, Any]:
         "last_error": settings.get("target_app_last_error") or "",
         "last_operation_id": settings.get("target_app_last_operation_id") or "",
         "last_operation": dict(last_op) if last_op else None,
-        "auto_rebuild": settings.get("target_app_auto_rebuild") or "on_worktree_merge",
+        "auto_rebuild": auto_rebuild,
+        "auto_rebuild_hour_utc": settings.get("target_app_auto_rebuild_hour_utc") or "0",
         "auto_rebuild_last_started_at": settings.get("target_app_auto_rebuild_last_started_at") or "",
         "auto_rebuild_last_finished_at": settings.get("target_app_auto_rebuild_last_finished_at") or "",
         "auto_rebuild_last_ok": (settings.get("target_app_auto_rebuild_last_ok") or "0") == "1",

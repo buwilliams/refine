@@ -43,6 +43,8 @@ def main() -> int:
             "agent_cli": "codex",
             "file_browser_ignore_patterns": " node_modules, .git, vendor_cache ",
             "target_app_env_json": '{"PORT":3001}',
+            "target_app_auto_rebuild": "daily",
+            "target_app_auto_rebuild_hour_utc": "19",
         }
         rc, out, err = _run_cli([*prefix, "settings", "save", json.dumps(payload)])
         assert rc == 0, err
@@ -55,6 +57,8 @@ def main() -> int:
         assert settings["agent_cli"] == "codex"
         assert settings["file_browser_ignore_patterns"] == "node_modules, .git, vendor_cache"
         assert settings["target_app_env_json"] == '{"PORT": "3001"}'
+        assert settings["target_app_auto_rebuild"] == "daily"
+        assert settings["target_app_auto_rebuild_hour_utc"] == "19"
 
         rc, out, err = _run_cli([*prefix, "settings", "set", "target_app_cwd", "apps/web"])
         assert rc == 0, err
@@ -67,6 +71,30 @@ def main() -> int:
         rc, out, err = _run_cli([*prefix, "settings", "set", "parallel_run_cap", "0"])
         assert rc == 1
         assert "parallel_run_cap must be between 1 and 100" in err
+
+        rc, out, err = _run_cli([
+            *prefix,
+            "settings",
+            "set",
+            "target_app_auto_rebuild_hour_utc",
+            "24",
+        ])
+        assert rc == 1
+        assert "target_app_auto_rebuild_hour_utc must be between 0 and 23" in err
+
+        rc, out, err = _run_cli([
+            *prefix,
+            "settings",
+            "set",
+            "target_app_auto_rebuild",
+            "nightly",
+        ])
+        assert rc == 0, err
+        assert _json(out)["ok"] is True
+
+        rc, out, err = _run_cli([*prefix, "settings", "get"])
+        assert rc == 0, err
+        assert _json(out)["settings"]["target_app_auto_rebuild"] == "daily"
 
         from refine_cli import cli
 

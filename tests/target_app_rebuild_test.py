@@ -5,7 +5,7 @@ import json
 import sys
 import threading
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -144,6 +144,24 @@ def main() -> int:
 
         calls.clear()
 
+        status, body = api.update_settings({
+            "target_app_auto_rebuild": "daily",
+            "target_app_auto_rebuild_hour_utc": "23",
+        })
+        assert status == 200, body
+        assert db.get_setting(conn, "target_app_auto_rebuild") == "daily"
+        assert db.get_setting(conn, "target_app_auto_rebuild_hour_utc") == "23"
+        status, body = api.update_settings({
+            "target_app_auto_rebuild_hour_utc": "24",
+        })
+        assert status == 400, body
+        assert "between 0 and 23" in body["error"]["message"], body
+        status, body = api.update_settings({
+            "target_app_auto_rebuild": "nightly",
+        })
+        assert status == 200, body
+        assert db.get_setting(conn, "target_app_auto_rebuild") == "daily"
+
         class RebuildQueueClient:
             def call(self, method: str, params: dict | None = None, *, timeout: float = 30.0) -> dict:  # noqa: ARG002
                 calls.append(method)
@@ -201,35 +219,45 @@ def main() -> int:
         )
         assert target_settings["target_app_auto_rebuild"] == "hourly"
 
-        db.set_setting(conn, "target_app_auto_rebuild", "nightly")
+        db.set_setting(conn, "target_app_auto_rebuild", "daily")
+        db.set_setting(conn, "target_app_auto_rebuild_hour_utc", "13")
         db.set_setting(conn, "target_app_auto_rebuild_last_started_at", "")
-        midnight = datetime.now().astimezone().replace(
-            hour=0, minute=0, second=0, microsecond=0,
+        daily_window = datetime.now(timezone.utc).replace(
+            hour=13, minute=0, second=0, microsecond=0,
         )
         rebuilder._queue_scheduled_rebuild_if_due(  # noqa: SLF001
-            midnight.replace(hour=12),
+            daily_window.replace(hour=12),
         )
         rebuilder._drain_queue()  # noqa: SLF001
         assert runs[-1] == "hourly automatic rebuild", runs
         db.set_setting(
             conn,
             "target_app_auto_rebuild_last_started_at",
-            (midnight - timedelta(days=1)).isoformat(),
+            (daily_window - timedelta(days=1)).isoformat(),
         )
-        rebuilder._queue_scheduled_rebuild_if_due(midnight)  # noqa: SLF001
+        rebuilder._queue_scheduled_rebuild_if_due(daily_window)  # noqa: SLF001
         rebuilder._drain_queue()  # noqa: SLF001
-        assert runs[-1] == "nightly automatic rebuild", runs
-        nightly_count = len(runs)
+        assert runs[-1] == "daily automatic rebuild (13:00 UTC)", runs
+        daily_count = len(runs)
         db.set_setting(
             conn,
             "target_app_auto_rebuild_last_started_at",
-            midnight.isoformat(),
+            daily_window.isoformat(),
         )
-        rebuilder._queue_scheduled_rebuild_if_due(  # noqa: SLF001
-            midnight.replace(hour=12),
-        )
+        rebuilder._queue_scheduled_rebuild_if_due(daily_window)  # noqa: SLF001
         rebuilder._drain_queue()  # noqa: SLF001
-        assert len(runs) == nightly_count, runs
+        assert len(runs) == daily_count, runs
+
+        db.set_setting(conn, "target_app_auto_rebuild", "nightly")
+        db.set_setting(conn, "target_app_auto_rebuild_hour_utc", "0")
+        db.set_setting(conn, "target_app_auto_rebuild_last_started_at", "")
+        legacy_midnight = daily_window.replace(hour=0)
+        rebuilder._queue_scheduled_rebuild_if_due(legacy_midnight)  # noqa: SLF001
+        rebuilder._drain_queue()  # noqa: SLF001
+        assert runs[-1] == "daily automatic rebuild (00:00 UTC)", runs
+        snapshot = target_app_ops.snapshot(conn)
+        assert snapshot["auto_rebuild"] == "daily", snapshot
+        assert snapshot["auto_rebuild_hour_utc"] == "0", snapshot
 
         db.set_setting(conn, "target_app_stop_command", "stop-app")
         db.set_setting(conn, "target_app_rebuild_command", "build-app")

@@ -331,6 +331,7 @@ DEFAULT_SETTINGS = {
     "target_app_tcp_check_port": "",
     "target_app_process_check_command": "",
     "target_app_auto_rebuild": "on_worktree_merge",
+    "target_app_auto_rebuild_hour_utc": "0",
     "target_app_auto_rebuild_last_started_at": "",
     "target_app_auto_rebuild_last_finished_at": "",
     "target_app_auto_rebuild_last_ok": "0",
