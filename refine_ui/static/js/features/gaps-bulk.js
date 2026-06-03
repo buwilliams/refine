@@ -234,6 +234,79 @@ async function openBulkTransferNodeModal() {
   }
 }
 
+async function openBulkAssignFeatureModal({ button = null } = {}) {
+  const f = gapsFilterFromHash();
+  const filter = {
+    status: f.status, q: f.q, reporter: f.reporter,
+    feature: f.feature,
+    rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
+    node: f.node,
+    severity: f.severity, category: f.category, actor: f.actor,
+  };
+  const filterDesc = describeGapsFilter(filter);
+  const selectionFields = _selectionRequestFields();
+  if (!_hasAnyGapSelection()) {
+    toast("No Gaps selected.", "warn");
+    return;
+  }
+  const countText = _selectionCountText("selected");
+
+  let features = [];
+  try {
+    const params = new URLSearchParams({
+      node: "current",
+      limit: "500",
+      sort: "updated",
+      dir: "desc",
+    });
+    const data = await api("GET", "/api/features?" + params);
+    features = data.features || [];
+  } catch (e) {
+    await showActionError(e, "Could not load Features");
+    return;
+  }
+  if (!features.length) {
+    toast("No current-node Features available.", "warn");
+    return;
+  }
+  const opts = features.map((feature) => `
+    <option value="${htmlEscape(feature.id)}">
+      ${htmlEscape(feature.name || feature.id)}
+      · ${htmlEscape(feature.status || "backlog")}
+      · ${feature.done_count || 0}/${feature.gap_count || 0} done
+    </option>`).join("");
+  const body = () => `
+    <div class="modal-title">Assign to Feature</div>
+    <div class="modal-body">
+      <div class="muted small" style="margin-bottom:8px">
+        Applies to ${htmlEscape(countText || "all matching")} —
+        ${htmlEscape(filterDesc)}.
+      </div>
+      <label for="bulk-assign-feature-value">Feature</label>
+      <select class="modal-input" id="bulk-assign-feature-value" style="width:100%">
+        ${opts}
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        Selected Gaps already in this Feature or owned by another node are skipped.
+      </p>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>Cancel</button>
+      <button data-ok>Assign</button>
+    </div>`;
+  const featureId = await _openModal(
+    body, { cancel: null, ok: features[0].id }, ".modal-input",
+  );
+  if (featureId === null) return;
+  await withButtonBusy(button, "Assigning...", async () => {
+    const r = await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/bulk`, {
+      filter, ...selectionFields,
+    });
+    toast(`Assigned ${r.updated}; skipped ${r.skipped}.`, "info");
+    await renderGapsList();
+  });
+}
+
 async function confirmBulkDelete() {
   const f = gapsFilterFromHash();
   const filter = {

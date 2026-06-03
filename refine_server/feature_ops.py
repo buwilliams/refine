@@ -277,6 +277,77 @@ def assign_gap(feature_id: str, gap_id: str) -> tuple[int, dict[str, Any]]:
         conn.close()
 
 
+def bulk_assign_gaps(feature_id: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    feature_id = feature_id.upper()
+    conn = _conn()
+    try:
+        feature = _require_feature(conn, feature_id)
+        if isinstance(feature, tuple):
+            return feature
+        owner_err = _require_active_node(feature["node_id"], "Feature")
+        if owner_err is not None:
+            return owner_err
+        code, selected = gap_ops.select_bulk_update_candidates(
+            conn,
+            body.get("filter") or {},
+            set(body.get("exclude_ids") or []),
+            skip_automated=False,
+            selected_ids=gap_ops.selected_gap_ids(body),
+        )
+        if code != 200:
+            return code, selected
+        rows = selected.get("gaps") or []
+        skipped_details = list(selected.get("skipped_details") or [])
+        if not rows:
+            return 200, {
+                "feature_id": feature_id,
+                "updated": 0,
+                "ids": [],
+                "skipped": len(skipped_details),
+                "skipped_details": skipped_details,
+            }
+        next_order = _next_feature_order(conn, feature_id)
+        moved_ids: list[str] = []
+        old_features: set[str] = set()
+        with db.transaction(conn):
+            for row in rows:
+                gap_id = str(row["id"]).upper()
+                if str(row.get("node_id") or "") != str(feature["node_id"]):
+                    skipped_details.append({
+                        "id": gap_id,
+                        "reason": "different-node",
+                    })
+                    continue
+                old_feature = str(row.get("feature_id") or "").upper()
+                if old_feature == feature_id:
+                    skipped_details.append({
+                        "id": gap_id,
+                        "reason": "already-assigned",
+                    })
+                    continue
+                _set_gap_membership(conn, gap_id, feature_id, next_order)
+                moved_ids.append(gap_id)
+                next_order += 1
+                if old_feature:
+                    old_features.add(old_feature)
+            for old_feature in sorted(old_features):
+                _compact_feature_orders(conn, old_feature)
+            if moved_ids:
+                _compact_feature_orders(conn, feature_id)
+        status, detail = get_feature(feature_id)
+        feature_body = detail.get("feature") if status == 200 else None
+        return 200, {
+            "feature_id": feature_id,
+            "updated": len(moved_ids),
+            "ids": moved_ids,
+            "skipped": len(skipped_details),
+            "skipped_details": skipped_details,
+            "feature": feature_body,
+        }
+    finally:
+        conn.close()
+
+
 def remove_gap(feature_id: str, gap_id: str) -> tuple[int, dict[str, Any]]:
     feature_id = feature_id.upper()
     gap_id = gap_id.upper()

@@ -105,6 +105,7 @@ async function renderGapsList() {
         <button class="secondary small" id="bulk-set-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
+        <button class="secondary small" id="bulk-assign-feature">Feature…</button>
         <button class="secondary small" id="bulk-transfer-node">Node…</button>
         <button class="secondary small" id="bulk-delete">Delete…</button>
       </div>
@@ -154,6 +155,7 @@ async function renderGapsList() {
   bindCommand("#bulk-set-priority", "gaps.bulk.priority");
   bindCommand("#bulk-set-status", "gaps.bulk.status");
   bindCommand("#bulk-set-reporter", "gaps.bulk.reporter");
+  bindCommand("#bulk-assign-feature", "gaps.bulk.feature");
   bindCommand("#bulk-transfer-node", "gaps.bulk.transfer_node");
   bindCommand("#bulk-delete", "gaps.bulk.delete");
   bindCommand("#gap-select-page", "gaps.select_page");
@@ -321,8 +323,10 @@ function _isGapSelected(id) {
 
 function renderGapFeatureCell(gap) {
   if (!gap.feature_id) return "—";
+  const featureId = String(gap.feature_id);
+  const featureLabel = featureId.length > 12 ? `${featureId.slice(0, 10)}…` : featureId;
   const order = gap.feature_order ? ` #${gap.feature_order}` : "";
-  return `<a href="#/features/${encodeURIComponent(gap.feature_id)}">${htmlEscape(gap.feature_id)}${htmlEscape(order)}</a>`;
+  return `<a href="#/features/${encodeURIComponent(featureId)}" title="${htmlEscape(featureId)}">${htmlEscape(featureLabel)}${htmlEscape(order)}</a>`;
 }
 
 function drawGapsTable(gaps, state) {

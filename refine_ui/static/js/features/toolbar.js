@@ -527,12 +527,12 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
         ${active.mode === "plan" ? `
           <button id="btn-plan-draft" class="secondary"
                   ${planHasAgentResponse(active) ? "" : "disabled"}>
-            Draft Gaps
+            Draft Project
           </button>` : ""}
         ${active.gapId ? `
           <button id="btn-gap-round-extract" class="secondary"
                   ${gapChatCanExtractRound(active) ? "" : "disabled"}>
-            Extract Round
+            Draft Round
           </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
                 ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>

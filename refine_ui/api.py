@@ -1473,6 +1473,14 @@ def assign_feature_gap(feature_id: str, gap_id: str) -> tuple[int, dict]:
     return status, payload
 
 
+@_system_operation("Bulk assign Gaps to Feature")
+@_exclusive_mutation("Bulk assign Gaps to Feature")
+def bulk_assign_feature_gaps(feature_id: str, body: dict) -> tuple[int, dict]:
+    status, payload = feature_ops.bulk_assign_gaps(feature_id.upper(), body or {})
+    _sync_feature_mutation(payload, status, "refine: bulk assign gaps to feature")
+    return status, payload
+
+
 @_exclusive_mutation("Remove Gap from Feature")
 def remove_feature_gap(feature_id: str, gap_id: str) -> tuple[int, dict]:
     status, payload = feature_ops.remove_gap(feature_id.upper(), gap_id.upper())
@@ -2402,11 +2410,22 @@ def import_persist(body: dict) -> tuple[int, dict]:
         stopped = _background_processes_stopped_response()
         if stopped is not None:
             return stopped
-        job_body = json.loads(json.dumps({
+        job_body = {
             "reporter": (body.get("reporter") or "").strip(),
             "drafts": drafts,
             "background": False,
-        }))
+        }
+        for key in (
+            "feature_id",
+            "feature",
+            "new_feature_name",
+            "new_feature_description",
+            "feature_description",
+            "feature_reporter",
+        ):
+            if key in body:
+                job_body[key] = body.get(key)
+        job_body = json.loads(json.dumps(job_body))
 
         def run_job() -> dict[str, Any]:
             status, result = _import_persist_sync(job_body)

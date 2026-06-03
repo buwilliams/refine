@@ -154,6 +154,11 @@ def _h_assign_feature_gap(_h, m, _b, _q):
     return api.assign_feature_gap(m.group(1).upper(), m.group(2).upper())
 
 
+@route("POST", r"/api/features/([0-9A-Za-z]{26})/gaps/bulk")
+def _h_bulk_assign_feature_gaps(_h, m, body, _q):
+    return api.bulk_assign_feature_gaps(m.group(1).upper(), body or {})
+
+
 @route("DELETE", r"/api/features/([0-9A-Za-z]{26})/gaps/([0-9A-Za-z]{26})")
 def _h_remove_feature_gap(_h, m, _b, _q):
     return api.remove_feature_gap(m.group(1).upper(), m.group(2).upper())

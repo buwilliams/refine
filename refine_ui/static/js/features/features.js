@@ -406,7 +406,6 @@ function openFeatureModal(feature = null, options = {}) {
           <div class="actions feature-gap-heading-actions">
             <button type="button" class="secondary small feature-gap-add-btn"
                     data-feature-new-gap aria-label="New Gap" title="New Gap">+</button>
-            <button type="button" class="secondary small" data-feature-assign-gap>Assign existing</button>
           </div>
         </div>
         ${renderFeatureGapTable(gaps, {
@@ -467,10 +466,6 @@ function openFeatureModal(feature = null, options = {}) {
         const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
         openFeatureModal(data.feature, { navigateAway });
       });
-    });
-    root.querySelector("[data-feature-assign-gap]")?.addEventListener("click", async () => {
-      await openFeatureAssignGapModal(feature.id);
-      await reloadModal();
     });
     bindFeatureGapActions(root, feature.id, reloadModal);
     bindFeatureGapDragReorder(root, feature.id, reloadModal);
@@ -653,40 +648,6 @@ function openFeatureNewGapFlow(featureId, onSaved) {
       await onSaved?.();
     },
   });
-}
-
-async function openFeatureAssignGapModal(featureId) {
-  const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}/candidate-gaps?limit=100`);
-  const gaps = data.gaps || [];
-  if (!gaps.length) {
-    await modalAlert("No standalone Gaps are available for this Feature.", {
-      title: "Assign Gap",
-    });
-    return;
-  }
-  const body = () => `
-    <div class="modal-title">Assign Existing Gap</div>
-    <div class="modal-body">
-      <label>Gap</label>
-      <select class="modal-input">
-        ${gaps.map((gap) => `
-          <option value="${htmlEscape(gap.id)}">
-            ${htmlEscape(gap.name || gap.id)} · ${htmlEscape(gap.status || "backlog")} · ${htmlEscape(gap.priority || "low")}
-          </option>`).join("")}
-      </select>
-    </div>
-    <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>Assign</button>
-    </div>`;
-  const selected = await _openModal(body, { cancel: null, ok: "" }, ".modal-input");
-  if (!selected) return;
-  try {
-    await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(selected)}`);
-    toast("Gap assigned to Feature", "info");
-  } catch (e) {
-    showActionError(e, "Assign failed");
-  }
 }
 
 async function cancelFeatureFromUi(featureId) {

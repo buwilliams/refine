@@ -379,6 +379,15 @@ registerCommand({
 });
 
 registerCommand({
+  id: "gaps.bulk.feature",
+  title: "Bulk: assign selected Gaps to Feature",
+  group: "Gaps",
+  aliases: ["bulk-feature"],
+  visible: () => state.currentRoute === "gaps",
+  run: ({ button } = {}) => openBulkAssignFeatureModal({ button }),
+});
+
+registerCommand({
   id: "gaps.bulk.transfer_node",
   title: "Bulk: transfer selected Gaps to node",
   group: "Gaps",

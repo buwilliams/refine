@@ -176,6 +176,45 @@ def main() -> int:
         assert source_detail["gaps"][0]["feature_order"] == 1, source_detail
         print("[ok] moving a Gap between Features compacts both ordered lists")
 
+        bulk_source = new_ulid()
+        bulk_target = new_ulid()
+        for fid, name in ((bulk_source, "Bulk Source Feature"), (bulk_target, "Bulk Target Feature")):
+            status, body = feature_ops.create_feature({
+                "id": fid,
+                "name": name,
+                "reporter": "Ada",
+            })
+            assert status == 201, body
+        bulk_free = new_ulid()
+        bulk_move = new_ulid()
+        bulk_already = new_ulid()
+        for gap_id in (bulk_free, bulk_move, bulk_already):
+            create_indexed_gap(conn, gap_id, status="todo", node_id=active)
+        status, body = feature_ops.assign_gap(bulk_source, bulk_move)
+        assert status == 200, body
+        status, body = feature_ops.assign_gap(bulk_target, bulk_already)
+        assert status == 200, body
+        status, body = feature_ops.bulk_assign_gaps(bulk_target, {
+            "selected_ids": [bulk_free, bulk_move, bulk_already],
+        })
+        assert status == 200, body
+        assert body["updated"] == 2, body
+        assert body["ids"] == [bulk_free, bulk_move], body
+        assert body["skipped_details"] == [{
+            "id": bulk_already,
+            "reason": "already-assigned",
+        }], body
+        assert [g["id"] for g in body["feature"]["gaps"]] == [
+            bulk_already,
+            bulk_free,
+            bulk_move,
+        ], body
+        status, body = feature_ops.get_feature(bulk_source)
+        assert status == 200, body
+        assert body["feature"]["gaps"] == [], body
+        assert gaps.read_gap_json(bulk_move, include_logs=False)["feature_id"] == bulk_target
+        print("[ok] bulk Feature assignment moves selected Gaps and skips existing membership")
+
         other_node = project_state.create_node("Other")
         other_gap = new_ulid()
         create_indexed_gap(conn, other_gap, status="todo", node_id=other_node["id"])

@@ -104,8 +104,11 @@ def main() -> int:
             encoding="utf-8",
         )
         assert 'id="bulk-transfer-node"' in gaps_list
+        assert 'id="bulk-assign-feature"' in gaps_list
         assert 'id="gap-select-page"' in gaps_list
         assert "selectCurrentGapsPage" in gaps_list
+        assert "openBulkAssignFeatureModal" in gaps_bulk
+        assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/bulk`' in gaps_bulk
         assert "openBulkTransferNodeModal" in gaps_bulk
         assert 'api("POST", "/api/nodes/transfer-gaps"' in gaps_bulk
         assert "filter, ...selectionFields" in gaps_bulk

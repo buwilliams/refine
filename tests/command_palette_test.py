@@ -90,6 +90,7 @@ def main() -> int:
         "files.search",
         "gaps.bulk.move",
         "gaps.bulk.failed_back",
+        "gaps.bulk.feature",
         "system.cache.rebuild",
         "target_app.generate",
         "quality.regression.new",
@@ -98,6 +99,7 @@ def main() -> int:
     ):
         assert f'id: "{command_id}"' in commands_js
     assert 'aliases: ["bulk_move", "bulk-move", "move-gaps"]' in commands_js
+    assert 'aliases: ["bulk-feature"]' in commands_js
     assert 'new URL("https://github.com/buwilliams/refine/issues/new")' in commands_js
     assert 'url.searchParams.set("title", title)' in commands_js
     assert 'url.searchParams.set("body", description)' in commands_js
@@ -127,6 +129,7 @@ def main() -> int:
     assert 'runCommand("gap.import")' in common_js
     assert 'runCommand("refine.issue.request")' in common_js
     assert 'bindCommand("#bulk-set-status", "gaps.bulk.status")' in gaps_list_js
+    assert 'bindCommand("#bulk-assign-feature", "gaps.bulk.feature")' in gaps_list_js
     assert 'bindCommand("#s-target-generate-ai", "target_app.generate");' in system_tab_js["settings_application"]
     assert 'await withButtonBusy(button, "Generating...", async () => {' in commands_js
     assert 'api("POST", "/api/target-app/generate-instructions", { kind: "all" })' in commands_js
@@ -237,7 +240,7 @@ def main() -> int:
     assert "async function sendChatText(text)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
     assert "btn-gap-round-extract" in toolbar_js
-    assert "Extract Round" in toolbar_js
+    assert "Draft Round" in toolbar_js
     assert 'id="chat-gap-link"' in toolbar_js
     assert 'href="#/gaps/${encodeURIComponent(active.gapId)}"' in toolbar_js
     assert ".chat-gap-link" in toolbar_css

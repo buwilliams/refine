@@ -46,6 +46,34 @@ def main() -> int:
             result = wait_job(body["job"]["id"])
             assert result["http_status"] == 201, result
             assert result["count"] == 3, result
+
+            status, body = api.import_persist({
+                "reporter": "Reporter",
+                "new_feature_name": "Async Imported Feature",
+                "new_feature_description": "Queued feature destination",
+                "drafts": [
+                    {
+                        "name": f"Async feature import {i}",
+                        "actual": f"Async feature actual {i}",
+                        "target": f"Async feature target {i}",
+                        "duplicate_decision": "original",
+                    }
+                    for i in range(1, 4)
+                ],
+            })
+            assert status == 202, body
+            result = wait_job(body["job"]["id"])
+            assert result["http_status"] == 201, result
+            assert result["count"] == 3, result
+            assert result["feature_destination"] == "new", result
+            feature_id = result["feature_id"]
+            from refine_server import feature_ops
+
+            status, detail = feature_ops.get_feature(feature_id)
+            assert status == 200, detail
+            assert detail["feature"]["name"] == "Async Imported Feature", detail
+            assert [g["id"] for g in detail["feature"]["gaps"]] == result["created"], detail
+            assert [g["feature_order"] for g in detail["feature"]["gaps"]] == [1, 2, 3], detail
         finally:
             api.IMPORT_BACKGROUND_THRESHOLD = original_import_threshold
 

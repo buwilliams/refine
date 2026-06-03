@@ -200,6 +200,7 @@ def main() -> int:
         "Check app",
         "Sync app",
         "Transfer Gaps between nodes",
+        "Bulk assign Gaps to Feature",
         "Bulk update Gaps",
         "Bulk delete Gaps",
         "Import Gaps",
@@ -322,12 +323,15 @@ def main() -> int:
     assert '@route("DELETE", r"/api/features/([0-9A-Za-z]{26})")' in server_py
     assert 'r"/api/features/([0-9A-Za-z]{26})"' in server_py
     assert 'r"/api/features/([0-9A-Za-z]{26})/gaps/([0-9A-Za-z]{26})"' in server_py
+    assert 'r"/api/features/([0-9A-Za-z]{26})/gaps/bulk"' in server_py
     assert "def list_features" in api_py
     assert "def create_feature" in api_py
     assert "def cancel_feature" in api_py
     assert "def delete_feature" in api_py
+    assert "def bulk_assign_feature_gaps" in api_py
     assert "feature_ops.list_features" in api_py
     assert "feature_ops.assign_gap" in api_py
+    assert "feature_ops.bulk_assign_gaps" in api_py
     assert "feature_ops.cancel_feature" in api_py
     assert "feature_ops.delete_feature" in api_py
     assert "features: renderFeaturesList" in router_js
@@ -380,14 +384,15 @@ def main() -> int:
     assert "feature-gap-heading-actions" in features_js
     assert "feature-gap-add-btn" in features_js
     assert 'data-feature-new-gap aria-label="New Gap" title="New Gap">+</button>' in features_js
-    assert "<button type=\"button\" class=\"secondary small\" data-feature-assign-gap>Assign existing</button>" in features_js
+    assert "data-feature-assign-gap" not in features_js
+    assert "Assign existing" not in features_js
     assert "ID <code>${htmlEscape(feature.id)}</code>" in features_js
     assert 'node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>' in features_js
     assert "Create the Feature before adding ordered Gaps." not in features_js
     assert "function bindFeatureGapActions" in features_js
     assert "function bindFeatureGapDragReorder" in features_js
     assert "function featureGapActionIcon" in features_js
-    assert "openFeatureAssignGapModal" in features_js
+    assert "openFeatureAssignGapModal" not in features_js
     assert "openFeatureNewGapFlow" in features_js
     assert "cancelFeatureFromUi" in features_js
     assert "deleteFeatureFromUi" in features_js
@@ -425,6 +430,10 @@ def main() -> int:
     assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}`' in features_js
     assert 'params.set("feature", f.feature);' in gaps_list_js
     assert 'placeholder="Feature ID or standalone"' in gaps_list_js
+    assert 'id="bulk-assign-feature"' in gaps_list_js
+    assert 'bindCommand("#bulk-assign-feature", "gaps.bulk.feature")' in gaps_list_js
+    assert "openBulkAssignFeatureModal" in gaps_bulk_js
+    assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/bulk`' in gaps_bulk_js
     assert "renderGapFeatureCell" in gaps_list_js
     assert "renderGapFeatureAssociation" in gaps_detail_js
     assert "openGapFeatureAssignModal" in gaps_detail_js
@@ -589,7 +598,7 @@ def main() -> int:
     assert 'runCommand("plan.open")' in common_js
     assert "async function openPlanChatDock(options = {})" in toolbar_js
     assert "{ purpose: \"plan\" }" in toolbar_js
-    assert "Draft Gaps" in toolbar_js
+    assert "Draft Project" in toolbar_js
     assert "function planTranscriptText(tab)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
     assert "function syncPlanDraftButton(tab)" in toolbar_js
