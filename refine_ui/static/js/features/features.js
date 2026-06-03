@@ -11,6 +11,8 @@ const FEATURES_STATUS_OPTIONS = [
   "awaiting-rebuild", "review", "done", "failed", "cancelled",
 ];
 
+let _featureModalRoot = null;
+
 function featuresHash(parts) {
   const next = new URLSearchParams();
   if (parts.q) next.set("q", parts.q);
@@ -142,26 +144,44 @@ async function refreshFeaturesTable() {
 }
 
 function drawFeaturesTable(features, stateForRender) {
+  const root = $("#features-table");
   const page = stateForRender.pageMeta || {};
   const total = page.total ?? ((page.offset || 0) + features.length + (page.has_more ? 1 : 0));
   $("#features-count").textContent = `${total} feature${total === 1 ? "" : "s"}`;
   $("#features-filtered").hidden = !(
     stateForRender.q || stateForRender.status || stateForRender.reporter || stateForRender.node
   );
+  if (!features.length) {
+    root.innerHTML = `
+      <p class="muted">No Features match the current filters.</p>
+      ${renderPaginationControls("features", page, 0, "feature")}`;
+    bindPaginationControls(root, "features", (pageNo) =>
+      updateFeaturesFilter({ page: pageNo }));
+    return;
+  }
   const rows = features.length ? features.map((feature) => `
     <tr data-feature-id="${htmlEscape(feature.id)}">
-      <td data-label="Name"><a href="#/features/${encodeURIComponent(feature.id)}">${htmlEscape(feature.name || "Untitled Feature")}</a></td>
-      <td data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
+      <td class="features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
+      <td class="features-status-cell" data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
       <td data-label="Progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</td>
       <td data-label="Next">${feature.next_gap ? htmlEscape(feature.next_gap.name || feature.next_gap.id) : '<span class="muted small">-</span>'}</td>
-      <td data-label="Reporter">${htmlEscape(feature.reporter || "-")}</td>
-      <td data-label="Node">${htmlEscape(feature.node_display_name || feature.node_id || "-")}</td>
-      <td data-label="Updated">${fmtTime(feature.updated)}</td>
+      <td class="muted small" data-label="Reporter">${htmlEscape(feature.reporter || "-")}</td>
+      <td class="muted small" data-label="Node">${htmlEscape(feature.node_display_name || feature.node_id || "-")}</td>
+      <td class="muted small" data-label="Updated">${fmtTime(feature.updated)}</td>
     </tr>`).join("") : `
     <tr><td colspan="7" class="muted">No Features match the current filters.</td></tr>`;
-  $("#features-table").innerHTML = `
+  root.innerHTML = `
     <div class="table-scroll">
-      <table>
+      <table class="table features-table mobile-card-table">
+        <colgroup>
+          <col class="features-col-name">
+          <col class="features-col-status">
+          <col class="features-col-progress">
+          <col class="features-col-next">
+          <col class="features-col-reporter">
+          <col class="features-col-node">
+          <col class="features-col-updated">
+        </colgroup>
         <thead><tr>
           ${featureSortHeader("name", "Name", stateForRender)}
           ${featureSortHeader("status", "Status", stateForRender)}
@@ -196,51 +216,17 @@ function drawFeaturesTable(features, stateForRender) {
 function featureSortHeader(key, label, stateForRender) {
   const active = stateForRender.effectiveSort === key;
   const dir = active ? stateForRender.effectiveDir : (FEATURES_DEFAULT_DIR[key] || "asc");
+  const arrow = active
+    ? (dir === "asc" ? "↑" : "↓")
+    : `<span class="sort-arrow-placeholder">↕</span>`;
   return `<th class="sortable ${active ? "active" : ""}" data-sort="${key}">
-    ${htmlEscape(label)} <span class="sort-indicator">${active ? (dir === "asc" ? "▲" : "▼") : ""}</span>
+    ${htmlEscape(label)} <span class="sort-arrow">${arrow}</span>
   </th>`;
 }
 
 async function renderFeatureDetail(route) {
   if (renderNoProjectIfDetached("Features")) return;
-  const featureId = route.id;
-  const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
-  const feature = data.feature;
-  $("#main").innerHTML = `
-    <div class="page-title-row">
-      <div>
-        <h2>${htmlEscape(feature.name || "Untitled Feature")}</h2>
-        <p class="muted">${htmlEscape(feature.description || "")}</p>
-      </div>
-      <div class="actions">
-        <button id="feature-new-gap">New Gap</button>
-        <button class="secondary" id="feature-assign-gap">Assign existing</button>
-        <button class="secondary" id="feature-edit">Edit</button>
-        <button class="secondary" id="feature-cancel">Cancel Feature</button>
-        <button class="danger" id="feature-delete">Delete Feature</button>
-      </div>
-    </div>
-    <div class="panel">
-      <p>
-        <span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span>
-        <span class="muted small">${feature.done_count || 0} / ${feature.gap_count || 0} done</span>
-      </p>
-      ${renderFeatureGapTable(feature.gaps || [], { actions: true })}
-    </div>
-  `;
-  $("#feature-edit")?.addEventListener("click", () => openFeatureModal(feature));
-  $("#feature-new-gap")?.addEventListener("click", () => openFeatureNewGapFlow(feature.id, async () => {
-    await renderFeatureDetail({ id: feature.id });
-  }));
-  $("#feature-assign-gap")?.addEventListener("click", async () => {
-    await openFeatureAssignGapModal(feature.id);
-    await renderFeatureDetail({ id: feature.id });
-  });
-  $("#feature-cancel")?.addEventListener("click", () => cancelFeatureFromUi(feature.id));
-  $("#feature-delete")?.addEventListener("click", () => deleteFeatureFromUi(feature.id));
-  bindFeatureGapActions(document, feature.id, async () => {
-    await renderFeatureDetail({ id: feature.id });
-  });
+  openFeatureDetailModal(route.id);
 }
 
 function renderFeatureGapTable(gaps, options = {}) {
@@ -258,7 +244,22 @@ function renderFeatureGapTable(gaps, options = {}) {
   const rows = visible.length ? visible.map((gap, idx) => {
     const globalIdx = start + idx;
     return `
-    <tr>
+    <tr data-feature-gap-row="${htmlEscape(gap.id)}">
+      ${actions ? `<td class="feature-gap-drag-cell" data-label="Move">
+        <button type="button" class="feature-gap-drag-handle" draggable="true"
+                data-feature-drag-gap="${htmlEscape(gap.id)}"
+                aria-label="Drag to reorder ${htmlEscape(gap.name || gap.id)}"
+                title="Drag to reorder">
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <circle cx="9" cy="5" r="1.5"></circle>
+            <circle cx="15" cy="5" r="1.5"></circle>
+            <circle cx="9" cy="12" r="1.5"></circle>
+            <circle cx="15" cy="12" r="1.5"></circle>
+            <circle cx="9" cy="19" r="1.5"></circle>
+            <circle cx="15" cy="19" r="1.5"></circle>
+          </svg>
+        </button>
+      </td>` : ""}
       <td data-label="Order">${gap.feature_order || ""}</td>
       <td data-label="Gap"><a href="#/gaps/${encodeURIComponent(gap.id)}">${htmlEscape(gap.name || gap.id)}</a></td>
       <td data-label="Status"><span class="status-pill ${htmlEscape(gap.status || "backlog")}">${workflowStatusLabel(gap.status || "backlog")}</span></td>
@@ -267,22 +268,43 @@ function renderFeatureGapTable(gaps, options = {}) {
       <td data-label="Updated">${fmtTime(gap.updated)}</td>
       ${actions ? `<td data-label="Actions">
         <div class="actions compact-actions">
-          <button class="secondary small" data-feature-move="up" data-gap-id="${htmlEscape(gap.id)}" data-neighbor-id="${htmlEscape(gaps[globalIdx - 1]?.id || "")}" ${globalIdx === 0 ? "disabled" : ""}>Up</button>
-          <button class="secondary small" data-feature-move="down" data-gap-id="${htmlEscape(gap.id)}" data-neighbor-id="${htmlEscape(gaps[globalIdx + 1]?.id || "")}" ${globalIdx === gaps.length - 1 ? "disabled" : ""}>Down</button>
-          <button class="secondary small" data-feature-remove-gap="${htmlEscape(gap.id)}">Remove</button>
+          <button class="secondary small feature-gap-icon-btn" data-feature-move="up"
+                  data-gap-id="${htmlEscape(gap.id)}"
+                  data-neighbor-id="${htmlEscape(gaps[globalIdx - 1]?.id || "")}"
+                  aria-label="Move ${htmlEscape(gap.name || gap.id)} up"
+                  title="Move up"
+                  ${globalIdx === 0 ? "disabled" : ""}>${featureGapActionIcon("chevron-up")}</button>
+          <button class="secondary small feature-gap-icon-btn" data-feature-move="down"
+                  data-gap-id="${htmlEscape(gap.id)}"
+                  data-neighbor-id="${htmlEscape(gaps[globalIdx + 1]?.id || "")}"
+                  aria-label="Move ${htmlEscape(gap.name || gap.id)} down"
+                  title="Move down"
+                  ${globalIdx === gaps.length - 1 ? "disabled" : ""}>${featureGapActionIcon("chevron-down")}</button>
+          <button class="secondary small feature-gap-icon-btn" data-feature-delete-gap="${htmlEscape(gap.id)}"
+                  aria-label="Delete ${htmlEscape(gap.name || gap.id)}"
+                  title="Delete Gap">${featureGapActionIcon("trash")}</button>
         </div>
       </td>` : ""}
     </tr>`;
   }).join("") : `
-    <tr><td colspan="${actions ? 7 : 6}" class="muted">No Gaps are assigned to this Feature.</td></tr>`;
+    <tr><td colspan="${actions ? 8 : 6}" class="muted">No Gaps are assigned to this Feature.</td></tr>`;
   return `
     <div class="table-scroll">
-      <table>
-        <thead><tr><th>Order</th><th>Gap</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Updated</th>${actions ? "<th>Actions</th>" : ""}</tr></thead>
+      <table class="table feature-gaps-table mobile-card-table">
+        <thead><tr>${actions ? '<th class="feature-gap-drag-col"></th>' : ""}<th>Order</th><th>Gap</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Updated</th>${actions ? "<th>Actions</th>" : ""}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
     ${pageMeta ? renderPaginationControls("feature-modal-gaps", pageMeta, visible.length, "gap") : ""}`;
+}
+
+function featureGapActionIcon(name) {
+  const icons = {
+    "chevron-up": '<path d="M6 15l6-6 6 6"></path>',
+    "chevron-down": '<path d="M6 9l6 6 6-6"></path>',
+    trash: '<path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M6 6l1 15h10l1-15"></path><path d="M10 11v6"></path><path d="M14 11v6"></path>',
+  };
+  return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
 }
 
 function renderFeatureNew() {
@@ -290,14 +312,90 @@ function renderFeatureNew() {
   setTimeout(() => openFeatureModal(), 0);
 }
 
+function ensureFeatureModalUnderlay() {
+  const main = $("#main");
+  if (main && main.innerHTML.trim()) return;
+  renderDashboard();
+}
+
+async function openFeatureDetailModal(featureId) {
+  ensureFeatureModalUnderlay();
+  if (typeof closeGapDetailModal === "function") {
+    closeGapDetailModal({ navigateAway: false });
+  }
+  closeFeatureModal({ navigateAway: false });
+  try {
+    const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
+    openFeatureModal(data.feature, { navigateAway: true });
+  } catch (e) {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop";
+    root.innerHTML = `
+      <div class="modal feature-modal" role="dialog" aria-modal="true" aria-label="Feature detail">
+        <button class="modal-close" type="button" aria-label="Close">×</button>
+        <div class="modal-body"><p class="muted">Could not load Feature: ${htmlEscape(e.message)}</p></div>
+      </div>`;
+    document.body.appendChild(root);
+    _featureModalRoot = root;
+    const dismiss = () => closeFeatureModal({ navigateAway: true });
+    function onKey(evt) {
+      if (evt.key === "Escape") { evt.preventDefault(); dismiss(); }
+    }
+    document.addEventListener("keydown", onKey, true);
+    root._cleanup = () => document.removeEventListener("keydown", onKey, true);
+    root.addEventListener("click", (evt) => {
+      if (evt.target === root) dismiss();
+    });
+    root.querySelector(".modal-close")?.addEventListener("click", dismiss);
+  }
+}
+
+function closeFeatureModal({ navigateAway = false } = {}) {
+  if (!_featureModalRoot) return;
+  _featureModalRoot._cleanup?.();
+  _featureModalRoot.remove();
+  _featureModalRoot = null;
+  if (navigateAway) {
+    const target = state.underlayHash || "#/features";
+    if (location.hash !== target) location.hash = target;
+    else state.currentRoute = parseHash().route;
+  }
+}
+
 function openFeatureModal(feature = null, options = {}) {
+  closeFeatureModal({ navigateAway: false });
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   const gaps = feature?.gaps || [];
   const gapPage = Math.max(1, parseInt(options.gapPage || "1", 10) || 1);
+  const navigateAway = !!options.navigateAway;
+  const nodeDisplayName = feature
+    ? (feature.node_display_name || feature.node_id || "Unknown")
+    : "";
+  const nodeOwnerTitle = feature?.node_id
+    ? `Node owner: ${nodeDisplayName} (${feature.node_id})`
+    : `Node owner: ${nodeDisplayName}`;
   root.innerHTML = `
-    <div class="modal feature-modal" role="dialog" aria-modal="true" aria-labelledby="feature-modal-title">
-      <div class="modal-title" id="feature-modal-title">${feature ? "Edit Feature" : "New Feature"}</div>
+    <div class="modal feature-modal ${feature ? "feature-detail-modal" : "feature-create-modal"}" role="dialog" aria-modal="true" aria-labelledby="feature-modal-title">
+      <button class="modal-close" type="button" aria-label="Close">×</button>
+      ${feature ? `
+      <div class="feature-modal-head">
+        <div class="feature-modal-title-block">
+          <div class="feature-modal-title-row">
+            <div class="modal-title" id="feature-modal-title">Feature</div>
+            <span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span>
+            <span class="muted small">${feature.done_count || 0} / ${feature.gap_count || 0} done</span>
+          </div>
+          <div class="feature-modal-meta muted small">
+            ID <code>${htmlEscape(feature.id)}</code> · created ${fmtTime(feature.created)} · updated ${fmtTime(feature.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
+          </div>
+        </div>
+        <div class="actions feature-modal-top-actions">
+          <button type="button" class="secondary small" data-feature-cancel>Cancel Feature</button>
+          <button type="button" class="danger small" data-feature-delete>Delete Feature</button>
+        </div>
+      </div>` : `
+      <div class="modal-title" id="feature-modal-title">New Feature</div>`}
       <div class="modal-body">
         <label>Name</label>
         <input type="text" id="feature-name" class="modal-input" value="${htmlEscape(feature?.name || "")}">
@@ -305,8 +403,9 @@ function openFeatureModal(feature = null, options = {}) {
         <textarea id="feature-description">${htmlEscape(feature?.description || "")}</textarea>
         ${feature ? `<div class="feature-modal-gap-heading">
           <div class="modal-title compact">Ordered Gaps</div>
-          <div class="actions">
-            <button type="button" class="secondary small" data-feature-new-gap>New Gap</button>
+          <div class="actions feature-gap-heading-actions">
+            <button type="button" class="secondary small feature-gap-add-btn"
+                    data-feature-new-gap aria-label="New Gap" title="New Gap">+</button>
             <button type="button" class="secondary small" data-feature-assign-gap>Assign existing</button>
           </div>
         </div>
@@ -316,55 +415,57 @@ function openFeatureModal(feature = null, options = {}) {
           pageSize: FEATURE_MODAL_GAP_PAGE_SIZE,
         })}` : ""}
       </div>
-      <div class="modal-actions">
+      ${feature ? "" : `<div class="modal-actions">
         <button class="secondary" data-cancel>Cancel</button>
-        <button data-ok>${feature ? "Save" : "Create"}</button>
-      </div>
+        <button data-ok>Create</button>
+      </div>`}
     </div>`;
   document.body.appendChild(root);
-  const close = () => root.remove();
+  _featureModalRoot = root;
+  const close = () => closeFeatureModal({ navigateAway });
+  function onKey(e) {
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+  }
+  document.addEventListener("keydown", onKey, true);
+  root._cleanup = () => document.removeEventListener("keydown", onKey, true);
   root.addEventListener("click", (e) => {
     if (e.target === root) close();
   });
-  root.querySelector("[data-cancel]")?.addEventListener("click", close);
-  root.querySelector("[data-ok]")?.addEventListener("click", async () => {
-    const body = {
-      name: root.querySelector("#feature-name")?.value.trim() || "",
-      description: root.querySelector("#feature-description")?.value.trim() || "",
-      reporter: feature ? (feature.reporter || "") : (state.lastReporter || ""),
-    };
-    if (!body.name) {
-      toast("Feature name is required", "error");
-      return;
-    }
-    try {
-      const saved = feature
-        ? await api("PATCH", `/api/features/${encodeURIComponent(feature.id)}`, body)
-        : await api("POST", "/api/features", body);
-      close();
-      toast(feature ? "Feature updated" : "Feature created", "success");
-      location.hash = `#/features/${encodeURIComponent(saved.feature.id)}`;
-    } catch (e) {
-      showActionError(e);
-    }
-  });
+  root.querySelector(".modal-close")?.addEventListener("click", close);
+  if (feature) {
+    bindFeatureAutosave(root, feature);
+  } else {
+    root.querySelector("[data-cancel]")?.addEventListener("click", close);
+    root.querySelector("[data-ok]")?.addEventListener("click", async () => {
+      const body = {
+        name: root.querySelector("#feature-name")?.value.trim() || "",
+        description: root.querySelector("#feature-description")?.value.trim() || "",
+        reporter: state.lastReporter || "",
+      };
+      if (!body.name) {
+        toast("Feature name is required", "error");
+        return;
+      }
+      try {
+        const saved = await api("POST", "/api/features", body);
+        close();
+        toast("Feature created", "success");
+        location.hash = `#/features/${encodeURIComponent(saved.feature.id)}`;
+      } catch (e) {
+        showActionError(e);
+      }
+    });
+  }
   if (feature) {
     const reloadModal = async () => {
       const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
-      close();
-      openFeatureModal(data.feature, { gapPage });
-      if (state.currentRoute === "features_detail") {
-        await renderFeatureDetail({ id: feature.id });
-      }
+      openFeatureModal(data.feature, { gapPage, navigateAway });
     };
     root.querySelector("[data-feature-new-gap]")?.addEventListener("click", () => {
       close();
       openFeatureNewGapFlow(feature.id, async () => {
         const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
-        openFeatureModal(data.feature);
-        if (state.currentRoute === "features_detail") {
-          await renderFeatureDetail({ id: feature.id });
-        }
+        openFeatureModal(data.feature, { navigateAway });
       });
     });
     root.querySelector("[data-feature-assign-gap]")?.addEventListener("click", async () => {
@@ -372,12 +473,139 @@ function openFeatureModal(feature = null, options = {}) {
       await reloadModal();
     });
     bindFeatureGapActions(root, feature.id, reloadModal);
+    bindFeatureGapDragReorder(root, feature.id, reloadModal);
     bindPaginationControls(root, "feature-modal-gaps", (pageNo) => {
-      close();
-      openFeatureModal(feature, { gapPage: pageNo });
+      openFeatureModal(feature, { gapPage: pageNo, navigateAway });
     });
+    root.querySelector("[data-feature-cancel]")?.addEventListener("click", () =>
+      cancelFeatureFromUi(feature.id));
+    root.querySelector("[data-feature-delete]")?.addEventListener("click", () =>
+      deleteFeatureFromUi(feature.id));
   }
   root.querySelector("#feature-name")?.focus();
+}
+
+function bindFeatureAutosave(root, feature) {
+  const controls = [
+    root.querySelector("#feature-name"),
+    root.querySelector("#feature-description"),
+  ].filter(Boolean);
+  const saved = {
+    name: feature.name || "",
+    description: feature.description || "",
+  };
+  let inFlight = false;
+  let pending = false;
+  const restoreSaved = () => {
+    const name = root.querySelector("#feature-name");
+    const description = root.querySelector("#feature-description");
+    if (name) name.value = saved.name;
+    if (description) description.value = saved.description;
+  };
+  const save = async () => {
+    if (inFlight) {
+      pending = true;
+      return;
+    }
+    const body = {
+      name: root.querySelector("#feature-name")?.value.trim() || "",
+      description: root.querySelector("#feature-description")?.value.trim() || "",
+      reporter: feature.reporter || "",
+    };
+    if (!body.name) {
+      toast("Feature name is required", "error");
+      restoreSaved();
+      return;
+    }
+    if (body.name === saved.name && body.description === saved.description) return;
+    inFlight = true;
+    try {
+      const result = await api("PATCH", `/api/features/${encodeURIComponent(feature.id)}`, body);
+      const updated = result.feature || {};
+      saved.name = updated.name || body.name;
+      saved.description = updated.description || body.description;
+      if (state.currentRoute === "features") await refreshFeaturesTable();
+    } catch (e) {
+      restoreSaved();
+      showActionError(e, "Feature autosave failed");
+    } finally {
+      inFlight = false;
+      if (pending) {
+        pending = false;
+        await save();
+      }
+    }
+  };
+  const autosave = debounce(save, 450);
+  controls.forEach((control) => {
+    control.addEventListener("input", autosave);
+    control.addEventListener("change", save);
+  });
+}
+
+function bindFeatureGapDragReorder(root, featureId, onChanged) {
+  let draggedGapId = "";
+  root.querySelectorAll("[data-feature-drag-gap]").forEach((handle) => {
+    handle.addEventListener("click", (e) => e.preventDefault());
+    handle.addEventListener("dragstart", (e) => {
+      draggedGapId = handle.dataset.featureDragGap || "";
+      if (!draggedGapId) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", draggedGapId);
+      handle.closest("[data-feature-gap-row]")?.classList.add("dragging");
+    });
+    handle.addEventListener("dragend", () => {
+      draggedGapId = "";
+      clearFeatureGapDragState(root);
+    });
+  });
+  root.querySelectorAll("[data-feature-gap-row]").forEach((row) => {
+    row.addEventListener("dragover", (e) => {
+      if (!draggedGapId) return;
+      const targetGapId = row.dataset.featureGapRow || "";
+      if (!targetGapId || targetGapId === draggedGapId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const rect = row.getBoundingClientRect();
+      const position = e.clientY < rect.top + rect.height / 2 ? "before" : "after";
+      root.querySelectorAll("[data-feature-gap-row]").forEach((candidate) => {
+        candidate.classList.remove("drop-before", "drop-after");
+      });
+      row.classList.add(position === "before" ? "drop-before" : "drop-after");
+      row.dataset.featureDropPosition = position;
+    });
+    row.addEventListener("dragleave", () => {
+      row.classList.remove("drop-before", "drop-after");
+      delete row.dataset.featureDropPosition;
+    });
+    row.addEventListener("drop", async (e) => {
+      const sourceGapId = e.dataTransfer.getData("text/plain") || draggedGapId;
+      const targetGapId = row.dataset.featureGapRow || "";
+      const position = row.dataset.featureDropPosition || "after";
+      clearFeatureGapDragState(root);
+      if (!sourceGapId || !targetGapId || sourceGapId === targetGapId) return;
+      e.preventDefault();
+      try {
+        await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(sourceGapId)}/reorder`, {
+          [position]: targetGapId,
+        });
+        toast("Feature order updated", "info");
+        await onChanged?.();
+      } catch (err) {
+        showActionError(err, "Reorder failed");
+      }
+    });
+  });
+}
+
+function clearFeatureGapDragState(root) {
+  root.querySelectorAll("[data-feature-gap-row]").forEach((row) => {
+    row.classList.remove("dragging", "drop-before", "drop-after");
+    delete row.dataset.featureDropPosition;
+  });
 }
 
 function bindFeatureGapActions(root, featureId, onChanged) {
@@ -398,21 +626,21 @@ function bindFeatureGapActions(root, featureId, onChanged) {
       }
     });
   });
-  root.querySelectorAll("[data-feature-remove-gap]").forEach((btn) => {
+  root.querySelectorAll("[data-feature-delete-gap]").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const gapId = btn.dataset.featureRemoveGap;
+      const gapId = btn.dataset.featureDeleteGap;
       if (!gapId) return;
       const ok = await modalConfirm(
-        "Remove this Gap from the Feature? The Gap will not be deleted.",
-        { title: "Remove Gap", okLabel: "Remove", cancelLabel: "Keep it" },
+        "Delete this Gap from the Feature? This cannot be undone.",
+        { title: "Delete Gap", okLabel: "Delete Gap", cancelLabel: "Keep it", danger: true },
       );
       if (!ok) return;
       try {
-        await api("DELETE", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`);
-        toast("Gap removed from Feature", "info");
+        await api("DELETE", `/api/gaps/${encodeURIComponent(gapId)}`);
+        toast("Gap deleted", "info");
         await onChanged?.();
       } catch (e) {
-        showActionError(e, "Remove failed");
+        showActionError(e, "Delete failed");
       }
     });
   });
@@ -470,7 +698,11 @@ async function cancelFeatureFromUi(featureId) {
   try {
     await api("POST", `/api/features/${encodeURIComponent(featureId)}/cancel`);
     toast("Feature cancelled", "info");
-    await renderFeatureDetail({ id: featureId });
+    if (state.currentRoute === "features_detail") {
+      await openFeatureDetailModal(featureId);
+    } else if (state.currentRoute === "features") {
+      await refreshFeaturesTable();
+    }
   } catch (e) {
     showActionError(e, "Cancel Feature failed");
   }
@@ -485,6 +717,7 @@ async function deleteFeatureFromUi(featureId) {
   try {
     await api("DELETE", `/api/features/${encodeURIComponent(featureId)}`);
     toast("Feature deleted", "info");
+    closeFeatureModal({ navigateAway: false });
     location.hash = "#/features";
   } catch (e) {
     showActionError(e, "Delete Feature failed");

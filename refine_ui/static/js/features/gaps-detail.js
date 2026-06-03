@@ -179,32 +179,7 @@ function renderGapFeatureAssociation(gap) {
   return `
     <div class="gap-feature-row muted small" style="margin-bottom:14px">
       Feature ${feature}
-      <button class="secondary small" id="btn-gap-feature-assign" type="button">${gap.feature_id ? "Move" : "Assign"}</button>
-      ${gap.feature_id ? `<button class="secondary small" id="btn-gap-feature-up" type="button">Up</button>` : ""}
-      ${gap.feature_id ? `<button class="secondary small" id="btn-gap-feature-down" type="button">Down</button>` : ""}
-      ${gap.feature_id ? `<button class="secondary small" id="btn-gap-feature-remove" type="button">Remove</button>` : ""}
     </div>`;
-}
-
-async function moveGapWithinFeature(featureId, gapId, direction, onChanged = null) {
-  const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
-  const gaps = data.feature?.gaps || [];
-  const idx = gaps.findIndex((candidate) => candidate.id === gapId);
-  if (idx < 0) {
-    toast("Gap is no longer in this Feature", "warn");
-    return;
-  }
-  const neighbor = direction === "up" ? gaps[idx - 1] : gaps[idx + 1];
-  if (!neighbor) {
-    toast(direction === "up" ? "Gap is already first" : "Gap is already last", "info");
-    return;
-  }
-  const body = direction === "up"
-    ? { before: neighbor.id }
-    : { after: neighbor.id };
-  await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/reorder`, body);
-  toast("Feature order updated", "info");
-  await onChanged?.();
 }
 
 async function openGapFeatureAssignModal(gap) {
@@ -319,6 +294,8 @@ function drawGapDetail(gap) {
               <button class="nav-menu-item" type="button" id="btn-reporter">Reporter</button>
               <button class="nav-menu-item" type="button" id="btn-rename">Rename</button>
               <button class="nav-menu-item" type="button" id="btn-priority">Change Priority</button>
+              <button class="nav-menu-item" type="button" id="btn-gap-feature-assign">Move to Feature</button>
+              <button class="nav-menu-item" type="button" id="btn-gap-feature-remove" ${gap.feature_id ? "" : "disabled"}>Remove from Feature</button>
               <button class="nav-menu-item" type="button" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel</button>
               <button class="nav-menu-item danger" type="button" id="btn-delete">Delete</button>
             </div>
@@ -541,10 +518,12 @@ function drawGapDetail(gap) {
     }
   });
   $("#btn-gap-feature-assign")?.addEventListener("click", async () => {
+    closeGapActionMenu();
     await openGapFeatureAssignModal(gap);
     await loadGapDetail(gap.id);
   });
   $("#btn-gap-feature-remove")?.addEventListener("click", async () => {
+    closeGapActionMenu();
     if (!gap.feature_id) return;
     const ok = await modalConfirm(
       "Remove this Gap from its Feature? The Gap will not be deleted.",
@@ -558,24 +537,6 @@ function drawGapDetail(gap) {
       if (state.currentRoute === "gaps") await refreshGapsTable();
     } catch (e) {
       showActionError(e, "Remove from Feature failed");
-    }
-  });
-  $("#btn-gap-feature-up")?.addEventListener("click", async () => {
-    try {
-      await moveGapWithinFeature(gap.feature_id, gap.id, "up", async () => {
-        await loadGapDetail(gap.id);
-      });
-    } catch (e) {
-      showActionError(e, "Reorder failed");
-    }
-  });
-  $("#btn-gap-feature-down")?.addEventListener("click", async () => {
-    try {
-      await moveGapWithinFeature(gap.feature_id, gap.id, "down", async () => {
-        await loadGapDetail(gap.id);
-      });
-    } catch (e) {
-      showActionError(e, "Reorder failed");
     }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {

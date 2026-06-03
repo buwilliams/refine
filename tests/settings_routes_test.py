@@ -60,6 +60,9 @@ def main() -> int:
     gaps_css = (root / "refine_ui/static/css/gaps.css").read_text(
         encoding="utf-8",
     )
+    modals_css = (root / "refine_ui/static/css/modals.css").read_text(
+        encoding="utf-8",
+    )
     gaps_bulk_js = (root / "refine_ui/static/js/features/gaps-bulk.js").read_text(
         encoding="utf-8",
     )
@@ -328,7 +331,18 @@ def main() -> int:
     assert "feature_ops.cancel_feature" in api_py
     assert "feature_ops.delete_feature" in api_py
     assert "features: renderFeaturesList" in router_js
-    assert "features_detail: renderFeatureDetail" in router_js
+    assert "features_detail: renderFeatureDetail" not in router_js
+    assert 'if (r.route === "features_detail")' in router_js
+    assert "openFeatureDetailModal(r.id)" in router_js
+    assert "const fromFeatureDetail" in router_js
+    assert "const fromGapDetail" in router_js
+    assert "if (!fromFeatureDetail && !fromGapDetail)" in router_js
+    features_detail_router_body = router_js.split('if (r.route === "features_detail")', 1)[1].split("return;", 1)[0]
+    assert "closeGapDetailModal({ navigateAway: false })" in features_detail_router_body
+    assert "closeFeatureModal({ navigateAway: false })" in features_detail_router_body
+    assert features_detail_router_body.index("closeGapDetailModal") < features_detail_router_body.index("openFeatureDetailModal")
+    assert features_detail_router_body.index("closeFeatureModal") < features_detail_router_body.index("openFeatureDetailModal")
+    assert "closeFeatureModal({ navigateAway: false })" in router_js
     assert "features_new: renderFeatureNew" in router_js
     assert 'if (parts[0] === "features")' in router_js
     assert '<a href="#/features" data-route="features">Features</a>' in index_html
@@ -339,25 +353,74 @@ def main() -> int:
     assert index_html.index('data-route="changes">Changes') < index_html.index('data-route="logs">Logs')
     assert '<script src="/static/js/features/features.js"></script>' in index_html
     assert "function renderFeatureDetail" in features_js
+    assert "function openFeatureDetailModal" in features_js
+    feature_detail_modal_body = features_js.split("async function openFeatureDetailModal", 1)[1].split("\nfunction closeFeatureModal", 1)[0]
+    assert 'typeof closeGapDetailModal === "function"' in feature_detail_modal_body
+    assert "closeGapDetailModal({ navigateAway: false })" in feature_detail_modal_body
     assert "function openFeatureModal" in features_js
+    assert "function closeFeatureModal" in features_js
+    assert "ensureFeatureModalUnderlay" in features_js
+    assert 'openFeatureModal(data.feature, { navigateAway: true })' in features_js
+    assert 'class="modal feature-modal"' in features_js
+    assert 'feature ? "feature-detail-modal" : "feature-create-modal"' in features_js
+    assert 'class="modal-close"' in features_js
     assert 'id="features-new"' not in features_js
     assert 'id="feature-reporter"' not in features_js
-    assert 'reporter: feature ? (feature.reporter || "") : (state.lastReporter || "")' in features_js
+    assert "function bindFeatureAutosave" in features_js
+    assert "Feature autosave failed" in features_js
+    assert 'root.querySelector("[data-ok]")?.addEventListener("click", async () => {' in features_js
+    assert "reporter: state.lastReporter || \"\"" in features_js
+    assert "reporter: feature.reporter || \"\"" in features_js
+    assert "data-cancel>Close" not in features_js
+    assert "data-ok>Save" not in features_js
+    assert "feature-modal-head" in features_js
+    assert "feature-modal-top-actions" in features_js
+    assert "feature-modal-meta muted small" in features_js
+    assert "feature-modal-gap-heading" in features_js
+    assert "feature-gap-heading-actions" in features_js
+    assert "feature-gap-add-btn" in features_js
+    assert 'data-feature-new-gap aria-label="New Gap" title="New Gap">+</button>' in features_js
+    assert "<button type=\"button\" class=\"secondary small\" data-feature-assign-gap>Assign existing</button>" in features_js
+    assert "ID <code>${htmlEscape(feature.id)}</code>" in features_js
+    assert 'node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>' in features_js
     assert "Create the Feature before adding ordered Gaps." not in features_js
     assert "function bindFeatureGapActions" in features_js
+    assert "function bindFeatureGapDragReorder" in features_js
+    assert "function featureGapActionIcon" in features_js
     assert "openFeatureAssignGapModal" in features_js
     assert "openFeatureNewGapFlow" in features_js
     assert "cancelFeatureFromUi" in features_js
     assert "deleteFeatureFromUi" in features_js
     assert "data-feature-move" in features_js
-    assert "data-feature-remove-gap" in features_js
+    assert "data-feature-remove-gap" not in features_js
+    assert "data-feature-delete-gap" in features_js
+    assert "data-feature-drag-gap" in features_js
+    assert 'draggable="true"' in features_js
+    assert "feature-gap-drag-handle" in features_js
+    assert "feature-gap-icon-btn" in features_js
+    assert 'featureGapActionIcon("chevron-up")' in features_js
+    assert 'featureGapActionIcon("chevron-down")' in features_js
+    assert 'featureGapActionIcon("trash")' in features_js
+    assert ">Up</button>" not in features_js
+    assert ">Down</button>" not in features_js
+    assert ">Remove</button>" not in features_js
+    assert "[position]: targetGapId" in features_js
+    assert 'api("DELETE", `/api/gaps/${encodeURIComponent(gapId)}`' in features_js
+    assert "Delete this Gap from the Feature? This cannot be undone." in features_js
     assert 'location.hash = `#/features/${encodeURIComponent(row.dataset.featureId)}`;' in features_js
+    assert '<td class="features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>' in features_js
+    assert '<a href="#/features/${encodeURIComponent(feature.id)}"' not in features_js
+    assert '<table class="table features-table mobile-card-table">' in features_js
+    assert '<col class="features-col-name">' in features_js
+    assert '<col class="features-col-status">' in features_js
+    assert 'class="features-status-cell"' in features_js
+    assert '<span class="sort-arrow">' in features_js
     assert "FEATURE_MODAL_GAP_PAGE_SIZE" in features_js
     assert 'renderPaginationControls("feature-modal-gaps"' in features_js
     assert 'bindPaginationControls(root, "feature-modal-gaps"' in features_js
     assert 'data-neighbor-id="${htmlEscape(gaps[globalIdx - 1]?.id || "")}"' in features_js
     assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/reorder`' in features_js
-    assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`' in features_js
+    assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`' not in features_js
     assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/cancel`' in features_js
     assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}`' in features_js
     assert 'params.set("feature", f.feature);' in gaps_list_js
@@ -365,11 +428,16 @@ def main() -> int:
     assert "renderGapFeatureCell" in gaps_list_js
     assert "renderGapFeatureAssociation" in gaps_detail_js
     assert "openGapFeatureAssignModal" in gaps_detail_js
-    assert "moveGapWithinFeature" in gaps_detail_js
-    assert 'id="btn-gap-feature-up"' in gaps_detail_js
-    assert 'id="btn-gap-feature-down"' in gaps_detail_js
-    assert 'data-gap-feature-move="up"' in gaps_list_js
-    assert 'data-gap-feature-move="down"' in gaps_list_js
+    assert '<button class="nav-menu-item" type="button" id="btn-gap-feature-assign">Move to Feature</button>' in gaps_detail_js
+    assert '<button class="nav-menu-item" type="button" id="btn-gap-feature-remove" ${gap.feature_id ? "" : "disabled"}>Remove from Feature</button>' in gaps_detail_js
+    assert 'id="btn-gap-feature-assign" type="button">${gap.feature_id ? "Move" : "Assign"}' not in gaps_detail_js
+    assert 'id="btn-gap-feature-remove" type="button">Remove</button>' not in gaps_detail_js
+    assert "moveGapWithinFeature" not in gaps_detail_js
+    assert 'id="btn-gap-feature-up"' not in gaps_detail_js
+    assert 'id="btn-gap-feature-down"' not in gaps_detail_js
+    assert "data-gap-feature-move" not in gaps_list_js
+    assert ">Up</button>" not in gaps_list_js
+    assert ">Down</button>" not in gaps_list_js
     assert 'name="import-feature-mode"' in import_js
     assert "new_feature_name" in import_js
     assert "feature_id: dest.existingId.trim()" in import_js
@@ -1130,6 +1198,21 @@ def main() -> int:
     assert "width: 140px;" in gaps_css
     assert ".gaps-status-cell" in gaps_css
     assert "white-space: nowrap;" in gaps_css
+    assert ".features-table" in gaps_css
+    assert ".features-col-status" in gaps_css
+    assert ".features-status-cell" in gaps_css
+    assert ".feature-gaps-table" in gaps_css
+    assert ".feature-gap-drag-handle" in gaps_css
+    assert ".feature-gap-icon-btn" in gaps_css
+    assert ".feature-gaps-table tr.drop-before td" in gaps_css
+    assert ".feature-detail-modal" in modals_css
+    assert "max-width: 1080px;" in modals_css
+    assert "height: 75vh;" in modals_css
+    assert "max-height: calc(100vh - 60px);" in modals_css
+    assert ".feature-modal-head" in modals_css
+    assert ".feature-modal-top-actions" in modals_css
+    assert ".feature-gap-heading-actions" in modals_css
+    assert ".feature-gap-add-btn" in modals_css
     assert "${STATUS_FILTER_OPTIONS" in changes_js
     assert "const filterShellOpen = filterShell ? filterShell.open : false;" in changes_js
     assert "const logsFilterShellOpen = logsFilterShell ? logsFilterShell.open : false;" in logs_js

@@ -167,3 +167,99 @@
 .gaps-status-cell {
   white-space: nowrap;
 }
+
+.features-table {
+  table-layout: fixed;
+}
+.features-col-name {
+  width: auto;
+}
+.features-col-status {
+  width: 140px;
+}
+.features-col-progress {
+  width: 120px;
+}
+.features-col-next {
+  width: 20%;
+}
+.features-col-reporter {
+  width: 15%;
+}
+.features-col-node {
+  width: 13%;
+}
+.features-col-updated {
+  width: 120px;
+}
+.features-name-cell {
+  overflow-wrap: anywhere;
+}
+.features-status-cell {
+  white-space: nowrap;
+}
+
+.feature-gaps-table {
+  table-layout: fixed;
+}
+.feature-gap-drag-col,
+.feature-gap-drag-cell {
+  width: 40px;
+}
+.feature-gap-drag-cell {
+  text-align: center;
+}
+.feature-gap-drag-handle {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-text-muted);
+  cursor: grab;
+}
+.feature-gap-drag-handle:hover,
+.feature-gap-drag-handle:focus-visible {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+.feature-gap-drag-handle:active {
+  cursor: grabbing;
+}
+.feature-gap-drag-handle svg {
+  width: 18px;
+  height: 18px;
+  fill: currentColor;
+}
+.feature-gap-icon-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.feature-gap-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.feature-gaps-table tr.dragging td {
+  opacity: 0.48;
+}
+.feature-gaps-table tr.drop-before td {
+  border-top: 2px solid var(--color-primary);
+}
+.feature-gaps-table tr.drop-after td {
+  border-bottom: 2px solid var(--color-primary);
+}

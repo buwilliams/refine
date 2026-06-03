@@ -322,12 +322,7 @@ function _isGapSelected(id) {
 function renderGapFeatureCell(gap) {
   if (!gap.feature_id) return "—";
   const order = gap.feature_order ? ` #${gap.feature_order}` : "";
-  return `
-    <a href="#/features/${encodeURIComponent(gap.feature_id)}">${htmlEscape(gap.feature_id)}${htmlEscape(order)}</a>
-    <span class="actions compact-actions">
-      <button type="button" class="secondary small" data-gap-feature-move="up" data-feature-id="${htmlEscape(gap.feature_id)}" data-gap-id="${htmlEscape(gap.id)}">Up</button>
-      <button type="button" class="secondary small" data-gap-feature-move="down" data-feature-id="${htmlEscape(gap.feature_id)}" data-gap-id="${htmlEscape(gap.id)}">Down</button>
-    </span>`;
+  return `<a href="#/features/${encodeURIComponent(gap.feature_id)}">${htmlEscape(gap.feature_id)}${htmlEscape(order)}</a>`;
 }
 
 function drawGapsTable(gaps, state) {
@@ -422,21 +417,6 @@ function drawGapsTable(gaps, state) {
       if (e.target.closest(".gap-select-col")) return;
       if (e.target.closest("a, button, input, select, textarea")) return;
       location.hash = "#/gaps/" + row.dataset.id;
-    });
-  });
-  $$("[data-gap-feature-move]", root).forEach((btn) => {
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      try {
-        await moveGapWithinFeature(
-          btn.dataset.featureId,
-          btn.dataset.gapId,
-          btn.dataset.gapFeatureMove,
-          refreshGapsTable,
-        );
-      } catch (err) {
-        showActionError(err, "Reorder failed");
-      }
     });
   });
   $$(".gap-select", root).forEach((cb) => {

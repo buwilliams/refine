@@ -1,11 +1,11 @@
 // ---- Router -----------------------------------------------------------------
 
-// `gaps_detail` is handled directly in `navigate()` because it opens a
-// modal on top of the current screen rather than replacing `#main`.
+// `gaps_detail` and `features_detail` are handled directly in `navigate()`
+// because they open modals on top of the current screen rather than replacing
+// `#main`.
 const routes = {
   dashboard: renderDashboard,
   features: renderFeaturesList,
-  features_detail: renderFeatureDetail,
   features_new: renderFeatureNew,
   gaps: renderGapsList,
   gaps_new: renderGapNew,
@@ -93,9 +93,28 @@ function navigate() {
     return;
   }
 
+  if (r.route === "features_detail") {
+    try {
+      const prevHash = new URL(_prevHashURL).hash || "#/features";
+      const fromFeatureDetail = /^#\/features\/[^/]+/.test(prevHash) && !/^#\/features\/new/.test(prevHash);
+      const fromGapDetail = /^#\/gaps\/[^/]+/.test(prevHash) && !/^#\/gaps\/(new|plan|import)/.test(prevHash);
+      if (!fromFeatureDetail && !fromGapDetail) {
+        state.underlayHash = prevHash;
+      }
+    } catch { /* keep prior state.underlayHash */ }
+    state.currentRoute = "features_detail";
+    state.currentGap = null;
+    highlightNav("features");
+    if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
+    if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
+    openFeatureDetailModal(r.id);
+    return;
+  }
+
   // Leaving a Gap detail modal — close it (without rewriting the hash,
   // since we're already moving to a different one).
   if (_gapModalRoot) closeGapDetailModal({ navigateAway: false });
+  if (_featureModalRoot) closeFeatureModal({ navigateAway: false });
 
   if (
     prevRoute === r.route &&
