@@ -29,6 +29,9 @@ def main() -> int:
         assert prompt is not None
         assert "First, analyze the Gap logs and context below" in prompt
         assert "Do not wait for another user message" in prompt
+        assert "Stay scoped to THIS GAP by default" in prompt
+        assert "Do not enumerate `.refine/gaps`" in prompt
+        assert "scan sibling Gap files" in prompt
         assert "## Recent Gap logs/activity (oldest first)" in prompt
         assert "Agent hit failing tests in checkout flow" in prompt
         assert "The user's first message follows." not in prompt

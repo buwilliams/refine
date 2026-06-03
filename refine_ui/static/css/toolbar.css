@@ -333,6 +333,7 @@ button.chat-activity-toggle:hover:not(:disabled) {
   display: inline-flex;
   gap: 3px;
 }
+.chat-pending-dots[hidden] { display: none; }
 .chat-pending-dots span {
   width: 6px;
   height: 6px;

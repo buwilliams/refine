@@ -268,6 +268,7 @@ def main() -> int:
     assert "Agent activity" not in toolbar_js
     assert ".chat-progress-panel" in toolbar_css
     assert ".chat-progress-line::before" in toolbar_css
+    assert ".chat-pending-dots[hidden] { display: none; }" in toolbar_css
 
     assert ".nav-command-button" in base_css
     assert ".nav-issue-button" in base_css
