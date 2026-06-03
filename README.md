@@ -24,7 +24,7 @@ refine has a robust CLI:
 uv run refine --help
 ```
 
-The external interface test app lives at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
+For development of Refine, there is an independent app used to test Refine surfaces (UI and CLI) at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
 
 ### Windows Users
 
