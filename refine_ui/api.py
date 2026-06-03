@@ -502,6 +502,11 @@ def activate_node(body: dict[str, Any]) -> tuple[int, dict]:
     except ValueError as e:
         return err(400, str(e))
     try:
+        runtime.refresh_local_node(payload.get("active_node_id") or node_id)
+        runtime.stop_runner()
+    except Exception:
+        pass
+    try:
         get_client().call(
             M_CHAT_RESET_ALL,
             {"reason": "node activated"},

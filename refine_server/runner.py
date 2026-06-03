@@ -331,6 +331,7 @@ class Runner:
         """
         return {
             "pid": os.getpid(),
+            "local_node_id": self.local_node_id,
             "running": self.sub_mgr.running_snapshot(),
             "chat": self.chat.snapshot(),
             "merger": self.merger.snapshot(),

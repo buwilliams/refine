@@ -518,7 +518,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
   const showProgress = active.showProgress !== false;
   const hasActivityToggle = hasSession || progressText;
   const showActivityPanel = showProgress && hasActivityToggle;
-  const activityLabel = active.pending ? "Agent is thinking..." : "Agent activity";
+  const activityLabel = chatActivityLabel(active);
   const showActivityDots = chatActivityIsPulsing(active);
   const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
   return `
@@ -1532,7 +1532,7 @@ function applyPendingIndicator(tab) {
     toggle.title = tab?.showProgress === false ? "Expand activity" : "Collapse activity";
   }
   if (dots) dots.hidden = !chatActivityIsPulsing(tab);
-  if (label) label.textContent = tab?.pending ? "Agent is thinking..." : "Agent activity";
+  if (label) label.textContent = chatActivityLabel(tab);
   if (input) input.disabled = !tab || !tab.sessionId || tab.pending;
   syncChatActionButtons(tab);
 }
@@ -1543,7 +1543,12 @@ function markChatActivityPulse(tab) {
 }
 
 function chatActivityIsPulsing(tab) {
-  return !!tab?.pending && Number(tab.activityPulseUntil || 0) > Date.now();
+  return !!tab?.pending;
+}
+
+function chatActivityLabel(tab) {
+  if (tab?.pending) return "Agent is thinking...";
+  return "Waiting on you";
 }
 
 function syncChatActionButtons(tab) {

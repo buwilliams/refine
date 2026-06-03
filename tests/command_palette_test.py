@@ -261,6 +261,11 @@ def main() -> int:
     assert "r.progress_lines && r.progress_lines.length" in toolbar_js
     assert "chat-activity-toggle" in toolbar_js
     assert "chat-progress-panel" in toolbar_js
+    assert "function chatActivityLabel(tab)" in toolbar_js
+    assert 'return "Waiting on you";' in toolbar_js
+    assert "function chatActivityIsPulsing(tab)" in toolbar_js
+    assert "return !!tab?.pending;" in toolbar_js
+    assert "Agent activity" not in toolbar_js
     assert ".chat-progress-panel" in toolbar_css
     assert ".chat-progress-line::before" in toolbar_css
 

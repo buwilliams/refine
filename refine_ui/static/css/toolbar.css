@@ -168,8 +168,8 @@ button.toolbar-tab:hover:not(:disabled),
   background: var(--success);
 }
 
-/* Bordered container that wraps the chat output and the pending indicator
-   so "Agent is thinking…" sits inside the same box as the transcript. */
+/* Bordered container that wraps the chat output and activity state
+   so waiting/thinking status sits inside the same box as the transcript. */
 .chat-output-box {
   background: var(--card);
   border: 1px solid var(--color-border-subtle);

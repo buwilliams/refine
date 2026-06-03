@@ -231,6 +231,10 @@ def main() -> int:
     assert "def _background_processes_stopped_response" in api_py
     assert "background_processes_stopped" in api_py
     assert 'allow_busy_when=lambda _owner: _background_processes_stopped()' in api_py
+    activate_node_body = api_py.split("def activate_node", 1)[1].split("\n@_system_operation", 1)[0]
+    assert "runtime.refresh_local_node" in activate_node_body
+    assert "runtime.stop_runner()" in activate_node_body
+    assert activate_node_body.index("runtime.stop_runner()") < activate_node_body.index("M_CHAT_RESET_ALL")
     assert "function renderProcessesTab" in settings_js
     assert "function renderRunnerWorkRow" in settings_js
     assert "function renderRuntimeAgentCards" not in settings_js

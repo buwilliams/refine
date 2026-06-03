@@ -163,7 +163,13 @@ def test_runner_client_uses_supervisor_only() -> None:
             runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
             runner = runtime.ensure_runner()
             assert runner.worker_pid == 98765
-            assert calls == [("ensure_worker", {"config_path": str(client / ".refine" / "refine.toml")})]
+            assert calls == [(
+                "ensure_worker",
+                {
+                    "config_path": str(client / ".refine" / "refine.toml"),
+                    "local_node_id": "default",
+                },
+            )]
             assert "REFINE_RUNNER_SOCKET" not in os.environ
         finally:
             runtime.stop_all()
@@ -244,6 +250,7 @@ def test_backend_call_routes_through_supervisor() -> None:
                     "backend_call",
                     {
                         "config_path": str(client / ".refine" / "refine.toml"),
+                        "local_node_id": "default",
                         "method": "test_method",
                         "params": {},
                         "timeout": 1.0,
@@ -300,6 +307,41 @@ def test_runtime_local_node_is_stable_after_active_switch() -> None:
         _restore_runtime_env(saved_env)
 
 
+def test_activate_node_restarts_runner_with_new_local_node() -> None:
+    saved_env = _save_runtime_env()
+    _clear_runtime_env()
+    tmp, client = make_client_repo("refine-runtime-activate-node-")
+    conn = init_refine(client)
+    runtime = None
+    try:
+        from refine_server import project_state
+        from refine_ui import api, runtime
+
+        runtime.load_configured(
+            client / ".refine" / "refine.toml",
+            start_poller=False,
+            start_runner=True,
+        )
+        initial = runtime.runner_status_snapshot()["local_node_id"]
+        other = project_state.create_node("Other Node")
+        assert initial == project_state.DEFAULT_NODE_ID, initial
+
+        status, body = api.activate_node({"node_id": other["id"]})
+        assert status == 200, body
+        assert body["active_node_id"] == other["id"], body
+        assert runtime.backend_info()["local_node_id"] == other["id"]
+        assert runtime.runner_status_snapshot()["local_node_id"] == other["id"]
+    finally:
+        if runtime is not None:
+            runtime.stop_all()
+        try:
+            conn.close()
+        except Exception:
+            pass
+        cleanup_tmp(tmp)
+        _restore_runtime_env(saved_env)
+
+
 def main() -> int:
     try:
         test_configured_app_start_resumes_agents()
@@ -308,6 +350,7 @@ def main() -> int:
         test_stop_all_without_runner_does_not_stop_supervisor_worker()
         test_backend_call_routes_through_supervisor()
         test_runtime_local_node_is_stable_after_active_switch()
+        test_activate_node_restarts_runner_with_new_local_node()
         worker_source = (
             Path(__file__).resolve().parents[1] / "refine_runtime" / "worker.py"
         ).read_text(encoding="utf-8")

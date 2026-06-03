@@ -166,7 +166,10 @@ def ensure_runner():
         try:
             result = _supervisor_request(
                 M_ENSURE_WORKER,
-                {"config_path": str(cfg.config_path)},
+                {
+                    "config_path": str(cfg.config_path),
+                    "local_node_id": _local_node_id_or_empty(),
+                },
                 timeout=WORKER_STARTUP_TIMEOUT_SECONDS + 15.0,
             )
         except config.ConfigError:
@@ -214,6 +217,7 @@ def runner_call(
         M_BACKEND_CALL,
         {
             "config_path": str(cfg.config_path),
+            "local_node_id": _local_node_id_or_empty(),
             "method": method,
             "params": params or {},
             "timeout": timeout,
@@ -300,6 +304,17 @@ def _local_node_id_or_empty() -> str:
         return project_state.local_node_id()
     except Exception:
         return ""
+
+
+def refresh_local_node(node_id: str | None = None) -> str:
+    cfg = config.get(reload=True)
+    local_node_id = str(
+        node_id or project_state.local_node_id(root=cfg.volume_root),
+    ).strip()
+    if not local_node_id:
+        local_node_id = project_state.active_node_id(root=cfg.volume_root)
+    os.environ[config.ENV_LOCAL_NODE_ID] = local_node_id
+    return local_node_id
 
 
 def runner_status_snapshot() -> dict:

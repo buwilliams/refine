@@ -301,6 +301,7 @@ class Supervisor:
             return self._h_target_app_run(call_params)
         self._h_ensure_worker({
             "config_path": str(params.get("config_path") or self.cfg_path or ""),
+            "local_node_id": str(params.get("local_node_id") or ""),
         })
         with self._lock:
             worker_socket = self.worker_socket
@@ -314,6 +315,7 @@ class Supervisor:
                 self.worker_socket = None
             self._h_ensure_worker({
                 "config_path": str(params.get("config_path") or self.cfg_path or ""),
+                "local_node_id": str(params.get("local_node_id") or ""),
             })
             with self._lock:
                 worker_socket = self.worker_socket
@@ -367,6 +369,12 @@ class Supervisor:
             raise RuntimeError("No Refine app is attached")
         cfg = config.Config.load(cfg_path)
         socket_path = self._runner_socket_path(str(cfg.config_path))
+        local_node_id = str(
+            params.get("local_node_id")
+            or project_state.local_node_id(root=cfg.volume_root),
+        ).strip()
+        if not local_node_id:
+            local_node_id = project_state.active_node_id(root=cfg.volume_root)
         existing_worker: subprocess.Popen | None = None
         with self._lock:
             if (
@@ -375,7 +383,11 @@ class Supervisor:
                 and self.worker_socket == socket_path
             ):
                 existing_worker = self.worker
-        if existing_worker is not None and self._can_ping_worker(socket_path):
+        if (
+            existing_worker is not None
+            and self._can_ping_worker(socket_path)
+            and self._worker_local_node_matches(socket_path, local_node_id)
+        ):
             with self._lock:
                 if self.worker is existing_worker:
                     return self._worker_result()
@@ -386,6 +398,7 @@ class Supervisor:
                 and self.worker.poll() is None
                 and self.worker_socket == socket_path
                 and self._can_ping_worker(socket_path)
+                and self._worker_local_node_matches(socket_path, local_node_id)
             ):
                 return self._worker_result()
             self._stop_worker_locked()
@@ -398,9 +411,7 @@ class Supervisor:
             env["REFINE_RUNNER_SOCKET"] = str(socket_path)
             env["REFINE_NO_INPROCESS_RUNNER"] = "1"
             env["REFINE_PARENT_PID"] = str(os.getpid())
-            env[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(
-                root=cfg.volume_root,
-            )
+            env[config.ENV_LOCAL_NODE_ID] = local_node_id
             env.setdefault("PYTHONUNBUFFERED", "1")
             self.cfg_path = str(cfg.config_path)
             self.runner_socket = socket_path
@@ -743,6 +754,13 @@ class Supervisor:
             ping.get("source_fingerprint") == identity.SOURCE_FINGERPRINT
             and ping.get("refine_version") == identity.REFINE_VERSION
         )
+
+    def _worker_local_node_matches(self, socket_path: Path, local_node_id: str) -> bool:
+        try:
+            snapshot = ipc.request(socket_path, M_RUNNING, {}, timeout=2.0)
+        except Exception:
+            return False
+        return str(snapshot.get("local_node_id") or "") == str(local_node_id or "")
 
     def _wait_for_worker_socket(self, path: Path, proc: subprocess.Popen) -> None:
         deadline = time.time() + WORKER_STARTUP_TIMEOUT_SECONDS
