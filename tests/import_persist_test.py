@@ -181,6 +181,97 @@ def main() -> int:
         ).fetchone()
         assert dict(row) == {"reporter": "Csv Reporter", "priority": "high"}
 
+        from refine_server import feature_ops, import_ops
+
+        status, body = api.import_persist({
+            "reporter": "Reporter",
+            "new_feature_name": "Imported Feature",
+            "new_feature_description": "Imported as ordered work",
+            "drafts": [
+                {
+                    "name": "Feature import one",
+                    "actual": "Current feature-backed import alpha",
+                    "target": "Target feature-backed import alpha",
+                    "duplicate_decision": "original",
+                },
+                {
+                    "name": "Feature import two",
+                    "actual": "Current feature-backed import beta",
+                    "target": "Target feature-backed import beta",
+                    "duplicate_decision": "original",
+                },
+            ],
+        })
+        assert status == 201, body
+        assert body["count"] == 2, body
+        assert body["feature_destination"] == "new", body
+        feature_id = body["feature_id"]
+        status, detail = feature_ops.get_feature(feature_id)
+        assert status == 200, detail
+        assert detail["feature"]["name"] == "Imported Feature", detail
+        assert [g["id"] for g in detail["feature"]["gaps"]] == body["created"], detail
+        assert [g["feature_order"] for g in detail["feature"]["gaps"]] == [1, 2], detail
+        print("[ok] import can create a Feature and preserve reviewed order")
+
+        status, body = api.import_persist({
+            "reporter": "Reporter",
+            "feature_id": feature_id,
+            "drafts": [{
+                "name": "Feature import append",
+                "actual": "Current feature-backed import append",
+                "target": "Target feature-backed import append",
+                "duplicate_decision": "original",
+            }],
+        })
+        assert status == 201, body
+        status, detail = feature_ops.get_feature(feature_id)
+        assert status == 200, detail
+        assert [g["feature_order"] for g in detail["feature"]["gaps"]] == [1, 2, 3], detail
+        assert detail["feature"]["gaps"][-1]["id"] == body["created"][0], detail
+        print("[ok] import can append to an existing Feature")
+
+        status, body = api.import_persist({
+            "reporter": "Reporter",
+            "new_feature_name": "Rollback Feature",
+            "drafts": [
+                {
+                    "name": "Rollback import one",
+                    "actual": "Current feature rollback alpha",
+                    "target": "Target feature rollback alpha",
+                    "duplicate_decision": "original",
+                },
+                {"name": "Rollback invalid", "actual": "", "target": ""},
+            ],
+        })
+        assert status == 200, body
+        assert body["count"] == 0, body
+        assert body["failed"] == 1, body
+        assert body["rolled_back"] == 1, body
+        status, missing = feature_ops.get_feature(body["feature_id"])
+        assert status == 404, missing
+        rows = conn.execute(
+            "SELECT id FROM gaps_index WHERE name LIKE 'Rollback import%'",
+        ).fetchall()
+        assert rows == [], rows
+        print("[ok] failed Feature import rolls back created Feature and Gaps")
+
+        status, body = api.import_persist({
+            "new_feature_name": "No-op Feature",
+            "drafts": [{
+                "actual": "Current ignored duplicate",
+                "target": "Target ignored duplicate",
+                "reporter": "Reporter",
+                "duplicate_decision": "duplicate",
+            }],
+        })
+        assert status == 200, body
+        assert body["count"] == 0, body
+        assert "feature_id" not in body, body
+        status, listed = feature_ops.list_features(q="No-op Feature")
+        assert status == 200, listed
+        assert listed["features"] == [], listed
+        print("[ok] no-op Feature import does not leave an empty Feature")
+
         from refine_server.paths import relative_gap_path
         from refine_server.runner import Runner
         import refine_server.runner as runner_mod
@@ -215,7 +306,8 @@ def main() -> int:
 
         def create_gap_and_project(*, gap_id, name, initial_round,
                                    status="backlog", priority="low",
-                                   node_id=None):
+                                   node_id=None, feature_id=None,
+                                   feature_order=None):
             gap = original_create_gap(
                 gap_id=gap_id,
                 name=name,
@@ -223,12 +315,14 @@ def main() -> int:
                 status=status,
                 priority=priority,
                 node_id=node_id,
+                feature_id=feature_id,
+                feature_order=feature_order,
             )
             runner._conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, "
-                "node_id, json_path) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "node_id, feature_id, feature_order, json_path) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     gap_id,
                     name,
@@ -238,6 +332,8 @@ def main() -> int:
                     gap["created"],
                     gap["updated"],
                     node_id or project_state.active_node_id(),
+                    feature_id,
+                    feature_order,
                     relative_gap_path(gap_id),
                 ),
             )

@@ -9,7 +9,7 @@ import sqlite3
 from collections import Counter
 from typing import Any, Callable
 
-from refine_server import cluster, db, gap_writer, gaps as shared_gaps
+from refine_server import cluster, db, feature_ops, gap_writer, gaps as shared_gaps
 from refine_server import project_state, search_index
 from refine_server.backend_protocol import (
     M_BULK_DELETE_GAPS,
@@ -701,6 +701,20 @@ def update_gap_reporter_index_no_ownership(gap_id: str, reporter: str) -> None:
         conn.close()
 
 
+def remove_feature_record(feature_id: str) -> None:
+    feature_id = feature_id.upper()
+    try:
+        feature_ops.feature_json_path(feature_id).unlink()
+    except FileNotFoundError:
+        pass
+    conn = _conn()
+    try:
+        with db.transaction(conn):
+            conn.execute("DELETE FROM features_index WHERE id = ?", (feature_id,))
+    finally:
+        conn.close()
+
+
 def upsert_gap_search_no_ownership(gap_id: str) -> None:
     gap = shared_gaps.read_gap_json(gap_id, include_logs=False)
     if not gap:
@@ -762,6 +776,9 @@ def persist(
     drafts = body.get("drafts") or []
     if not isinstance(drafts, list) or not drafts:
         return _err(400, "drafts must be a non-empty list")
+    feature_destination, feature_err = prepare_feature_destination(body)
+    if feature_err is not None:
+        return feature_err
     dedup_candidates: list[dict[str, Any]] | None = None
     created: list[str] = []
     failures: list[dict[str, Any]] = []
@@ -775,6 +792,7 @@ def persist(
     duplicate_moves: list[dict[str, Any]] = []
     duplicate_updates: list[dict[str, Any]] = []
     total = len(drafts)
+    feature_created_count = 0
     _progress(progress, 0, total, f"Importing 0 of {total} Gaps")
     for idx, d in enumerate(drafts, start=1):
         _cancel(cancel, created, duplicate_moves, duplicate_updates)
@@ -800,6 +818,17 @@ def persist(
             "reporter": draft_reporter,
             "priority": priority,
         }
+        if feature_destination is not None:
+            feature_node = str(feature_destination["node_id"])
+            if draft_node_id and draft_node_id != feature_node:
+                failures.append({
+                    "index": idx,
+                    "error": "draft node does not match Feature node",
+                    "draft": {**failure_draft, "node_id": draft_node_id},
+                })
+                _progress(progress, idx, total, f"Imported {idx} of {total} drafts")
+                continue
+            draft_node_id = feature_node
         if draft_node_id and project_state.node_by_id(draft_node_id) is None:
             failures.append({
                 "index": idx,
@@ -916,16 +945,21 @@ def persist(
             _progress(progress, idx, total, f"Imported {idx} of {total} drafts")
             continue
         gap_id = new_ulid()
+        create_params = {
+            "gap_id": gap_id,
+            "name": name,
+            "reporter": draft_reporter,
+            "priority": priority,
+            "actual": actual,
+            "target": target,
+            "node_id": draft_node_id or project_state.active_node_id(),
+        }
+        if feature_destination is not None:
+            feature_created_count += 1
+            create_params["feature_id"] = feature_destination["id"]
+            create_params["feature_order"] = int(feature_destination["next_order"]) + feature_created_count - 1
         try:
-            runner_call(M_CREATE_GAP, {
-                "gap_id": gap_id,
-                "name": name,
-                "reporter": draft_reporter,
-                "priority": priority,
-                "actual": actual,
-                "target": target,
-                "node_id": draft_node_id or project_state.active_node_id(),
-            }, 30.0)
+            runner_call(M_CREATE_GAP, create_params, 30.0)
             created.append(gap_id)
             _cancel(cancel, created, duplicate_moves, duplicate_updates)
             _progress(progress, idx, total, f"Imported {idx} of {total} drafts")
@@ -938,14 +972,96 @@ def persist(
             })
             _progress(progress, idx, total, f"Imported {idx} of {total} drafts")
     _cancel(cancel, created, duplicate_moves, duplicate_updates)
+    rolled_back = 0
+    feature = feature_destination.get("feature") if feature_destination else None
+    if feature_destination is not None and failures:
+        rolled_back = rollback_import_created_gaps(runner_call, created)
+        if feature_destination.get("created"):
+            remove_feature_record(str(feature_destination["id"]))
+        created = []
+    if feature_destination is not None and feature_destination.get("created") and not created and not failures:
+        remove_feature_record(str(feature_destination["id"]))
+        feature_destination = None
+        feature = None
     status = 201 if created and not failures else 200
-    return status, {
+    payload = {
         "created": created,
         "count": len(created),
         "failures": failures,
         "failed": len(failures),
         "duplicate_actions": duplicate_actions,
     }
+    if feature_destination is not None:
+        payload["feature"] = feature
+        payload["feature_id"] = str(feature_destination["id"])
+        payload["feature_destination"] = (
+            "new" if feature_destination.get("created") else "existing"
+        )
+        if rolled_back:
+            payload["rolled_back"] = rolled_back
+    return status, payload
+
+
+def prepare_feature_destination(
+    body: dict[str, Any],
+) -> tuple[dict[str, Any] | None, tuple[int, dict] | None]:
+    feature_id = str(body.get("feature_id") or body.get("feature") or "").strip().upper()
+    new_name = str(body.get("new_feature_name") or "").strip()
+    if feature_id and new_name:
+        return None, _err(400, "Specify either feature_id or new_feature_name, not both")
+    if not feature_id and not new_name:
+        return None, None
+    if new_name:
+        status, payload = feature_ops.create_feature({
+            "name": new_name,
+            "description": str(
+                body.get("new_feature_description")
+                or body.get("feature_description")
+                or ""
+            ).strip(),
+            "reporter": str(body.get("feature_reporter") or body.get("reporter") or "").strip(),
+        })
+        if status >= 400:
+            return None, (status, payload)
+        feature = payload["feature"]
+        return {
+            "id": str(feature["id"]),
+            "node_id": str(feature["node_id"]),
+            "next_order": 1,
+            "created": True,
+            "feature": feature,
+        }, None
+    conn = _conn()
+    try:
+        row = conn.execute(
+            "SELECT id, name, description, reporter, node_id, created, updated, json_path "
+            "FROM features_index WHERE id = ?",
+            (feature_id,),
+        ).fetchone()
+        if row is None:
+            return None, _err(404, "Feature not found")
+        feature = feature_ops.enrich_feature_row(conn, dict(row), include_gaps=False)
+        active = project_state.active_node_id()
+        if str(row["node_id"]) != active:
+            return None, _err(
+                409,
+                "Feature is owned by another node",
+                error_code="node_ownership",
+            )
+        next_row = conn.execute(
+            "SELECT COALESCE(MAX(feature_order), 0) AS max_order "
+            "FROM gaps_index WHERE feature_id = ?",
+            (feature_id,),
+        ).fetchone()
+        return {
+            "id": feature_id,
+            "node_id": str(row["node_id"]),
+            "next_order": int(next_row["max_order"] or 0) + 1,
+            "created": False,
+            "feature": feature,
+        }, None
+    finally:
+        conn.close()
 
 
 def create_gap(
@@ -991,6 +1107,32 @@ def create_gap(
                 "duplicate": duplicate,
             }
         }
+    feature_params: dict[str, Any] = {}
+    feature_id = str(body.get("feature_id") or body.get("feature") or "").strip().upper()
+    if feature_id:
+        conn = db.connect()
+        try:
+            row = conn.execute(
+                "SELECT id, node_id FROM features_index WHERE id = ?",
+                (feature_id,),
+            ).fetchone()
+            if row is None:
+                return _err(404, "Feature not found")
+            if str(row["node_id"]) != project_state.active_node_id():
+                return _err(
+                    409,
+                    "Feature is owned by another node",
+                    error_code="node_ownership",
+                )
+            max_row = conn.execute(
+                "SELECT COALESCE(MAX(feature_order), 0) AS max_order "
+                "FROM gaps_index WHERE feature_id = ?",
+                (feature_id,),
+            ).fetchone()
+        finally:
+            conn.close()
+        feature_params["feature_id"] = feature_id
+        feature_params["feature_order"] = int(max_row["max_order"] or 0) + 1
     gap_id = new_ulid()
     result = runner_call(M_CREATE_GAP, {
         "gap_id": gap_id,
@@ -999,6 +1141,7 @@ def create_gap(
         "reporter": reporter,
         "actual": actual,
         "target": target,
+        **feature_params,
     }, 30.0)
     return 201, result
 

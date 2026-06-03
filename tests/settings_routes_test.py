@@ -66,6 +66,9 @@ def main() -> int:
     gaps_detail_js = (root / "refine_ui/static/js/features/gaps-detail.js").read_text(
         encoding="utf-8",
     )
+    features_js = (root / "refine_ui/static/js/features/features.js").read_text(
+        encoding="utf-8",
+    )
     changes_js = (root / "refine_ui/static/js/features/changes.js").read_text(
         encoding="utf-8",
     )
@@ -310,8 +313,58 @@ def main() -> int:
     assert "data-feature-cell" not in settings_js
     assert "featureEnabled(" not in common_js
     assert "refreshFeatures" not in common_js
-    assert '@route("GET", r"/api/features")' not in server_py
-    assert "def list_features" not in api_py
+    assert '@route("GET", r"/api/features")' in server_py
+    assert '@route("POST", r"/api/features")' in server_py
+    assert '@route("POST", r"/api/features/([0-9A-Za-z]{26})/cancel")' in server_py
+    assert '@route("DELETE", r"/api/features/([0-9A-Za-z]{26})")' in server_py
+    assert 'r"/api/features/([0-9A-Za-z]{26})"' in server_py
+    assert 'r"/api/features/([0-9A-Za-z]{26})/gaps/([0-9A-Za-z]{26})"' in server_py
+    assert "def list_features" in api_py
+    assert "def create_feature" in api_py
+    assert "def cancel_feature" in api_py
+    assert "def delete_feature" in api_py
+    assert "feature_ops.list_features" in api_py
+    assert "feature_ops.assign_gap" in api_py
+    assert "feature_ops.cancel_feature" in api_py
+    assert "feature_ops.delete_feature" in api_py
+    assert "features: renderFeaturesList" in router_js
+    assert "features_detail: renderFeatureDetail" in router_js
+    assert "features_new: renderFeatureNew" in router_js
+    assert 'if (parts[0] === "features")' in router_js
+    assert '<a href="#/features" data-route="features">Features</a>' in index_html
+    assert 'id="btn-new-feature">New Feature</a>' in index_html
+    assert '<script src="/static/js/features/features.js"></script>' in index_html
+    assert "function renderFeatureDetail" in features_js
+    assert "function openFeatureModal" in features_js
+    assert "function bindFeatureGapActions" in features_js
+    assert "openFeatureAssignGapModal" in features_js
+    assert "openFeatureNewGapFlow" in features_js
+    assert "cancelFeatureFromUi" in features_js
+    assert "deleteFeatureFromUi" in features_js
+    assert "data-feature-move" in features_js
+    assert "data-feature-remove-gap" in features_js
+    assert 'location.hash = `#/features/${encodeURIComponent(row.dataset.featureId)}`;' in features_js
+    assert "FEATURE_MODAL_GAP_PAGE_SIZE" in features_js
+    assert 'renderPaginationControls("feature-modal-gaps"' in features_js
+    assert 'bindPaginationControls(root, "feature-modal-gaps"' in features_js
+    assert 'data-neighbor-id="${htmlEscape(gaps[globalIdx - 1]?.id || "")}"' in features_js
+    assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/reorder`' in features_js
+    assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`' in features_js
+    assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/cancel`' in features_js
+    assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}`' in features_js
+    assert 'params.set("feature", f.feature);' in gaps_list_js
+    assert 'placeholder="Feature ID or standalone"' in gaps_list_js
+    assert "renderGapFeatureCell" in gaps_list_js
+    assert "renderGapFeatureAssociation" in gaps_detail_js
+    assert "openGapFeatureAssignModal" in gaps_detail_js
+    assert "moveGapWithinFeature" in gaps_detail_js
+    assert 'id="btn-gap-feature-up"' in gaps_detail_js
+    assert 'id="btn-gap-feature-down"' in gaps_detail_js
+    assert 'data-gap-feature-move="up"' in gaps_list_js
+    assert 'data-gap-feature-move="down"' in gaps_list_js
+    assert 'name="import-feature-mode"' in import_js
+    assert "new_feature_name" in import_js
+    assert "feature_id: dest.existingId.trim()" in import_js
     assert "features.is_enabled" not in runner_py
     assert "feature_disabled" not in runner_py
     assert 'key.startswith("feature_")' not in project_state_py
@@ -466,7 +519,9 @@ def main() -> int:
     assert "function syncPlanDraftButton(tab)" in toolbar_js
     assert "btn.disabled = !planHasAgentResponse(tab);" in toolbar_js
     assert "function openPlanDraftModalFromText(text)" in import_js
-    assert "drawImportDrafts(root, annotated, close, { clearSession: false });" in import_js
+    assert "featureDestination: {" in import_js
+    assert 'mode: "new"' in import_js
+    assert "inferPlanFeatureName(text)" in import_js
     assert ".nav-context-summary" in base_css
     assert ".nav-context-section-label" in base_css
     assert "margin-top: 12px;" in base_css

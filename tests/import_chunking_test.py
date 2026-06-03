@@ -53,8 +53,8 @@ def main() -> int:
     assert 'decision === "move_original_to_backlog"' in import_js
     assert 'decision.startsWith("update_original_")' in import_js
     assert "function importDraftCreateCount(drafts)" in import_js
-    assert "function updateImportPersistButton(root, draftState)" in import_js
-    assert 'btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}`;' in import_js
+    assert "function updateImportPersistButton(root, draftState, featureDestination = null)" in import_js
+    assert 'btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}${suffix}`;' in import_js
     assert "No drafts remain in this review." in import_js
     assert "const targets = reviewDrafts" in import_js
     assert "function renderImportDraftRange(start, end, visibleCount, totalCount, filtered)" in import_js
@@ -62,7 +62,10 @@ def main() -> int:
     assert "data-import-unresolved-filter" in import_js
     assert "showNeedsResolutionOnly = true" in import_js
     assert "Resolve ${unresolved.length} draft" in import_js
-    assert "pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index))" in import_js
+    assert "pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index, draftCount))" in import_js
+    assert 'data-import-draft-move="up"' in import_js
+    assert 'data-import-draft-move="down"' in import_js
+    assert "[draftState[idx], draftState[swapIdx]] = [draftState[swapIdx], draftState[idx]]" in import_js
     assert "function renderImportDraftPager(page, totalPages)" in import_js
     assert 'class="import-draft-footer"' in import_js
     assert "data-import-page=\"prev\"" in import_js

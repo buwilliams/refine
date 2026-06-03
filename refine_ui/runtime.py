@@ -17,6 +17,7 @@ from refine_runtime.supervisor_protocol import (
     M_STOP_WORKER,
     WORKER_STARTUP_TIMEOUT_SECONDS,
 )
+from refine_server.backend_protocol import M_RUNNING
 
 from .poller import SqlitePoller
 

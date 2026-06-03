@@ -49,6 +49,7 @@ def _h_list_gaps(_h, _m, _b, q):
         category=_get_one(q, "category"),
         actor=_get_one(q, "actor"),
         reporter=_get_one(q, "reporter"),
+        feature=_get_one(q, "feature"),
         rounds_gte=_get_one(q, "rounds_gte"),
         rounds_lte=_get_one(q, "rounds_lte"),
         node=_get_one(q, "node"),
@@ -98,6 +99,69 @@ def _h_update_gap(_h, m, body, _q):
 @route("DELETE", r"/api/gaps/([0-9A-Za-z]{26})")
 def _h_delete_gap(_h, m, _b, _q):
     return api.delete_gap(m.group(1).upper())
+
+
+@route("GET", r"/api/features")
+def _h_list_features(_h, _m, _b, q):
+    return api.list_features(
+        status=_get_one(q, "status"),
+        q=_get_one(q, "q"),
+        reporter=_get_one(q, "reporter"),
+        node=_get_one(q, "node"),
+        limit=int(_get_one(q, "limit", "50")),
+        offset=int(_get_one(q, "offset", "0")),
+        sort=_get_one(q, "sort"),
+        direction=_get_one(q, "dir"),
+    )
+
+
+@route("POST", r"/api/features")
+def _h_create_feature(_h, _m, body, _q):
+    return api.create_feature(body or {})
+
+
+@route("GET", r"/api/features/([0-9A-Za-z]{26})")
+def _h_get_feature(_h, m, _b, _q):
+    return api.get_feature(m.group(1).upper())
+
+
+@route("PATCH", r"/api/features/([0-9A-Za-z]{26})")
+def _h_update_feature(_h, m, body, _q):
+    return api.update_feature(m.group(1).upper(), body or {})
+
+
+@route("POST", r"/api/features/([0-9A-Za-z]{26})/cancel")
+def _h_cancel_feature(_h, m, _b, _q):
+    return api.cancel_feature(m.group(1).upper())
+
+
+@route("DELETE", r"/api/features/([0-9A-Za-z]{26})")
+def _h_delete_feature(_h, m, _b, _q):
+    return api.delete_feature(m.group(1).upper())
+
+
+@route("GET", r"/api/features/([0-9A-Za-z]{26})/candidate-gaps")
+def _h_feature_candidate_gaps(_h, m, _b, q):
+    return api.list_feature_candidate_gaps(
+        m.group(1).upper(),
+        limit=int(_get_one(q, "limit", "50")),
+        offset=int(_get_one(q, "offset", "0")),
+    )
+
+
+@route("POST", r"/api/features/([0-9A-Za-z]{26})/gaps/([0-9A-Za-z]{26})")
+def _h_assign_feature_gap(_h, m, _b, _q):
+    return api.assign_feature_gap(m.group(1).upper(), m.group(2).upper())
+
+
+@route("DELETE", r"/api/features/([0-9A-Za-z]{26})/gaps/([0-9A-Za-z]{26})")
+def _h_remove_feature_gap(_h, m, _b, _q):
+    return api.remove_feature_gap(m.group(1).upper(), m.group(2).upper())
+
+
+@route("POST", r"/api/features/([0-9A-Za-z]{26})/gaps/([0-9A-Za-z]{26})/reorder")
+def _h_reorder_feature_gap(_h, m, body, _q):
+    return api.reorder_feature_gap(m.group(1).upper(), m.group(2).upper(), body or {})
 
 
 @route("POST", r"/api/gaps/([0-9A-Za-z]{26})/rounds")

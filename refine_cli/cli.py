@@ -39,7 +39,7 @@ from typing import Annotated, Callable
 
 import click
 import typer
-from refine_server import chat_ops, cluster, cluster_ops, config, dashboard_ops, db, diagnostics_ops, file_ops, gap_ops, import_ops, node_ops, observability_ops, process_ops, project_apps, project_config_ops, project_registry, project_state, project_sync, reporter_ops, settings_ops, target_app_ops, upgrade
+from refine_server import chat_ops, cluster, cluster_ops, config, dashboard_ops, db, diagnostics_ops, feature_ops, file_ops, gap_ops, import_ops, node_ops, observability_ops, process_ops, project_apps, project_config_ops, project_registry, project_state, project_sync, reporter_ops, settings_ops, target_app_ops, upgrade
 from refine_server.backend_protocol import M_PREFLIGHT, M_PROJECT_SYNC
 
 
@@ -163,6 +163,13 @@ gaps_app = typer.Typer(
     context_settings=_CONTEXT_SETTINGS,
     no_args_is_help=True,
 )
+features_app = typer.Typer(
+    name="features",
+    help="Manage Features and their ordered Gaps.",
+    add_completion=False,
+    context_settings=_CONTEXT_SETTINGS,
+    no_args_is_help=True,
+)
 changes_app = typer.Typer(
     name="changes",
     help="Inspect merged Refine changes.",
@@ -232,6 +239,7 @@ app.add_typer(upgrade_app, name="upgrade")
 app.add_typer(job_app, name="job")
 app.add_typer(files_app, name="files")
 app.add_typer(gaps_app, name="gaps")
+app.add_typer(features_app, name="features")
 app.add_typer(changes_app, name="changes")
 app.add_typer(chat_app, name="chat")
 app.add_typer(settings_app, name="settings")
@@ -1611,6 +1619,193 @@ def files_read_command(
     return 0 if status < 400 else 1
 
 
+@features_app.command("list", help="List Features.")
+def features_list_command(
+    ctx: typer.Context,
+    status: Annotated[str | None, typer.Option("--status", help="Filter by derived status.")] = None,
+    q: Annotated[str | None, typer.Option("--q", help="Search query.")] = None,
+    reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    node: Annotated[str | None, typer.Option("--node", help="Node id, current, or all.")] = None,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum rows.")] = 50,
+    offset: Annotated[int, typer.Option("--offset", help="Rows to skip.")] = 0,
+    sort: Annotated[str | None, typer.Option("--sort", help="Sort key.")] = None,
+    direction: Annotated[str | None, typer.Option("--dir", help="Sort direction.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cli_project_config(ctx, port=port)
+    status_code, payload = feature_ops.list_features(
+        status=status,
+        q=q,
+        reporter=reporter,
+        node=node,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        direction=direction,
+    )
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("show", help="Show Feature detail.")
+def features_show_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    _cli_project_config(ctx, port=port)
+    status_code, payload = feature_ops.get_feature(feature_id.upper())
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("create", help="Create a Feature.")
+def features_create_command(
+    ctx: typer.Context,
+    name: Annotated[str, typer.Option("--name", help="Feature name.")],
+    description: Annotated[str, typer.Option("--description", help="Feature description.")] = "",
+    reporter: Annotated[str, typer.Option("--reporter", help="Reporter.")] = "",
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg = _cli_project_config(ctx, port=port)
+    status_code, payload = feature_ops.create_feature({
+        "name": name,
+        "description": description,
+        "reporter": reporter,
+    })
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: create feature")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("update", help="Update Feature metadata.")
+def features_update_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    name: Annotated[str | None, typer.Option("--name", help="Feature name.")] = None,
+    description: Annotated[str | None, typer.Option("--description", help="Feature description.")] = None,
+    reporter: Annotated[str | None, typer.Option("--reporter", help="Reporter.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg = _cli_project_config(ctx, port=port)
+    body: dict[str, object] = {}
+    if name is not None:
+        body["name"] = name
+    if description is not None:
+        body["description"] = description
+    if reporter is not None:
+        body["reporter"] = reporter
+    status_code, payload = feature_ops.update_feature(feature_id.upper(), body)
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: update feature")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("delete", help="Delete a Feature and its Gaps.")
+def features_delete_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    yes: Annotated[bool, typer.Option("--yes", "-y", help="Confirm cascade deletion.")] = False,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    if not yes:
+        _print_json({"error": {"message": "Feature deletion requires --yes confirmation"}})
+        return 1
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        status_code, payload = feature_ops.delete_feature(
+            conn,
+            runner_call,
+            feature_id.upper(),
+        )
+    finally:
+        conn.close()
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: delete feature")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("cancel", help="Cancel a Feature and non-terminal Gaps.")
+def features_cancel_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg, runner_call = _backend_runner_for_cli(ctx, port)
+    conn = db.connect(cfg.sqlite_path)
+    try:
+        status_code, payload = feature_ops.cancel_feature(
+            conn,
+            runner_call,
+            feature_id.upper(),
+        )
+    finally:
+        conn.close()
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: cancel feature")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("add-gap", help="Assign a Gap to a Feature.")
+def features_add_gap_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg = _cli_project_config(ctx, port=port)
+    status_code, payload = feature_ops.assign_gap(feature_id.upper(), gap_id.upper())
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: assign gap to feature")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("remove-gap", help="Remove a Gap from a Feature.")
+def features_remove_gap_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg = _cli_project_config(ctx, port=port)
+    status_code, payload = feature_ops.remove_gap(feature_id.upper(), gap_id.upper())
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: remove gap from feature")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+@features_app.command("reorder", help="Reorder a Gap inside a Feature.")
+def features_reorder_command(
+    ctx: typer.Context,
+    feature_id: Annotated[str, typer.Argument(help="Feature ID.")],
+    gap_id: Annotated[str, typer.Argument(help="Gap ID.")],
+    before: Annotated[str | None, typer.Option("--before", help="Move before this Gap ID.")] = None,
+    after: Annotated[str | None, typer.Option("--after", help="Move after this Gap ID.")] = None,
+    port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
+) -> int:
+    cfg = _cli_project_config(ctx, port=port)
+    status_code, payload = feature_ops.reorder_gap(
+        feature_id.upper(),
+        gap_id.upper(),
+        before=before.upper() if before else None,
+        after=after.upper() if after else None,
+    )
+    _sync_feature_cli_mutation(cfg, payload, status_code, "refine: reorder feature gaps")
+    _print_json(payload)
+    return 0 if status_code < 400 else 1
+
+
+def _sync_feature_cli_mutation(
+    cfg: config.Config,
+    payload: dict[str, object],
+    status_code: int,
+    message: str,
+) -> None:
+    if status_code < 400:
+        payload["sync"] = _sync_cli_refine_state(cfg, message=message)
+
+
 @gaps_app.command("list", help="List Gaps.")
 def gaps_list_command(
     ctx: typer.Context,
@@ -1620,6 +1815,7 @@ def gaps_list_command(
     category: Annotated[str | None, typer.Option("--category", help="Filter by activity category.")] = None,
     actor: Annotated[str | None, typer.Option("--actor", help="Filter by activity actor.")] = None,
     reporter: Annotated[str | None, typer.Option("--reporter", help="Filter by reporter.")] = None,
+    feature: Annotated[str | None, typer.Option("--feature", help="Feature ID, standalone, or all.")] = None,
     rounds_gte: Annotated[int | None, typer.Option("--rounds-gte", help="Minimum number of rounds, inclusive.")] = None,
     rounds_lte: Annotated[int | None, typer.Option("--rounds-lte", help="Maximum number of rounds, inclusive.")] = None,
     node: Annotated[str | None, typer.Option("--node", help="Node id, current, unknown, or all.")] = None,
@@ -1638,6 +1834,7 @@ def gaps_list_command(
         category=category,
         actor=actor,
         reporter=reporter,
+        feature=feature,
         rounds_gte=rounds_gte,
         rounds_lte=rounds_lte,
         node=node,
@@ -1689,6 +1886,7 @@ def gaps_create_command(
     target: Annotated[str, typer.Option("--target", help="Target behavior.")] = "",
     name: Annotated[str | None, typer.Option("--name", help="Gap name.")] = None,
     priority: Annotated[str, typer.Option("--priority", help="low, medium, or high.")] = "low",
+    feature: Annotated[str | None, typer.Option("--feature", help="Create this Gap inside an existing Feature ID.")] = None,
     duplicate_decision: Annotated[
         str | None,
         typer.Option("--duplicate-decision", help="duplicate, original, or move_original_to_backlog."),
@@ -1704,6 +1902,8 @@ def gaps_create_command(
     }
     if name is not None:
         body["name"] = name
+    if feature is not None:
+        body["feature_id"] = feature.upper()
     if duplicate_decision is not None:
         body["duplicate_decision"] = duplicate_decision
     try:
@@ -2165,6 +2365,9 @@ def import_dedup_command(
 def import_persist_command(
     ctx: typer.Context,
     source: Annotated[str, typer.Argument(help="Import JSON, file path, or '-' for stdin.")],
+    new_feature_name: Annotated[str | None, typer.Option("--new-feature-name", help="Create a Feature for the imported Gaps.")] = None,
+    new_feature_description: Annotated[str | None, typer.Option("--new-feature-description", help="Description for a new import Feature.")] = None,
+    feature: Annotated[str | None, typer.Option("--feature", help="Append imported Gaps to an existing Feature ID.")] = None,
     port: Annotated[int | None, typer.Option("--port", help="Refine port.")] = None,
 ) -> int:
     cfg, runner_call = _backend_runner_for_cli(ctx, port)
@@ -2172,6 +2375,12 @@ def import_persist_command(
     body = {"drafts": value} if isinstance(value, list) else value
     if not isinstance(body, dict):
         raise click.ClickException("persist input must be a JSON object or draft list")
+    if new_feature_name is not None:
+        body["new_feature_name"] = new_feature_name
+    if new_feature_description is not None:
+        body["new_feature_description"] = new_feature_description
+    if feature is not None:
+        body["feature_id"] = feature.upper()
     try:
         status, payload = import_ops.persist(runner_call, body)
     except Exception as e:

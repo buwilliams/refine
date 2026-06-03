@@ -938,6 +938,9 @@ class Runner:
         name = params.get("name", "Untitled Gap")
         priority = _normalize_priority(params.get("priority"))
         node_id = str(params.get("node_id") or self.local_node_id)
+        feature_id = str(params.get("feature_id") or "").strip() or None
+        feature_order_raw = params.get("feature_order")
+        feature_order = int(feature_order_raw) if feature_order_raw is not None else None
         round_obj = shared_gaps.new_round(
             reporter=params["reporter"],
             actual=params.get("actual", ""),
@@ -946,14 +949,16 @@ class Runner:
         gap = gap_writer.create_gap(
             gap_id=gap_id, name=name, initial_round=round_obj,
             status="backlog", priority=priority, node_id=node_id,
+            feature_id=feature_id, feature_order=feature_order,
         )
 
         from refine_server.paths import relative_gap_path
         with db.transaction(self._conn):
             self._conn.execute(
                 "INSERT INTO gaps_index "
-                "(id, name, status, priority, reporter, round_count, created, updated, node_id, json_path) "
-                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?, ?) "
+                "(id, name, status, priority, reporter, round_count, created, updated, "
+                "node_id, feature_id, feature_order, json_path) "
+                "VALUES (?, ?, 'backlog', ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(id) DO UPDATE SET "
                 "name = excluded.name, "
                 "status = excluded.status, "
@@ -963,10 +968,12 @@ class Runner:
                 "created = excluded.created, "
                 "updated = excluded.updated, "
                 "node_id = excluded.node_id, "
+                "feature_id = excluded.feature_id, "
+                "feature_order = excluded.feature_order, "
                 "json_path = excluded.json_path",
                 (gap_id, name, priority, params["reporter"],
                  len(gap.get("rounds") or []), gap["created"], gap["updated"],
-                 node_id, relative_gap_path(gap_id)),
+                 node_id, feature_id, feature_order, relative_gap_path(gap_id)),
             )
             search_index.upsert_gap(self._conn, gap)
         # ensure reporter exists in dropdown list

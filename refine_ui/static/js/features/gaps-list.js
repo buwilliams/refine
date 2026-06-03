@@ -14,6 +14,7 @@ function gapsHash(parts) {
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
   if (parts.reporter) next.set("reporter", parts.reporter);
+  if (parts.feature)  next.set("feature", parts.feature);
   if (parts.rounds_gte !== undefined && parts.rounds_gte !== "") {
     next.set("rounds_gte", parts.rounds_gte);
   }
@@ -75,6 +76,8 @@ async function renderGapsList() {
           ${(state.project?.nodes || []).map((inst) =>
             `<option value="${htmlEscape(inst.id)}" ${inst.id === f.node ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
         </select>
+        <input type="text" id="filter-feature" class="filter-feature"
+               placeholder="Feature ID or standalone" value="${htmlEscape(f.feature)}">
         <input type="number" id="filter-rounds-gte" class="filter-number"
                min="0" step="1" inputmode="numeric"
                placeholder="Rounds ≥" value="${htmlEscape(f.rounds_gte)}">
@@ -123,6 +126,8 @@ async function renderGapsList() {
     updateGapsFilter({ status: e.target.value, page: 1 }));
   $("#filter-reporter").addEventListener("change", (e) =>
     updateGapsFilter({ reporter: e.target.value, page: 1 }));
+  $("#filter-feature").addEventListener("input", debounce((e) =>
+    updateGapsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
   $("#filter-node").addEventListener("change", (e) =>
     updateGapsFilter({ node: e.target.value, page: 1 }));
   $("#filter-rounds-gte").addEventListener("input", debounce((e) =>
@@ -175,6 +180,7 @@ function gapsFilterFromHash() {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
     reporter: hashQs.get("reporter") || "",
+    feature: hashQs.get("feature") || "",
     rounds_gte: hashQs.get("rounds_gte") || "",
     rounds_lte: hashQs.get("rounds_lte") || "",
     node: hashQs.get("node") || "",
@@ -198,6 +204,7 @@ function updateGapsFilter(patch) {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
     reporter: "reporter" in patch ? patch.reporter : current.reporter,
+    feature: "feature" in patch ? patch.feature : current.feature,
     rounds_gte: "rounds_gte" in patch ? patch.rounds_gte : current.rounds_gte,
     rounds_lte: "rounds_lte" in patch ? patch.rounds_lte : current.rounds_lte,
     node: "node" in patch ? patch.node : current.node,
@@ -221,6 +228,7 @@ async function refreshGapsTable() {
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
   if (f.reporter) params.set("reporter", f.reporter);
+  if (f.feature) params.set("feature", f.feature);
   if (f.rounds_gte) params.set("rounds_gte", f.rounds_gte);
   if (f.rounds_lte) params.set("rounds_lte", f.rounds_lte);
   if (f.node) params.set("node", f.node);
@@ -257,7 +265,7 @@ async function refreshGapsTable() {
     }
     applyGapsFilterIndicator(f);
     const renderState = {
-      q: f.q, status: f.status,
+      q: f.q, status: f.status, feature: f.feature,
       rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
       sort: f.effectiveSort, dir: f.effectiveDir,
       page: data.page || {
@@ -311,6 +319,17 @@ function _isGapSelected(id) {
     : gapsIncludedIds.has(id);
 }
 
+function renderGapFeatureCell(gap) {
+  if (!gap.feature_id) return "—";
+  const order = gap.feature_order ? ` #${gap.feature_order}` : "";
+  return `
+    <a href="#/features/${encodeURIComponent(gap.feature_id)}">${htmlEscape(gap.feature_id)}${htmlEscape(order)}</a>
+    <span class="actions compact-actions">
+      <button type="button" class="secondary small" data-gap-feature-move="up" data-feature-id="${htmlEscape(gap.feature_id)}" data-gap-id="${htmlEscape(gap.id)}">Up</button>
+      <button type="button" class="secondary small" data-gap-feature-move="down" data-feature-id="${htmlEscape(gap.feature_id)}" data-gap-id="${htmlEscape(gap.id)}">Down</button>
+    </span>`;
+}
+
 function drawGapsTable(gaps, state) {
   const root = $("#gaps-table");
   // Selection UI follows the filter shell — only show checkboxes when the
@@ -332,6 +351,7 @@ function drawGapsTable(gaps, state) {
     { key: "status",   label: "Status",   sortable: true },
     { key: "priority", label: "Priority", sortable: true },
     { key: "reporter", label: "Reporter", sortable: true },
+    { key: "feature", label: "Feature", sortable: false },
     { key: "node", label: "Node", sortable: true },
     { key: "updated",  label: "Updated",  sortable: true },
   ];
@@ -362,6 +382,7 @@ function drawGapsTable(gaps, state) {
         <col class="gaps-col-status">
         <col class="gaps-col-priority">
         <col class="gaps-col-reporter">
+        <col class="gaps-col-feature">
         <col class="gaps-col-node">
         <col class="gaps-col-updated">
       </colgroup>
@@ -383,6 +404,7 @@ function drawGapsTable(gaps, state) {
             <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
             <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
+            <td class="muted small" data-label="Feature">${renderGapFeatureCell(g)}</td>
             <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
             <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>
           </tr>`;
@@ -398,7 +420,23 @@ function drawGapsTable(gaps, state) {
   $$(".table tbody tr", root).forEach((row) => {
     row.addEventListener("click", (e) => {
       if (e.target.closest(".gap-select-col")) return;
+      if (e.target.closest("a, button, input, select, textarea")) return;
       location.hash = "#/gaps/" + row.dataset.id;
+    });
+  });
+  $$("[data-gap-feature-move]", root).forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await moveGapWithinFeature(
+          btn.dataset.featureId,
+          btn.dataset.gapId,
+          btn.dataset.gapFeatureMove,
+          refreshGapsTable,
+        );
+      } catch (err) {
+        showActionError(err, "Reorder failed");
+      }
     });
   });
   $$(".gap-select", root).forEach((cb) => {

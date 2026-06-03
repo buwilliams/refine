@@ -10,7 +10,7 @@ async function renderGapNew() {
 
 let _newGapModalOpen = false;
 
-function openNewGapModal() {
+function openNewGapModal(options = {}) {
   if (_newGapModalOpen) return;
   const reporter = state.lastReporter || "";
   if (!reporter) {
@@ -23,7 +23,7 @@ function openNewGapModal() {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-gap-title" style="max-width:560px">
-      <div class="modal-title" id="new-gap-title">New Gap</div>
+      <div class="modal-title" id="new-gap-title">${options.featureId ? "New Feature Gap" : "New Gap"}</div>
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">
           Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
@@ -122,6 +122,7 @@ function openNewGapModal() {
     try {
       const r = await api("POST", "/api/gaps", {
         reporter: currentReporter, actual, target, priority,
+        ...(options.featureId ? { feature_id: options.featureId } : {}),
         duplicate_decision: effectiveDuplicateDecision,
       });
       if (r?.created === false) {
@@ -143,6 +144,9 @@ function openNewGapModal() {
         return;
       }
       toast("Gap created", "info");
+      if (typeof options.onSaved === "function") {
+        await options.onSaved(r);
+      }
       // Stay on whatever screen the modal was layered over — Dashboard,
       // Gaps list, etc. `close(true)` only re-routes if we came in via
       // the `#/gaps/new` deep link; otherwise the underlying hash is

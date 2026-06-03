@@ -227,8 +227,9 @@ class Dispatcher:
         limit = max(1, available_slots * 2)
         pending = {
             lane: list(conn.execute(
-                "SELECT id, name, branch_name FROM gaps_index "
-                f"WHERE status = ? AND node_id = ? AND {priority_case_sql()} = ? "
+                "SELECT id, name, branch_name FROM gaps_index g "
+                f"WHERE status = ? AND node_id = ? AND {priority_case_sql('g.priority')} = ? "
+                f"AND {self._feature_dispatch_eligible_sql('g')} "
                 "ORDER BY updated ASC LIMIT ?",
                 (lane, active_node, active_rank, limit),
             ).fetchall())
@@ -283,12 +284,34 @@ class Dispatcher:
     def _highest_blocking_priority_rank(self, conn: sqlite3.Connection) -> int | None:
         placeholders = ",".join("?" * len(_DISPATCH_PRIORITY_STATUSES))
         row = conn.execute(
-            f"SELECT {priority_case_sql()} AS rank FROM gaps_index "
+            f"SELECT {priority_case_sql('g.priority')} AS rank FROM gaps_index g "
             f"WHERE node_id = ? AND status IN ({placeholders}) "
+            f"AND {self._feature_dispatch_eligible_sql('g')} "
             "ORDER BY rank ASC LIMIT 1",
             (self._node_id(), *_DISPATCH_PRIORITY_STATUSES),
         ).fetchone()
         return int(row["rank"]) if row else None
+
+    def _feature_dispatch_eligible_sql(self, alias: str) -> str:
+        return (
+            f"({alias}.feature_id IS NULL OR ("
+            f"{alias}.feature_order IS NOT NULL "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM gaps_index earlier "
+            f"  WHERE earlier.feature_id = {alias}.feature_id "
+            f"  AND earlier.node_id = {alias}.node_id "
+            f"  AND earlier.feature_order < {alias}.feature_order "
+            "  AND earlier.status NOT IN ('done', 'cancelled')"
+            ") "
+            "AND NOT EXISTS ("
+            "  SELECT 1 FROM gaps_index active_feature_gap "
+            f"  WHERE active_feature_gap.feature_id = {alias}.feature_id "
+            f"  AND active_feature_gap.node_id = {alias}.node_id "
+            f"  AND active_feature_gap.id <> {alias}.id "
+            "  AND active_feature_gap.status IN ('in-progress', 'qa')"
+            ")"
+            "))"
+        )
 
     def _preempt_lower_priority_runs(self, conn: sqlite3.Connection,
                                      active_rank: int) -> int:
@@ -332,7 +355,8 @@ class Dispatcher:
         active_node = self._node_id()
         if n == 0:
             rows = conn.execute(
-                "SELECT id FROM gaps_index WHERE status = 'backlog' AND node_id = ?",
+                "SELECT id FROM gaps_index g WHERE status = 'backlog' AND node_id = ? "
+                f"AND {self._feature_dispatch_eligible_sql('g')}",
                 (active_node,),
             ).fetchall()
         else:
@@ -340,8 +364,9 @@ class Dispatcher:
                 "%Y-%m-%dT%H:%M:%SZ"
             )
             rows = conn.execute(
-                "SELECT id FROM gaps_index "
-                "WHERE status = 'backlog' AND node_id = ? AND updated <= ?",
+                "SELECT id FROM gaps_index g "
+                "WHERE status = 'backlog' AND node_id = ? AND updated <= ? "
+                f"AND {self._feature_dispatch_eligible_sql('g')}",
                 (active_node, cutoff),
             ).fetchall()
         if not rows:
@@ -1030,6 +1055,7 @@ class Dispatcher:
             cur = conn.execute(
                 "UPDATE gaps_index SET status = 'in-progress', updated = ?, branch_name = ? "
                 "WHERE id = ? AND status = 'todo' AND node_id = ? "
+                f"AND {self._feature_dispatch_eligible_sql('gaps_index')} "
                 "AND ("
                 "  SELECT COUNT(*) FROM gaps_index "
                 "  WHERE status = 'in-progress' AND node_id = ?"

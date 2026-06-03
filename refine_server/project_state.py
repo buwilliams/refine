@@ -335,8 +335,10 @@ def clear_maintenance(*, root: Path | None = None) -> None:
 def empty_refine_state(root: Path | None = None) -> bool:
     root = root or volume_root()
     gaps = root / "gaps"
+    features = root / "features"
     has_gaps = gaps.exists() and any(gaps.glob("**/gap.json"))
-    return not has_gaps and not (root / "index.sqlite").exists()
+    has_features = features.exists() and any(features.glob("**/feature.json"))
+    return not has_gaps and not has_features and not (root / "index.sqlite").exists()
 
 
 def ensure_initialized(conn: sqlite3.Connection | None = None, *,
@@ -347,6 +349,7 @@ def ensure_initialized(conn: sqlite3.Connection | None = None, *,
     root = root or volume_root()
     root.mkdir(parents=True, exist_ok=True)
     (root / "gaps").mkdir(exist_ok=True)
+    (root / "features").mkdir(exist_ok=True)
     config.ensure_refine_gitignore(root)
     status = schema_status(root)
     if status["compatible"]:
@@ -376,6 +379,7 @@ def migrate_project_state(*, root: Path | None = None) -> None:
     _rewrite_nodes_registry(root)
     _assert_legacy_node_paths_removed(root)
     _rewrite_gap_node_ownership(root)
+    _rewrite_feature_node_ownership(root)
     cfg = read_project_config(root=root)
     cfg["schema_version"] = CURRENT_SCHEMA_VERSION
     cfg.setdefault("refine", {})["version"] = _refine_version()
@@ -558,6 +562,18 @@ def _rewrite_gap_node_ownership(root: Path) -> None:
         if changed:
             gap["updated"] = gap.get("updated") or now_iso()
             _write_json(path, gap)
+
+
+def _rewrite_feature_node_ownership(root: Path) -> None:
+    for path in sorted((root / "features").glob("**/feature.json")):
+        feature = _read_json(path, {})
+        if not isinstance(feature, dict) or not feature.get("id"):
+            continue
+        if "node_id" in feature:
+            continue
+        feature["node_id"] = DEFAULT_NODE_ID
+        feature["updated"] = feature.get("updated") or now_iso()
+        _write_json(path, feature)
 
 
 def migrate_legacy(conn: sqlite3.Connection | None = None, *,
@@ -1261,6 +1277,7 @@ def rebuild_sqlite_cache(
             conn.execute("DELETE FROM gap_search_docs")
             conn.execute("DELETE FROM gaps_index")
             conn.execute("DELETE FROM gap_cache_meta")
+        conn.execute("DELETE FROM features_index")
         phase_ms["delete_ms"] = perf_metrics.elapsed_ms(phase_start)
         phase_start = perf_metrics.now()
         for key, value in settings.items():
@@ -1288,6 +1305,8 @@ def rebuild_sqlite_cache(
         phase_ms["settings_reporters_ms"] = perf_metrics.elapsed_ms(phase_start)
         phase_start = perf_metrics.now()
         rows_updated = _apply_gap_cache_refresh(conn, gap_refresh)
+        feature_rows = _project_features_index(conn, root)
+        rows_updated += feature_rows
         phase_ms["gap_index_refresh_ms"] = perf_metrics.elapsed_ms(phase_start)
     if force:
         from . import search_index
@@ -1370,6 +1389,7 @@ def state_fingerprint(*, root: Path | None = None) -> str:
         guidance_json_path(root),
     ]
     paths.extend(sorted(nodes_dir(root).glob("**/*.json")))
+    paths.extend(sorted((root / "features").glob("**/feature.json")))
     parts: list[str] = []
     for path in paths:
         try:
@@ -1596,8 +1616,8 @@ def _upsert_gap_index_row(conn: sqlite3.Connection,
     conn.execute(
         "INSERT OR REPLACE INTO gaps_index "
         "(id, name, status, priority, reporter, round_count, created, updated, "
-        "branch_name, node_id, json_path) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "branch_name, node_id, feature_id, feature_order, json_path) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         (
             str(gap.get("id") or ""),
             str(gap.get("name") or "Untitled Gap"),
@@ -1609,9 +1629,50 @@ def _upsert_gap_index_row(conn: sqlite3.Connection,
             str(gap.get("updated") or gap.get("created") or now_iso()),
             gap.get("branch_name"),
             str(gap.get("node_id") or DEFAULT_NODE_ID),
+            _nullable_text(gap.get("feature_id")),
+            _nullable_int(gap.get("feature_order")),
             rel_path,
         ),
     )
+
+
+def _project_features_index(conn: sqlite3.Connection, root: Path) -> int:
+    rows = 0
+    for path in sorted((root / "features").glob("**/feature.json")):
+        feature = _read_json(path, {})
+        if not isinstance(feature, dict) or not feature.get("id"):
+            continue
+        conn.execute(
+            "INSERT OR REPLACE INTO features_index "
+            "(id, name, description, reporter, node_id, created, updated, json_path) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                str(feature.get("id") or ""),
+                str(feature.get("name") or "Untitled Feature"),
+                str(feature.get("description") or ""),
+                str(feature.get("reporter") or ""),
+                str(feature.get("node_id") or DEFAULT_NODE_ID),
+                str(feature.get("created") or now_iso()),
+                str(feature.get("updated") or feature.get("created") or now_iso()),
+                path.relative_to(root).as_posix(),
+            ),
+        )
+        rows += 1
+    return rows
+
+
+def _nullable_text(value: Any) -> str | None:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _nullable_int(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _read_gap_cache_bytes(path: Path) -> bytes:

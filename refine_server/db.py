@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS gaps_index (
     updated     TEXT NOT NULL,
     branch_name TEXT,
     node_id TEXT NOT NULL DEFAULT 'default',
+    feature_id TEXT,
+    feature_order INTEGER,
     json_path   TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gaps_status   ON gaps_index(status);
@@ -50,6 +52,21 @@ CREATE TABLE IF NOT EXISTS gap_cache_meta (
 );
 CREATE INDEX IF NOT EXISTS idx_gap_cache_meta_gap_id
     ON gap_cache_meta(gap_id);
+
+CREATE TABLE IF NOT EXISTS features_index (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    reporter    TEXT NOT NULL DEFAULT '',
+    node_id     TEXT NOT NULL DEFAULT 'default',
+    created     TEXT NOT NULL,
+    updated     TEXT NOT NULL,
+    json_path   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_features_node
+    ON features_index(node_id);
+CREATE INDEX IF NOT EXISTS idx_features_updated
+    ON features_index(updated);
 
 CREATE TABLE IF NOT EXISTS runs (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -398,7 +415,7 @@ def init_db(path: Path | None = None) -> None:
 
 
 def schema_ready(conn: sqlite3.Connection) -> bool:
-    required = {"gaps_index", "gap_cache_meta", "settings", "reporters"}
+    required = {"gaps_index", "gap_cache_meta", "features_index", "settings", "reporters"}
     rows = conn.execute(
         "SELECT name FROM sqlite_master WHERE type = 'table'"
     ).fetchall()
@@ -445,6 +462,10 @@ def _migrate(conn: sqlite3.Connection) -> None:
             conn.execute(
                 "UPDATE gaps_index SET node_id = COALESCE(NULLIF(instance_id, ''), 'default')"
             )
+    if "feature_id" not in cols:
+        conn.execute("ALTER TABLE gaps_index ADD COLUMN feature_id TEXT")
+    if "feature_order" not in cols:
+        conn.execute("ALTER TABLE gaps_index ADD COLUMN feature_order INTEGER")
     run_cols = {r["name"] for r in conn.execute("PRAGMA table_info(runs)")}
     if "kind" not in run_cols:
         conn.execute(
@@ -468,6 +489,30 @@ def _migrate(conn: sqlite3.Connection) -> None:
     )
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_gaps_node ON gaps_index(node_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gaps_feature ON gaps_index(feature_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_gaps_feature_order "
+        "ON gaps_index(feature_id, feature_order)"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS features_index ("
+        "id TEXT PRIMARY KEY, "
+        "name TEXT NOT NULL, "
+        "description TEXT NOT NULL DEFAULT '', "
+        "reporter TEXT NOT NULL DEFAULT '', "
+        "node_id TEXT NOT NULL DEFAULT 'default', "
+        "created TEXT NOT NULL, "
+        "updated TEXT NOT NULL, "
+        "json_path TEXT NOT NULL)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_features_node ON features_index(node_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_features_updated ON features_index(updated)"
     )
     _ensure_search_schema(conn)
     _rebuild_activity_search(conn)

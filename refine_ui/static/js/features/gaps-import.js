@@ -54,6 +54,12 @@ function newImportSession() {
     jobId: "",
     result: null,
     error: "",
+    featureDestination: {
+      mode: "standalone",
+      newName: "",
+      newDescription: "",
+      existingId: "",
+    },
     updatedAt: new Date().toISOString(),
   };
 }
@@ -530,13 +536,32 @@ async function openPlanDraftModalFromText(text) {
     if (closed) return;
     const annotated = await annotateImportDuplicateDrafts(drafts);
     if (closed) return;
-    drawImportDrafts(root, annotated, close, { clearSession: false });
+    drawImportDrafts(root, annotated, close, {
+      clearSession: false,
+      featureDestination: {
+        mode: "new",
+        newName: inferPlanFeatureName(text),
+        newDescription: "Created from Plan Mode.",
+        existingId: "",
+      },
+    });
   } catch (e) {
     if (e.name === "AbortError") return;
     if (draftsRoot) {
       draftsRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message)}</p>`;
     }
   }
+}
+
+function inferPlanFeatureName(text) {
+  const firstLine = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean) || "Planned Feature";
+  const cleaned = firstLine
+    .replace(/^(plan|feature|proposal)\s*[:\-]\s*/i, "")
+    .trim() || "Planned Feature";
+  return cleaned.length > 80 ? cleaned.slice(0, 77).trimEnd() + "..." : cleaned;
 }
 
 async function annotateImportDuplicateDrafts(drafts) {
@@ -655,6 +680,9 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   const draftState = drafts.map(normalizeImportDraft);
   const saveSession = options.saveSession || null;
   const clearSessionOnClose = options.clearSession !== false;
+  let featureDestination = normalizeImportFeatureDestination(
+    options.featureDestination || (readImportSession() || {}).featureDestination,
+  );
   let page = 1;
   let showNeedsResolutionOnly = false;
   let originalUpdateField = "actual";
@@ -698,21 +726,32 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         allFilteredSelected,
         updateField: originalUpdateField,
       })}
+      ${renderImportFeatureDestination(featureDestination)}
       ${duplicateCount ? `<p class="muted small">${duplicateCount} possible duplicate${duplicateCount === 1 ? "" : "s"} found. Resolve them with the bulk actions before saving.</p>` : ""}
       ${!visibleDrafts.length
         ? `<p class="muted">${showNeedsResolutionOnly ? "No drafts need resolution." : "No drafts remain in this review."}</p>`
-        : renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected })}
+        : renderImportDraftTable(pageDrafts, {
+            pageAllSelected,
+            pageSomeSelected,
+            draftCount: draftState.length,
+          })}
       <div class="import-draft-footer">
         ${renderImportDraftPager(page, totalPages)}
       </div>
     `;
-    updateImportPersistButton(root, draftState);
+    updateImportPersistButton(root, draftState, featureDestination);
+    bindImportFeatureDestination(drafts_root, (next) => {
+      featureDestination = next;
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      updateImportPersistButton(root, draftState, featureDestination);
+    });
     bindImportDraftPage(drafts_root, draftState, saveSession, {
+      featureDestination: () => featureDestination,
       onSelectionChange: renderPage,
     });
     const persistReviewState = () => {
       syncImportDraftPage(drafts_root, draftState);
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
     };
     $("[data-import-unresolved-filter]", drafts_root)?.addEventListener("change", (e) => {
       persistReviewState();
@@ -725,7 +764,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       for (const { draft } of visibleDrafts.slice(start, start + IMPORT_DRAFT_PAGE_SIZE)) {
         draft.selected = !pageAllSelected;
       }
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       renderPage();
     });
     $("[data-import-toggle-all]", drafts_root)?.addEventListener("click", () => {
@@ -733,7 +772,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       visibleDrafts.forEach(({ draft }) => {
         draft.selected = !allFilteredSelected;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       renderPage();
     });
     $("[data-import-select-duplicates]", drafts_root)?.addEventListener("click", () => {
@@ -741,7 +780,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       reviewDrafts.forEach(({ draft }) => {
         draft.selected = !!draft.duplicate;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       renderPage();
     });
     $("[data-import-dismiss-duplicates]", drafts_root)?.addEventListener("click", () => {
@@ -753,7 +792,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = "duplicate";
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       toast(`Dismissed ${targets.length} duplicate${targets.length === 1 ? "" : "s"}`, "info");
       renderPage();
     });
@@ -768,7 +807,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = "original";
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       toast(`Marked ${targets.length} duplicate draft${targets.length === 1 ? "" : "s"} to import`, "info");
       renderPage();
     });
@@ -783,7 +822,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = "move_original_to_backlog";
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for backlog`, "info");
       renderPage();
     });
@@ -802,9 +841,21 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = `update_original_${field}`;
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
       toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for ${field} update`, "info");
       renderPage();
+    });
+    $$("[data-import-draft-move]", drafts_root).forEach((btn) => {
+      btn.addEventListener("click", () => {
+        syncImportDraftPage(drafts_root, draftState);
+        const idx = parseInt(btn.dataset.idx || "-1", 10);
+        const direction = btn.dataset.importDraftMove;
+        const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+        if (idx < 0 || swapIdx < 0 || swapIdx >= draftState.length) return;
+        [draftState[idx], draftState[swapIdx]] = [draftState[swapIdx], draftState[idx]];
+        if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+        renderPage();
+      });
     });
     $$("[data-import-page]", drafts_root).forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -822,7 +873,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     <button class="secondary" data-cancel>Cancel</button>
     <button id="btn-persist"></button>
   `;
-  updateImportPersistButton(root, draftState);
+  updateImportPersistButton(root, draftState, featureDestination);
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {
     const ok = await modalConfirm(
       "Cancel this import and discard its draft state?",
@@ -836,7 +887,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     const btn = actions.querySelector("#btn-persist");
     if (btn.disabled) return;
     syncImportDraftPage(drafts_root, draftState);
-    if (saveSession) saveSession({ phase: "review", drafts: draftState });
+    if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
     const unresolved = draftState.filter(importDraftNeedsResolution);
     if (unresolved.length) {
       showNeedsResolutionOnly = true;
@@ -858,19 +909,29 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       close(true, { force: true });
       return;
     }
+    featureDestination = readImportFeatureDestination(drafts_root);
+    if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+    let destinationPayload = {};
+    try {
+      destinationPayload = importFeatureDestinationPayload(featureDestination);
+    } catch (e) {
+      toast(e.message, "error");
+      return;
+    }
     await withButtonBusy(btn, "Saving…", async () => {
       try {
         let r = await api("POST", "/api/import/persist", {
           reporter: state.lastReporter || "",
           drafts: payload,
           background: true,
+          ...destinationPayload,
         });
         if (r.job) {
-          if (saveSession) saveSession({ phase: "saving", drafts: draftState, jobId: r.job.id, result: null, error: "" });
+          if (saveSession) saveSession({ phase: "saving", drafts: draftState, featureDestination, jobId: r.job.id, result: null, error: "" });
           drawImportSaving(root, readImportSession(), close, saveSession);
           r = await waitForImportPersistJob(r.job.id, root, close, saveSession);
         } else {
-          if (saveSession) saveSession({ phase: "saving", drafts: draftState, jobId: "", result: null, error: "" });
+          if (saveSession) saveSession({ phase: "saving", drafts: draftState, featureDestination, jobId: "", result: null, error: "" });
         }
         await handleImportPersistResult(root, r, payload, skipped, close, saveSession, {
           clearSession: clearSessionOnClose,
@@ -1074,11 +1135,149 @@ function importDraftCreateCount(drafts) {
   return drafts.filter(importDraftCreatesGap).length;
 }
 
-function updateImportPersistButton(root, draftState) {
+function updateImportPersistButton(root, draftState, featureDestination = null) {
   const btn = root.querySelector("#btn-persist");
   if (!btn) return;
   const count = importDraftCreateCount(draftState);
-  btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}`;
+  const destination = normalizeImportFeatureDestination(featureDestination);
+  const suffix = destination.mode === "new"
+    ? " to new Feature"
+    : destination.mode === "existing"
+      ? " to Feature"
+      : "";
+  btn.textContent = `Save (${count}) gap${count === 1 ? "" : "s"}${suffix}`;
+}
+
+function normalizeImportFeatureDestination(raw = null) {
+  const mode = ["standalone", "new", "existing"].includes(raw?.mode)
+    ? raw.mode
+    : "standalone";
+  return {
+    mode,
+    newName: String(raw?.newName || ""),
+    newDescription: String(raw?.newDescription || ""),
+    existingId: String(raw?.existingId || ""),
+  };
+}
+
+function renderImportFeatureDestination(destination) {
+  const dest = normalizeImportFeatureDestination(destination);
+  return `
+    <div class="import-feature-destination">
+      <div class="small" style="font-weight:600">Save destination</div>
+      <div class="filter-row">
+        <label class="checkbox-row">
+          <input type="radio" name="import-feature-mode" value="standalone" ${dest.mode === "standalone" ? "checked" : ""}>
+          <span>Standalone Gaps</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="radio" name="import-feature-mode" value="new" ${dest.mode === "new" ? "checked" : ""}>
+          <span>New Feature</span>
+        </label>
+        <label class="checkbox-row">
+          <input type="radio" name="import-feature-mode" value="existing" ${dest.mode === "existing" ? "checked" : ""}>
+          <span>Existing Feature</span>
+        </label>
+      </div>
+      <div class="import-feature-destination-fields" data-import-feature-fields="new" ${dest.mode === "new" ? "" : "hidden"}>
+        <div class="form-row">
+          <label>Feature name</label>
+          <input type="text" data-import-feature-new-name value="${htmlEscape(dest.newName)}" placeholder="Settings redesign">
+        </div>
+        <div class="form-row">
+          <label>Feature description</label>
+          <textarea data-import-feature-new-description rows="3">${htmlEscape(dest.newDescription)}</textarea>
+        </div>
+      </div>
+      <div class="import-feature-destination-fields" data-import-feature-fields="existing" ${dest.mode === "existing" ? "" : "hidden"}>
+        <div class="form-row">
+          <label>Feature</label>
+          <select data-import-feature-existing class="modal-input" data-selected="${htmlEscape(dest.existingId)}">
+            <option value="">Loading Features...</option>
+          </select>
+        </div>
+      </div>
+      <p class="muted small" data-import-feature-summary>${htmlEscape(importFeatureDestinationSummary(dest))}</p>
+    </div>`;
+}
+
+function bindImportFeatureDestination(root, onChange) {
+  const apply = () => {
+    const dest = readImportFeatureDestination(root);
+    root.querySelectorAll("[data-import-feature-fields]").forEach((el) => {
+      el.hidden = el.dataset.importFeatureFields !== dest.mode;
+    });
+    const summary = root.querySelector("[data-import-feature-summary]");
+    if (summary) summary.textContent = importFeatureDestinationSummary(dest);
+    onChange(dest);
+  };
+  root.querySelectorAll("input[name='import-feature-mode']").forEach((input) => {
+    input.addEventListener("change", apply);
+  });
+  root.querySelector("[data-import-feature-new-name]")?.addEventListener("input", debounce(apply, 150));
+  root.querySelector("[data-import-feature-new-description]")?.addEventListener("input", debounce(apply, 150));
+  const select = root.querySelector("[data-import-feature-existing]");
+  if (select) {
+    select.addEventListener("change", apply);
+    populateImportFeatureSelect(select).then(apply).catch(() => {
+      select.innerHTML = `<option value="">Could not load Features</option>`;
+    });
+  }
+}
+
+function readImportFeatureDestination(root) {
+  return normalizeImportFeatureDestination({
+    mode: root.querySelector("input[name='import-feature-mode']:checked")?.value || "standalone",
+    newName: root.querySelector("[data-import-feature-new-name]")?.value || "",
+    newDescription: root.querySelector("[data-import-feature-new-description]")?.value || "",
+    existingId: root.querySelector("[data-import-feature-existing]")?.value || "",
+  });
+}
+
+async function populateImportFeatureSelect(select) {
+  const selected = select.dataset.selected || "";
+  const data = await api("GET", "/api/features?limit=100&node=current");
+  const features = data.features || [];
+  select.innerHTML = features.length
+    ? features.map((feature) => `
+        <option value="${htmlEscape(feature.id)}" ${feature.id === selected ? "selected" : ""}>
+          ${htmlEscape(feature.name || feature.id)} · ${htmlEscape(feature.status || "backlog")} · ${feature.done_count || 0}/${feature.gap_count || 0} done
+        </option>`).join("")
+    : `<option value="">No Features available</option>`;
+}
+
+function importFeatureDestinationSummary(dest) {
+  if (dest.mode === "new") {
+    return dest.newName
+      ? `Creates Feature "${dest.newName}" and saves imported Gaps in reviewed order.`
+      : "Creates a new Feature and saves imported Gaps in reviewed order.";
+  }
+  if (dest.mode === "existing") {
+    return dest.existingId
+      ? `Appends imported Gaps to Feature ${dest.existingId} in reviewed order.`
+      : "Choose an existing Feature before saving.";
+  }
+  return "Saves imported Gaps as standalone Gaps.";
+}
+
+function importFeatureDestinationPayload(destination) {
+  const dest = normalizeImportFeatureDestination(destination);
+  if (dest.mode === "new") {
+    if (!dest.newName.trim()) {
+      throw new Error("Feature name is required");
+    }
+    return {
+      new_feature_name: dest.newName.trim(),
+      new_feature_description: dest.newDescription.trim(),
+    };
+  }
+  if (dest.mode === "existing") {
+    if (!dest.existingId.trim()) {
+      throw new Error("Choose a Feature before saving");
+    }
+    return { feature_id: dest.existingId.trim() };
+  }
+  return {};
 }
 
 function renderImportDraftActionBar({
@@ -1168,11 +1367,12 @@ function renderImportDraftPager(page, totalPages) {
     </div>`;
 }
 
-function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected }) {
+function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected, draftCount }) {
   return `
     <table class="table import-drafts-table">
       <colgroup>
         <col class="import-col-select">
+        <col class="import-col-order">
         <col class="import-col-name">
         <col class="import-col-reporter">
         <col class="import-col-priority">
@@ -1188,6 +1388,7 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected 
                    ${pageAllSelected ? "checked" : ""}
                    data-indeterminate="${pageSomeSelected ? "1" : "0"}">
           </th>
+          <th>Order</th>
           <th>Name</th>
           <th>Reporter</th>
           <th>Priority</th>
@@ -1197,18 +1398,24 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected 
         </tr>
       </thead>
       <tbody>
-        ${pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index)).join("")}
+        ${pageDrafts.map(({ draft, index }) => renderImportDraftRow(draft, index, draftCount)).join("")}
       </tbody>
     </table>`;
 }
 
-function renderImportDraftRow(d, index) {
+function renderImportDraftRow(d, index, draftCount) {
   return `
     <tr class="draft ${importDraftNeedsResolution(d) ? "needs-resolution" : ""}"
         data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
       <td class="gap-select-col">
         <input type="checkbox" data-import-draft-select ${d.selected ? "checked" : ""}
                aria-label="Select draft ${index + 1}">
+      </td>
+      <td>
+        <div class="actions compact-actions">
+          <button type="button" class="secondary small" data-import-draft-move="up" data-idx="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
+          <button type="button" class="secondary small" data-import-draft-move="down" data-idx="${index}" ${index >= draftCount - 1 ? "disabled" : ""}>Down</button>
+        </div>
       </td>
       <td>
         <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
@@ -1266,6 +1473,17 @@ function renderImportDuplicateTarget(match) {
 }
 
 function bindImportDraftPage(root, draftState, saveSession = null, options = {}) {
+  const saveReview = () => {
+    if (!saveSession) return;
+    const destination = typeof options.featureDestination === "function"
+      ? options.featureDestination()
+      : options.featureDestination;
+    saveSession({
+      phase: "review",
+      drafts: draftState,
+      ...(destination ? { featureDestination: destination } : {}),
+    });
+  };
   const pageToggle = root.querySelector("[data-import-toggle-page-checkbox]");
   if (pageToggle) {
     pageToggle.indeterminate = pageToggle.dataset.indeterminate === "1";
@@ -1279,7 +1497,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
     row.dataset.duplicateDecision = draft.duplicateDecision || "";
     row.querySelector("[data-import-draft-select]")?.addEventListener("change", (e) => {
       draft.selected = e.target.checked;
-      if (saveSession) saveSession({ phase: "review", drafts: draftState });
+      saveReview();
       if (typeof options.onSelectionChange === "function") options.onSelectionChange();
     });
     $$(".import-duplicate-actions button", row).forEach((btn) => {
@@ -1290,7 +1508,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
       btn.addEventListener("click", () => {
         row.dataset.duplicateDecision = btn.dataset.duplicateDecision;
         draft.duplicateDecision = btn.dataset.duplicateDecision;
-        if (saveSession) saveSession({ phase: "review", drafts: draftState });
+        saveReview();
         $$(".import-duplicate-actions button", row).forEach((candidate) => {
           candidate.classList.toggle("selected", candidate === btn);
         });
@@ -1300,7 +1518,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
       const syncAndClearError = () => {
         syncImportDraftRow(row, draftState);
         draft.error = "";
-        if (saveSession) saveSession({ phase: "review", drafts: draftState });
+        saveReview();
         row.querySelector(".draft-error")?.remove();
       };
       field.addEventListener("input", syncAndClearError);
@@ -1313,7 +1531,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
         draft.duplicateDecision = "";
         draft.duplicate = null;
         draft.error = "";
-        if (saveSession) saveSession({ phase: "review", drafts: draftState });
+        saveReview();
         row.querySelector(".import-duplicate")?.remove();
         row.querySelectorAll(".import-duplicate").forEach((el) => el.remove());
         row.querySelector(".draft-error")?.remove();

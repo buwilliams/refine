@@ -172,6 +172,75 @@ function latestStateBoundary(latest) {
     : workflowLog;
 }
 
+function renderGapFeatureAssociation(gap) {
+  const feature = gap.feature_id
+    ? `<a href="#/features/${encodeURIComponent(gap.feature_id)}">${htmlEscape(gap.feature_id)}</a>${gap.feature_order ? ` · order ${gap.feature_order}` : ""}`
+    : `<span class="muted">Standalone</span>`;
+  return `
+    <div class="gap-feature-row muted small" style="margin-bottom:14px">
+      Feature ${feature}
+      <button class="secondary small" id="btn-gap-feature-assign" type="button">${gap.feature_id ? "Move" : "Assign"}</button>
+      ${gap.feature_id ? `<button class="secondary small" id="btn-gap-feature-up" type="button">Up</button>` : ""}
+      ${gap.feature_id ? `<button class="secondary small" id="btn-gap-feature-down" type="button">Down</button>` : ""}
+      ${gap.feature_id ? `<button class="secondary small" id="btn-gap-feature-remove" type="button">Remove</button>` : ""}
+    </div>`;
+}
+
+async function moveGapWithinFeature(featureId, gapId, direction, onChanged = null) {
+  const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
+  const gaps = data.feature?.gaps || [];
+  const idx = gaps.findIndex((candidate) => candidate.id === gapId);
+  if (idx < 0) {
+    toast("Gap is no longer in this Feature", "warn");
+    return;
+  }
+  const neighbor = direction === "up" ? gaps[idx - 1] : gaps[idx + 1];
+  if (!neighbor) {
+    toast(direction === "up" ? "Gap is already first" : "Gap is already last", "info");
+    return;
+  }
+  const body = direction === "up"
+    ? { before: neighbor.id }
+    : { after: neighbor.id };
+  await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}/reorder`, body);
+  toast("Feature order updated", "info");
+  await onChanged?.();
+}
+
+async function openGapFeatureAssignModal(gap) {
+  const data = await api("GET", "/api/features?limit=100&node=current");
+  const features = data.features || [];
+  if (!features.length) {
+    await modalAlert("Create a Feature before assigning this Gap.", {
+      title: "Assign Feature",
+    });
+    return;
+  }
+  const body = () => `
+    <div class="modal-title">${gap.feature_id ? "Move to Feature" : "Assign to Feature"}</div>
+    <div class="modal-body">
+      <label>Feature</label>
+      <select class="modal-input">
+        ${features.map((feature) => `
+          <option value="${htmlEscape(feature.id)}" ${feature.id === gap.feature_id ? "selected" : ""}>
+            ${htmlEscape(feature.name || feature.id)} · ${htmlEscape(feature.status || "backlog")} · ${feature.done_count || 0}/${feature.gap_count || 0} done
+          </option>`).join("")}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel>Cancel</button>
+      <button data-ok>${gap.feature_id ? "Move" : "Assign"}</button>
+    </div>`;
+  const featureId = await _openModal(body, { cancel: null, ok: "" }, ".modal-input");
+  if (!featureId || featureId === gap.feature_id) return;
+  try {
+    await api("POST", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gap.id)}`);
+    toast(gap.feature_id ? "Gap moved to Feature" : "Gap assigned to Feature", "info");
+  } catch (e) {
+    showActionError(e, "Assign Feature failed");
+  }
+}
+
 function drawGapDetail(gap) {
   if (!gap) return;
   if (_gapRoundFormDraft && _gapRoundFormDraft.gapId !== gap.id) {
@@ -260,6 +329,7 @@ function drawGapDetail(gap) {
         ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
         ${gap.branch_name ? ` · branch <code>${gap.branch_name}</code>` : ""}
       </div>
+      ${renderGapFeatureAssociation(gap)}
 
       ${failureBanner ? `
         <div class="banner ${failureBanner.severity}">
@@ -468,6 +538,44 @@ function drawGapDetail(gap) {
       await loadGapDetail(gap.id);
     } catch (err) {
       await showActionError(err);
+    }
+  });
+  $("#btn-gap-feature-assign")?.addEventListener("click", async () => {
+    await openGapFeatureAssignModal(gap);
+    await loadGapDetail(gap.id);
+  });
+  $("#btn-gap-feature-remove")?.addEventListener("click", async () => {
+    if (!gap.feature_id) return;
+    const ok = await modalConfirm(
+      "Remove this Gap from its Feature? The Gap will not be deleted.",
+      { title: "Remove from Feature", okLabel: "Remove", cancelLabel: "Keep it" },
+    );
+    if (!ok) return;
+    try {
+      await api("DELETE", `/api/features/${encodeURIComponent(gap.feature_id)}/gaps/${encodeURIComponent(gap.id)}`);
+      toast("Gap removed from Feature", "info");
+      await loadGapDetail(gap.id);
+      if (state.currentRoute === "gaps") await refreshGapsTable();
+    } catch (e) {
+      showActionError(e, "Remove from Feature failed");
+    }
+  });
+  $("#btn-gap-feature-up")?.addEventListener("click", async () => {
+    try {
+      await moveGapWithinFeature(gap.feature_id, gap.id, "up", async () => {
+        await loadGapDetail(gap.id);
+      });
+    } catch (e) {
+      showActionError(e, "Reorder failed");
+    }
+  });
+  $("#btn-gap-feature-down")?.addEventListener("click", async () => {
+    try {
+      await moveGapWithinFeature(gap.feature_id, gap.id, "down", async () => {
+        await loadGapDetail(gap.id);
+      });
+    } catch (e) {
+      showActionError(e, "Reorder failed");
     }
   });
   $("#btn-cancel")?.addEventListener("click", async () => {

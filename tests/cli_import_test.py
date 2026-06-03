@@ -105,6 +105,8 @@ def main() -> int:
                 "import",
                 "persist",
                 json.dumps(persist_body),
+                "--new-feature-name",
+                "CLI import Feature",
             ])
             rc_long, _out_long, err_long = _run_cli([
                 *prefix,
@@ -127,6 +129,8 @@ def main() -> int:
         create_call = [call for call in calls if call[0] == M_CREATE_GAP][-1]
         assert create_call[1]["reporter"] == "Reporter", create_call
         assert create_call[1]["priority"] == "medium", create_call
+        assert create_call[1]["feature_id"], create_call
+        assert create_call[1]["feature_order"] == 1, create_call
     finally:
         conn.close()
         cleanup_tmp(tmp)

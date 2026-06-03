@@ -23,6 +23,7 @@ async function openBulkModal(field) {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
+    feature: f.feature,
     rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
     node: f.node,
     severity: f.severity, category: f.category, actor: f.actor,
@@ -138,6 +139,7 @@ function applyGapsFilterIndicator(f) {
     "search": !!f.q,
     "filter-status": !!f.status,
     "filter-reporter": !!f.reporter,
+    "filter-feature": !!f.feature,
     "filter-rounds-gte": !!f.rounds_gte,
     "filter-rounds-lte": !!f.rounds_lte,
     "filter-node": !!f.node,
@@ -163,6 +165,7 @@ async function openBulkTransferNodeModal() {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
+    feature: f.feature,
     rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
     node: f.node,
     severity: f.severity, category: f.category, actor: f.actor,
@@ -235,6 +238,7 @@ async function confirmBulkDelete() {
   const f = gapsFilterFromHash();
   const filter = {
     status: f.status, q: f.q, reporter: f.reporter,
+    feature: f.feature,
     rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
     node: f.node,
     severity: f.severity, category: f.category, actor: f.actor,
@@ -279,6 +283,7 @@ function describeGapsFilter(filter) {
   const parts = [];
   if (filter.status)   parts.push(`status=${filter.status}`);
   if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
+  if (filter.feature)  parts.push(`feature=${filter.feature}`);
   if (filter.rounds_gte) parts.push(`rounds≥${filter.rounds_gte}`);
   if (filter.rounds_lte) parts.push(`rounds≤${filter.rounds_lte}`);
   if (filter.node) parts.push(`node=${filter.node}`);

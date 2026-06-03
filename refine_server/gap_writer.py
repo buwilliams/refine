@@ -25,7 +25,9 @@ def _lock_for(gap_id: str) -> threading.Lock:
 
 def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any],
                status: str = "backlog", priority: str = "low",
-               node_id: str | None = None) -> dict[str, Any]:
+               node_id: str | None = None,
+               feature_id: str | None = None,
+               feature_order: int | None = None) -> dict[str, Any]:
     """Initialize gap.json with one round. Returns the new Gap record."""
     with _lock_for(gap_id):
         gap = shared_gaps.empty_gap(gap_id, name)
@@ -33,6 +35,9 @@ def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any],
         gap["priority"] = priority
         if node_id:
             gap["node_id"] = node_id
+        if feature_id:
+            gap["feature_id"] = feature_id
+            gap["feature_order"] = feature_order
         gap["rounds"].append(initial_round)
         gap["updated"] = now_iso()
         shared_gaps.write_gap_json(gap)
@@ -41,7 +46,10 @@ def create_gap(*, gap_id: str, name: str, initial_round: dict[str, Any],
 
 def update_fields(gap_id: str, **fields: Any) -> dict[str, Any]:
     """Update canonical top-level gap fields and touch updated."""
-    allowed = {"name", "status", "priority", "branch_name", "node_id"}
+    allowed = {
+        "name", "status", "priority", "branch_name", "node_id",
+        "feature_id", "feature_order",
+    }
     unknown = set(fields) - allowed
     if unknown:
         raise ValueError(f"unknown gap fields: {', '.join(sorted(unknown))}")

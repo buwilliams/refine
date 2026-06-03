@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlparse
 
-from refine_server import activity, chat_ops, cluster, cluster_ops, config, dashboard_ops, db, diagnostics_ops, file_ops, gap_ops, gap_writer, gaps as shared_gaps, import_ops, node_ops, observability_ops, process_ops, project_apps, project_config_ops, project_registry, project_state, project_sync as project_sync_mod, quality, reporter_ops, reporters, round_logs, search_index, settings_ops, target_app_ops, upgrade
+from refine_server import activity, chat_ops, cluster, cluster_ops, config, dashboard_ops, db, diagnostics_ops, feature_ops, file_ops, gap_ops, gap_writer, gaps as shared_gaps, import_ops, node_ops, observability_ops, process_ops, project_apps, project_config_ops, project_registry, project_state, project_sync as project_sync_mod, quality, reporter_ops, reporters, round_logs, search_index, settings_ops, target_app_ops, upgrade
 from refine_server import perf_metrics
 from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
@@ -1272,6 +1272,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
               category: str | None = None,
               actor: str | None = None,
               reporter: str | None = None,
+              feature: str | None = None,
               rounds_gte: object | None = None,
               rounds_lte: object | None = None,
               node: str | None = None,
@@ -1304,6 +1305,7 @@ def list_gaps(*, status: str | None = None, q: str | None = None,
         category=category,
         actor=actor,
         reporter=reporter,
+        feature=feature,
         rounds_gte=rounds_gte,
         rounds_lte=rounds_lte,
         node=node,
@@ -1377,6 +1379,132 @@ def get_gap_logs(
         limit=limit,
         offset=offset,
     )
+
+
+# --- Feature endpoints --------------------------------------------------------
+
+def list_features(*, status: str | None = None, q: str | None = None,
+                  reporter: str | None = None, node: str | None = None,
+                  limit: int = 50, offset: int = 0,
+                  sort: str | None = None,
+                  direction: str | None = None) -> tuple[int, dict]:
+    if not _project_attached():
+        return 200, {
+            "features": [],
+            "page": _empty_page(limit, offset),
+            "attached": False,
+        }
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    return feature_ops.list_features(
+        status=status,
+        q=q,
+        reporter=reporter,
+        node=node,
+        limit=limit,
+        offset=offset,
+        sort=sort,
+        direction=direction,
+    )
+
+
+def get_feature(feature_id: str) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    return feature_ops.get_feature(feature_id.upper())
+
+
+@_exclusive_mutation("Create Feature")
+def create_feature(body: dict) -> tuple[int, dict]:
+    status, payload = feature_ops.create_feature(body or {})
+    _sync_feature_mutation(payload, status, "refine: create feature")
+    return status, payload
+
+
+@_exclusive_mutation("Update Feature")
+def update_feature(feature_id: str, body: dict) -> tuple[int, dict]:
+    status, payload = feature_ops.update_feature(feature_id.upper(), body or {})
+    _sync_feature_mutation(payload, status, "refine: update feature")
+    return status, payload
+
+
+@_system_operation("Cancel Feature")
+@_exclusive_mutation("Cancel Feature")
+def cancel_feature(feature_id: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        status, payload = feature_ops.cancel_feature(
+            conn,
+            _backend_runner_call,
+            feature_id.upper(),
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    finally:
+        conn.close()
+    _sync_feature_mutation(payload, status, "refine: cancel feature")
+    return status, payload
+
+
+@_system_operation("Delete Feature")
+@_exclusive_mutation("Delete Feature")
+def delete_feature(feature_id: str) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        status, payload = feature_ops.delete_feature(
+            conn,
+            _backend_runner_call,
+            feature_id.upper(),
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    finally:
+        conn.close()
+    _sync_feature_mutation(payload, status, "refine: delete feature")
+    return status, payload
+
+
+@_exclusive_mutation("Assign Gap to Feature")
+def assign_feature_gap(feature_id: str, gap_id: str) -> tuple[int, dict]:
+    status, payload = feature_ops.assign_gap(feature_id.upper(), gap_id.upper())
+    _sync_feature_mutation(payload, status, "refine: assign gap to feature")
+    return status, payload
+
+
+@_exclusive_mutation("Remove Gap from Feature")
+def remove_feature_gap(feature_id: str, gap_id: str) -> tuple[int, dict]:
+    status, payload = feature_ops.remove_gap(feature_id.upper(), gap_id.upper())
+    _sync_feature_mutation(payload, status, "refine: remove gap from feature")
+    return status, payload
+
+
+@_exclusive_mutation("Reorder Feature Gaps")
+def reorder_feature_gap(feature_id: str, gap_id: str, body: dict) -> tuple[int, dict]:
+    status, payload = feature_ops.reorder_gap(
+        feature_id.upper(),
+        gap_id.upper(),
+        before=str((body or {}).get("before") or "").strip() or None,
+        after=str((body or {}).get("after") or "").strip() or None,
+    )
+    _sync_feature_mutation(payload, status, "refine: reorder feature gaps")
+    return status, payload
+
+
+def list_feature_candidate_gaps(feature_id: str, *,
+                                limit: int = 50,
+                                offset: int = 0) -> tuple[int, dict]:
+    blocked = _schema_block_response()
+    if blocked is not None:
+        return blocked
+    return feature_ops.candidate_gaps(feature_id.upper(), limit=limit, offset=offset)
+
+
+def _sync_feature_mutation(payload: dict, status: int, message: str) -> None:
+    if status >= 400:
+        return
+    payload["sync"] = _sync_refine_state_after_mutation(message)
 
 
 def _mark_log_source(logs: list[dict[str, Any]], source: str) -> list[dict[str, Any]]:

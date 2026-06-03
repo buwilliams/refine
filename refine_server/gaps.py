@@ -69,6 +69,8 @@ def empty_gap(gap_id: str, name: str) -> dict[str, Any]:
         "status": "backlog",
         "priority": "low",
         "branch_name": None,
+        "feature_id": None,
+        "feature_order": None,
         "node_id": node_id,
         "created": now,
         "updated": now,
@@ -186,6 +188,8 @@ def read_gap_json(gap_id: str, *, include_logs: bool = True) -> dict[str, Any] |
         gap.setdefault("status", "backlog")
         gap.setdefault("priority", "low")
         gap.setdefault("branch_name", None)
+        gap.setdefault("feature_id", None)
+        gap.setdefault("feature_order", None)
         if "node_id" not in gap and "instance_id" in gap:
             gap["node_id"] = gap.get("instance_id") or "default"
         gap.pop("instance_id", None)

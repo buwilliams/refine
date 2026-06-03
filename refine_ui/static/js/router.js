@@ -4,6 +4,9 @@
 // modal on top of the current screen rather than replacing `#main`.
 const routes = {
   dashboard: renderDashboard,
+  features: renderFeaturesList,
+  features_detail: renderFeatureDetail,
+  features_new: renderFeatureNew,
   gaps: renderGapsList,
   gaps_new: renderGapNew,
   gaps_import: renderGapImport,
@@ -29,6 +32,11 @@ function parseHash() {
     if (parts[1] === "plan") return { route: "gaps_plan" };
     if (parts[1] === "import") return { route: "gaps_import" };
     return { route: "gaps_detail", id: parts[1] };
+  }
+  if (parts[0] === "features") {
+    if (parts.length === 1) return { route: "features" };
+    if (parts[1] === "new") return { route: "features_new" };
+    return { route: "features_detail", id: parts[1] };
   }
   if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs" };
@@ -123,7 +131,9 @@ function highlightNav(route) {
   for (const a of $$(".nav a")) {
     const r = a.dataset.route;
     a.classList.toggle("active",
-      r === route || (r === "gaps" && route.startsWith("gaps")));
+      r === route ||
+      (r === "gaps" && route.startsWith("gaps")) ||
+      (r === "features" && route.startsWith("features")));
   }
 }
 

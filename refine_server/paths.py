@@ -6,6 +6,7 @@ Spec:
       refine.toml
       index.sqlite
       gaps/<first 2 chars>/<remaining ULID>/gap.json
+      features/<first 2 chars>/<remaining ULID>/feature.json
 """
 from __future__ import annotations
 
@@ -41,3 +42,20 @@ def relative_gap_path(gap_id: str) -> str:
     """Path stored in SQLite's gaps_index.json_path column (relative to volume root)."""
     gid = gap_id.upper()
     return f"gaps/{gid[:2]}/{gid[2:]}/gap.json"
+
+
+def feature_dir(feature_id: str) -> Path:
+    fid = feature_id.upper()
+    if len(fid) < 3:
+        raise ValueError(f"feature_id too short: {feature_id!r}")
+    return volume_root() / "features" / fid[:2] / fid[2:]
+
+
+def feature_json_path(feature_id: str) -> Path:
+    return feature_dir(feature_id) / "feature.json"
+
+
+def relative_feature_path(feature_id: str) -> str:
+    """Path stored in SQLite's features_index.json_path column."""
+    fid = feature_id.upper()
+    return f"features/{fid[:2]}/{fid[2:]}/feature.json"

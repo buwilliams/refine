@@ -151,6 +151,7 @@ def list_gaps(
     category: str | None = None,
     actor: str | None = None,
     reporter: str | None = None,
+    feature: str | None = None,
     rounds_gte: Any | None = None,
     rounds_lte: Any | None = None,
     node: str | None = None,
@@ -177,7 +178,7 @@ def list_gaps(
     fts_match = search_index.fts_query(q)
     sql = [
         "SELECT id, name, status, priority, reporter, "
-        "round_count, created, updated, branch_name, node_id "
+        "round_count, created, updated, branch_name, node_id, feature_id, feature_order "
         "FROM gaps_index"
     ]
     args: list[Any] = []
@@ -207,6 +208,13 @@ def list_gaps(
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
+    if feature:
+        feature_value = str(feature).strip()
+        if feature_value == "standalone":
+            where.append("feature_id IS NULL")
+        elif feature_value != "all":
+            where.append("feature_id = ?")
+            args.append(feature_value.upper())
     if min_rounds is not None:
         where.append("round_count >= ?")
         args.append(min_rounds)
@@ -289,6 +297,7 @@ def list_gaps(
             "category": category or "",
             "actor": actor or "",
             "reporter": reporter or "",
+            "feature": feature or "",
             "rounds_gte": "" if min_rounds is None else min_rounds,
             "rounds_lte": "" if max_rounds is None else max_rounds,
             "node": node or "",
@@ -306,7 +315,8 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     conn = _conn()
     try:
         row = conn.execute(
-            "SELECT id, name, status, priority, created, updated, branch_name, node_id "
+            "SELECT id, name, status, priority, created, updated, branch_name, node_id, "
+            "feature_id, feature_order "
             "FROM gaps_index WHERE id = ?", (gap_id,),
         ).fetchone()
         if not row:
@@ -326,6 +336,8 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     gap["priority"] = row["priority"] or "low"
     gap["branch_name"] = row["branch_name"]
     gap["node_id"] = row["node_id"]
+    gap["feature_id"] = row["feature_id"]
+    gap["feature_order"] = row["feature_order"]
     gap["node_display_name"] = project_state.gap_node_display(row["node_id"])
     rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
     log_counts = round_logs.count_by_round(gap_id, len(rounds))
@@ -532,7 +544,8 @@ def select_bulk_update_candidates(
             placeholders = ",".join("?" * len(chunk))
             rows = conn.execute(
                 "SELECT id, name, status, priority, reporter, "
-                "round_count, created, updated, branch_name, node_id "
+                "round_count, created, updated, branch_name, node_id, "
+                "feature_id, feature_order "
                 f"FROM gaps_index WHERE id IN ({placeholders})",
                 chunk,
             ).fetchall()
@@ -547,6 +560,7 @@ def select_bulk_update_candidates(
     category = filt.get("category") or None
     actor = filt.get("actor") or None
     reporter = filt.get("reporter") or None
+    feature = str(filt.get("feature") or "").strip()
     min_rounds, max_rounds, bounds_err = round_count_bounds(
         filt.get("rounds_gte"),
         filt.get("rounds_lte"),
@@ -555,7 +569,7 @@ def select_bulk_update_candidates(
         return bounds_err
     sql = [
         "SELECT id, name, status, priority, reporter, "
-        "round_count, created, updated, branch_name, node_id "
+        "round_count, created, updated, branch_name, node_id, feature_id, feature_order "
         "FROM gaps_index"
     ]
     args: list[Any] = []
@@ -579,6 +593,12 @@ def select_bulk_update_candidates(
     if reporter:
         where.append("reporter = ?")
         args.append(reporter)
+    if feature:
+        if feature == "standalone":
+            where.append("feature_id IS NULL")
+        elif feature != "all":
+            where.append("feature_id = ?")
+            args.append(feature.upper())
     if min_rounds is not None:
         where.append("round_count >= ?")
         args.append(min_rounds)

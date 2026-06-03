@@ -89,13 +89,15 @@ def main() -> int:
 
         def insert_gap(gid: str, status: str, priority: str,
                        branch: str | None = None,
-                       node_id: str = "default") -> None:
+                       node_id: str = "default",
+                       feature_id: str | None = None,
+                       feature_order: int | None = None) -> None:
             ts = now_iso()
             conn.execute(
                 "INSERT INTO gaps_index "
                 "(id, name, status, priority, reporter, created, updated, "
-                " branch_name, node_id, json_path) "
-                "VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?)",
+                " branch_name, node_id, feature_id, feature_order, json_path) "
+                "VALUES (?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)",
                 (
                     gid,
                     gid,
@@ -105,6 +107,8 @@ def main() -> int:
                     ts,
                     branch,
                     node_id,
+                    feature_id,
+                    feature_order,
                     f"gaps/{gid}.json",
                 ),
             )
@@ -206,6 +210,58 @@ def main() -> int:
             "SELECT status FROM gaps_index WHERE id = 'race-todo'",
         ).fetchone()
         assert row["status"] == "todo", dict(row)
+
+        reset()
+        db.set_setting(conn, "backlog_promote_after_seconds", "0")
+        insert_gap("feature-done", "done", "high", feature_id="feature-a", feature_order=1)
+        insert_gap("feature-first-backlog", "backlog", "high", feature_id="feature-a", feature_order=2)
+        insert_gap("feature-later-backlog", "backlog", "high", feature_id="feature-a", feature_order=3)
+        dispatcher._promote_backlog(conn)
+        rows = {
+            row["id"]: row["status"]
+            for row in conn.execute(
+                "SELECT id, status FROM gaps_index WHERE feature_id = 'feature-a'",
+            )
+        }
+        assert rows == {
+            "feature-done": "done",
+            "feature-first-backlog": "todo",
+            "feature-later-backlog": "backlog",
+        }, rows
+        db.set_setting(conn, "backlog_promote_after_seconds", "-1")
+
+        reset()
+        db.set_setting(conn, "parallel_run_cap", "3")
+        insert_gap("feature-blocker", "todo", "high", feature_id="feature-b", feature_order=1)
+        insert_gap("feature-blocked-high", "todo", "high", feature_id="feature-b", feature_order=2)
+        insert_gap("standalone-low", "todo", "low")
+        dispatcher._tick()
+        assert launched == ["feature-blocker"], launched
+        launched.clear()
+        conn.execute("UPDATE gaps_index SET status = 'failed' WHERE id = 'feature-blocker'")
+        dispatcher._tick()
+        assert launched == ["standalone-low"], launched
+
+        reset()
+        insert_gap("feature-earlier-todo", "todo", "high", feature_id="feature-c", feature_order=1)
+        insert_gap("feature-later-todo", "todo", "high", feature_id="feature-c", feature_order=2)
+        assert not dispatcher._reserve_in_progress_slot(  # noqa: SLF001
+            conn,
+            "feature-later-todo",
+            "refine/feature-later-todo",
+        )
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'feature-later-todo'",
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+
+        reset()
+        db.set_setting(conn, "parallel_run_cap", "3")
+        insert_gap("feature-one-first", "todo", "high", feature_id="feature-one", feature_order=1)
+        insert_gap("feature-one-second", "todo", "high", feature_id="feature-one", feature_order=2)
+        insert_gap("feature-two-first", "todo", "high", feature_id="feature-two", feature_order=1)
+        dispatcher._tick()
+        assert launched == ["feature-one-first", "feature-two-first"], launched
 
         reset()
         insert_gap("high-ready", "ready-merge", "high")
