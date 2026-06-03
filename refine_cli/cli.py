@@ -2941,8 +2941,14 @@ def status_command(
         "fresh setup, repair, and release updates."
     ),
 )
-def update_command(ctx: typer.Context) -> int:
-    return _run_command(cmd_update, ctx)
+def update_command(
+    ctx: typer.Context,
+    port: Annotated[
+        int | None,
+        typer.Argument(help="Refine port. Defaults to the primary installed port."),
+    ] = None,
+) -> int:
+    return _run_command(cmd_update, ctx, port=port)
 
 
 @app.command(
@@ -3241,10 +3247,19 @@ def cmd_test(_args: _Args) -> int:
     return 0
 
 
-def cmd_update(_args: _Args) -> int:
-    print(f"Running: {README_INSTALL_COMMAND}", flush=True)
+def cmd_update(args: _Args) -> int:
+    clone, unit = _resolve_clone_and_unit_or_exit()
     try:
-        result = subprocess.run(["bash", "-lc", README_INSTALL_COMMAND])
+        port = _runtime_action_port(args, clone, None, unit)
+    except SystemExit as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    print(f"Running: {README_INSTALL_COMMAND}", flush=True)
+    env = os.environ.copy()
+    env["REFINE_INSTALL_PORT"] = str(port)
+    env["REFINE_UPDATE_TARGET_APP"] = env.get("REFINE_UPDATE_TARGET_APP", "1")
+    try:
+        result = subprocess.run(["bash", "-lc", README_INSTALL_COMMAND], env=env)
     except OSError as e:
         print(f"refine update: could not launch installer: {e}", file=sys.stderr)
         return 1
@@ -3419,6 +3434,11 @@ def cmd_install(args: _Args) -> int:
         _print_status_block(clone, unit, cfg, port=port)
     else:
         _print_setup_status_block(clone, port=port, unit=unit)
+    try:
+        primary = config.write_primary_port(clone, port, source="install")
+        print(f"Primary refine port recorded at {primary}")
+    except (OSError, ValueError) as e:
+        print(f"refine install: could not record primary port: {e}", file=sys.stderr)
     return 0
 
 
@@ -3446,6 +3466,8 @@ def cmd_uninstall(args: _Args) -> int:
     if _remove_legacy_user_ui_unit(ui_unit):
         print(f"Removed legacy user unit {legacy_path}")
     _remove_legacy_runtime_units(unit)
+    if config.clear_primary_port(clone, port=port):
+        print(f"Removed primary refine port record for {port}.")
     return 0
 
 
@@ -4274,10 +4296,25 @@ def _require_config_for_port(args: _Args, clone: Path, port: int, command: str) 
 def _effective_port(args: _Args, cfg: "config.Config | None") -> int:
     default_port = cfg.web_port if cfg is not None else config.runtime_port()
     raw_port = getattr(args, "port", None)
-    port = int(raw_port if raw_port is not None else default_port)
-    if port <= 0 or port > 65535:
-        raise SystemExit(f"refine: invalid port {port}")
+    port = _validate_port(raw_port if raw_port is not None else default_port)
     return port
+
+
+def _validate_port(raw: int | str, *, label: str = "port") -> int:
+    try:
+        port = int(raw)
+    except (TypeError, ValueError):
+        raise SystemExit(f"refine: invalid {label} {raw!r}") from None
+    if port <= 0 or port > 65535:
+        raise SystemExit(f"refine: invalid {label} {port}")
+    return port
+
+
+def _explicit_env_port() -> int | None:
+    raw = os.environ.get(config.ENV_UI_SCOPE) or os.environ.get(config.ENV_UI_PORT)
+    if raw is None or not str(raw).strip():
+        return None
+    return _validate_port(str(raw).strip(), label="environment port")
 
 
 def _start_background_ui(
@@ -4905,6 +4942,44 @@ def _listener_port_pids() -> list[tuple[int, int]]:
 def _runtime_action_port(args: _Args, clone: Path,
                          cfg: "config.Config | None",
                          unit: str | None = None) -> int:
+    raw_port = getattr(args, "port", None)
+    if raw_port is not None:
+        return _validate_port(raw_port)
+    env_port = _explicit_env_port()
+    if env_port is not None:
+        return env_port
+    primary = config.primary_port(clone)
+    if primary is not None:
+        return primary
+
+    installed_ports = _installed_ui_unit_ports(unit) if unit is not None else []
+    if len(installed_ports) == 1:
+        selected = installed_ports[0]
+        try:
+            config.write_primary_port(clone, selected, source="installed-unit")
+        except (OSError, ValueError):
+            pass
+        return selected
+
+    candidates: set[int] = set()
+    candidates.update(installed_ports)
+    candidates.update(_owned_refine_ui_ports(clone))
+    candidates.update(_runtime_app_ports(clone))
+    candidates.update(_runtime_pid_ports(clone, cfg))
+    if len(candidates) == 1:
+        selected = next(iter(candidates))
+        try:
+            config.write_primary_port(clone, selected, source="detected")
+        except (OSError, ValueError):
+            pass
+        return selected
+    if len(candidates) > 1:
+        ports = ", ".join(str(p) for p in sorted(candidates))
+        raise SystemExit(
+            "refine: multiple Refine ports found "
+            f"({ports}); pass a port explicitly or run `refine install <port>` "
+            "to set the primary port."
+        )
     return _effective_port(args, cfg)
 
 

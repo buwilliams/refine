@@ -136,6 +136,8 @@ def main() -> int:
     assert "--upgrade" in script
     assert "--no-upgrade" in script
     assert 'REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"' in script
+    assert 'REFINE_INSTALL_PORT="${REFINE_INSTALL_PORT:-}"' in script
+    assert 'REFINE_UPDATE_TARGET_APP="${REFINE_UPDATE_TARGET_APP:-1}"' in script
     assert "latest_remote_semver_release_tag" in script
     assert "api.github.com/repos/$slug/releases" in script
     assert "upgrade_refine_checkout" in script
@@ -144,15 +146,19 @@ def main() -> int:
     assert "Using current Refine checkout" in script
     assert "bound_target_app" in script
     assert "Using existing target app binding" in script
+    assert "recorded_primary_port" in script
+    assert "resolve_refine_port" in script
     assert "restart_refine_after_upgrade" in script
     assert "Restart Refine now to run" in script
-    assert "uv run refine restart" in script
+    assert 'uv run refine restart "$port"' in script
+    assert 'uv run refine app rebuild --port "$port"' in script
     assert "assuming local development and skipping release upgrade" in script
     assert "not on a semver release tag" in script
     assert 'if [ "$REFINE_UPGRADED" = "1" ]; then' in script
     assert 'confirm "Install or repair Playwright Chromium for regression screenshots" "$default_answer"' in script
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
-    assert 'uv run refine target "$TARGET_APP_PATH" --force' in script
+    assert 'uv run refine target "$TARGET_APP_PATH" --force --port "$port"' in script
+    assert 'REFINE_UI_PORT="$port" REFINE_UI_SCOPE="$port"' in script
     assert "uv run refine install $port" in script
     assert "Some install steps did not complete" in script
     assert "Why it is needed:" in script
@@ -720,7 +726,10 @@ def main() -> int:
             check=True,
         )
         output = result.stdout + result.stderr
+        log_text = install_log.read_text(encoding="utf-8")
         assert "Refine upgraded to release 1.0.0" in output
+        assert "Refresh target application" in output
+        assert "uv run refine app rebuild --port 8080" in log_text
         assert "Skipped Playwright. Managed regression screenshots may fail" in output
         assert "+ npx --yes playwright install --with-deps chromium" not in output
         assert "Refine was upgraded but not restarted" not in output

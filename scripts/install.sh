@@ -10,6 +10,8 @@ REFINE_REPO_URL="${REFINE_REPO_URL:-https://github.com/buwilliams/refine.git}"
 REFINE_RAW_INSTALL_URL="${REFINE_RAW_INSTALL_URL:-https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh}"
 REFINE_INSTALL_CHECKOUT_DEFAULT="${REFINE_INSTALL_CHECKOUT_DEFAULT:-${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine}}"
 REFINE_DEFAULT_PORT="${REFINE_DEFAULT_PORT:-8080}"
+REFINE_INSTALL_PORT="${REFINE_INSTALL_PORT:-}"
+REFINE_UPDATE_TARGET_APP="${REFINE_UPDATE_TARGET_APP:-1}"
 REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
 REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
@@ -338,6 +340,38 @@ bound_target_app() {
     return 1
   done < "$binding"
   return 1
+}
+
+recorded_primary_port() {
+  local checkout="$1"
+  [ -n "$checkout" ] || return 1
+  python3 - "$checkout" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1]) / "run" / "primary.json"
+try:
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    port = int(raw.get("port"))
+except Exception:
+    raise SystemExit(1)
+if 0 < port <= 65535:
+    print(port)
+else:
+    raise SystemExit(1)
+PY
+}
+
+resolve_refine_port() {
+  local port=""
+  if [ -n "$REFINE_INSTALL_PORT" ]; then
+    port="$REFINE_INSTALL_PORT"
+  elif [ -n "$REFINE_CHECKOUT" ]; then
+    port="$(recorded_primary_port "$REFINE_CHECKOUT" || true)"
+  fi
+  [ -n "$port" ] || port="$REFINE_DEFAULT_PORT"
+  printf '%s\n' "$port"
 }
 
 terminal_available() {
@@ -1243,11 +1277,13 @@ choose_target_app() {
 configure_refine_setting() {
   local key="$1"
   local value="$2"
+  local port
+  port="$(resolve_refine_port)"
   if dry_run; then
-    log_detail "${DIM}+ set Refine setting $key=$value${RESET}"
+    log_detail "${DIM}+ set Refine setting $key=$value on port $port${RESET}"
     return 0
   fi
-  REFINE_SETTING_KEY="$key" REFINE_SETTING_VALUE="$value" uv run python - <<'PY'
+  REFINE_UI_PORT="$port" REFINE_UI_SCOPE="$port" REFINE_SETTING_KEY="$key" REFINE_SETTING_VALUE="$value" uv run python - <<'PY'
 import os
 from refine_server import config, db
 
@@ -1300,10 +1336,12 @@ target_refine() {
     "Refine needs the target application directory to attach work to it." \
     "Check $TARGET_APP_PATH or choose another target app, then re-run install.sh." \
     "Target app missing: $TARGET_APP_PATH"
-  run uv run refine target "$TARGET_APP_PATH" --force || die_issue \
+  local port
+  port="$(resolve_refine_port)"
+  run uv run refine target "$TARGET_APP_PATH" --force --port "$port" || die_issue \
     "Refine target attachment" \
     "Target attachment tells Refine which application repository it should manage." \
-    "Run manually: cd $REFINE_CHECKOUT && uv run refine target $TARGET_APP_PATH --force" \
+    "Run manually: cd $REFINE_CHECKOUT && uv run refine target $TARGET_APP_PATH --force --port $port" \
     "refine target failed"
   configure_refine_setting "agent_cli" "$SELECTED_PROVIDER"
   configure_target_app_commands
@@ -1313,7 +1351,7 @@ start_refine() {
   section "Start Refine"
   local port
   local refine_started="1"
-  port="$(prompt "Refine port" "$REFINE_DEFAULT_PORT")"
+  port="$(prompt "Refine port" "$(resolve_refine_port)")"
   if has_systemd && confirm "Install Refine as a persistent service with: uv run refine install $port" "y"; then
     if run uv run refine install "$port"; then
       ok "Refine installed as a persistent service"
@@ -1357,9 +1395,11 @@ start_refine() {
 restart_refine_after_upgrade() {
   section "Restart Refine"
   local release="$REFINE_UPGRADED_TO"
+  local port
   [ -n "$release" ] || release="the new release"
+  port="$(resolve_refine_port)"
   if ! confirm "Restart Refine now to run $release" "y"; then
-    info "Refine was upgraded but not restarted. Restart later with: cd $REFINE_CHECKOUT && uv run refine restart"
+    info "Refine was upgraded but not restarted. Restart later with: cd $REFINE_CHECKOUT && uv run refine restart $port"
     return 0
   fi
   run cd "$REFINE_CHECKOUT" || die_issue \
@@ -1367,11 +1407,29 @@ restart_refine_after_upgrade() {
     "The installer needs to enter the Refine checkout before restarting Refine." \
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not enter $REFINE_CHECKOUT"
-  run uv run refine restart || warn_issue \
+  if run uv run refine restart "$port"; then
+    refresh_target_app_after_upgrade "$port"
+  else
+    warn_issue \
     "Refine restart after upgrade" \
     "The running service must restart before it uses the upgraded Refine release." \
-    "Run manually: cd $REFINE_CHECKOUT && uv run refine restart" \
-    "Could not restart Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine restart"
+    "Run manually: cd $REFINE_CHECKOUT && uv run refine restart $port" \
+    "Could not restart Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine restart $port"
+  fi
+}
+
+refresh_target_app_after_upgrade() {
+  local port="$1"
+  [ "$REFINE_UPDATE_TARGET_APP" != "0" ] || {
+    info "Skipping target application refresh after update."
+    return 0
+  }
+  section "Refresh target application"
+  run uv run refine app rebuild --port "$port" || warn_issue \
+    "Target application refresh after update" \
+    "The upgraded Refine runner should restart or rebuild the managed application so stale app state is cleared." \
+    "Run manually: cd $REFINE_CHECKOUT && uv run refine app rebuild --port $port" \
+    "Could not refresh the target application. Run manually: cd $REFINE_CHECKOUT && uv run refine app rebuild --port $port"
 }
 
 preflight() {

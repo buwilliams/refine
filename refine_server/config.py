@@ -20,10 +20,12 @@ Schema (TOML):
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import sys
 import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -41,6 +43,7 @@ ENV_UI_SCOPE = "REFINE_UI_SCOPE"
 ENV_UI_PORT = "REFINE_UI_PORT"
 DEFAULT_UI_PORT = 8080
 DOTENV_FILENAME = ".env"
+PRIMARY_FILENAME = "primary.json"
 
 # Marker line in the binding file recording the systemd service base name
 # associated with this refine checkout, so `refine start/stop/status` don't
@@ -359,6 +362,70 @@ def local_run_root(start: Path | None = None) -> Path:
     if source is not None:
         return source / "run"
     return Path(tempfile.gettempdir()) / "refine-run"
+
+
+def primary_path(start: Path | None = None) -> Path:
+    """Checkout-local primary Refine instance metadata path."""
+    return local_run_root(start) / PRIMARY_FILENAME
+
+
+def primary_port(start: Path | None = None) -> int | None:
+    """Return the checkout's primary port if it is recorded and valid."""
+    try:
+        raw = json.loads(primary_path(start).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    try:
+        port = int(raw.get("port"))
+    except (TypeError, ValueError):
+        return None
+    return port if 0 < port <= 65535 else None
+
+
+def write_primary_port(
+    start: Path | None,
+    port: int | str,
+    *,
+    source: str = "manual",
+) -> Path:
+    """Persist the checkout's primary Refine port under run/primary.json."""
+    selected = int(port)
+    if selected <= 0 or selected > 65535:
+        raise ValueError(f"invalid port: {port!r}")
+    path = primary_path(start)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "port": selected,
+        "source": str(source or "manual"),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def clear_primary_port(start: Path | None = None, *, port: int | str | None = None) -> bool:
+    """Remove run/primary.json, optionally only when it matches `port`."""
+    path = primary_path(start)
+    if port is not None:
+        current = primary_port(start)
+        try:
+            selected = int(port)
+        except (TypeError, ValueError):
+            return False
+        if current != selected:
+            return False
+    try:
+        path.unlink()
+        return True
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return False
 
 
 def runtime_port(default: int = DEFAULT_UI_PORT) -> int:

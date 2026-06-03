@@ -599,7 +599,8 @@ def main() -> int:
         no_port_args = type("Args", (), {"port": None, "config": str(unit_cfg_path)})()
         explicit_unit_args = type("Args", (), {"port": 18124, "config": str(unit_cfg_path)})()
 
-        assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 8080
+        assert refine_cli._runtime_action_port(no_port_args, unit_clone, unit_cfg, unit_name) == 18124
+        assert config.primary_port(unit_clone) == 18124
         assert refine_cli._runtime_action_port(explicit_unit_args, unit_clone, unit_cfg, unit_name) == 18124
         assert refine_cli.cmd_start(explicit_unit_args) == 0
         stop_out = StringIO()
@@ -708,7 +709,12 @@ def main() -> int:
         other_clone.mkdir()
         assert refine_cli._running_pid(other_clone, bg_cfg, 18112) is None
         no_port_args = type("Args", (), {"port": None})()
-        assert refine_cli._runtime_action_port(no_port_args, clone, bg_cfg) == 8080
+        try:
+            refine_cli._runtime_action_port(no_port_args, clone, bg_cfg)
+        except SystemExit as e:
+            assert "multiple Refine ports found" in str(e)
+        else:
+            raise AssertionError("ambiguous runtime ports should require an explicit port")
         assert refine_cli._runtime_action_port(type("Args", (), {"port": 18112})(), clone, bg_cfg) == 18112
         assert refine_cli._stop_background_ui(clone, bg_cfg, 18112) is True
     finally:
@@ -739,7 +745,12 @@ def main() -> int:
             8080, 18111, 18112, 18113, 18120, 18121, 18122,
         ]
         assert refine_cli._status_ports(type("Args", (), {"port": 18123})(), clone, bg_cfg) == [18123]
-        assert refine_cli._runtime_action_port(type("Args", (), {"port": None})(), clone, bg_cfg) == 8080
+        try:
+            refine_cli._runtime_action_port(type("Args", (), {"port": None})(), clone, bg_cfg)
+        except SystemExit as e:
+            assert "multiple Refine ports found" in str(e)
+        else:
+            raise AssertionError("ambiguous runtime ports should require an explicit port")
         assert refine_cli._performance_ports(type("Args", (), {"port": None})(), bg_cfg) == [8080]
     finally:
         refine_cli._owned_refine_ui_ports = old_owned_ports

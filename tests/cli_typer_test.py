@@ -421,22 +421,82 @@ def main() -> int:
 
     calls.clear()
     old_run = cli.subprocess.run
+    old_resolve = cli._resolve_clone_and_unit_or_exit
+    old_runtime_action_port = cli._runtime_action_port
     try:
-        cli.subprocess.run = lambda cmd, **_kwargs: calls.append(cmd) or type(
-            "Result",
-            (),
-            {"returncode": 37},
-        )()
+        cli._resolve_clone_and_unit_or_exit = lambda: (Path("/tmp/refine"), "refine-refine")
+
+        def fake_runtime_action_port(args, clone, cfg, unit):  # noqa: ANN001
+            assert getattr(args, "port") is None
+            assert clone == Path("/tmp/refine")
+            assert cfg is None
+            assert unit == "refine-refine"
+            return 18082
+
+        cli._runtime_action_port = fake_runtime_action_port
+
+        def fake_update_run(cmd, **kwargs):  # noqa: ANN001
+            calls.append((cmd, kwargs.get("env") or {}))
+            return type("Result", (), {"returncode": 37})()
+
+        cli.subprocess.run = fake_update_run
         rc, out, err = _run_cli(["update"])
     finally:
         cli.subprocess.run = old_run
+        cli._resolve_clone_and_unit_or_exit = old_resolve
+        cli._runtime_action_port = old_runtime_action_port
     assert rc == 37, err
-    assert calls == [["bash", "-lc", cli.README_INSTALL_COMMAND]]
+    assert calls and calls[0][0] == ["bash", "-lc", cli.README_INSTALL_COMMAND]
+    assert calls[0][1]["REFINE_INSTALL_PORT"] == "18082"
+    assert calls[0][1]["REFINE_UPDATE_TARGET_APP"] == "1"
     assert (
         cli.README_INSTALL_COMMAND
         == "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash"
     )
     assert f"Running: {cli.README_INSTALL_COMMAND}" in out
+
+    calls.clear()
+    old_resolve = cli._resolve_clone_and_unit_or_exit
+    old_installed_ports = cli._installed_ui_unit_ports
+    old_owned_ports = cli._owned_refine_ui_ports
+    old_app_ports = cli._runtime_app_ports
+    old_pid_ports = cli._runtime_pid_ports
+    try:
+        tmp_primary = Path(tempfile.mkdtemp(prefix="refine-primary-port-"))
+        cli._installed_ui_unit_ports = lambda _unit: [18081]
+        cli._owned_refine_ui_ports = lambda _clone: []
+        cli._runtime_app_ports = lambda _clone: []
+        cli._runtime_pid_ports = lambda _clone, _cfg: []
+        selected = cli._runtime_action_port(
+            type("Args", (), {"port": None})(),
+            tmp_primary,
+            None,
+            "refine-test",
+        )
+        assert selected == 18081
+        from refine_server import config as config_mod
+
+        assert config_mod.primary_port(tmp_primary) == 18081
+        cli._installed_ui_unit_ports = lambda _unit: [18081, 18082]
+        try:
+            cli._runtime_action_port(
+                type("Args", (), {"port": None})(),
+                tmp_primary / "other",
+                None,
+                "refine-test",
+            )
+        except SystemExit as e:
+            assert "multiple Refine ports found" in str(e)
+        else:
+            raise AssertionError("ambiguous primary port should fail")
+    finally:
+        cli._resolve_clone_and_unit_or_exit = old_resolve
+        cli._installed_ui_unit_ports = old_installed_ports
+        cli._owned_refine_ui_ports = old_owned_ports
+        cli._runtime_app_ports = old_app_ports
+        cli._runtime_pid_ports = old_pid_ports
+        if "tmp_primary" in locals():
+            shutil.rmtree(tmp_primary, ignore_errors=True)
 
     calls.clear()
     old_start = cli.cmd_start
@@ -529,6 +589,8 @@ def main() -> int:
 
     start_source = function_source("cmd_start")
     assert "_print_upgrade_notice(clone)" in start_source
+    assert "config.write_primary_port(clone, port, source=\"install\")" in function_source("cmd_install")
+    assert "config.clear_primary_port(clone, port=port)" in function_source("cmd_uninstall")
     assert "_print_upgrade_notice(clone)" in function_source("_start_systemd_ui")
     assert "_print_upgrade_notice(clone)" in function_source("_restart_systemd_ui")
     assert "_print_upgrade_notice(clone)" in function_source("_restart_setup_systemd_ui")
