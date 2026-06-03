@@ -45,12 +45,19 @@ def main() -> int:
             severity="error",
             category="cli",
         )
+        gap_writer.append_round_log(
+            gap_id=gid,
+            round_idx=0,
+            message="Target application rebuilt; Gap is ready for review",
+            severity="info",
+            category="state",
+        )
         after = json_path.read_bytes()
         assert after == before, "log appends must not rewrite gap.json"
 
         logs_path = gap_logs_path(gid)
         assert logs_path.is_file()
-        assert len(logs_path.read_text(encoding="utf-8").splitlines()) == 3
+        assert len(logs_path.read_text(encoding="utf-8").splitlines()) == 4
 
         hydrated = gaps.read_gap_json(gid)
         assert hydrated is not None
@@ -58,6 +65,7 @@ def main() -> int:
             "first line",
             "second line",
             "third line",
+            "Target application rebuilt; Gap is ready for review",
         ]
         metadata_only = gaps.read_gap_json(gid, include_logs=False)
         assert "logs" not in metadata_only["rounds"][0]
@@ -65,10 +73,11 @@ def main() -> int:
         status, body = api.get_gap(gid)
         assert status == 200, body
         round_obj = body["gap"]["rounds"][0]
-        assert round_obj["log_count"] == 3
+        assert round_obj["log_count"] == 4
         assert "logs" not in round_obj
-        assert round_obj["latest_log"]["message"] == "third line"
+        assert round_obj["latest_log"]["message"] == "Target application rebuilt; Gap is ready for review"
         assert round_obj["latest_error_log"]["message"] == "third line"
+        assert round_obj["latest_state_log"]["message"] == "Target application rebuilt; Gap is ready for review"
 
         status, page1 = api.get_gap_logs(gid, round_idx=0, limit=2, offset=0)
         assert status == 200, page1
@@ -77,7 +86,10 @@ def main() -> int:
 
         status, page2 = api.get_gap_logs(gid, round_idx=0, limit=2, offset=2)
         assert status == 200, page2
-        assert [log["message"] for log in page2["logs"]] == ["third line"]
+        assert [log["message"] for log in page2["logs"]] == [
+            "third line",
+            "Target application rebuilt; Gap is ready for review",
+        ]
         assert page2["pagination"]["has_more"] is False
 
         legacy = "01ROUNDLOGSLEGACYAAAAAAA"

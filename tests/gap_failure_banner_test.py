@@ -46,6 +46,34 @@ assert.strictEqual(
 );
 assert.strictEqual(computeFailureBanner({{ status: "review" }}, olderError), null);
 
+const resolvedMergeError = {{
+  latest_log: {{
+    datetime: "2026-01-03T00:00:00Z",
+    severity: "info",
+    category: "state",
+    message: "Target application rebuilt; Gap is ready for review",
+  }},
+  latest_error_log: {{
+    datetime: "2026-01-02T00:00:00Z",
+    severity: "error",
+    category: "git",
+    message: "git merge failed",
+  }},
+  latest_state_log: {{
+    datetime: "2026-01-03T00:00:00Z",
+    severity: "info",
+    category: "state",
+    message: "Target application rebuilt; Gap is ready for review",
+  }},
+  latest_workflow_log: {{
+    datetime: "2026-01-02T00:00:00Z",
+    severity: "warn",
+    category: "state",
+    message: "Workflow status changed: ready-merge → failed; git merge failed",
+  }},
+}};
+assert.strictEqual(computeFailureBanner({{ status: "review" }}, resolvedMergeError), null);
+
 const currentError = {{
   latest_error_log: {{
     datetime: "2026-01-03T00:00:00Z",

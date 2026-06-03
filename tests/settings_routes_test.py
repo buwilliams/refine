@@ -796,6 +796,8 @@ def main() -> int:
     assert 'target_app_url: $("#s-target-app-url").value' in settings_js
     assert 'errLog?.message || workflowLog?.message || fallbackLog?.message || "Gap failed"' in gaps_detail_js
     assert "function currentRoundLog(log, workflowLog)" in gaps_detail_js
+    assert "function latestStateBoundary(latest)" in gaps_detail_js
+    assert "latest?.latest_state_log" in gaps_detail_js
     assert "logDatetime < workflowDatetime" in gaps_detail_js
     assert 'lastLog?.message || "Agent run failed"' not in gaps_detail_js
     assert "async function loadSettingsSurfaceData()" in settings_core_js

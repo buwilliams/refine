@@ -160,6 +160,18 @@ function currentRoundLog(log, workflowLog) {
   return log;
 }
 
+function latestStateBoundary(latest) {
+  const stateLog = latest?.latest_state_log;
+  const workflowLog = latest?.latest_workflow_log;
+  if (!stateLog) return workflowLog || null;
+  if (!workflowLog) return stateLog;
+  const stateDatetime = String(stateLog.datetime || "");
+  const workflowDatetime = String(workflowLog.datetime || "");
+  return !stateDatetime || !workflowDatetime || stateDatetime >= workflowDatetime
+    ? stateLog
+    : workflowLog;
+}
+
 function drawGapDetail(gap) {
   if (!gap) return;
   if (_gapRoundFormDraft && _gapRoundFormDraft.gapId !== gap.id) {
@@ -772,13 +784,14 @@ function bindRoundFormSubmit(gap) {
 }
 
 function computeFailureBanner(gap, latest) {
-  const workflowLog = latest?.latest_workflow_log;
+  const stateBoundary = latestStateBoundary(latest);
+  const workflowLog = currentRoundLog(latest?.latest_workflow_log, stateBoundary);
   if (gap.status === "failed") {
     const lastLog = latest?.latest_log;
-    const errLog = currentRoundLog(latest?.latest_error_log, workflowLog);
+    const errLog = currentRoundLog(latest?.latest_error_log, stateBoundary);
     const fallbackLog = currentRoundLog(
       lastLog?.severity && lastLog.severity !== "info" ? lastLog : null,
-      workflowLog,
+      stateBoundary,
     );
     return {
       severity: "error",
@@ -788,7 +801,7 @@ function computeFailureBanner(gap, latest) {
   }
   if (gap.status === "review") {
     // Was there a recent error? Then we treat it as a stuck-review state.
-    const errLog = currentRoundLog(latest?.latest_error_log, workflowLog);
+    const errLog = currentRoundLog(latest?.latest_error_log, stateBoundary);
     if (errLog) {
       return {
         severity: "error",

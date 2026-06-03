@@ -332,11 +332,14 @@ def get_gap(gap_id: str) -> tuple[int, dict]:
     for idx, round_obj in enumerate(rounds):
         round_obj["log_count"] = log_counts.get(idx, 0)
         latest_log, latest_error_log = round_logs.latest_for_round(gap_id, idx)
+        latest_state_log = round_logs.latest_state_for_round(gap_id, idx)
         latest_workflow_log = round_logs.latest_workflow_for_round(gap_id, idx)
         if latest_log:
             round_obj["latest_log"] = compact_log(latest_log)
         if latest_error_log:
             round_obj["latest_error_log"] = compact_log(latest_error_log)
+        if latest_state_log:
+            round_obj["latest_state_log"] = compact_log(latest_state_log)
         if latest_workflow_log:
             round_obj["latest_workflow_log"] = compact_log(latest_workflow_log)
     log_count = sum(log_counts.values())
@@ -1139,8 +1142,22 @@ def round_metadata(round_obj: dict[str, Any]) -> dict[str, Any]:
     if logs:
         meta["latest_log"] = compact_log(logs[-1])
         for log in reversed(logs):
+            if isinstance(log, dict) and log.get("category") == "state":
+                meta["latest_state_log"] = compact_log(log)
+                break
+        for log in reversed(logs):
             if isinstance(log, dict) and log.get("severity") == "error":
                 meta["latest_error_log"] = compact_log(log)
+                break
+        for log in reversed(logs):
+            if (
+                isinstance(log, dict)
+                and log.get("category") == "state"
+                and str(log.get("message") or "").startswith(
+                    "Workflow status changed:",
+                )
+            ):
+                meta["latest_workflow_log"] = compact_log(log)
                 break
     return meta
 

@@ -192,6 +192,17 @@ def latest_workflow_for_round(
     return latest
 
 
+def latest_state_for_round(
+    gap_id: str,
+    round_idx: int,
+) -> dict[str, Any] | None:
+    latest: dict[str, Any] | None = None
+    for entry in _round_entries(gap_id, round_idx):
+        if entry.get("category") == "state":
+            latest = entry
+    return latest
+
+
 def hydrate_round_logs(gap: dict[str, Any]) -> None:
     rounds = [r for r in (gap.get("rounds") or []) if isinstance(r, dict)]
     if not rounds:
