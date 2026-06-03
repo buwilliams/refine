@@ -17,7 +17,9 @@ const SYSTEM_LOG_FILTERS = [
   { status: "complete", label: "Completed" },
   { status: "error", label: "Errors" },
 ];
-const GAP_CHAT_ROUND_STATUSES = new Set(["review"]);
+const GAP_CHAT_ROUND_STATUSES = new Set([
+  "backlog", "todo", "review", "done", "failed", "cancelled",
+]);
 const FILES_TREE_MAX_DEPTH = 3;
 const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
@@ -1755,7 +1757,7 @@ async function extractRoundFromGapChat() {
   }
   if (!GAP_CHAT_ROUND_STATUSES.has(tab.gapStatus || "")) {
     toast(
-      `New rounds may only be appended from review (status=${tab.gapStatus || "unknown"}).`,
+      `Cannot draft a round while the Gap is ${tab.gapStatus || "unknown"}.`,
       "error",
     );
     syncGapRoundExtractButton(tab);
