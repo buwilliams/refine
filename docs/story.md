@@ -163,3 +163,11 @@ Effort: Very High (22 commits, 5 milestones)
 Milestones started: supervisor-owned app switching; CLI/API operation centralization; port-scoped runtime correctness; black-box harness isolation; Gap chat workflow polish.
 
 Runtime ownership became much stricter: app state moved under checkout-local `run/<port>`, legacy runtime state was quarantined during migration, target apps stopped needing `/run/` ignores, status output listed every runtime port, and restart handling stopped letting old supervisors unlink newer sockets. The CLI and API also converged on shared operation logic with configured-port defaults, while the black-box harness stopped disturbing live supervisors. Product work kept pace with round extraction from Gap chat, round-count filters, owner labels, inline Gap metadata, and a chevron-driven activity panel in the Chat dock.
+
+## Day 22: 2026-06-03 (Wednesday)
+
+Effort: Very High (19 commits, 5 milestones)
+
+Milestones started: supervisor control-plane completion; live-port test isolation; app setup and README polish; failure-state cleanup; System operations observability.
+
+The supervisor became the real runtime control plane: CLI and UI calls now route backend work, target-app operations, attach, and switch actions through the supervisor instead of reaching for worker sockets directly. The test harness was pushed away from live port 8080, stale Gap failure noise was suppressed, merge workflow state persisted more reliably, README positioning and the new logo landed, app setup gained clearer clone-destination handling, extracted rounds respect the selected reporter, upgrade status moved into System, and the toolbar gained a System operations stream with multi-select status filters and a larger default history.
