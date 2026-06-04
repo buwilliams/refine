@@ -168,7 +168,7 @@ def list_gaps(
             "attached": False,
         }
         if include_facets:
-            body["facets"] = {"categories": [], "actors": []}
+            body["facets"] = {"categories": [], "actors": [], "status_counts": {}}
         return 200, body
     metric_start = perf_metrics.now()
     page_limit, page_offset = page_bounds(limit, offset)
@@ -188,7 +188,7 @@ def list_gaps(
         args.append(status)
     if q:
         if fts_match is None:
-            return 200, {
+            body = {
                 "gaps": [],
                 "page": {
                     "limit": page_limit,
@@ -196,6 +196,13 @@ def list_gaps(
                     "has_more": False,
                 },
             }
+            if include_facets:
+                body["facets"] = {
+                    "categories": [],
+                    "actors": [],
+                    "status_counts": {},
+                }
+            return 200, body
         where.append(
             "id IN ("
             "SELECT gap_id FROM gap_search_docs "
@@ -255,8 +262,11 @@ def list_gaps(
             + " AND ".join(sub_where) + ")"
         )
         args.extend(sub_args)
+    filter_sql = ""
     if where:
-        sql.append("WHERE " + " AND ".join(where))
+        filter_sql = "WHERE " + " AND ".join(where)
+        sql.append(filter_sql)
+    filter_args = list(args)
     sql.append("ORDER BY " + gaps_order_clause(sort, direction))
     sql.append("LIMIT ? OFFSET ?")
     args.extend([page_limit + 1, page_offset])
@@ -265,9 +275,18 @@ def list_gaps(
         rows = [enrich_gap_row(dict(r)) for r in conn.execute(" ".join(sql), args)]
         facets: dict | None = None
         if include_facets:
+            count_sql = (
+                "SELECT status, COUNT(*) AS n FROM gaps_index "
+                + filter_sql
+                + " GROUP BY status"
+            )
             facets = {
                 "categories": activity.distinct_categories(conn),
                 "actors": activity.distinct_actors(conn),
+                "status_counts": {
+                    row["status"]: row["n"]
+                    for row in conn.execute(count_sql, filter_args)
+                },
             }
     finally:
         conn.close()

@@ -64,6 +64,11 @@ def main() -> int:
         assert {g["id"] for g in payload["gaps"]} == {two, three}, payload
         assert all(g["round_count"] >= 2 for g in payload["gaps"]), payload
 
+        code, payload = api.list_gaps(rounds_gte=2, limit=1, include_facets=True)
+        assert code == 200, payload
+        assert payload["facets"]["status_counts"] == {"todo": 2}, payload
+        assert len(payload["gaps"]) == 1, payload
+
         code, payload = api.list_gaps(rounds_lte=2, limit=10)
         assert code == 200, payload
         assert {g["id"] for g in payload["gaps"]} == {one, two}, payload

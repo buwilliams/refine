@@ -54,6 +54,9 @@ def main() -> int:
     dashboard_js = (root / "refine_ui/static/js/features/dashboard.js").read_text(
         encoding="utf-8",
     )
+    workflow_js = (root / "refine_ui/static/js/workflow-visualization.js").read_text(
+        encoding="utf-8",
+    )
     gaps_list_js = (root / "refine_ui/static/js/features/gaps-list.js").read_text(
         encoding="utf-8",
     )
@@ -1203,19 +1206,21 @@ def main() -> int:
     assert "const POST_REBUILD_WORKFLOW_STATUSES = [" in common_js
     assert 'state.dashboard?.quality_timing === "post_rebuild"' in common_js
     assert "dashboard-status-grid" in dashboard_js
-    assert "const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([" in dashboard_js
-    assert '"todo",' in dashboard_js
-    assert '"in-progress",' in dashboard_js
-    assert '"qa",' in dashboard_js
-    assert '"ready-merge",' in dashboard_js
-    assert '"awaiting-rebuild",' in dashboard_js
-    assert "dashboard-status-card-agent" in dashboard_js
-    assert "dashboard-agent-indicator" in dashboard_js
-    assert "dashboard-status-head" in dashboard_js
-    assert "Agent-managed automation" not in dashboard_js
-    assert "AI-managed automation" in dashboard_js
-    assert ">Auto<" not in dashboard_js
-    assert ">AI<" in dashboard_js
+    assert 'src="/static/js/workflow-visualization.js"' in index_html
+    assert "function renderWorkflowVisualization({" in workflow_js
+    assert "const AGENT_MANAGED_WORKFLOW_STATUSES = new Set([" in workflow_js
+    assert '"todo",' in workflow_js
+    assert '"in-progress",' in workflow_js
+    assert '"qa",' in workflow_js
+    assert '"ready-merge",' in workflow_js
+    assert '"awaiting-rebuild",' in workflow_js
+    assert "workflow-status-card-agent" in workflow_js
+    assert "workflow-agent-indicator" in workflow_js
+    assert "workflow-status-head" in workflow_js
+    assert "Agent-managed automation" not in workflow_js
+    assert "AI-managed automation" in workflow_js
+    assert ">Auto<" not in workflow_js
+    assert ">AI<" in workflow_js
     assert "dashboard-collapsible-shell" in dashboard_js
     assert "dashboardRefreshInFlight" in dashboard_js
     assert "dashboardRefreshQueued" in dashboard_js
@@ -1242,7 +1247,7 @@ def main() -> int:
     assert "Current node" not in dashboard_js
     assert "All nodes" not in dashboard_js
     assert "node: x.filter?.node || scope" in dashboard_js
-    assert "gapsHash({ status: s, node: scope })" in dashboard_js
+    assert "hrefForStatus: (s) => gapsHash({ status: s, node: scope })" in dashboard_js
     assert "gapsHash({ reporter: row.dataset.reporter, node: scope })" in dashboard_js
     assert "const showReviewPanel = !!reviewReporter || needsAttention.length > 0;" in dashboard_js
     assert "Needs attention</span>" in dashboard_js
@@ -1257,15 +1262,15 @@ def main() -> int:
     assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter throughput")
     assert "repeat(10, minmax(88px, 1fr))" in dashboard_css
     assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
-    assert "dashboard-status-label" in dashboard_css
-    assert ".dashboard-status-head" in dashboard_css
+    assert "workflow-status-label" in dashboard_css
+    assert ".workflow-status-head" in dashboard_css
     assert "white-space: normal" in dashboard_css
     assert "position: absolute" in dashboard_css
     assert "z-index: 1" in dashboard_css
-    assert ".dashboard-status-card-agent" in dashboard_css
-    assert ".dashboard-agent-indicator" in dashboard_css
-    assert ".dashboard-status-card.in-progress .dashboard-status-count" not in dashboard_css
-    assert ".dashboard-status-card.awaiting-rebuild .dashboard-status-count" not in dashboard_css
+    assert ".workflow-status-card-agent" in dashboard_css
+    assert ".workflow-agent-indicator" in dashboard_css
+    assert ".workflow-status-card.in-progress .workflow-status-count" not in dashboard_css
+    assert ".workflow-status-card.awaiting-rebuild .workflow-status-count" not in dashboard_css
     assert ".dashboard-title-row" in dashboard_css
     assert ".dashboard-scope-switch" in dashboard_css
     dashboard_scope_hover_css = re.search(
@@ -1279,6 +1284,11 @@ def main() -> int:
     assert "#dash > .dashboard-collapsible-shell" in dashboard_css
     assert "${STATUS_FILTER_OPTIONS" in gaps_list_js
     assert "const filterShellOpen = filterShell ? filterShell.open : false;" in gaps_list_js
+    assert 'id="gaps-workflow"' in gaps_list_js
+    assert "function drawGapsWorkflowVisualization(filter, counts)" in gaps_list_js
+    assert "drawGapsWorkflowVisualization(f, facets.status_counts || {})" in gaps_list_js
+    assert "function gapsWorkflowStatusHash(status, filter = gapsFilterFromHash())" in gaps_list_js
+    assert "hrefForStatus: (status) => gapsWorkflowStatusHash(status, f)" in gaps_list_js
     assert "const GAPS_DEFAULT_LIMIT = 50;" in gaps_list_js
     assert 'renderPaginationControls("gaps"' in gaps_list_js
     assert 'bindPaginationControls(root, "gaps"' in gaps_list_js

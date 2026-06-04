@@ -44,6 +44,13 @@ async function renderGapsList() {
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
+    <div id="gaps-workflow" class="gaps-workflow">
+      ${renderWorkflowVisualization({
+        counts: {},
+        hrefForStatus: (status) => gapsWorkflowStatusHash(status, f),
+        className: "gaps-workflow-grid",
+      })}
+    </div>
     <details class="filter-shell" id="gaps-filter-shell"${filterShellOpen ? " open" : ""}>
       <summary>
         <span class="filter-shell-title">Filters &amp; bulk actions</span>
@@ -222,6 +229,35 @@ function updateGapsFilter(patch) {
   refreshGapsTable();
 }
 
+function gapsWorkflowStatusHash(status, filter = gapsFilterFromHash()) {
+  return gapsHash({
+    q: filter.q,
+    status,
+    reporter: filter.reporter,
+    feature: filter.feature,
+    rounds_gte: filter.rounds_gte,
+    rounds_lte: filter.rounds_lte,
+    node: filter.node,
+    severity: filter.severity,
+    category: filter.category,
+    actor: filter.actor,
+    limit: filter.limit,
+    sort: filter.sort,
+    dir: filter.dir,
+    page: 1,
+  });
+}
+
+function drawGapsWorkflowVisualization(filter, counts) {
+  const root = document.getElementById("gaps-workflow");
+  if (!root) return;
+  root.innerHTML = renderWorkflowVisualization({
+    counts,
+    hrefForStatus: (status) => gapsWorkflowStatusHash(status, filter),
+    className: "gaps-workflow-grid",
+  });
+}
+
 async function refreshGapsTable() {
   if (state.currentRoute !== "gaps") return;
   if (renderNoProjectIfDetached("Gaps")) return;
@@ -247,6 +283,7 @@ async function refreshGapsTable() {
     if (renderNoProjectIfApiDetached(data, "Gaps")) return;
     const gaps = data.gaps || [];
     const facets = data.facets || {};
+    drawGapsWorkflowVisualization(f, facets.status_counts || {});
     // Refresh the category / actor dropdowns from the server-side
     // distinct values — same pattern as the Logs screen.
     const catSel = $("#gaps-category");

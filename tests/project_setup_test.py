@@ -186,7 +186,7 @@ def main() -> int:
         assert status == 200, gaps
         assert gaps["attached"] is False
         assert gaps["gaps"] == []
-        assert gaps["facets"] == {"categories": [], "actors": []}
+        assert gaps["facets"] == {"categories": [], "actors": [], "status_counts": {}}
         status, changes = get_json("/api/changes")
         assert status == 200, changes
         assert changes["attached"] is False

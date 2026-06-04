@@ -7,14 +7,6 @@ let dashboardRefreshInFlight = false;
 let dashboardRefreshQueued = false;
 let dashboardRetryTimer = null;
 const DASHBOARD_REFRESH_TIMEOUT_MS = 6000;
-const AGENT_MANAGED_DASHBOARD_STATUSES = new Set([
-  "todo",
-  "in-progress",
-  "qa",
-  "ready-merge",
-  "awaiting-rebuild",
-]);
-
 function dashboardScopeFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
   return hashQs.get("node") === "all" ? "all" : "current";
@@ -164,20 +156,12 @@ function drawDashboard(d, opts = {}) {
   // away — the container is gone, so just bail silently.
   if (!dash) return;
   dash.innerHTML = `
-    <section class="card-grid dashboard-status-grid">
-      ${orderedStatuses.map((s) => {
-        const agentManaged = AGENT_MANAGED_DASHBOARD_STATUSES.has(s);
-        return `
-        <a class="card dashboard-status-card ${s}${agentManaged ? " dashboard-status-card-agent" : ""}" href="${gapsHash({ status: s, node: scope })}" style="text-decoration:none;color:inherit"
-           title="${counts[s] || 0} ${workflowStatusLabel(s)} gap${(counts[s] || 0) === 1 ? "" : "s"}${agentManaged ? " - agent-managed automation" : ""}">
-          <div class="dashboard-status-head">
-            ${agentManaged ? `<span class="dashboard-agent-indicator" aria-label="AI-managed automation">AI</span>` : ""}
-            <div class="dashboard-status-label">${workflowStatusLabel(s)}</div>
-          </div>
-          <div class="dashboard-status-count">${fmtCount(counts[s] || 0)}</div>
-        </a>`;
-      }).join("")}
-    </section>
+    ${renderWorkflowVisualization({
+      counts,
+      statuses: orderedStatuses,
+      hrefForStatus: (s) => gapsHash({ status: s, node: scope }),
+      className: "dashboard-status-grid",
+    })}
 
     ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}>

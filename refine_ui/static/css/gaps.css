@@ -1,3 +1,18 @@
+/* --- Gap workflow ---------------------------------------------------- */
+.gaps-workflow {
+  margin-bottom: 14px;
+}
+
+.gaps-workflow-grid {
+  grid-template-columns: repeat(10, minmax(88px, 1fr));
+}
+
+@media (max-width: 900px) {
+  .gaps-workflow-grid {
+    grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
+  }
+}
+
 /* --- Gap actions ----------------------------------------------------- */
 .gap-action-group {
   display: inline-flex;

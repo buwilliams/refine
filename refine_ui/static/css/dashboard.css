@@ -67,13 +67,13 @@
 .dashboard-panel-actions {
   margin-bottom: 10px;
 }
-#dash > .dashboard-status-grid {
+.workflow-status-grid {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(10, minmax(88px, 1fr));
   padding-top: 0;
 }
-#dash > .dashboard-status-grid > .dashboard-status-card {
+.workflow-status-grid > .workflow-status-card {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -91,19 +91,19 @@
     border-color 120ms ease,
     box-shadow 120ms ease;
 }
-#dash > .dashboard-status-grid > .dashboard-status-card:hover {
+.workflow-status-grid > .workflow-status-card:hover {
   border-color: var(--color-border);
   transform: translateY(-1px);
 }
-#dash > .dashboard-status-grid > .dashboard-status-card-agent {
+.workflow-status-grid > .workflow-status-card-agent {
   border-color: #d4e3ff;
 }
-#dash > .dashboard-status-grid .dashboard-status-head {
+.workflow-status-grid .workflow-status-head {
   width: 100%;
   min-width: 0;
   min-height: 0;
 }
-#dash > .dashboard-status-grid .dashboard-agent-indicator {
+.workflow-status-grid .workflow-agent-indicator {
   position: absolute;
   top: auto;
   bottom: 8px;
@@ -120,7 +120,7 @@
   letter-spacing: 0;
   pointer-events: none;
 }
-#dash > .dashboard-status-grid .dashboard-status-label {
+.workflow-status-grid .workflow-status-label {
   display: block;
   margin-bottom: 2px;
   width: 100%;
@@ -135,7 +135,7 @@
   text-overflow: unset;
   line-height: 1.2;
 }
-#dash > .dashboard-status-grid .dashboard-status-count {
+.workflow-status-grid .workflow-status-count {
   color: var(--color-text);
   font-size: 22px;
   font-weight: 750;
@@ -143,20 +143,20 @@
   margin-top: 2px;
   letter-spacing: 0;
 }
-#dash > .dashboard-status-grid .dashboard-status-card.done .dashboard-status-count {
+.workflow-status-grid .workflow-status-card.done .workflow-status-count {
   color: var(--color-success);
 }
-#dash > .dashboard-status-grid .dashboard-status-card.failed .dashboard-status-count {
+.workflow-status-grid .workflow-status-card.failed .workflow-status-count {
   color: var(--color-danger);
 }
-#dash > .dashboard-status-grid .dashboard-status-card.cancelled .dashboard-status-count {
+.workflow-status-grid .workflow-status-card.cancelled .workflow-status-count {
   color: var(--color-text-soft);
 }
-#dash > .dashboard-status-grid .dashboard-status-card.review .dashboard-status-count {
+.workflow-status-grid .workflow-status-card.review .workflow-status-count {
   color: var(--color-primary);
 }
 @media (max-width: 900px) {
-  #dash > .dashboard-status-grid {
+  .workflow-status-grid {
     grid-template-columns: repeat(auto-fit, minmax(78px, 1fr));
   }
 }
