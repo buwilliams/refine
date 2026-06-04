@@ -3216,6 +3216,9 @@ def _cli_node_summary() -> dict[str, object]:
 
 
 def cmd_test(_args: _Args) -> int:
+    import shutil
+    import tempfile
+
     root = Path(__file__).resolve().parents[1]
     tests_dir = root / "tests"
     tests = sorted(tests_dir.glob("*_test.py"))
@@ -3230,13 +3233,23 @@ def cmd_test(_args: _Args) -> int:
         root_path if not env.get("PYTHONPATH")
         else f"{root_path}{os.pathsep}{env['PYTHONPATH']}"
     )
-    print(f"Running {len(tests)} test scripts")
-    for test in tests:
-        rel = test.relative_to(root)
-        print(f"\n=== {rel} ===", flush=True)
-        result = subprocess.run([sys.executable, str(test)], cwd=str(root), env=env)
-        if result.returncode != 0:
-            failures.append(rel)
+    test_run_base = Path(tempfile.mkdtemp(prefix="refine-test-run-"))
+    test_run_root = test_run_base / "run"
+    env[config.ENV_TEST_RUN_ROOT] = str(test_run_root)
+    env.pop(config.ENV_RUN_DIR, None)
+    env.pop("REFINE_SUPERVISOR_SOCKET", None)
+    env.pop("REFINE_RUNNER_SOCKET", None)
+    env.pop("REFINE_SUPERVISOR_PID", None)
+    try:
+        print(f"Running {len(tests)} test scripts")
+        for test in tests:
+            rel = test.relative_to(root)
+            print(f"\n=== {rel} ===", flush=True)
+            result = subprocess.run([sys.executable, str(test)], cwd=str(root), env=env)
+            if result.returncode != 0:
+                failures.append(rel)
+    finally:
+        shutil.rmtree(test_run_base, ignore_errors=True)
 
     if failures:
         print("\nFAILED:")

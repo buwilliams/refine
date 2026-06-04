@@ -39,6 +39,7 @@ BINDING_FILENAME = ".refine-binding"
 ENV_CONFIG_PATH = "REFINE_CONFIG_PATH"
 ENV_LOCAL_NODE_ID = "REFINE_LOCAL_NODE_ID"
 ENV_RUN_DIR = "REFINE_RUN_DIR"
+ENV_TEST_RUN_ROOT = "REFINE_TEST_RUN_ROOT"
 ENV_UI_SCOPE = "REFINE_UI_SCOPE"
 ENV_UI_PORT = "REFINE_UI_PORT"
 DEFAULT_UI_PORT = 8080
@@ -342,6 +343,17 @@ def find_binding(start: Path | None = None) -> Path | None:
 
 def local_run_root(start: Path | None = None) -> Path:
     """Checkout-local runtime root for host state."""
+    raw_test_root = os.environ.get(ENV_TEST_RUN_ROOT)
+    test_root = Path(raw_test_root).expanduser().resolve() if raw_test_root else None
+    source = _refine_source_checkout()
+    if raw_test_root:
+        if start is not None:
+            try:
+                resolved_start = start.resolve()
+            except OSError:
+                resolved_start = start
+            if source is not None and resolved_start == source:
+                return test_root
     if start is not None:
         return start.resolve() / "run"
     binding = find_binding()
@@ -357,8 +369,11 @@ def local_run_root(start: Path | None = None) -> Path:
             return cwd / "run"
         for d in [cwd, *cwd.parents]:
             if _looks_like_refine_checkout(d):
+                if test_root is not None and source is not None and d.resolve() == source:
+                    return test_root
                 return d / "run"
-    source = _refine_source_checkout()
+    if test_root is not None:
+        return test_root
     if source is not None:
         return source / "run"
     return Path(tempfile.gettempdir()) / "refine-run"

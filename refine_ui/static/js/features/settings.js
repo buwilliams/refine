@@ -31,6 +31,7 @@ async function renderSettingsSurface(route) {
 async function refreshSettings(options = {}) {
   if (!isSettingsRoute()) return;
   const surface = settingsSurfaceForRoute();
+  const activeSlug = readSettingsTab(surface);
   if (
     _targetAppDraftDirty &&
     !options.force &&
@@ -40,8 +41,8 @@ async function refreshSettings(options = {}) {
     return;
   }
   try {
-    const data = await loadSettingsSurfaceData();
-    drawSettingsSurface(surface, data);
+    const data = await loadSettingsSurfaceData(surface, activeSlug);
+    drawSettingsSurface(surface, data, activeSlug);
   } catch (e) {
     const root = document.getElementById("settings-content");
     if (root) drawRuntimeRecovery(e);
@@ -70,7 +71,7 @@ async function refreshSettingsTab(slug, options = {}) {
     return;
   }
   try {
-    const data = await loadSettingsSurfaceData();
+    const data = await loadSettingsSurfaceData(surface, activeSlug);
     updateSettingsTabContent(
       activeSlug,
       renderSettingsTabBody(surface, activeSlug, data),
@@ -82,6 +83,8 @@ async function refreshSettingsTab(slug, options = {}) {
 }
 
 async function loadSettingsSurfaceData() {
+  const surface = arguments[0] || settingsSurfaceForRoute();
+  const activeSlug = arguments[1] || readSettingsTab(surface);
   const project = await api("GET", "/api/project/status");
   state.project = project;
   updateActiveNodeLabel();
@@ -89,23 +92,24 @@ async function loadSettingsSurfaceData() {
     enterNoProjectMode(project);
     return detachedSettingsSurfaceData(project);
   }
+  const needs = settingsSurfaceDataNeeds(surface, activeSlug);
   const [
     s, diag, reps, gov, quality, dash, nodes, cluster, guidance,
     performance, processes,
   ] = await Promise.all([
-    api("GET", "/api/settings"),
-    api("GET", "/api/diagnostics"),
-    api("GET", "/api/reporters"),
-    api("GET", "/api/governance"),
-    api("GET", "/api/quality"),
-    api("GET", "/api/dashboard"),
-    api("GET", "/api/nodes"),
-    api("GET", "/api/cluster"),
-    api("GET", "/api/guidance"),
-    api("GET", typeof performanceApiPath === "function"
+    needs.settings ? api("GET", "/api/settings") : Promise.resolve({}),
+    needs.diagnostics ? api("GET", "/api/diagnostics") : Promise.resolve({}),
+    needs.reporters ? api("GET", "/api/reporters") : Promise.resolve({}),
+    needs.governance ? api("GET", "/api/governance") : Promise.resolve({}),
+    needs.quality ? api("GET", "/api/quality") : Promise.resolve({}),
+    needs.dashboard ? api("GET", "/api/dashboard") : Promise.resolve({}),
+    needs.nodes ? api("GET", "/api/nodes") : Promise.resolve({}),
+    needs.cluster ? api("GET", "/api/cluster") : Promise.resolve({}),
+    needs.guidance ? api("GET", "/api/guidance") : Promise.resolve({}),
+    needs.performance ? api("GET", typeof performanceApiPath === "function"
       ? performanceApiPath()
-      : "/api/performance"),
-    api("GET", "/api/processes"),
+      : "/api/performance") : Promise.resolve({}),
+    needs.processes ? api("GET", "/api/processes") : Promise.resolve({}),
   ]);
   state.project = project;
   state.reporters = reps.reporters || [];
@@ -145,6 +149,55 @@ async function loadSettingsSurfaceData() {
     projectRegistryEnabled: project.registry_enabled !== false,
     appOptions,
   };
+}
+
+function settingsSurfaceDataNeeds(surface, slug) {
+  const needs = {
+    settings: false,
+    diagnostics: false,
+    reporters: false,
+    governance: false,
+    quality: false,
+    dashboard: false,
+    nodes: false,
+    cluster: false,
+    guidance: false,
+    performance: false,
+    processes: false,
+  };
+  if (surface === SETTINGS_SURFACES.settings) {
+    if (slug === "processes") {
+      needs.settings = true;
+      needs.diagnostics = true;
+      needs.dashboard = true;
+      needs.processes = true;
+    } else if (slug === "performance") {
+      needs.settings = true;
+      needs.diagnostics = true;
+      needs.reporters = true;
+      needs.governance = true;
+      needs.dashboard = true;
+      needs.nodes = true;
+      needs.guidance = true;
+      needs.performance = true;
+    }
+  } else if (surface === SETTINGS_SURFACES.node) {
+    if (slug === "nodes") {
+      needs.nodes = true;
+      needs.cluster = true;
+    } else if (slug === "reporters") {
+      needs.reporters = true;
+      needs.nodes = true;
+    } else if (slug === "application" || slug === "runtime") {
+      needs.settings = true;
+      needs.nodes = true;
+    }
+  } else if (surface === SETTINGS_SURFACES.project) {
+    if (slug === "quality") needs.quality = true;
+    else if (slug === "governance") needs.governance = true;
+    else if (slug === "guidance") needs.guidance = true;
+  }
+  return needs;
 }
 
 function detachedSettingsSurfaceData(project = {}) {
@@ -842,14 +895,14 @@ function bindSettingsTabBody(surface, slug, data) {
   }
 }
 
-function drawSettingsSurface(surface, data) {
+function drawSettingsSurface(surface, data, activeSlugOverride = null) {
   const root = document.getElementById("settings-content");
   if (!root) return;
-  const activeSlug = readSettingsTab(surface);
+  const activeSlug = activeSlugOverride || readSettingsTab(surface);
   const tabStrip = renderSettingsTabStrip(activeSlug, surface);
   const pane = (tab) => renderSettingsPane(
     tab.slug,
-    renderSettingsTabBody(surface, tab.slug, data),
+    tab.slug === activeSlug ? renderSettingsTabBody(surface, tab.slug, data) : "",
     activeSlug,
   );
   $("#settings-content").innerHTML = `
@@ -858,5 +911,5 @@ function drawSettingsSurface(surface, data) {
   `;
 
   bindSettingsTabHandlers();
-  surface.tabs.forEach((tab) => bindSettingsTabBody(surface, tab.slug, data));
+  bindSettingsTabBody(surface, activeSlug, data);
 }

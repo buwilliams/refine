@@ -35,15 +35,21 @@ def main() -> int:
     old_runner_socket = os.environ.get("REFINE_RUNNER_SOCKET")
     old_run_dir = os.environ.get(config.ENV_RUN_DIR)
     old_config = os.environ.get(config.ENV_CONFIG_PATH)
+    old_resource_manager = supervisor_mod.ResourceManager
     try:
         cfg_path = client / ".refine" / "refine.toml"
         os.environ[config.ENV_CONFIG_PATH] = str(cfg_path)
+        fake_resources = FakeResourceManager()
+        supervisor_mod.ResourceManager = lambda _settings: fake_resources  # type: ignore[assignment]
         supervisor = Supervisor(host="127.0.0.1", port=19876, cfg_path=str(cfg_path))
-        supervisor.resources = FakeResourceManager()
+        supervisor.resources = fake_resources
+        supervisor.capabilities = supervisor.resources.capabilities()
         supervisor._can_ping_worker = lambda _path: True  # type: ignore[method-assign]
+        supervisor._worker_local_node_matches = lambda _path, _node_id: True  # type: ignore[method-assign]
         supervisor.start()
         try:
-            pid_path = Path(__file__).resolve().parents[1] / "run" / "19876" / "supervisor.pid"
+            run_dir = config.local_run_dir(port=19876)
+            pid_path = run_dir / "supervisor.pid"
             assert pid_path.read_text(encoding="utf-8").strip() == str(os.getpid())
             status = supervisor.dispatch(M_STATUS, {})
             assert status["supervisor_pid"] == os.getpid()
@@ -177,7 +183,8 @@ def main() -> int:
             os.environ.pop(config.ENV_CONFIG_PATH, None)
         else:
             os.environ[config.ENV_CONFIG_PATH] = old_config
-        shutil.rmtree(Path(__file__).resolve().parents[1] / "run" / "19876", ignore_errors=True)
+        supervisor_mod.ResourceManager = old_resource_manager  # type: ignore[assignment]
+        shutil.rmtree(config.local_run_dir(port=19876), ignore_errors=True)
         cleanup_tmp(tmp)
     exercise_ipc_server_does_not_unlink_replacement_socket()
     exercise_ipc_server_rebinds_deleted_socket()
@@ -195,8 +202,9 @@ def main() -> int:
 
 def exercise_ipc_server_does_not_unlink_replacement_socket() -> None:
     from refine_runtime import ipc
+    from refine_server import config
 
-    path = Path(__file__).resolve().parents[1] / "run" / "19877" / "s.sock"
+    path = config.local_run_dir(port=19877) / "s.sock"
     path.parent.mkdir(parents=True, exist_ok=True)
 
     def dispatcher(_method, _params):  # noqa: ANN001, ANN202
@@ -225,8 +233,9 @@ def exercise_ipc_server_does_not_unlink_replacement_socket() -> None:
 
 def exercise_ipc_server_rebinds_deleted_socket() -> None:
     from refine_runtime import ipc
+    from refine_server import config
 
-    path = Path(__file__).resolve().parents[1] / "run" / "19878" / "s.sock"
+    path = config.local_run_dir(port=19878) / "s.sock"
     path.parent.mkdir(parents=True, exist_ok=True)
 
     def dispatcher(method, _params):  # noqa: ANN001, ANN202

@@ -64,6 +64,7 @@ def main() -> int:
         assert calls[-1][1] == "backend_call"
         assert calls[-1][2] == {
             "config_path": str(client_repo / ".refine" / "refine.toml"),
+            "local_node_id": "default",
             "method": "slow_method",
             "params": {"x": 1},
             "timeout": 123.0,
