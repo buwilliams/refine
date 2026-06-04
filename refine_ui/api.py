@@ -2620,7 +2620,10 @@ def target_app_stop(_body: dict | None = None) -> tuple[int, dict]:
     return _target_app_run("stop")
 
 
-@_exclusive_mutation("Rebuild target app")
+@_exclusive_mutation(
+    "Rebuild target app",
+    allow_active_kinds={"target_app_rebuild"},
+)
 def target_app_rebuild(_body: dict | None = None) -> tuple[int, dict]:
     """Queue the standard stop/rebuild/start target-app rebuild sequence."""
     return target_app_rebuild_queue(_body)

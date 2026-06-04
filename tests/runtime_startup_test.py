@@ -271,6 +271,72 @@ def test_backend_call_routes_through_supervisor() -> None:
         _restore_runtime_env(saved_env)
 
 
+def test_attach_adopts_supervisor_worker_local_node() -> None:
+    saved_env = _save_runtime_env()
+    _clear_runtime_env()
+    tmp, client = make_client_repo("refine-runtime-adopt-worker-node-")
+    conn = init_refine(client)
+    try:
+        from refine_server import project_state
+        from refine_ui import runtime
+
+        other = project_state.create_node("Other Node")
+        project_state.set_active_node(project_state.DEFAULT_NODE_ID)
+        runtime.load_configured(
+            client / ".refine" / "refine.toml",
+            start_poller=False,
+            start_runner=False,
+        )
+        os.environ.pop("REFINE_TEST_INPROCESS_BACKEND", None)
+        supervisor_calls: list[tuple[str, dict]] = []
+        original_supervisor_request = runtime._supervisor_request  # type: ignore[attr-defined]
+
+        def fake_supervisor_request(method, params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+            supervisor_calls.append((method, params or {}))
+            if method == "attach_app":
+                return {
+                    "http_status": 200,
+                    "body": {
+                        "attached": True,
+                        "config_path": str(client / ".refine" / "refine.toml"),
+                        "local_node_id": other["id"],
+                    },
+                }
+            return {"ok": True}
+
+        try:
+            runtime._supervisor_request = fake_supervisor_request  # type: ignore[attr-defined]
+            status, body = runtime.attach_project_via_supervisor(
+                {"path": str(client), "start_poller": False},
+                clone_dir=Path(__file__).resolve().parents[1],
+                port=RUNTIME_STARTUP_TEST_PORT,
+            )
+            assert status == 200, body
+            assert runtime.backend_info()["local_node_id"] == other["id"]
+            runtime.runner_call("test_method", {}, timeout=1.0)
+            assert supervisor_calls[-1] == (
+                "backend_call",
+                {
+                    "config_path": str(client / ".refine" / "refine.toml"),
+                    "local_node_id": other["id"],
+                    "method": "test_method",
+                    "params": {},
+                    "timeout": 1.0,
+                },
+            )
+        finally:
+            runtime._supervisor_request = original_supervisor_request  # type: ignore[attr-defined]
+            runtime._runner = None  # type: ignore[attr-defined]
+            runtime._worker_pid = None  # type: ignore[attr-defined]
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        cleanup_tmp(tmp)
+        _restore_runtime_env(saved_env)
+
+
 def test_runtime_local_node_is_stable_after_active_switch() -> None:
     saved_env = _save_runtime_env()
     _clear_runtime_env()
@@ -376,6 +442,7 @@ def main() -> int:
         test_runner_client_uses_supervisor_only()
         test_stop_all_without_runner_does_not_stop_supervisor_worker()
         test_backend_call_routes_through_supervisor()
+        test_attach_adopts_supervisor_worker_local_node()
         test_supervisor_request_preserves_reported_errors()
         test_runtime_local_node_is_stable_after_active_switch()
         test_activate_node_restarts_runner_with_new_local_node()

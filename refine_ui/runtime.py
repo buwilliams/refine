@@ -26,6 +26,7 @@ _runner = None
 _runner_lock = threading.Lock()
 _loaded_config_path: Path | None = None
 _worker_pid: int | None = None
+_local_node_id: str | None = None
 
 
 class _SupervisorRunnerClient:
@@ -79,7 +80,7 @@ def load_configured(
     migrate: bool = False,
 ) -> config.Config:
     """Load config, initialize SQLite, and ensure background services run."""
-    global _loaded_config_path
+    global _loaded_config_path, _local_node_id
     requested_path = Path(path).resolve() if path is not None else config.find_config(port=port)
     cfg_preview = config.Config.load(path, port=port)
     os.environ.setdefault(config.ENV_UI_PORT, str(cfg_preview.web_port))
@@ -121,9 +122,8 @@ def load_configured(
         project_state.ensure_initialized(conn, migrate=migrate, root=cfg.volume_root)
     finally:
         conn.close()
-    os.environ[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(
-        root=cfg.volume_root,
-    )
+    _local_node_id = project_state.local_node_id(root=cfg.volume_root)
+    os.environ[config.ENV_LOCAL_NODE_ID] = _local_node_id
     project_state.resume_agents_for_startup()
     if start_poller:
         ensure_poller()
@@ -302,6 +302,8 @@ def _int_or_none(value: object) -> int | None:
 
 
 def _local_node_id_or_empty() -> str:
+    if _local_node_id:
+        return _local_node_id
     try:
         return project_state.local_node_id()
     except Exception:
@@ -309,12 +311,14 @@ def _local_node_id_or_empty() -> str:
 
 
 def refresh_local_node(node_id: str | None = None) -> str:
+    global _local_node_id
     cfg = config.get(reload=True)
     local_node_id = str(
         node_id or project_state.local_node_id(root=cfg.volume_root),
     ).strip()
     if not local_node_id:
         local_node_id = project_state.active_node_id(root=cfg.volume_root)
+    _local_node_id = local_node_id
     os.environ[config.ENV_LOCAL_NODE_ID] = local_node_id
     return local_node_id
 
@@ -386,6 +390,7 @@ def attach_project_via_supervisor(body: dict, *, clone_dir: Path, port: int) -> 
             payload["config_path"],
             port=port,
             start_poller=body.get("start_poller") is not False,
+            local_node_id=payload.get("local_node_id"),
         )
     return code, payload
 
@@ -395,8 +400,9 @@ def adopt_supervisor_config(
     *,
     port: int | str | None = None,
     start_poller: bool = True,
+    local_node_id: str | None = None,
 ) -> config.Config:
-    global _loaded_config_path
+    global _loaded_config_path, _local_node_id
     cfg = config.get(path=str(path), reload=True, port=port)
     os.environ[config.ENV_CONFIG_PATH] = str(cfg.config_path)
     os.environ[config.ENV_UI_PORT] = str(cfg.web_port)
@@ -404,9 +410,11 @@ def adopt_supervisor_config(
     os.environ[config.ENV_RUN_DIR] = str(config.local_run_dir(port=cfg.web_port))
     os.environ.pop("REFINE_RUNNER_SOCKET", None)
     os.environ["REFINE_NO_INPROCESS_RUNNER"] = "1"
-    os.environ[config.ENV_LOCAL_NODE_ID] = project_state.local_node_id(
-        root=cfg.volume_root,
-    )
+    selected_node = str(local_node_id or "").strip()
+    if not selected_node:
+        selected_node = project_state.local_node_id(root=cfg.volume_root)
+    _local_node_id = selected_node
+    os.environ[config.ENV_LOCAL_NODE_ID] = selected_node
     _loaded_config_path = cfg.config_path
     db.init_db(cfg.sqlite_path)
     if start_poller:
@@ -417,7 +425,7 @@ def adopt_supervisor_config(
 
 def detach_configured() -> None:
     """Stop project-scoped services and return this process to no-app state."""
-    global _loaded_config_path
+    global _loaded_config_path, _local_node_id
     try:
         _supervisor_request(M_DETACH_APP, {}, timeout=10.0)
     except Exception:
@@ -425,5 +433,7 @@ def detach_configured() -> None:
     else:
         stop_poller()
     os.environ.pop(config.ENV_CONFIG_PATH, None)
+    os.environ.pop(config.ENV_LOCAL_NODE_ID, None)
     config.clear_cache()
     _loaded_config_path = None
+    _local_node_id = None

@@ -77,6 +77,7 @@ class Supervisor:
         self.ui: subprocess.Popen | None = None
         self.worker: subprocess.Popen | None = None
         self.worker_socket: Path | None = None
+        self.worker_local_node_id: str | None = None
         self._worker_recent_output: list[str] = []
         self._worker_starting = False
         self._stopping = threading.Event()
@@ -338,6 +339,8 @@ class Supervisor:
             commit_refine_state=self._commit_refine_state,
             node_summary=self._node_summary,
         )
+        if code == 200 and isinstance(payload, dict) and self.worker_local_node_id:
+            payload.setdefault("local_node_id", self.worker_local_node_id)
         return {"http_status": code, "body": payload}
 
     def _h_switch_app(self, params: dict[str, Any]) -> dict[str, Any]:
@@ -417,6 +420,7 @@ class Supervisor:
             self.cfg_path = str(cfg.config_path)
             self.runner_socket = socket_path
             self.worker_socket = socket_path
+            self.worker_local_node_id = local_node_id
             self._worker_starting = True
             self.worker = self.resources.popen(
                 [sys.executable, "-m", "refine_runtime.worker"],
@@ -741,6 +745,7 @@ class Supervisor:
             "worker_pid": self.worker.pid if self.worker is not None else None,
             "worker_socket": str(self.worker_socket or ""),
             "socket_path": str(self.worker_socket or ""),
+            "local_node_id": str(self.worker_local_node_id or ""),
             "resource_backend": self.capabilities.name,
             "resource_isolation": self.capabilities.isolation,
         }
@@ -810,6 +815,7 @@ class Supervisor:
     def _stop_worker_locked(self) -> bool:
         worker = self.worker
         self.worker = None
+        self.worker_local_node_id = None
         self._worker_starting = False
         if worker is None:
             return False

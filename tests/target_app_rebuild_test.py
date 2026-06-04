@@ -185,6 +185,39 @@ def main() -> int:
         assert row["status"] == "awaiting-rebuild", dict(row)
         assert db.get_setting(conn, "target_app_last_error") == "old failure"
 
+        calls.clear()
+        seen_allow_kinds: list[set[str] | None] = []
+
+        class FakeExclusiveOperation:
+            def __enter__(self):  # noqa: ANN204
+                return {"id": "target-app-rebuild-test"}
+
+            def __exit__(self, _exc_type, _exc, _tb) -> bool:  # noqa: ANN001
+                return False
+
+        original_exclusive_operation = api.background_jobs.exclusive_operation
+
+        def fake_exclusive_operation(
+            _label: str,
+            *,
+            allow_active_kinds: set[str] | None = None,
+            **_kwargs,
+        ) -> FakeExclusiveOperation:
+            seen_allow_kinds.append(allow_active_kinds)
+            return FakeExclusiveOperation()
+
+        try:
+            api.background_jobs.exclusive_operation = fake_exclusive_operation  # type: ignore[assignment]
+            api.get_client = lambda: RebuildQueueClient()  # type: ignore[assignment]
+            status, body = api.target_app_rebuild({})
+        finally:
+            api.background_jobs.exclusive_operation = original_exclusive_operation  # type: ignore[assignment]
+            api.get_client = old_get_client  # type: ignore[assignment]
+        assert status == 202, body
+        assert body["queued"] is True, body
+        assert calls == [M_TARGET_APP_REBUILD_QUEUE], calls
+        assert seen_allow_kinds == [{"target_app_rebuild"}], seen_allow_kinds
+
         db.set_setting(conn, "target_app_start_command", "")
         db.set_setting(conn, "target_app_stop_command", "")
         db.set_setting(conn, "target_app_state", "running")
