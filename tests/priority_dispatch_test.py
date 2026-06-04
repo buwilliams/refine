@@ -241,6 +241,14 @@ def main() -> int:
         conn.execute("UPDATE gaps_index SET status = 'failed' WHERE id = 'feature-blocker'")
         dispatcher._tick()
         assert launched == ["standalone-low"], launched
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'feature-blocked-high'",
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+        launched.clear()
+        conn.execute("UPDATE gaps_index SET status = 'todo' WHERE id = 'feature-blocker'")
+        dispatcher._tick()
+        assert launched == ["feature-blocker"], launched
 
         reset()
         insert_gap("feature-earlier-todo", "todo", "high", feature_id="feature-c", feature_order=1)
@@ -252,6 +260,19 @@ def main() -> int:
         )
         row = conn.execute(
             "SELECT status FROM gaps_index WHERE id = 'feature-later-todo'",
+        ).fetchone()
+        assert row["status"] == "todo", dict(row)
+
+        reset()
+        insert_gap("feature-earlier-failed", "failed", "high", feature_id="feature-d", feature_order=1)
+        insert_gap("feature-later-after-failed", "todo", "high", feature_id="feature-d", feature_order=2)
+        assert not dispatcher._reserve_in_progress_slot(  # noqa: SLF001
+            conn,
+            "feature-later-after-failed",
+            "refine/feature-later-after-failed",
+        )
+        row = conn.execute(
+            "SELECT status FROM gaps_index WHERE id = 'feature-later-after-failed'",
         ).fetchone()
         assert row["status"] == "todo", dict(row)
 
