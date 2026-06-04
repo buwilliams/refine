@@ -302,7 +302,10 @@ class ChatManager:
                 continue
             with s.proc_lock:
                 proc = s.proc
-                running = proc is not None and proc.poll() is None
+                try:
+                    running = proc is not None and proc.poll() is None
+                except Exception:
+                    running = proc is not None
                 pid = proc.pid if running else None
                 idle_base = s.last_chunk_at if running and s.last_chunk_at else s.last_activity_ts
                 out.append({
@@ -525,7 +528,10 @@ class ChatManager:
             s.out_lines.clear()
             s.progress_lines.clear()
         with s.proc_lock:
-            in_flight = s.proc is not None and s.proc.poll() is None
+            try:
+                in_flight = s.proc is not None and s.proc.poll() is None
+            except Exception:
+                in_flight = s.proc is not None
         return {
             "alive": s.alive,
             "session_id": session_id,
