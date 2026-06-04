@@ -20,7 +20,7 @@ from refine_server.gaps import now_iso, read_gap_json
 from refine_server.priorities import BLOCKING_STATUSES, priority_case_sql, priority_rank
 
 from . import gap_writer, git_ops, guidance, preflight, recovery, subprocess_mgr
-from .friendly_outcome import classify_outcome
+from .friendly_outcome import Outcome, classify_outcome
 
 
 _RESET_TO_TODO_REASONS = {"priority_preempted", "paused"}
@@ -1209,16 +1209,26 @@ class Dispatcher:
             return
 
         cwd = git_ops.gap_worktree_path(gap_id)
+        scope_outcome = self._sanitize_agent_subpath_changes(
+            conn,
+            gap_id,
+            round_idx,
+            base_commit,
+            cwd,
+        )
         new_commits = git_ops.commits_on_branch_since(base_commit, cwd)
         no_new_commits = new_commits == 0
 
-        outcome = classify_outcome(
-            exit_code=exit_code,
-            killed_reason=killed_reason,
-            no_new_commits=no_new_commits,
-            agent_reported_success=agent_reported_success,
-            failure_text=failure_text,
-        )
+        if scope_outcome is not None:
+            outcome = scope_outcome
+        else:
+            outcome = classify_outcome(
+                exit_code=exit_code,
+                killed_reason=killed_reason,
+                no_new_commits=no_new_commits,
+                agent_reported_success=agent_reported_success,
+                failure_text=failure_text,
+            )
 
         success = outcome.kind == "success"
 
@@ -1286,6 +1296,74 @@ class Dispatcher:
 
         # Passing pre-merge implementation now waits in `qa`; the Quality run
         # will wake the Merger after it promotes the Gap to `ready-merge`.
+
+    def _sanitize_agent_subpath_changes(
+        self,
+        conn: sqlite3.Connection,
+        gap_id: str,
+        round_idx: int,
+        base_commit: str,
+        cwd,
+    ) -> Outcome | None:
+        agent_subpath = db.get_setting(conn, "agent_subpath") or ""
+        if not agent_subpath.strip():
+            return None
+        result = git_ops.sanitize_branch_to_subpath(
+            base_commit,
+            agent_subpath,
+            cwd=cwd,
+        )
+        if result.get("ok") and not result.get("rewritten"):
+            return None
+
+        if not result.get("ok"):
+            return Outcome(
+                "failure",
+                "git",
+                "error",
+                "Agent branch scope enforcement failed",
+                str(result.get("details") or result.get("message") or ""),
+            )
+
+        details = str(result.get("details") or "")
+        if result.get("scoped_commit"):
+            message = (
+                "Agent changed files outside `agent_subpath`; Refine kept only "
+                f"changes under `{agent_subpath}` before merge"
+            )
+            try:
+                gap_writer.append_round_log(
+                    gap_id=gap_id,
+                    round_idx=round_idx,
+                    severity="warn",
+                    category="git",
+                    message=message,
+                    details=details,
+                    actor="runner",
+                )
+            except Exception:
+                pass
+            activity.append(
+                conn,
+                message=message,
+                severity="warn",
+                category="git",
+                gap_id=gap_id,
+                actor="runner",
+                details=details,
+            )
+            return None
+
+        return Outcome(
+            "failure",
+            "git",
+            "error",
+            (
+                "Agent changed files outside `agent_subpath` but produced no "
+                f"changes under `{agent_subpath}`; refusing to merge"
+            ),
+            details,
+        )
 
     def _on_quality_finished(
         self,

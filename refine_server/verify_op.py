@@ -155,6 +155,18 @@ def perform_verify(conn: sqlite3.Connection, gap_id: str, *,
                 conn, gap_id, switched_from, pre_switch_stash, actor, r,
             )
 
+    scope_guard = _guard_agent_subpath_scope(
+        conn,
+        gap_id,
+        target,
+        branch,
+        actor=actor,
+    )
+    if not scope_guard.get("ok"):
+        return _restore_host_branch_and_return(
+            conn, gap_id, switched_from, pre_switch_stash, actor, scope_guard,
+        )
+
     # Auto-commit refine's own state (`.refine/`) — gap.json and friends
     # are tracked content per the spec, and the runner writes them as it
     # goes, so they show up as dirty between rounds. Commit them on the
@@ -272,6 +284,83 @@ def _restore_host_branch_and_return(conn, gap_id, switched_from,
                      details=pop.stderr,
                      severity="warn", category="git", actor=actor)
     return ret
+
+
+def _guard_agent_subpath_scope(
+    conn: sqlite3.Connection,
+    gap_id: str,
+    target: str,
+    branch: str,
+    *,
+    actor: str,
+) -> dict:
+    agent_subpath = (db.get_setting(conn, "agent_subpath") or "").strip()
+    if not agent_subpath:
+        return {"ok": True}
+    base = git_ops.merge_base(target, branch)
+    if not base:
+        msg = (
+            f"Could not determine merge-base for `{branch}` and `{target}` "
+            "before enforcing agent_subpath scope"
+        )
+        _log(conn, gap_id, msg, severity="error", category="git", actor=actor)
+        return {"ok": False, "stage": "scope_guard", "message": msg}
+    checked = git_ops.scope_violations_between(base, branch, agent_subpath)
+    if not checked.get("ok"):
+        msg = checked.get("message") or "Could not inspect branch scope"
+        details = str(checked.get("details") or "")
+        _log(
+            conn,
+            gap_id,
+            msg,
+            details=details,
+            severity="error",
+            category="git",
+            actor=actor,
+        )
+        return {
+            "ok": False,
+            "stage": "scope_guard",
+            "message": msg,
+            "details": details,
+        }
+    violations = checked.get("violations") or []
+    if not violations:
+        return {"ok": True}
+    deletion_count = sum(
+        1 for entry in violations if str(entry.status).startswith("D")
+    )
+    msg = (
+        f"Gap branch `{branch}` touched files outside `agent_subpath` "
+        f"(`{agent_subpath}`); refusing to merge"
+    )
+    details = "\n".join(
+        f"{entry.status}\t" + "\t".join(entry.paths)
+        for entry in violations[:25]
+    )
+    if len(violations) > 25:
+        details += f"\n... {len(violations) - 25} more"
+    if deletion_count:
+        details = (
+            f"{deletion_count} outside-scope deletion"
+            f"{'' if deletion_count == 1 else 's'} detected\n"
+            + details
+        )
+    _log(
+        conn,
+        gap_id,
+        msg,
+        details=details,
+        severity="error",
+        category="git",
+        actor=actor,
+    )
+    return {
+        "ok": False,
+        "stage": "scope_guard",
+        "message": msg,
+        "details": details,
+    }
 
 
 def _recover_already_merged_missing_branch(

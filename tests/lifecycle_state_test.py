@@ -175,6 +175,88 @@ def main() -> int:
         )
         assert status(conn, gid_noop_success) == "ready-merge"
 
+        # agent_subpath is an enforced write boundary, not just a subprocess
+        # cwd hint. If an agent commits a tree that drops everything outside
+        # the subpath, Refine rewrites the branch to base + scoped changes.
+        db.set_setting(conn, "agent_subpath", "Modules/Claims")
+        gid_scope_sanitize = "01LIFECYCLESCOPEKEEPAAA"
+        branch_scope_sanitize = "refine/lifecycle-scope-keep"
+        create_indexed_gap(
+            conn,
+            gid_scope_sanitize,
+            status="in-progress",
+            branch=branch_scope_sanitize,
+        )
+        wt_scope_sanitize, base_scope_sanitize = launchable_worktree(
+            gid_scope_sanitize,
+            branch_scope_sanitize,
+        )
+        scoped_dir = wt_scope_sanitize / "Modules" / "Claims"
+        scoped_dir.mkdir(parents=True)
+        git(wt_scope_sanitize, "rm", "-r", "--cached", ".")
+        (scoped_dir / "claim.txt").write_text("claim\n", encoding="utf-8")
+        git(wt_scope_sanitize, "add", "Modules/Claims/claim.txt")
+        git(wt_scope_sanitize, "commit", "-m", "catastrophic scoped commit")
+        destructive_tree = git(
+            wt_scope_sanitize,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "HEAD",
+        ).stdout.splitlines()
+        assert destructive_tree == ["Modules/Claims/claim.txt"], destructive_tree
+        dispatcher._on_finished(
+            gid_scope_sanitize,
+            0,
+            0,
+            None,
+            base_scope_sanitize,
+        )
+        assert status(conn, gid_scope_sanitize) == "ready-merge"
+        sanitized_tree = git(
+            wt_scope_sanitize,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "HEAD",
+        ).stdout.splitlines()
+        assert "app.txt" in sanitized_tree, sanitized_tree
+        assert "Modules/Claims/claim.txt" in sanitized_tree, sanitized_tree
+        sanitized_diff = git(
+            wt_scope_sanitize,
+            "diff",
+            "--name-status",
+            base_scope_sanitize,
+            "HEAD",
+        ).stdout.splitlines()
+        assert sanitized_diff == ["A\tModules/Claims/claim.txt"], sanitized_diff
+
+        gid_scope_empty = "01LIFECYCLESCOPEEMPTYAA"
+        branch_scope_empty = "refine/lifecycle-scope-empty"
+        create_indexed_gap(
+            conn,
+            gid_scope_empty,
+            status="in-progress",
+            branch=branch_scope_empty,
+        )
+        wt_scope_empty, base_scope_empty = launchable_worktree(
+            gid_scope_empty,
+            branch_scope_empty,
+        )
+        git(wt_scope_empty, "rm", "app.txt")
+        git(wt_scope_empty, "commit", "-m", "delete outside scope")
+        dispatcher._on_finished(
+            gid_scope_empty,
+            0,
+            0,
+            None,
+            base_scope_empty,
+            agent_reported_success=True,
+        )
+        assert status(conn, gid_scope_empty) == "failed"
+        assert git(wt_scope_empty, "rev-parse", "HEAD").stdout.strip() == base_scope_empty
+        db.set_setting(conn, "agent_subpath", "")
+
         for reason, expected_fragment in (
             (None, "exit 2"),
             ("idle", "stuck"),

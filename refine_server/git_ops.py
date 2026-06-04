@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,6 +55,12 @@ class GitResult:
     code: int
 
 
+@dataclass(frozen=True)
+class DiffEntry:
+    status: str
+    paths: tuple[str, ...]
+
+
 def _run(args: list[str], *, cwd: Path | None = None, env: dict | None = None,
          timeout: float | None = 120.0) -> GitResult:
     # Default to the client repo. Without this, callers that forget to pass
@@ -65,6 +72,27 @@ def _run(args: list[str], *, cwd: Path | None = None, env: dict | None = None,
         ["git", *args],
         cwd=str(run_cwd),
         env=env,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    return GitResult(
+        ok=(proc.returncode == 0),
+        stdout=proc.stdout,
+        stderr=proc.stderr,
+        code=proc.returncode,
+    )
+
+
+def _run_input(args: list[str], input_text: str, *,
+               cwd: Path | None = None, env: dict | None = None,
+               timeout: float | None = 120.0) -> GitResult:
+    run_cwd = cwd if cwd is not None else client_repo_path()
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=str(run_cwd),
+        env=env,
+        input=input_text,
         capture_output=True,
         text=True,
         timeout=timeout,
@@ -141,6 +169,220 @@ def rev_parse(ref: str = "HEAD", cwd: Path | None = None) -> str | None:
     return r.stdout.strip()
 
 
+def merge_base(left_ref: str, right_ref: str,
+               cwd: Path | None = None) -> str | None:
+    r = _run(["merge-base", left_ref, right_ref], cwd=cwd or client_repo_path())
+    if not r.ok:
+        return None
+    return r.stdout.strip()
+
+
+def diff_name_status(base_ref: str, tip_ref: str,
+                     cwd: Path | None = None) -> tuple[GitResult, list[DiffEntry]]:
+    r = _run(
+        ["diff", "--name-status", "-z", base_ref, tip_ref],
+        cwd=cwd or client_repo_path(),
+    )
+    if not r.ok:
+        return r, []
+    fields = r.stdout.split("\0")
+    if fields and fields[-1] == "":
+        fields.pop()
+    entries: list[DiffEntry] = []
+    i = 0
+    while i < len(fields):
+        status = fields[i]
+        i += 1
+        if not status:
+            continue
+        if status[0] in {"R", "C"}:
+            if i + 1 >= len(fields):
+                break
+            entries.append(DiffEntry(status, (fields[i], fields[i + 1])))
+            i += 2
+        else:
+            if i >= len(fields):
+                break
+            entries.append(DiffEntry(status, (fields[i],)))
+            i += 1
+    return r, entries
+
+
+def paths_outside_subpath(entries: list[DiffEntry],
+                          subpath: str | None) -> list[DiffEntry]:
+    scope = _normalize_scope_subpath(subpath)
+    if not scope:
+        return []
+    return [
+        entry
+        for entry in entries
+        if any(not _path_is_in_scope(path, scope) for path in entry.paths)
+    ]
+
+
+def scope_violations_between(base_ref: str, tip_ref: str, subpath: str,
+                             cwd: Path | None = None) -> dict:
+    r, entries = diff_name_status(base_ref, tip_ref, cwd=cwd)
+    if not r.ok:
+        return {
+            "ok": False,
+            "message": "Could not inspect branch diff for agent_subpath scope",
+            "details": r.stderr or r.stdout,
+        }
+    violations = paths_outside_subpath(entries, subpath)
+    return {"ok": True, "entries": entries, "violations": violations}
+
+
+def sanitize_branch_to_subpath(base_ref: str, subpath: str, *,
+                               cwd: Path | None = None) -> dict:
+    """Rewrite HEAD to base_ref plus only changes under agent_subpath.
+
+    The rewrite is constructed with a temporary Git index so the live index is
+    not used to filter the agent's work. The final hard reset only updates the
+    Gap worktree to the sanitized commit (or back to base_ref if there were no
+    scoped changes).
+    """
+    repo = cwd or client_repo_path()
+    scope = _normalize_scope_subpath(subpath)
+    if not scope:
+        return {"ok": True, "rewritten": False, "reason": "no-scope"}
+
+    original_head = rev_parse("HEAD", cwd=repo)
+    base_commit = rev_parse(base_ref, cwd=repo)
+    if not original_head or not base_commit:
+        return {
+            "ok": False,
+            "message": "Could not resolve branch HEAD or base commit",
+            "details": f"base_ref={base_ref!r} head={original_head!r}",
+        }
+    if original_head == base_commit:
+        return {"ok": True, "rewritten": False, "reason": "no-commits"}
+
+    scope_check = scope_violations_between(base_commit, original_head, scope, cwd=repo)
+    if not scope_check.get("ok"):
+        return scope_check
+    violations = scope_check.get("violations") or []
+    if not violations:
+        return {"ok": True, "rewritten": False, "reason": "already-scoped"}
+
+    scoped_diff = _run(
+        [
+            "diff",
+            "--binary",
+            "--no-renames",
+            base_commit,
+            original_head,
+            "--",
+            scope,
+        ],
+        cwd=repo,
+    )
+    if not scoped_diff.ok:
+        return {
+            "ok": False,
+            "message": "Could not build scoped branch diff",
+            "details": scoped_diff.stderr or scoped_diff.stdout,
+        }
+
+    base_tree = _run(["rev-parse", f"{base_commit}^{{tree}}"], cwd=repo)
+    if not base_tree.ok:
+        return {
+            "ok": False,
+            "message": "Could not resolve base tree",
+            "details": base_tree.stderr or base_tree.stdout,
+        }
+
+    with tempfile.TemporaryDirectory(prefix="refine-scope-index-") as tmp:
+        env = {
+            **os.environ,
+            "GIT_INDEX_FILE": str(Path(tmp) / "index"),
+        }
+        read = _run(["read-tree", base_commit], cwd=repo, env=env)
+        if not read.ok:
+            return {
+                "ok": False,
+                "message": "Could not initialize temporary index from base",
+                "details": read.stderr or read.stdout,
+            }
+        if scoped_diff.stdout:
+            applied = _run_input(
+                ["apply", "--cached", "--binary", "--whitespace=nowarn", "-"],
+                scoped_diff.stdout,
+                cwd=repo,
+                env=env,
+            )
+            if not applied.ok:
+                return {
+                    "ok": False,
+                    "message": "Could not apply scoped diff to temporary index",
+                    "details": applied.stderr or applied.stdout,
+                }
+        tree = _run(["write-tree"], cwd=repo, env=env)
+        if not tree.ok:
+            return {
+                "ok": False,
+                "message": "Could not write sanitized tree",
+                "details": tree.stderr or tree.stdout,
+            }
+        sanitized_tree = tree.stdout.strip()
+
+        if sanitized_tree == base_tree.stdout.strip():
+            reset = reset_hard(base_commit, cwd=repo)
+            if not reset.ok:
+                return {
+                    "ok": False,
+                    "message": "Could not reset branch to base after scope filter",
+                    "details": reset.stderr or reset.stdout,
+                }
+            return {
+                "ok": True,
+                "rewritten": True,
+                "scoped_commit": False,
+                "original_head": original_head,
+                "new_head": base_commit,
+                "outside_changes": len(violations),
+                "details": _format_diff_entries(violations),
+            }
+
+        message = _run(["log", "-1", "--format=%B", original_head], cwd=repo)
+        commit_message = (
+            message.stdout
+            if message.ok and message.stdout.strip()
+            else "refine: scoped agent changes"
+        )
+        author_env = _author_env_for_commit(original_head, repo, env)
+        commit = _run_input(
+            ["commit-tree", sanitized_tree, "-p", base_commit, "-F", "-"],
+            commit_message,
+            cwd=repo,
+            env=author_env,
+        )
+        if not commit.ok:
+            return {
+                "ok": False,
+                "message": "Could not create sanitized commit",
+                "details": commit.stderr or commit.stdout,
+            }
+
+    new_head = commit.stdout.strip()
+    reset = reset_hard(new_head, cwd=repo)
+    if not reset.ok:
+        return {
+            "ok": False,
+            "message": "Could not update branch to sanitized commit",
+            "details": reset.stderr or reset.stdout,
+        }
+    return {
+        "ok": True,
+        "rewritten": True,
+        "scoped_commit": True,
+        "original_head": original_head,
+        "new_head": new_head,
+        "outside_changes": len(violations),
+        "details": _format_diff_entries(violations),
+    }
+
+
 def rev_list_count(base_ref: str, tip_ref: str,
                    cwd: Path | None = None) -> int:
     r = _run(
@@ -153,6 +395,44 @@ def rev_list_count(base_ref: str, tip_ref: str,
         return int(r.stdout.strip())
     except ValueError:
         return 0
+
+
+def _normalize_scope_subpath(subpath: str | None) -> str:
+    raw = str(subpath or "").strip().replace("\\", "/")
+    parts = [part for part in raw.split("/") if part and part != "."]
+    if any(part == ".." for part in parts):
+        return ""
+    return "/".join(parts)
+
+
+def _path_is_in_scope(path: str, scope: str) -> bool:
+    normalized = path.strip().replace("\\", "/").strip("/")
+    return normalized == scope or normalized.startswith(scope + "/")
+
+
+def _format_diff_entries(entries: list[DiffEntry], *, limit: int = 25) -> str:
+    lines: list[str] = []
+    for entry in entries[:limit]:
+        lines.append(f"{entry.status}\t" + "\t".join(entry.paths))
+    if len(entries) > limit:
+        lines.append(f"... {len(entries) - limit} more")
+    return "\n".join(lines)
+
+
+def _author_env_for_commit(ref: str, repo: Path,
+                           base_env: dict[str, str]) -> dict[str, str]:
+    r = _run(["show", "-s", "--format=%an%x00%ae%x00%aI", ref], cwd=repo)
+    if not r.ok:
+        return base_env
+    parts = r.stdout.rstrip("\n").split("\0")
+    if len(parts) != 3 or not parts[0] or not parts[1] or not parts[2]:
+        return base_env
+    return {
+        **base_env,
+        "GIT_AUTHOR_NAME": parts[0],
+        "GIT_AUTHOR_EMAIL": parts[1],
+        "GIT_AUTHOR_DATE": parts[2],
+    }
 
 
 def stash_push(message: str, *, cwd: Path | None = None) -> GitResult:

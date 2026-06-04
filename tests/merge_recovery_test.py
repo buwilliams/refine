@@ -273,6 +273,49 @@ def main() -> int:
         assert result["final_status"] == "awaiting-rebuild", result
         assert db_status(conn, gid_default) == "awaiting-rebuild"
 
+        # Pre-merge scope guard: a ready branch that bypassed the dispatcher
+        # sanitizer must not be allowed to land outside agent_subpath changes
+        # on the target branch.
+        scoped_base = client / "Modules" / "Claims" / "base.txt"
+        scoped_base.parent.mkdir(parents=True, exist_ok=True)
+        scoped_base.write_text("base\n", encoding="utf-8")
+        git(client, "add", "Modules/Claims/base.txt")
+        git(client, "commit", "-m", "add claims base")
+        git(client, "push")
+        db.set_setting(conn, "agent_subpath", "Modules/Claims")
+        gid_scope_guard = "01MERGESCOPEGUARDAAAAAAA"
+        branch_scope_guard = "refine/merge-scope-guard"
+        create_indexed_gap(
+            conn,
+            gid_scope_guard,
+            status="ready-merge",
+            branch=branch_scope_guard,
+        )
+        result = git_ops.create_worktree(gid_scope_guard, "main", branch_scope_guard)
+        assert result.ok, result.stderr
+        wt_scope_guard = git_ops.gap_worktree_path(gid_scope_guard)
+        git(wt_scope_guard, "rm", "app.txt")
+        (wt_scope_guard / "Modules" / "Claims" / "guarded.txt").write_text(
+            "scoped\n",
+            encoding="utf-8",
+        )
+        git(wt_scope_guard, "add", "Modules/Claims/guarded.txt")
+        git(wt_scope_guard, "commit", "-m", "unsafe scope branch")
+        merger._merge_one(gid_scope_guard)
+        assert db_status(conn, gid_scope_guard) == "failed"
+        assert git_ops.local_branch_exists(branch_scope_guard)
+        origin_files = git(
+            client,
+            "ls-tree",
+            "-r",
+            "--name-only",
+            "origin/main",
+        ).stdout
+        assert "app.txt" in origin_files
+        assert "Modules/Claims/guarded.txt" not in origin_files
+        assert any("agent_subpath" in msg for msg in latest_messages(gid_scope_guard))
+        db.set_setting(conn, "agent_subpath", "")
+
         # A conflicted stash apply/pop leaves unmerged index entries without a
         # MERGE_HEAD sentinel. The merger must clear that once before picking
         # up ready Gaps; otherwise every queued Gap fails on the dirty tree.
