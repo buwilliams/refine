@@ -370,6 +370,14 @@ function toggleToolbar() {
 
 function toggleChatDock() { toggleToolbar(); }
 
+function minimizeToolbar() {
+  if (!chatState.open && !chatState.fullscreen) return;
+  chatState.open = false;
+  chatState.fullscreen = false;
+  saveChatStateToStorage();
+  drawToolbar();
+}
+
 function toggleToolbarFullscreen() {
   chatState.fullscreen = !chatState.fullscreen;
   if (chatState.fullscreen) chatState.open = true;  // fullscreen implies open
@@ -1772,6 +1780,7 @@ async function draftGapsFromPlan() {
     return;
   }
   openPlanDraftModalFromText(transcript);
+  minimizeToolbar();
 }
 
 async function extractRoundFromGapChat() {
@@ -1802,6 +1811,7 @@ async function extractRoundFromGapChat() {
     return;
   }
   openGapRoundExtractModal(tab.gapId, transcript);
+  minimizeToolbar();
 }
 
 function openGapRoundExtractModal(gapId, transcript) {

@@ -613,7 +613,7 @@ def main() -> int:
     assert 'class="nav-bug-icon"' in index_html
     assert 'id="btn-new-gap">+ New Gap</a>' in index_html
     assert 'class="nav-menu nav-create-menu" id="nav-create-menu"' in index_html
-    assert 'id="btn-plan">Plan</a>' in index_html
+    assert 'id="btn-plan">Plan Mode</a>' in index_html
     assert 'id="btn-import">Import gaps</a>' in index_html
     assert 'id="btn-refine-issue-menu">Request refine feature/bugfix</a>' in index_html
     assert index_html.index('id="btn-plan"') < index_html.index('id="btn-import"')
@@ -647,6 +647,11 @@ def main() -> int:
     assert "function planHasAgentResponse(tab)" in toolbar_js
     assert "function syncPlanDraftButton(tab)" in toolbar_js
     assert "btn.disabled = !planHasAgentResponse(tab);" in toolbar_js
+    assert "function minimizeToolbar()" in toolbar_js
+    plan_draft_body = toolbar_js.split("async function draftGapsFromPlan()", 1)[1].split("async function extractRoundFromGapChat()", 1)[0]
+    assert "openPlanDraftModalFromText(transcript);" in plan_draft_body
+    assert "minimizeToolbar();" in plan_draft_body
+    assert plan_draft_body.index("openPlanDraftModalFromText(transcript);") < plan_draft_body.index("minimizeToolbar();")
     assert "function openPlanDraftModalFromText(text)" in import_js
     assert "featureDestination: {" in import_js
     assert 'mode: "new"' in import_js
@@ -1217,6 +1222,9 @@ def main() -> int:
     assert "workflow-status-card-agent" in workflow_js
     assert "workflow-agent-indicator" in workflow_js
     assert "workflow-status-head" in workflow_js
+    assert "function workflowVisualizationLabel(status)" in workflow_js
+    assert '"ready-merge": "Ready merge"' in workflow_js
+    assert '"awaiting-rebuild": "Rebuild"' in workflow_js
     assert "Agent-managed automation" not in workflow_js
     assert "AI-managed automation" in workflow_js
     assert ">Auto<" not in workflow_js
@@ -1260,17 +1268,24 @@ def main() -> int:
         < dashboard_js.index("Needs attention")
     )
     assert dashboard_js.index("Awaiting your review") < dashboard_js.index("Reporter throughput")
-    assert "repeat(10, minmax(88px, 1fr))" in dashboard_css
-    assert "repeat(auto-fit, minmax(78px, 1fr))" in dashboard_css
-    assert "workflow-status-label" in dashboard_css
-    assert ".workflow-status-head" in dashboard_css
-    assert "white-space: normal" in dashboard_css
-    assert "position: absolute" in dashboard_css
-    assert "z-index: 1" in dashboard_css
-    assert ".workflow-status-card-agent" in dashboard_css
-    assert ".workflow-agent-indicator" in dashboard_css
-    assert ".workflow-status-card.in-progress .workflow-status-count" not in dashboard_css
-    assert ".workflow-status-card.awaiting-rebuild .workflow-status-count" not in dashboard_css
+    assert "repeat(10, minmax(88px, 1fr))" in common_css
+    assert "repeat(auto-fit, minmax(78px, 1fr))" in common_css
+    assert "workflow-status-label" in common_css
+    assert ".workflow-status-head" in common_css
+    workflow_label_css = re.search(
+        r"\.workflow-status-grid \.workflow-status-label \{(.*?)\}",
+        common_css,
+        re.S,
+    )
+    assert workflow_label_css
+    assert "white-space: nowrap" in workflow_label_css.group(1)
+    assert "white-space: normal" not in workflow_label_css.group(1)
+    assert "position: absolute" in common_css
+    assert "z-index: 1" in common_css
+    assert ".workflow-status-card-agent" in common_css
+    assert ".workflow-agent-indicator" in common_css
+    assert ".workflow-status-card.in-progress .workflow-status-count" not in common_css
+    assert ".workflow-status-card.awaiting-rebuild .workflow-status-count" not in common_css
     assert ".dashboard-title-row" in dashboard_css
     assert ".dashboard-scope-switch" in dashboard_css
     dashboard_scope_hover_css = re.search(

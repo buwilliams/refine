@@ -241,6 +241,7 @@ def main() -> int:
     assert "function planHasAgentResponse(tab)" in toolbar_js
     assert "btn-gap-round-extract" in toolbar_js
     assert "Draft Round" in toolbar_js
+    assert "function minimizeToolbar()" in toolbar_js
     assert 'id="chat-gap-link"' in toolbar_js
     assert 'href="#/gaps/${encodeURIComponent(active.gapId)}"' in toolbar_js
     assert ".chat-gap-link" in toolbar_css
@@ -248,6 +249,10 @@ def main() -> int:
     assert "openGapDetailModal(r.id);" in router_js
     assert "async function extractRoundFromGapChat()" in toolbar_js
     assert "function openGapRoundExtractModal(gapId, transcript)" in toolbar_js
+    gap_round_body = toolbar_js.split("async function extractRoundFromGapChat()", 1)[1].split("function openGapRoundExtractModal", 1)[0]
+    assert "openGapRoundExtractModal(tab.gapId, transcript);" in gap_round_body
+    assert "minimizeToolbar();" in gap_round_body
+    assert gap_round_body.index("openGapRoundExtractModal(tab.gapId, transcript);") < gap_round_body.index("minimizeToolbar();")
     assert "extractImportDrafts(transcript, bodyRoot, signal)" in toolbar_js
     assert 'api("POST", `/api/gaps/${gapId}/rounds`, {' in toolbar_js
     assert 'toast("Pick a reporter in the top-right selector", "error")' in toolbar_js
