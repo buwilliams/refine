@@ -938,6 +938,9 @@ def main() -> int:
     assert "filters: new Set()" in toolbar_js
     assert 'label: "System", mode: "system"' in toolbar_js
     assert "function recordSystemOperation(payload)" in toolbar_js
+    assert 'if (typeof drainPendingSystemOperations === "function") drainPendingSystemOperations();' in toolbar_js
+    assert "function isDuplicateSystemOperation(item)" in toolbar_js
+    assert "if (isDuplicateSystemOperation(item)) return;" in toolbar_js
     assert "function normalizeSystemLogStatus(status)" in toolbar_js
     assert "systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT)" in toolbar_js
     assert "function renderSystemPanel()" in toolbar_js
@@ -1426,9 +1429,25 @@ def main() -> int:
     assert "params.set(\"sort\", f.sort);" in logs_js
     assert "params.set(\"dir\", f.dir);" in logs_js
     assert "recordUiError(msg, {" in common_js
+    assert "pendingSystemOperations: []" in common_js
+    assert "function recordUiNotice(message" in common_js
+    assert "function normalizeUiNoticeStatus(kind)" in common_js
+    assert "function drainPendingSystemOperations()" in common_js
+    assert "function showFormError(el, message" in common_js
+    assert "recordUiNotice(text, { kind: \"error\", source });" in common_js
+    assert "showFormError(error, err.details || err.message || \"Could not open folder\"" in common_js
+    assert "showFormError(error, manualMigrationText(err)" in common_js
+    assert "showFormError(error, err.details || err.message || \"Could not attach project\"" in common_js
+    assert "showFormError(error, e.details || e.message || \"Could not create scaffold Gap\"" in common_js
+    assert "error.textContent =" not in common_js
+    assert 'recordUiNotice(message, { kind, source: "toast" })' in common_js
+    assert 'recordUiNotice(message, { kind, source: "modal" })' in common_js
+    assert 'window.addEventListener("error"' in common_js
+    assert 'window.addEventListener("unhandledrejection"' in common_js
     assert "function recordUiError(message, details = {})" in common_js
     assert 'fetch("/api/activity/ui-error"' in common_js
-    assert "if (kind === \"error\" && !isDuplicateApiErrorToast(message))" in common_js
+    assert "if (kind === \"error\")" in common_js
+    assert "if (!isDuplicateApiErrorToast(message))" in common_js
     assert '@route("POST", r"/api/activity/ui-error")' in server_py
     assert 'const BULK_STATUS_OPTIONS = [' in gaps_bulk_js
     assert '"__last_workflow_state"' in gaps_bulk_js

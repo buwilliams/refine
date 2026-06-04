@@ -16,6 +16,7 @@ const state = {
   // the URL when the modal is dismissed so the page the user came from
   // is what they land back on.
   underlayHash: "#/",
+  pendingSystemOperations: [],
 };
 
 const WORKFLOW_STATUSES = [
@@ -259,13 +260,63 @@ async function resolveBackgroundJobResponse(response, message = "") {
 }
 
 function toast(message, kind = "info") {
+  if (kind === "error") {
+    if (!isDuplicateApiErrorToast(message)) {
+      recordUiError(message, { source: "toast" });
+    }
+  } else {
+    recordUiNotice(message, { kind, source: "toast" });
+  }
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
   el.textContent = message;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 4000);
-  if (kind === "error" && !isDuplicateApiErrorToast(message)) {
-    recordUiError(message, { source: "toast" });
+}
+
+function recordUiNotice(message, { kind = "info", source = "ui", details = null } = {}) {
+  const text = String(message || "").trim();
+  if (!text) return;
+  const payload = {
+    message: text,
+    status: normalizeUiNoticeStatus(kind),
+    category: source || "ui",
+    timestamp: new Date().toISOString(),
+  };
+  if (details) payload.details = details;
+  if (typeof recordSystemOperation === "function") {
+    recordSystemOperation(payload);
+    return;
+  }
+  state.pendingSystemOperations.push(payload);
+  if (state.pendingSystemOperations.length > 100) {
+    state.pendingSystemOperations = state.pendingSystemOperations.slice(-100);
+  }
+}
+
+function normalizeUiNoticeStatus(kind) {
+  const normalized = String(kind || "info").toLowerCase();
+  if (normalized === "success") return "complete";
+  if (normalized === "warning") return "warn";
+  if (["info", "warn", "error", "complete"].includes(normalized)) return normalized;
+  return "info";
+}
+
+function drainPendingSystemOperations() {
+  if (typeof recordSystemOperation !== "function") return;
+  const pending = state.pendingSystemOperations.splice(0);
+  pending.forEach((payload) => recordSystemOperation(payload));
+}
+
+function showFormError(el, message, { source = "form", alreadyLogged = false } = {}) {
+  if (!el) return;
+  const text = String(message || "Request failed");
+  el.textContent = text;
+  el.style.display = "";
+  if (alreadyLogged) {
+    recordUiNotice(text, { kind: "error", source });
+  } else {
+    recordUiError(text, { source });
   }
 }
 
@@ -280,6 +331,11 @@ function isDuplicateApiErrorToast(message) {
 
 function recordUiError(message, details = {}) {
   if (!message) return;
+  recordUiNotice(message, {
+    kind: "error",
+    source: details.source || "ui-error",
+    details,
+  });
   const payload = {
     message: String(message),
     route: location.hash || location.pathname,
@@ -291,6 +347,41 @@ function recordUiError(message, details = {}) {
     body: JSON.stringify(payload),
   }).catch(() => {});
 }
+
+function uiRuntimeErrorDetails(error) {
+  if (!error) return "";
+  if (error instanceof Error) {
+    return error.stack || error.message || "";
+  }
+  try {
+    return JSON.stringify(error);
+  } catch (_) {
+    return String(error);
+  }
+}
+
+window.addEventListener("error", (event) => {
+  recordUiError(event.message || "Uncaught UI error", {
+    source: "window.error",
+    details: [
+      event.filename || "",
+      event.lineno ? `line ${event.lineno}` : "",
+      event.colno ? `column ${event.colno}` : "",
+      uiRuntimeErrorDetails(event.error),
+    ].filter(Boolean).join("\n"),
+  });
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  const reason = event.reason;
+  const message = reason instanceof Error
+    ? reason.message
+    : String(reason || "Unhandled UI promise rejection");
+  recordUiError(message, {
+    source: "unhandledrejection",
+    details: uiRuntimeErrorDetails(reason),
+  });
+});
 
 // ---- Project attach/setup ---------------------------------------------------
 
@@ -407,8 +498,10 @@ async function openProjectDirectoryPicker({
         });
       } catch (err) {
         browser.innerHTML = "";
-        error.textContent = err.details || err.message || "Could not open folder";
-        error.style.display = "";
+        showFormError(error, err.details || err.message || "Could not open folder", {
+          source: "project-directory",
+          alreadyLogged: !!err.__uiLogged,
+        });
       }
     };
 
@@ -712,8 +805,9 @@ function openProjectAttachModal({
       } catch (err) {
         if (err.status === 409 && /migration required/i.test(err.message || "")) {
           if (isManualMigrationError(err)) {
-            error.textContent = manualMigrationText(err);
-            error.style.display = "";
+            showFormError(error, manualMigrationText(err), {
+              source: "project-attach",
+            });
             button.disabled = false;
             button.textContent = okLabel;
             return;
@@ -748,8 +842,10 @@ function openProjectAttachModal({
             }
           }
         }
-        error.textContent = err.details || err.message || "Could not attach project";
-        error.style.display = "";
+        showFormError(error, err.details || err.message || "Could not attach project", {
+          source: "project-attach",
+          alreadyLogged: !!err.__uiLogged,
+        });
         button.disabled = false;
         button.textContent = okLabel;
       }
@@ -916,8 +1012,10 @@ function openProjectTemplateModal(templates) {
           close(result);
           if (gap.id) location.hash = "#/gaps/" + encodeURIComponent(gap.id);
         } catch (e) {
-          error.textContent = e.details || e.message || "Could not create scaffold Gap";
-          error.style.display = "";
+          showFormError(error, e.details || e.message || "Could not create scaffold Gap", {
+            source: "project-template",
+            alreadyLogged: !!e.__uiLogged,
+          });
           button.classList.remove("is-selected");
           $$(".project-template-option", root).forEach((b) => { b.disabled = false; });
         }
@@ -1013,8 +1111,9 @@ function modalConfirm(message, {
 }
 
 function modalAlert(message, {
-  title = "Action not allowed", okLabel = "OK",
+  title = "Action not allowed", okLabel = "OK", kind = "warn",
 } = {}) {
+  recordUiNotice(message, { kind, source: "modal" });
   const body = () => `
     ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
     <div class="modal-body modal-message-body">${htmlEscape(message)}</div>
@@ -1042,13 +1141,16 @@ function backgroundJobActiveMessage(err) {
 
 async function showActionError(err, fallbackPrefix = "") {
   if (isNodeOwnershipError(err)) {
-    await modalAlert(err.message || "This action is not allowed because the Gap is owned by another node.");
+    await modalAlert(err.message || "This action is not allowed because the Gap is owned by another node.", {
+      kind: "error",
+    });
     return;
   }
   if (isBackgroundJobActiveError(err)) {
     await modalAlert(backgroundJobActiveMessage(err), {
       title: "Refine is busy",
       okLabel: "OK",
+      kind: "warn",
     });
     return;
   }

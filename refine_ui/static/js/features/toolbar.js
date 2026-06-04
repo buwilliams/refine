@@ -171,6 +171,7 @@ function clampChatBodyHeight(px) { return clampToolbarBodyHeight(px); }
 function initToolbar() {
   loadChatStateFromStorage();
   ensureStandaloneTab();
+  if (typeof drainPendingSystemOperations === "function") drainPendingSystemOperations();
   drawToolbar();
   observeToolbarSize();
   observeTopbarHeight();
@@ -605,6 +606,7 @@ function recordSystemOperation(payload) {
     timestamp: String(payload?.timestamp || new Date().toISOString()),
   };
   if (!item.message) return;
+  if (isDuplicateSystemOperation(item)) return;
   systemOperationState.messages.push(item);
   if (systemOperationState.messages.length > SYSTEM_OPERATION_LOG_LIMIT) {
     systemOperationState.messages = systemOperationState.messages.slice(-SYSTEM_OPERATION_LOG_LIMIT);
@@ -612,6 +614,16 @@ function recordSystemOperation(payload) {
   if (chatState.tabs[SYSTEM_TAB_ID] && chatState.open && chatState.activeTabId === SYSTEM_TAB_ID) {
     drawToolbar();
   }
+}
+
+function isDuplicateSystemOperation(item) {
+  const cutoff = Date.parse(item.timestamp || "") - 5000;
+  return systemOperationState.messages.slice(-20).some((existing) => {
+    if (existing.message !== item.message || existing.status !== item.status) return false;
+    const existingTime = Date.parse(existing.timestamp || "");
+    if (Number.isNaN(existingTime) || Number.isNaN(cutoff)) return true;
+    return existingTime >= cutoff;
+  });
 }
 
 function renderSystemPanel() {
