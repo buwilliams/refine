@@ -283,6 +283,11 @@ def _supervisor_request(
     os.environ["REFINE_SUPERVISOR_SOCKET"] = str(socket_path)
     try:
         return ipc.request(socket_path, method, params or {}, timeout=timeout)
+    except ipc.IpcError as e:
+        message = f"Refine supervisor reported {e.code} at {socket_path}: {e.message}"
+        if e.details:
+            message = f"{message} ({e.details})"
+        raise config.ConfigError(message) from e
     except Exception as e:
         raise config.ConfigError(
             f"Refine supervisor is not reachable at {socket_path}: {e}"

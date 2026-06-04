@@ -77,6 +77,7 @@ class Supervisor:
         self.ui: subprocess.Popen | None = None
         self.worker: subprocess.Popen | None = None
         self.worker_socket: Path | None = None
+        self._worker_recent_output: list[str] = []
         self._worker_starting = False
         self._stopping = threading.Event()
         self._lock = threading.RLock()
@@ -423,10 +424,18 @@ class Supervisor:
                 env=env,
                 kind="worker",
                 stdin=subprocess.DEVNULL,
-                stdout=None,
-                stderr=None,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
             )
             worker = self.worker
+            if worker.stdout is not None:
+                self._worker_recent_output.clear()
+                threading.Thread(
+                    target=self._capture_worker_output,
+                    args=(worker, worker.stdout),
+                    name=f"refine-supervisor-worker-out-{worker.pid}",
+                    daemon=True,
+                ).start()
 
         try:
             self._wait_for_worker_socket(socket_path, worker)
@@ -768,9 +777,35 @@ class Supervisor:
             if path.exists() and self._can_ping_worker(path):
                 return
             if proc.poll() is not None:
-                raise config.ConfigError("Backend runner exited before opening its socket.")
+                detail = self._worker_output_tail()
+                suffix = f" Recent worker output:\n{detail}" if detail else ""
+                raise config.ConfigError(
+                    "Backend runner exited before opening its socket "
+                    f"(exit code {proc.returncode}).{suffix}"
+                )
             time.sleep(0.1)
         raise config.ConfigError(f"Backend runner socket did not appear: {path}")
+
+    def _capture_worker_output(self, proc: subprocess.Popen, stream) -> None:  # noqa: ANN001
+        try:
+            while True:
+                chunk = stream.readline()
+                if not chunk:
+                    break
+                text = str(chunk).rstrip("\n")
+                if text:
+                    sys.stderr.write(text + "\n")
+                    with self._lock:
+                        if self.worker is proc:
+                            self._worker_recent_output.append(text)
+                            self._worker_recent_output = self._worker_recent_output[-40:]
+        except Exception:
+            return
+
+    def _worker_output_tail(self) -> str:
+        with self._lock:
+            lines = list(self._worker_recent_output[-12:])
+        return "\n".join(lines)
 
     def _stop_worker_locked(self) -> bool:
         worker = self.worker

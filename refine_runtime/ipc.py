@@ -185,7 +185,12 @@ class JsonRequestHandler(socketserver.StreamRequestHandler):
                     "message": str(e) or repr(e),
                 },
             }
-        self.wfile.write(json.dumps(resp, separators=(",", ":")).encode("utf-8") + b"\n")
+        try:
+            self.wfile.write(
+                json.dumps(resp, separators=(",", ":")).encode("utf-8") + b"\n",
+            )
+        except (BrokenPipeError, ConnectionResetError):
+            return
 
 
 class IpcServer:

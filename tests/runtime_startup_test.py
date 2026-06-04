@@ -342,6 +342,33 @@ def test_activate_node_restarts_runner_with_new_local_node() -> None:
         _restore_runtime_env(saved_env)
 
 
+def test_supervisor_request_preserves_reported_errors() -> None:
+    from refine_runtime import ipc
+    from refine_server import config
+    from refine_ui import runtime
+
+    original_request = ipc.request
+
+    def fake_request(_path, _method, _params=None, *, timeout=30.0):  # noqa: ANN001, ANN202
+        raise ipc.IpcError(
+            "ConfigError",
+            "Backend runner exited before opening its socket (exit code 1).",
+        )
+
+    try:
+        ipc.request = fake_request  # type: ignore[assignment]
+        try:
+            runtime._supervisor_request("ensure_worker", {}, timeout=1.0)  # noqa: SLF001
+            raise AssertionError("supervisor error should raise")
+        except config.ConfigError as e:
+            message = str(e)
+            assert "Refine supervisor reported ConfigError" in message
+            assert "Backend runner exited before opening its socket" in message
+            assert "not reachable" not in message
+    finally:
+        ipc.request = original_request  # type: ignore[assignment]
+
+
 def main() -> int:
     try:
         test_configured_app_start_resumes_agents()
@@ -349,6 +376,7 @@ def main() -> int:
         test_runner_client_uses_supervisor_only()
         test_stop_all_without_runner_does_not_stop_supervisor_worker()
         test_backend_call_routes_through_supervisor()
+        test_supervisor_request_preserves_reported_errors()
         test_runtime_local_node_is_stable_after_active_switch()
         test_activate_node_restarts_runner_with_new_local_node()
         worker_source = (

@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -188,6 +189,7 @@ def main() -> int:
         cleanup_tmp(tmp)
     exercise_ipc_server_does_not_unlink_replacement_socket()
     exercise_ipc_server_rebinds_deleted_socket()
+    exercise_worker_start_failure_includes_recent_output()
     root = Path(__file__).resolve().parents[1]
     runtime_source = (root / "refine_ui" / "runtime.py").read_text(encoding="utf-8")
     api_source = (root / "refine_ui" / "api.py").read_text(encoding="utf-8")
@@ -256,6 +258,30 @@ def exercise_ipc_server_rebinds_deleted_socket() -> None:
     finally:
         server.stop()
         shutil.rmtree(path.parent, ignore_errors=True)
+
+
+def exercise_worker_start_failure_includes_recent_output() -> None:
+    from refine_runtime.supervisor import Supervisor
+    from refine_server import config
+
+    supervisor = Supervisor(host="127.0.0.1", port=19878, cfg_path=None)
+    supervisor._worker_recent_output = [  # noqa: SLF001
+        "Traceback (most recent call last):",
+        "sqlite3.InterfaceError: bad parameter or other API misuse",
+    ]
+    proc = FakeProc(2000, kind="worker", cwd=Path.cwd(), env={})
+    proc.returncode = 1
+    try:
+        supervisor._wait_for_worker_socket(  # noqa: SLF001
+            Path(tempfile.gettempdir()) / "refine-missing-worker.sock",
+            proc,
+        )
+        raise AssertionError("worker startup failure should raise")
+    except config.ConfigError as e:
+        message = str(e)
+        assert "exit code 1" in message
+        assert "Recent worker output" in message
+        assert "sqlite3.InterfaceError" in message
 
 
 class FakeResourceManager:
