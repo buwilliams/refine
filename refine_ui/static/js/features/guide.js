@@ -729,10 +729,8 @@ function openGuide(options = {}) {
     const firstIncomplete = firstIncompleteGuideItem();
     if (requestedTab) {
       guideState.activeTab = requestedTab;
-    } else if (firstIncomplete) {
-      guideState.activeTab = GUIDE_TAB_GET_STARTED;
     } else {
-      guideState.activeTab = normalizeGuideTab(guideState.activeTab) || GUIDE_TAB_REFERENCE;
+      guideState.activeTab = GUIDE_TAB_GET_STARTED;
     }
     if (guideState.activeTab === GUIDE_TAB_GET_STARTED) {
       ensureGuideSelection();
@@ -822,8 +820,8 @@ function drawGuide() {
               aria-label="Close Guide" title="Close Guide">x</button>
     </div>
     <div class="guide-body">
-      <p class="guide-intro">${htmlEscape(guideContextMessage())}</p>
       ${renderGuideTabStrip()}
+      <p class="guide-intro">${htmlEscape(guideContextMessage())}</p>
       ${guideState.activeTab === GUIDE_TAB_GET_STARTED
         ? renderGuideGetStartedPane()
         : renderGuideReferencePane()}

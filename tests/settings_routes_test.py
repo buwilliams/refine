@@ -505,6 +505,10 @@ def main() -> int:
     assert "[data-guide-label-item]" in guide_js
     assert "openGuide({ itemId, openTarget: false })" in guide_js
     assert "guideState.activeTab = guideTabForCategory(found.category)" in guide_js
+    open_guide_body = guide_js.split("function openGuide(options = {})", 1)[1].split("function selectGuideTab", 1)[0]
+    assert "if (requested) {\n    activateGuideItem(requested);" in open_guide_body
+    assert "guideState.activeTab = GUIDE_TAB_GET_STARTED;" in open_guide_body
+    assert "guideState.activeTab = normalizeGuideTab(guideState.activeTab) || GUIDE_TAB_REFERENCE;" not in open_guide_body
     assert "function bindSettingsMarkdownFields" in settings_js
     assert "data-settings-markdown-preview" in settings_js
     assert "data-settings-markdown-editor" in settings_js
@@ -691,6 +695,9 @@ def main() -> int:
     assert "function renderGuideTabStrip" in guide_js
     assert "function renderGuideGetStartedPane" in guide_js
     assert "function renderGuideReferencePane" in guide_js
+    assert guide_js.index("${renderGuideTabStrip()}") < guide_js.index(
+        '<p class="guide-intro">${htmlEscape(guideContextMessage())}</p>',
+    )
     assert "root.querySelectorAll(\"[data-guide-tab]\")" in guide_js
     assert 'class="settings-tabs guide-tabs"' in guide_js
     assert 'class="settings-tab ${guideState.activeTab === tab.slug ? "active" : ""}"' in guide_js
