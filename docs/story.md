@@ -171,3 +171,11 @@ Effort: Very High (19 commits, 5 milestones)
 Milestones started: supervisor control-plane completion; live-port test isolation; app setup and README polish; failure-state cleanup; System operations observability.
 
 The supervisor became the real runtime control plane: CLI and UI calls now route backend work, target-app operations, attach, and switch actions through the supervisor instead of reaching for worker sockets directly. The test harness was pushed away from live port 8080, stale Gap failure noise was suppressed, merge workflow state persisted more reliably, README positioning and the new logo landed, app setup gained clearer clone-destination handling, extracted rounds respect the selected reporter, upgrade status moved into System, and the toolbar gained a System operations stream with multi-select status filters and a larger default history.
+
+## Day 23: 2026-06-04 (Thursday)
+
+Effort: Very High (19 commits, 5 milestones)
+
+Milestones started: Feature workflow execution; Guide tabs and help polish; update/status visibility; chat and toolbar ergonomics; runtime cache/merger diagnostics.
+
+Feature and planning work moved forward: Feature workflow actions landed, Plan became Plan Mode in the create menu, Plan drafts now open as Feature drafts, and Gaps got the same workflow visualization as the Dashboard without dashboard label wrapping. Guide tabs, field-help affordances, active-node page titles, global version/status output, and Processes/System responsiveness were tightened. Chat also became more useful with multiline input, richer Gap preambles, recovery-round support, UI notices in the System toolbar, and auto-minimizing draft actions, while the runtime gained stronger worker startup diagnostics and SQLite cache readiness checks that prevent legacy projections from surprising the Merger.

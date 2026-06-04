@@ -104,12 +104,57 @@ def main() -> int:
             except FileNotFoundError:
                 pass
         conn = db.connect(cfg.sqlite_path)
+        conn.execute(
+            "CREATE TABLE gaps_index ("
+            "id TEXT PRIMARY KEY, "
+            "name TEXT NOT NULL, "
+            "status TEXT NOT NULL, "
+            "priority TEXT NOT NULL DEFAULT 'low', "
+            "reporter TEXT NOT NULL DEFAULT '', "
+            "round_count INTEGER NOT NULL DEFAULT 0, "
+            "created TEXT NOT NULL, "
+            "updated TEXT NOT NULL, "
+            "branch_name TEXT, "
+            "instance_id TEXT NOT NULL DEFAULT 'default', "
+            "json_path TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE gap_cache_meta ("
+            "json_path TEXT PRIMARY KEY, "
+            "gap_id TEXT NOT NULL DEFAULT '', "
+            "mtime_ns INTEGER NOT NULL, "
+            "size INTEGER NOT NULL, "
+            "sha256 TEXT NOT NULL DEFAULT '', "
+            "updated_at TEXT NOT NULL)"
+        )
+        conn.execute(
+            "CREATE TABLE features_index ("
+            "id TEXT PRIMARY KEY, "
+            "name TEXT NOT NULL, "
+            "description TEXT NOT NULL DEFAULT '', "
+            "reporter TEXT NOT NULL DEFAULT '', "
+            "node_id TEXT NOT NULL DEFAULT 'default', "
+            "created TEXT NOT NULL, "
+            "updated TEXT NOT NULL, "
+            "json_path TEXT NOT NULL)"
+        )
+        conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute(
+            "CREATE TABLE reporters ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "name TEXT NOT NULL UNIQUE, "
+            "created TEXT NOT NULL)"
+        )
         assert db.schema_ready(conn) is False
         assert (
             project_state.ensure_sqlite_cache_current(conn)
             == project_state.active_node_id()
         )
         assert db.schema_ready(conn) is True
+        migrated_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(gaps_index)")
+        }
+        assert "node_id" in migrated_columns
         gap_count = conn.execute(
             "SELECT COUNT(*) AS n FROM gaps_index WHERE id IN (?, ?, ?)",
             gids,

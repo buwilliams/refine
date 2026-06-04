@@ -42,6 +42,7 @@ from __future__ import annotations
 import sqlite3
 import threading
 import time
+import traceback
 from collections.abc import Callable
 
 from refine_server import activity, db, project_state, quality
@@ -192,6 +193,7 @@ class Merger:
                         self._get_conn(),
                         message=f"Merger tick error: {e!r}",
                         severity="error", category="git", actor="runner",
+                        details=traceback.format_exc(),
                     )
                 except Exception:
                     pass

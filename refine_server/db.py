@@ -424,7 +424,29 @@ def schema_ready(conn: sqlite3.Connection) -> bool:
         str(row["name"] if isinstance(row, sqlite3.Row) else row[0])
         for row in rows
     }
-    return required.issubset(existing)
+    if not required.issubset(existing):
+        return False
+    required_columns = {
+        "gaps_index": {
+            "id", "name", "status", "priority", "reporter", "round_count",
+            "created", "updated", "branch_name", "node_id", "feature_id",
+            "feature_order", "json_path",
+        },
+        "gap_cache_meta": {
+            "json_path", "gap_id", "mtime_ns", "size", "sha256", "updated_at",
+        },
+        "features_index": {
+            "id", "name", "description", "reporter", "node_id", "created",
+            "updated", "json_path",
+        },
+        "settings": {"key", "value"},
+        "reporters": {"id", "name", "created"},
+    }
+    for table, columns in required_columns.items():
+        present = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        if not columns.issubset(present):
+            return False
+    return True
 
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
