@@ -69,13 +69,21 @@ function workflowStatuses() {
 
 function updateActiveNodeLabel() {
   const el = document.getElementById("active-node-label");
-  if (!el) return;
   const project = state.project || {};
   const active = project.active_node || null;
   const activeId = project.active_node_id || "";
   const label = active?.display_name || active?.name || activeId || "none";
-  el.textContent = project.attached === false ? "none" : label;
-  el.title = el.textContent;
+  const visibleLabel = project.attached === false ? "none" : label;
+  if (el) {
+    el.textContent = visibleLabel;
+    el.title = el.textContent;
+  }
+  updatePageTitle(project.attached === false ? "" : label);
+}
+
+function updatePageTitle(nodeLabel) {
+  const label = String(nodeLabel || "").trim();
+  document.title = label && label !== "none" ? `${label} - refine` : "refine";
 }
 
 function updateNavReporterContext() {

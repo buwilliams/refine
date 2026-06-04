@@ -74,6 +74,9 @@ def test_client_switch_path(root: Path) -> None:
     assert "object-fit: contain;" in base_css
     assert "function updateActiveNodeLabel()" in common_js
     assert "updateActiveNodeLabel()" in common_js
+    assert "function updatePageTitle(nodeLabel)" in common_js
+    assert 'document.title = label && label !== "none" ? `${label} - refine` : "refine";' in common_js
+    assert 'updatePageTitle(project.attached === false ? "" : label);' in common_js
 
     assert "function openAddAppModal(options = {})" in common_js
     assert "function openProjectDirectoryPicker" in common_js
