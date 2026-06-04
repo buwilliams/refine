@@ -716,6 +716,10 @@ def main() -> int:
         assert "Refine was upgraded but not restarted" in output
         assert "uv run refine restart" in output
         assert "uv run refine start" not in output
+        log_text = install_log.read_text(encoding="utf-8")
+        assert "+ uv run refine restart" not in log_text
+        assert "+ uv run refine app rebuild" not in log_text
+        assert "Refresh target application" not in output
 
         result = subprocess.run(
             ["bash", str(install_sh), "--yes"],
@@ -729,6 +733,7 @@ def main() -> int:
         log_text = install_log.read_text(encoding="utf-8")
         assert "Refine upgraded to release 1.0.0" in output
         assert "Refresh target application" in output
+        assert "uv run refine restart 8080" in log_text
         assert "uv run refine app rebuild --port 8080" in log_text
         assert "Skipped Playwright. Managed regression screenshots may fail" in output
         assert "+ npx --yes playwright install --with-deps chromium" not in output
