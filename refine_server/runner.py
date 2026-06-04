@@ -189,18 +189,19 @@ class Runner:
     # ---- direct backend routing ---------------------------------------------
 
     def call(self, method: str, params: dict | None = None) -> dict:
-        with self._diag_lock:
-            self._last_call_at = now_iso()
-        try:
-            project_state.ensure_sqlite_cache_current(
-                self._conn,
-                node_id=self.local_node_id,
-            )
-            return self._dispatch_method(method, params or {})
-        except Exception as e:
+        with self._conn_lock:
             with self._diag_lock:
-                self._recent_errors.append(f"{now_iso()} {method}: {e!r}")
-            raise
+                self._last_call_at = now_iso()
+            try:
+                project_state.ensure_sqlite_cache_current(
+                    self._conn,
+                    node_id=self.local_node_id,
+                )
+                return self._dispatch_method(method, params or {})
+            except Exception as e:
+                with self._diag_lock:
+                    self._recent_errors.append(f"{now_iso()} {method}: {e!r}")
+                raise
 
     def _dispatch_method(self, method: str, params: dict) -> dict:
         handlers = {
@@ -2372,7 +2373,12 @@ class Runner:
         return {"session_id": sid}
 
     def _h_chat_input(self, params: dict) -> dict:
-        ok = self.chat.send(params["session_id"], params["text"])
+        text = params.get("text", "")
+        if text is None:
+            text = ""
+        if not isinstance(text, str):
+            raise ValueError("chat input text must be a string")
+        ok = self.chat.send(str(params["session_id"]), text)
         return {"sent": ok}
 
     def _h_chat_read(self, params: dict) -> dict:

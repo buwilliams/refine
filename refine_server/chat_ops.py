@@ -23,11 +23,16 @@ def start(runner_call: RunnerCall, body: dict[str, Any]) -> tuple[int, dict[str,
 
 
 def input(runner_call: RunnerCall, session_id: str, body: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    raw_text = body.get("text", "")
+    if raw_text is None:
+        raw_text = ""
+    if not isinstance(raw_text, str):
+        raise ValueError("chat input text must be a string")
     result = runner_call(
         M_CHAT_INPUT,
         {
             "session_id": session_id,
-            "text": body.get("text", ""),
+            "text": raw_text,
         },
         30.0,
     )

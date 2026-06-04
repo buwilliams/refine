@@ -2552,6 +2552,8 @@ def chat_start(body: dict) -> tuple[int, dict]:
 def chat_input(sid: str, body: dict) -> tuple[int, dict]:
     try:
         return chat_ops.input(_backend_runner_call, sid, body)
+    except ValueError as e:
+        return 400, {"error": {"code": "bad_request", "message": str(e)}}
     except BackendError as e:
         return _backend_err(e)
 

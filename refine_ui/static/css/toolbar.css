@@ -350,18 +350,24 @@ button.chat-activity-toggle:hover:not(:disabled) {
 .chat-input-wrap {
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex: 1;
   min-width: 0;
 }
 .chat-input-wrap #chat-input {
   width: 100%;
+  min-height: 42px;
+  max-height: 120px;
+  resize: none;
+  overflow-y: auto;
+  line-height: 1.35;
+  padding-top: 8px;
+  padding-bottom: 8px;
 }
 .chat-input-pending-dots {
   position: absolute;
   left: 10px;
-  top: calc(50% + 1px);
-  transform: translateY(-50%);
+  top: 19px;
   color: var(--muted);
   pointer-events: none;
   z-index: 1;

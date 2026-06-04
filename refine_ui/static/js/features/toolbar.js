@@ -499,6 +499,10 @@ function drawToolbar() {
         sendChatLine();
       }
     });
+    $("#chat-input")?.addEventListener("input", (e) => {
+      resizeChatInput(e.currentTarget);
+    });
+    resizeChatInput($("#chat-input"));
   }
 
   wireToolbarResize(root);
@@ -575,10 +579,11 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                 ${showInputDots ? "" : "hidden"}>
             <span></span><span></span><span></span>
           </span>
-          <input type="text" id="chat-input"
-                 class="${showInputDots ? "chat-input-waiting" : ""}"
-                 placeholder="${htmlEscape(inputPlaceholder)}"
-                 ${hasSession && !active.pending ? "" : "disabled"}>
+          <textarea id="chat-input"
+                    class="${showInputDots ? "chat-input-waiting" : ""}"
+                    rows="2"
+                    placeholder="${htmlEscape(inputPlaceholder)}"
+                    ${hasSession && !active.pending ? "" : "disabled"}></textarea>
         </div>
       </div>
     `;
@@ -596,6 +601,14 @@ function renderChatProgress(text) {
   return lines.map((line) => `
     <div class="chat-progress-line">${htmlEscape(line)}</div>
   `).join("");
+}
+
+function resizeChatInput(input) {
+  if (!input) return;
+  input.style.height = "auto";
+  const max = 120;
+  const next = Math.min(max, Math.max(42, input.scrollHeight || 42));
+  input.style.height = `${next}px`;
 }
 
 function recordSystemOperation(payload) {
@@ -2001,6 +2014,7 @@ async function sendChatLine() {
   const text = input.value;
   if (!text.trim()) return;
   input.value = "";
+  resizeChatInput(input);
   await sendChatText(text);
 }
 
@@ -2009,7 +2023,8 @@ async function sendChatText(text) {
   if (!t || !t.sessionId || t.pending) return;
   text = String(text || "");
   if (!text.trim()) return;
-  const echo = `\n> ${text}\n`;
+  const quotedText = text.split(/\r?\n/).map((line) => `> ${line}`).join("\n");
+  const echo = `\n${quotedText}\n`;
   t.output = (t.output || "") + echo;
   const out = $("#chat-output");
   if (out) {

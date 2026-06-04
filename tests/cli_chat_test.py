@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from refine_server import chat_ops
 from refine_server.backend_protocol import M_CHAT_INPUT, M_CHAT_READ, M_CHAT_START, M_CHAT_STOP
 
 
@@ -28,6 +29,7 @@ def _json(out: str) -> dict:
 
 def main() -> int:
     from refine_cli import cli
+    from refine_ui import api
 
     calls: list[tuple[str, dict[str, object], float]] = []
 
@@ -58,6 +60,31 @@ def main() -> int:
         assert payload["method"] == M_CHAT_INPUT
         assert payload["params"] == {"session_id": "sid123", "text": "hello"}
 
+        multiline = "first line\nsecond line"
+        rc, out, err = _run_cli(["chat", "input", "sid123", multiline])
+        assert rc == 0, err
+        payload = _json(out)
+        assert payload["method"] == M_CHAT_INPUT
+        assert payload["params"] == {"session_id": "sid123", "text": multiline}
+
+        try:
+            chat_ops.input(fake_runner, "sid123", {"text": ["not", "text"]})
+            raise AssertionError("non-string chat text should fail before dispatch")
+        except ValueError as e:
+            assert "chat input text must be a string" in str(e)
+
+        old_backend_runner_call = api._backend_runner_call
+        try:
+            api._backend_runner_call = lambda *_args, **_kwargs: (
+                (_ for _ in ()).throw(AssertionError("backend should not be called"))
+            )
+            status, body = api.chat_input("sid123", {"text": {"bad": "shape"}})
+            assert status == 400, body
+            assert body["error"]["code"] == "bad_request"
+            assert "chat input text must be a string" in body["error"]["message"]
+        finally:
+            api._backend_runner_call = old_backend_runner_call
+
         rc, out, err = _run_cli(["chat", "read", "sid123"])
         assert rc == 0, err
         assert _json(out)["method"] == M_CHAT_READ
@@ -70,6 +97,7 @@ def main() -> int:
 
     assert [call[0] for call in calls] == [
         M_CHAT_START,
+        M_CHAT_INPUT,
         M_CHAT_INPUT,
         M_CHAT_READ,
         M_CHAT_STOP,

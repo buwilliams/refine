@@ -278,6 +278,12 @@ def main() -> int:
     assert "return !!tab?.pending;" in toolbar_js
     assert 'id="chat-input-pending-dots"' in toolbar_js
     assert 'class="chat-pending-dots chat-input-pending-dots"' in toolbar_js
+    assert '<textarea id="chat-input"' in toolbar_js
+    assert 'rows="2"' in toolbar_js
+    assert "if (e.key === \"Enter\" && !e.shiftKey)" in toolbar_js
+    assert "sendChatLine();" in toolbar_js
+    assert "function resizeChatInput(input)" in toolbar_js
+    assert 'text.split(/\\r?\\n/).map((line) => `> ${line}`).join("\\n")' in toolbar_js
     assert 'input.placeholder = chatInputPlaceholder(tab);' in toolbar_js
     assert 'input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));' in toolbar_js
     assert "Agent activity" not in toolbar_js
@@ -287,6 +293,8 @@ def main() -> int:
     assert ".chat-input-wrap" in toolbar_css
     assert ".chat-input-pending-dots" in toolbar_css
     assert "#chat-input.chat-input-waiting" in toolbar_css
+    assert "max-height: 120px;" in toolbar_css
+    assert "resize: none;" in toolbar_css
 
     assert ".nav-command-button" in base_css
     assert ".nav-issue-button" in base_css
