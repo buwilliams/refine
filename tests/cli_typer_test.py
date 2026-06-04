@@ -580,6 +580,31 @@ def main() -> int:
     assert "Refine 1.2.0 is available (current 1.0.0)." in upgrade_notice
     assert "./r update" in upgrade_notice
 
+    class StatusUpgradeInfo:
+        current_version = "1.0.0"
+        latest_version = "1.2.0"
+        upgrade_available = True
+        command = "./r update"
+        error = ""
+        local_development = False
+
+    status_info = StatusUpgradeInfo()
+    assert (
+        cli._status_version_summary(status_info)
+        == "installed 1.0.0; update 1.2.0 available"
+    )
+    status_info.upgrade_available = False
+    status_info.latest_version = "1.0.0"
+    assert cli._status_version_summary(status_info) == "installed 1.0.0; no update available"
+    status_info.latest_version = ""
+    status_info.error = "offline"
+    assert cli._status_version_summary(status_info) == "installed 1.0.0; update check failed: offline"
+
+    status_output = StringIO()
+    with redirect_stdout(status_output):
+        cli._print_status_version_block(StatusUpgradeInfo())
+    assert "version:  installed 1.0.0; update 1.2.0 available" in status_output.getvalue()
+
     cli_source = Path(cli.__file__).read_text(encoding="utf-8")
 
     def function_source(name: str) -> str:

@@ -3713,6 +3713,7 @@ def cmd_reset(args: _Args) -> int:
 
 def cmd_status(args: _Args) -> int:
     clone, unit = _resolve_clone_and_unit_or_exit()
+    _print_status_version_block(_status_upgrade_info(clone))
     for port in _status_ports(args, clone, None, unit):
         cfg = _config_for_port(args, clone, port)
         if cfg is None:
@@ -3857,7 +3858,12 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
     print()
 
 
-def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None) -> None:
+def _print_setup_status_block(
+    clone: Path,
+    *,
+    port: int,
+    unit: str | None = None,
+) -> None:
     ui_unit = _ui_unit_name(unit, port) if unit is not None else ""
     web_up = _port_open(SETUP_UI_HOST, port)
     process_pid = _running_pid(clone, None, port)
@@ -3883,6 +3889,33 @@ def _print_setup_status_block(clone: Path, *, port: int, unit: str | None = None
         print(f"  journal:  journalctl -u {ui_unit} -f")
     print(f"  stop:     uv run refine stop {port}")
     print()
+
+
+def _status_upgrade_info(clone: Path) -> "upgrade.UpgradeInfo":
+    return upgrade.status(clone)
+
+
+def _print_status_version_block(info: "upgrade.UpgradeInfo") -> None:
+    print()
+    print(_bold("refine"))
+    print(f"  version:  {_status_version_summary(info)}")
+
+
+def _status_version_summary(info: "upgrade.UpgradeInfo") -> str:
+    current = str(getattr(info, "current_version", "") or "unknown")
+    latest = str(getattr(info, "latest_version", "") or "")
+    error = str(getattr(info, "error", "") or "")
+    local_dev = bool(getattr(info, "local_development", False))
+    if bool(getattr(info, "upgrade_available", False)) and latest:
+        return f"installed {current}; update {latest} available"
+    if error:
+        return f"installed {current}; update check failed: {error}"
+    if local_dev:
+        suffix = f"; latest release {latest}" if latest else ""
+        return f"installed {current}; local development checkout{suffix}"
+    if latest:
+        return f"installed {current}; no update available"
+    return f"installed {current}; update check unavailable"
 
 
 def _print_upgrade_notice(clone: Path) -> None:
