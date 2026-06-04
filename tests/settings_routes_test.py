@@ -659,7 +659,7 @@ def main() -> int:
     assert 'title: "Get Started"' in guide_js
     assert 'description: "The minimum steps needed to run refine on this app."' in guide_js
     assert 'title: "Quick Start"' not in guide_js
-    assert 'Get Started &middot;' in guide_js
+    assert 'Get Started &middot;' not in guide_js
     assert "completed/skipped" not in guide_js
     assert "function guideChecklistItemsInOrder" in guide_js
     assert "function guideReferenceCategories" in guide_js
@@ -719,7 +719,7 @@ def main() -> int:
     assert "canUseDefault: options.canUseDefault !== false" in guide_js
     assert "{ canUseDefault: false }" in guide_js
     assert "const defaultButton = checklist && item.canUseDefault" in guide_js
-    assert 'class="guide-progress"' in guide_js
+    assert 'class="guide-progress"' not in guide_js
     assert 'class="guide-status guide-status-' in guide_js
     assert "function firstIncompleteGuideItem" in guide_js
     assert "function openGuideItemTarget" in guide_js
@@ -813,9 +813,16 @@ def main() -> int:
     assert 'command: "gap.import"' in guide_js
     assert 'command: "refine.issue.request"' in guide_js
     assert ".guide-resize::after" in guide_css
-    assert ".guide-progress" in guide_css
     assert ".guide-tabs-row" in guide_css
     assert ".guide-tabs" in guide_css
+    guide_tabs_row = re.search(r"\.guide-tabs-row \{(.*?)\}", guide_css, re.S)
+    assert guide_tabs_row
+    assert "width: 100%;" in guide_tabs_row.group(1)
+    guide_tabs_css = re.search(r"\.guide-tabs \{(.*?)\}", guide_css, re.S)
+    assert guide_tabs_css
+    assert "width: 100%;" in guide_tabs_css.group(1)
+    assert "max-width: none;" in guide_tabs_css.group(1)
+    assert ".guide-progress" not in guide_css
     assert ".guide-tab-pane" in guide_css
     assert ".guide-get-started-list" in guide_css
     assert ".guide-get-started-list .guide-item" in guide_css

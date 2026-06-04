@@ -811,7 +811,6 @@ function drawGuide() {
   }
   guideState.activeTab = normalizeGuideTab(guideState.activeTab) || GUIDE_TAB_GET_STARTED;
   if (guideState.activeTab === GUIDE_TAB_GET_STARTED) ensureGuideSelection();
-  const progress = guideProgress();
   root.innerHTML = `
     <div class="guide-resize" id="guide-resize"
          role="separator" aria-orientation="vertical"
@@ -826,7 +825,7 @@ function drawGuide() {
       <p class="guide-intro">${htmlEscape(guideContextMessage())}</p>
       ${renderGuideTabStrip()}
       ${guideState.activeTab === GUIDE_TAB_GET_STARTED
-        ? renderGuideGetStartedPane(progress)
+        ? renderGuideGetStartedPane()
         : renderGuideReferencePane()}
     </div>
   `;
@@ -901,12 +900,9 @@ function renderGuideTabStrip() {
     </div>`;
 }
 
-function renderGuideGetStartedPane(progress) {
+function renderGuideGetStartedPane() {
   return `
     <section class="guide-tab-pane guide-get-started-pane" data-guide-tab-pane="${GUIDE_TAB_GET_STARTED}">
-      <div class="guide-progress" aria-live="polite">
-        Get Started &middot; <strong>${progress.done}</strong> of <strong>${progress.total}</strong> complete
-      </div>
       <div class="guide-get-started-list">
         ${guideChecklistItemsInOrder().map(({ item }) => renderGuideItem(item)).join("")}
       </div>
