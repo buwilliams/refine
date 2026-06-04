@@ -477,9 +477,34 @@ def main() -> int:
     assert "function renderSettingsGuideLabel" in settings_js
     assert "function renderSettingsGuideIcon" in settings_js
     assert 'data-guide-label-item="${htmlEscape(itemId)}"' in settings_js
+    assert 'tabindex="-1"' in settings_js
     assert ".settings-guide-icon" in common_css
+    settings_guide_icon_css = re.search(r"\.settings-guide-icon \{(.*?)\}", common_css, re.S)
+    assert settings_guide_icon_css
+    assert "border: 0;" in settings_guide_icon_css.group(1)
+    assert "background: transparent;" in settings_guide_icon_css.group(1)
+    assert "box-shadow: none;" in settings_guide_icon_css.group(1)
+    settings_guide_hover_css = re.search(
+        r"\.settings-guide-icon:hover:not\(:disabled\),\s*\.settings-guide-icon:focus-visible \{(.*?)\}",
+        common_css,
+        re.S,
+    )
+    assert settings_guide_hover_css
+    assert "background: transparent;" in settings_guide_hover_css.group(1)
+    assert "border-color: transparent;" in settings_guide_hover_css.group(1)
+    assert "box-shadow: none;" in settings_guide_hover_css.group(1)
+    assert ".settings-guide-icon:hover:not(:disabled) svg" in common_css
+    settings_guide_svg_hover_css = re.search(
+        r"\.settings-guide-icon:hover:not\(:disabled\) svg,\s*\.settings-guide-icon:focus-visible svg \{(.*?)\}",
+        common_css,
+        re.S,
+    )
+    assert settings_guide_svg_hover_css
+    assert "color: var(--color-primary-hover);" in settings_guide_svg_hover_css.group(1)
+    assert "transform: scale(1.12);" in settings_guide_svg_hover_css.group(1)
     assert "[data-guide-label-item]" in guide_js
     assert "openGuide({ itemId, openTarget: false })" in guide_js
+    assert "guideState.activeTab = guideTabForCategory(found.category)" in guide_js
     assert "function bindSettingsMarkdownFields" in settings_js
     assert "data-settings-markdown-preview" in settings_js
     assert "data-settings-markdown-editor" in settings_js
@@ -628,6 +653,9 @@ def main() -> int:
     assert '<script src="/static/js/features/guide.js"></script>' in index_html
     assert '<link rel="stylesheet" href="/static/css/guide.css">' in index_html
     assert "const GUIDE_CATEGORIES = [" in guide_js
+    assert 'const GUIDE_TAB_GET_STARTED = "get-started"' in guide_js
+    assert 'const GUIDE_TAB_REFERENCE = "reference"' in guide_js
+    assert "activeTab: GUIDE_TAB_GET_STARTED" in guide_js
     assert 'title: "Get Started"' in guide_js
     assert 'description: "The minimum steps needed to run refine on this app."' in guide_js
     assert 'title: "Quick Start"' not in guide_js
@@ -645,6 +673,8 @@ def main() -> int:
     assert "function loadGuideStateForCurrentApp" in guide_js
     assert "function guideChecklistComplete" in guide_js
     assert "function clearGuideSelection" in guide_js
+    assert "function normalizeGuideTab" in guide_js
+    assert "function guideTabForCategory" in guide_js
     assert "function guideCategoryCompleteIcon" in guide_js
     assert "function guideSearchIcon" in guide_js
     assert "nextInput.setSelectionRange(selectionStart, selectionEnd)" in guide_js
@@ -657,8 +687,20 @@ def main() -> int:
     assert "function restoreGuideBodyScrollTop" in guide_js
     assert "restoreGuideBodyScrollTop(previousBodyScrollTop)" in guide_js
     assert "await openGuideItemTarget(found.item)" in guide_js
+    assert "function selectGuideTab" in guide_js
+    assert "function renderGuideTabStrip" in guide_js
+    assert "function renderGuideGetStartedPane" in guide_js
+    assert "function renderGuideReferencePane" in guide_js
+    assert "root.querySelectorAll(\"[data-guide-tab]\")" in guide_js
+    assert 'class="settings-tabs guide-tabs"' in guide_js
+    assert 'class="settings-tab ${guideState.activeTab === tab.slug ? "active" : ""}"' in guide_js
+    assert 'data-guide-tab="${tab.slug}"' in guide_js
+    assert 'data-guide-tab-pane="${GUIDE_TAB_GET_STARTED}"' in guide_js
+    assert 'class="guide-get-started-list"' in guide_js
+    assert "guideChecklistItemsInOrder().map(({ item }) => renderGuideItem(item)).join(\"\")" in guide_js
     assert "const searchingReference = !category.checklist && Boolean(guideState.referenceQuery.trim())" in guide_js
-    assert 'class="guide-reference"' in guide_js
+    assert 'class="guide-tab-pane guide-reference"' in guide_js
+    assert 'data-guide-tab-pane="${GUIDE_TAB_REFERENCE}"' in guide_js
     assert 'class="guide-reference-search"' in guide_js
     assert 'class="guide-reference-search-icon"' in guide_js
     assert 'class="guide-category-complete"' in guide_js
@@ -686,7 +728,7 @@ def main() -> int:
     assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
     assert "function clearGuideTargetHighlight" in guide_js
     assert "setTimeout(() => el.classList.remove(\"guide-target-highlight\")" not in guide_js
-    assert "if (active && !(active.category.checklist && guideChecklistComplete()))" in guide_js
+    assert "if (active?.category?.checklist && !guideChecklistComplete())" in guide_js
     assert 'class="guide-item-kind"' not in guide_js
     assert "Focus in app" not in guide_js
     assert 'hash: "#/node/application"' in guide_js
@@ -695,7 +737,8 @@ def main() -> int:
     no_app_guide_request = re.compile(
         r'context: "no-app",\s+'
         r'categoryId: "get-started",\s+'
-        r'itemId: "quickstart-add-app",'
+        r'itemId: "quickstart-add-app",\s+'
+        r'openTarget: true,'
     )
     assert len(no_app_guide_request.findall(common_js)) == 2
     assert no_app_guide_request.search(settings_core_js)
@@ -771,10 +814,25 @@ def main() -> int:
     assert 'command: "refine.issue.request"' in guide_js
     assert ".guide-resize::after" in guide_css
     assert ".guide-progress" in guide_css
-    assert "background: #fffbea;" in guide_css
+    assert ".guide-tabs-row" in guide_css
+    assert ".guide-tabs" in guide_css
+    assert ".guide-tab-pane" in guide_css
+    assert ".guide-get-started-list" in guide_css
+    assert ".guide-get-started-list .guide-item" in guide_css
+    active_guide_item = re.search(r"\.guide-item\.active \{(.*?)\}", guide_css, re.S)
+    assert active_guide_item
+    active_guide_item_css = active_guide_item.group(1)
+    assert "background: var(--color-success-soft);" in active_guide_item_css
+    assert "rgba(22, 163, 74" in active_guide_item_css
+    assert "#fffbea" not in active_guide_item_css
     assert "color: #111827;" in guide_css
     target_highlight_css = guide_css.split(".guide-target-highlight", 1)[1].split("}", 1)[0]
     assert "background-color" not in target_highlight_css
+    assert "rgba(22, 163, 74" in target_highlight_css
+    assert "rgba(37, 99, 235" not in target_highlight_css
+    target_pulse_css = guide_css.split("@keyframes guide-target-pulse", 1)[1]
+    assert "rgba(22, 163, 74" in target_pulse_css
+    assert "rgba(37, 99, 235" not in target_pulse_css
     assert ".guide-reference" in guide_css
     assert ".guide-reference-search" in guide_css
     assert ".guide-reference-search input" in guide_css

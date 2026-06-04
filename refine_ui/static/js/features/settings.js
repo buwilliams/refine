@@ -449,6 +449,7 @@ function renderSettingsGuideIcon(itemId = "", title = "setting") {
     <button type="button"
             class="settings-guide-icon"
             data-guide-label-item="${htmlEscape(itemId)}"
+            tabindex="-1"
             title="Open Guide: ${htmlEscape(title)}"
             aria-label="Open Guide for ${htmlEscape(title)}">
       <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
@@ -803,7 +804,7 @@ function bindSettingsNoProjectTab() {
           context: "no-app",
           categoryId: "get-started",
           itemId: "quickstart-add-app",
-          openTarget: false,
+          openTarget: true,
         });
       }
     });

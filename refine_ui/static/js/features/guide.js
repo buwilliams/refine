@@ -10,6 +10,8 @@ const GUIDE_MAX_WIDTH = 560;
 const GUIDE_STATUS_UNCHECKED = "unchecked";
 const GUIDE_STATUS_CHECKED = "checked";
 const GUIDE_STATUS_SKIPPED = "skipped";
+const GUIDE_TAB_GET_STARTED = "get-started";
+const GUIDE_TAB_REFERENCE = "reference";
 let guideHighlightedTarget = null;
 
 const guideState = {
@@ -19,6 +21,7 @@ const guideState = {
   context: "",
   activeCategory: "",
   activeItem: "",
+  activeTab: GUIDE_TAB_GET_STARTED,
   referenceQuery: "",
 };
 
@@ -442,14 +445,23 @@ function readGuideStoredState(project = null) {
         : {};
     const activeItem = typeof parsed?.activeItem === "string" ? parsed.activeItem : "";
     const activeCategory = typeof parsed?.activeCategory === "string" ? parsed.activeCategory : "";
+    const activeTab = normalizeGuideTab(parsed?.activeTab)
+      || (activeCategory && activeCategory !== GUIDE_TAB_GET_STARTED ? GUIDE_TAB_REFERENCE : GUIDE_TAB_GET_STARTED);
     return {
       statuses,
       activeCategory,
       activeItem,
+      activeTab,
       referenceQuery: typeof parsed?.referenceQuery === "string" ? parsed.referenceQuery : "",
     };
   } catch {
-    return { statuses: {}, activeCategory: "", activeItem: "", referenceQuery: "" };
+    return {
+      statuses: {},
+      activeCategory: "",
+      activeItem: "",
+      activeTab: GUIDE_TAB_GET_STARTED,
+      referenceQuery: "",
+    };
   }
 }
 
@@ -463,6 +475,7 @@ function saveGuideState() {
       statuses: guideState.statuses || {},
       activeCategory: guideState.activeCategory || "",
       activeItem: guideState.activeItem || "",
+      activeTab: normalizeGuideTab(guideState.activeTab) || GUIDE_TAB_GET_STARTED,
       referenceQuery: guideState.referenceQuery || "",
     }));
   } catch {}
@@ -473,6 +486,7 @@ function loadGuideStateForProject(project = null, { redraw = true } = {}) {
   guideState.statuses = stored.statuses || {};
   guideState.activeCategory = stored.activeCategory || "";
   guideState.activeItem = stored.activeItem || "";
+  guideState.activeTab = stored.activeTab || GUIDE_TAB_GET_STARTED;
   guideState.referenceQuery = stored.referenceQuery || "";
   guideState.context = "";
   clearGuideTargetHighlight();
@@ -488,6 +502,7 @@ function resetGuideState({ redraw = true } = {}) {
   guideState.context = "";
   guideState.activeCategory = "";
   guideState.activeItem = "";
+  guideState.activeTab = GUIDE_TAB_GET_STARTED;
   guideState.referenceQuery = "";
   clearGuideTargetHighlight();
   try { localStorage.removeItem(guideStateStorageKey()); } catch {}
@@ -507,6 +522,14 @@ function guideChecklistItemsInOrder() {
 
 function guideReferenceCategories() {
   return GUIDE_CATEGORIES.filter((category) => !category.checklist);
+}
+
+function normalizeGuideTab(tab) {
+  return [GUIDE_TAB_GET_STARTED, GUIDE_TAB_REFERENCE].includes(tab) ? tab : "";
+}
+
+function guideTabForCategory(category) {
+  return category?.checklist ? GUIDE_TAB_GET_STARTED : GUIDE_TAB_REFERENCE;
 }
 
 function filteredGuideReferenceCategories() {
@@ -573,6 +596,7 @@ function activateGuideItem(found) {
   if (!found) return;
   guideState.activeCategory = found.category.id;
   guideState.activeItem = found.item.id;
+  guideState.activeTab = guideTabForCategory(found.category);
 }
 
 function guideItemByOffset(id, offset) {
@@ -583,8 +607,9 @@ function guideItemByOffset(id, offset) {
 }
 
 function ensureGuideSelection() {
+  if (guideState.activeTab !== GUIDE_TAB_GET_STARTED) return;
   const active = guideState.activeItem ? findGuideItem(guideState.activeItem) : null;
-  if (active && !(active.category.checklist && guideChecklistComplete())) {
+  if (active?.category?.checklist && !guideChecklistComplete()) {
     return;
   }
   clearGuideSelection();
@@ -694,17 +719,48 @@ function openGuide(options = {}) {
   guideState.open = true;
   guideState.context = options.context || guideState.context || "";
   const requested = options.itemId ? findGuideItem(options.itemId) : null;
+  let shouldOpenTarget = false;
   if (requested) guideState.referenceQuery = "";
-  const firstIncomplete = requested || firstIncompleteGuideItem();
-  if (firstIncomplete) {
-    activateGuideItem(firstIncomplete);
-  } else if (!requested && guideChecklistComplete()) {
-    clearGuideSelection();
+  if (requested) {
+    activateGuideItem(requested);
+    shouldOpenTarget = true;
+  } else {
+    const requestedTab = normalizeGuideTab(options.tab);
+    const firstIncomplete = firstIncompleteGuideItem();
+    if (requestedTab) {
+      guideState.activeTab = requestedTab;
+    } else if (firstIncomplete) {
+      guideState.activeTab = GUIDE_TAB_GET_STARTED;
+    } else {
+      guideState.activeTab = normalizeGuideTab(guideState.activeTab) || GUIDE_TAB_REFERENCE;
+    }
+    if (guideState.activeTab === GUIDE_TAB_GET_STARTED) {
+      ensureGuideSelection();
+      if (guideChecklistComplete()) clearGuideSelection();
+      shouldOpenTarget = Boolean(firstIncomplete);
+    } else {
+      const active = guideState.activeItem ? findGuideItem(guideState.activeItem) : null;
+      if (active?.category?.checklist) clearGuideSelection();
+    }
   }
   if (requested) saveGuideState();
   setGuideWidth(guideState.width, { persist: false });
   drawGuide();
-  if (firstIncomplete && options.openTarget !== false) openActiveGuideTarget();
+  if (shouldOpenTarget && guideState.activeItem && options.openTarget !== false) openActiveGuideTarget();
+}
+
+function selectGuideTab(tab) {
+  const normalized = normalizeGuideTab(tab);
+  if (!normalized) return;
+  guideState.activeTab = normalized;
+  if (normalized === GUIDE_TAB_GET_STARTED) {
+    ensureGuideSelection();
+  } else {
+    const active = guideState.activeItem ? findGuideItem(guideState.activeItem) : null;
+    if (active?.category?.checklist) clearGuideSelection();
+  }
+  saveGuideState();
+  drawGuide();
 }
 
 function closeGuide() {
@@ -753,7 +809,8 @@ function drawGuide() {
     root.innerHTML = "";
     return;
   }
-  ensureGuideSelection();
+  guideState.activeTab = normalizeGuideTab(guideState.activeTab) || GUIDE_TAB_GET_STARTED;
+  if (guideState.activeTab === GUIDE_TAB_GET_STARTED) ensureGuideSelection();
   const progress = guideProgress();
   root.innerHTML = `
     <div class="guide-resize" id="guide-resize"
@@ -767,29 +824,17 @@ function drawGuide() {
     </div>
     <div class="guide-body">
       <p class="guide-intro">${htmlEscape(guideContextMessage())}</p>
-      <div class="guide-progress" aria-live="polite">
-        Get Started &middot; <strong>${progress.done}</strong> of <strong>${progress.total}</strong> complete
-      </div>
-      ${GUIDE_CATEGORIES.filter((category) => category.checklist).map(renderGuideCategory).join("")}
-      <section class="guide-reference" aria-labelledby="guide-reference-title">
-        <div class="guide-reference-header">
-          <h3 id="guide-reference-title">Reference</h3>
-          <p>Explanations for fields, settings, screens, and daily workflows.</p>
-          <div class="guide-reference-search">
-            <span class="guide-reference-search-icon">${guideSearchIcon()}</span>
-            <input type="search"
-                   data-guide-reference-search
-                   aria-label="Search reference"
-                   placeholder="Search reference"
-                   value="${htmlEscape(guideState.referenceQuery)}">
-          </div>
-        </div>
-        ${renderGuideReferenceCategories()}
-      </section>
+      ${renderGuideTabStrip()}
+      ${guideState.activeTab === GUIDE_TAB_GET_STARTED
+        ? renderGuideGetStartedPane(progress)
+        : renderGuideReferencePane()}
     </div>
   `;
   restoreGuideBodyScrollTop(previousBodyScrollTop);
   root.querySelector("#guide-close")?.addEventListener("click", closeGuide);
+  root.querySelectorAll("[data-guide-tab]").forEach((button) => {
+    button.addEventListener("click", () => selectGuideTab(button.dataset.guideTab || ""));
+  });
   root.querySelectorAll("[data-guide-open-item]").forEach((button) => {
     button.addEventListener("click", () => selectGuideItem(button.dataset.guideOpenItem || ""));
   });
@@ -834,6 +879,57 @@ function guideBodyScrollTop() {
 function restoreGuideBodyScrollTop(scrollTop) {
   const body = document.getElementById("guide-panel")?.querySelector(".guide-body");
   if (body && Number.isFinite(scrollTop)) body.scrollTop = scrollTop;
+}
+
+function renderGuideTabStrip() {
+  const tabs = [
+    { slug: GUIDE_TAB_GET_STARTED, label: "Get Started" },
+    { slug: GUIDE_TAB_REFERENCE, label: "Reference" },
+  ];
+  return `
+    <div class="settings-tabs-row guide-tabs-row">
+      <nav class="settings-tabs guide-tabs" id="guide-tabs" role="tablist" aria-label="Guide sections">
+        ${tabs.map((tab) => `
+          <button type="button"
+                  class="settings-tab ${guideState.activeTab === tab.slug ? "active" : ""}"
+                  data-guide-tab="${tab.slug}"
+                  role="tab"
+                  aria-selected="${guideState.activeTab === tab.slug ? "true" : "false"}">
+            ${htmlEscape(tab.label)}
+          </button>`).join("")}
+      </nav>
+    </div>`;
+}
+
+function renderGuideGetStartedPane(progress) {
+  return `
+    <section class="guide-tab-pane guide-get-started-pane" data-guide-tab-pane="${GUIDE_TAB_GET_STARTED}">
+      <div class="guide-progress" aria-live="polite">
+        Get Started &middot; <strong>${progress.done}</strong> of <strong>${progress.total}</strong> complete
+      </div>
+      <div class="guide-get-started-list">
+        ${guideChecklistItemsInOrder().map(({ item }) => renderGuideItem(item)).join("")}
+      </div>
+    </section>`;
+}
+
+function renderGuideReferencePane() {
+  return `
+    <section class="guide-tab-pane guide-reference" data-guide-tab-pane="${GUIDE_TAB_REFERENCE}" aria-labelledby="guide-reference-title">
+      <div class="guide-reference-header">
+        <h3 id="guide-reference-title">Reference</h3>
+        <p>Explanations for fields, settings, screens, and daily workflows.</p>
+        <div class="guide-reference-search">
+          <span class="guide-reference-search-icon">${guideSearchIcon()}</span>
+          <input type="search"
+                 data-guide-reference-search
+                 aria-label="Search reference"
+                 placeholder="Search reference"
+                 value="${htmlEscape(guideState.referenceQuery)}">
+        </div>
+      </div>
+      ${renderGuideReferenceCategories()}
+    </section>`;
 }
 
 function renderGuideReferenceCategories() {

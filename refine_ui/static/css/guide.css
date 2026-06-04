@@ -115,8 +115,34 @@ body.guide-open .toolbar-dock {
   color: var(--fg);
 }
 
+.guide-tabs-row {
+  margin-bottom: 12px;
+}
+
+.guide-tabs {
+  max-width: 100%;
+}
+
+.guide-tab-pane {
+  min-width: 0;
+}
+
+.guide-get-started-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.guide-get-started-list .guide-item {
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
 .guide-reference {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .guide-reference-header {
@@ -257,8 +283,8 @@ body.guide-open .toolbar-dock {
 }
 
 .guide-item.active {
-  background: #fffbea;
-  box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.22);
+  background: var(--color-success-soft);
+  box-shadow: inset 0 0 0 1px rgba(22, 163, 74, 0.30);
   color: #111827;
 }
 
@@ -359,21 +385,21 @@ body.guide-open .toolbar-dock {
 }
 
 .guide-target-highlight {
-  outline: 2px solid rgba(37, 99, 235, 0.60);
+  outline: 2px solid rgba(22, 163, 74, 0.62);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
   animation: guide-target-pulse 1.15s ease-in-out infinite;
-  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.22);
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.22);
 }
 
 @keyframes guide-target-pulse {
   0%, 100% {
-    outline-color: rgba(37, 99, 235, 0.52);
-    box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.20);
+    outline-color: rgba(22, 163, 74, 0.54);
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.20);
   }
   50% {
-    outline-color: rgba(37, 99, 235, 0.95);
-    box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.12);
+    outline-color: rgba(22, 163, 74, 0.95);
+    box-shadow: 0 0 0 5px rgba(22, 163, 74, 0.14);
   }
 }
 

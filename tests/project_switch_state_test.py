@@ -153,6 +153,9 @@ def test_client_switch_path(root: Path) -> None:
     assert 'if (!hasAttachedProject()) {' in target_app_js
     assert 'guideState.context === "no-app"' in guide_js
     assert "options.openTarget !== false" in guide_js
+    no_app_guide_body = common_js.split('context: "no-app"', 1)[1]
+    no_app_guide_body = no_app_guide_body.split("});", 1)[0]
+    assert "openTarget: true" in no_app_guide_body
     assert "function resetGuideState" in guide_js
     assert "localStorage.removeItem(GUIDE_CHECKLIST_KEY)" in guide_js
     assert "function loadGuideStateForCurrentApp" in guide_js

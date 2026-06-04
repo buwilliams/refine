@@ -124,7 +124,7 @@ function renderNoProjectEmptyState(title = "Refine") {
         context: "no-app",
         categoryId: "get-started",
         itemId: "quickstart-add-app",
-        openTarget: false,
+        openTarget: true,
       });
     }
   });
@@ -155,7 +155,7 @@ function enterNoProjectMode(project = null, { openGuidePanel = false } = {}) {
       context: "no-app",
       categoryId: "get-started",
       itemId: "quickstart-add-app",
-      openTarget: false,
+      openTarget: true,
     });
   }
 }

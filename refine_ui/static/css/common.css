@@ -361,27 +361,36 @@ select {
   height: 18px;
   margin-left: 6px;
   padding: 0;
-  border: 1px solid var(--color-border);
+  border: 0;
   border-radius: 999px;
-  background: white;
-  color: var(--color-primary);
+  background: transparent;
+  color: var(--color-text-soft);
   vertical-align: -3px;
   box-shadow: none;
 }
-.settings-guide-icon:hover,
+.settings-guide-icon:hover:not(:disabled),
 .settings-guide-icon:focus-visible {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: white;
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-soft);
+  box-shadow: none;
+  outline: none;
 }
 .settings-guide-icon svg {
   width: 13px;
   height: 13px;
   fill: none;
+  color: var(--color-primary);
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transition: color 120ms ease, transform 120ms ease;
+}
+.settings-guide-icon:hover:not(:disabled) svg,
+.settings-guide-icon:focus-visible svg {
+  color: var(--color-primary-hover);
+  transform: scale(1.12);
 }
 .table {
   width: 100%;
