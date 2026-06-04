@@ -14,7 +14,11 @@ def main() -> int:
     conn = init_refine(client)
     try:
         from refine_server import feature_ops, gap_ops, gap_writer, gaps, project_state
-        from refine_server.backend_protocol import M_BULK_DELETE_GAPS, M_CANCEL
+        from refine_server.backend_protocol import (
+            M_BULK_DELETE_GAPS,
+            M_CANCEL,
+            M_FEATURE_WORKFLOW_MOVE,
+        )
         from refine_server.paths import feature_json_path, relative_feature_path
         from refine_server.ulid import new_ulid
 
@@ -217,6 +221,164 @@ def main() -> int:
         assert body["feature"]["gaps"] == [], body
         assert gaps.read_gap_json(bulk_move, include_logs=False)["feature_id"] == bulk_target
         print("[ok] bulk Feature assignment moves selected Gaps and skips existing membership")
+
+        workflow_feature = new_ulid()
+        status, body = feature_ops.create_feature({
+            "id": workflow_feature,
+            "name": "Workflow Feature",
+            "reporter": "Ada",
+        })
+        assert status == 201, body
+        workflow_statuses = [
+            "backlog",
+            "todo",
+            "in-progress",
+            "qa",
+            "failed",
+            "cancelled",
+            "review",
+            "done",
+            "ready-merge",
+            "awaiting-rebuild",
+        ]
+        workflow_gap_ids: dict[str, str] = {}
+        for idx, gap_status in enumerate(workflow_statuses):
+            gid = f"01FEATUREWF{idx:02d}AAAAAAAAAAAAA"
+            workflow_gap_ids[gap_status] = gid
+            create_indexed_gap(
+                conn,
+                gid,
+                status=gap_status,
+                node_id=active,
+                branch=f"refine/{gid.lower()}" if gap_status == "in-progress" else None,
+            )
+            status, body = feature_ops.assign_gap(workflow_feature, gid)
+            assert status == 200, body
+
+        runner_calls.clear()
+
+        def fake_workflow_runner(method: str, params: dict, timeout: float) -> dict:
+            runner_calls.append((method, params, timeout))
+            assert method == M_FEATURE_WORKFLOW_MOVE, method
+            assert params["status"] == "backlog", params
+            return {
+                "updated": len(params["gap_ids"]),
+                "ids": list(params["gap_ids"]),
+                "value": params["status"],
+                "stopped": 1,
+                "stopped_ids": [workflow_gap_ids["in-progress"]],
+                "failed": 0,
+                "failures": [],
+                "skipped": 0,
+                "skipped_details": [],
+                "progress": {
+                    "completed": len(params["gap_ids"]),
+                    "total": len(params["gap_ids"]),
+                },
+            }
+
+        status, body = feature_ops.move_feature_workflow(
+            conn,
+            fake_workflow_runner,
+            workflow_feature,
+            "backlog",
+        )
+        assert status == 200, body
+        assert [call[0] for call in runner_calls] == [M_FEATURE_WORKFLOW_MOVE], runner_calls
+        assert runner_calls[0][1]["gap_ids"] == [
+            workflow_gap_ids["backlog"],
+            workflow_gap_ids["todo"],
+            workflow_gap_ids["in-progress"],
+            workflow_gap_ids["qa"],
+            workflow_gap_ids["failed"],
+            workflow_gap_ids["cancelled"],
+        ], runner_calls
+        assert body["skipped_details"] == [
+            {"id": workflow_gap_ids["review"], "reason": "status:review"},
+            {"id": workflow_gap_ids["done"], "reason": "status:done"},
+            {"id": workflow_gap_ids["ready-merge"], "reason": "status:ready-merge"},
+            {"id": workflow_gap_ids["awaiting-rebuild"], "reason": "status:awaiting-rebuild"},
+        ], body
+        print("[ok] Feature workflow action selects only non-protected Gaps")
+
+        from refine_server.runner import Runner
+
+        class NoopDispatcher:
+            def enforce_now(self) -> None:
+                pass
+
+            def stop(self) -> None:
+                pass
+
+        class NoopGovernance:
+            def wake(self) -> None:
+                pass
+
+            def stop(self) -> None:
+                pass
+
+        class FakeSubprocessManager:
+            def __init__(self) -> None:
+                self.cancelled: list[tuple[str, str]] = []
+
+            def is_running(self, gap_id: str) -> bool:
+                return gap_id == workflow_gap_ids["in-progress"]
+
+            def cancel(self, gap_id: str, reason: str = "cancel") -> bool:
+                self.cancelled.append((gap_id, reason))
+                return True
+
+            def cancel_all(self, reason: str = "shutdown") -> int:  # noqa: ARG002
+                return 0
+
+        runner = Runner()
+        runner.dispatcher = NoopDispatcher()  # type: ignore[assignment]
+        runner.governance_agent = NoopGovernance()  # type: ignore[assignment]
+        fake_sub_mgr = FakeSubprocessManager()
+        runner.sub_mgr = fake_sub_mgr  # type: ignore[assignment]
+        try:
+            result = runner._h_feature_workflow_move({  # noqa: SLF001
+                "feature_id": workflow_feature,
+                "status": "todo",
+                "gap_ids": [
+                    workflow_gap_ids["todo"],
+                    workflow_gap_ids["in-progress"],
+                    workflow_gap_ids["qa"],
+                    workflow_gap_ids["review"],
+                    workflow_gap_ids["done"],
+                    workflow_gap_ids["ready-merge"],
+                    workflow_gap_ids["awaiting-rebuild"],
+                ],
+            })
+        finally:
+            runner.shutdown()
+        assert result["ids"] == [
+            workflow_gap_ids["in-progress"],
+            workflow_gap_ids["qa"],
+        ], result
+        assert result["stopped_ids"] == [workflow_gap_ids["in-progress"]], result
+        assert fake_sub_mgr.cancelled == [
+            (workflow_gap_ids["in-progress"], "feature_workflow_move"),
+        ], fake_sub_mgr.cancelled
+        rows = {
+            row["id"]: (row["status"], row["branch_name"])
+            for row in conn.execute(
+                "SELECT id, status, branch_name FROM gaps_index "
+                "WHERE feature_id = ?",
+                (workflow_feature,),
+            )
+        }
+        assert rows[workflow_gap_ids["in-progress"]] == ("todo", None), rows
+        assert rows[workflow_gap_ids["qa"]][0] == "todo", rows
+        assert rows[workflow_gap_ids["review"]][0] == "review", rows
+        assert rows[workflow_gap_ids["done"]][0] == "done", rows
+        assert rows[workflow_gap_ids["ready-merge"]][0] == "ready-merge", rows
+        assert rows[workflow_gap_ids["awaiting-rebuild"]][0] == "awaiting-rebuild", rows
+        assert gaps.read_gap_json(
+            workflow_gap_ids["in-progress"],
+            include_logs=True,
+        )["status"] == "todo"
+        print("[ok] Feature workflow action stops in-progress and moves eligible Gaps")
 
         other_node = project_state.create_node("Other")
         other_gap = new_ulid()

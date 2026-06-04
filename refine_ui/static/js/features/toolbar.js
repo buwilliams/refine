@@ -530,7 +530,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
         ${active.mode === "plan" ? `
           <button id="btn-plan-draft" class="secondary"
                   ${planHasAgentResponse(active) ? "" : "disabled"}>
-            Draft Project
+            Draft Feature
           </button>` : ""}
         ${active.gapId ? `
           <button id="btn-gap-round-extract" class="secondary"

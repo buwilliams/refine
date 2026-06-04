@@ -9,11 +9,19 @@ from pathlib import Path
 from typing import Any
 
 from refine_server import db, gap_ops, gap_writer, gaps as shared_gaps, project_state
+from refine_server.backend_protocol import M_FEATURE_WORKFLOW_MOVE
 from refine_server.gap_ops import RunnerCall, page_bounds
 from refine_server.paths import feature_dir, feature_json_path, relative_feature_path
 from refine_server.ulid import new_ulid
 
 TERMINAL_STATUSES = {"done", "cancelled"}
+FEATURE_WORKFLOW_TARGETS = {"backlog", "todo"}
+FEATURE_WORKFLOW_PROTECTED_STATUSES = {
+    "review",
+    "done",
+    "ready-merge",
+    "awaiting-rebuild",
+}
 FEATURE_CANCEL_STATUSES = {
     "backlog",
     "todo",
@@ -246,6 +254,86 @@ def cancel_feature(
         "skipped_ids": skipped_ids,
         "feature": feature_body,
     }
+
+
+def move_feature_workflow(
+    conn: sqlite3.Connection,
+    runner_call: RunnerCall,
+    feature_id: str,
+    target_status: str,
+) -> tuple[int, dict[str, Any]]:
+    """Move eligible Gaps in a Feature to backlog or todo."""
+    feature_id = feature_id.upper()
+    target = str(target_status or "").strip().lower()
+    if target not in FEATURE_WORKFLOW_TARGETS:
+        return _err(400, "status must be one of backlog or todo")
+    feature = _require_feature(conn, feature_id)
+    if isinstance(feature, tuple):
+        return feature
+    owner_err = _require_active_node(feature["node_id"], "Feature")
+    if owner_err is not None:
+        return owner_err
+
+    selected_ids: list[str] = []
+    skipped: list[dict[str, str]] = []
+    failures: list[dict[str, str]] = []
+    for gap in _ordered_gap_rows(conn, feature_id):
+        gap_id = str(gap["id"]).upper()
+        if str(gap.get("node_id") or "") != str(feature["node_id"]):
+            failures.append({"id": gap_id, "error": "Gap is owned by another node"})
+            continue
+        status = str(gap.get("status") or "").lower()
+        if status in FEATURE_WORKFLOW_PROTECTED_STATUSES:
+            skipped.append({"id": gap_id, "reason": f"status:{status}"})
+            continue
+        selected_ids.append(gap_id)
+
+    if failures:
+        return 409, {
+            "feature_id": feature_id,
+            "status": target,
+            "updated": 0,
+            "ids": [],
+            "skipped": len(skipped),
+            "skipped_details": skipped,
+            "failed": len(failures),
+            "failures": failures,
+        }
+    if not selected_ids:
+        status, body = get_feature(feature_id)
+        feature_body = body.get("feature") if status < 400 else None
+        return 200, {
+            "feature_id": feature_id,
+            "status": target,
+            "updated": 0,
+            "ids": [],
+            "skipped": len(skipped),
+            "skipped_details": skipped,
+            "failed": 0,
+            "failures": [],
+            "feature": feature_body,
+        }
+
+    result = runner_call(
+        M_FEATURE_WORKFLOW_MOVE,
+        {
+            "feature_id": feature_id,
+            "status": target,
+            "gap_ids": selected_ids,
+        },
+        max(30.0, min(300.0, len(selected_ids) / 10)),
+    )
+    result["feature_id"] = feature_id
+    result["status"] = target
+    result["skipped"] = int(result.get("skipped") or 0) + len(skipped)
+    result["skipped_details"] = [
+        *skipped,
+        *list(result.get("skipped_details") or []),
+    ]
+    status, body = get_feature(feature_id)
+    if status < 400:
+        result["feature"] = body.get("feature")
+    return (409 if int(result.get("failed") or 0) else 200), result
 
 
 def assign_gap(feature_id: str, gap_id: str) -> tuple[int, dict[str, Any]]:

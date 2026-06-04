@@ -135,6 +135,11 @@ def _h_cancel_feature(_h, m, _b, _q):
     return api.cancel_feature(m.group(1).upper())
 
 
+@route("POST", r"/api/features/([0-9A-Za-z]{26})/workflow")
+def _h_move_feature_workflow(_h, m, body, _q):
+    return api.move_feature_workflow(m.group(1).upper(), body or {})
+
+
 @route("DELETE", r"/api/features/([0-9A-Za-z]{26})")
 def _h_delete_feature(_h, m, _b, _q):
     return api.delete_feature(m.group(1).upper())

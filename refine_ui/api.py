@@ -1453,6 +1453,25 @@ def cancel_feature(feature_id: str) -> tuple[int, dict]:
     return status, payload
 
 
+@_system_operation("Move Feature Gaps")
+@_exclusive_mutation("Move Feature Gaps")
+def move_feature_workflow(feature_id: str, body: dict) -> tuple[int, dict]:
+    conn = _conn()
+    try:
+        status, payload = feature_ops.move_feature_workflow(
+            conn,
+            _backend_runner_call,
+            feature_id.upper(),
+            str((body or {}).get("status") or ""),
+        )
+    except BackendError as e:
+        return _backend_err(e)
+    finally:
+        conn.close()
+    _sync_feature_mutation(payload, status, "refine: move feature gaps")
+    return status, payload
+
+
 @_system_operation("Delete Feature")
 @_exclusive_mutation("Delete Feature")
 def delete_feature(feature_id: str) -> tuple[int, dict]:

@@ -17,6 +17,7 @@ def main() -> int:
 
     from refine_server import agent_cli, chat_mgr, llm, preflight, target_app
     from refine_server.chat_mgr import ChatManager, ChatSession
+    from refine_server.runner import _build_plan_chat_preamble
     from refine_server.subprocess_mgr import (
         _summarize_codex_event, _summarize_copilot_event,
     )
@@ -259,6 +260,12 @@ def main() -> int:
     manager = ChatManager(get_standalone_idle_timeout=lambda: 0)
     snapshot_manager = ChatManager(get_standalone_idle_timeout=lambda: 999)
     plan_manager = ChatManager(get_standalone_idle_timeout=lambda: 999)
+    plan_prompt, plan_intro = _build_plan_chat_preamble()
+    assert "new software project" in plan_prompt
+    assert "ordered implementation-ready Gaps" in plan_prompt
+    assert "Encourage thoroughness throughout" in plan_prompt
+    assert "Draft Feature" in plan_prompt
+    assert "Draft Feature" in plan_intro
     plan_sid = plan_manager.start(
         Path.cwd(),
         is_standalone=True,

@@ -18,16 +18,15 @@ Linux, macOS, or Ubuntu/WSL:
 curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
 ```
 
-The installer checks the host, installs or repairs missing tools when you approve, asks which AI provider to use, and starts Refine. Attach a target application from the browser Guide after startup, or set `REFINE_INSTALL_TARGET_APP` for scripted installs.
+The installer checks the host, installs or repairs missing tools when you approve, asks which AI provider to use, and starts Refine. Attach a target application from the browser Guide after startup.
 
 refine has a robust CLI:
 
 ```bash
 ./r --help
 ```
-(./r is a shell script that executes 'uv run refine [args]' for convenience)
 
-For development of Refine, there is an independent app used to test Refine surfaces (UI and CLI) at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
+For testing Refine, there is a black-box testing app for Refine surfaces (UI and CLI) at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
 
 ### Windows Users
 

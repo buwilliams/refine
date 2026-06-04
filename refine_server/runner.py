@@ -17,7 +17,7 @@ from refine_server.gaps import now_iso
 from refine_server.backend_protocol import (
     M_APPEND_ROUND, M_BACKGROUND_PROCESSES_SET, M_CANCEL, M_CANCEL_ALL, M_CHAT_INPUT, M_CHAT_READ,
     M_CHAT_RESET_ALL, M_CHAT_START, M_CHAT_STOP, M_CREATE_GAP, M_DELETE_GAP, M_DIAGNOSTICS, M_EDIT_ROUND,
-    M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
+    M_BULK_DELETE_GAPS, M_BULK_UPDATE_GAPS, M_ENFORCE_SCHEDULING, M_EXTRACT_GAPS, M_FEATURE_WORKFLOW_MOVE, M_LAUNCH, M_LIST_CHANGES, M_LOG_APPEND, M_PING,
     M_GOVERNANCE_GENERATE_RULES, M_GOVERNANCE_GET, M_GOVERNANCE_SAVE,
     M_GOVERNANCE_WAKE, M_MERGE_REPORTER, M_PREFLIGHT, M_RENAME_REPORTER, M_RENAME_REPORTER_STRINGS,
     M_RETRY_MERGE, M_RETRY_QA, M_RUNNING,
@@ -220,6 +220,7 @@ class Runner:
             M_APPEND_ROUND: self._h_append_round,
             M_EDIT_ROUND: self._h_edit_round,
             M_BULK_UPDATE_GAPS: self._h_bulk_update_gaps,
+            M_FEATURE_WORKFLOW_MOVE: self._h_feature_workflow_move,
             M_LOG_APPEND: self._h_log_append,
             M_DELETE_GAP: self._h_delete_gap,
             M_BULK_DELETE_GAPS: self._h_bulk_delete_gaps,
@@ -1115,6 +1116,139 @@ class Runner:
         if int(result.get("ready_merge") or 0) > 0:
             self.merger.wake()
         return result
+
+    def _h_feature_workflow_move(self, params: dict) -> dict:
+        target = _normalize_status_required(str(params.get("status") or ""))
+        if target not in {"backlog", "todo"}:
+            raise ValueError("status must be one of backlog or todo")
+        raw_ids = params.get("gap_ids") or []
+        if not isinstance(raw_ids, list):
+            raise ValueError("gap_ids must be a list")
+        gap_ids = _unique_strings(raw_ids)
+        if not gap_ids:
+            return {
+                "updated": 0,
+                "ids": [],
+                "failed": 0,
+                "failures": [],
+                "skipped": 0,
+                "skipped_details": [],
+                "progress": {"completed": 0, "total": 0},
+            }
+
+        with self._bulk_update_lock:
+            result = self._feature_workflow_move_locked(target, gap_ids)
+        self.dispatcher.enforce_now()
+        self.governance_agent.wake()
+        return result
+
+    def _feature_workflow_move_locked(self, target: str, gap_ids: list[str]) -> dict:
+        active = self.local_node_id
+        rows: list[sqlite3.Row] = []
+        for chunk in _chunks(gap_ids):
+            placeholders = ",".join("?" * len(chunk))
+            rows.extend(self._conn.execute(
+                "SELECT id, status, branch_name, node_id FROM gaps_index "
+                f"WHERE id IN ({placeholders})",
+                chunk,
+            ).fetchall())
+        by_id = {row["id"]: row for row in rows}
+        missing = [gid for gid in gap_ids if gid not in by_id]
+        if missing:
+            raise ValueError(f"Gap not found: {missing[0]}")
+        owners = {
+            str(row["node_id"] or project_state.DEFAULT_NODE_ID)
+            for row in rows
+        }
+        if owners != {active}:
+            owner = sorted(owners - {active})[0]
+            owner_name = project_state.gap_node_display(owner)
+            active_name = project_state.gap_node_display(active)
+            raise ValueError(
+                "Action not allowed: Gap is owned by another node "
+                f"({owner_name}). Transfer to {active_name} before making changes."
+            )
+
+        protected = {"review", "done", "ready-merge", "awaiting-rebuild"}
+        updated_ids: list[str] = []
+        stopped_ids: list[str] = []
+        skipped: list[dict[str, str]] = []
+        failures: list[dict[str, str]] = []
+        now = now_iso()
+
+        for idx, gap_id in enumerate(gap_ids, start=1):
+            row = by_id[gap_id]
+            previous = str(row["status"] or "")
+            branch_name = str(row["branch_name"] or "")
+            if previous in protected:
+                skipped.append({"id": gap_id, "reason": f"status:{previous}"})
+                self._record_bulk_progress("feature workflow", idx, len(gap_ids))
+                continue
+            if previous == target:
+                skipped.append({"id": gap_id, "reason": f"status:{previous}"})
+                self._record_bulk_progress("feature workflow", idx, len(gap_ids))
+                continue
+
+            stopped = False
+            try:
+                if previous == "in-progress" or self.sub_mgr.is_running(gap_id):
+                    stopped = self.sub_mgr.cancel(gap_id, reason="feature_workflow_move")
+                with db.transaction(self._conn):
+                    if previous == "in-progress":
+                        self._conn.execute(
+                            "UPDATE gaps_index SET status = ?, branch_name = NULL, "
+                            "updated = ? WHERE id = ? AND node_id = ?",
+                            (target, now, gap_id, active),
+                        )
+                    else:
+                        self._conn.execute(
+                            "UPDATE gaps_index SET status = ?, updated = ? "
+                            "WHERE id = ? AND node_id = ?",
+                            (target, now, gap_id, active),
+                        )
+                if previous == "in-progress":
+                    git_ops.remove_worktree(gap_id)
+                    if branch_name:
+                        git_ops.delete_branch(branch_name)
+                gap_writer.update_fields(
+                    gap_id,
+                    status=target,
+                    **({"branch_name": None} if previous == "in-progress" else {}),
+                )
+                message = (
+                    f"Workflow status changed by Feature action: {previous} → {target}"
+                )
+                if previous == "in-progress":
+                    message += "; stopped automation and discarded partial work"
+                gap_writer.append_latest_round_log(
+                    gap_id=gap_id,
+                    severity="warn" if previous == "in-progress" else "info",
+                    category="state",
+                    actor="refine",
+                    message=message,
+                )
+                updated_ids.append(gap_id)
+                if stopped:
+                    stopped_ids.append(gap_id)
+            except Exception as e:
+                failures.append({"id": gap_id, "error": str(e) or repr(e)})
+            self._record_bulk_progress("feature workflow", idx, len(gap_ids))
+
+        return {
+            "updated": len(updated_ids),
+            "ids": updated_ids,
+            "value": target,
+            "stopped": len(stopped_ids),
+            "stopped_ids": stopped_ids,
+            "failed": len(failures),
+            "failures": failures,
+            "skipped": len(skipped),
+            "skipped_details": skipped,
+            "progress": {
+                "completed": len(updated_ids) + len(failures) + len(skipped),
+                "total": len(gap_ids),
+            },
+        }
 
     def _bulk_update_gaps_locked(
         self,
@@ -2816,21 +2950,31 @@ def _chunks(values: list[str], size: int = 500) -> list[list[str]]:
 
 def _build_plan_chat_preamble() -> tuple[str, str]:
     prompt = """\
-You are helping a user plan future software work for Refine.
+You are helping a user plan a new software project or substantial Feature for
+Refine.
 
-Discuss the user's idea, ask clarifying questions, and help shape it into
-one or more implementation-ready Gaps. A Gap is a single actionable software
-change with:
+Discuss the user's idea, ask clarifying questions when important details are
+missing, and help shape the work into a thorough implementation plan. Think
+through the project from setup through usable product behavior: data model,
+UI flows, backend/API behavior, integration points, edge cases, persistence,
+tests, and rollout or migration needs when relevant.
+
+Express the plan as ordered implementation-ready Gaps in the sequence they
+should be built. A Gap is a single actionable software change with:
 - a short name,
 - actual/current behavior,
 - target/desired behavior.
 
+Encourage thoroughness throughout: include the Gaps needed for the result to be
+usable end-to-end, not just the first visible screen or happy path.
+
 Do not create Gaps yourself. When the user is ready, they will use Refine's
-Draft Gaps action to review and save proposed Gaps.
+Draft Feature action to review the proposed ordered Gaps and save them as a
+Feature.
 """
     intro = (
         "[refine] Plan mode loaded. Discuss the idea here, then use "
-        "Draft Gaps to review proposed Gaps before saving."
+        "Draft Feature to review proposed ordered Gaps before saving."
     )
     return prompt, intro
 

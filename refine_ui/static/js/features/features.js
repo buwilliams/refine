@@ -10,6 +10,9 @@ const FEATURES_STATUS_OPTIONS = [
   "", "backlog", "todo", "in-progress", "qa", "ready-merge",
   "awaiting-rebuild", "review", "done", "failed", "cancelled",
 ];
+const FEATURE_WORKFLOW_PROTECTED_STATUSES = new Set([
+  "review", "done", "ready-merge", "awaiting-rebuild",
+]);
 
 let _featureModalRoot = null;
 
@@ -307,6 +310,13 @@ function featureGapActionIcon(name) {
   return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
 }
 
+function featureWorkflowEligibleCount(feature, targetStatus) {
+  return (feature?.gaps || []).filter((gap) => {
+    const status = gap.status || "";
+    return status !== targetStatus && !FEATURE_WORKFLOW_PROTECTED_STATUSES.has(status);
+  }).length;
+}
+
 function renderFeatureNew() {
   location.hash = "#/features";
   setTimeout(() => openFeatureModal(), 0);
@@ -391,6 +401,12 @@ function openFeatureModal(feature = null, options = {}) {
           </div>
         </div>
         <div class="actions feature-modal-top-actions">
+          <button type="button" class="small"
+                  data-feature-workflow="backlog"
+                  ${featureWorkflowEligibleCount(feature, "backlog") ? "" : "disabled"}>&lt;- Backlog</button>
+          <button type="button" class="small"
+                  data-feature-workflow="todo"
+                  ${featureWorkflowEligibleCount(feature, "todo") ? "" : "disabled"}>Todo -&gt;</button>
           <button type="button" class="secondary small" data-feature-cancel>Cancel Feature</button>
           <button type="button" class="danger small" data-feature-delete>Delete Feature</button>
         </div>
@@ -476,6 +492,13 @@ function openFeatureModal(feature = null, options = {}) {
       cancelFeatureFromUi(feature.id));
     root.querySelector("[data-feature-delete]")?.addEventListener("click", () =>
       deleteFeatureFromUi(feature.id));
+    root.querySelectorAll("[data-feature-workflow]").forEach((btn) => {
+      btn.addEventListener("click", () =>
+        moveFeatureWorkflowFromUi(feature.id, btn.dataset.featureWorkflow, {
+          button: btn,
+          reload: reloadModal,
+        }));
+    });
   }
   root.querySelector("#feature-name")?.focus();
 }
@@ -667,6 +690,34 @@ async function cancelFeatureFromUi(featureId) {
   } catch (e) {
     showActionError(e, "Cancel Feature failed");
   }
+}
+
+async function moveFeatureWorkflowFromUi(featureId, targetStatus, { button = null, reload = null } = {}) {
+  const target = String(targetStatus || "").trim();
+  if (!["backlog", "todo"].includes(target)) return;
+  const label = target === "backlog" ? "backlog" : "todo";
+  const busy = target === "backlog" ? "Moving to backlog…" : "Moving to todo…";
+  await withButtonBusy(button, busy, async () => {
+    try {
+      const result = await api("POST", `/api/features/${encodeURIComponent(featureId)}/workflow`, {
+        status: target,
+      });
+      const updated = result.updated || 0;
+      const skipped = result.skipped || 0;
+      const stopped = result.stopped || 0;
+      const stopText = stopped ? `; stopped ${stopped}` : "";
+      toast(`Moved ${updated} Gap${updated === 1 ? "" : "s"} to ${label}${stopText}${skipped ? `; skipped ${skipped}` : ""}`, "info");
+      if (typeof reload === "function") {
+        await reload();
+      } else if (state.currentRoute === "features_detail") {
+        await openFeatureDetailModal(featureId);
+      } else if (state.currentRoute === "features") {
+        await refreshFeaturesTable();
+      }
+    } catch (e) {
+      await showActionError(e, "Feature workflow action failed");
+    }
+  });
 }
 
 async function deleteFeatureFromUi(featureId) {

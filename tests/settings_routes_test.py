@@ -400,6 +400,11 @@ def main() -> int:
     assert "openFeatureNewGapFlow" in features_js
     assert "cancelFeatureFromUi" in features_js
     assert "deleteFeatureFromUi" in features_js
+    assert "moveFeatureWorkflowFromUi" in features_js
+    assert 'data-feature-workflow="backlog"' in features_js
+    assert 'data-feature-workflow="todo"' in features_js
+    assert "FEATURE_WORKFLOW_PROTECTED_STATUSES" in features_js
+    assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/workflow`' in features_js
     assert "data-feature-move" in features_js
     assert "data-feature-remove-gap" not in features_js
     assert "data-feature-delete-gap" in features_js
@@ -432,6 +437,9 @@ def main() -> int:
     assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`' not in features_js
     assert 'api("POST", `/api/features/${encodeURIComponent(featureId)}/cancel`' in features_js
     assert 'api("DELETE", `/api/features/${encodeURIComponent(featureId)}`' in features_js
+    assert 'r"/api/features/([0-9A-Za-z]{26})/workflow"' in server_py
+    assert "def move_feature_workflow" in api_py
+    assert "feature_ops.move_feature_workflow" in api_py
     assert 'params.set("feature", f.feature);' in gaps_list_js
     assert 'placeholder="Feature ID or standalone"' in gaps_list_js
     assert 'id="bulk-assign-feature"' in gaps_list_js
@@ -602,7 +610,7 @@ def main() -> int:
     assert 'runCommand("plan.open")' in common_js
     assert "async function openPlanChatDock(options = {})" in toolbar_js
     assert "{ purpose: \"plan\" }" in toolbar_js
-    assert "Draft Project" in toolbar_js
+    assert "Draft Feature" in toolbar_js
     assert "function planTranscriptText(tab)" in toolbar_js
     assert "function planHasAgentResponse(tab)" in toolbar_js
     assert "function syncPlanDraftButton(tab)" in toolbar_js
