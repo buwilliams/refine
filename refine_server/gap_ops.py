@@ -980,11 +980,11 @@ def append_round(
     row, ownership_err = require_active_gap(conn, gap_id, columns="status, node_id")
     if ownership_err is not None:
         return ownership_err
-    if row["status"] != "review":
+    if row["status"] not in ("review", "failed"):
         return _err(
             409,
-            "New rounds may only be appended from `review` "
-            f"(status={row['status']}). From `todo` or `failed`, edit the "
+            "New rounds may only be appended from `review` or `failed` "
+            f"(status={row['status']}). From `todo`, edit the "
             "latest round instead.",
         )
     result = runner_call(M_APPEND_ROUND, {
@@ -1005,7 +1005,7 @@ def edit_latest_round(
     row, ownership_err = require_active_gap(conn, gap_id, columns="status, node_id")
     if ownership_err is not None:
         return ownership_err
-    if row["status"] not in ("backlog", "todo", "failed"):
+    if row["status"] not in ("backlog", "todo"):
         return _err(
             409,
             "Only the latest unaddressed round can be edited "

@@ -252,8 +252,9 @@ function drawGapDetail(gap) {
     : `Node owner: ${nodeDisplayName}`;
 
   const isLatestEditable = (gap.status === "backlog" ||
-                            gap.status === "todo" ||
-                            gap.status === "failed");
+                            gap.status === "todo");
+  const canSubmitNewRound = (gap.status === "review" ||
+                             gap.status === "failed");
   const hasPreservedDraft = hasPreservedRoundFormDraft(gap.id);
   const cancelEnabled = !["done", "cancelled"].includes(gap.status);
   // Chat is always available — the value is the Gap context the runner
@@ -339,9 +340,9 @@ function drawGapDetail(gap) {
           })}
         </div>` : ""}
 
-      ${gap.status === "review" ? `
+      ${canSubmitNewRound ? `
         <div class="card" style="margin-top:14px">
-          <h3>Submit follow-up round</h3>
+          <h3>${gap.status === "failed" ? "Submit recovery round" : "Submit follow-up round"}</h3>
           ${renderRoundForm("submit", null)}
         </div>` : ""}
 
