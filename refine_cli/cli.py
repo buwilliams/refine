@@ -3271,6 +3271,9 @@ def cmd_update(args: _Args) -> int:
     env = os.environ.copy()
     env["REFINE_INSTALL_PORT"] = str(port)
     env["REFINE_UPDATE_TARGET_APP"] = env.get("REFINE_UPDATE_TARGET_APP", "1")
+    primary_node = config.primary_active_node(clone)
+    if primary_node:
+        env[config.ENV_LOCAL_NODE_ID] = primary_node
     try:
         result = subprocess.run(["bash", "-lc", README_INSTALL_COMMAND], env=env)
     except OSError as e:
@@ -4391,6 +4394,9 @@ def _start_background_ui(
     env["REFINE_UI_SCOPE"] = str(port)
     env[config.ENV_RUN_DIR] = str(config.local_run_dir(clone, port=port))
     env["REFINE_SUPERVISOR_SOCKET"] = str(_supervisor_socket_path(clone, cfg, port))
+    primary_node = config.primary_active_node(clone)
+    if primary_node:
+        env[config.ENV_LOCAL_NODE_ID] = primary_node
     if cfg is not None:
         env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
     env.setdefault("PYTHONUNBUFFERED", "1")

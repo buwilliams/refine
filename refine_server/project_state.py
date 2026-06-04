@@ -859,6 +859,11 @@ def local_node_id(*, root: Path | None = None) -> str:
         entry = node_by_id(env_node, root=root)
         if entry is not None and not entry.get("archived"):
             return env_node
+    primary_node = config.primary_active_node()
+    if primary_node:
+        entry = node_by_id(primary_node, root=root)
+        if entry is not None and not entry.get("archived"):
+            return primary_node
     return active_node_id(root=root)
 
 
@@ -926,6 +931,7 @@ def set_active_node(node_id: str, *, root: Path | None = None) -> None:
         raise ValueError(f"archived node cannot be activated: {node_id}")
     _write_active_node_selection(root, node_id)
     _ensure_node_files(node_id, root=root)
+    config.write_primary_active_node(None, node_id)
 
 
 def create_node(display_name: str, *, node_id: str | None = None,

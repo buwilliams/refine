@@ -384,19 +384,46 @@ def primary_path(start: Path | None = None) -> Path:
     return local_run_root(start) / PRIMARY_FILENAME
 
 
-def primary_port(start: Path | None = None) -> int | None:
-    """Return the checkout's primary port if it is recorded and valid."""
+def _read_primary_payload(start: Path | None = None) -> dict[str, object]:
     try:
         raw = json.loads(primary_path(start).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return None
-    if not isinstance(raw, dict):
-        return None
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def _write_primary_payload(
+    start: Path | None,
+    payload: dict[str, object],
+    *,
+    source: str,
+) -> Path:
+    path = primary_path(start)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload["version"] = 1
+    payload["source"] = str(source or "manual")
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    tmp.replace(path)
+    return path
+
+
+def primary_port(start: Path | None = None) -> int | None:
+    """Return the checkout's primary port if it is recorded and valid."""
+    raw = _read_primary_payload(start)
     try:
         port = int(raw.get("port"))
     except (TypeError, ValueError):
         return None
     return port if 0 < port <= 65535 else None
+
+
+def primary_active_node(start: Path | None = None) -> str | None:
+    """Return the checkout's most recently activated node id, if recorded."""
+    raw = _read_primary_payload(start)
+    node_id = str(raw.get("active_node_id") or "").strip()
+    return node_id or None
 
 
 def write_primary_port(
@@ -409,18 +436,24 @@ def write_primary_port(
     selected = int(port)
     if selected <= 0 or selected > 65535:
         raise ValueError(f"invalid port: {port!r}")
-    path = primary_path(start)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "version": 1,
-        "port": selected,
-        "source": str(source or "manual"),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    tmp.replace(path)
-    return path
+    payload = _read_primary_payload(start)
+    payload["port"] = selected
+    return _write_primary_payload(start, payload, source=source)
+
+
+def write_primary_active_node(
+    start: Path | None,
+    node_id: str,
+    *,
+    source: str = "node-activate",
+) -> Path:
+    """Persist the checkout's most recently activated node under run/primary.json."""
+    selected = str(node_id or "").strip()
+    if not selected:
+        raise ValueError("node_id is required")
+    payload = _read_primary_payload(start)
+    payload["active_node_id"] = selected
+    return _write_primary_payload(start, payload, source=source)
 
 
 def clear_primary_port(start: Path | None = None, *, port: int | str | None = None) -> bool:

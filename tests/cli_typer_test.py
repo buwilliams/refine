@@ -424,11 +424,15 @@ def main() -> int:
     old_resolve = cli._resolve_clone_and_unit_or_exit
     old_runtime_action_port = cli._runtime_action_port
     try:
-        cli._resolve_clone_and_unit_or_exit = lambda: (Path("/tmp/refine"), "refine-refine")
+        update_clone = Path(tempfile.mkdtemp(prefix="refine-update-primary-node-"))
+        from refine_server import config as config_mod
+
+        config_mod.write_primary_active_node(update_clone, "node-update")
+        cli._resolve_clone_and_unit_or_exit = lambda: (update_clone, "refine-refine")
 
         def fake_runtime_action_port(args, clone, cfg, unit):  # noqa: ANN001
             assert getattr(args, "port") is None
-            assert clone == Path("/tmp/refine")
+            assert clone == update_clone
             assert cfg is None
             assert unit == "refine-refine"
             return 18082
@@ -445,10 +449,13 @@ def main() -> int:
         cli.subprocess.run = old_run
         cli._resolve_clone_and_unit_or_exit = old_resolve
         cli._runtime_action_port = old_runtime_action_port
+        if "update_clone" in locals():
+            shutil.rmtree(update_clone, ignore_errors=True)
     assert rc == 37, err
     assert calls and calls[0][0] == ["bash", "-lc", cli.README_INSTALL_COMMAND]
     assert calls[0][1]["REFINE_INSTALL_PORT"] == "18082"
     assert calls[0][1]["REFINE_UPDATE_TARGET_APP"] == "1"
+    assert calls[0][1]["REFINE_LOCAL_NODE_ID"] == "node-update"
     assert (
         cli.README_INSTALL_COMMAND
         == "curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash"
@@ -463,6 +470,9 @@ def main() -> int:
     old_pid_ports = cli._runtime_pid_ports
     try:
         tmp_primary = Path(tempfile.mkdtemp(prefix="refine-primary-port-"))
+        from refine_server import config as config_mod
+
+        config_mod.write_primary_active_node(tmp_primary, "node-installed")
         cli._installed_ui_unit_ports = lambda _unit: [18081]
         cli._owned_refine_ui_ports = lambda _clone: []
         cli._runtime_app_ports = lambda _clone: []
@@ -474,9 +484,9 @@ def main() -> int:
             "refine-test",
         )
         assert selected == 18081
-        from refine_server import config as config_mod
 
         assert config_mod.primary_port(tmp_primary) == 18081
+        assert config_mod.primary_active_node(tmp_primary) == "node-installed"
         cli._installed_ui_unit_ports = lambda _unit: [18081, 18082]
         try:
             cli._runtime_action_port(

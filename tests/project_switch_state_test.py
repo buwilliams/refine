@@ -1194,15 +1194,28 @@ def test_active_node_is_port_scoped_for_same_checkout() -> None:
         cfg_alt = config.get(reload=True)
         project_state.set_active_node(desktop["id"])
         assert project_state.active_node_id() == desktop["id"]
+        assert config.primary_active_node(clone) == desktop["id"]
         sqlite_alt = cfg_alt.sqlite_path
 
         os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_PORT)
         config.get(reload=True)
         assert project_state.active_node_id() == laptop["id"]
+        old_local_node = os.environ.get(config.ENV_LOCAL_NODE_ID)
+        try:
+            os.environ.pop(config.ENV_LOCAL_NODE_ID, None)
+            assert project_state.local_node_id() == desktop["id"]
+        finally:
+            if old_local_node is None:
+                os.environ.pop(config.ENV_LOCAL_NODE_ID, None)
+            else:
+                os.environ[config.ENV_LOCAL_NODE_ID] = old_local_node
+        project_state.set_active_node(laptop["id"])
+        assert config.primary_active_node(clone) == laptop["id"]
 
         os.environ["REFINE_UI_SCOPE"] = str(PROJECT_SWITCH_TEST_ALT_PORT)
         config.get(reload=True)
         assert project_state.active_node_id() == desktop["id"]
+        assert config.primary_active_node(clone) == laptop["id"]
 
         assert sqlite_primary != sqlite_alt
         assert sqlite_primary.parent == clone / "run" / str(PROJECT_SWITCH_TEST_PORT) / "cache"

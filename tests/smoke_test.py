@@ -661,6 +661,7 @@ def main() -> int:
         refine_cli._find_host_command = lambda name: str(fake_uv) if name == "uv" else None
         refine_cli._listener_pids = lambda port: []
         refine_cli.subprocess.Popen = FakePopen
+        config.write_primary_active_node(clone, "node-background")
         pid = refine_cli._start_background_ui(clone, bg_cfg, host=bg_cfg.web_host, port=18111)
     finally:
         refine_cli._find_host_command = old_find_host_command
@@ -673,6 +674,7 @@ def main() -> int:
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
     assert popen_calls[0]["env"]["REFINE_RUN_DIR"] == str(clone / "run" / "18111")
+    assert popen_calls[0]["env"]["REFINE_LOCAL_NODE_ID"] == "node-background"
     try:
         refine_cli._effective_port(type("Args", (), {"port": 0})(), bg_cfg)
         raise AssertionError("port 0 should be rejected")
