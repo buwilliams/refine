@@ -3010,6 +3010,7 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
     gap_json = shared_gaps.read_gap_json(gap_id, include_logs=False) or {}
     rounds = gap_json.get("rounds") or []
     latest = rounds[-1] if rounds else {}
+    latest_round_logs = _gap_chat_latest_round_logs(gap_id, len(rounds))
     recent_activity = activity.recent(conn, limit=10, gap_id=gap_id)
     # Activity rows from `recent` are ordered DESC; flip for chronological.
     recent_activity = list(reversed(recent_activity))
@@ -3075,6 +3076,22 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
             parts.append(f"- Actual (current behavior): {latest['actual']}")
         if latest.get("target"):
             parts.append(f"- Target (desired behavior): {latest['target']}")
+        parts.append("")
+        parts.append("## Latest round logs (oldest first)")
+        if latest_round_logs:
+            for entry in latest_round_logs:
+                ts = entry.get("datetime", "")
+                msg = entry.get("message", "")
+                sev = entry.get("severity", "info")
+                category = entry.get("category", "cli")
+                actor = entry.get("actor")
+                actor_note = f", actor={actor}" if actor else ""
+                parts.append(f"- [{ts}] ({sev}, {category}{actor_note}) {msg}")
+                details = _gap_chat_log_details(entry)
+                if details:
+                    parts.append(f"  details: {details}")
+        else:
+            parts.append("- No round logs recorded for the latest round.")
     if recent_activity:
         parts.append("")
         parts.append("## Recent Gap logs/activity (oldest first)")
@@ -3115,3 +3132,30 @@ def _build_gap_chat_preamble(conn: sqlite3.Connection, gap_id: str,
         f"as soon as the indicator clears."
     )
     return priming_prompt, intro
+
+
+def _gap_chat_latest_round_logs(gap_id: str, round_count: int,
+                                *, limit: int = 20) -> list[dict[str, Any]]:
+    if round_count <= 0:
+        return []
+    round_idx = round_count - 1
+    try:
+        counts = round_logs.count_by_round(gap_id, round_count)
+        total = counts.get(round_idx, 0)
+        offset = max(0, total - limit)
+        entries, _has_more = round_logs.page_round_logs(
+            gap_id, round_idx, limit=limit, offset=offset,
+        )
+    except Exception:
+        return []
+    return entries
+
+
+def _gap_chat_log_details(entry: dict[str, Any], *, max_chars: int = 500) -> str:
+    details = str(entry.get("details") or "").strip()
+    if not details:
+        return ""
+    collapsed = " ".join(details.split())
+    if len(collapsed) <= max_chars:
+        return collapsed
+    return collapsed[: max_chars - 1].rstrip() + "..."
