@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::model::node::{ActiveNodeSelection, Node, NodeRegistry, NodeSettings};
@@ -13,6 +14,12 @@ pub const ACTIVE_NODE_FILE: &str = "active-node.json";
 #[derive(Clone, Debug)]
 pub struct FileNodeRegistryService {
     pub durable_root: PathBuf,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct NodeUpdate {
+    pub display_name: Option<String>,
+    pub archived: Option<bool>,
 }
 
 impl FileNodeRegistryService {
@@ -37,23 +44,31 @@ impl FileNodeRegistryService {
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
         let registry = self.load_registry()?;
         let active_node_id = self.load_active_node_id()?;
-        let nodes: Vec<_> = registry
-            .nodes
-            .iter()
-            .map(|node| {
-                json!({
-                    "id": node.id,
-                    "display_name": node.display_name,
-                    "archived": node.archived,
-                    "active": node.id == active_node_id,
-                    "created_at": node.created_at,
-                    "updated_at": node.updated_at
-                })
-            })
-            .collect();
+        let nodes = node_values_with_active(&registry.nodes, &active_node_id);
         Ok(json!({
             "nodes": nodes,
             "active_node_id": active_node_id
+        }))
+    }
+
+    pub fn list_with_counts_response(
+        &self,
+        counts: BTreeMap<String, BTreeMap<String, usize>>,
+    ) -> RefineResult<serde_json::Value> {
+        let registry = self.load_registry()?;
+        let active_node_id = self.load_active_node_id()?;
+        let nodes = node_values_with_active(&registry.nodes, &active_node_id);
+        let active_node = nodes
+            .iter()
+            .find(|node| node_id_value(node) == active_node_id)
+            .and_then(|node| node.get("display_name"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("Default");
+        Ok(json!({
+            "active_node_id": active_node_id,
+            "active_node": active_node,
+            "nodes": nodes,
+            "counts": counts
         }))
     }
 
@@ -87,6 +102,28 @@ impl FileNodeRegistryService {
         self.show(&id)
     }
 
+    pub fn create_with_display_name(&self, display_name: &str) -> RefineResult<Node> {
+        let display_name = display_name.trim();
+        if display_name.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "display_name is required".to_string(),
+            ));
+        }
+        let mut registry = self.load_registry()?;
+        let id = unique_node_id(&registry, display_name);
+        let now = now_timestamp();
+        let node = Node {
+            id,
+            display_name: display_name.to_string(),
+            created_at: now.clone(),
+            updated_at: now,
+            archived: false,
+        };
+        registry.nodes.push(node.clone());
+        self.save_registry(&registry)?;
+        Ok(node)
+    }
+
     pub fn activate(&self, id: &str) -> RefineResult<serde_json::Value> {
         let registry = self.load_registry()?;
         if !registry.active_node_allowed(id) {
@@ -113,6 +150,35 @@ impl FileNodeRegistryService {
         node.updated_at = now_timestamp();
         self.save_registry(&registry)?;
         self.show(id)
+    }
+
+    pub fn update(&self, id: &str, update: NodeUpdate) -> RefineResult<Node> {
+        let mut registry = self.load_registry()?;
+        let active_node_id = self.load_active_node_id()?;
+        let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
+            return Err(RefineError::NotFound(format!("node {id} was not found")));
+        };
+        if let Some(display_name) = update.display_name {
+            let display_name = display_name.trim();
+            if display_name.is_empty() {
+                return Err(RefineError::InvalidInput(
+                    "display name cannot be empty".to_string(),
+                ));
+            }
+            node.display_name = display_name.to_string();
+        }
+        if let Some(archived) = update.archived {
+            if archived && id == active_node_id {
+                return Err(RefineError::Conflict(
+                    "active node cannot be archived".to_string(),
+                ));
+            }
+            node.archived = archived;
+        }
+        node.updated_at = now_timestamp();
+        let node = node.clone();
+        self.save_registry(&registry)?;
+        Ok(node)
     }
 
     pub fn rename(&self, id: &str, name: &str) -> RefineResult<serde_json::Value> {
@@ -146,6 +212,17 @@ impl FileNodeRegistryService {
                 target_app_runtime: Default::default(),
             }
         }))
+    }
+
+    pub fn ensure_transfer_target(&self, id: &str) -> RefineResult<()> {
+        let registry = self.load_registry()?;
+        if registry.active_node_allowed(id) {
+            Ok(())
+        } else {
+            Err(RefineError::NotFound(format!(
+                "node {id} was not found or is archived"
+            )))
+        }
     }
 
     fn load_registry(&self) -> RefineResult<NodeRegistry> {
@@ -188,13 +265,20 @@ impl FileNodeRegistryService {
                 path.display()
             ))
         })?;
-        let selection = serde_json::from_slice::<ActiveNodeSelection>(&bytes).map_err(|error| {
+        let value = serde_json::from_slice::<Value>(&bytes).map_err(|error| {
             RefineError::Serialization(format!(
                 "failed to parse active node {}: {error}",
                 path.display()
             ))
         })?;
-        Ok(selection.active_node_id)
+        if let Ok(selection) = serde_json::from_value::<ActiveNodeSelection>(value.clone()) {
+            return Ok(selection.active_node_id);
+        }
+        Ok(value
+            .get("active_node_id")
+            .and_then(|value| value.as_str())
+            .unwrap_or("default")
+            .to_string())
     }
 
     fn save_active_node_id(&self, id: &str) -> RefineResult<()> {
@@ -209,6 +293,15 @@ impl FileNodeRegistryService {
     }
 }
 
+pub fn detached_nodes_response(counts: BTreeMap<String, BTreeMap<String, usize>>) -> Value {
+    json!({
+        "active_node_id": "default",
+        "active_node": "Default",
+        "nodes": [node_value(&default_node("default", "Default"), true)],
+        "counts": counts
+    })
+}
+
 fn default_node(id: &str, display_name: &str) -> Node {
     let now = now_timestamp();
     Node {
@@ -218,6 +311,66 @@ fn default_node(id: &str, display_name: &str) -> Node {
         updated_at: now,
         archived: false,
     }
+}
+
+fn node_values_with_active(nodes: &[Node], active_node_id: &str) -> Vec<Value> {
+    nodes
+        .iter()
+        .map(|node| node_value(node, node.id == active_node_id))
+        .collect()
+}
+
+fn node_value(node: &Node, active: bool) -> Value {
+    json!({
+        "id": node.id,
+        "display_name": node.display_name,
+        "archived": node.archived,
+        "active": active,
+        "created_at": node.created_at,
+        "updated_at": node.updated_at
+    })
+}
+
+fn unique_node_id(registry: &NodeRegistry, display_name: &str) -> String {
+    let base = slug_id(display_name, "node");
+    if !registry.nodes.iter().any(|node| node.id == base) {
+        return base;
+    }
+    for suffix in 2..1000 {
+        let candidate = format!("{base}-{suffix}");
+        if !registry.nodes.iter().any(|node| node.id == candidate) {
+            return candidate;
+        }
+    }
+    format!("{base}-{}", Utc::now().timestamp())
+}
+
+fn slug_id(value: &str, fallback: &str) -> String {
+    let mut slug = String::new();
+    let mut last_dash = false;
+    for ch in value.trim().to_lowercase().chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch);
+            last_dash = false;
+        } else if !last_dash && !slug.is_empty() {
+            slug.push('-');
+            last_dash = true;
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        fallback.to_string()
+    } else {
+        slug
+    }
+}
+
+fn node_id_value(node: &Value) -> &str {
+    node.get("id")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
 }
 
 fn clean_node_id(id: &str) -> RefineResult<String> {

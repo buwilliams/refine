@@ -15,8 +15,8 @@ use crate::model::feature::{Feature, FeatureDetail};
 use crate::model::gap::{Gap, GapPriority};
 use crate::model::workflow::{
     FeatureOperation, GapOperation, GapStatus, feature_operation_allowed, gap_operation_allowed,
-    is_bulk_target_allowed, is_feature_cancel_status, is_feature_protected_status,
-    user_status_transition,
+    is_automated_status, is_bulk_target_allowed, is_feature_cancel_status,
+    is_feature_protected_status, user_status_transition,
 };
 
 use super::types::*;
@@ -603,6 +603,29 @@ impl FileWorkItemService {
         validate_gap_operation(&current.gap.status, &GapOperation::StartImplementation)?;
         self.set_gap_status_unchecked(gap_id, &GapStatus::InProgress)?;
         self.show_gap_summary(gap_id)
+    }
+
+    pub fn start_gap_workflow(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        if current.gap.status == GapStatus::Backlog {
+            self.transition_gap_status(gap_id, GapStatus::Todo)?;
+        }
+        self.start_gap_summary(gap_id)
+    }
+
+    pub fn workflow_enforcement_summary(&self) -> RefineResult<WorkflowEnforcementSummary> {
+        let snapshot = FileProjectStateStore::new(&self.durable_root).rebuild_projection()?;
+        let automated = snapshot
+            .gaps
+            .values()
+            .filter(|gap| is_automated_status(&gap.gap.status))
+            .map(|gap| gap.gap.id.clone())
+            .collect();
+        Ok(WorkflowEnforcementSummary {
+            ok: true,
+            checked: snapshot.gaps.len(),
+            automated,
+        })
     }
 
     pub fn transition_gap_status(

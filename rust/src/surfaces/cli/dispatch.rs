@@ -8,7 +8,6 @@ use crate::core::host::agent_providers::{
 };
 use crate::core::host::cluster::{ClusterService, FileClusterRegistryService};
 use crate::core::host::installation::{FileInstallationService, InstallationService};
-use crate::core::host::process_supervision::FileProcessSupervisor;
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::core::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
@@ -18,16 +17,13 @@ use crate::core::product::project_registry::{FileProjectRegistryService, Project
 use crate::core::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
 };
-use crate::core::product::scheduling::{
-    FileSchedulingService, SchedulerControl, SchedulingService,
-};
+use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
 use crate::core::product::work_items::{
     BulkGapFilter, BulkGapSelection, BulkGapUpdate, FileWorkItemService,
 };
 use crate::core::supervisor::errors::RefineResult;
 use crate::core::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
 use crate::core::supervisor::runtime::RuntimeRoot;
-use crate::model::project::RegisteredApp;
 use crate::model::workflow::{GapStatus, user_status_transition};
 use crate::surfaces::web_server::{API_GROUPS, InProcessWebServer, LocalHttpDaemon};
 
@@ -120,22 +116,15 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Workflow {
             action: WorkflowAction::Pause { runtime_root },
         } => {
-            let scheduler = FileSchedulingService::new(&runtime_root);
-            let supervisor = FileProcessSupervisor::new(runtime_root);
-            supervisor.set_agents_paused(true)?;
-            let state = supervisor.set_background_processes_stopped(true)?;
-            scheduler.pause(SchedulerControl::Agents)?;
+            let state = FileSchedulingService::new(runtime_root).set_agent_workflow_paused(true)?;
             println!("{}", serde_json::to_string_pretty(&state).unwrap());
             Ok(())
         }
         Commands::Workflow {
             action: WorkflowAction::Resume { runtime_root },
         } => {
-            let scheduler = FileSchedulingService::new(&runtime_root);
-            let supervisor = FileProcessSupervisor::new(runtime_root);
-            supervisor.set_background_processes_stopped(false)?;
-            let state = supervisor.set_agents_paused(false)?;
-            scheduler.resume(SchedulerControl::Agents)?;
+            let state =
+                FileSchedulingService::new(runtime_root).set_agent_workflow_paused(false)?;
             println!("{}", serde_json::to_string_pretty(&state).unwrap());
             Ok(())
         }
@@ -156,30 +145,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Workflow {
             action: WorkflowAction::Enforce { durable_root },
         } => {
-            let snapshot = FileProjectStateStore::new(durable_root).rebuild_projection()?;
-            let automated: Vec<_> = snapshot
-                .gaps
-                .values()
-                .filter(|gap| {
-                    matches!(
-                        gap.gap.status,
-                        GapStatus::InProgress
-                            | GapStatus::Qa
-                            | GapStatus::ReadyMerge
-                            | GapStatus::AwaitingRebuild
-                    )
-                })
-                .map(|gap| gap.gap.id.clone())
-                .collect();
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({
-                    "ok": true,
-                    "checked": snapshot.gaps.len(),
-                    "automated": automated
-                }))
-                .unwrap()
-            );
+            let summary = FileWorkItemService::new(durable_root).workflow_enforcement_summary()?;
+            println!("{}", serde_json::to_string_pretty(&summary).unwrap());
             Ok(())
         }
         Commands::System {
@@ -720,16 +687,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     durable_root,
                 },
         } => {
-            let path = absolutize_cli_path(&path)?;
-            let timestamp = cli_timestamp();
-            let registry = FileProjectRegistryService::new(runtime_root, durable_root).register(
-                RegisteredApp {
-                    name,
-                    path: path.display().to_string(),
-                    added_at: timestamp,
-                    last_used_at: None,
-                },
-            )?;
+            let registry = FileProjectRegistryService::new(runtime_root, durable_root)
+                .register_path(Some(&name), &path, false)?;
             println!("{}", serde_json::to_string_pretty(&registry).unwrap());
             Ok(())
         }
@@ -966,12 +925,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     durable_root: Some(durable_root),
                 },
         } => {
-            let service = FileWorkItemService::new(durable_root);
-            let current = service.show_gap_summary(&id)?;
-            if current.gap.status == GapStatus::Backlog {
-                service.transition_gap_status(&id, GapStatus::Todo)?;
-            }
-            let gap = service.start_gap_summary(&id)?;
+            let gap = FileWorkItemService::new(durable_root).start_gap_workflow(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()

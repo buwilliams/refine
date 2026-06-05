@@ -2,19 +2,17 @@ use crate::core::supervisor::config::{
     FileGovernanceService, FileGuidanceService, FileReporterService, FileSettingsService,
 };
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::core::host::cluster::{ClusterBootstrapRequest, bootstrap_remote_node};
+use crate::core::host::cluster::{ClusterNodeUpdate, FileClusterRegistryService};
 use crate::core::host::process_supervision::FileProcessSupervisor;
+use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::core::product::project_registry::{
     FileProjectRegistryService, ProjectRegistryService, registry_apps_array,
 };
 use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::model::cluster::{valid_cluster_node_id, valid_ssh_host};
-use crate::model::project::RegisteredApp;
 
 use super::support::*;
 use super::*;
@@ -82,22 +80,8 @@ impl InProcessWebServer {
                 "display_name is required".to_string(),
             ));
         }
-        let mut registry = match load_node_registry(&durable_root) {
-            Ok(registry) => registry,
-            Err(error) => return error_response(error),
-        };
-        let id = unique_node_id(&registry, display_name);
-        let now = now_timestamp_web();
-        registry.nodes.push(json!({
-            "id": id,
-            "display_name": display_name,
-            "archived": false,
-            "active": false,
-            "created_at": now,
-            "updated_at": now
-        }));
-        match save_node_registry(&durable_root, &registry) {
-            Ok(()) => self.handle_nodes(),
+        match FileNodeRegistryService::new(&durable_root).create_with_display_name(display_name) {
+            Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
     }
@@ -110,21 +94,8 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .trim();
-        let registry = match load_node_registry(&durable_root) {
-            Ok(registry) => registry,
-            Err(error) => return error_response(error),
-        };
-        if !registry
-            .nodes
-            .iter()
-            .any(|node| node_id_value(node) == node_id && !node_archived(node))
-        {
-            return error_response(RefineError::NotFound(format!(
-                "node {node_id} was not found or is archived"
-            )));
-        }
-        match save_active_node_id(&durable_root, node_id) {
-            Ok(()) => self.handle_nodes(),
+        match FileNodeRegistryService::new(durable_root).activate(node_id) {
+            Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
     }
@@ -139,44 +110,16 @@ impl InProcessWebServer {
         else {
             return error_response(RefineError::InvalidInput("node id is required".to_string()));
         };
-        let mut registry = match load_node_registry(&durable_root) {
-            Ok(registry) => registry,
-            Err(error) => return error_response(error),
-        };
-        let active_node_id = match load_active_node_id(&durable_root) {
-            Ok(active) => active,
-            Err(error) => return error_response(error),
-        };
         let body = request.body.unwrap_or_else(|| json!({}));
-        let Some(node) = registry
-            .nodes
-            .iter_mut()
-            .find(|node| node_id_value(node) == node_id)
-        else {
-            return error_response(RefineError::NotFound(format!(
-                "node {node_id} was not found"
-            )));
+        let update = NodeUpdate {
+            display_name: body
+                .get("display_name")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            archived: body.get("archived").and_then(|value| value.as_bool()),
         };
-        if let Some(display_name) = body.get("display_name").and_then(|value| value.as_str()) {
-            let display_name = display_name.trim();
-            if display_name.is_empty() {
-                return error_response(RefineError::InvalidInput(
-                    "display_name cannot be empty".to_string(),
-                ));
-            }
-            node["display_name"] = json!(display_name);
-        }
-        if let Some(archived) = body.get("archived").and_then(|value| value.as_bool()) {
-            if archived && node_id == active_node_id {
-                return error_response(RefineError::Conflict(
-                    "active node cannot be archived".to_string(),
-                ));
-            }
-            node["archived"] = json!(archived);
-        }
-        node["updated_at"] = json!(now_timestamp_web());
-        match save_node_registry(&durable_root, &registry) {
-            Ok(()) => self.handle_nodes(),
+        match FileNodeRegistryService::new(durable_root).update(node_id, update) {
+            Ok(_) => self.handle_nodes(),
             Err(error) => error_response(error),
         }
     }
@@ -189,18 +132,10 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .trim();
-        let registry = match load_node_registry(&durable_root) {
-            Ok(registry) => registry,
-            Err(error) => return error_response(error),
-        };
-        if !registry
-            .nodes
-            .iter()
-            .any(|node| node_id_value(node) == target_node_id && !node_archived(node))
+        if let Err(error) =
+            FileNodeRegistryService::new(&durable_root).ensure_transfer_target(target_node_id)
         {
-            return error_response(RefineError::NotFound(format!(
-                "node {target_node_id} was not found or is archived"
-            )));
+            return error_response(error);
         }
         let selection = match serde_json::from_value::<BulkGapSelection>(body.clone()) {
             Ok(selection) => selection,
@@ -244,8 +179,8 @@ impl InProcessWebServer {
             }
             Err(error) => return error_response(error),
         };
-        match load_cluster_registry(&durable_root) {
-            Ok(registry) => ApiResponse::json(200, cluster_response(registry)),
+        match FileClusterRegistryService::new(durable_root).list_response() {
+            Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
@@ -265,56 +200,29 @@ impl InProcessWebServer {
             })
             .unwrap_or_default();
         let id = id.trim();
-        if !valid_cluster_node_id(id) {
-            return error_response(RefineError::InvalidInput(
-                "cluster node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
-            ));
-        }
-        let mut registry = match load_cluster_registry(&durable_root) {
-            Ok(registry) => registry,
-            Err(error) => return error_response(error),
+        let update = ClusterNodeUpdate {
+            display_name: body
+                .get("display_name")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            ssh_host: body
+                .get("ssh_host")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            ssh_port: body.get("ssh_port").and_then(|value| value.as_u64()),
+            refine_checkout: body
+                .get("refine_checkout")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            target_app_path: body
+                .get("target_app_path")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
+            enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
-        let existing_index = registry
-            .nodes
-            .iter()
-            .position(|node| cluster_node_id_value(node) == id);
-        let mut node = existing_index
-            .and_then(|index| registry.nodes.get(index).cloned())
-            .unwrap_or_else(|| default_cluster_node(id));
-        if let Some(display_name) = body.get("display_name").and_then(|value| value.as_str()) {
-            node["display_name"] = json!(display_name.trim());
-        }
-        if let Some(ssh_host) = body.get("ssh_host").and_then(|value| value.as_str()) {
-            let ssh_host = ssh_host.trim();
-            if !valid_ssh_host(ssh_host) {
-                return error_response(RefineError::InvalidInput(
-                    "ssh_host must be a host without user@ prefix".to_string(),
-                ));
-            }
-            node["ssh_host"] = json!(ssh_host);
-        }
-        for (field, default_value) in [("ssh_port", 22_u64), ("refine_port", 8080_u64)] {
-            if let Some(port) = body.get(field).and_then(|value| value.as_u64()) {
-                node[field] = json!(if port == 0 { default_value } else { port });
-            }
-        }
-        for field in ["refine_checkout", "target_app_path"] {
-            if let Some(value) = body.get(field).and_then(|value| value.as_str()) {
-                node[field] = json!(value.trim());
-            }
-        }
-        if let Some(enabled) = body.get("enabled").and_then(|value| value.as_bool()) {
-            node["enabled"] = json!(enabled);
-        }
-        node["updated_at"] = json!(now_timestamp_web());
-        if let Some(index) = existing_index {
-            registry.nodes[index] = node;
-        } else {
-            registry.nodes.push(node);
-        }
-        registry.updated_at = now_timestamp_web();
-        match save_cluster_registry(&durable_root, &registry) {
-            Ok(()) => ApiResponse::json(200, cluster_response(registry)),
+        match FileClusterRegistryService::new(durable_root).upsert_node(id, update) {
+            Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
@@ -332,97 +240,23 @@ impl InProcessWebServer {
                 "cluster node id is required".to_string(),
             ));
         };
-        let mut registry = match load_cluster_registry(&durable_root) {
-            Ok(registry) => registry,
-            Err(error) => return error_response(error),
-        };
-        let Some(index) = registry
-            .nodes
-            .iter()
-            .position(|node| cluster_node_id_value(node) == node_id)
-        else {
-            return error_response(RefineError::NotFound(format!(
-                "cluster node {node_id} was not found"
-            )));
-        };
         let body = request.body.unwrap_or_else(|| json!({}));
-        let node = registry.nodes[index].clone();
         let dry_run = body
             .get("dry_run")
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
-        let result = match bootstrap_remote_node(ClusterBootstrapRequest {
-            node_id: node_id.to_string(),
-            ssh_host: node
-                .get("ssh_host")
-                .and_then(|value| value.as_str())
-                .unwrap_or("")
-                .to_string(),
-            ssh_port: node
-                .get("ssh_port")
-                .and_then(|value| value.as_u64())
-                .and_then(|value| u16::try_from(value).ok())
-                .unwrap_or(22),
-            refine_checkout: node
-                .get("refine_checkout")
-                .and_then(|value| value.as_str())
-                .unwrap_or("~/refine")
-                .to_string(),
-            target_app_path: node
-                .get("target_app_path")
-                .and_then(|value| value.as_str())
-                .unwrap_or("")
-                .to_string(),
-            refine_port: node
-                .get("refine_port")
-                .and_then(|value| value.as_u64())
-                .and_then(|value| u16::try_from(value).ok())
-                .unwrap_or(8080),
-            dry_run,
-        }) {
-            Ok(result) => result,
-            Err(error) => return error_response(error),
-        };
-        registry.nodes[index]["health"] = json!({
-            "status": if result.ok { "ready" } else { "failed" },
-            "checked_at": now_timestamp_web(),
-            "details": {
-                "bootstrap": result
-            }
-        });
-        registry.updated_at = now_timestamp_web();
-        if let Err(error) = save_cluster_registry(&durable_root, &registry) {
-            return error_response(error);
+        match FileClusterRegistryService::new(durable_root)
+            .bootstrap_node_response(node_id, dry_run)
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
         }
-        let result = registry.nodes[index]
-            .get("health")
-            .and_then(|health| health.get("details"))
-            .and_then(|details| details.get("bootstrap"))
-            .cloned()
-            .unwrap_or_else(|| json!({}));
-        ApiResponse::json(
-            200,
-            json!({
-                "ok": result.get("ok").and_then(|value| value.as_bool()).unwrap_or(false),
-                "node_id": node_id,
-                "dry_run": dry_run,
-                "result": result,
-                "cluster": cluster_response(registry)
-            }),
-        )
     }
 
     pub(super) fn nodes_response(&self) -> RefineResult<serde_json::Value> {
         let Some(durable_root) = self.current_durable_root()? else {
-            return Ok(json!({
-                "active_node_id": "default",
-                "active_node": "Default",
-                "nodes": [default_node("default", "Default", true)],
-                "counts": {}
-            }));
+            return Ok(detached_nodes_response(BTreeMap::new()));
         };
-        let registry = load_node_registry(&durable_root)?;
-        let active_node_id = load_active_node_id(&durable_root)?;
         let projection = self.current_projection()?;
         let mut counts: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
         for gap in projection.gaps.values() {
@@ -433,27 +267,7 @@ impl InProcessWebServer {
                 .entry(gap.gap.status.as_str().to_string())
                 .or_insert(0) += 1;
         }
-        let nodes: Vec<_> = registry
-            .nodes
-            .iter()
-            .map(|node| {
-                let mut node = node.clone();
-                node["active"] = json!(node_id_value(&node) == active_node_id);
-                node
-            })
-            .collect();
-        let active_node = nodes
-            .iter()
-            .find(|node| node_id_value(node) == active_node_id)
-            .and_then(|node| node.get("display_name"))
-            .and_then(|value| value.as_str())
-            .unwrap_or("Default");
-        Ok(json!({
-            "active_node_id": active_node_id,
-            "active_node": active_node,
-            "nodes": nodes,
-            "counts": counts
-        }))
+        FileNodeRegistryService::new(durable_root).list_with_counts_response(counts)
     }
 
     pub(super) fn handle_target_app_status(&self) -> ApiResponse {
@@ -644,34 +458,9 @@ impl InProcessWebServer {
             .get("name")
             .and_then(|value| value.as_str())
             .filter(|value| !value.trim().is_empty())
-            .map(str::to_string)
-            .unwrap_or_else(|| {
-                Path::new(path)
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .unwrap_or(path)
-                    .to_string()
-            });
-        let app_path = PathBuf::from(path.trim());
-        let app_path = if app_path.is_absolute() {
-            app_path
-        } else {
-            match std::env::current_dir() {
-                Ok(cwd) => cwd.join(app_path),
-                Err(error) => {
-                    return error_response(RefineError::Io(format!(
-                        "failed to inspect cwd: {error}"
-                    )));
-                }
-            }
-        };
-        let app = RegisteredApp {
-            name,
-            path: app_path.display().to_string(),
-            added_at: now_timestamp_web(),
-            last_used_at: None,
-        };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).register(app)
+            .map(str::trim);
+        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone())
+            .register_path(name, path, false)
         {
             Ok(registry) => ApiResponse::json(
                 201,

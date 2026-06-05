@@ -638,3 +638,11 @@ impl InProcessWebServer {
         }
     }
 }
+
+fn cluster_node_id_from_path(path: &str) -> Option<String> {
+    path.strip_prefix("/cluster/nodes/")
+        .and_then(|rest| rest.split('/').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}

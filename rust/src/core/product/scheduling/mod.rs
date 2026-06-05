@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessPauseState};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
@@ -166,6 +167,22 @@ impl FileSchedulingService {
             policy.active_node_id = FileNodeRegistryService::new(durable_root).active_node_id()?;
         }
         Ok(policy)
+    }
+
+    pub fn set_agent_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        let state = if paused {
+            supervisor.set_agents_paused(true)?;
+            let state = supervisor.set_background_processes_stopped(true)?;
+            self.pause(SchedulerControl::Agents)?;
+            state
+        } else {
+            supervisor.set_background_processes_stopped(false)?;
+            let state = supervisor.set_agents_paused(false)?;
+            self.resume(SchedulerControl::Agents)?;
+            state
+        };
+        Ok(state)
     }
 
     fn ensure_automation_running(&self, state: &SchedulerState) -> RefineResult<()> {

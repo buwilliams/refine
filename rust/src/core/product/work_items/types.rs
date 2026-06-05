@@ -72,3 +72,10 @@ pub struct BulkTransferNodeResult {
     pub skipped: usize,
     pub skipped_details: Vec<BulkSkippedDetail>,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+pub struct WorkflowEnforcementSummary {
+    pub ok: bool,
+    pub checked: usize,
+    pub automated: Vec<String>,
+}

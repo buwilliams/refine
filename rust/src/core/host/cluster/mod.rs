@@ -4,7 +4,7 @@ use std::process::Command;
 
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::model::cluster::{
-    Cluster, ClusterNode, RemoteRunResult, valid_cluster_node_id, valid_ssh_host,
+    Cluster, ClusterHealth, ClusterNode, RemoteRunResult, valid_cluster_node_id, valid_ssh_host,
 };
 
 pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
@@ -31,6 +31,17 @@ pub trait ClusterService {
 #[derive(Clone, Debug)]
 pub struct FileClusterRegistryService {
     pub durable_root: PathBuf,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ClusterNodeUpdate {
+    pub display_name: Option<String>,
+    pub ssh_host: Option<String>,
+    pub ssh_port: Option<u64>,
+    pub refine_checkout: Option<String>,
+    pub target_app_path: Option<String>,
+    pub refine_port: Option<u64>,
+    pub enabled: Option<bool>,
 }
 
 impl FileClusterRegistryService {
@@ -75,6 +86,99 @@ impl FileClusterRegistryService {
         cluster.updated_at = now_timestamp();
         self.save(&cluster)?;
         Ok(cluster_response(cluster))
+    }
+
+    pub fn upsert_node(
+        &self,
+        id: &str,
+        update: ClusterNodeUpdate,
+    ) -> RefineResult<serde_json::Value> {
+        let id = id.trim();
+        if !valid_cluster_node_id(id) {
+            return Err(RefineError::InvalidInput(
+                "cluster node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
+            ));
+        }
+        let mut cluster = self.registry()?;
+        let existing_index = cluster.nodes.iter().position(|node| node.id == id);
+        let mut node = existing_index
+            .and_then(|index| cluster.nodes.get(index).cloned())
+            .unwrap_or_else(|| default_cluster_node(id));
+        if let Some(display_name) = update.display_name {
+            node.display_name = display_name.trim().to_string();
+        }
+        if let Some(ssh_host) = update.ssh_host {
+            let ssh_host = ssh_host.trim();
+            if !valid_ssh_host(ssh_host) {
+                return Err(RefineError::InvalidInput(
+                    "ssh_host must be a host without user@ prefix".to_string(),
+                ));
+            }
+            node.ssh_host = ssh_host.to_string();
+        }
+        if let Some(ssh_port) = update.ssh_port {
+            node.ssh_port = port_or_default(ssh_port, 22);
+        }
+        if let Some(refine_port) = update.refine_port {
+            node.refine_port = port_or_default(refine_port, 8080);
+        }
+        if let Some(refine_checkout) = update.refine_checkout {
+            node.refine_checkout = refine_checkout.trim().to_string();
+        }
+        if let Some(target_app_path) = update.target_app_path {
+            node.target_app_path = target_app_path.trim().to_string();
+        }
+        if let Some(enabled) = update.enabled {
+            node.enabled = enabled;
+        }
+        node.updated_at = now_timestamp();
+        if let Some(index) = existing_index {
+            cluster.nodes[index] = node;
+        } else {
+            cluster.nodes.push(node);
+        }
+        cluster.updated_at = now_timestamp();
+        self.save(&cluster)?;
+        Ok(cluster_response(cluster))
+    }
+
+    pub fn bootstrap_node_response(
+        &self,
+        node_id: &str,
+        dry_run: bool,
+    ) -> RefineResult<serde_json::Value> {
+        let mut cluster = self.registry()?;
+        let Some(index) = cluster.nodes.iter().position(|node| node.id == node_id) else {
+            return Err(RefineError::NotFound(format!(
+                "cluster node {node_id} was not found"
+            )));
+        };
+        let node = cluster.nodes[index].clone();
+        let result = bootstrap_remote_node(ClusterBootstrapRequest {
+            node_id: node_id.to_string(),
+            ssh_host: node.ssh_host,
+            ssh_port: node.ssh_port,
+            refine_checkout: node.refine_checkout,
+            target_app_path: node.target_app_path,
+            refine_port: node.refine_port,
+            dry_run,
+        })?;
+        let mut details = serde_json::Map::new();
+        details.insert("bootstrap".to_string(), serde_json::json!(result.clone()));
+        cluster.nodes[index].health = Some(ClusterHealth {
+            status: if result.ok { "ready" } else { "failed" }.to_string(),
+            checked_at: now_timestamp(),
+            details: Some(details),
+        });
+        cluster.updated_at = now_timestamp();
+        self.save(&cluster)?;
+        Ok(serde_json::json!({
+            "ok": result.ok,
+            "node_id": node_id,
+            "dry_run": dry_run,
+            "result": result,
+            "cluster": cluster_response(cluster)
+        }))
     }
 
     pub fn set_enabled(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
@@ -328,6 +432,13 @@ fn default_cluster_node(id: &str) -> ClusterNode {
         created_at: now.clone(),
         updated_at: now,
     }
+}
+
+fn port_or_default(value: u64, default: u16) -> u16 {
+    if value == 0 {
+        return default;
+    }
+    u16::try_from(value).unwrap_or(default)
 }
 
 fn cluster_response(cluster: Cluster) -> serde_json::Value {

@@ -148,6 +148,40 @@ impl FileProjectRegistryService {
             },
         })
     }
+
+    pub fn register_path(
+        &self,
+        name: Option<&str>,
+        path: &str,
+        make_current: bool,
+    ) -> RefineResult<AppRegistry> {
+        let app_path = normalize_app_path(path)?;
+        let display_path = app_path.display().to_string();
+        let app_name = name
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .unwrap_or_else(|| {
+                app_path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| display_path.clone())
+            });
+        let mut registry = self.load()?;
+        upsert_app(
+            &mut registry,
+            RegisteredApp {
+                name: app_name,
+                path: display_path,
+                added_at: now_timestamp(),
+                last_used_at: None,
+            },
+            make_current,
+        );
+        self.save(&registry)?;
+        Ok(registry)
+    }
 }
 
 impl ProjectRegistryService for FileProjectRegistryService {
