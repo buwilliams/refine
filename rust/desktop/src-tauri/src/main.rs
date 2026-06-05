@@ -53,7 +53,7 @@ mod real_tauri {
     };
     use tauri::menu::{Menu, MenuItem};
     use tauri::tray::TrayIconBuilder;
-    use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+    use tauri::{WebviewUrl, WebviewWindowBuilder};
 
     #[tauri::command]
     fn desktop_manifest(port: u16) -> Result<serde_json::Value, String> {
@@ -120,15 +120,13 @@ mod real_tauri {
                         let _ = bridge.tray_menu_action(event.id().as_ref());
                     })
                     .build(app)?;
-                WebviewWindowBuilder::new(
-                    app,
-                    "main",
-                    WebviewUrl::External(local_url.parse().map_err(|error| {
-                        tauri::Error::InvalidArgs(format!("invalid local URL: {error}"))
-                    })?),
-                )
-                .title("Refine")
-                .build()?;
+                let webview_url = local_url
+                    .parse()
+                    .map(WebviewUrl::External)
+                    .map_err(tauri::Error::InvalidUrl)?;
+                WebviewWindowBuilder::new(app, "main", webview_url)
+                    .title("Refine")
+                    .build()?;
                 Ok(())
             })
             .invoke_handler(tauri::generate_handler![

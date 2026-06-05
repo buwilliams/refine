@@ -2550,6 +2550,34 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(registered.status, 201);
     assert_eq!(registered.body["apps"].as_array().unwrap().len(), 3);
 
+    let clone_source = temp_root.join("clone-source");
+    let clone_destination = temp_root.join("clone-destination");
+    fs::create_dir_all(&clone_source).unwrap();
+    let output = Command::new("git")
+        .arg("init")
+        .arg(&clone_source)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let cloned = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/apps/clone".to_string(),
+        auth_token: Some("secret".to_string()),
+        body: Some(json!({
+            "source": clone_source.display().to_string(),
+            "destination": clone_destination.display().to_string(),
+            "name": "cloned-app",
+            "make_current": false
+        })),
+    });
+    assert_eq!(cloned.status, 201);
+    assert!(clone_destination.join(".git").exists());
+    assert_eq!(cloned.body["apps"].as_array().unwrap().len(), 4);
+
     let switched_by_name = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/switch".to_string(),
@@ -2579,7 +2607,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         body: None,
     });
     assert_eq!(listed.status, 200);
-    assert_eq!(listed.body["apps"].as_array().unwrap().len(), 3);
+    assert_eq!(listed.body["apps"].as_array().unwrap().len(), 4);
     assert_eq!(listed.body["current"], "");
 
     let settings = server.handle(ApiRequest {
@@ -2621,7 +2649,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         body: Some(json!({"path": other_app.display().to_string()})),
     });
     assert_eq!(removed.status, 200);
-    assert_eq!(removed.body["apps"].as_array().unwrap().len(), 2);
+    assert_eq!(removed.body["apps"].as_array().unwrap().len(), 3);
 
     fs::remove_dir_all(temp_root).unwrap();
 }

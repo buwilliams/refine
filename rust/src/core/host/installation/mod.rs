@@ -1,5 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
+#[cfg(not(test))]
+use std::process::Command;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -42,6 +44,14 @@ pub struct InstallBackendRegistration {
     pub credential_store: String,
     pub desktop_bundle: Option<String>,
     pub registered: bool,
+    #[serde(default)]
+    pub activated: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub activation_commands: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deactivation_commands: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activation_error: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub notes: Vec<String>,
@@ -189,8 +199,10 @@ impl FileInstallationService {
 
     fn unregister_backend(&self) -> RefineResult<()> {
         if let Some(backend) = self.load_backend()?
-            && let Some(path) = backend.service_metadata_path
+            && let Some(path) = backend.service_metadata_path.clone()
         {
+            let mut backend = backend;
+            self.deactivate_os_backend(&mut backend);
             let path = PathBuf::from(path);
             if path.exists() {
                 fs::remove_file(&path).map_err(|error| {
@@ -256,17 +268,61 @@ impl FileInstallationService {
                 "native service metadata written to {}",
                 path.display()
             ));
-            backend.notes.push(
-                "service manager enable/load is left to the installer or operator".to_string(),
-            );
+            self.activate_os_backend(backend);
         } else {
             backend.registered = false;
+            backend.activated = false;
             backend
                 .notes
                 .push("no native service metadata path is available on this platform".to_string());
         }
         backend.updated_at = now_timestamp();
         Ok(())
+    }
+
+    fn activate_os_backend(&self, backend: &mut InstallBackendRegistration) {
+        backend.activation_error = None;
+        let commands = activation_commands(backend);
+        backend.activation_commands = commands.iter().map(ServiceCommand::display).collect();
+        if commands.is_empty() {
+            backend.activated = false;
+            backend
+                .notes
+                .push("service activation is handled by the platform installer".to_string());
+            return;
+        }
+        for command in commands {
+            if let Err(error) = run_service_command(&command) {
+                backend.activated = false;
+                backend.activation_error = Some(error.clone());
+                backend.notes.push(format!(
+                    "native service activation failed while running `{}`: {error}",
+                    command.display()
+                ));
+                return;
+            }
+        }
+        backend.activated = true;
+        backend
+            .notes
+            .push("native service activated with the platform service manager".to_string());
+    }
+
+    fn deactivate_os_backend(&self, backend: &mut InstallBackendRegistration) {
+        let commands = deactivation_commands(backend);
+        backend.deactivation_commands = commands.iter().map(ServiceCommand::display).collect();
+        for command in commands {
+            if let Err(error) = run_service_command(&command) {
+                backend.notes.push(format!(
+                    "native service deactivation failed while running `{}`: {error}",
+                    command.display()
+                ));
+                return;
+            }
+        }
+        if !backend.deactivation_commands.is_empty() {
+            backend.activated = false;
+        }
     }
 
     fn service_metadata(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
@@ -357,7 +413,7 @@ impl InstallationService for FileInstallationService {
                 target,
                 version: Some(self.current_version.clone()),
                 stale: false,
-                partial: !backend.registered,
+                partial: !backend_complete(&backend),
                 conflicting: false,
                 backend: Some(backend),
             },
@@ -373,7 +429,7 @@ impl InstallationService for FileInstallationService {
         let mut state = self.load()?;
         state.status.installed = true;
         let backend = self.register_backend(state.status.target.clone())?;
-        state.status.partial = !backend.registered;
+        state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
         state.status.stale = false;
         state.status.backend = Some(backend);
@@ -398,7 +454,7 @@ impl InstallationService for FileInstallationService {
         state.status.installed = true;
         state.status.version = Some(version.to_string());
         state.status.stale = false;
-        state.status.partial = !backend.registered;
+        state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
         state.status.backend = Some(backend);
         state.updated_at = now_timestamp();
@@ -421,7 +477,7 @@ impl InstallationService for FileInstallationService {
         state.status.version = Some(previous);
         state.status.stale = false;
         let backend = self.register_backend(state.status.target.clone())?;
-        state.status.partial = !backend.registered;
+        state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
         state.status.backend = Some(backend);
         state.previous_version = current;
@@ -453,7 +509,7 @@ impl InstallationService for FileInstallationService {
         state.status.partial = state.status.installed
             && backend
                 .as_ref()
-                .map(|backend| !backend.registered)
+                .map(|backend| !backend_complete(backend))
                 .unwrap_or(true);
         state.status.conflicting = state.status.installed
             && backend
@@ -536,10 +592,167 @@ fn backend_for_target(
         credential_store: credential_store.to_string(),
         desktop_bundle,
         registered: false,
+        activated: false,
+        activation_commands: Vec::new(),
+        deactivation_commands: Vec::new(),
+        activation_error: None,
         created_at: timestamp.to_string(),
         updated_at: timestamp.to_string(),
         notes,
     }
+}
+
+fn backend_complete(backend: &InstallBackendRegistration) -> bool {
+    backend.registered && backend.activated
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ServiceCommand {
+    program: String,
+    args: Vec<String>,
+}
+
+impl ServiceCommand {
+    fn new(program: impl Into<String>, args: Vec<String>) -> Self {
+        Self {
+            program: program.into(),
+            args,
+        }
+    }
+
+    fn display(&self) -> String {
+        let mut parts = vec![shell_word(&self.program)];
+        parts.extend(self.args.iter().map(|arg| shell_word(arg)));
+        parts.join(" ")
+    }
+}
+
+fn activation_commands(backend: &InstallBackendRegistration) -> Vec<ServiceCommand> {
+    match backend.target {
+        InstallTarget::LinuxCliWeb => {
+            let unit = backend
+                .service_metadata_path
+                .as_deref()
+                .and_then(|path| PathBuf::from(path).file_name().map(|name| name.to_owned()))
+                .and_then(|name| name.to_str().map(str::to_string))
+                .unwrap_or_else(|| "refine.service".to_string());
+            vec![
+                ServiceCommand::new(
+                    "systemctl",
+                    vec!["--user".to_string(), "daemon-reload".to_string()],
+                ),
+                ServiceCommand::new(
+                    "systemctl",
+                    vec![
+                        "--user".to_string(),
+                        "enable".to_string(),
+                        "--now".to_string(),
+                        unit,
+                    ],
+                ),
+            ]
+        }
+        InstallTarget::MacOsAppBundle => {
+            let Some(plist) = backend.service_metadata_path.clone() else {
+                return Vec::new();
+            };
+            let domain = launchctl_gui_domain();
+            vec![
+                ServiceCommand::new(
+                    "launchctl",
+                    vec!["bootstrap".to_string(), domain.clone(), plist],
+                ),
+                ServiceCommand::new(
+                    "launchctl",
+                    vec!["enable".to_string(), format!("{domain}/com.refine.daemon")],
+                ),
+            ]
+        }
+        InstallTarget::WindowsInstaller => Vec::new(),
+    }
+}
+
+fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec<ServiceCommand> {
+    match backend.target {
+        InstallTarget::LinuxCliWeb => {
+            let unit = backend
+                .service_metadata_path
+                .as_deref()
+                .and_then(|path| PathBuf::from(path).file_name().map(|name| name.to_owned()))
+                .and_then(|name| name.to_str().map(str::to_string))
+                .unwrap_or_else(|| "refine.service".to_string());
+            vec![
+                ServiceCommand::new(
+                    "systemctl",
+                    vec![
+                        "--user".to_string(),
+                        "disable".to_string(),
+                        "--now".to_string(),
+                        unit,
+                    ],
+                ),
+                ServiceCommand::new(
+                    "systemctl",
+                    vec!["--user".to_string(), "daemon-reload".to_string()],
+                ),
+            ]
+        }
+        InstallTarget::MacOsAppBundle => {
+            let Some(plist) = backend.service_metadata_path.clone() else {
+                return Vec::new();
+            };
+            vec![ServiceCommand::new(
+                "launchctl",
+                vec!["bootout".to_string(), launchctl_gui_domain(), plist],
+            )]
+        }
+        InstallTarget::WindowsInstaller => Vec::new(),
+    }
+}
+
+fn run_service_command(command: &ServiceCommand) -> Result<(), String> {
+    #[cfg(test)]
+    {
+        let _ = command;
+        return Ok(());
+    }
+
+    #[cfg(not(test))]
+    {
+        let output = Command::new(&command.program)
+            .args(&command.args)
+            .output()
+            .map_err(|error| error.to_string())?;
+        if output.status.success() {
+            return Ok(());
+        }
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let detail = if stderr.is_empty() { stdout } else { stderr };
+        if detail.is_empty() {
+            Err(format!("exited with {}", output.status))
+        } else {
+            Err(detail)
+        }
+    }
+}
+
+#[cfg(target_family = "unix")]
+fn launchctl_gui_domain() -> String {
+    format!("gui/{}", unsafe { libc_getuid() })
+}
+
+#[cfg(target_family = "unix")]
+unsafe fn libc_getuid() -> u32 {
+    unsafe extern "C" {
+        fn getuid() -> u32;
+    }
+    unsafe { getuid() }
+}
+
+#[cfg(not(target_family = "unix"))]
+fn launchctl_gui_domain() -> String {
+    "gui/current".to_string()
 }
 
 fn current_exe_string() -> RefineResult<String> {
@@ -557,6 +770,10 @@ fn systemd_escape_arg(value: &str) -> String {
     } else {
         format!("\"{}\"", value.replace('"', "\\\""))
     }
+}
+
+fn shell_word(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 fn xml_escape(value: &str) -> String {
@@ -596,6 +813,16 @@ mod tests {
             "systemd_user"
         );
         assert!(installed.backend.as_ref().unwrap().registered);
+        assert!(installed.backend.as_ref().unwrap().activated);
+        assert!(
+            installed
+                .backend
+                .as_ref()
+                .unwrap()
+                .activation_commands
+                .iter()
+                .any(|command| command.contains("'systemctl' '--user' 'enable' '--now'"))
+        );
         let service_metadata_path = PathBuf::from(
             installed
                 .backend

@@ -1,6 +1,7 @@
 use serde_json::json;
 
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
+use crate::core::product::work_items::{BulkGapFilter, BulkGapSelection, BulkGapUpdate};
 use crate::core::supervisor::security::{AuthToken, FileSecurityService, SecurityService};
 use crate::core::supervisor::sessions::{FileSessionService, SessionService, SurfaceKind};
 
@@ -70,6 +71,33 @@ impl InProcessWebServer {
                 .map(|state| json!({"promoted": promoted, "reservations": state.reservations}))
         }) {
             Ok(body) => ApiResponse::json(200, body),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_workflow_restore(&self) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "restore workflow state");
+        let service = self.work_item_service(durable_root);
+        match service.bulk_update_gaps(
+            BulkGapSelection {
+                filter: BulkGapFilter::default(),
+                selected_ids: None,
+                exclude_ids: Vec::new(),
+            },
+            BulkGapUpdate::Status("__last_workflow_state".to_string()),
+        ) {
+            Ok(result) => ApiResponse::json(200, json!(result)),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_workflow_enforce(&self) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "enforce workflow state");
+        match self
+            .work_item_service(durable_root)
+            .workflow_enforcement_summary()
+        {
+            Ok(summary) => ApiResponse::json(200, json!(summary)),
             Err(error) => error_response(error),
         }
     }

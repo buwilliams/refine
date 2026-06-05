@@ -974,9 +974,12 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_activity_list(&self, raw_path: &str) -> ApiResponse {
-        if self.durable_root.is_none() {
+        let Some(_) = (match self.current_durable_root() {
+            Ok(durable_root) => durable_root,
+            Err(error) => return error_response(error),
+        }) else {
             return durable_root_unavailable("read activity");
-        }
+        };
         let projection = match self.current_projection() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),

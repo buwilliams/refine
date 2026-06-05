@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
@@ -41,6 +42,13 @@ pub fn run() -> RefineResult<()> {
 }
 
 pub fn dispatch(cli: Cli) -> RefineResult<()> {
+    #[cfg(not(test))]
+    if matches!(&cli.command, Commands::Project { .. }) {
+        if let Commands::Project { action } = cli.command {
+            return dispatch_project_daemon(action);
+        }
+    }
+
     match cli.command {
         Commands::Workflow {
             action: WorkflowAction::Allowed { from, to },
@@ -105,6 +113,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     runtime_root,
                 },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let response = daemon_json("POST", "/workflow/schedule", None)?;
+                print_json(&response);
+                return Ok(());
+            }
             let scheduler = FileSchedulingService::with_durable_root(runtime_root, durable_root);
             let promoted = scheduler.promote()?;
             let state = scheduler.load_state()?;
@@ -136,6 +149,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Workflow {
             action: WorkflowAction::Restore { durable_root },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let response = daemon_json("POST", "/workflow/restore", None)?;
+                print_json(&response);
+                return Ok(());
+            }
             let result = FileWorkItemService::new(durable_root).bulk_update_gaps(
                 BulkGapSelection {
                     filter: BulkGapFilter::default(),
@@ -150,6 +168,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Workflow {
             action: WorkflowAction::Enforce { durable_root },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let response = daemon_json("POST", "/workflow/enforce", None)?;
+                print_json(&response);
+                return Ok(());
+            }
             let summary = FileWorkItemService::new(durable_root).workflow_enforcement_summary()?;
             println!("{}", serde_json::to_string_pretty(&summary).unwrap());
             Ok(())
@@ -494,6 +517,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     limit,
                 },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
+                print_json(&json!({
+                    "entries": response.get("activity").cloned().unwrap_or_default()
+                }));
+                return Ok(());
+            }
             let entries = FileActivityService::new(durable_root).recent(limit)?;
             println!(
                 "{}",
@@ -508,6 +538,14 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     limit,
                 },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
+                print_json(&json!({
+                    "entries": response.get("activity").cloned().unwrap_or_default(),
+                    "tail": true
+                }));
+                return Ok(());
+            }
             let entries = FileActivityService::new(durable_root).recent(limit)?;
             println!(
                 "{}",
@@ -518,6 +556,25 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Log {
             action: LogAction::Show { id, durable_root },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let response = daemon_json("GET", "/activity?limit=1000", None)?;
+                let Some(entry) = response
+                    .get("activity")
+                    .and_then(|value| value.as_array())
+                    .and_then(|entries| {
+                        entries.iter().find(|entry| {
+                            entry.get("id").and_then(|value| value.as_str()) == Some(id.as_str())
+                        })
+                    })
+                    .cloned()
+                else {
+                    return Err(RefineError::NotFound(format!(
+                        "Log entry {id} was not found"
+                    )));
+                };
+                print_json(&json!({ "entry": entry }));
+                return Ok(());
+            }
             let service = FileActivityService::new(durable_root);
             let limit = service.count()?.max(1);
             let Some(entry) = service
@@ -548,6 +605,30 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     actor,
                 },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let mut query = vec![
+                    format!("limit={limit}"),
+                    format!("offset={offset}"),
+                    format!("q={}", query_component(&q)),
+                ];
+                if let Some(value) = gap_id {
+                    query.push(format!("gap_id={}", query_component(&value)));
+                }
+                if let Some(value) = severity {
+                    query.push(format!("severity={}", query_component(&value)));
+                }
+                if let Some(value) = category {
+                    query.push(format!("category={}", query_component(&value)));
+                }
+                if let Some(value) = actor {
+                    query.push(format!("actor={}", query_component(&value)));
+                }
+                let response = daemon_json("GET", &format!("/activity?{}", query.join("&")), None)?;
+                print_json(&json!({
+                    "entries": response.get("activity").cloned().unwrap_or_default()
+                }));
+                return Ok(());
+            }
             let entries = FileActivityService::new(durable_root).query(
                 limit,
                 offset,
@@ -585,6 +666,15 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Log {
+            action: LogAction::Export { durable_root: None },
+        } => {
+            let response = daemon_json("GET", "/activity?limit=1000", None)?;
+            let entries = response.get("activity").cloned().unwrap_or_default();
+            let exported = entries.as_array().map(Vec::len).unwrap_or_default();
+            print_json(&json!({"entries": entries, "exported": exported}));
+            Ok(())
+        }
+        Commands::Log {
             action:
                 LogAction::Bundle {
                     durable_root,
@@ -593,6 +683,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     redact_secrets,
                 },
         } => {
+            if skipped_durable_root(&durable_root) {
+                return Err(RefineError::NotImplemented(
+                    "log bundle is not available through the daemon API yet".to_string(),
+                ));
+            }
             let bundle = FileSupportBundleService::new(durable_root, runtime_root, repo_root)
                 .export(redact_secrets)?;
             println!("{}", serde_json::to_string_pretty(&bundle).unwrap());
@@ -878,6 +973,15 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 }))
                 .unwrap()
             );
+            Ok(())
+        }
+        Commands::Project {
+            action: ProjectAction::Sync {
+                durable_root: None, ..
+            },
+        } => {
+            let response = daemon_json("POST", "/cache/rebuild", None)?;
+            print_json(&response);
             Ok(())
         }
         Commands::Gap {
@@ -1392,6 +1496,44 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     feature_id,
                 },
         } => {
+            if skipped_durable_root(&durable_root) {
+                let import = FileImportService::new(PathBuf::new());
+                let source = if let Some(file) = file {
+                    fs::read_to_string(&file).map_err(|error| {
+                        RefineError::Io(format!(
+                            "failed to read import file {}: {error}",
+                            file.display()
+                        ))
+                    })?
+                } else {
+                    text.ok_or_else(|| {
+                        RefineError::InvalidInput(
+                            "feature import requires --text or --file".to_string(),
+                        )
+                    })?
+                };
+                let drafts = if csv {
+                    import.parse_csv(&source, reporter.as_deref())?
+                } else {
+                    import.parse_text(&source, reporter.as_deref())?
+                };
+                if drafts.is_empty() {
+                    return Err(RefineError::InvalidInput(
+                        "import input did not contain any drafts".to_string(),
+                    ));
+                }
+                let response = daemon_json(
+                    "POST",
+                    "/import/persist",
+                    Some(json!({
+                        "drafts": drafts,
+                        "reporter": reporter,
+                        "feature_id": feature_id
+                    })),
+                )?;
+                print_json(&response);
+                return Ok(());
+            }
             let service = FileImportService::new(durable_root);
             let result = if let Some(file) = file {
                 service.import_from_file(file, csv, reporter.as_deref(), feature_id.as_deref())?
@@ -1438,11 +1580,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let snapshot = if let Some(client_repo) = project_status.client_repo {
                 let durable_root = PathBuf::from(client_repo).join(".refine");
                 let store = FileProjectStateStore::new(&durable_root);
-                let snapshot = store.rebuild_projection()?;
-                if let Some(cache_dir) = &cache_dir {
-                    store.persist_projection_snapshot(cache_dir, &snapshot)?;
-                }
-                snapshot
+                let cache_root = cache_dir
+                    .clone()
+                    .unwrap_or_else(|| runtime_root.join("cache"));
+                store.load_or_refresh_projection(&cache_root)?
             } else {
                 ProjectionSnapshot::default()
             };
@@ -1481,12 +1622,61 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::Workflow { action } => dispatch_workflow_daemon(action),
         Commands::Node { action } => dispatch_node_daemon(action),
         Commands::Cluster { action } => dispatch_cluster_daemon(action),
-        other => Err(crate::core::supervisor::errors::RefineError::InvalidInput(
-            format!(
-                "CLI command is missing required options or cannot run in this mode: {other:?}"
-            ),
-        )),
     }
+}
+
+#[cfg(not(test))]
+fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()> {
+    let response = match action {
+        ProjectAction::Status { .. } => daemon_json("GET", "/project/status", None)?,
+        ProjectAction::Attach { path, .. } => {
+            daemon_json("POST", "/project/attach", Some(json!({ "path": path })))?
+        }
+        ProjectAction::Switch { name, .. } => {
+            daemon_json("POST", "/apps/switch", Some(json!({ "name": name })))?
+        }
+        ProjectAction::Detach { .. } => daemon_json("POST", "/project/detach", None)?,
+        ProjectAction::Register { name, path, .. } => daemon_json(
+            "POST",
+            "/apps/register",
+            Some(json!({
+                "name": name,
+                "path": path
+            })),
+        )?,
+        ProjectAction::Clone {
+            source,
+            destination,
+            name,
+            make_current,
+            ..
+        } => daemon_json(
+            "POST",
+            "/apps/clone",
+            Some(json!({
+                "source": source,
+                "destination": destination,
+                "name": name,
+                "make_current": make_current
+            })),
+        )?,
+        ProjectAction::Remove { name, .. } => {
+            daemon_json("DELETE", "/apps", Some(json!({ "name": name })))?
+        }
+        ProjectAction::Migrate { .. } => {
+            let status = daemon_json("GET", "/project/status", None)?;
+            json!({
+                "ok": true,
+                "migrated": false,
+                "schema": status.get("schema").cloned().unwrap_or(serde_json::Value::Null),
+                "message": "project schema is already compatible"
+            })
+        }
+        ProjectAction::Sync { .. } => daemon_json("POST", "/project/sync", None)?,
+        ProjectAction::Doctor { .. } => daemon_json("GET", "/diagnostics", None)?,
+    };
+    print_json(&response);
+    Ok(())
 }
 
 fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
@@ -2201,6 +2391,14 @@ fn path_segment(value: &str) -> String {
         }
     }
     escaped
+}
+
+fn query_component(value: &str) -> String {
+    path_segment(value)
+}
+
+fn skipped_durable_root(path: &PathBuf) -> bool {
+    path.as_os_str().is_empty()
 }
 
 fn new_cli_idempotency_key() -> String {

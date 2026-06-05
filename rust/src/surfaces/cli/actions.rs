@@ -58,27 +58,31 @@ pub enum ProjectAction {
     Status {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Attach {
         path: String,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Switch {
         name: String,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Detach {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Register {
@@ -86,7 +90,8 @@ pub enum ProjectAction {
         path: String,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Clone {
@@ -98,30 +103,35 @@ pub enum ProjectAction {
         make_current: bool,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Remove {
         name: String,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Migrate {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
     Sync {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long)]
         cache_dir: Option<PathBuf>,
     },
     Doctor {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
@@ -134,23 +144,27 @@ pub enum ProjectAction {
 pub enum GapAction {
     Create {
         name: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long)]
         id: Option<String>,
     },
     List {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Show {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Edit {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long)]
         name: Option<String>,
@@ -160,14 +174,16 @@ pub enum GapAction {
     Note {
         id: String,
         body: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long, default_value = "")]
         author: String,
     },
     Round {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long)]
         reporter: Option<String>,
@@ -180,50 +196,59 @@ pub enum GapAction {
     },
     Start {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Cancel {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Retry {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long, default_value = "quality")]
         stage: String,
     },
     Verify {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Merge {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Undo {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Delete {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     AssignFeature {
         id: String,
         feature_id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     RemoveFeature {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
 }
@@ -232,7 +257,8 @@ pub enum GapAction {
 pub enum FeatureAction {
     Create {
         name: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long)]
         id: Option<String>,
@@ -242,17 +268,20 @@ pub enum FeatureAction {
         reporter: Option<String>,
     },
     List {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Show {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Edit {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long)]
         name: Option<String>,
@@ -264,40 +293,47 @@ pub enum FeatureAction {
     AddGap {
         id: String,
         gap_id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     RemoveGap {
         id: String,
         gap_id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     ReorderGap {
         id: String,
         gap_id: String,
         order: i64,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Move {
         id: String,
         target: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Cancel {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Delete {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Import {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
         #[arg(long)]
         text: Option<String>,
@@ -321,12 +357,14 @@ pub enum WorkflowAction {
     Transition {
         id: String,
         target: CliGapStatus,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     BulkTransition {
         target: CliGapStatus,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long = "selected-id")]
         selected_ids: Vec<String>,
@@ -336,7 +374,8 @@ pub enum WorkflowAction {
         q: Option<String>,
     },
     Schedule {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
@@ -350,11 +389,13 @@ pub enum WorkflowAction {
         runtime_root: PathBuf,
     },
     Restore {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
     },
     Enforce {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
     },
 }
@@ -393,44 +434,52 @@ impl From<CliGapStatus> for GapStatus {
 #[derive(Debug, Subcommand)]
 pub enum NodeAction {
     List {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Show {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Create {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Activate {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Archive {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Rename {
         id: String,
         name: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Settings {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Transfer {
         id: String,
         item_id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
 }
@@ -438,17 +487,20 @@ pub enum NodeAction {
 #[derive(Debug, Subcommand)]
 pub enum ClusterAction {
     List {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Show {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     AddNode {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     EditNode {
@@ -471,42 +523,50 @@ pub enum ClusterAction {
         refine_port: Option<u16>,
         #[arg(long)]
         enabled: Option<bool>,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     EnableNode {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     DisableNode {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     RemoveNode {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Sync {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Run {
         id: String,
         command: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Transfer {
         id: String,
         item_id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Maintenance {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
 }
@@ -514,25 +574,29 @@ pub enum ClusterAction {
 #[derive(Debug, Subcommand)]
 pub enum LogAction {
     List {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
         #[arg(long, default_value_t = 50)]
         limit: usize,
     },
     Tail {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
         #[arg(long, default_value_t = 20)]
         limit: usize,
     },
     Show {
         id: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
     },
     Query {
         q: String,
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
         #[arg(long, default_value_t = 50)]
         limit: usize,
@@ -548,11 +612,13 @@ pub enum LogAction {
         actor: Option<String>,
     },
     Export {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
     Bundle {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
         durable_root: PathBuf,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
@@ -650,7 +716,8 @@ pub enum SystemAction {
         runtime_root: PathBuf,
     },
     Doctor {
-        #[arg(long)]
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,

@@ -836,6 +836,8 @@ refine/
           work_items/
           scheduling/
           chat/
+          imports/
+          nodes/
         host/
           installation/
           process_supervision/

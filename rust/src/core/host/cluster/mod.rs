@@ -500,7 +500,7 @@ fn ssh_command(
 ) -> RefineResult<Command> {
     let destination = ssh_destination(user, host)?;
     let mut command = Command::new("ssh");
-    command.arg("-p").arg(port.to_string());
+    append_ssh_common_args(&mut command, port);
     let identity_path = identity_path.trim();
     if !identity_path.is_empty() {
         command.arg("-i").arg(identity_path);
@@ -516,7 +516,8 @@ fn ssh_display_command(
     identity_path: &str,
     remote_command: &str,
 ) -> RefineResult<String> {
-    let mut parts = vec!["ssh".to_string(), "-p".to_string(), port.to_string()];
+    let mut parts = vec!["ssh".to_string()];
+    parts.extend(ssh_common_args(port));
     let identity_path = identity_path.trim();
     if !identity_path.is_empty() {
         parts.push("-i".to_string());
@@ -525,6 +526,25 @@ fn ssh_display_command(
     parts.push(shell_word(&ssh_destination(user, host)?));
     parts.push(shell_word(remote_command));
     Ok(parts.join(" "))
+}
+
+fn append_ssh_common_args(command: &mut Command, port: u16) {
+    command.args(ssh_common_args(port));
+}
+
+fn ssh_common_args(port: u16) -> Vec<String> {
+    vec![
+        "-p".to_string(),
+        port.to_string(),
+        "-o".to_string(),
+        "BatchMode=yes".to_string(),
+        "-o".to_string(),
+        "ConnectTimeout=10".to_string(),
+        "-o".to_string(),
+        "ServerAliveInterval=5".to_string(),
+        "-o".to_string(),
+        "ServerAliveCountMax=2".to_string(),
+    ]
 }
 
 fn shell_word(value: &str) -> String {
@@ -618,6 +638,9 @@ mod tests {
         assert!(result.ok);
         assert_eq!(result.exit_code, None);
         assert!(result.command.contains("ssh -p 2222"));
+        assert!(result.command.contains("-o BatchMode=yes"));
+        assert!(result.command.contains("-o ConnectTimeout=10"));
+        assert!(result.command.contains("-o ServerAliveCountMax=2"));
         assert!(result.command.contains("-i '~/.ssh/refine_ed25519'"));
         assert!(result.command.contains("'deploy@example.com'"));
         assert!(result.remote_command.contains("refine_port=8081"));

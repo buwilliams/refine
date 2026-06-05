@@ -41,6 +41,14 @@ impl InProcessWebServer {
             return self.handle_workflow_schedule();
         }
 
+        if request.method == "POST" && request.path == "/workflow/restore" {
+            return self.handle_workflow_restore();
+        }
+
+        if request.method == "POST" && request.path == "/workflow/enforce" {
+            return self.handle_workflow_enforce();
+        }
+
         if request.method == "GET" && request.path == "/activity" {
             return self.handle_activity_list(&raw_path);
         }
@@ -341,6 +349,10 @@ impl InProcessWebServer {
 
         if request.method == "POST" && request.path == "/apps/register" {
             return self.handle_project_register(request);
+        }
+
+        if request.method == "POST" && request.path == "/apps/clone" {
+            return self.handle_project_clone(request);
         }
 
         if request.method == "POST" && request.path == "/apps/switch" {

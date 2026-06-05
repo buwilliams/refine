@@ -582,6 +582,46 @@ impl InProcessWebServer {
         }
     }
 
+    pub(super) fn handle_project_clone(&self, request: ApiRequest) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("clone projects");
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let Some(source) = body
+            .get("source")
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.trim().is_empty())
+        else {
+            return error_response(RefineError::InvalidInput("source is required".to_string()));
+        };
+        let Some(destination) = body
+            .get("destination")
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.trim().is_empty())
+        else {
+            return error_response(RefineError::InvalidInput(
+                "destination is required".to_string(),
+            ));
+        };
+        let name = body
+            .get("name")
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.trim().is_empty());
+        let make_current = body
+            .get("make_current")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(true);
+        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).clone_app(
+            source,
+            destination,
+            name,
+            make_current,
+        ) {
+            Ok(status) => ApiResponse::json(201, project_status_value(status)),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(super) fn handle_project_switch(&self, request: ApiRequest) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("switch projects");
