@@ -9,6 +9,12 @@ __pycache__/
 build/
 dist/
 
+# Rust build artifacts
+/rust/target/
+/rust/desktop/src-tauri/target/
+/rust/xtask/target/
+/rust/run/
+
 # Per-checkout refine binding (links this refine source dir to a target app).
 # Created by `refine init`; host-specific; do not commit.
 .refine-binding

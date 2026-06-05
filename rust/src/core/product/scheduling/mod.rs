@@ -1,0 +1,790 @@
+use std::collections::{BTreeMap, BTreeSet};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use serde_json::json;
+use uuid::Uuid;
+
+use crate::core::product::nodes::FileNodeRegistryService;
+use crate::core::product::project_state::{
+    FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
+};
+use crate::core::supervisor::config::{ConfigService, FileSettingsService};
+use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::model::JsonObject;
+use crate::model::log::LogEntry;
+use crate::model::workflow::GapStatus;
+
+pub const SCHEDULER_STATE_FILE: &str = "scheduler-state.json";
+
+#[derive(Clone, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SchedulerControl {
+    Agents,
+    TargetApp,
+    Job(String),
+    AllAutomation,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReservationState {
+    Reserved,
+    Dispatched,
+    Cancelled,
+    Interrupted,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ScheduleReservation {
+    pub reservation_id: String,
+    pub gap_id: String,
+    #[serde(default = "default_node_id")]
+    pub node_id: String,
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    #[serde(default = "default_target_app_id")]
+    pub target_app_id: String,
+    pub job_id: Option<String>,
+    pub state: ReservationState,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SchedulerPolicy {
+    pub global_limit: usize,
+    pub per_node_limit: usize,
+    pub per_provider_limit: usize,
+    pub per_target_app_limit: usize,
+    pub active_node_id: String,
+    pub provider: String,
+    pub target_app_id: String,
+}
+
+impl Default for SchedulerPolicy {
+    fn default() -> Self {
+        Self {
+            global_limit: 2,
+            per_node_limit: 1,
+            per_provider_limit: 2,
+            per_target_app_limit: 2,
+            active_node_id: default_node_id(),
+            provider: default_provider(),
+            target_app_id: default_target_app_id(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SchedulerState {
+    pub paused: BTreeSet<SchedulerControl>,
+    #[serde(default)]
+    pub policy: SchedulerPolicy,
+    pub reservations: Vec<ScheduleReservation>,
+    pub updated_at: Option<String>,
+}
+
+pub trait SchedulingService {
+    fn promote(&self) -> RefineResult<usize>;
+    fn reserve(&self, gap_id: &str) -> RefineResult<String>;
+    fn dispatch(&self, reservation_id: &str) -> RefineResult<String>;
+    fn pause(&self, control: SchedulerControl) -> RefineResult<()>;
+    fn resume(&self, control: SchedulerControl) -> RefineResult<()>;
+    fn cancel(&self, job_id: &str) -> RefineResult<()>;
+    fn retry(&self, job_id: &str) -> RefineResult<String>;
+}
+
+#[derive(Clone, Debug)]
+pub struct FileSchedulingService {
+    pub runtime_root: PathBuf,
+    pub durable_root: Option<PathBuf>,
+    pub job_registry: FileJobRegistry,
+}
+
+impl FileSchedulingService {
+    pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
+        let runtime_root = runtime_root.into();
+        Self {
+            job_registry: FileJobRegistry::new(&runtime_root),
+            runtime_root,
+            durable_root: None,
+        }
+    }
+
+    pub fn with_durable_root(
+        runtime_root: impl Into<PathBuf>,
+        durable_root: impl Into<PathBuf>,
+    ) -> Self {
+        let runtime_root = runtime_root.into();
+        Self {
+            job_registry: FileJobRegistry::new(&runtime_root),
+            runtime_root,
+            durable_root: Some(durable_root.into()),
+        }
+    }
+
+    pub fn state_path(&self) -> PathBuf {
+        self.runtime_root.join(SCHEDULER_STATE_FILE)
+    }
+
+    pub fn load_state(&self) -> RefineResult<SchedulerState> {
+        read_state(&self.state_path())
+    }
+
+    fn save_state(&self, state: &mut SchedulerState) -> RefineResult<()> {
+        state.policy = self.policy()?;
+        state.updated_at = Some(now_timestamp());
+        write_state(&self.state_path(), state)
+    }
+
+    pub fn policy(&self) -> RefineResult<SchedulerPolicy> {
+        let mut policy = SchedulerPolicy::default();
+        if let Some(durable_root) = &self.durable_root {
+            let settings = FileSettingsService::new(durable_root).load()?;
+            policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
+            policy.per_node_limit =
+                setting_usize(&settings, "parallel_per_node_cap", policy.per_node_limit);
+            policy.per_provider_limit = setting_usize(
+                &settings,
+                "parallel_per_provider_cap",
+                policy.per_provider_limit,
+            );
+            policy.per_target_app_limit = setting_usize(
+                &settings,
+                "parallel_per_target_app_cap",
+                policy.per_target_app_limit,
+            );
+            policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
+            policy.target_app_id = durable_root
+                .parent()
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| policy.target_app_id.clone());
+            policy.active_node_id = FileNodeRegistryService::new(durable_root).active_node_id()?;
+        }
+        Ok(policy)
+    }
+
+    fn ensure_automation_running(&self, state: &SchedulerState) -> RefineResult<()> {
+        if state.paused.contains(&SchedulerControl::AllAutomation)
+            || state.paused.contains(&SchedulerControl::Agents)
+        {
+            return Err(RefineError::Conflict(
+                "automation is paused for agents".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn active_reservation<'a>(
+        state: &'a SchedulerState,
+        gap_id: &str,
+    ) -> Option<&'a ScheduleReservation> {
+        state.reservations.iter().find(|reservation| {
+            reservation.gap_id == gap_id
+                && matches!(
+                    reservation.state,
+                    ReservationState::Reserved | ReservationState::Dispatched
+                )
+        })
+    }
+
+    fn reservation_load(state: &SchedulerState, policy: &SchedulerPolicy) -> ReservationLoad {
+        Self::reservation_load_excluding(state, policy, None)
+    }
+
+    fn reservation_load_excluding(
+        state: &SchedulerState,
+        policy: &SchedulerPolicy,
+        excluded_index: Option<usize>,
+    ) -> ReservationLoad {
+        let mut load = ReservationLoad::default();
+        for reservation in state
+            .reservations
+            .iter()
+            .enumerate()
+            .filter(|(index, reservation)| {
+                Some(*index) != excluded_index
+                    && matches!(
+                        reservation.state,
+                        ReservationState::Reserved | ReservationState::Dispatched
+                    )
+            })
+            .map(|(_, reservation)| reservation)
+        {
+            load.global += 1;
+            *load.by_node.entry(reservation.node_id.clone()).or_default() += 1;
+            *load
+                .by_provider
+                .entry(reservation.provider.clone())
+                .or_default() += 1;
+            *load
+                .by_target_app
+                .entry(reservation.target_app_id.clone())
+                .or_default() += 1;
+        }
+        load.ensure_policy_keys(policy);
+        load
+    }
+
+    fn capacity_available(
+        state: &SchedulerState,
+        policy: &SchedulerPolicy,
+        node_id: &str,
+        provider: &str,
+        target_app_id: &str,
+    ) -> bool {
+        let load = Self::reservation_load(state, policy);
+        load.global < policy.global_limit
+            && load.by_node.get(node_id).copied().unwrap_or(0) < policy.per_node_limit
+            && load.by_provider.get(provider).copied().unwrap_or(0) < policy.per_provider_limit
+            && load.by_target_app.get(target_app_id).copied().unwrap_or(0)
+                < policy.per_target_app_limit
+    }
+
+    fn capacity_available_excluding(
+        state: &SchedulerState,
+        policy: &SchedulerPolicy,
+        node_id: &str,
+        provider: &str,
+        target_app_id: &str,
+        excluded_index: usize,
+    ) -> bool {
+        let load = Self::reservation_load_excluding(state, policy, Some(excluded_index));
+        load.global < policy.global_limit
+            && load.by_node.get(node_id).copied().unwrap_or(0) < policy.per_node_limit
+            && load.by_provider.get(provider).copied().unwrap_or(0) < policy.per_provider_limit
+            && load.by_target_app.get(target_app_id).copied().unwrap_or(0)
+                < policy.per_target_app_limit
+    }
+
+    fn reservation_metadata(
+        &self,
+        gap: Option<&GapSummaryProjection>,
+        policy: &SchedulerPolicy,
+    ) -> RefineResult<ReservationMetadata> {
+        let node_id = gap
+            .and_then(|gap| gap.gap.node_id.clone())
+            .unwrap_or_else(|| default_node_id());
+        if node_id != policy.active_node_id {
+            let gap_id = gap
+                .map(|gap| gap.gap.id.as_str())
+                .unwrap_or("requested Gap");
+            return Err(RefineError::Conflict(format!(
+                "{gap_id} is owned by node {node_id}, not active node {}",
+                policy.active_node_id
+            )));
+        }
+        Ok(ReservationMetadata {
+            node_id,
+            provider: policy.provider.clone(),
+            target_app_id: policy.target_app_id.clone(),
+        })
+    }
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct ReservationLoad {
+    global: usize,
+    by_node: BTreeMap<String, usize>,
+    by_provider: BTreeMap<String, usize>,
+    by_target_app: BTreeMap<String, usize>,
+}
+
+impl ReservationLoad {
+    fn ensure_policy_keys(&mut self, policy: &SchedulerPolicy) {
+        self.by_node
+            .entry(policy.active_node_id.clone())
+            .or_default();
+        self.by_provider.entry(policy.provider.clone()).or_default();
+        self.by_target_app
+            .entry(policy.target_app_id.clone())
+            .or_default();
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct ReservationMetadata {
+    node_id: String,
+    provider: String,
+    target_app_id: String,
+}
+
+impl SchedulingService for FileSchedulingService {
+    fn promote(&self) -> RefineResult<usize> {
+        let mut state = self.load_state()?;
+        let policy = self.policy()?;
+        state.policy = policy.clone();
+        self.ensure_automation_running(&state)?;
+        let Some(durable_root) = &self.durable_root else {
+            return Ok(state
+                .reservations
+                .iter()
+                .filter(|reservation| reservation.state == ReservationState::Reserved)
+                .count());
+        };
+        let store = FileProjectStateStore::new(durable_root);
+        let snapshot = store.rebuild_projection()?;
+        let mut eligible = snapshot
+            .gaps
+            .values()
+            .filter(|projection| projection.gap.status == GapStatus::Todo)
+            .cloned()
+            .collect::<Vec<_>>();
+        eligible.sort_by(|a, b| {
+            a.gap
+                .feature_order
+                .unwrap_or(i64::MAX)
+                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+                .then_with(|| a.gap.created.cmp(&b.gap.created))
+                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        });
+
+        let mut promoted = 0;
+        for gap in eligible {
+            if Self::active_reservation(&state, &gap.gap.id).is_some() {
+                continue;
+            }
+            let metadata = match self.reservation_metadata(Some(&gap), &policy) {
+                Ok(metadata) => metadata,
+                Err(RefineError::Conflict(_)) => continue,
+                Err(error) => return Err(error),
+            };
+            if !Self::capacity_available(
+                &state,
+                &policy,
+                &metadata.node_id,
+                &metadata.provider,
+                &metadata.target_app_id,
+            ) {
+                break;
+            }
+            let now = now_timestamp();
+            state.reservations.push(ScheduleReservation {
+                reservation_id: new_reservation_id(),
+                gap_id: gap.gap.id,
+                node_id: metadata.node_id,
+                provider: metadata.provider,
+                target_app_id: metadata.target_app_id,
+                job_id: None,
+                state: ReservationState::Reserved,
+                created_at: now.clone(),
+                updated_at: now,
+            });
+            promoted += 1;
+        }
+        if promoted > 0 {
+            self.save_state(&mut state)?;
+        }
+        Ok(promoted)
+    }
+
+    fn reserve(&self, gap_id: &str) -> RefineResult<String> {
+        let gap_id = gap_id.trim();
+        if gap_id.is_empty() {
+            return Err(RefineError::InvalidInput("Gap id is required".to_string()));
+        }
+        let mut state = self.load_state()?;
+        let policy = self.policy()?;
+        state.policy = policy.clone();
+        self.ensure_automation_running(&state)?;
+        if let Some(existing) = Self::active_reservation(&state, gap_id) {
+            return Ok(existing.reservation_id.clone());
+        }
+        let gap = if let Some(durable_root) = &self.durable_root {
+            let snapshot = FileProjectStateStore::new(durable_root).rebuild_projection()?;
+            Some(snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
+                RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
+            })?)
+        } else {
+            None
+        };
+        let metadata = self.reservation_metadata(gap.as_ref(), &policy)?;
+        if !Self::capacity_available(
+            &state,
+            &policy,
+            &metadata.node_id,
+            &metadata.provider,
+            &metadata.target_app_id,
+        ) {
+            return Err(RefineError::Conflict(
+                "scheduler concurrency limit reached".to_string(),
+            ));
+        }
+        let now = now_timestamp();
+        let reservation = ScheduleReservation {
+            reservation_id: new_reservation_id(),
+            gap_id: gap_id.to_string(),
+            node_id: metadata.node_id,
+            provider: metadata.provider,
+            target_app_id: metadata.target_app_id,
+            job_id: None,
+            state: ReservationState::Reserved,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        let id = reservation.reservation_id.clone();
+        state.reservations.push(reservation);
+        self.save_state(&mut state)?;
+        Ok(id)
+    }
+
+    fn dispatch(&self, reservation_id: &str) -> RefineResult<String> {
+        let reservation_id = reservation_id.trim();
+        let mut state = self.load_state()?;
+        self.ensure_automation_running(&state)?;
+        let Some(reservation) = state
+            .reservations
+            .iter_mut()
+            .find(|reservation| reservation.reservation_id == reservation_id)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "reservation {reservation_id} was not found"
+            )));
+        };
+        if reservation.state != ReservationState::Reserved {
+            return Err(RefineError::Conflict(format!(
+                "reservation {reservation_id} is not reserved"
+            )));
+        }
+        let job = self
+            .job_registry
+            .register(&format!("gap:{}", reservation.gap_id))?;
+        reservation.job_id = Some(job.id.clone());
+        reservation.state = ReservationState::Dispatched;
+        reservation.updated_at = now_timestamp();
+        self.save_state(&mut state)?;
+        Ok(job.id)
+    }
+
+    fn pause(&self, control: SchedulerControl) -> RefineResult<()> {
+        let mut state = self.load_state()?;
+        state.paused.insert(control);
+        self.save_state(&mut state)
+    }
+
+    fn resume(&self, control: SchedulerControl) -> RefineResult<()> {
+        let mut state = self.load_state()?;
+        state.paused.remove(&control);
+        self.save_state(&mut state)
+    }
+
+    fn cancel(&self, job_id: &str) -> RefineResult<()> {
+        let job_id = job_id.trim();
+        self.job_registry.cancel(job_id)?;
+        let mut state = self.load_state()?;
+        if let Some(reservation) = state
+            .reservations
+            .iter_mut()
+            .find(|reservation| reservation.job_id.as_deref() == Some(job_id))
+        {
+            reservation.state = ReservationState::Cancelled;
+            reservation.updated_at = now_timestamp();
+            self.save_state(&mut state)?;
+        }
+        Ok(())
+    }
+
+    fn retry(&self, job_id: &str) -> RefineResult<String> {
+        let job_id = job_id.trim();
+        let mut state = self.load_state()?;
+        let policy = self.policy()?;
+        state.policy = policy.clone();
+        self.ensure_automation_running(&state)?;
+        let Some(reservation_index) = state
+            .reservations
+            .iter()
+            .position(|reservation| reservation.job_id.as_deref() == Some(job_id))
+        else {
+            return Err(RefineError::NotFound(format!(
+                "reservation for job {job_id} was not found"
+            )));
+        };
+        let gap_id = state.reservations[reservation_index].gap_id.clone();
+        let node_id = state.reservations[reservation_index].node_id.clone();
+        let provider = state.reservations[reservation_index].provider.clone();
+        let target_app_id = state.reservations[reservation_index].target_app_id.clone();
+        if !Self::capacity_available_excluding(
+            &state,
+            &policy,
+            &node_id,
+            &provider,
+            &target_app_id,
+            reservation_index,
+        ) {
+            return Err(RefineError::Conflict(
+                "scheduler concurrency limit reached".to_string(),
+            ));
+        }
+        let job = self.job_registry.register(&format!("gap:{gap_id}"))?;
+        let mut details = JsonObject::new();
+        details.insert("retried_job_id".to_string(), json!(job.id));
+        self.job_registry.append_log(
+            job_id,
+            LogEntry {
+                datetime: now_timestamp(),
+                severity: "info".to_string(),
+                category: "job".to_string(),
+                message: format!("Job retried as {}", job.id),
+                details: Some(details),
+                actions: Vec::new(),
+                actor: Some("refine".to_string()),
+                gap_id: Some(gap_id),
+            },
+        )?;
+        let reservation = &mut state.reservations[reservation_index];
+        reservation.job_id = Some(job.id.clone());
+        reservation.state = ReservationState::Dispatched;
+        reservation.updated_at = now_timestamp();
+        self.save_state(&mut state)?;
+        Ok(job.id)
+    }
+}
+
+fn read_state(path: &Path) -> RefineResult<SchedulerState> {
+    if !path.exists() {
+        return Ok(SchedulerState::default());
+    }
+    let bytes = fs::read(path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read scheduler state {}: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_slice::<SchedulerState>(&bytes).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to parse scheduler state {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn write_state(path: &Path, state: &SchedulerState) -> RefineResult<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create scheduler state directory {}: {error}",
+                parent.display()
+            ))
+        })?;
+    }
+    let encoded = serde_json::to_vec_pretty(state).map_err(|error| {
+        RefineError::Serialization(format!("failed to encode scheduler state: {error}"))
+    })?;
+    fs::write(path, encoded).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to write scheduler state {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -> usize {
+    settings
+        .get(key)
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(fallback)
+}
+
+fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
+    settings
+        .get(key)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToString::to_string)
+        .unwrap_or_else(|| fallback.to_string())
+}
+
+fn default_node_id() -> String {
+    "default".to_string()
+}
+
+fn default_provider() -> String {
+    "claude".to_string()
+}
+
+fn default_target_app_id() -> String {
+    "default".to_string()
+}
+
+fn new_reservation_id() -> String {
+    format!("res-{}", Uuid::new_v4())
+}
+
+fn now_timestamp() -> String {
+    Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::product::nodes::FileNodeRegistryService;
+    use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
+    use crate::core::supervisor::config::FileSettingsService;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn file_scheduler_promotes_todo_gaps_and_dispatches_jobs() {
+        let temp_root = unique_temp_dir("scheduler");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_gap_summary("Queued", Some("GAP1"))
+            .unwrap();
+        work_items
+            .transition_gap_status("GAP1", GapStatus::Todo)
+            .unwrap();
+        work_items
+            .create_gap_summary("Backlog", Some("GAP2"))
+            .unwrap();
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.promote().unwrap(), 1);
+        assert_eq!(scheduler.promote().unwrap(), 0);
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.reservations.len(), 1);
+        assert_eq!(state.reservations[0].gap_id, "GAP1");
+
+        let job_id = scheduler
+            .dispatch(&state.reservations[0].reservation_id)
+            .unwrap();
+        assert_eq!(
+            scheduler.job_registry.status(&job_id).unwrap().owner,
+            "gap:GAP1"
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_enforces_configured_concurrency_limits() {
+        let temp_root = unique_temp_dir("scheduler-limits");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        FileSettingsService::new(&durable_root)
+            .update(&json!({
+                "parallel_run_cap": 2,
+                "parallel_per_node_cap": 2,
+                "parallel_per_provider_cap": 1,
+                "parallel_per_target_app_cap": 2,
+                "agent_cli": "smoke-ai"
+            }))
+            .unwrap();
+        let work_items = FileWorkItemService::new(&durable_root);
+        for id in ["GAP1", "GAP2", "GAP3"] {
+            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items
+                .transition_gap_status(id, GapStatus::Todo)
+                .unwrap();
+        }
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.promote().unwrap(), 1);
+        assert_eq!(scheduler.promote().unwrap(), 0);
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.policy.provider, "smoke-ai");
+        assert_eq!(state.policy.per_provider_limit, 1);
+        assert_eq!(state.reservations.len(), 1);
+        assert_eq!(state.reservations[0].provider, "smoke-ai");
+        assert_eq!(state.reservations[0].node_id, "default");
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_enforces_active_node_ownership() {
+        let temp_root = unique_temp_dir("scheduler-node-ownership");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_gap_summary("Local", Some("LOCAL"))
+            .unwrap();
+        work_items
+            .transition_gap_status("LOCAL", GapStatus::Todo)
+            .unwrap();
+        work_items
+            .create_gap_summary("Remote", Some("REMOTE"))
+            .unwrap();
+        work_items
+            .transition_gap_status("REMOTE", GapStatus::Todo)
+            .unwrap();
+        work_items
+            .bulk_transfer_gaps_to_node(
+                "remote-node",
+                BulkGapSelection {
+                    selected_ids: Some(vec!["REMOTE".to_string()]),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        FileNodeRegistryService::new(&durable_root)
+            .create("remote-node")
+            .unwrap();
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.promote().unwrap(), 1);
+        assert!(scheduler.reserve("REMOTE").is_err());
+
+        FileNodeRegistryService::new(&durable_root)
+            .activate("remote-node")
+            .unwrap();
+        let remote_scheduler =
+            FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        let remote_reservation = remote_scheduler.reserve("REMOTE").unwrap();
+        let state = remote_scheduler.load_state().unwrap();
+        assert!(state.reservations.iter().any(|reservation| {
+            reservation.reservation_id == remote_reservation && reservation.node_id == "remote-node"
+        }));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_pauses_cancels_and_retries_jobs() {
+        let temp_root = unique_temp_dir("scheduler-controls");
+        let scheduler = FileSchedulingService::new(temp_root.join("run/8080"));
+
+        scheduler.pause(SchedulerControl::Agents).unwrap();
+        assert!(scheduler.reserve("GAP1").is_err());
+        scheduler.resume(SchedulerControl::Agents).unwrap();
+
+        let reservation_id = scheduler.reserve("GAP1").unwrap();
+        assert_eq!(scheduler.reserve("GAP1").unwrap(), reservation_id);
+        let job_id = scheduler.dispatch(&reservation_id).unwrap();
+        scheduler.cancel(&job_id).unwrap();
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.reservations[0].state, ReservationState::Cancelled);
+
+        let retried_job_id = scheduler.retry(&job_id).unwrap();
+        assert_ne!(retried_job_id, job_id);
+        assert_eq!(
+            scheduler
+                .job_registry
+                .status(&retried_job_id)
+                .unwrap()
+                .owner,
+            "gap:GAP1"
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "refine-native-{prefix}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+}

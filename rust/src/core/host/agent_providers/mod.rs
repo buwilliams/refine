@@ -1,0 +1,683 @@
+use std::env;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use serde::{Deserialize, Serialize};
+
+use crate::core::supervisor::errors::{RefineError, RefineResult};
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProviderCapability {
+    pub name: String,
+    pub display_name: String,
+    pub binary: String,
+    pub installed: bool,
+    pub path: Option<String>,
+    pub supports_resume: bool,
+    pub supports_direct_api: bool,
+    pub supports_cli: bool,
+    pub output_format: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProviderInvocation {
+    pub provider: String,
+    pub prompt: String,
+    pub session_id: Option<String>,
+    pub cwd: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ProviderInvocationResult {
+    pub output: String,
+    pub provider_session_id: Option<String>,
+    pub raw_output: String,
+}
+
+pub trait AgentProviderService {
+    fn detect(&self) -> RefineResult<Vec<ProviderCapability>>;
+    fn configure(&self, provider: &str) -> RefineResult<()>;
+    fn authenticate(&self, provider: &str) -> RefineResult<()>;
+    fn invoke(&self, invocation: ProviderInvocation) -> RefineResult<String>;
+    fn resume(&self, provider: &str, session_id: &str) -> RefineResult<String>;
+    fn diagnose(&self, provider: &str) -> RefineResult<Vec<String>>;
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct HostAgentProviderService {
+    pub path_override: Option<String>,
+}
+
+impl HostAgentProviderService {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    fn spec(provider: &str) -> Option<ProviderSpec> {
+        match provider {
+            "claude" => Some(ProviderSpec::new(
+                "claude",
+                "Claude Code",
+                "claude",
+                "claude_json",
+                true,
+                false,
+            )),
+            "codex" => Some(ProviderSpec::new(
+                "codex",
+                "OpenAI Codex",
+                "codex",
+                "codex_json",
+                true,
+                true,
+            )),
+            "gemini" => Some(ProviderSpec::new(
+                "gemini", "Gemini", "gemini", "plain", false, true,
+            )),
+            "copilot" => Some(ProviderSpec::new(
+                "copilot",
+                "GitHub Copilot",
+                "copilot",
+                "copilot_json",
+                false,
+                false,
+            )),
+            "smoke-ai" => Some(ProviderSpec::new(
+                "smoke-ai", "Smoke AI", "smoke-ai", "plain", false, false,
+            )),
+            _ => None,
+        }
+    }
+
+    fn specs() -> Vec<ProviderSpec> {
+        ["claude", "codex", "gemini", "copilot", "smoke-ai"]
+            .into_iter()
+            .filter_map(Self::spec)
+            .collect()
+    }
+
+    fn detect_spec(&self, spec: ProviderSpec) -> ProviderCapability {
+        let binary = if spec.name == "smoke-ai" {
+            env::var("REFINE_SMOKE_AI_PATH").unwrap_or_else(|_| spec.binary.to_string())
+        } else {
+            spec.binary.to_string()
+        };
+        let path = find_executable(&binary, self.path_override.as_deref());
+        ProviderCapability {
+            name: spec.name.to_string(),
+            display_name: spec.display_name.to_string(),
+            binary,
+            installed: path.is_some(),
+            path: path.map(|path| path.display().to_string()),
+            supports_resume: spec.supports_resume,
+            supports_direct_api: spec.supports_direct_api,
+            supports_cli: true,
+            output_format: spec.output_format.to_string(),
+        }
+    }
+
+    fn resolve_binary_for_provider(&self, provider: &str) -> RefineResult<(ProviderSpec, String)> {
+        let spec = Self::spec(provider)
+            .ok_or_else(|| RefineError::InvalidInput(format!("unknown provider {provider}")))?;
+        let capability = self.detect_spec(spec.clone());
+        let Some(path) = capability.path.or_else(|| {
+            if capability.installed {
+                Some(capability.binary.clone())
+            } else {
+                None
+            }
+        }) else {
+            return Err(RefineError::Degraded(format!(
+                "{} CLI was not found on PATH",
+                capability.display_name
+            )));
+        };
+        Ok((spec, path))
+    }
+
+    pub fn invoke_detailed(
+        &self,
+        invocation: ProviderInvocation,
+    ) -> RefineResult<ProviderInvocationResult> {
+        let (spec, binary) = self.resolve_binary_for_provider(&invocation.provider)?;
+        let cwd = invocation.cwd.as_deref().map(Path::new);
+        let args = spec.chat_args(
+            &binary,
+            &invocation.prompt,
+            invocation.session_id.as_deref(),
+            cwd,
+        );
+        run_provider_command_result(&args, cwd, spec.output_format)
+    }
+
+    pub fn resume_detailed(
+        &self,
+        provider: &str,
+        session_id: &str,
+    ) -> RefineResult<ProviderInvocationResult> {
+        let (spec, binary) = self.resolve_binary_for_provider(provider)?;
+        if !spec.supports_resume {
+            return Err(RefineError::InvalidInput(format!(
+                "{} does not support provider-session resume",
+                spec.display_name
+            )));
+        }
+        let args = spec.chat_args(&binary, "", Some(session_id), None);
+        run_provider_command_result(&args, None, spec.output_format)
+    }
+}
+
+impl AgentProviderService for HostAgentProviderService {
+    fn detect(&self) -> RefineResult<Vec<ProviderCapability>> {
+        Ok(Self::specs()
+            .into_iter()
+            .map(|spec| self.detect_spec(spec))
+            .collect())
+    }
+
+    fn configure(&self, provider: &str) -> RefineResult<()> {
+        Self::spec(provider)
+            .map(|_| ())
+            .ok_or_else(|| RefineError::InvalidInput(format!("unknown provider {provider}")))
+    }
+
+    fn authenticate(&self, provider: &str) -> RefineResult<()> {
+        let capability = self
+            .detect_spec(Self::spec(provider).ok_or_else(|| {
+                RefineError::InvalidInput(format!("unknown provider {provider}"))
+            })?);
+        if capability.installed {
+            Ok(())
+        } else {
+            Err(RefineError::Degraded(format!(
+                "{} CLI was not found on PATH",
+                capability.display_name
+            )))
+        }
+    }
+
+    fn invoke(&self, invocation: ProviderInvocation) -> RefineResult<String> {
+        self.invoke_detailed(invocation).map(|result| result.output)
+    }
+
+    fn resume(&self, provider: &str, session_id: &str) -> RefineResult<String> {
+        self.resume_detailed(provider, session_id)
+            .map(|result| result.output)
+    }
+
+    fn diagnose(&self, provider: &str) -> RefineResult<Vec<String>> {
+        let capability = self
+            .detect_spec(Self::spec(provider).ok_or_else(|| {
+                RefineError::InvalidInput(format!("unknown provider {provider}"))
+            })?);
+        if capability.installed {
+            Ok(vec![format!(
+                "{} CLI found at {}",
+                capability.display_name,
+                capability.path.unwrap_or_default()
+            )])
+        } else {
+            Ok(vec![format!(
+                "{} CLI not found; install it and run its login command on the host",
+                capability.display_name
+            )])
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ProviderSpec {
+    name: &'static str,
+    display_name: &'static str,
+    binary: &'static str,
+    output_format: &'static str,
+    supports_resume: bool,
+    supports_direct_api: bool,
+}
+
+impl ProviderSpec {
+    fn new(
+        name: &'static str,
+        display_name: &'static str,
+        binary: &'static str,
+        output_format: &'static str,
+        supports_resume: bool,
+        supports_direct_api: bool,
+    ) -> Self {
+        Self {
+            name,
+            display_name,
+            binary,
+            output_format,
+            supports_resume,
+            supports_direct_api,
+        }
+    }
+
+    fn agent_args(&self, binary_path: &str, prompt: &str, cwd: Option<&Path>) -> Vec<String> {
+        match self.name {
+            "claude" => vec![
+                binary_path.to_string(),
+                "--print".to_string(),
+                "--output-format=stream-json".to_string(),
+                "--verbose".to_string(),
+                "--dangerously-skip-permissions".to_string(),
+                prompt.to_string(),
+            ],
+            "codex" => {
+                let mut args = vec![
+                    binary_path.to_string(),
+                    "exec".to_string(),
+                    "--dangerously-bypass-approvals-and-sandbox".to_string(),
+                    "--color".to_string(),
+                    "never".to_string(),
+                    "--json".to_string(),
+                ];
+                if let Some(cwd) = cwd {
+                    args.extend(["-C".to_string(), cwd.display().to_string()]);
+                }
+                args.push(prompt.to_string());
+                args
+            }
+            "gemini" => vec![
+                binary_path.to_string(),
+                "--yolo".to_string(),
+                "-p".to_string(),
+                prompt.to_string(),
+            ],
+            "copilot" => {
+                let mut args = vec![
+                    binary_path.to_string(),
+                    "--allow-all".to_string(),
+                    "--output-format".to_string(),
+                    "json".to_string(),
+                    "--no-color".to_string(),
+                    "--no-auto-update".to_string(),
+                ];
+                if let Some(cwd) = cwd {
+                    args.extend(["-C".to_string(), cwd.display().to_string()]);
+                }
+                args.extend(["-p".to_string(), prompt.to_string()]);
+                args
+            }
+            "smoke-ai" => vec![binary_path.to_string(), prompt.to_string()],
+            _ => vec![binary_path.to_string(), prompt.to_string()],
+        }
+    }
+
+    fn chat_args(
+        &self,
+        binary_path: &str,
+        prompt: &str,
+        session_id: Option<&str>,
+        cwd: Option<&Path>,
+    ) -> Vec<String> {
+        match self.name {
+            "claude" => {
+                let mut args = vec![
+                    binary_path.to_string(),
+                    "--print".to_string(),
+                    "--output-format=stream-json".to_string(),
+                    "--verbose".to_string(),
+                ];
+                if let Some(session_id) = session_id {
+                    args.extend(["--resume".to_string(), session_id.to_string()]);
+                }
+                if !prompt.is_empty() {
+                    args.push(prompt.to_string());
+                }
+                args
+            }
+            "codex" if session_id.is_some() => {
+                let mut args = vec![
+                    binary_path.to_string(),
+                    "exec".to_string(),
+                    "resume".to_string(),
+                    "--dangerously-bypass-approvals-and-sandbox".to_string(),
+                    "--json".to_string(),
+                    session_id.unwrap_or_default().to_string(),
+                ];
+                if !prompt.is_empty() {
+                    args.push(prompt.to_string());
+                }
+                args
+            }
+            "copilot" if session_id.is_some() => {
+                let mut args = vec![
+                    binary_path.to_string(),
+                    "--allow-all".to_string(),
+                    "--output-format".to_string(),
+                    "json".to_string(),
+                    "--no-color".to_string(),
+                    "--no-auto-update".to_string(),
+                ];
+                if let Some(cwd) = cwd {
+                    args.extend(["-C".to_string(), cwd.display().to_string()]);
+                }
+                args.push(format!("--resume={}", session_id.unwrap_or_default()));
+                if !prompt.is_empty() {
+                    args.extend(["-p".to_string(), prompt.to_string()]);
+                }
+                args
+            }
+            _ => self.agent_args(binary_path, prompt, cwd),
+        }
+    }
+}
+
+fn find_executable(binary: &str, path_override: Option<&str>) -> Option<PathBuf> {
+    let candidate = Path::new(binary);
+    if candidate.components().count() > 1 {
+        return executable_file(candidate).then(|| candidate.to_path_buf());
+    }
+    let path = path_override
+        .map(str::to_string)
+        .or_else(|| env::var("PATH").ok())
+        .unwrap_or_default();
+    env::split_paths(&path)
+        .map(|dir| dir.join(binary))
+        .find(|path| executable_file(path))
+}
+
+fn executable_file(path: &Path) -> bool {
+    path.is_file()
+}
+
+fn run_provider_command_result(
+    args: &[String],
+    cwd: Option<&Path>,
+    output_format: &str,
+) -> RefineResult<ProviderInvocationResult> {
+    let Some((binary, rest)) = args.split_first() else {
+        return Err(RefineError::InvalidInput(
+            "provider command cannot be empty".to_string(),
+        ));
+    };
+    let mut command = Command::new(binary);
+    command
+        .args(rest)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
+    let output = command.output().map_err(|error| {
+        RefineError::Degraded(format!(
+            "failed to launch provider command {binary}: {error}"
+        ))
+    })?;
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if !output.status.success() {
+        let message = last_non_empty_line(&stderr)
+            .or_else(|| last_non_empty_line(&stdout))
+            .unwrap_or_else(|| format!("provider command exited {}", output.status));
+        return Err(RefineError::Degraded(message));
+    }
+    let final_text = extract_final_text(&stdout, output_format);
+    let provider_session_id = extract_provider_session_id(&stdout);
+    if final_text.trim().is_empty() {
+        Ok(ProviderInvocationResult {
+            output: stdout.clone(),
+            provider_session_id,
+            raw_output: stdout,
+        })
+    } else {
+        Ok(ProviderInvocationResult {
+            output: final_text,
+            provider_session_id,
+            raw_output: stdout,
+        })
+    }
+}
+
+fn extract_final_text(stdout: &str, output_format: &str) -> String {
+    if output_format == "plain" {
+        return stdout.trim().to_string();
+    }
+    let mut last = String::new();
+    let mut deltas = Vec::new();
+    for line in stdout.lines() {
+        let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        let Some(object) = event.as_object() else {
+            continue;
+        };
+        if let Some(item) = object.get("item").and_then(|value| value.as_object()) {
+            let item_type = item.get("type").and_then(|value| value.as_str());
+            let text = item
+                .get("text")
+                .or_else(|| item.get("content"))
+                .or_else(|| object.get("text"))
+                .and_then(|value| value.as_str());
+            if matches!(item_type, Some("agent_message" | "assistant_message")) {
+                if let Some(text) = text {
+                    last = text.to_string();
+                }
+                continue;
+            }
+        }
+        if object.get("type").and_then(|value| value.as_str()) == Some("assistant.message") {
+            if let Some(content) = object
+                .get("data")
+                .and_then(|value| value.get("content"))
+                .and_then(|value| value.as_str())
+            {
+                last = content.to_string();
+            }
+            continue;
+        }
+        if object.get("type").and_then(|value| value.as_str()) == Some("assistant.message_delta") {
+            if let Some(delta) = object
+                .get("data")
+                .and_then(|value| value.get("deltaContent"))
+                .and_then(|value| value.as_str())
+            {
+                deltas.push(delta.to_string());
+            }
+            continue;
+        }
+        if object.get("type").and_then(|value| value.as_str()) == Some("assistant") {
+            if let Some(text) = object
+                .get("message")
+                .and_then(|value| value.get("content"))
+                .and_then(text_from_content)
+            {
+                last = text;
+            }
+        }
+    }
+    if last.is_empty() {
+        if deltas.is_empty() {
+            stdout.trim().to_string()
+        } else {
+            deltas.join("")
+        }
+    } else {
+        last
+    }
+}
+
+fn extract_provider_session_id(stdout: &str) -> Option<String> {
+    for line in stdout.lines() {
+        let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+        if let Some(session_id) = find_session_id_value(&event) {
+            return Some(session_id);
+        }
+    }
+    None
+}
+
+fn find_session_id_value(value: &serde_json::Value) -> Option<String> {
+    const SESSION_KEYS: &[&str] = &[
+        "provider_session_id",
+        "session_id",
+        "sessionId",
+        "conversation_id",
+        "conversationId",
+    ];
+    match value {
+        serde_json::Value::Object(object) => {
+            for key in SESSION_KEYS {
+                if let Some(session_id) = object
+                    .get(*key)
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
+                    return Some(session_id.to_string());
+                }
+            }
+            object.values().find_map(find_session_id_value)
+        }
+        serde_json::Value::Array(values) => values.iter().find_map(find_session_id_value),
+        _ => None,
+    }
+}
+
+fn text_from_content(content: &serde_json::Value) -> Option<String> {
+    let parts = content
+        .as_array()?
+        .iter()
+        .filter_map(|block| {
+            if block.get("type").and_then(|value| value.as_str()) == Some("text") {
+                block
+                    .get("text")
+                    .and_then(|value| value.as_str())
+                    .map(str::to_string)
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>();
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join("\n").trim().to_string())
+    }
+}
+
+fn last_non_empty_line(text: &str) -> Option<String> {
+    text.lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .map(|line| line.chars().take(500).collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn host_provider_service_detects_known_provider_binaries() {
+        let temp_root = unique_temp_dir("providers");
+        let bin_dir = temp_root.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        fs::write(bin_dir.join("codex"), "#!/bin/sh\n").unwrap();
+
+        let service = HostAgentProviderService {
+            path_override: Some(bin_dir.display().to_string()),
+        };
+        let providers = service.detect().unwrap();
+        let codex = providers
+            .iter()
+            .find(|provider| provider.name == "codex")
+            .unwrap();
+        assert!(codex.installed);
+        assert!(codex.supports_resume);
+        assert_eq!(codex.output_format, "codex_json");
+        let claude = providers
+            .iter()
+            .find(|provider| provider.name == "claude")
+            .unwrap();
+        assert!(!claude.installed);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn host_provider_service_invokes_smoke_ai_and_extracts_json_final_text() {
+        let temp_root = unique_temp_dir("provider-invoke");
+        let bin_dir = temp_root.join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let smoke = bin_dir.join("smoke-ai");
+        fs::write(
+            &smoke,
+            "#!/bin/sh\nprintf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"smoke ok\"}}'\n",
+        )
+        .unwrap();
+        make_executable(&smoke);
+
+        let service = HostAgentProviderService {
+            path_override: Some(bin_dir.display().to_string()),
+        };
+        let output = service
+            .invoke(ProviderInvocation {
+                provider: "smoke-ai".to_string(),
+                prompt: "hello".to_string(),
+                session_id: None,
+                cwd: None,
+            })
+            .unwrap();
+        assert!(output.contains("agent_message"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn extract_final_text_handles_codex_and_copilot_jsonl() {
+        let codex = r#"{"item":{"type":"agent_message","text":"done"}}"#;
+        assert_eq!(extract_final_text(codex, "codex_json"), "done");
+
+        let copilot = concat!(
+            "{\"type\":\"assistant.message_delta\",\"data\":{\"deltaContent\":\"hel\"}}\n",
+            "{\"type\":\"assistant.message_delta\",\"data\":{\"deltaContent\":\"lo\"}}\n"
+        );
+        assert_eq!(extract_final_text(copilot, "copilot_json"), "hello");
+    }
+
+    #[test]
+    fn extract_provider_session_id_handles_common_jsonl_shapes() {
+        let stdout = concat!(
+            "{\"item\":{\"type\":\"agent_message\",\"text\":\"done\"},\"session_id\":\"prov-1\"}\n",
+            "{\"data\":{\"conversationId\":\"prov-2\"}}\n"
+        );
+        assert_eq!(
+            extract_provider_session_id(stdout),
+            Some("prov-1".to_string())
+        );
+        assert_eq!(
+            extract_provider_session_id("{\"data\":{\"conversationId\":\"prov-2\"}}\n"),
+            Some("prov-2".to_string())
+        );
+    }
+
+    #[cfg(unix)]
+    fn make_executable(path: &Path) {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).unwrap();
+    }
+
+    #[cfg(not(unix))]
+    fn make_executable(_path: &Path) {}
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        env::temp_dir().join(format!(
+            "refine-native-{prefix}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+}

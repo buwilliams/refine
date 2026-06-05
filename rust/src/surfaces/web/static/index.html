@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>refine</title>
+  <link rel="icon" href="/static/images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/dashboard.css">
+  <link rel="stylesheet" href="/static/css/common.css">
+  <link rel="stylesheet" href="/static/css/modals.css">
+  <link rel="stylesheet" href="/static/css/gaps.css">
+  <link rel="stylesheet" href="/static/css/guide.css">
+  <link rel="stylesheet" href="/static/css/toolbar.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#/" data-route="dashboard" aria-label="Refine dashboard">
+      <img class="brand-logo" src="/static/images/refine_logo_transparent.png" alt="refine">
+      <div class="brand-node" id="active-node-label">-</div>
+    </a>
+    <nav class="nav">
+      <a href="#/" data-route="dashboard">Dashboard</a>
+      <a href="#/features" data-route="features">Features</a>
+      <a href="#/gaps" data-route="gaps">Gaps</a>
+      <a href="#/changes" data-route="changes">Changes</a>
+      <a href="#/logs" data-route="logs">Logs</a>
+    </nav>
+    <div class="topbar-actions">
+      <details class="nav-menu nav-context-menu" id="nav-context-menu">
+        <summary class="nav-context-summary" aria-label="Current context">
+          <span class="target-app-dot nav-context-summary-dot" aria-hidden="true"></span>
+          <span class="nav-context-app" id="nav-context-app-summary">Application</span>
+          <span class="nav-context-separator" aria-hidden="true">/</span>
+          <span class="nav-context-reporter" id="nav-context-reporter-summary">No reporter</span>
+        </summary>
+        <div class="nav-menu-panel nav-context-panel">
+          <div class="nav-menu-label">Application</div>
+          <a id="target-app-indicator" class="target-app-indicator nav-context-status"
+             href="#/system/processes"
+             aria-label="Target application status (click to manage)"
+             title="Target application status"
+             data-state="unknown">
+            <span class="target-app-dot" aria-hidden="true"></span>
+            <span class="target-app-label">Application</span>
+          </a>
+          <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
+          <select id="global-reporter" aria-label="Reporter"></select>
+          <div class="nav-menu-label nav-context-section-label">Management</div>
+          <a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 7v14"></path>
+              <path d="M3 5a2 2 0 0 1 2-2h4a3 3 0 0 1 3 3v15a3 3 0 0 0-3-3H5a2 2 0 0 1-2-2V5Z"></path>
+              <path d="M21 5a2 2 0 0 0-2-2h-4a3 3 0 0 0-3 3v15a3 3 0 0 1 3-3h4a2 2 0 0 0 2-2V5Z"></path>
+            </svg>
+            <span>Guide</span>
+          </a>
+          <a class="nav-menu-item nav-management-item" href="#/node/nodes" data-route="node">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+              <path d="M8 8h8"></path>
+              <path d="M8 12h8"></path>
+              <path d="M8 16h5"></path>
+            </svg>
+            <span>Node</span>
+          </a>
+          <a class="nav-menu-item nav-management-item" href="#/project/application" data-route="project">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M4 20V6a2 2 0 0 1 2-2h7l7 7v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"></path>
+              <path d="M13 4v7h7"></path>
+            </svg>
+            <span>Project</span>
+          </a>
+          <a class="nav-menu-item nav-management-item" href="#/system/processes" data-route="settings">
+            <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+              <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"></path>
+              <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.03.04a2 2 0 1 1-3.94 0L10 20a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.04-.03a2 2 0 1 1 0-3.94L4 10a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.03-.04a2 2 0 1 1 3.94 0L14 4a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.4 9c.06.36.27.69.6 1l.04.03a2 2 0 1 1 0 3.94L20 14c-.33.31-.54.64-.6 1Z"></path>
+            </svg>
+            <span>System</span>
+          </a>
+        </div>
+      </details>
+      <a id="agent-status-indicator" class="agent-status-indicator nav-status-indicator"
+         href="#/system/processes"
+         aria-label="Agent status (click to view processes)"
+         title="Agent status"
+         data-state="unknown">
+        <span class="target-app-dot" aria-hidden="true"></span>
+        <span class="agent-status-label">0</span>
+      </a>
+      <button class="secondary nav-command-button" id="btn-command-palette"
+              aria-label="Open command palette">
+        <span class="nav-command-icon" aria-hidden="true"></span>
+        <span class="nav-command-shortcut" data-command-shortcut>Ctrl+K</span>
+      </button>
+      <button class="secondary nav-issue-button" id="btn-refine-issue"
+              aria-label="Request refine feature or bugfix"
+              title="Request refine feature or bugfix">
+        <span class="nav-bug-icon" aria-hidden="true"></span>
+      </button>
+      <div class="nav-create-group">
+        <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
+        <details class="nav-menu nav-create-menu" id="nav-create-menu">
+          <summary class="btn nav-action nav-create-more" aria-label="More create actions"></summary>
+          <div class="nav-menu-panel nav-create-panel">
+            <a class="nav-menu-item" href="#/features/new" id="btn-new-feature">New Feature</a>
+            <a class="nav-menu-item" href="#/gaps/plan" id="btn-plan">Plan Mode</a>
+            <a class="nav-menu-item" href="#/gaps/import" id="btn-import">Import gaps</a>
+            <a class="nav-menu-item" href="https://github.com/buwilliams/refine/issues/new"
+               id="btn-refine-issue-menu">Request refine feature/bugfix</a>
+          </div>
+        </details>
+      </div>
+    </div>
+  </header>
+
+  <div id="banners" class="banners"></div>
+
+  <main id="main"></main>
+
+  <aside id="toolbar-dock" class="toolbar-dock" aria-label="Toolbar"></aside>
+  <aside id="guide-panel" class="guide-panel" aria-label="Guide" aria-hidden="true"></aside>
+
+  <template id="t-banner">
+    <div class="banner">
+      <span class="banner-msg"></span>
+      <span class="banner-actions"></span>
+    </div>
+  </template>
+
+  <script src="/static/js/common.js"></script>
+  <script src="/static/js/command-registry.js"></script>
+  <script src="/static/js/workflow-visualization.js"></script>
+  <script src="/static/js/features/dashboard.js"></script>
+  <script src="/static/js/features/features.js"></script>
+  <script src="/static/js/features/gaps-list.js"></script>
+  <script src="/static/js/features/gaps-bulk.js"></script>
+  <script src="/static/js/features/gaps-detail.js"></script>
+  <script src="/static/js/features/gaps-new.js"></script>
+  <script src="/static/js/features/gaps-import.js"></script>
+  <script src="/static/js/features/changes.js"></script>
+  <script src="/static/js/features/toolbar.js"></script>
+  <script src="/static/js/features/guide.js"></script>
+  <script src="/static/js/features/logs.js"></script>
+  <script src="/static/js/features/settings_application.js"></script>
+  <script src="/static/js/features/settings_processes.js"></script>
+  <script src="/static/js/features/settings_guidance.js"></script>
+  <script src="/static/js/features/settings_quality.js"></script>
+  <script src="/static/js/features/settings_runtime.js"></script>
+  <script src="/static/js/features/settings_performance.js"></script>
+  <script src="/static/js/features/settings_governance.js"></script>
+  <script src="/static/js/features/settings_nodes.js"></script>
+  <script src="/static/js/features/settings_reporters.js"></script>
+  <script src="/static/js/features/settings.js"></script>
+  <script src="/static/js/target-app.js"></script>
+  <script src="/static/js/commands.js"></script>
+  <script src="/static/js/command-palette.js"></script>
+  <script src="/static/js/router.js"></script>
+  <script src="/static/js/init.js"></script>
+</body>
+</html>
