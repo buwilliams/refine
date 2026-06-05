@@ -115,7 +115,6 @@ function clearProjectScopedUiState() {
   updateActiveNodeLabel();
   updateNavAppContextLabel("No app");
   if (typeof applyNoTargetAppSnapshot === "function") applyNoTargetAppSnapshot();
-  if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
 }
 
 function renderNoProjectEmptyState(title = "Refine") {

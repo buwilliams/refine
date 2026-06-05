@@ -401,11 +401,25 @@ class Supervisor:
                 self.worker is not None
                 and self.worker.poll() is None
                 and self.worker_socket == socket_path
-                and self._can_ping_worker(socket_path)
+            ):
+                worker_alive = True
+            else:
+                worker_alive = False
+        if worker_alive:
+            if (
+                self._can_ping_worker(socket_path)
                 and self._worker_local_node_matches(socket_path, local_node_id)
             ):
-                return self._worker_result()
-            self._stop_worker_locked()
+                with self._lock:
+                    return self._worker_result()
+            with self._lock:
+                if self.worker is not None and self.worker.poll() is not None:
+                    self._stop_worker_locked()
+                else:
+                    return self._worker_result()
+        else:
+            with self._lock:
+                self._stop_worker_locked()
             env = os.environ.copy()
             env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
             env["REFINE_UI_PORT"] = str(self.port)

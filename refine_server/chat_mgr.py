@@ -960,7 +960,10 @@ class ChatManager:
                         continue
                     # Don't kill a session with an in-flight request — the user
                     # is plainly active.
-                    if s.proc is not None and s.proc.poll() is None:
+                    try:
+                        if s.proc is not None and s.proc.poll() is None:
+                            continue
+                    except Exception:
                         continue
                     if now - s.last_activity_ts >= timeout:
                         to_close.append(s)
