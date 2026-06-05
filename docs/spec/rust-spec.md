@@ -6,12 +6,14 @@ Define a Rust-native Refine architecture with three user-facing surfaces:
 **web**, **desktop**, and **CLI**. All surfaces talk to one local
 supervisor daemon that owns host integration, process lifecycle, project
 attachment, target-app operations, agent execution, and durable Refine state.
+The reason to centralize real work in `core` is complete feature parity:
+Desktop, browser, and CLI should expose the same product capabilities through
+different presentation and transport layers.
 
-The Rust direction is not a Tauri wrapper around the current Python runtime. It
-is a product architecture for a native local Refine platform. The current
-Python implementation remains useful as the behavioral baseline during the
-port, but the target architecture should not require host Python or `uv` for
-Refine itself.
+The Rust direction is a product architecture for a native local Refine
+platform. The current Python implementation remains useful as the behavioral
+baseline during the port, but the target architecture should not require host
+Python or `uv` for Refine itself.
 
 ## Goals
 
@@ -26,13 +28,15 @@ Refine itself.
   task-scoped.
 - Make installation, update, diagnostics, and recovery native OS behaviors.
 - Keep business logic shared across web, desktop, and CLI surfaces.
+- Preserve complete feature parity across web, desktop, and CLI by routing
+  product behavior through shared `core` modules.
 - Support an incremental port that can be validated workflow by workflow.
 
 ## Non-Goals
 
 - Preserve old Python package or module boundaries in Rust.
 - Recreate the current web app as a separate product from Desktop.
-- Let Tauri own Refine process lifecycle directly.
+- Let Tauri own Refine backend logic or long-running workflow execution.
 - Hide all target-app dependencies. Git, Node, Docker, browsers, provider auth,
   and language toolchains may still be necessary for specific workflows.
 - Duplicate workflow logic in the web UI, desktop UI, and CLI.
@@ -40,7 +44,12 @@ Refine itself.
 
 ## Product Surfaces
 
-Refine has three surfaces over one local system.
+Refine has three surfaces over one local system. They should have complete
+feature parity. A surface may choose a different interaction style, but missing
+capabilities should be treated as implementation gaps unless explicitly
+documented as product decisions. This is the main reason `core` exists:
+workflow semantics, state mutation, process lifecycle, provider execution, and
+storage orchestration are implemented once and exposed through every surface.
 
 ### Desktop
 
@@ -49,19 +58,23 @@ Desktop is the default download-and-use surface for macOS and Windows.
 Responsibilities:
 
 - Install, update, launch, and stop the local Refine daemon.
-- Render the shared Refine UI in a native webview.
+- Render the shared Refine UI in a native webview pointed at the local Refine
+  web server.
 - Provide native window, tray, menu, notification, and deep-link integration.
 - Guide first-run setup: target app, provider, dependency checks, and auth.
 - Surface daemon status, logs, diagnostics, and recovery actions.
-- Broker only narrow native commands to the daemon. Desktop must not start
-  target apps, agent processes, workers, or rebuilds itself.
+- Broker only narrow native commands. Desktop must not start target apps,
+  agent processes, workers, or rebuilds itself.
 
 Tauri is the preferred desktop shell. Tauri commands should be a thin native
-bridge to daemon APIs and OS shell integration, not a parallel backend.
+bridge for OS shell integration, daemon bootstrap/status checks, window
+control, tray/menu actions, notifications, and deep links. The preferred
+desktop design is for the Tauri webview to point at the daemon's local web
+server; Tauri should not become a parallel backend.
 
 ### Web
 
-Web is the browser surface served by the daemon.
+Web is the browser surface served by the daemon's local web server.
 
 Responsibilities:
 
@@ -71,7 +84,12 @@ Responsibilities:
 - Use the same HTTP, WebSocket, or server-sent-event APIs as Desktop.
 
 The web surface should remain deployable as static assets served by the daemon.
-Business logic belongs in Rust core services, not in frontend-only code.
+Business logic belongs in Rust core services, not in frontend-only code. The
+existing fully baked UI under `python/refine_ui/static/` should be copied into
+the Rust project so native Refine is self-contained. During the port, that copy
+is the Rust-owned web UI asset tree; once the Rust port is complete, the
+`python/` directory can be deprecated without leaving the Rust product
+dependent on Python-owned static files.
 
 ### CLI
 
@@ -91,25 +109,34 @@ installed, but normal operation should go through the daemon.
 ## System Model
 
 ```text
-Desktop UI        Web UI             CLI
-   |                |                 |
-   +----------------+-----------------+
-                    |
-           Local API / IPC boundary
-                    |
-          Rust supervisor daemon
-                    |
-    +---------------+-------------------------------+
-    |               |                               |
- Core services   Host integrations              Storage
-    |               |                               |
- Agents         Git / OS / process / app       Project state
- Target apps    provider / browser / Docker    Runtime state
+Desktop shell      Browser UI          CLI
+ (Tauri)              |                 |
+    |                 |                 |
+    +-----------------+-----------------+
+                      |
+          port-scoped Refine daemon
+                      |
+              local web server
+     HTTP, WebSocket, SSE, static assets,
+     auth, request parsing, response shaping
+                      |
+                    core
+   supervisor, product workflow, host adapters,
+   jobs, storage orchestration, observability
+                      |
+                    model
+       canonical records, workflow states,
+       allowed operations, process kinds
+                      |
+ durable project state + run/<port>/ runtime state
 ```
 
-The supervisor daemon is the single local authority. Surfaces request
-capabilities from the daemon; they do not directly mutate durable state or own
-long-lived OS processes.
+The supervisor daemon is the single local authority. It contains the local web
+server that serves UI assets and exposes the HTTP, WebSocket, and
+server-sent-event routes used by Desktop, browser, and CLI surfaces. Route
+handlers are transport adapters: they handle HTTP concerns, translate requests
+and responses, and call `core` for real work. Surfaces do not directly mutate
+durable state or own long-lived OS processes.
 
 ## Capability Model
 
@@ -117,7 +144,8 @@ Capabilities are the primary code-organization model for Refine's Rust
 architecture. They are namespaces, service boundaries, trait families, storage
 interfaces, and vocabulary for major areas of the system. They sit inside the
 overall supervisor architecture described above; they are not separate daemons,
-UI-specific action handlers, or a replacement for the local API boundary.
+UI-specific action handlers, or a replacement for the daemon web-server
+transport layer.
 
 The intent is to prevent major concerns from being reimplemented across the
 codebase. Logging should not be scattered through every module as ad hoc file
@@ -223,7 +251,7 @@ Requirements:
 
 - One daemon owns one port-scoped local Refine runtime authority, matching the
   current Python runtime model.
-- The daemon exposes a local authenticated API for surfaces.
+- The daemon exposes local authenticated web-server routes for surfaces.
 - Status distinguishes daemon health, web availability, worker state, target-app
   state, active operations, and degraded integrations.
 - Restart preserves attached app selection and running operation records.
@@ -490,7 +518,11 @@ refine/
         cli/
         desktop/
         web/
-        local_api/
+          static/
+            css/
+            images/
+            js/
+        web_server/
       core/
         product/
           project_registry/
@@ -539,9 +571,11 @@ refine/
 ```
 
 `python/` remains the current implementation and behavior oracle during the
-port. New core product code should live under `rust/src/`, and repository
-automation should live under `rust/xtask/`, so the native architecture is
-explicit and contained within the Rust project.
+port. The existing UI assets in `python/refine_ui/static/` should be copied
+into `rust/src/surfaces/web/static/` so the Rust project has its own complete
+UI asset tree. New core product code should live under `rust/src/`, and
+repository automation should live under `rust/xtask/`, so the native
+architecture is explicit and contained within the Rust project.
 If Tauri requires a separate package, it should live under
 `rust/desktop/src-tauri/` and depend on the core product package. It should not
 own capabilities, durable state rules, process lifecycle, provider behavior, or
@@ -562,7 +596,7 @@ it directly implements. Rust modules should follow a one-way dependency graph:
 
 ```text
 surfaces
-  surfaces::{cli, desktop, web, local_api}
+  surfaces::{cli, desktop, web, web_server}
       |
 core
   core::supervisor::{lifecycle, sessions, jobs, security, runtime, config}
@@ -594,8 +628,9 @@ Rules:
   activity, metrics, diagnostics, and support bundles. Processing modules emit
   through this abstraction; model modules do not.
 - `surfaces::*` modules own entrypoints and adapters for CLI, web,
-  desktop, and local API. Surface modules call supervisor-facing services; they
-  do not directly mutate durable Refine state or spawn managed processes.
+  desktop, and the daemon web server. Surface modules call supervisor-facing
+  services; they do not directly mutate durable Refine state or spawn managed
+  processes.
 - Avoid a generic `shared` module. Put code in the module that owns the concept.
   If a primitive is genuinely cross-cutting, give it a narrow named home inside
   the relevant container instead of creating a catch-all utility bucket.
@@ -620,7 +655,8 @@ product capability:
 - `core::supervisor::config`; path: `rust/src/core/supervisor/config/`. Owns
   loading, validating, and merging user, project, and runtime configuration.
 - `core::supervisor::errors`; path: `rust/src/core/supervisor/errors/`. Owns
-  error categories and translation into local API and CLI output.
+  error categories and translation into daemon web-server responses and CLI
+  output.
 - `core::supervisor::testing`; path: `rust/src/core/supervisor/testing/`. Owns
   black-box fixtures, fake supervisors, fake providers, fake process handles,
   and contract-test helpers.
@@ -629,27 +665,46 @@ product capability:
 - `surfaces::desktop`; path: `rust/src/surfaces/desktop/`. Owns
   desktop shell integration, native menu and tray hooks, update prompts, and
   narrow bridge command definitions used by the Tauri wrapper.
-- `surfaces::web`; path: `rust/src/surfaces/web/`. Owns serving or
-  packaging the web UI assets and generated client bindings.
-- `surfaces::local_api`; path: `rust/src/surfaces/local_api/`. Owns
-  HTTP, WebSocket, local IPC, auth extraction, request routing, and API
-  translation into supervisor and capability services.
+- `surfaces::web`; path: `rust/src/surfaces/web/`. Owns the Rust copy of the
+  web UI assets, generated client bindings, and asset packaging metadata.
+  Initial assets should come from `python/refine_ui/static/` and live under
+  `rust/src/surfaces/web/static/`.
+- `surfaces::web_server`; path: `rust/src/surfaces/web_server/`. Owns the
+  local daemon web server: HTTP routes, WebSocket endpoints,
+  server-sent-event streams, static asset serving, auth extraction, request
+  parsing, response shaping, and translation into supervisor and core services.
 
 `rust/xtask/` should contain repository automation that is not part of the
 shipped product: code generation, API contract export, fixture refresh, release
 packaging, installer smoke tests, and migration checks.
 
-## Local API
+## Daemon Web Server
 
-The daemon should expose two local interfaces:
+The daemon should run a port-scoped local web server. This is the concrete
+boundary for Desktop, browser, and CLI requests.
 
-- HTTP/WebSocket API for web and desktop UI.
-- Local IPC or loopback HTTP for CLI and privileged desktop bridge commands.
+Responsibilities:
+
+- Serve the web UI assets used by both the external browser and Tauri webview.
+- Expose HTTP routes for request/response operations.
+- Expose WebSocket or server-sent-event streams for operation events, logs,
+  chat, and UI updates.
+- Handle auth, local-origin checks, request parsing, response shaping, and API
+  version negotiation.
+- Translate transport requests into supervisor-facing core services.
+- Keep route handlers thin; workflow logic, state mutation, process lifecycle,
+  provider execution, Git behavior, and storage orchestration belong in
+  `core`.
+
+The CLI should normally talk to the same daemon web server using structured
+HTTP/JSON contracts. It may run limited bootstrap commands when the daemon is
+not available, such as locating the checkout runtime, starting the daemon, or
+printing diagnostics from local runtime files.
 
 API requirements:
 
 - Stable typed contracts.
-- Capability-oriented routes or methods.
+- Module-oriented routes or methods that map clearly onto `core` services.
 - Streaming operation events.
 - Idempotency keys for mutating long-running operations.
 - Consistent error codes and machine-readable details.
@@ -765,6 +820,9 @@ redesign can be handled later as a separate product/design pass.
 ## Testing Strategy
 
 Testing should verify capabilities through public surfaces.
+Parity matters: when a product capability is implemented in `core`, tests
+should prove it is reachable through web, desktop, and CLI surfaces unless a
+documented product decision says otherwise.
 
 Required layers:
 
@@ -772,9 +830,11 @@ Required layers:
   validators.
 - Integration tests for storage, migrations, Git, process supervision, and
   provider adapters.
-- Contract tests for local API request/response and event contracts.
+- Contract tests for daemon web-server request/response and event contracts.
 - CLI tests with JSON output checks.
 - Web/Desktop UI smoke tests through the shared API.
+- Surface parity tests that verify core capabilities are available through the
+  CLI, browser UI, and Desktop webview.
 - Black-box compatibility tests that run representative workflows against the
   Rust implementation.
 - OS matrix tests for macOS, Windows, and Linux process/service behavior.
@@ -801,8 +861,8 @@ implementation details.
 
 ## Acceptance Criteria
 
-- `docs/rust.md` defines web, desktop, and CLI surfaces over one supervisor
-  daemon.
+- `docs/spec/rust-spec.md` defines web, desktop, and CLI surfaces over one
+  supervisor daemon.
 - The architecture is organized around system capabilities.
 - The daemon is the sole local authority for process lifecycle and durable
   workflow mutations.
@@ -811,6 +871,11 @@ implementation details.
 - Target-app and provider dependencies are treated as explicit, scoped
   integrations.
 - Business logic is shared across surfaces.
+- Web, desktop, and CLI surfaces are expected to reach complete feature parity
+  through shared `core` modules.
+- The Rust project contains its own copied web UI asset tree derived from
+  `python/refine_ui/static/`, so Rust does not depend on Python-owned static
+  files after the port is complete.
 - The document includes migration and testing strategy for a vertical port.
 - The document defines `model` as the centralized model module for
   canonical state, workflow states, and allowed operations.
