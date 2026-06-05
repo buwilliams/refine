@@ -30,7 +30,7 @@ Refine itself.
 
 ## Non-Goals
 
-- Preserve Python module boundaries in Rust.
+- Preserve old Python package or module boundaries in Rust.
 - Recreate the current web app as a separate product from Desktop.
 - Let Tauri own Refine process lifecycle directly.
 - Hide all target-app dependencies. Git, Node, Docker, browsers, provider auth,
@@ -113,24 +113,42 @@ long-lived OS processes.
 
 ## Capability Model
 
-Every product action should map to a system capability. Capabilities are stable
-contracts exposed through the daemon and reused by web, desktop, and CLI.
+Capabilities are the primary code-organization model for Refine's Rust
+architecture. They are namespaces, service boundaries, trait families, storage
+interfaces, and vocabulary for major areas of the system. They sit inside the
+overall supervisor architecture described above; they are not separate daemons,
+UI-specific action handlers, or a replacement for the local API boundary.
+
+The intent is to prevent major concerns from being reimplemented across the
+codebase. Logging should not be scattered through every module as ad hoc file
+writes or UI messages; it should flow through one log abstraction. The same
+pattern applies to storage, process supervision, Git, provider integration,
+quality checks, chat, settings, diagnostics, and every other major capability.
 
 Each capability should define:
 
-- Inputs and validation rules.
-- Required authority and permission checks.
-- Durable state mutations.
-- Runtime side effects.
-- Events emitted for UI updates and logs.
-- Recovery behavior after crash or restart.
-- Human-readable and machine-readable error shapes.
+- A stable namespace and module home.
+- Public service traits and concrete implementations.
+- Domain models, value types, and vocabulary used by that capability.
+- The storage, process, network, or host-integration ports it owns.
+- The events, logs, and diagnostics it emits through shared abstractions.
+- The errors it exposes through shared error types and API translation.
+- Test fixtures and fake implementations for isolated and black-box tests.
+- Dependency rules that keep the capability from reaching into unrelated
+  surfaces or duplicating another capability's responsibilities.
+
+Product actions compose these capabilities through the daemon. For example, a
+Gap execution workflow may use work-item, scheduling, provider, process, Git,
+storage, event, and log abstractions, but those abstractions remain centralized
+instead of being rebuilt inside the Gap execution code.
 
 ## Core Capabilities
 
 ### Installation And Update
 
-Capability: install, repair, update, rollback, uninstall.
+Module: `capabilities::installation`; path: `rust/src/capabilities/installation/`.
+
+Owns abstractions for: install, repair, update, rollback, uninstall.
 
 Requirements:
 
@@ -152,7 +170,9 @@ OS backends:
 
 ### Daemon Lifecycle
 
-Capability: start, stop, restart, status, health, recover.
+Module: `capabilities::daemon_lifecycle`; path: `rust/src/capabilities/daemon_lifecycle/`.
+
+Owns abstractions for: start, stop, restart, status, health, recover.
 
 Requirements:
 
@@ -167,7 +187,9 @@ Requirements:
 
 ### Surface Session
 
-Capability: open UI, authenticate local surface, stream state, deliver
+Module: `capabilities::surface_session`; path: `rust/src/capabilities/surface_session/`.
+
+Owns abstractions for: open UI, authenticate local surface, stream state, deliver
 notifications.
 
 Requirements:
@@ -180,7 +202,9 @@ Requirements:
 
 ### Project Registry
 
-Capability: register, attach, switch, detach, clone, remove, inspect.
+Module: `capabilities::project_registry`; path: `rust/src/capabilities/project_registry/`.
+
+Owns abstractions for: register, attach, switch, detach, clone, remove, inspect.
 
 Requirements:
 
@@ -193,7 +217,9 @@ Requirements:
 
 ### Project State
 
-Capability: initialize, read, mutate, migrate, sync, rebuild indexes.
+Module: `capabilities::project_state`; path: `rust/src/capabilities/project_state/`.
+
+Owns abstractions for: initialize, read, mutate, migrate, sync, rebuild indexes.
 
 Requirements:
 
@@ -206,7 +232,9 @@ Requirements:
 
 ### Work Items
 
-Capability: create, import, deduplicate, list, update, transition, cancel,
+Module: `capabilities::work_items`; path: `rust/src/capabilities/work_items/`.
+
+Owns abstractions for: create, import, deduplicate, list, update, transition, cancel,
 delete, assign, reorder.
 
 Requirements:
@@ -220,7 +248,9 @@ Requirements:
 
 ### Scheduling And Execution
 
-Capability: promote, reserve, dispatch, pause, resume, cancel, retry.
+Module: `capabilities::scheduling`; path: `rust/src/capabilities/scheduling/`.
+
+Owns abstractions for: promote, reserve, dispatch, pause, resume, cancel, retry.
 
 Requirements:
 
@@ -234,7 +264,9 @@ Requirements:
 
 ### Agent Providers
 
-Capability: detect, configure, authenticate, invoke, parse, resume, diagnose.
+Module: `capabilities::agent_providers`; path: `rust/src/capabilities/agent_providers/`.
+
+Owns abstractions for: detect, configure, authenticate, invoke, parse, resume, diagnose.
 
 Requirements:
 
@@ -248,7 +280,9 @@ Requirements:
 
 ### Process Supervision
 
-Capability: launch, signal, wait, stream, inspect, limit, clean up.
+Module: `capabilities::process_supervision`; path: `rust/src/capabilities/process_supervision/`.
+
+Owns abstractions for: launch, signal, wait, stream, inspect, limit, clean up.
 
 Requirements:
 
@@ -270,7 +304,9 @@ OS backends should cover:
 
 ### Target App Operations
 
-Capability: configure, start, stop, restart, status, rebuild, open, diagnose.
+Module: `capabilities::target_apps`; path: `rust/src/capabilities/target_apps/`.
+
+Owns abstractions for: configure, start, stop, restart, status, rebuild, open, diagnose.
 
 Requirements:
 
@@ -283,7 +319,9 @@ Requirements:
 
 ### Git And Worktrees
 
-Capability: inspect, branch, worktree, diff, merge, rebase, commit, reset,
+Module: `capabilities::git_worktrees`; path: `rust/src/capabilities/git_worktrees/`.
+
+Owns abstractions for: inspect, branch, worktree, diff, merge, rebase, commit, reset,
 push, recover.
 
 Requirements:
@@ -299,7 +337,9 @@ Requirements:
 
 ### Quality And Verification
 
-Capability: run checks, browser QA, regressions, screenshots, compare, gate.
+Module: `capabilities::quality`; path: `rust/src/capabilities/quality/`.
+
+Owns abstractions for: run checks, browser QA, regressions, screenshots, compare, gate.
 
 Requirements:
 
@@ -311,7 +351,9 @@ Requirements:
 
 ### Chat And Planning
 
-Capability: start, resume, stream, attach to Gap or Feature, persist context.
+Module: `capabilities::chat`; path: `rust/src/capabilities/chat/`.
+
+Owns abstractions for: start, resume, stream, attach to Gap or Feature, persist context.
 
 Requirements:
 
@@ -323,7 +365,9 @@ Requirements:
 
 ### Observability And Diagnostics
 
-Capability: activity, logs, metrics, doctor, support bundle.
+Module: `capabilities::observability`; path: `rust/src/capabilities/observability/`.
+
+Owns abstractions for: activity, logs, metrics, doctor, support bundle.
 
 Requirements:
 
@@ -337,7 +381,9 @@ Requirements:
 
 ### Security And Permissions
 
-Capability: local auth, secret storage, command authorization, audit.
+Module: `capabilities::security`; path: `rust/src/capabilities/security/`.
+
+Owns abstractions for: local auth, secret storage, command authorization, audit.
 
 Requirements:
 
@@ -351,7 +397,9 @@ Requirements:
 
 ### Cluster And Multi-Node
 
-Capability: node registry, transfer, sync, remote command, ownership.
+Module: `capabilities::cluster`; path: `rust/src/capabilities/cluster/`.
+
+Owns abstractions for: node registry, transfer, sync, remote command, ownership.
 
 Requirements:
 
@@ -365,14 +413,17 @@ Requirements:
 ## Component Architecture
 
 The Rust implementation should live entirely under `rust/`. That directory is
-the Cargo workspace root for the native Refine project. The current Python
-implementation lives under `python/`, and the two implementations should remain
-side-by-side during the port instead of interleaving Rust crates with Python
-packages at the repository root.
+the Rust project root for native Refine. The current Python implementation
+lives under `python/`, and the two implementations should remain side-by-side
+during the port instead of interleaving Rust modules with Python packages at the
+repository root.
 
-Crates should map to capability boundaries and dependency direction, not to the
-old Python package layout. A surface crate should not contain business rules
-that belong in core services.
+Start with one core product Cargo package under `rust/`. Use Rust modules for
+namespaces, code ownership, service traits, and abstraction boundaries. The Rust
+project may become a small Cargo workspace to host a thin desktop Tauri wrapper,
+but capabilities should not be split into separate packages. The core product
+remains one package; the desktop package exists only for native shell packaging
+and Tauri integration.
 
 Suggested repository layout:
 
@@ -382,232 +433,151 @@ refine/
   python/
   rust/
     Cargo.toml
-    crates/
-      refine-core/
-      refine-api/
-      refine-daemon/
-      refine-cli/
-      refine-desktop/
-      refine-web/
-      refine-storage/
-      refine-events/
-      refine-git/
-      refine-process/
-      refine-integrations/
-      refine-quality/
-      refine-chat/
-      refine-cluster/
-      refine-config/
-      refine-test-support/
-    apps/
-      desktop/
-      web/
+    src/
+      main.rs
+      lib.rs
+      architecture/
+        supervisor/
+        local_api/
+        surfaces/
+          cli/
+          desktop/
+          web/
+        runtime/
+        jobs/
+        config/
+        errors/
+        testing/
+      capabilities/
+        installation/
+        daemon_lifecycle/
+        surface_session/
+        project_registry/
+        project_state/
+        work_items/
+        scheduling/
+        agent_providers/
+        process_supervision/
+        target_apps/
+        git_worktrees/
+        quality/
+        chat/
+        observability/
+        security/
+        cluster/
+      shared/
+        ids/
+        paths/
+        time/
+        serialization/
+    desktop/
+      src-tauri/
+        Cargo.toml
+        src/
+          main.rs
     xtask/
 ```
 
 `python/` remains the current implementation and behavior oracle during the
-port. New Rust code should live under `rust/crates/`, `rust/apps/`, and
-`rust/xtask/` so the native architecture is explicit and contained within the
-Rust workspace.
+port. New core product code should live under `rust/src/`, and repository
+automation should live under `rust/xtask/`, so the native architecture is
+explicit and contained within the Rust project.
+If Tauri requires a separate package, it should live under
+`rust/desktop/src-tauri/` and depend on the core product package. It should not
+own capabilities, durable state rules, process lifecycle, provider behavior, or
+workflow logic.
 
-### Workspace Crates
+### Module Direction
 
-- `refine-core`: domain models, Gaps, Features, state transitions, validation,
-  scheduling rules, work-item operations, capability orchestration, and
-  migration interfaces. This crate owns product semantics and should have no
-  dependency on HTTP, Tauri, process execution, or concrete storage backends.
-- `refine-api`: local API contracts, request and response types, error shapes,
-  event stream schemas, auth claims, version negotiation, and generated client
-  bindings. This crate defines the public contract shared by daemon, web,
-  desktop, CLI, and tests.
-- `refine-daemon`: supervisor runtime, API server, IPC server, event bus, job
-  registry, lifecycle management, operation recovery, and composition of core
-  services with host integrations. This crate is the only long-running local
-  authority.
-- `refine-cli`: command-line surface over daemon APIs plus limited bootstrap
-  commands for install, start, repair, status, and doctor when the daemon is
-  unavailable.
-- `refine-desktop`: Tauri shell integration, native menus, tray, notifications,
-  updater, deep links, local daemon bootstrap, and narrow native commands that
-  call the daemon instead of owning Refine processes.
-- `refine-web`: compiled frontend assets, generated API client, UI route
-  definitions, and static asset packaging. This crate or package should not own
-  workflow rules.
-- `refine-storage`: durable JSON records, app registry storage, runtime storage,
-  SQLite or index storage, migrations, atomic writes, cache rebuild, and backup
-  or restore helpers.
-- `refine-events`: activity records, log records, progress events, telemetry
-  schemas, support-bundle data models, redaction helpers, and event formatting
-  shared by UI and CLI.
-- `refine-git`: Git inspection, branch operations, worktree operations, diff,
-  commit, merge, rebase, push, conflict recovery, and dirty-worktree
-  classification.
-- `refine-process`: cross-platform process spawning, process groups, streaming
-  output, stdin, signals, cancellation, exit status, child cleanup, and resource
-  controls.
-- `refine-integrations`: provider adapters, provider CLI detection, direct API
-  provider adapters, Docker detection, browser automation detection, language
-  toolchain detection, package-manager detection, and target-app dependency
-  diagnostics.
-- `refine-quality`: check execution, browser QA, screenshots, regression jobs,
-  comparison results, quality gates, and quality-job persistence.
-- `refine-chat`: chat sessions, provider stream normalization, Gap-attached chat,
-  standalone chat, resumability, round-log conversion, and chat-derived import
-  operations.
-- `refine-cluster`: node registry, node ownership, project-state sync, remote
-  command orchestration, transfer operations, and maintenance locking.
-- `refine-config`: user settings, project settings, runtime settings, dependency
-  policy, governance settings, and OS path resolution.
-- `refine-test-support`: fixtures, fake providers, fake process backends, temp
-  storage helpers, API contract helpers, and black-box harness adapters. This
-  crate should be dev-only and must not become a production dependency.
-
-### Dependency Direction
-
-Crates should follow a one-way dependency graph:
+Modules should follow a one-way dependency graph:
 
 ```text
 surfaces
-  refine-cli / refine-desktop / refine-web
+  architecture::surfaces::{cli, desktop, web}
       |
 daemon
-  refine-daemon
+  architecture::supervisor / architecture::local_api / architecture::jobs
       |
-capabilities and adapters
-  refine-core / refine-storage / refine-git / refine-process
-  refine-integrations / refine-quality / refine-chat / refine-cluster
+capabilities
+  capabilities::{work_items, scheduling, process_supervision, ...}
       |
-contracts and shared types
-  refine-api / refine-events / refine-config
+shared foundations
+  shared::{ids, paths, time, serialization}
 ```
 
 Rules:
 
-- `refine-core` may depend on shared contract and configuration types, but not
-  on `refine-daemon`, `refine-cli`, `refine-desktop`, `refine-web`, Tauri,
-  Axum, SQL implementation details, or OS process APIs.
-- `refine-api` should remain transport-oriented but server-neutral. It should
-  not call daemon services or storage.
-- `refine-daemon` composes capabilities. It can depend on adapter crates, but
-  adapter crates should not depend back on the daemon.
-- Surface crates call `refine-api` contracts and daemon clients. They should not
-  directly mutate durable Refine state or spawn managed processes.
-- Storage, Git, process, provider, quality, chat, and cluster crates expose
-  typed services to `refine-core` or `refine-daemon`; they do not reach into UI
-  state.
-- Test support can depend broadly on production crates, but production crates
-  cannot depend on test support.
+- `architecture::*` modules compose capabilities into the supervisor, local API,
+  jobs, runtime lifecycle, and user surfaces.
+- `capabilities::*` modules own product and host-integration abstractions. Each
+  capability has exactly one top-level module and directory, listed in the Core
+  Capabilities section.
+- Capability modules can depend on `shared::*` foundations and on service
+  traits from other capabilities when composition requires it, but they should
+  not reach into surface modules.
+- Surface modules call the local API or supervisor-facing service facades. They
+  should not directly mutate durable Refine state or spawn managed processes.
+- Shared modules are small foundations. They should not accumulate product
+  logic just because multiple modules need the same helper.
+- Test support lives under `architecture::testing` and per-capability test
+  fixtures. It can depend broadly on production modules, but production modules
+  cannot depend on test-only code.
 
-### Internal Directory Pattern
+### Architecture Support Modules
 
-Each crate should expose a small public API and organize implementation by
-capability. Prefer shallow directories with clear service boundaries:
+The following modules support the overall architecture rather than a single
+product capability:
 
-```text
-rust/crates/refine-core/src/
-  lib.rs
-  capabilities/
-  models/
-  transitions/
-  scheduling/
-  work_items/
-  migrations/
-
-rust/crates/refine-daemon/src/
-  main.rs
-  server/
-  ipc/
-  supervisor/
-  jobs/
-  operations/
-  recovery/
-  auth/
-
-rust/crates/refine-storage/src/
-  lib.rs
-  records/
-  indexes/
-  migrations/
-  paths/
-  atomic/
-
-rust/crates/refine-integrations/src/
-  lib.rs
-  providers/
-  docker/
-  browsers/
-  toolchains/
-  target_apps/
-```
-
-Directory names should describe product capabilities or host integration
-domains. Avoid directories named after temporary implementation mechanisms, old
-Python modules, or individual UI pages unless the crate is a surface crate.
-
-### Application Directories
-
-`rust/apps/desktop/` should contain the Tauri app manifest, platform-specific
-icons, desktop packaging metadata, updater configuration, and webview
-entrypoints. Its Rust commands should delegate to `rust/crates/refine-desktop`.
-
-`rust/apps/web/` should contain the frontend source, build configuration,
-generated API client, static assets, and UI tests. Built assets are packaged for
-both the daemon-served browser surface and the desktop webview.
+- `architecture::supervisor`; path: `rust/src/architecture/supervisor/`. Owns
+  daemon authority, startup composition, runtime ownership, and controlled
+  shutdown.
+- `architecture::local_api`; path: `rust/src/architecture/local_api/`. Owns
+  HTTP, WebSocket, local IPC, auth extraction, request routing, and API
+  translation into capability services.
+- `architecture::surfaces::cli`; path: `rust/src/architecture/surfaces/cli/`.
+  Owns the CLI surface and structured output formatting.
+- `architecture::surfaces::desktop`; path:
+  `rust/src/architecture/surfaces/desktop/`. Owns desktop shell integration,
+  native menu and tray hooks, update prompts, and narrow bridge command
+  definitions used by the Tauri wrapper.
+- `architecture::surfaces::web`; path: `rust/src/architecture/surfaces/web/`.
+  Owns serving or packaging the web UI assets and generated client bindings.
+- `architecture::runtime`; path: `rust/src/architecture/runtime/`. Owns runtime
+  bootstrap, OS path selection, instance identity, and process startup context.
+- `architecture::jobs`; path: `rust/src/architecture/jobs/`. Owns the job
+  registry, operation handles, cancellation plumbing, and operation recovery
+  coordination.
+- `architecture::config`; path: `rust/src/architecture/config/`. Owns loading,
+  validating, and merging user, project, and runtime configuration.
+- `architecture::errors`; path: `rust/src/architecture/errors/`. Owns shared
+  error categories and translation into local API and CLI output.
+- `architecture::testing`; path: `rust/src/architecture/testing/`. Owns
+  black-box fixtures, fake supervisors, fake providers, fake process handles,
+  and contract-test helpers.
 
 `rust/xtask/` should contain repository automation that is not part of the
 shipped product: code generation, API schema export, fixture refresh, release
 packaging, installer smoke tests, and migration checks.
 
-### Capability To Crate Map
-
-| Capability | Primary crate | Supporting crates |
-| --- | --- | --- |
-| Install and update | `refine-desktop`, `refine-cli` | `refine-daemon`, `refine-config`, `refine-events` |
-| Daemon lifecycle | `refine-daemon` | `refine-process`, `refine-config`, `refine-events` |
-| Surface session | `refine-daemon` | `refine-api`, `refine-events`, `refine-config` |
-| Project registry | `refine-core` | `refine-storage`, `refine-git`, `refine-config` |
-| Project state | `refine-core` | `refine-storage`, `refine-events` |
-| Work items | `refine-core` | `refine-storage`, `refine-events` |
-| Scheduling and execution | `refine-core`, `refine-daemon` | `refine-process`, `refine-integrations`, `refine-events` |
-| Agent providers | `refine-integrations` | `refine-chat`, `refine-events`, `refine-config` |
-| Process supervision | `refine-process` | `refine-daemon`, `refine-events` |
-| Target app operations | `refine-core`, `refine-daemon` | `refine-process`, `refine-integrations`, `refine-config` |
-| Git and worktrees | `refine-git` | `refine-core`, `refine-events` |
-| Quality and verification | `refine-quality` | `refine-process`, `refine-integrations`, `refine-storage` |
-| Chat and planning | `refine-chat` | `refine-integrations`, `refine-storage`, `refine-events` |
-| Observability and diagnostics | `refine-events`, `refine-daemon` | all capability crates |
-| Security and permissions | `refine-daemon`, `refine-config` | `refine-api`, `refine-events` |
-| Cluster and multi-node | `refine-cluster` | `refine-core`, `refine-storage`, `refine-process` |
-
-This map is a design tool, not a license to make every capability a separate
-process or service. The daemon remains one local authority; crates exist to keep
-code ownership, tests, and dependency direction understandable.
-
 ### Initial Implementation Cut
 
-The first Rust milestone should create only the crates needed to prove the
+The first Rust milestone should create only the modules needed to prove the
 architecture without fragmenting the code too early:
 
-- `refine-core` for app registry, daemon status models, basic work-item models,
-  and validation.
-- `refine-api` for status, doctor, app registry, and structured error
-  contracts.
-- `refine-storage` for OS path resolution, app registry records, runtime state,
-  and atomic writes.
-- `refine-process` for daemon-owned process inspection and a minimal managed
-  process abstraction.
-- `refine-daemon` for local API serving, lifecycle status, event emission, and
-  composition of the first services.
-- `refine-cli` for `start`, `stop`, `status`, `doctor`, `apps list`, `apps
-  attach`, `apps switch`, and `apps detach`.
-- `refine-test-support` for fake storage, fake process state, and API contract
-  fixtures.
+- `architecture::supervisor`, `architecture::local_api`,
+  `architecture::surfaces::cli`, `architecture::runtime`,
+  `architecture::config`, `architecture::errors`, and `architecture::testing`.
+- `capabilities::daemon_lifecycle`, `capabilities::surface_session`,
+  `capabilities::project_registry`, `capabilities::project_state`,
+  `capabilities::work_items`, `capabilities::process_supervision`, and
+  `capabilities::observability`.
+- `shared::ids`, `shared::paths`, `shared::time`, and
+  `shared::serialization`.
 
-Defer `refine-desktop`, `refine-web`, `refine-integrations`, `refine-quality`,
-`refine-chat`, and `refine-cluster` until the first daemon, storage, project
-registry, and CLI contracts are stable. Their directories can exist as empty
-workspace placeholders only if that helps packaging or CI; otherwise, add them
-when their first capability lands.
+Defer desktop shell, web asset packaging, provider execution, quality, chat,
+and cluster modules until the first supervisor, local API, project registry,
+storage, process, log, and CLI contracts are stable. Their directories should
+be added when their first concrete abstraction lands.
 
 ## Local API
 
@@ -747,6 +717,7 @@ implementation details.
   integrations.
 - Business logic is shared across surfaces.
 - The document includes migration and testing strategy for a vertical port.
-- The document defines a Cargo workspace under `rust/`, crate responsibilities,
-  dependency direction, application directories, and the initial Rust
-  implementation cut.
+- The document defines a core Rust package under `rust/`, leaves room for a
+  thin Tauri wrapper package, assigns capabilities to modules and directory
+  paths, defines supporting architecture modules, and identifies the initial
+  Rust implementation cut.
