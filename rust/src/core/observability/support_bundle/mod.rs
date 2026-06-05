@@ -7,6 +7,7 @@ use serde_json::json;
 
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -55,6 +56,11 @@ impl SupportBundleService for FileSupportBundleService {
         let activity = FileActivityService::new(&self.durable_root)
             .recent(200)
             .unwrap_or_default();
+        let metrics = FileMetricsService::new(&self.runtime_root)
+            .report(PerformanceQuery::default())
+            .map(|report| json!(report))
+            .unwrap_or_else(|error| json!({"error": error.to_string()}));
+        let chat_sessions = read_chat_sessions(&self.durable_root)?;
         let settings_path = self.durable_root.join("settings.json");
         let settings = read_json_if_exists(&settings_path)?;
         let bundle = json!({
@@ -62,6 +68,8 @@ impl SupportBundleService for FileSupportBundleService {
             "redacted": redact_secrets,
             "diagnostics": diagnostics,
             "activity": activity,
+            "metrics": metrics,
+            "chat_sessions": chat_sessions,
             "settings": settings
         });
         let bundle = if redact_secrets {
@@ -107,17 +115,45 @@ fn read_json_if_exists(path: &Path) -> RefineResult<serde_json::Value> {
     })
 }
 
+fn read_chat_sessions(durable_root: &Path) -> RefineResult<Vec<serde_json::Value>> {
+    let sessions_dir = durable_root.join("chat/sessions");
+    if !sessions_dir.exists() {
+        return Ok(Vec::new());
+    }
+    let mut sessions = Vec::new();
+    for entry in fs::read_dir(&sessions_dir).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read chat sessions directory {}: {error}",
+            sessions_dir.display()
+        ))
+    })? {
+        let entry = entry.map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read chat session entry {}: {error}",
+                sessions_dir.display()
+            ))
+        })?;
+        if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let value = read_json_if_exists(&entry.path())?;
+        sessions.push(value);
+    }
+    sessions.sort_by(|a, b| {
+        b.get("updated_at")
+            .and_then(|value| value.as_str())
+            .cmp(&a.get("updated_at").and_then(|value| value.as_str()))
+    });
+    sessions.truncate(20);
+    Ok(sessions)
+}
+
 fn redact_json(value: serde_json::Value) -> serde_json::Value {
     match value {
         serde_json::Value::Object(map) => serde_json::Value::Object(
             map.into_iter()
                 .map(|(key, value)| {
-                    let lowered = key.to_lowercase();
-                    if lowered.contains("secret")
-                        || lowered.contains("token")
-                        || lowered.contains("key")
-                        || lowered.contains("password")
-                    {
+                    if should_redact_key(&key) {
                         (key, serde_json::Value::String("[redacted]".to_string()))
                     } else {
                         (key, redact_json(value))
@@ -130,6 +166,16 @@ fn redact_json(value: serde_json::Value) -> serde_json::Value {
         }
         other => other,
     }
+}
+
+fn should_redact_key(key: &str) -> bool {
+    let lowered = key.to_lowercase();
+    lowered.contains("secret")
+        || lowered.contains("token")
+        || lowered.contains("key")
+        || lowered.contains("password")
+        || lowered == "provider_session_id"
+        || lowered == "authorization"
 }
 
 fn now_timestamp() -> String {
@@ -173,6 +219,36 @@ mod tests {
                 actions: Vec::new(),
             })
             .unwrap();
+        FileMetricsService::new(&runtime_root)
+            .record_operation("cache.rebuild", 42.0, true, json!({"rows": 3}))
+            .unwrap();
+        let sessions_dir = durable_root.join("chat/sessions");
+        fs::create_dir_all(&sessions_dir).unwrap();
+        fs::write(
+            sessions_dir.join("CHAT1.json"),
+            serde_json::to_string_pretty(&json!({
+                "id": "CHAT1",
+                "mode": "chat",
+                "provider": "smoke-ai",
+                "provider_session_id": "provider-secret-session",
+                "attachment": "standalone",
+                "created_at": "2026-06-05T00:00:00Z",
+                "updated_at": "2026-06-05T00:00:01Z",
+                "transcript_events": [
+                    {
+                        "role": "assistant",
+                        "text": "diagnostic transcript line",
+                        "created_at": "2026-06-05T00:00:01Z"
+                    }
+                ],
+                "importable_artifacts": [],
+                "closed": false,
+                "interrupted": false,
+                "interruption_detail": null
+            }))
+            .unwrap(),
+        )
+        .unwrap();
         let service = FileSupportBundleService::new(&durable_root, &runtime_root, &temp_root);
         let bundle = service.export(true).unwrap();
 
@@ -180,6 +256,9 @@ mod tests {
         assert!(body.contains("[redacted]"));
         assert!(!body.contains("\"api_token\": \"secret\""));
         assert!(!body.contains("activity-secret"));
+        assert!(!body.contains("provider-secret-session"));
+        assert!(body.contains("cache.rebuild"));
+        assert!(body.contains("diagnostic transcript line"));
         assert!(body.contains("visible"));
 
         fs::remove_dir_all(temp_root).unwrap();

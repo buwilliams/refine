@@ -498,6 +498,7 @@ fn ssh_command(
     identity_path: &str,
     remote_command: &str,
 ) -> RefineResult<Command> {
+    validate_ssh_prerequisites(identity_path)?;
     let destination = ssh_destination(user, host)?;
     let mut command = Command::new("ssh");
     append_ssh_common_args(&mut command, port);
@@ -507,6 +508,51 @@ fn ssh_command(
     }
     command.arg(destination).arg(remote_command);
     Ok(command)
+}
+
+fn validate_ssh_prerequisites(identity_path: &str) -> RefineResult<()> {
+    ensure_ssh_binary_available()?;
+    let identity_path = identity_path.trim();
+    if identity_path.is_empty() {
+        return Ok(());
+    }
+    let path = expand_identity_path(identity_path)?;
+    if path.is_file() {
+        return Ok(());
+    }
+    Err(RefineError::InvalidInput(format!(
+        "ssh identity file {} was not found",
+        path.display()
+    )))
+}
+
+fn ensure_ssh_binary_available() -> RefineResult<()> {
+    Command::new("ssh")
+        .arg("-V")
+        .output()
+        .map(|_| ())
+        .map_err(|error| RefineError::Io(format!("ssh CLI was not found on PATH: {error}")))
+}
+
+fn expand_identity_path(identity_path: &str) -> RefineResult<PathBuf> {
+    if identity_path == "~" || identity_path.starts_with("~/") {
+        let Some(home) = std::env::var_os("HOME") else {
+            return Err(RefineError::InvalidInput(
+                "ssh identity path uses ~ but HOME is not set".to_string(),
+            ));
+        };
+        let mut path = PathBuf::from(home);
+        if identity_path.len() > 2 {
+            path.push(&identity_path[2..]);
+        }
+        return Ok(path);
+    }
+    if identity_path.starts_with('~') {
+        return Err(RefineError::InvalidInput(
+            "ssh identity path must use an absolute path, relative path, or ~/path".to_string(),
+        ));
+    }
+    Ok(PathBuf::from(identity_path))
 }
 
 fn ssh_display_command(
@@ -662,6 +708,45 @@ mod tests {
         })
         .unwrap_err();
         assert!(matches!(error, RefineError::InvalidInput(_)));
+    }
+
+    #[test]
+    fn ssh_preflight_reports_missing_identity_file() {
+        let temp_root = unique_temp_dir("cluster-ssh-preflight");
+        let missing_identity = temp_root.join("missing_ed25519");
+
+        let error = validate_ssh_prerequisites(missing_identity.to_str().unwrap()).unwrap_err();
+
+        assert!(matches!(error, RefineError::InvalidInput(_)));
+        assert!(error.to_string().contains("ssh identity file"));
+    }
+
+    #[test]
+    fn ssh_command_uses_existing_identity_file() {
+        let temp_root = unique_temp_dir("cluster-ssh-command");
+        fs::create_dir_all(&temp_root).unwrap();
+        let identity = temp_root.join("id_ed25519");
+        fs::write(&identity, "").unwrap();
+
+        let command = ssh_command(
+            2222,
+            "deploy",
+            "example.com",
+            identity.to_str().unwrap(),
+            "printf ok",
+        )
+        .unwrap();
+
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        assert!(args.contains(&"BatchMode=yes".to_string()));
+        assert!(args.contains(&"ConnectTimeout=10".to_string()));
+        assert!(args.contains(&"-i".to_string()));
+        assert!(args.contains(&identity.display().to_string()));
+
+        fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
