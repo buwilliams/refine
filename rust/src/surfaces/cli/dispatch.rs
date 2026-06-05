@@ -43,6 +43,14 @@ pub fn run() -> RefineResult<()> {
 
 pub fn dispatch(cli: Cli) -> RefineResult<()> {
     #[cfg(not(test))]
+    if let Some(path) = explicit_durable_root_path(&cli.command) {
+        return Err(RefineError::InvalidInput(format!(
+            "direct --durable-root CLI dispatch is not supported in normal operation; use the daemon API for durable state mutations instead ({})",
+            path.display()
+        )));
+    }
+
+    #[cfg(not(test))]
     if matches!(&cli.command, Commands::Project { .. }) {
         if let Commands::Project { action } = cli.command {
             return dispatch_project_daemon(action);
@@ -2399,6 +2407,110 @@ fn query_component(value: &str) -> String {
 
 fn skipped_durable_root(path: &PathBuf) -> bool {
     path.as_os_str().is_empty()
+}
+
+pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf> {
+    match command {
+        Commands::Project { action } => match action {
+            ProjectAction::Status { durable_root, .. }
+            | ProjectAction::Attach { durable_root, .. }
+            | ProjectAction::Switch { durable_root, .. }
+            | ProjectAction::Detach { durable_root, .. }
+            | ProjectAction::Register { durable_root, .. }
+            | ProjectAction::Clone { durable_root, .. }
+            | ProjectAction::Remove { durable_root, .. }
+            | ProjectAction::Migrate { durable_root, .. }
+            | ProjectAction::Sync { durable_root, .. }
+            | ProjectAction::Doctor { durable_root, .. } => durable_root.as_ref(),
+        },
+        Commands::Gap { action } => match action {
+            GapAction::Create { durable_root, .. }
+            | GapAction::List { durable_root }
+            | GapAction::Show { durable_root, .. }
+            | GapAction::Edit { durable_root, .. }
+            | GapAction::Note { durable_root, .. }
+            | GapAction::Round { durable_root, .. }
+            | GapAction::Start { durable_root, .. }
+            | GapAction::Cancel { durable_root, .. }
+            | GapAction::Retry { durable_root, .. }
+            | GapAction::Verify { durable_root, .. }
+            | GapAction::Merge { durable_root, .. }
+            | GapAction::Undo { durable_root, .. }
+            | GapAction::Delete { durable_root, .. }
+            | GapAction::AssignFeature { durable_root, .. }
+            | GapAction::RemoveFeature { durable_root, .. } => durable_root.as_ref(),
+        },
+        Commands::Feature { action } => match action {
+            FeatureAction::Create { durable_root, .. }
+            | FeatureAction::List { durable_root }
+            | FeatureAction::Show { durable_root, .. }
+            | FeatureAction::Edit { durable_root, .. }
+            | FeatureAction::AddGap { durable_root, .. }
+            | FeatureAction::RemoveGap { durable_root, .. }
+            | FeatureAction::ReorderGap { durable_root, .. }
+            | FeatureAction::Move { durable_root, .. }
+            | FeatureAction::Cancel { durable_root, .. }
+            | FeatureAction::Delete { durable_root, .. } => durable_root.as_ref(),
+            FeatureAction::Import { durable_root, .. } => Some(durable_root),
+        },
+        Commands::Workflow { action } => match action {
+            WorkflowAction::Allowed { .. }
+            | WorkflowAction::Pause { .. }
+            | WorkflowAction::Resume { .. } => None,
+            WorkflowAction::Transition { durable_root, .. }
+            | WorkflowAction::BulkTransition { durable_root, .. } => durable_root.as_ref(),
+            WorkflowAction::Schedule { durable_root, .. }
+            | WorkflowAction::Restore { durable_root }
+            | WorkflowAction::Enforce { durable_root } => Some(durable_root),
+        },
+        Commands::Node { action } => match action {
+            NodeAction::List { durable_root }
+            | NodeAction::Show { durable_root, .. }
+            | NodeAction::Create { durable_root, .. }
+            | NodeAction::Activate { durable_root, .. }
+            | NodeAction::Archive { durable_root, .. }
+            | NodeAction::Rename { durable_root, .. }
+            | NodeAction::Settings { durable_root, .. }
+            | NodeAction::Transfer { durable_root, .. } => durable_root.as_ref(),
+        },
+        Commands::Cluster { action } => match action {
+            ClusterAction::List { durable_root }
+            | ClusterAction::Show { durable_root, .. }
+            | ClusterAction::AddNode { durable_root, .. }
+            | ClusterAction::EditNode { durable_root, .. }
+            | ClusterAction::EnableNode { durable_root, .. }
+            | ClusterAction::DisableNode { durable_root, .. }
+            | ClusterAction::RemoveNode { durable_root, .. }
+            | ClusterAction::Sync { durable_root }
+            | ClusterAction::Run { durable_root, .. }
+            | ClusterAction::Transfer { durable_root, .. }
+            | ClusterAction::Maintenance { durable_root } => durable_root.as_ref(),
+        },
+        Commands::Log { action } => match action {
+            LogAction::List { durable_root, .. }
+            | LogAction::Tail { durable_root, .. }
+            | LogAction::Show { durable_root, .. }
+            | LogAction::Query { durable_root, .. }
+            | LogAction::Bundle { durable_root, .. } => Some(durable_root),
+            LogAction::Export { durable_root } => durable_root.as_ref(),
+        },
+        Commands::Agent { .. } => None,
+        Commands::System { action } => match action {
+            SystemAction::Doctor { durable_root, .. } => durable_root.as_ref(),
+            SystemAction::Install { .. }
+            | SystemAction::Repair { .. }
+            | SystemAction::Update { .. }
+            | SystemAction::Rollback { .. }
+            | SystemAction::Uninstall { .. }
+            | SystemAction::Start { .. }
+            | SystemAction::Stop { .. }
+            | SystemAction::Restart { .. }
+            | SystemAction::Status { .. }
+            | SystemAction::ApiGroups
+            | SystemAction::Web { .. } => None,
+        },
+    }
+    .filter(|path| !skipped_durable_root(path))
 }
 
 fn new_cli_idempotency_key() -> String {

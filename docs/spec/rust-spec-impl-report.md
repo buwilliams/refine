@@ -1,12 +1,12 @@
 # Refine Rust Port — Spec Conformance Report
 
 **Scope:** `docs/spec/rust-spec.md` against all of `rust/src/`, `rust/xtask/`, `rust/desktop/`.
-**Method:** full re-read after the second round of conformance commits (`16f7d21`, `d087ea5`); I re-verified each
-prior finding and residual against source. Built and ran the suite: `cargo test` is green — **161 passed, 0
-failed**, and the test binaries compile clean.
+**Method:** full re-read after the second round of conformance commits (`16f7d21`, `d087ea5`) plus the
+`--durable-root` follow-up; I re-verified each prior finding and residual against source. Built and ran the
+suite: `cargo test` is green, and the test binaries compile clean.
 **Status vs previous report:** the two headline structural findings remain resolved, and three of the prior
-residuals (installation activation, support-bundle depth, layout) are now closed too. What's left is a single
-architectural residual plus dependency-bounded integration depth.
+residuals (installation activation, support-bundle depth, layout) are now closed too. The remaining open items
+are dependency-bounded integration depth rather than architectural contradictions.
 
 ---
 
@@ -21,11 +21,11 @@ app, and the web server is no longer single-threaded.
 
 The latest commits closed most of what was left. Installation now *activates* services (real `systemctl` /
 `launchctl` calls), the support bundle redacts secrets by default, cluster SSH gained real preflight guards, and
-the spec itself was updated to list `imports/` and `nodes/` in the layout. The one architectural residual that
-persists is the in-process CLI escape hatch: when a caller passes `--durable-root`, the CLI still mutates
-durable state directly instead of going through the daemon. The other open items are dependency-bounded
-integration depth (cluster SSH is a guarded shell-out rather than a native crate; no code signing/notarization),
-not architectural contradictions.
+the spec itself was updated to list `imports/` and `nodes/` in the layout. The in-process CLI escape hatch is
+now guarded in normal builds: if an internal caller constructs a CLI action with a concrete durable root,
+dispatch rejects it before any file-backed service branch can mutate durable state. The remaining open items are
+dependency-bounded integration depth (cluster SSH is a guarded shell-out rather than a native crate; no code
+signing/notarization), not architectural contradictions.
 
 ---
 
@@ -33,7 +33,7 @@ not architectural contradictions.
 
 | Prior finding | Prior status | Now | Evidence |
 |---|---|---|---|
-| **#1 CLI bypasses daemon, mutates durable state in-process** | Largest deviation | **Resolved (default path)** | `dispatch.rs:46-48` routes `Project` to the daemon; `dispatch.rs:1620-1624` routes `Gap/Feature/Workflow/Node/Cluster` to `dispatch_*_daemon`; `daemon_json` (`dispatch.rs:2255`) is a real HTTP client with session-token auth, `Idempotency-Key`, and `X-Refine-API-Version: 1`. In-process service construction now only fires when an explicit `--durable-root` is supplied (`skipped_durable_root`, `dispatch.rs:2400`). |
+| **#1 CLI bypasses daemon, mutates durable state in-process** | Largest deviation | **Resolved** | `dispatch.rs` rejects a concrete durable root in non-test dispatch before the in-process service branches are reachable; the normal `Gap/Feature/Workflow/Node/Cluster` path routes to `dispatch_*_daemon`; `daemon_json` is a real HTTP client with session-token auth, `Idempotency-Key`, and `X-Refine-API-Version: 1`. Production CLI parsing also rejects `--durable-root` on mutating commands. |
 | **#2 Projection cache built but never read in production** | Dead code | **Resolved (daemon path)** | Daemon wires `FileWorkItemService::with_projection_cache(..., runtime_root/cache)` (`web_server/runtime.rs:55`); `projection_snapshot()` prefers `load_or_refresh_projection` when a cache dir is set (`work_items/service.rs:75-82`); scheduling and chat now call `load_or_refresh_projection` (`scheduling/mod.rs:305-307`, `chat/mod.rs:564`); cache is refreshed after each mutation (`http.rs:241`). |
 | Node ownership not enforced in `work_items` | Asymmetric | **Resolved** | `ensure_gap_owned` / `ensure_feature_owned` return `RefineError::Conflict` when `gap.node_id != active_node_id` (`work_items/service.rs:90-123`). |
 | Daemon lifecycle never spawns the process | State-only | **Resolved** | `start_background_daemon` spawns `current_exe`, `try_wait`s for readiness, and uses `setsid` to detach (`lifecycle/mod.rs:67-122,208`). The spawn now lives in core, not the CLI surface. |
@@ -53,28 +53,19 @@ not architectural contradictions.
 
 ## Remaining gaps and residual inconsistencies
 
-1. **The in-process CLI escape hatch still bypasses the daemon.** When a command is given an explicit
-   `--durable-root`, the CLI constructs `FileWorkItemService::new(durable_root)` and mutates `.refine` files
-   directly — no daemon auth, no idempotency, no SSE notification, and (because it uses `::new`, not
-   `::with_projection_cache`) a full-scan `rebuild_projection()` rather than the cache. This is now opt-in
-   rather than the default, and it's a reasonable scripting/bootstrap affordance, but if a user passes
-   `--durable-root` while the daemon is also running, you again have two uncoordinated writers on the same
-   files. Worth either documenting as an intentional offline/bootstrap-only path or guarding against use while
-   a daemon holds the port.
-
-2. **Cluster SSH is a guarded shell-out, not a native integration** (`cluster/mod.rs:503`, `Command::new("ssh")`).
+1. **Cluster SSH is a guarded shell-out, not a native integration** (`cluster/mod.rs:503`, `Command::new("ssh")`).
    The latest commit added the right guardrails — `ensure_ssh_binary_available` probes for `ssh` and surfaces a
    clear error, and identity-file preflight is tested — so it no longer fails silently. But it still depends on
    a working external `ssh` and the user's `~/.ssh` setup; there is no SSH crate. Fine for now; worth revisiting
    if remote execution becomes load-bearing.
 
-3. **Installation activates services but still can't sign or notarize.** `activate_os_backend` now really runs
+2. **Installation activates services but still can't sign or notarize.** `activate_os_backend` now really runs
    `systemctl`/`launchctl`, so daemon auto-start works on Linux/macOS where those managers are present. What's
    left is genuinely installer-territory: code signing, notarization, and the Windows service path are deferred
    to "the platform installer" (the note emitted when no activation commands apply). Not a gap in the daemon
    architecture, just packaging work that lives outside this crate.
 
-4. **Core `Cargo.toml` is still deliberately minimal** — `clap, chrono, serde, serde_json, thiserror, uuid`;
+3. **Core `Cargo.toml` is still deliberately minimal** — `clap, chrono, serde, serde_json, thiserror, uuid`;
    no async runtime, HTTP, SSH, or OS-service crates. The hand-rolled thread-per-connection HTTP server is fine
    for a local daemon, and avoiding heavy deps is a defensible choice, but it's the root reason cluster SSH is a
    shell-out rather than a native integration. Flagging it as the shared cause, not a bug.
@@ -104,7 +95,7 @@ not architectural contradictions.
 | `core::observability::{metrics,support_bundle}` | ✅ | Support bundle redacts secrets by default (`redact_json`); metrics present. |
 | `surfaces::web_server` | ✅ | std `TcpListener` HTTP/1.1, **thread-per-connection**; static serving with traversal guards; SSE; auth + local-origin; idempotency; version negotiation; serves every route the CLI calls. |
 | `surfaces::web/static` | ✅ | 55 assets copied from `python/refine_ui/static/`; xtask verifies parity. |
-| `surfaces::cli` | ✅ default / ⚠️ escape hatch | All 9 model-oriented groups + actions; **daemon-routed by default**; in-process only with explicit `--durable-root`. |
+| `surfaces::cli` | ✅ | All 9 model-oriented groups + actions; **daemon-routed in normal builds**; concrete durable roots are rejected before in-process service branches can mutate durable state. |
 | `surfaces::desktop` + `desktop/src-tauri` | ✅ feature-gated | Bridge shell by default; real Tauri 2 webview/tray/menu under `--features real-tauri`. |
 | `xtask` | ✅ | api-contract export, static-asset parity, runtime-layout. |
 
@@ -116,14 +107,11 @@ The two criteria that previously failed now pass as wired:
 
 - *"The daemon is the sole local authority for process lifecycle and durable workflow mutations."* — The default
   CLI path, the web/desktop surfaces, lifecycle spawn, and the projection cache all now route through the
-  daemon. The only way to mutate durable state off-daemon is the explicit `--durable-root` escape hatch
-  (residual #1).
+  daemon. The prior explicit `--durable-root` escape hatch is now guarded in normal CLI dispatch.
 - *"durable model records plus a persisted projection snapshot … and in-memory indexes"* as the query path —
   The daemon loads/refreshes the `<port>/cache/` snapshot, builds indexes, and refreshes after mutation; CLI,
   scheduling, and chat consume it.
 
 The remaining shortfalls are integration-depth rather than architecture: cluster SSH is a guarded shell-out
-bounded by the minimal dependency set (residuals #2, #4), and installer-grade signing/notarization is deferred
-to packaging (residual #3). The single architectural residual is the in-process CLI `--durable-root` escape
-hatch (residual #1) — opt-in, but still a way to mutate durable state off-daemon. None of these undercut the
-daemon-centric design the spec asks for.
+bounded by the minimal dependency set (residuals #1, #3), and installer-grade signing/notarization is deferred
+to packaging (residual #2). None of these undercut the daemon-centric design the spec asks for.

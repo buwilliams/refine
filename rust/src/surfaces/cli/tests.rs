@@ -1,4 +1,4 @@
-use super::dispatch::dispatch;
+use super::dispatch::{dispatch, explicit_durable_root_path};
 use super::*;
 use crate::core::observability::activity::ActivityService;
 use crate::core::observability::activity::FileActivityService;
@@ -8,6 +8,27 @@ use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[test]
+fn explicit_durable_root_path_detects_internal_cli_escape_hatch() {
+    let durable_root = PathBuf::from("/tmp/refine-state");
+    let command = Commands::Gap {
+        action: GapAction::Create {
+            name: "direct write".to_string(),
+            durable_root: Some(durable_root.clone()),
+            id: None,
+        },
+    };
+    assert_eq!(explicit_durable_root_path(&command), Some(&durable_root));
+
+    let default_daemon_command = Commands::Workflow {
+        action: WorkflowAction::Schedule {
+            durable_root: PathBuf::new(),
+            runtime_root: PathBuf::from("run"),
+        },
+    };
+    assert_eq!(explicit_durable_root_path(&default_daemon_command), None);
+}
 
 #[test]
 fn project_sync_rebuilds_projection_from_cli_surface() {
