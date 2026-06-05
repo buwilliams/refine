@@ -142,11 +142,56 @@ Gap execution workflow may use work-item, scheduling, provider, process, Git,
 storage, event, and log abstractions, but those abstractions remain centralized
 instead of being rebuilt inside the Gap execution code.
 
+## Model
+
+Module: `model`; path: `rust/src/model/`.
+
+The Rust architecture should be data-first. State, model definitions, and
+workflow rules are the stable center of the system; processing modules are
+second-class consumers of that model. Code organization should make it possible
+to answer questions about Refine state without reading executor, UI, provider,
+or process code.
+
+`model` owns the canonical Rust structs, enums, value types, persisted
+record shapes, and workflow state machines used by the rest of the product. In
+Rust terms, this is the domain model plus serialized record surface. It should
+be the first place to inspect when asking what Refine stores, what states exist,
+and which operations are allowed.
+
+Responsibilities:
+
+- Gap, Feature, Round, Project, App, Node, Job, Process, Provider, Quality,
+  Chat, Settings, Event, and Error data types.
+- Workflow-state enums and transition tables.
+- The allowed-operation matrix for a Gap at a given workflow state, including
+  which process kinds may be started, resumed, cancelled, retried, reviewed, or
+  merged.
+- Process-kind, ownership, and lifecycle enums used by supervisor and host
+  modules.
+- Durable record versions and migration-facing model definitions.
+- Serializable request, response, and event payload types where they represent
+  product state rather than transport mechanics.
+- Validation helpers that are pure functions over model values.
+- Test fixtures for representative valid and invalid model states.
+
+Rules:
+
+- `model` must not perform I/O, spawn processes, call providers, route API
+  requests, or know about UI surfaces.
+- Processing modules ask `model` what states and operations are valid
+  before mutating state or launching work.
+- Storage serializes and deserializes model records; it does not invent shadow
+  model definitions.
+- UI, CLI, API, scheduler, process, provider, and quality code should all use
+  the same model types for Gap state and allowed operations.
+- If a workflow rule can be expressed as data or a pure state transition, it
+  belongs in `model`, not in a runner, route handler, or button callback.
+
 ## Core Capabilities
 
 ### Installation And Update
 
-Module: `capabilities::installation`; path: `rust/src/capabilities/installation/`.
+Module: `core::host::installation`; path: `rust/src/core/host/installation/`.
 
 Owns abstractions for: install, repair, update, rollback, uninstall.
 
@@ -170,7 +215,7 @@ OS backends:
 
 ### Daemon Lifecycle
 
-Module: `capabilities::daemon_lifecycle`; path: `rust/src/capabilities/daemon_lifecycle/`.
+Module: `core::supervisor::lifecycle`; path: `rust/src/core/supervisor/lifecycle/`.
 
 Owns abstractions for: start, stop, restart, status, health, recover.
 
@@ -187,7 +232,7 @@ Requirements:
 
 ### Surface Session
 
-Module: `capabilities::surface_session`; path: `rust/src/capabilities/surface_session/`.
+Module: `core::supervisor::sessions`; path: `rust/src/core/supervisor/sessions/`.
 
 Owns abstractions for: open UI, authenticate local surface, stream state, deliver
 notifications.
@@ -202,7 +247,7 @@ Requirements:
 
 ### Project Registry
 
-Module: `capabilities::project_registry`; path: `rust/src/capabilities/project_registry/`.
+Module: `core::product::project_registry`; path: `rust/src/core/product/project_registry/`.
 
 Owns abstractions for: register, attach, switch, detach, clone, remove, inspect.
 
@@ -217,7 +262,7 @@ Requirements:
 
 ### Project State
 
-Module: `capabilities::project_state`; path: `rust/src/capabilities/project_state/`.
+Module: `core::product::project_state`; path: `rust/src/core/product/project_state/`.
 
 Owns abstractions for: initialize, read, mutate, migrate, sync, rebuild indexes.
 
@@ -232,7 +277,7 @@ Requirements:
 
 ### Work Items
 
-Module: `capabilities::work_items`; path: `rust/src/capabilities/work_items/`.
+Module: `core::product::work_items`; path: `rust/src/core/product/work_items/`.
 
 Owns abstractions for: create, import, deduplicate, list, update, transition, cancel,
 delete, assign, reorder.
@@ -248,7 +293,7 @@ Requirements:
 
 ### Scheduling And Execution
 
-Module: `capabilities::scheduling`; path: `rust/src/capabilities/scheduling/`.
+Module: `core::product::scheduling`; path: `rust/src/core/product/scheduling/`.
 
 Owns abstractions for: promote, reserve, dispatch, pause, resume, cancel, retry.
 
@@ -264,7 +309,7 @@ Requirements:
 
 ### Agent Providers
 
-Module: `capabilities::agent_providers`; path: `rust/src/capabilities/agent_providers/`.
+Module: `core::host::agent_providers`; path: `rust/src/core/host/agent_providers/`.
 
 Owns abstractions for: detect, configure, authenticate, invoke, parse, resume, diagnose.
 
@@ -280,7 +325,7 @@ Requirements:
 
 ### Process Supervision
 
-Module: `capabilities::process_supervision`; path: `rust/src/capabilities/process_supervision/`.
+Module: `core::host::process_supervision`; path: `rust/src/core/host/process_supervision/`.
 
 Owns abstractions for: launch, signal, wait, stream, inspect, limit, clean up.
 
@@ -304,7 +349,7 @@ OS backends should cover:
 
 ### Target App Operations
 
-Module: `capabilities::target_apps`; path: `rust/src/capabilities/target_apps/`.
+Module: `core::host::target_apps`; path: `rust/src/core/host/target_apps/`.
 
 Owns abstractions for: configure, start, stop, restart, status, rebuild, open, diagnose.
 
@@ -319,7 +364,7 @@ Requirements:
 
 ### Git And Worktrees
 
-Module: `capabilities::git_worktrees`; path: `rust/src/capabilities/git_worktrees/`.
+Module: `core::host::git_worktrees`; path: `rust/src/core/host/git_worktrees/`.
 
 Owns abstractions for: inspect, branch, worktree, diff, merge, rebase, commit, reset,
 push, recover.
@@ -337,7 +382,7 @@ Requirements:
 
 ### Quality And Verification
 
-Module: `capabilities::quality`; path: `rust/src/capabilities/quality/`.
+Module: `core::host::quality`; path: `rust/src/core/host/quality/`.
 
 Owns abstractions for: run checks, browser QA, regressions, screenshots, compare, gate.
 
@@ -351,7 +396,7 @@ Requirements:
 
 ### Chat And Planning
 
-Module: `capabilities::chat`; path: `rust/src/capabilities/chat/`.
+Module: `core::product::chat`; path: `rust/src/core/product/chat/`.
 
 Owns abstractions for: start, resume, stream, attach to Gap or Feature, persist context.
 
@@ -365,7 +410,7 @@ Requirements:
 
 ### Observability And Diagnostics
 
-Module: `capabilities::observability`; path: `rust/src/capabilities/observability/`.
+Module: `core::observability`; path: `rust/src/core/observability/`.
 
 Owns abstractions for: activity, logs, metrics, doctor, support bundle.
 
@@ -381,7 +426,7 @@ Requirements:
 
 ### Security And Permissions
 
-Module: `capabilities::security`; path: `rust/src/capabilities/security/`.
+Module: `core::supervisor::security`; path: `rust/src/core/supervisor/security/`.
 
 Owns abstractions for: local auth, secret storage, command authorization, audit.
 
@@ -397,7 +442,7 @@ Requirements:
 
 ### Cluster And Multi-Node
 
-Module: `capabilities::cluster`; path: `rust/src/capabilities/cluster/`.
+Module: `core::host::cluster`; path: `rust/src/core/host/cluster/`.
 
 Owns abstractions for: node registry, transfer, sync, remote command, ownership.
 
@@ -431,45 +476,59 @@ Suggested repository layout:
 refine/
   docs/
   python/
+  run/
+    primary.json
+    <port>/
+      cache/
   rust/
     Cargo.toml
     src/
       main.rs
       lib.rs
-      architecture/
-        supervisor/
+      surfaces/
+        cli/
+        desktop/
+        web/
         local_api/
-        surfaces/
-          cli/
-          desktop/
-          web/
-        runtime/
-        jobs/
-        config/
-        errors/
-        testing/
-      capabilities/
-        installation/
-        daemon_lifecycle/
-        surface_session/
-        project_registry/
-        project_state/
-        work_items/
-        scheduling/
-        agent_providers/
-        process_supervision/
-        target_apps/
-        git_worktrees/
-        quality/
-        chat/
+      core/
+        product/
+          project_registry/
+          project_state/
+          work_items/
+          scheduling/
+          chat/
+        host/
+          installation/
+          process_supervision/
+          target_apps/
+          git_worktrees/
+          agent_providers/
+          quality/
+          cluster/
+        supervisor/
+          lifecycle/
+          sessions/
+          jobs/
+          security/
+          runtime/
+          config/
+          errors/
+          testing/
         observability/
-        security/
-        cluster/
-      shared/
-        ids/
-        paths/
-        time/
-        serialization/
+          activity/
+          logs/
+          metrics/
+          diagnostics/
+          support_bundle/
+      model/
+        gap/
+        feature/
+        workflow/
+        operations/
+        process/
+        project/
+        events/
+        records/
     desktop/
       src-tauri/
         Cargo.toml
@@ -487,39 +546,59 @@ If Tauri requires a separate package, it should live under
 own capabilities, durable state rules, process lifecycle, provider behavior, or
 workflow logic.
 
+`run/` is a repository-root runtime directory, not part of the Rust source
+tree. It should be gitignored and retained as the local runtime-state home used
+by the current Python implementation: `run/primary.json` for the primary local
+runtime record and `run/<port>/cache/` for port-scoped caches such as SQLite
+indexes. Rust should keep this convention unless a migration explicitly
+documents a replacement.
+
 ### Module Direction
 
-Modules should follow a one-way dependency graph:
+The architecture is conceptual: the repository already separates runtimes
+through `python/` and `rust/`, and the Rust package should focus on the modules
+it directly implements. Rust modules should follow a one-way dependency graph:
 
 ```text
 surfaces
-  architecture::surfaces::{cli, desktop, web}
+  surfaces::{cli, desktop, web, local_api}
       |
-daemon
-  architecture::supervisor / architecture::local_api / architecture::jobs
+core
+  core::supervisor::{lifecycle, sessions, jobs, security, runtime, config}
+  core::product::{work_items, scheduling, project_state, ...}
+  core::host::{process_supervision, target_apps, git_worktrees, ...}
       |
-capabilities
-  capabilities::{work_items, scheduling, process_supervision, ...}
-      |
-shared foundations
-  shared::{ids, paths, time, serialization}
+model
+  model::{gap, workflow, operations, process, records, ...}
+
+side channel for all processing layers
+observability
+  core::observability::{logs, activity, metrics, diagnostics}
 ```
 
 Rules:
 
-- `architecture::*` modules compose capabilities into the supervisor, local API,
-  jobs, runtime lifecycle, and user surfaces.
-- `capabilities::*` modules own product and host-integration abstractions. Each
-  capability has exactly one top-level module and directory, listed in the Core
-  Capabilities section.
-- Capability modules can depend on `shared::*` foundations and on service
-  traits from other capabilities when composition requires it, but they should
-  not reach into surface modules.
-- Surface modules call the local API or supervisor-facing service facades. They
-  should not directly mutate durable Refine state or spawn managed processes.
-- Shared modules are small foundations. They should not accumulate product
-  logic just because multiple modules need the same helper.
-- Test support lives under `architecture::testing` and per-capability test
+- `model::*` modules own canonical data types, persisted records,
+  workflow states, operation rules, and pure validation. They should not depend
+  on processing, surface, host, supervisor, or observability modules.
+- `core::product::*` modules own Refine domain behavior and durable workflow
+  semantics built on `model`.
+- `core::host::*` modules own OS, Git, process, provider, browser, Docker,
+  toolchain, target-app, quality, and cluster integration using model-defined
+  process and ownership types.
+- `core::supervisor::*` modules own daemon authority, runtime lifecycle,
+  sessions, jobs, security, configuration, error translation, and testing
+  support.
+- `core::observability::*` modules own the single abstraction for logs,
+  activity, metrics, diagnostics, and support bundles. Processing modules emit
+  through this abstraction; model modules do not.
+- `surfaces::*` modules own entrypoints and adapters for CLI, web,
+  desktop, and local API. Surface modules call supervisor-facing services; they
+  do not directly mutate durable Refine state or spawn managed processes.
+- Avoid a generic `shared` module. Put code in the module that owns the concept.
+  If a primitive is genuinely cross-cutting, give it a narrow named home inside
+  the relevant container instead of creating a catch-all utility bucket.
+- Test support lives under `core::supervisor::testing` and per-capability test
   fixtures. It can depend broadly on production modules, but production modules
   cannot depend on test-only code.
 
@@ -528,35 +607,35 @@ Rules:
 The following modules support the overall architecture rather than a single
 product capability:
 
-- `architecture::supervisor`; path: `rust/src/architecture/supervisor/`. Owns
-  daemon authority, startup composition, runtime ownership, and controlled
-  shutdown.
-- `architecture::local_api`; path: `rust/src/architecture/local_api/`. Owns
-  HTTP, WebSocket, local IPC, auth extraction, request routing, and API
-  translation into capability services.
-- `architecture::surfaces::cli`; path: `rust/src/architecture/surfaces/cli/`.
-  Owns the CLI surface and structured output formatting.
-- `architecture::surfaces::desktop`; path:
-  `rust/src/architecture/surfaces/desktop/`. Owns desktop shell integration,
-  native menu and tray hooks, update prompts, and narrow bridge command
-  definitions used by the Tauri wrapper.
-- `architecture::surfaces::web`; path: `rust/src/architecture/surfaces/web/`.
-  Owns serving or packaging the web UI assets and generated client bindings.
-- `architecture::runtime`; path: `rust/src/architecture/runtime/`. Owns runtime
-  bootstrap, OS path selection, instance identity, and process startup context.
-- `architecture::jobs`; path: `rust/src/architecture/jobs/`. Owns the job
-  registry, operation handles, cancellation plumbing, and operation recovery
-  coordination.
-- `architecture::config`; path: `rust/src/architecture/config/`. Owns loading,
-  validating, and merging user, project, and runtime configuration.
-- `architecture::errors`; path: `rust/src/architecture/errors/`. Owns shared
+- `model`; path: `rust/src/model/`. Owns canonical state types,
+  workflow-state enums, allowed-operation rules, persisted record definitions, and
+  pure validation.
+- `core::supervisor::runtime`; path: `rust/src/core/supervisor/runtime/`. Owns
+  runtime bootstrap, OS path selection, instance identity, process startup
+  context, and repo-root `run/` path resolution.
+- `core::supervisor::jobs`; path: `rust/src/core/supervisor/jobs/`. Owns the
+  job registry, operation handles, cancellation plumbing, and operation
+  recovery coordination.
+- `core::supervisor::config`; path: `rust/src/core/supervisor/config/`. Owns
+  loading, validating, and merging user, project, and runtime configuration.
+- `core::supervisor::errors`; path: `rust/src/core/supervisor/errors/`. Owns
   error categories and translation into local API and CLI output.
-- `architecture::testing`; path: `rust/src/architecture/testing/`. Owns
+- `core::supervisor::testing`; path: `rust/src/core/supervisor/testing/`. Owns
   black-box fixtures, fake supervisors, fake providers, fake process handles,
   and contract-test helpers.
+- `surfaces::cli`; path: `rust/src/surfaces/cli/`. Owns the CLI
+  surface and structured output formatting.
+- `surfaces::desktop`; path: `rust/src/surfaces/desktop/`. Owns
+  desktop shell integration, native menu and tray hooks, update prompts, and
+  narrow bridge command definitions used by the Tauri wrapper.
+- `surfaces::web`; path: `rust/src/surfaces/web/`. Owns serving or
+  packaging the web UI assets and generated client bindings.
+- `surfaces::local_api`; path: `rust/src/surfaces/local_api/`. Owns
+  HTTP, WebSocket, local IPC, auth extraction, request routing, and API
+  translation into supervisor and capability services.
 
 `rust/xtask/` should contain repository automation that is not part of the
-shipped product: code generation, API schema export, fixture refresh, release
+shipped product: code generation, API contract export, fixture refresh, release
 packaging, installer smoke tests, and migration checks.
 
 ### Initial Implementation Cut
@@ -564,15 +643,16 @@ packaging, installer smoke tests, and migration checks.
 The first Rust milestone should create only the modules needed to prove the
 architecture without fragmenting the code too early:
 
-- `architecture::supervisor`, `architecture::local_api`,
-  `architecture::surfaces::cli`, `architecture::runtime`,
-  `architecture::config`, `architecture::errors`, and `architecture::testing`.
-- `capabilities::daemon_lifecycle`, `capabilities::surface_session`,
-  `capabilities::project_registry`, `capabilities::project_state`,
-  `capabilities::work_items`, `capabilities::process_supervision`, and
-  `capabilities::observability`.
-- `shared::ids`, `shared::paths`, `shared::time`, and
-  `shared::serialization`.
+- `model::{gap, feature, workflow, operations, process, project, records}`.
+- `core::supervisor::lifecycle`, `core::supervisor::sessions`,
+  `core::supervisor::jobs`, `core::supervisor::runtime`,
+  `core::supervisor::config`, `core::supervisor::errors`, and
+  `core::supervisor::testing`.
+- `surfaces::cli` and `surfaces::local_api`.
+- `core::product::project_registry`, `core::product::project_state`,
+  `core::product::work_items`, and `core::product::scheduling`.
+- `core::host::process_supervision`.
+- `core::observability::{logs, activity, metrics, diagnostics}`.
 
 Defer desktop shell, web asset packaging, provider execution, quality, chat,
 and cluster modules until the first supervisor, local API, project registry,
@@ -622,6 +702,25 @@ Storage should distinguish:
 Durable workflow state should be portable and Git-friendly where the current
 Refine model requires collaboration. Runtime state should remain local and
 should not dirty the target app.
+
+Durable records should deserialize into `model` types. Storage code may
+own file layout, atomic writes, indexes, and cache rebuilds, but it should not
+define a second set of workflow structs or status enums. Cache/index records
+mirror model records and must be rebuildable from them.
+
+The checkout root keeps a gitignored `run/` directory for local runtime state.
+Rust should preserve this convention because the Python implementation already
+uses it successfully:
+
+- `run/primary.json`: primary local runtime record.
+- `run/<port>/`: port-scoped daemon, process, socket, and UI runtime state.
+- `run/<port>/cache/`: port-scoped caches such as rebuilt SQLite indexes.
+
+`run/` is Refine-owned runtime bookkeeping. It must stay outside tracked
+target-app files and should not be written into a target app's tracked
+`.gitignore`. If a target app needs an ignore rule for Refine runtime
+bookkeeping, use repo-local Git exclude behavior rather than mutating tracked
+application files.
 
 All storage paths must be OS-specific and documented:
 
@@ -676,10 +775,11 @@ Testing should verify capabilities through public surfaces.
 
 Required layers:
 
-- Unit tests for core state transitions and validators.
+- Unit tests for `model` state transitions, allowed-operation rules, and
+  validators.
 - Integration tests for storage, migrations, Git, process supervision, and
   provider adapters.
-- Contract tests for local API request/response and event schemas.
+- Contract tests for local API request/response and event contracts.
 - CLI tests with JSON output checks.
 - Web/Desktop UI smoke tests through the shared API.
 - Black-box compatibility tests that run representative workflows against the
@@ -717,7 +817,10 @@ implementation details.
   integrations.
 - Business logic is shared across surfaces.
 - The document includes migration and testing strategy for a vertical port.
+- The document defines `model` as the centralized model module for
+  canonical state, workflow states, and allowed operations.
 - The document defines a core Rust package under `rust/`, leaves room for a
   thin Tauri wrapper package, assigns capabilities to modules and directory
-  paths, defines supporting architecture modules, and identifies the initial
-  Rust implementation cut.
+  paths inside the concrete `core::*` containers, preserves repo-root
+  gitignored `run/` runtime state, and identifies the initial Rust
+  implementation cut.
