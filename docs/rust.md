@@ -221,7 +221,8 @@ Owns abstractions for: start, stop, restart, status, health, recover.
 
 Requirements:
 
-- One daemon owns one local Refine runtime authority.
+- One daemon owns one port-scoped local Refine runtime authority, matching the
+  current Python runtime model.
 - The daemon exposes a local authenticated API for surfaces.
 - Status distinguishes daemon health, web availability, worker state, target-app
   state, active operations, and degraded integrations.
@@ -638,27 +639,6 @@ product capability:
 shipped product: code generation, API contract export, fixture refresh, release
 packaging, installer smoke tests, and migration checks.
 
-### Initial Implementation Cut
-
-The first Rust milestone should create only the modules needed to prove the
-architecture without fragmenting the code too early:
-
-- `model::{gap, feature, workflow, operations, process, project, records}`.
-- `core::supervisor::lifecycle`, `core::supervisor::sessions`,
-  `core::supervisor::jobs`, `core::supervisor::runtime`,
-  `core::supervisor::config`, `core::supervisor::errors`, and
-  `core::supervisor::testing`.
-- `surfaces::cli` and `surfaces::local_api`.
-- `core::product::project_registry`, `core::product::project_state`,
-  `core::product::work_items`, and `core::product::scheduling`.
-- `core::host::process_supervision`.
-- `core::observability::{logs, activity, metrics, diagnostics}`.
-
-Defer desktop shell, web asset packaging, provider execution, quality, chat,
-and cluster modules until the first supervisor, local API, project registry,
-storage, process, log, and CLI contracts are stable. Their directories should
-be added when their first concrete abstraction lands.
-
 ## Local API
 
 The daemon should expose two local interfaces:
@@ -703,6 +683,12 @@ Durable workflow state should be portable and Git-friendly where the current
 Refine model requires collaboration. Runtime state should remain local and
 should not dirty the target app.
 
+The Rust implementation should start by preserving the current Python
+application's storage split and path behavior. Use the Python application as
+the source of truth for which records remain collaboration-visible and which
+records are local runtime state. Any change to that split should be documented
+as an intentional Rust architecture decision.
+
 Durable records should deserialize into `model` types. Storage code may
 own file layout, atomic writes, indexes, and cache rebuilds, but it should not
 define a second set of workflow structs or status enums. Cache/index records
@@ -735,17 +721,20 @@ Refine itself should be native and should not require host Python.
 Dependency classes:
 
 - Required core dependencies: bundled with Refine or implemented in Rust.
-- Required external dependencies: Git is likely required for most useful
-  workflows and should be detected early.
-- Optional workflow dependencies: Node/npm, Docker, Playwright browsers,
-  provider CLIs, language toolchains, package managers.
+- External prerequisites: Git is likely required for most useful workflows and
+  should be detected early, but it is not bundled into the desktop app.
+- Workflow prerequisites: browser automation dependencies, provider CLIs,
+  language toolchains, package managers, Docker, Node/npm, and other target
+  tools are installed by the user or target environment, not bundled into the
+  desktop app.
 - Provider dependencies: either provider CLI, provider API credentials, or both,
   depending on the configured adapter.
 
 Dependency checks should be capability-scoped. Missing Docker should not block
 Gap creation. Missing provider auth should block agent execution but not project
 inspection. Missing browser automation should block browser QA but not ordinary
-chat.
+chat. `doctor`, first-run setup, and workflow preflight should report missing
+prerequisites clearly instead of hiding or bundling them.
 
 ## Migration And Port Strategy
 
@@ -769,6 +758,10 @@ The current implementation should act as a behavior oracle during the port.
 Where behavior changes intentionally, document the change as a Rust architecture
 decision instead of preserving accidental compatibility.
 
+Desktop-first onboarding and broader web UI redesign are not part of this
+architecture decision. Reuse the existing web UI where useful during the port;
+redesign can be handled later as a separate product/design pass.
+
 ## Testing Strategy
 
 Testing should verify capabilities through public surfaces.
@@ -790,19 +783,21 @@ The black-box harness should treat Refine as a product surface, not as internal
 modules. It should exercise UI and CLI behavior and avoid depending on private
 implementation details.
 
-## Open Questions
+## Resolved Decisions
 
-- Should the daemon be per-user, per-checkout, or capable of managing multiple
-  target apps from one user-level authority?
-- Should provider integrations prefer direct APIs, CLIs, or both?
-- Which state must remain Git-visible for collaboration, and which should move
-  to local app support paths?
-- How much of the web UI should be reused unchanged versus redesigned for
-  Desktop-first onboarding?
-- Should the desktop bundle include Git, browser automation dependencies, or
-  any provider-specific helper binaries?
-- What is the minimum Rust MVP that proves the direction before porting advanced
-  workflows?
+- Runtime authority is port-scoped, matching the current Python application.
+- Provider integrations should support both direct provider APIs and provider
+  CLIs.
+- Git-visible collaboration state and local runtime state should follow the
+  current Python application's storage split unless a Rust architecture decision
+  explicitly changes it.
+- Web UI reuse versus redesign is intentionally deferred. Redesign work can be
+  handled later as needed.
+- The desktop bundle should not include Git, browser automation dependencies,
+  provider-specific helper binaries, or target workflow toolchains. These are
+  prerequisites that Refine detects, diagnoses, and reports.
+- No minimum Rust MVP is required for this document. The implementation can be
+  driven to completion workflow by workflow.
 
 ## Acceptance Criteria
 
@@ -819,8 +814,9 @@ implementation details.
 - The document includes migration and testing strategy for a vertical port.
 - The document defines `model` as the centralized model module for
   canonical state, workflow states, and allowed operations.
+- The document records the resolved daemon, provider, storage, dependency, UI,
+  and implementation-scope decisions.
 - The document defines a core Rust package under `rust/`, leaves room for a
   thin Tauri wrapper package, assigns capabilities to modules and directory
   paths inside the concrete `core::*` containers, preserves repo-root
-  gitignored `run/` runtime state, and identifies the initial Rust
-  implementation cut.
+  gitignored `run/` runtime state.
