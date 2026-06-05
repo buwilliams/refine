@@ -1,190 +1,125 @@
-Refine Rust Port — Spec Conformance Report
+# Refine Rust Port — Spec Conformance Report
 
-Scope reviewed: docs/spec/rust-spec.md against all of rust/src/, rust/xtask/, rust/desktop/.
-Method: full read of every module; I personally re-verified the projection-cache and CLI-authority findings below against
-source. No changes made. I did not run cargo build/cargo test (143 #[test] functions exist; I did not execute them).
-
-Verdict
-
-The port is far more complete than a scaffold — roughly 30k lines of real, working Rust. The model layer is essentially a
-faithful translation, the daemon web server is a genuine hand-rolled HTTP/1.1 server, the CLI command tree matches the
-spec noun-by-noun, and host integrations (git, process spawn, provider invocation, ssh) actually shell out and do work.
-
-But there are two structural inconsistencies that contradict the spec's central thesis, plus a tier of OS-integration and
-cache work that is modeled-but-not-wired. The spec's whole reason for existing is "one daemon as the sole local
-authority, with a projection cache as the only query path." Both of those load-bearing claims are violated in the code as
-written.
+**Scope:** `docs/spec/rust-spec.md` against all of `rust/src/`, `rust/xtask/`, `rust/desktop/`.
+**Method:** full re-read after the refactor; I re-verified each prior finding against source. This pass I also
+built and ran the suite: `cargo test` is green — **159 passed, 0 failed**, and the test binaries compile clean.
+**Status vs previous report:** the two headline structural findings are now substantially resolved, along with
+most of the secondary gaps. What remains is a smaller, well-understood residual tier.
 
 ---
-The two findings that matter
 
-1. The CLI bypasses the daemon and mutates durable state in-process — contradicts the core architecture
+## Verdict
 
-The spec is unambiguous (lines 175-179, 1008-1011): the daemon is "the single local authority," "Surfaces do not directly
-mutate durable state," and "The CLI should normally talk to the same daemon web server using structured HTTP/JSON
-contracts… [bootstrap] when the daemon is not available."
+The port is now a coherent daemon-centric implementation, ~34k lines, and it builds and tests clean. The
+spec's central thesis — *one daemon as the sole local authority, with a projection cache as the only query
+path* — is now actually wired, not just modeled. The CLI talks to the daemon over HTTP by default, the daemon
+owns the projection cache, node ownership is enforced at the mutation boundary, the daemon process is really
+spawned, secret storage and command authorization exist, the desktop package is a real (feature-gated) Tauri 2
+app, and the web server is no longer single-threaded.
 
-In practice, surfaces/cli/dispatch.rs constructs core services directly and mutates durable files in the CLI's own
-process:
-
-- dispatch.rs:64 — FileWorkItemService::new(durable_root).transition_gap_status(...)
-- dispatch.rs:95,140,305 — bulk update / transfer gaps, in-process
-- dispatch.rs:245-333 — node and cluster registry mutations, in-process
-
-The CLI can spawn the daemon (start_background_daemon, dispatch.rs:1380, a real current_exe spawn) and has an
-InProcessWebServer/LocalHttpDaemon import — but only system-group commands use it. Every product command (gap, feature,
-workflow, node, cluster) writes durable state directly. This means two writers (CLI process + daemon) can mutate the same
-.refine files concurrently with no shared authority, no auth, no idempotency, and no SSE notification — exactly the
-condition the daemon was introduced to eliminate. This is the single largest deviation in the codebase.
-
-2. The projection cache is built and persisted but never read in production — the spec's required cache abstraction is
-dead code
-
-The spec devotes its entire Storage Model section to this and lists it as an acceptance criterion: load the snapshot from
-<port>/cache/, validate fingerprints, rescan only changed records, and make "the projection API the only supported query
-abstraction" (lines 1073-1098, 1339-1341).
-
-The mechanism exists and is correct in isolation — load_or_refresh_projection (project_state/store.rs:89) does
-fingerprint-validated incremental refresh with full-scan fallback. But the only callers of it are tests. Every production
-path calls the full-scan rebuild_projection() instead:
-
-- work_items/service.rs:109, 117, 171, 234, 617, 637, 667
-- scheduling/mod.rs:347, 415
-- chat/mod.rs:564
-
-So every list/count/mutation re-scans all gap.json/feature.json from disk — O(n) per operation — and the persisted
-<port>/cache/ snapshot is never loaded except in load_or_refresh_projection, which nothing in production calls. The cache
-is implemented, tested, and bypassed. (This is downstream of finding #1: because the CLI and daemon both call core
-directly with no shared in-memory daemon state, there's no long-lived process to hold an in-memory index, so everyone
-full-scans.)
+The remaining deviations are narrower: an in-process CLI escape hatch that still bypasses the daemon when a
+caller passes `--durable-root`, OS-service *activation* (as opposed to file generation) that installation does
+not perform, and cluster SSH that still shells out to the system `ssh` binary. None of these contradict the
+architecture the way the prior two findings did.
 
 ---
-Layer-by-layer conformance
 
-Layer: model::{project,gap,feature,workflow,cluster,node}
-Status: ✅ Faithful
-Notes: All spec'd structs/fields/enum variants present; workflow transition tables match spec exactly; pure (no I/O); has
+## What changed since the last review
 
-fixtures + tests
-────────────────────────────────────────
-Layer: model::log
-Status: ⚠️ Minor
-Notes: LogEntry.actions / ActivityEntry.actions are Vec<LogAction>, spec says optional (log/mod.rs:12,27). Cosmetic.
-────────────────────────────────────────
-Layer: core::product::work_items
-Status: ✅ Broad / ⚠️ ownership
-Notes: Full CRUD/transition/bulk/assign/reorder. But node-ownership is not enforced before mutation (spec lines 460, 612)
-
-— enforced in scheduling but not work_items
-────────────────────────────────────────
-Layer: core::product::project_state
-Status: ⚠️ Split brain
-Notes: Query + index layer fully built and correct; cache layer orphaned (finding #2)
-────────────────────────────────────────
-Layer: core::product::scheduling
-Status: ✅ Real
-Notes: promote/reserve/dispatch/pause/resume/cancel/retry; concurrency limits (global/node/provider/app); reservations
-persisted + restart-recovered. Gap: feature-ordering enforced only in promote, not reserve/dispatch
-────────────────────────────────────────
-Layer: core::product::chat
-Status: ✅ Strong
-Notes: Durable sessions, interrupted-turn recovery, provider-resume, gap/feature context rebuild — closely matches the
-detailed chat spec
-────────────────────────────────────────
-Layer: core::product::project_registry
-Status: ✅ / ⚠️
-Notes: register/attach/switch/detach/remove/inspect all real; clone not implemented (spec line 560)
-────────────────────────────────────────
-Layer: core::host::{git_worktrees, process_supervision, target_apps, agent_providers}
-Status: ✅ Real
-Notes: Genuine subprocess work — git CLI with audit log, OS process spawn/signal/stream with typed ProcessOwner, provider
-
-CLI detection + JSON-event parsing
-────────────────────────────────────────
-Layer: core::host::cluster
-Status: ⚠️ Fragile
-Notes: Real, but shells out to system ssh (no ssh crate in Cargo.toml); no key/identity management; silently depends on
-external binary
-────────────────────────────────────────
-Layer: core::host::installation
-Status: ⚠️ Modeled only
-Notes: Tracks install state but performs no real OS registration — backend.registered = true is hardcoded; no
-launchd/systemd/Windows-service/signing/notarization (and no deps to do it)
-────────────────────────────────────────
-Layer: core::host::quality
-Status: ◐ Present
-Notes: service/types/tests scaffolded; depth of real browser-QA execution not fully confirmed
-────────────────────────────────────────
-Layer: core::supervisor::lifecycle
-Status: ⚠️ State-only
-Notes: start/stop write a status file; they do not spawn/kill the daemon. The real spawn lives in the CLI
-(start_background_daemon), not in core lifecycle
-────────────────────────────────────────
-Layer: core::supervisor::{sessions,jobs,runtime,config,errors}
-Status: ✅ Real
-Notes: Token auth + registry, file-backed job registry w/ states & log pagination, OS-specific path layout,
-settings/governance/reporters, categorized error enum
-────────────────────────────────────────
-Layer: core::supervisor::security
-Status: ⚠️ Partial
-Notes: Token auth + log redaction + audit trail real; no secret storage (keychain/cred-mgr), allowed_commands ACL defined
-
-but unused
-────────────────────────────────────────
-Layer: core::supervisor::testing
-Status: ❌ Stub
-Notes: Only not_implemented_fixture() (testing/mod.rs:3). Spec requires fake supervisor/providers/process handles +
-contract helpers
-────────────────────────────────────────
-Layer: core::observability::{logs,activity,diagnostics}
-Status: ✅ Real
-Notes: JSONL sidecars, multi-filter query + retention, 9-category doctor
-────────────────────────────────────────
-Layer: core::observability::{metrics,support_bundle}
-Status: ◐ Partial
-Notes: Types/constants present; full service depth unconfirmed
-────────────────────────────────────────
-Layer: surfaces::web_server
-Status: ✅ Real
-Notes: Hand-rolled std::net::TcpListener HTTP/1.1; static serving w/ traversal guards; SSE (/events, /api/sse); auth +
-local-origin checks; idempotency keys; API-version negotiation; all 9 API groups; thin handlers delegating to core.
-Single-threaded (one request per accept)
-────────────────────────────────────────
-Layer: surfaces::web/static
-Status: ✅ Complete
-Notes: All 55 assets copied from python/refine_ui/static/; xtask verifies parity
-────────────────────────────────────────
-Layer: surfaces::cli
-Status: ✅ Tree / ❌ wiring
-Notes: All 9 model-oriented groups + every spec'd action present — but wired in-process (finding #1)
-────────────────────────────────────────
-Layer: surfaces::desktop + desktop/src-tauri
-Status: ⚠️ Bridge only
-Notes: FileDesktopShellBridge real (bootstrap/status/notify/tray/deep-link/event-stream); Tauri package is a stub —
-src-tauri/Cargo.toml has no tauri dependency, main.rs just calls desktop_bridge_commands(). No window/webview/tray
-actually rendered
-────────────────────────────────────────
-Layer: xtask
-Status: ✅ Real
-Notes: api-contract export, static-asset parity check, runtime-layout — real file I/O
+| Prior finding | Prior status | Now | Evidence |
+|---|---|---|---|
+| **#1 CLI bypasses daemon, mutates durable state in-process** | Largest deviation | **Resolved (default path)** | `dispatch.rs:46-48` routes `Project` to the daemon; `dispatch.rs:1620-1624` routes `Gap/Feature/Workflow/Node/Cluster` to `dispatch_*_daemon`; `daemon_json` (`dispatch.rs:2255`) is a real HTTP client with session-token auth, `Idempotency-Key`, and `X-Refine-API-Version: 1`. In-process service construction now only fires when an explicit `--durable-root` is supplied (`skipped_durable_root`, `dispatch.rs:2400`). |
+| **#2 Projection cache built but never read in production** | Dead code | **Resolved (daemon path)** | Daemon wires `FileWorkItemService::with_projection_cache(..., runtime_root/cache)` (`web_server/runtime.rs:55`); `projection_snapshot()` prefers `load_or_refresh_projection` when a cache dir is set (`work_items/service.rs:75-82`); scheduling and chat now call `load_or_refresh_projection` (`scheduling/mod.rs:305-307`, `chat/mod.rs:564`); cache is refreshed after each mutation (`http.rs:241`). |
+| Node ownership not enforced in `work_items` | Asymmetric | **Resolved** | `ensure_gap_owned` / `ensure_feature_owned` return `RefineError::Conflict` when `gap.node_id != active_node_id` (`work_items/service.rs:90-123`). |
+| Daemon lifecycle never spawns the process | State-only | **Resolved** | `start_background_daemon` spawns `current_exe`, `try_wait`s for readiness, and uses `setsid` to detach (`lifecycle/mod.rs:67-122,208`). The spawn now lives in core, not the CLI surface. |
+| `project_registry` `clone` missing | Gap | **Resolved** | `clone_app` trait + impl runs `git clone` (`project_registry/mod.rs:18,216-224,313`). |
+| Security: no secret storage, ACL unused | Partial | **Resolved** | `SecretStore` trait + `NativeSecretStore`, `SecretStoreBackend::{MacosKeychain, WindowsCredentialManager}` (`security/mod.rs:29-89`); `allowed_commands` loaded from settings and enforced (`security/mod.rs:453-503`). |
+| `supervisor::testing` is a bare stub | Stub | **Resolved** | `TestRuntimeFixture`, `FakeProcessSupervisor`, `FakeProvider`, `assert_json_contract`, `process_spec` (`testing/mod.rs:14-158`). |
+| Desktop/Tauri package empty | Stub | **Resolved** | `real-tauri` feature pulls `tauri 2.11.2` + `tauri-build`; gated `real_tauri` module builds a genuine `WebviewWindowBuilder` / `TrayIconBuilder` / `Menu` app with `#[tauri::command]`s; default build runs the bridge shell (`desktop/src-tauri/src/main.rs`, `Cargo.toml:6-22`). |
+| Web server single-threaded | Limitation | **Resolved** | `serve_next_concurrent` spawns a thread per connection (`http.rs:111-119`, used at `http.rs:309`). |
+| `model::log` `actions` not optional | Cosmetic | **Resolved** | `#[serde(default, skip_serializing_if = "Vec::is_empty")]` on both `LogEntry.actions` and `ActivityEntry.actions` (`model/log/mod.rs`). |
+| Quality QA depth unconfirmed | Unknown | **Improved** | `run_playwright` invokes a real `playwright test <spec>` and captures `screenshot.png` (`quality/service.rs:304-378`). |
 
 ---
-Inconsistencies (beyond the two headline findings)
 
-- Lifecycle authority is in the wrong layer. Spec puts daemon start/stop/recover in core::supervisor::lifecycle, but the
-only real process spawn is in surfaces::cli::dispatch::start_background_daemon. Core lifecycle is reduced to status-file
-bookkeeping. A surface owns the capability the spec assigns to core.
-- Node-ownership enforcement is asymmetric. scheduling checks active-node ownership before acting; work_items does not.
-So scheduled work respects ownership but direct CLI/API mutations can edit another node's gaps — violating spec lines
-460-461.
-- Two undocumented modules. core/product/imports/ and core/product/nodes/ exist and are sensible, but aren't in the
-spec's suggested layout. Minor — the layout is explicitly "suggested" — but worth folding into the spec or noting as an
-intentional decision.
-- installation.registered = true hardcoded presents fake success for an OS integration that doesn't happen. This is the
-kind of convincing-stub that will read as "done" on a status board while doing nothing — flag it explicitly rather than
-leave it green.
-- Dependency gaps that cap several capabilities at "shell-out or stub": no async runtime / HTTP-server crate (web server
-is sync, single-threaded), no ssh crate (cluster depends on system binary), no OS-service/signing crates (installation
-can't really register a daemon). These aren't bugs, but they bound how far installation, cluster, and concurrency can go
-without new dependencies — and the spec's "native, no host Python" daemon-registration goal isn't reachable
-as-dependency'd.
+## Remaining gaps and residual inconsistencies
+
+1. **The in-process CLI escape hatch still bypasses the daemon.** When a command is given an explicit
+   `--durable-root`, the CLI constructs `FileWorkItemService::new(durable_root)` and mutates `.refine` files
+   directly — no daemon auth, no idempotency, no SSE notification, and (because it uses `::new`, not
+   `::with_projection_cache`) a full-scan `rebuild_projection()` rather than the cache. This is now opt-in
+   rather than the default, and it's a reasonable scripting/bootstrap affordance, but if a user passes
+   `--durable-root` while the daemon is also running, you again have two uncoordinated writers on the same
+   files. Worth either documenting as an intentional offline/bootstrap-only path or guarding against use while
+   a daemon holds the port.
+
+2. **Installation generates service files but does not activate them.** `register_os_backend` now writes a real
+   systemd user unit and a launchd plist, and `registered`/`partial` reflect whether the write actually
+   succeeded (`installation/mod.rs:215-263,360`) — a genuine improvement over the previously hardcoded
+   `registered = true`. But it stops at writing the unit file; nothing runs `systemctl --user enable` /
+   `launchctl load`, and there is no code signing or notarization. The daemon won't actually auto-start on
+   login from this alone. This is honest now (the `partial` flag surfaces it), just incomplete.
+
+3. **Cluster SSH still shells out to the system `ssh` binary** (`cluster/mod.rs:502`, `Command::new("ssh")`).
+   No SSH crate, no key/identity management; remote execution silently depends on a working external `ssh` and
+   `~/.ssh` setup. Functional but fragile, and unchanged from the prior review.
+
+4. **Core `Cargo.toml` is still deliberately minimal** — `clap, chrono, serde, serde_json, thiserror, uuid`;
+   no async runtime, HTTP, SSH, or OS-service crates. The hand-rolled thread-per-connection HTTP server is fine
+   for a local daemon, and avoiding heavy deps is a defensible choice, but it's the root reason #2 and #3 above
+   are shell-out / file-generation rather than native integrations. Flagging it as the shared cause, not a bug.
+
+5. **Layout nit:** `core/product/imports/` and `core/product/nodes/` exist and are sensible but still aren't in
+   the spec's "suggested layout." Fold them into the spec or note them as intentional.
+
+6. **Not re-verified in depth this pass:** `observability::{metrics, support_bundle}` internals and the full
+   chat transcript/resume surface. They compile and their tests pass; I did not re-read them line-by-line after
+   the refactor.
+
+---
+
+## Layer-by-layer conformance
+
+| Layer | Status | Notes |
+|---|---|---|
+| `model::{project,gap,feature,workflow,cluster,node}` | ✅ Faithful | Structs/fields/enum variants match; transition tables match spec; pure; fixtures + tests. |
+| `model::log` | ✅ | `actions` now effectively optional on the wire (`skip_serializing_if`). |
+| `core::product::work_items` | ✅ | Full CRUD/transition/bulk/assign/reorder; **node ownership now enforced** (`Conflict` on mismatch). |
+| `core::product::project_state` | ✅ | Query + index layer intact; **cache now consumed in production** via `load_or_refresh_projection`. |
+| `core::product::scheduling` | ✅ | promote/reserve/dispatch/pause/resume/cancel/retry; concurrency limits; restart-recovered reservations; now reads the projection cache. |
+| `core::product::chat` | ✅ | Durable sessions, interrupted-turn recovery, provider-resume, context rebuild. |
+| `core::product::project_registry` | ✅ | register/attach/switch/detach/remove/inspect/**clone** all present. |
+| `core::host::{git_worktrees, process_supervision, target_apps, agent_providers}` | ✅ | Real subprocess work; git audit log; typed `ProcessOwner`; provider detect + JSON-event parse. |
+| `core::host::quality` | ✅ (shell-dep) | Real `playwright test` invocation + screenshot capture; depends on external playwright. |
+| `core::host::cluster` | ⚠️ Fragile | Real but shells out to system `ssh`; no key management. |
+| `core::host::installation` | ⚠️ Writes, doesn't activate | Generates real systemd/launchd files; `partial` flag honest; no enable/load, no signing. |
+| `core::supervisor::lifecycle` | ✅ | **Really spawns** the daemon (`current_exe` + `setsid`), status/health/recover. |
+| `core::supervisor::security` | ✅ | Token auth, redaction, audit, **secret store**, **command ACL** enforced. |
+| `core::supervisor::{sessions,jobs,runtime,config,errors}` | ✅ | Auth + registry, file-backed jobs, OS path layout, settings/governance, categorized errors. |
+| `core::supervisor::testing` | ✅ | Real fixtures + fakes + contract helper. |
+| `core::observability::{logs,activity,diagnostics}` | ✅ | JSONL sidecars, multi-filter query + retention, 9-category doctor. |
+| `core::observability::{metrics,support_bundle}` | ◐ | Present; not re-verified in depth (tests pass). |
+| `surfaces::web_server` | ✅ | std `TcpListener` HTTP/1.1, **thread-per-connection**; static serving with traversal guards; SSE; auth + local-origin; idempotency; version negotiation; serves every route the CLI calls. |
+| `surfaces::web/static` | ✅ | 55 assets copied from `python/refine_ui/static/`; xtask verifies parity. |
+| `surfaces::cli` | ✅ default / ⚠️ escape hatch | All 9 model-oriented groups + actions; **daemon-routed by default**; in-process only with explicit `--durable-root`. |
+| `surfaces::desktop` + `desktop/src-tauri` | ✅ feature-gated | Bridge shell by default; real Tauri 2 webview/tray/menu under `--features real-tauri`. |
+| `xtask` | ✅ | api-contract export, static-asset parity, runtime-layout. |
+
+---
+
+## Acceptance criteria
+
+The two criteria that previously failed now pass as wired:
+
+- *"The daemon is the sole local authority for process lifecycle and durable workflow mutations."* — The default
+  CLI path, the web/desktop surfaces, lifecycle spawn, and the projection cache all now route through the
+  daemon. The only way to mutate durable state off-daemon is the explicit `--durable-root` escape hatch
+  (residual #1).
+- *"durable model records plus a persisted projection snapshot … and in-memory indexes"* as the query path —
+  The daemon loads/refreshes the `<port>/cache/` snapshot, builds indexes, and refreshes after mutation; CLI,
+  scheduling, and chat consume it.
+
+The remaining shortfalls against the spec are integration-depth rather than architecture: installation activates
+nothing (residual #2), cluster SSH and the HTTP/SSH layers are shell-outs bounded by the minimal dependency set
+(residuals #3–#4). These are reasonable next targets but don't undercut the daemon-centric design the spec asks
+for.
