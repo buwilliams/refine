@@ -472,7 +472,7 @@ def _backend_cli_runner_call(
 def _supervisor_required_message(port: int, socket_path: Path, error: BaseException) -> str:
     return (
         f"Refine supervisor is not reachable at {socket_path}: {error}. "
-        f"Run `uv run refine start {port}` first."
+        f"Run `./r start {port}` first."
     )
 
 
@@ -3079,10 +3079,10 @@ def cmd_target(args: _Args) -> int:
     print()
     print("Next steps:")
     if result.get("registry_path"):
-        print(f"  uv run refine start {port}    # background refine supervisor")
-        print(f"  uv run refine install {port}  # persistent service, auto-restarts")
-        print(f"  uv run refine status {port}   # check it's healthy")
-        print(f"  uv run refine stop {port}     # tear it all down")
+        print(f"  ./r start {port}    # background refine supervisor")
+        print(f"  ./r install {port}  # persistent service, auto-restarts")
+        print(f"  ./r status {port}   # check it's healthy")
+        print(f"  ./r stop {port}     # tear it all down")
     else:
         print(f"  cd {client_repo}")
         print(f"  refine doctor                 # sanity check the config")
@@ -3385,7 +3385,7 @@ def _write_and_enable_ui_unit(
         f"Environment=REFINE_UI_PORT={port}\n"
         f"Environment=REFINE_UI_SCOPE={port}\n"
         f"Environment={config.ENV_RUN_DIR}={config.local_run_dir(clone_dir, port=port)}\n"
-        f"ExecStart={uv} run refine supervisor\n"
+        f"ExecStart={uv} --project {clone_dir / 'python'} run refine supervisor\n"
         "Restart=on-failure\n"
         "RestartSec=2s\n"
         "TimeoutStopSec=30s\n"
@@ -3705,7 +3705,7 @@ def cmd_reset(args: _Args) -> int:
     print("Reset complete. To attach a target app:")
     print(f"  cd {cwd}")
     suffix = f" --port {port}" if port is not None else ""
-    print(f"  uv run refine target{suffix} <path/to/target-app>")
+    print(f"  ./r target{suffix} <path/to/target-app>")
     if client_refine_dir and client_refine_dir.is_dir() and not args.purge:
         print()
         print(f"The previous app's refine data is preserved at:")
@@ -3857,7 +3857,7 @@ def _print_status_block(clone: Path, unit: str, cfg: "config.Config", *,
           "supervisor-managed UI + runner worker")
     print(f"  logs:     {_runtime_log_path(clone, display_cfg, effective_port)}")
     print(f"  journal:  journalctl -u {ui_unit} -f")
-    print(f"  stop:     uv run refine stop {effective_port}")
+    print(f"  stop:     ./r stop {effective_port}")
     print()
 
 
@@ -3890,7 +3890,7 @@ def _print_setup_status_block(
     print(f"  logs:     {_runtime_log_path(clone, None, port)}")
     if ui_unit:
         print(f"  journal:  journalctl -u {ui_unit} -f")
-    print(f"  stop:     uv run refine stop {port}")
+    print(f"  stop:     ./r stop {port}")
     print()
 
 
@@ -4400,7 +4400,7 @@ def _start_background_ui(
     if cfg is not None:
         env["REFINE_CONFIG_PATH"] = str(cfg.config_path)
     env.setdefault("PYTHONUNBUFFERED", "1")
-    command = [uv, "run", "refine", "supervisor"]
+    command = [uv, "--project", str(clone / "python"), "run", "refine", "supervisor"]
     with log_path.open("ab") as log:
         proc = subprocess.Popen(
             command,

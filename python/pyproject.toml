@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Background AI coding agents that close behavior Gaps in client codebases."
 requires-python = ">=3.10"
 license = "MIT"
-readme = "README.md"
+readme = {text = "Refine Python implementation.", content-type = "text/markdown"}
 authors = [{name = "buwilliams"}]
 dependencies = [
     "typer>=0.16,<1.0",

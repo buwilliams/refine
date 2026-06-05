@@ -116,8 +116,14 @@ APP_SCAN_IGNORED_DIRS = {
 def is_refine_source_dir(path: Path) -> bool:
     """Return whether `path` looks like a Refine source checkout."""
     return (
-        (path / "pyproject.toml").is_file()
-        and (path / "refine_cli" / "cli.py").is_file()
+        (
+            (path / "python" / "pyproject.toml").is_file()
+            and (path / "python" / "refine_cli" / "cli.py").is_file()
+        )
+        or (
+            (path / "pyproject.toml").is_file()
+            and (path / "refine_cli" / "cli.py").is_file()
+        )
     )
 
 
@@ -260,7 +266,7 @@ def attach_project(
                 "Project setup must run from the host refine source directory.",
                 (
                     f"The process is running in {clone_dir}. Start refine from "
-                    "the source checkout with `uv run refine start` so it can "
+                    "the source checkout with `./r start` so it can "
                     "create host directories and manage port-local app state."
                 ),
             )
@@ -268,7 +274,7 @@ def attach_project(
             return _err(
                 400,
                 "Persistent service installation is only available from the CLI.",
-                "Run `uv run refine install` from the Refine checkout.",
+                "Run `./r install` from the Refine checkout.",
             )
 
         is_remote = looks_like_git_remote(raw_path)

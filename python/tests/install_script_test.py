@@ -78,21 +78,30 @@ def _run_piped_installer_with_pty(
 
 
 def _write_refine_checkout(checkout: Path, *, legacy: bool = False) -> None:
-    (checkout / "refine_cli").mkdir(parents=True, exist_ok=True)
-    (checkout / "pyproject.toml").write_text(
-        "[project]\nname = \"refine\"\n",
-        encoding="utf-8",
-    )
-    (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
     if legacy:
+        (checkout / "refine_cli").mkdir(parents=True, exist_ok=True)
+        (checkout / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
         (checkout / "install.sh").write_text("# marker\n", encoding="utf-8")
     else:
+        (checkout / "python" / "refine_cli").mkdir(parents=True, exist_ok=True)
+        (checkout / "python" / "pyproject.toml").write_text(
+            "[project]\nname = \"refine\"\n",
+            encoding="utf-8",
+        )
+        (checkout / "python" / "refine_cli" / "cli.py").write_text(
+            "# marker\n",
+            encoding="utf-8",
+        )
         (checkout / "scripts").mkdir(exist_ok=True)
         (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
 
 
 def main() -> int:
-    root = Path(__file__).resolve().parents[1]
+    root = Path(__file__).resolve().parents[2]
     install_sh = root / "scripts" / "install.sh"
     readme = root / "README.md"
 
@@ -150,16 +159,16 @@ def main() -> int:
     assert "resolve_refine_port" in script
     assert "restart_refine_after_upgrade" in script
     assert "Restart Refine now to run" in script
-    assert 'uv run refine restart "$port"' in script
-    assert 'uv run refine app rebuild --port "$port"' in script
+    assert 'uv --project "$(refine_project_dir)" run refine restart "$port"' in script
+    assert 'uv --project "$(refine_project_dir)" run refine app rebuild --port "$port"' in script
     assert "assuming local development and skipping release upgrade" in script
     assert "not on a semver release tag" in script
     assert 'if [ "$REFINE_UPGRADED" = "1" ]; then' in script
     assert 'confirm "Install or repair Playwright Chromium for regression screenshots" "$default_answer"' in script
     assert 'git clone --branch "$latest" "$REFINE_REPO_URL" "$checkout"' in script
-    assert 'uv run refine target "$TARGET_APP_PATH" --force --port "$port"' in script
+    assert 'uv --project "$(refine_project_dir)" run refine target "$TARGET_APP_PATH" --force --port "$port"' in script
     assert 'REFINE_UI_PORT="$port" REFINE_UI_SCOPE="$port"' in script
-    assert "uv run refine install $port" in script
+    assert "uv --project python run refine install $port" in script
     assert "Some install steps did not complete" in script
     assert "Why it is needed:" in script
     assert "What to do:" in script
@@ -218,9 +227,10 @@ def main() -> int:
         assert "Continue with Refine install" not in output
         assert "Is this a new Refine install" not in output
         assert "Dry run mode" in output
-        assert "uv run refine target" not in output
+        assert "uv --project" not in output
         assert "set Refine setting agent_cli=codex" not in output
-        assert "uv run refine target" in log_text
+        assert "uv --project" in log_text
+        assert "run refine target" in log_text
         assert "set Refine setting agent_cli=codex" in log_text
         assert "Provider:         codex" in output
         assert f"Install log: {install_log}" in output
@@ -371,7 +381,7 @@ def main() -> int:
         assert "uv is available in this shell" not in output
         assert "link" in log_text and "uv is available in this shell" in log_text
         assert "uv run refine init" not in output
-        assert "uv run refine target" not in output
+        assert "run refine target" not in output
         assert "Target app:       not attached yet" in output
         print("[ok] install.sh can complete without an initial target app")
     finally:
@@ -435,13 +445,13 @@ def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="refine-install-failure-summary-test-"))
     try:
         checkout = tmp / "refine"
-        (checkout / "refine_cli").mkdir(parents=True)
+        (checkout / "python" / "refine_cli").mkdir(parents=True)
         (checkout / "scripts").mkdir()
-        (checkout / "pyproject.toml").write_text(
+        (checkout / "python" / "pyproject.toml").write_text(
             "[project]\nname = \"refine\"\n",
             encoding="utf-8",
         )
-        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        (checkout / "python" / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
         (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
         subprocess.run(["git", "init", "-q"], cwd=checkout, check=True)
 
@@ -469,7 +479,7 @@ def main() -> int:
             "#!/bin/sh\n"
             "echo hidden uv stdout\n"
             "echo hidden uv stderr >&2\n"
-            "if [ \"$1\" = \"run\" ] && [ \"$2\" = \"refine\" ] && [ \"$3\" = \"start\" ]; then\n"
+            "if [ \"$1\" = \"--project\" ] && [ \"$3\" = \"run\" ] && [ \"$4\" = \"refine\" ] && [ \"$5\" = \"start\" ]; then\n"
             "  exit 1\n"
             "fi\n"
             "exit 0\n",
@@ -583,14 +593,14 @@ def main() -> int:
     try:
         checkout = tmp / "refine"
         target = tmp / "target-app"
-        (checkout / "refine_cli").mkdir(parents=True)
+        (checkout / "python" / "refine_cli").mkdir(parents=True)
         (checkout / "scripts").mkdir()
         target.mkdir()
-        (checkout / "pyproject.toml").write_text(
+        (checkout / "python" / "pyproject.toml").write_text(
             "[project]\nname = \"refine\"\n",
             encoding="utf-8",
         )
-        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        (checkout / "python" / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
         (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
         (checkout / ".refine-binding").write_text(
             f"# refine binding\n{target}\n",
@@ -651,14 +661,14 @@ def main() -> int:
     try:
         checkout = tmp / "refine"
         target = tmp / "target-app"
-        (checkout / "refine_cli").mkdir(parents=True)
+        (checkout / "python" / "refine_cli").mkdir(parents=True)
         (checkout / "scripts").mkdir()
         target.mkdir()
-        (checkout / "pyproject.toml").write_text(
+        (checkout / "python" / "pyproject.toml").write_text(
             "[project]\nname = \"refine\"\n",
             encoding="utf-8",
         )
-        (checkout / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+        (checkout / "python" / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
         (checkout / "scripts" / "install.sh").write_text("# marker\n", encoding="utf-8")
         (checkout / ".refine-binding").write_text(
             f"# refine binding\n{target}\n",
@@ -714,11 +724,14 @@ def main() -> int:
         assert "Install or repair Playwright Chromium for regression screenshots [y/N]" in output
         assert "Restart Refine now to run 1.0.0 [Y/n]" in output
         assert "Refine was upgraded but not restarted" in output
-        assert "uv run refine restart" in output
-        assert "uv run refine start" not in output
+        assert "uv --project python run refine restart" in output
+        assert "run refine start" not in output
         log_text = install_log.read_text(encoding="utf-8")
-        assert "+ uv run refine restart" not in log_text
-        assert "+ uv run refine app rebuild" not in log_text
+        assert "+ uv --project" not in "\n".join(
+            line for line in log_text.splitlines()
+            if "run refine restart" in line
+        )
+        assert "run refine app rebuild" not in log_text
         assert "Refresh target application" not in output
 
         result = subprocess.run(
@@ -733,8 +746,9 @@ def main() -> int:
         log_text = install_log.read_text(encoding="utf-8")
         assert "Refine upgraded to release 1.0.0" in output
         assert "Refresh target application" in output
-        assert "uv run refine restart 8080" in log_text
-        assert "uv run refine app rebuild --port 8080" in log_text
+        assert "uv --project" in log_text
+        assert "run refine restart 8080" in log_text
+        assert "run refine app rebuild --port 8080" in log_text
         assert "Skipped Playwright. Managed regression screenshots may fail" in output
         assert "+ npx --yes playwright install --with-deps chromium" not in output
         assert "Refine was upgraded but not restarted" not in output

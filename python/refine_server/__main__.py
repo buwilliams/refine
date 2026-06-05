@@ -1,7 +1,7 @@
 """Run the refine-server component on the host.
 
-Invoked as `uv run refine server` when you want server logs in the foreground.
-The production path is `uv run refine ui`, which owns a runner in-process.
+Invoked as `./r server` when you want server logs in the foreground.
+The production path is `./r ui`, which owns a runner in-process.
 """
 from __future__ import annotations
 

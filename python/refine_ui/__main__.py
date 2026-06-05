@@ -3,7 +3,7 @@
 Loads refine.toml when available, initializes SQLite, starts the SSE poller,
 and serves HTTP. Without config, it serves the host-native no-app UI so the
 user can create or attach a project from the browser.
-Invoked as `uv run refine ui` (the CLI dispatcher).
+Invoked as `./r ui` from a source checkout (the CLI dispatcher).
 """
 from __future__ import annotations
 

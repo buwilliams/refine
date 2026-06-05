@@ -133,8 +133,8 @@ def bootstrap(node_id: str, *, root: Path | None = None,
     port = shlex.quote(str(node.get("refine_port") or 8080))
     remote_cmd = (
         f"{install} && cd {checkout} && "
-        f"uv run refine target {target} --force && "
-        f"uv run refine start {port}"
+        f"./r target {target} --force && "
+        f"./r start {port}"
     )
     cmd = _ssh_command(node, remote_cmd)
     result = subprocess.run(cmd, text=True, capture_output=True, timeout=timeout)
@@ -166,7 +166,7 @@ def _remote_refine_command(node: dict[str, Any], refine_args: list[str]) -> str:
         str(Path(str(node.get("target_app_path") or "")) / ".refine" / "refine.toml")
     )
     args = " ".join(shlex.quote(str(arg)) for arg in refine_args)
-    return f"cd {checkout} && uv run refine --config {config_path} {args}"
+    return f"cd {checkout} && ./r --config {config_path} {args}"
 
 
 def _validate_ssh_host(host: str) -> None:

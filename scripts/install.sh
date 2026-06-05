@@ -292,8 +292,8 @@ dry_run() {
 }
 
 is_refine_checkout() {
-  [ -f "$1/pyproject.toml" ] &&
-    [ -f "$1/refine_cli/cli.py" ] &&
+  [ -f "$1/python/pyproject.toml" ] &&
+    [ -f "$1/python/refine_cli/cli.py" ] &&
     [ -f "$1/scripts/install.sh" ]
 }
 
@@ -305,6 +305,22 @@ is_legacy_refine_checkout() {
 
 is_any_refine_checkout() {
   is_refine_checkout "$1" || is_legacy_refine_checkout "$1"
+}
+
+refine_project_dir() {
+  local project_dir="$REFINE_CHECKOUT/python"
+  if [ ! -f "$project_dir/pyproject.toml" ]; then
+    project_dir="$REFINE_CHECKOUT"
+  fi
+  printf '%s\n' "$project_dir"
+}
+
+refine_manual_prefix() {
+  if [ -f "$REFINE_CHECKOUT/python/pyproject.toml" ]; then
+    printf 'cd %s && uv --project python run refine' "$REFINE_CHECKOUT"
+  else
+    printf 'cd %s && uv run refine' "$REFINE_CHECKOUT"
+  fi
 }
 
 current_refine_checkout() {
@@ -1283,7 +1299,7 @@ configure_refine_setting() {
     log_detail "${DIM}+ set Refine setting $key=$value on port $port${RESET}"
     return 0
   fi
-  REFINE_UI_PORT="$port" REFINE_UI_SCOPE="$port" REFINE_SETTING_KEY="$key" REFINE_SETTING_VALUE="$value" uv run python - <<'PY'
+  REFINE_UI_PORT="$port" REFINE_UI_SCOPE="$port" REFINE_SETTING_KEY="$key" REFINE_SETTING_VALUE="$value" uv --project "$(refine_project_dir)" run python - <<'PY'
 import os
 from refine_server import config, db
 
@@ -1338,10 +1354,10 @@ target_refine() {
     "Target app missing: $TARGET_APP_PATH"
   local port
   port="$(resolve_refine_port)"
-  run uv run refine target "$TARGET_APP_PATH" --force --port "$port" || die_issue \
+  run uv --project "$(refine_project_dir)" run refine target "$TARGET_APP_PATH" --force --port "$port" || die_issue \
     "Refine target attachment" \
     "Target attachment tells Refine which application repository it should manage." \
-    "Run manually: cd $REFINE_CHECKOUT && uv run refine target $TARGET_APP_PATH --force --port $port" \
+    "Run manually: $(refine_manual_prefix) target $TARGET_APP_PATH --force --port $port" \
     "refine target failed"
   configure_refine_setting "agent_cli" "$SELECTED_PROVIDER"
   configure_target_app_commands
@@ -1352,38 +1368,38 @@ start_refine() {
   local port
   local refine_started="1"
   port="$(prompt "Refine port" "$(resolve_refine_port)")"
-  if has_systemd && confirm "Install Refine as a persistent service with: uv run refine install $port" "y"; then
-    if run uv run refine install "$port"; then
+  if has_systemd && confirm "Install Refine as a persistent service with: uv --project python run refine install $port" "y"; then
+    if run uv --project "$(refine_project_dir)" run refine install "$port"; then
       ok "Refine installed as a persistent service"
     else
       warn_issue \
         "Persistent Refine service install" \
         "The persistent service keeps Refine running after terminal close and host restarts." \
-        "Run manually: cd $REFINE_CHECKOUT && uv run refine install $port" \
+        "Run manually: $(refine_manual_prefix) install $port" \
         "Persistent install failed. Trying non-installed background start."
-      if ! run uv run refine start "$port"; then
+      if ! run uv --project "$(refine_project_dir)" run refine start "$port"; then
         warn_issue \
           "Refine background start" \
           "Refine must be running for the browser UI." \
-          "Run manually: cd $REFINE_CHECKOUT && uv run refine start $port" \
-          "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
+          "Run manually: $(refine_manual_prefix) start $port" \
+          "Could not start Refine. Run manually: $(refine_manual_prefix) start $port"
         refine_started="0"
       fi
     fi
   else
     if ! has_systemd; then
-      info "Persistent service install requires systemd. Starting with: uv run refine start $port"
+      info "Persistent service install requires systemd. Starting with: uv --project python run refine start $port"
     fi
-    if ! run uv run refine start "$port"; then
+    if ! run uv --project "$(refine_project_dir)" run refine start "$port"; then
       warn_issue \
         "Refine background start" \
         "Refine must be running for the browser UI." \
-        "Run manually: cd $REFINE_CHECKOUT && uv run refine start $port" \
-        "Could not start Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine start $port"
+        "Run manually: $(refine_manual_prefix) start $port" \
+        "Could not start Refine. Run manually: $(refine_manual_prefix) start $port"
       refine_started="0"
     fi
   fi
-  run uv run refine status "$port" || true
+  run uv --project "$(refine_project_dir)" run refine status "$port" || true
   say
   if [ "$refine_started" = "1" ]; then
     ok "Open Refine: http://localhost:$port"
@@ -1399,7 +1415,7 @@ restart_refine_after_upgrade() {
   [ -n "$release" ] || release="the new release"
   port="$(resolve_refine_port)"
   if ! confirm "Restart Refine now to run $release" "y"; then
-    info "Refine was upgraded but not restarted. Restart later with: cd $REFINE_CHECKOUT && uv run refine restart $port"
+    info "Refine was upgraded but not restarted. Restart later with: $(refine_manual_prefix) restart $port"
     return 0
   fi
   run cd "$REFINE_CHECKOUT" || die_issue \
@@ -1407,14 +1423,14 @@ restart_refine_after_upgrade() {
     "The installer needs to enter the Refine checkout before restarting Refine." \
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not enter $REFINE_CHECKOUT"
-  if run uv run refine restart "$port"; then
+  if run uv --project "$(refine_project_dir)" run refine restart "$port"; then
     refresh_target_app_after_upgrade "$port"
   else
     warn_issue \
     "Refine restart after upgrade" \
     "The running service must restart before it uses the upgraded Refine release." \
-    "Run manually: cd $REFINE_CHECKOUT && uv run refine restart $port" \
-    "Could not restart Refine. Run manually: cd $REFINE_CHECKOUT && uv run refine restart $port"
+    "Run manually: $(refine_manual_prefix) restart $port" \
+    "Could not restart Refine. Run manually: $(refine_manual_prefix) restart $port"
   fi
 }
 
@@ -1425,11 +1441,11 @@ refresh_target_app_after_upgrade() {
     return 0
   }
   section "Refresh target application"
-  run uv run refine app rebuild --port "$port" || warn_issue \
+  run uv --project "$(refine_project_dir)" run refine app rebuild --port "$port" || warn_issue \
     "Target application refresh after update" \
     "The upgraded Refine runner should restart or rebuild the managed application so stale app state is cleared." \
-    "Run manually: cd $REFINE_CHECKOUT && uv run refine app rebuild --port $port" \
-    "Could not refresh the target application. Run manually: cd $REFINE_CHECKOUT && uv run refine app rebuild --port $port"
+    "Run manually: $(refine_manual_prefix) app rebuild --port $port" \
+    "Could not refresh the target application. Run manually: $(refine_manual_prefix) app rebuild --port $port"
 }
 
 preflight() {

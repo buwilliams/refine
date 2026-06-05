@@ -146,7 +146,11 @@ def find_dotenv(start: Path | None = None) -> Path | None:
 
 
 def _looks_like_refine_checkout(path: Path) -> bool:
-    return (path / "pyproject.toml").is_file() and (path / "refine_cli").is_dir()
+    return (
+        ((path / "python" / "pyproject.toml").is_file()
+         and (path / "python" / "refine_cli").is_dir())
+        or ((path / "pyproject.toml").is_file() and (path / "refine_cli").is_dir())
+    )
 
 
 def _has_refine_checkout_ancestor(path: Path) -> bool:
@@ -154,8 +158,19 @@ def _has_refine_checkout_ancestor(path: Path) -> bool:
 
 
 def _refine_source_checkout() -> Path | None:
-    root = Path(__file__).resolve().parents[1]
-    return root if _looks_like_refine_checkout(root) else None
+    python_root = Path(__file__).resolve().parents[1]
+    repo_root = python_root.parent
+    if _looks_like_refine_checkout(repo_root):
+        return repo_root
+    return python_root if _looks_like_refine_checkout(python_root) else None
+
+
+def _is_source_path(path: Path, source: Path | None) -> bool:
+    if source is None:
+        return False
+    resolved = path.resolve()
+    source = source.resolve()
+    return resolved == source or resolved == source / "python"
 
 
 def _parse_dotenv_line(line: str) -> tuple[str, str] | None:
@@ -352,7 +367,7 @@ def local_run_root(start: Path | None = None) -> Path:
                 resolved_start = start.resolve()
             except OSError:
                 resolved_start = start
-            if source is not None and resolved_start == source:
+            if _is_source_path(resolved_start, source):
                 return test_root
     if start is not None:
         return start.resolve() / "run"
@@ -369,7 +384,7 @@ def local_run_root(start: Path | None = None) -> Path:
             return cwd / "run"
         for d in [cwd, *cwd.parents]:
             if _looks_like_refine_checkout(d):
-                if test_root is not None and source is not None and d.resolve() == source:
+                if test_root is not None and _is_source_path(d, source):
                     return test_root
                 return d / "run"
     if test_root is not None:

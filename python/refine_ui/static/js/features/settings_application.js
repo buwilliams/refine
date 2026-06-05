@@ -13,7 +13,7 @@ function renderProjectApplicationsSection({
       ${projectRegistryEnabled ? "" : `
         <p class="muted small" style="color:var(--warn)">
           App switching requires the host-native Refine supervisor. Start from
-          the refine source checkout with <code>uv run refine start</code>
+          the refine source checkout with <code>./r start</code>
           before a project is attached.
         </p>`}
       <div class="form-row"><label>${renderSettingsGuideLabel(

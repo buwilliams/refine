@@ -14,12 +14,13 @@ def main() -> int:
     from refine_cli import cli
     from refine_server import config
 
-    root = Path(__file__).resolve().parents[1]
-    example = (root / ".env.example").read_text(encoding="utf-8")
+    python_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
+    example = (python_root / ".env.example").read_text(encoding="utf-8")
     assert "REFINE_SMOKE_AI_PATH" in example
     assert "OPENAI_API_KEY" not in example
     assert "REFINE_UI_PORT" not in example
-    gitignore = (root / ".gitignore").read_text(encoding="utf-8")
+    gitignore = (repo_root / ".gitignore").read_text(encoding="utf-8")
     assert ".env" in gitignore
     assert ".env.example" not in gitignore
 

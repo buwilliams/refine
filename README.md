@@ -1,6 +1,6 @@
 # Refine – Your Team's Agentic Software Delivery System
 
-<img src="refine_ui/static/images/refine_logo_transparent.png" alt="refine" style="width: 100%; height: auto;">
+<img src="python/refine_ui/static/images/refine_logo_transparent.png" alt="refine" style="width: 100%; height: auto;">
 
 refine is an agentic software delivery system that coordinates people and agents across distributed machines. Product, support, and customers — anyone who can articulate what the app does today vs what it should do instead - can make meaningful contributions to your software. Build new apps, implement features, and fix bugs while keeping feedback cheap, local, and repeatable.
 

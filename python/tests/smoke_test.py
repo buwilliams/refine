@@ -26,6 +26,18 @@ from io import StringIO
 from pathlib import Path
 
 
+def _write_refine_source_checkout(path: Path) -> None:
+    (path / "python" / "refine_cli").mkdir(parents=True)
+    (path / "python" / "pyproject.toml").write_text(
+        "[project]\nname = \"refine\"\n",
+        encoding="utf-8",
+    )
+    (path / "python" / "refine_cli" / "cli.py").write_text(
+        "# marker\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
     tmp = Path(tempfile.mkdtemp(prefix="refine-smoke-"))
     print(f"using tmp dir: {tmp}")
@@ -279,9 +291,7 @@ def main() -> int:
     from refine_cli import cli as refine_cli
     from refine_cli.cli import bootstrap_client_repo, _sync_bound_project_registry
     clone = tmp / "refine-clone"
-    (clone / "refine_cli").mkdir(parents=True)
-    (clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
-    (clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    _write_refine_source_checkout(clone)
     (clone / ".env").write_text("REFINE_CLIENT_REFINE_DIR=/old/path\n", encoding="utf-8")
     (clone / ".refine-current").symlink_to(tmp / "old-refine-data", target_is_directory=True)
     ui_client = tmp / "ui-created-client"
@@ -340,15 +350,7 @@ def main() -> int:
     print("[ok] UI project bootstrap creates git repo + port-local app binding")
 
     setup_install_clone = tmp / "setup-install-clone"
-    (setup_install_clone / "refine_cli").mkdir(parents=True)
-    (setup_install_clone / "pyproject.toml").write_text(
-        "[project]\nname = \"refine\"\n",
-        encoding="utf-8",
-    )
-    (setup_install_clone / "refine_cli" / "cli.py").write_text(
-        "# marker\n",
-        encoding="utf-8",
-    )
+    _write_refine_source_checkout(setup_install_clone)
     setup_uv_bin = tmp / "setup-install-bin"
     setup_uv_bin.mkdir()
     setup_uv = setup_uv_bin / "uv"
@@ -426,9 +428,7 @@ def main() -> int:
     print("[ok] persistent refine works before a target app is attached")
 
     unit_clone = tmp / "refine-unit-clone"
-    (unit_clone / "refine_cli").mkdir(parents=True)
-    (unit_clone / "pyproject.toml").write_text("[project]\nname = \"refine\"\n", encoding="utf-8")
-    (unit_clone / "refine_cli" / "cli.py").write_text("# marker\n", encoding="utf-8")
+    _write_refine_source_checkout(unit_clone)
     unit_client = tmp / "unit-client"
     fake_uv_bin = tmp / "login-bin"
     fake_uv_bin.mkdir()
@@ -541,7 +541,7 @@ def main() -> int:
     assert f"Environment=REFINE_RUN_DIR={unit_clone / 'run' / '8080'}" in unit_text
     assert "Environment=REFINE_CONFIG_PATH=" not in unit_text
     assert "User=installing-user" in unit_text
-    assert f"ExecStart={fake_uv} run refine supervisor" in unit_text
+    assert f"ExecStart={fake_uv} --project {unit_clone / 'python'} run refine supervisor" in unit_text
     assert "Restart=on-failure" in unit_text
     assert "WantedBy=multi-user.target" in unit_text
     assert ("enable", "refine-unit-clone-8080-ui") in systemctl_calls
@@ -670,7 +670,14 @@ def main() -> int:
     assert pid == 43210
     assert (clone / "run" / "18111" / "supervisor.pid").read_text(encoding="utf-8").strip() == "43210"
     assert not (bg_cfg.volume_root / "run" / "18111" / "supervisor.pid").exists()
-    assert popen_calls[0]["cmd"] == [str(fake_uv), "run", "refine", "supervisor"]
+    assert popen_calls[0]["cmd"] == [
+        str(fake_uv),
+        "--project",
+        str(clone / "python"),
+        "run",
+        "refine",
+        "supervisor",
+    ]
     assert popen_calls[0]["cwd"] == str(clone)
     assert popen_calls[0]["env"]["REFINE_UI_PORT"] == "18111"
     assert popen_calls[0]["env"]["REFINE_RUN_DIR"] == str(clone / "run" / "18111")

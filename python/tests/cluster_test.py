@@ -49,7 +49,7 @@ def main() -> int:
         assert cmd[7] == "buildbox.example", cmd
         assert "@" not in cmd[7], cmd
         assert cmd[8] == (
-            "cd /opt/refine && uv run refine --config "
+            "cd /opt/refine && ./r --config "
             "/srv/app/.refine/refine.toml node list"
         ), cmd
         try:
