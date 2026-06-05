@@ -770,11 +770,15 @@ class Supervisor:
         )
 
     def _worker_local_node_matches(self, socket_path: Path, local_node_id: str) -> bool:
+        stored = str(self.worker_local_node_id or "")
+        expected = str(local_node_id or "")
+        if stored and expected:
+            return stored == expected
         try:
             snapshot = ipc.request(socket_path, M_RUNNING, {}, timeout=2.0)
         except Exception:
-            return False
-        return str(snapshot.get("local_node_id") or "") == str(local_node_id or "")
+            return True
+        return str(snapshot.get("local_node_id") or "") == expected
 
     def _wait_for_worker_socket(self, path: Path, proc: subprocess.Popen) -> None:
         deadline = time.time() + WORKER_STARTUP_TIMEOUT_SECONDS
