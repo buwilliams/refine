@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::security::FileSecurityService;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -47,6 +49,8 @@ pub struct ManagedProcessSpec {
     pub stdin: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub limits: Option<ProcessResourceLimits>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authorization_command: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -115,12 +119,27 @@ pub trait ProcessSupervisor {
 #[derive(Clone, Debug)]
 pub struct FileProcessSupervisor {
     pub runtime_root: PathBuf,
+    pub allowed_commands: BTreeSet<String>,
 }
 
 impl FileProcessSupervisor {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
+            allowed_commands: BTreeSet::new(),
+        }
+    }
+
+    pub fn with_allowed_commands(
+        runtime_root: impl Into<PathBuf>,
+        allowed_commands: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            allowed_commands: allowed_commands
+                .into_iter()
+                .map(|command| command.into())
+                .collect(),
         }
     }
 
@@ -266,6 +285,15 @@ impl ProcessSupervisor for FileProcessSupervisor {
                 "managed process command is required".to_string(),
             ));
         }
+        let authorization_command = spec
+            .authorization_command
+            .clone()
+            .unwrap_or_else(|| process_command_line(&spec));
+        FileSecurityService::with_allowed_commands(
+            &self.runtime_root,
+            self.allowed_commands.iter().cloned(),
+        )
+        .authorize_host_command("process_supervisor", &authorization_command)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -475,6 +503,13 @@ fn is_background_owner(owner: &ProcessOwner) -> bool {
     )
 }
 
+fn process_command_line(spec: &ManagedProcessSpec) -> String {
+    std::iter::once(spec.command.as_str())
+        .chain(spec.args.iter().map(String::as_str))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 fn process_isolation_label(limits: Option<&ProcessResourceLimits>) -> &'static str {
     if limits.is_some() {
         "requested"
@@ -642,6 +677,7 @@ mod tests {
                     cpu_priority: Some("normal".to_string()),
                     kill_on_parent_exit: false,
                 }),
+                authorization_command: None,
             })
             .unwrap();
         assert_eq!(supervisor.list().unwrap().len(), 1);
@@ -744,6 +780,7 @@ mod tests {
             env: Vec::new(),
             stdin: None,
             limits: None,
+            authorization_command: None,
         });
         assert!(rejected.is_err());
         supervisor.set_agents_paused(false).unwrap();
@@ -766,6 +803,30 @@ mod tests {
             .unwrap();
         let recovered = supervisor.recover().unwrap();
         assert_eq!(recovered[0].state, "interrupted");
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_enforces_allowed_commands() {
+        let temp_root = unique_temp_dir("process-allowed");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::with_allowed_commands(&runtime_root, ["printf"]);
+
+        let denied = supervisor.launch(ManagedProcessSpec {
+            owner: ProcessOwner::UserHelper,
+            command: shell_binary().to_string(),
+            args: shell_args("rm -rf target").to_vec(),
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: Some("rm -rf target".to_string()),
+        });
+
+        assert!(matches!(denied, Err(RefineError::Unauthorized(_))));
+        let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
+        assert!(audit.contains("\"outcome\":\"denied\""));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

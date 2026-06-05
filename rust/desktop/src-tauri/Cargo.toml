@@ -3,5 +3,20 @@ name = "refine-desktop"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = []
+real-tauri = [
+    "dep:tauri",
+    "tauri/compression",
+    "tauri/dynamic-acl",
+    "tauri/tray-icon",
+    "tauri/wry",
+]
+
 [dependencies]
 refine-native = { path = "../.." }
+serde_json = "1"
+tauri = { version = "2.11.2", default-features = false, optional = true }
+
+[build-dependencies]
+tauri-build = { version = "2.6.2", features = [] }

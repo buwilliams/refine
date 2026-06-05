@@ -40,6 +40,15 @@ pub struct DesktopShellState {
     pub updated_at: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct DesktopShellManifest {
+    pub title: String,
+    pub local_url: String,
+    pub tray_actions: Vec<String>,
+    pub deep_link_schemes: Vec<String>,
+    pub bridge_commands: Vec<DesktopBridgeCommand>,
+}
+
 pub trait DesktopShellBridge {
     fn bootstrap_daemon(&self) -> RefineResult<DaemonStatus>;
     fn daemon_status(&self) -> RefineResult<DaemonStatus>;
@@ -280,6 +289,27 @@ pub fn desktop_bridge_commands() -> [DesktopBridgeCommand; 7] {
     ]
 }
 
+pub fn desktop_shell_manifest(local_url: &str) -> RefineResult<DesktopShellManifest> {
+    let local_url = local_url.trim();
+    if !is_local_refine_url(local_url) {
+        return Err(RefineError::InvalidInput(
+            "desktop shell URL must be local http://127.0.0.1 or http://localhost".to_string(),
+        ));
+    }
+    Ok(DesktopShellManifest {
+        title: "Refine".to_string(),
+        local_url: local_url.to_string(),
+        tray_actions: vec![
+            "show".to_string(),
+            "open_browser".to_string(),
+            "restart_daemon".to_string(),
+            "quit".to_string(),
+        ],
+        deep_link_schemes: vec!["refine".to_string()],
+        bridge_commands: desktop_bridge_commands().to_vec(),
+    })
+}
+
 fn default_state() -> DesktopShellState {
     DesktopShellState {
         local_url: None,
@@ -400,6 +430,23 @@ mod tests {
                 DesktopBridgeCommand::SubscribeEvents,
             ]
         );
+    }
+
+    #[test]
+    fn desktop_shell_manifest_describes_webview_tray_and_deep_links() {
+        let manifest = desktop_shell_manifest("http://127.0.0.1:8080").unwrap();
+
+        assert_eq!(manifest.title, "Refine");
+        assert_eq!(manifest.local_url, "http://127.0.0.1:8080");
+        assert!(manifest.tray_actions.contains(&"show".to_string()));
+        assert!(manifest.tray_actions.contains(&"quit".to_string()));
+        assert_eq!(manifest.deep_link_schemes, vec!["refine"]);
+        assert!(
+            manifest
+                .bridge_commands
+                .contains(&DesktopBridgeCommand::WindowControl)
+        );
+        assert!(desktop_shell_manifest("https://example.com").is_err());
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

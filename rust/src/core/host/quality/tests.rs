@@ -1,4 +1,5 @@
 use crate::core::supervisor::config::FileSettingsService;
+use crate::core::supervisor::errors::RefineError;
 use serde_json::json;
 use std::fs;
 use std::io::Write;
@@ -165,6 +166,29 @@ fn quality_service_runs_commands_compares_screenshots_and_gates() {
             .unwrap()
             .ok
     );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn quality_service_enforces_allowed_commands_for_direct_checks() {
+    let temp_root = unique_temp_dir("quality-security");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    FileSettingsService::new(&durable_root)
+        .update(&json!({"allowed_commands": "printf"}))
+        .unwrap();
+    let service = FileQualityService::with_runtime_root(&durable_root, &runtime_root);
+
+    let denied = service.run_checks(QualityCheckRequest {
+        owner_id: "GAP1".to_string(),
+        command: "rm -rf target".to_string(),
+        browser_required: false,
+    });
+
+    assert!(matches!(denied, Err(RefineError::Unauthorized(_))));
+    let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
+    assert!(audit.contains("\"outcome\":\"denied\""));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

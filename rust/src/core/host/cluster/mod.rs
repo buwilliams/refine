@@ -3,8 +3,10 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::security::FileSecurityService;
 use crate::model::cluster::{
     Cluster, ClusterHealth, ClusterNode, RemoteRunResult, valid_cluster_node_id, valid_ssh_host,
+    valid_ssh_user,
 };
 
 pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
@@ -13,6 +15,8 @@ pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
 pub struct ClusterBootstrapRequest {
     pub node_id: String,
     pub ssh_host: String,
+    pub ssh_user: String,
+    pub ssh_identity_path: String,
     pub ssh_port: u16,
     pub refine_checkout: String,
     pub target_app_path: String,
@@ -31,12 +35,15 @@ pub trait ClusterService {
 #[derive(Clone, Debug)]
 pub struct FileClusterRegistryService {
     pub durable_root: PathBuf,
+    pub runtime_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ClusterNodeUpdate {
     pub display_name: Option<String>,
     pub ssh_host: Option<String>,
+    pub ssh_user: Option<String>,
+    pub ssh_identity_path: Option<String>,
     pub ssh_port: Option<u64>,
     pub refine_checkout: Option<String>,
     pub target_app_path: Option<String>,
@@ -48,6 +55,17 @@ impl FileClusterRegistryService {
     pub fn new(durable_root: impl Into<PathBuf>) -> Self {
         Self {
             durable_root: durable_root.into(),
+            runtime_root: None,
+        }
+    }
+
+    pub fn with_runtime_root(
+        durable_root: impl Into<PathBuf>,
+        runtime_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            durable_root: durable_root.into(),
+            runtime_root: Some(runtime_root.into()),
         }
     }
 
@@ -116,6 +134,19 @@ impl FileClusterRegistryService {
             }
             node.ssh_host = ssh_host.to_string();
         }
+        if let Some(ssh_user) = update.ssh_user {
+            let ssh_user = ssh_user.trim();
+            if !valid_ssh_user(ssh_user) {
+                return Err(RefineError::InvalidInput(
+                    "ssh_user may only contain letters, numbers, dot, underscore, and hyphen"
+                        .to_string(),
+                ));
+            }
+            node.ssh_user = ssh_user.to_string();
+        }
+        if let Some(identity_path) = update.ssh_identity_path {
+            node.ssh_identity_path = identity_path.trim().to_string();
+        }
         if let Some(ssh_port) = update.ssh_port {
             node.ssh_port = port_or_default(ssh_port, 22);
         }
@@ -157,6 +188,8 @@ impl FileClusterRegistryService {
         let result = bootstrap_remote_node(ClusterBootstrapRequest {
             node_id: node_id.to_string(),
             ssh_host: node.ssh_host,
+            ssh_user: node.ssh_user,
+            ssh_identity_path: node.ssh_identity_path,
             ssh_port: node.ssh_port,
             refine_checkout: node.refine_checkout,
             target_app_path: node.target_app_path,
@@ -207,6 +240,18 @@ impl FileClusterRegistryService {
         cluster.updated_at = now_timestamp();
         self.save(&cluster)?;
         Ok(cluster_response(cluster))
+    }
+
+    pub fn run_remote_response(
+        &self,
+        node_id: &str,
+        command: &str,
+    ) -> RefineResult<serde_json::Value> {
+        let result = self.run_remote(node_id, command)?;
+        Ok(serde_json::json!({
+            "ok": result.ok,
+            "result": result
+        }))
     }
 
     pub fn sync_response(&self) -> RefineResult<serde_json::Value> {
@@ -283,21 +328,27 @@ impl ClusterService for FileClusterRegistryService {
         if remote_command.is_empty() {
             return Err(RefineError::InvalidInput("command is required".to_string()));
         }
-        let output = Command::new("ssh")
-            .arg("-p")
-            .arg(node.ssh_port.to_string())
-            .arg(&node.ssh_host)
-            .arg(&remote_command)
-            .output()
-            .map_err(|error| RefineError::Io(format!("failed to run ssh command: {error}")))?;
+        self.security()?
+            .authorize_host_command("cluster", &remote_command)?;
+        let command = ssh_display_command(
+            node.ssh_port,
+            &node.ssh_user,
+            &node.ssh_host,
+            &node.ssh_identity_path,
+            &remote_command,
+        )?;
+        let output = ssh_command(
+            node.ssh_port,
+            &node.ssh_user,
+            &node.ssh_host,
+            &node.ssh_identity_path,
+            &remote_command,
+        )?
+        .output()
+        .map_err(|error| RefineError::Io(format!("failed to run ssh command: {error}")))?;
         Ok(RemoteRunResult {
             node_id: node_id.to_string(),
-            command: format!(
-                "ssh -p {} {} {}",
-                node.ssh_port,
-                shell_word(&node.ssh_host),
-                shell_word(&remote_command)
-            ),
+            command,
             remote_command,
             exit_code: output.status.code(),
             stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
@@ -311,6 +362,16 @@ impl ClusterService for FileClusterRegistryService {
         cluster.updated_at = now_timestamp();
         self.save(&cluster)?;
         Ok(cluster)
+    }
+}
+
+impl FileClusterRegistryService {
+    fn security(&self) -> RefineResult<FileSecurityService> {
+        let runtime_root = self
+            .runtime_root
+            .clone()
+            .unwrap_or_else(|| self.durable_root.join("runtime"));
+        FileSecurityService::from_project_settings(runtime_root, &self.durable_root)
     }
 }
 
@@ -358,12 +419,13 @@ pub fn bootstrap_remote_node(request: ClusterBootstrapRequest) -> RefineResult<R
         &request.target_app_path,
         request.refine_port,
     );
-    let command = format!(
-        "ssh -p {} {} {}",
+    let command = ssh_display_command(
         request.ssh_port,
-        shell_word(&request.ssh_host),
-        shell_word(&remote_command)
-    );
+        &request.ssh_user,
+        &request.ssh_host,
+        &request.ssh_identity_path,
+        &remote_command,
+    )?;
     if request.dry_run {
         return Ok(RemoteRunResult {
             node_id: request.node_id,
@@ -375,13 +437,15 @@ pub fn bootstrap_remote_node(request: ClusterBootstrapRequest) -> RefineResult<R
             ok: true,
         });
     }
-    let output = Command::new("ssh")
-        .arg("-p")
-        .arg(request.ssh_port.to_string())
-        .arg(&request.ssh_host)
-        .arg(&remote_command)
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to run ssh bootstrap: {error}")))?;
+    let output = ssh_command(
+        request.ssh_port,
+        &request.ssh_user,
+        &request.ssh_host,
+        &request.ssh_identity_path,
+        &remote_command,
+    )?
+    .output()
+    .map_err(|error| RefineError::Io(format!("failed to run ssh bootstrap: {error}")))?;
     Ok(RemoteRunResult {
         node_id: request.node_id,
         command,
@@ -413,6 +477,56 @@ fn bootstrap_remote_command(
     command
 }
 
+fn ssh_destination(user: &str, host: &str) -> RefineResult<String> {
+    let user = user.trim();
+    if !valid_ssh_user(user) {
+        return Err(RefineError::InvalidInput(
+            "ssh_user may only contain letters, numbers, dot, underscore, and hyphen".to_string(),
+        ));
+    }
+    if user.is_empty() {
+        Ok(host.to_string())
+    } else {
+        Ok(format!("{user}@{host}"))
+    }
+}
+
+fn ssh_command(
+    port: u16,
+    user: &str,
+    host: &str,
+    identity_path: &str,
+    remote_command: &str,
+) -> RefineResult<Command> {
+    let destination = ssh_destination(user, host)?;
+    let mut command = Command::new("ssh");
+    command.arg("-p").arg(port.to_string());
+    let identity_path = identity_path.trim();
+    if !identity_path.is_empty() {
+        command.arg("-i").arg(identity_path);
+    }
+    command.arg(destination).arg(remote_command);
+    Ok(command)
+}
+
+fn ssh_display_command(
+    port: u16,
+    user: &str,
+    host: &str,
+    identity_path: &str,
+    remote_command: &str,
+) -> RefineResult<String> {
+    let mut parts = vec!["ssh".to_string(), "-p".to_string(), port.to_string()];
+    let identity_path = identity_path.trim();
+    if !identity_path.is_empty() {
+        parts.push("-i".to_string());
+        parts.push(shell_word(identity_path));
+    }
+    parts.push(shell_word(&ssh_destination(user, host)?));
+    parts.push(shell_word(remote_command));
+    Ok(parts.join(" "))
+}
+
 fn shell_word(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
@@ -423,6 +537,8 @@ fn default_cluster_node(id: &str) -> ClusterNode {
         id: id.to_string(),
         display_name: id.to_string(),
         ssh_host: String::new(),
+        ssh_user: String::new(),
+        ssh_identity_path: String::new(),
         ssh_port: 22,
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
@@ -482,6 +598,7 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::supervisor::config::FileSettingsService;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -489,6 +606,8 @@ mod tests {
         let result = bootstrap_remote_node(ClusterBootstrapRequest {
             node_id: "node-1".to_string(),
             ssh_host: "example.com".to_string(),
+            ssh_user: "deploy".to_string(),
+            ssh_identity_path: "~/.ssh/refine_ed25519".to_string(),
             ssh_port: 2222,
             refine_checkout: "~/refine".to_string(),
             target_app_path: "/srv/app".to_string(),
@@ -499,6 +618,8 @@ mod tests {
         assert!(result.ok);
         assert_eq!(result.exit_code, None);
         assert!(result.command.contains("ssh -p 2222"));
+        assert!(result.command.contains("-i '~/.ssh/refine_ed25519'"));
+        assert!(result.command.contains("'deploy@example.com'"));
         assert!(result.remote_command.contains("refine_port=8081"));
         assert!(result.remote_command.contains("/srv/app"));
     }
@@ -508,6 +629,8 @@ mod tests {
         let error = bootstrap_remote_node(ClusterBootstrapRequest {
             node_id: "node-1".to_string(),
             ssh_host: "user@example.com".to_string(),
+            ssh_user: String::new(),
+            ssh_identity_path: String::new(),
             ssh_port: 22,
             refine_checkout: String::new(),
             target_app_path: String::new(),
@@ -534,6 +657,37 @@ mod tests {
         service.maintenance_response().unwrap();
         service.remove_node("node-1").unwrap();
         assert_eq!(service.registry().unwrap().nodes.len(), 0);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_cluster_registry_authorizes_remote_run_commands() {
+        let temp_root = unique_temp_dir("cluster-security");
+        let durable_root = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        FileSettingsService::new(&durable_root)
+            .update(&serde_json::json!({"allowed_commands": "printf"}))
+            .unwrap();
+        let service = FileClusterRegistryService::with_runtime_root(&durable_root, &runtime_root);
+        service
+            .upsert_node(
+                "node-1",
+                ClusterNodeUpdate {
+                    ssh_host: Some("example.com".to_string()),
+                    ssh_user: Some("deploy".to_string()),
+                    ssh_identity_path: Some("~/.ssh/refine_ed25519".to_string()),
+                    enabled: Some(true),
+                    ..ClusterNodeUpdate::default()
+                },
+            )
+            .unwrap();
+
+        let denied = service.run_remote_response("node-1", "rm -rf target");
+
+        assert!(matches!(denied, Err(RefineError::Unauthorized(_))));
+        let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
+        assert!(audit.contains("\"outcome\":\"denied\""));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

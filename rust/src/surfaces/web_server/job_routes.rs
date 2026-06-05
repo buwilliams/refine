@@ -9,6 +9,7 @@ use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnostic
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
 use crate::core::supervisor::errors::RefineError;
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::core::supervisor::security::{NativeSecretStore, SecretStore};
 
 use super::support::*;
 use super::*;
@@ -359,6 +360,70 @@ impl InProcessWebServer {
         provider_status_response()
     }
 
+    pub(super) fn handle_agent_secrets_status(&self) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("inspect secret storage");
+        };
+        let store = NativeSecretStore::new(runtime_root);
+        ApiResponse::json(200, json!({"secret_store": store.backend_status()}))
+    }
+
+    pub(super) fn handle_agent_secrets_list(&self) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("list secrets");
+        };
+        let store = NativeSecretStore::new(runtime_root);
+        match store.list_secrets() {
+            Ok(secrets) => ApiResponse::json(200, json!({"secrets": secrets})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_agent_secret(&self, request: ApiRequest) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("manage secrets");
+        };
+        let Some((scope, name)) = secret_scope_name_from_path(&request.path) else {
+            return error_response(RefineError::InvalidInput(
+                "secret path must be /agents/secrets/{scope}/{name}".to_string(),
+            ));
+        };
+        let store = NativeSecretStore::new(runtime_root);
+        match request.method.as_str() {
+            "GET" => match store.get_secret(&scope, &name) {
+                Ok(secret) => ApiResponse::json(
+                    200,
+                    json!({"secret": secret.metadata, "value": secret.value}),
+                ),
+                Err(error) => error_response(error),
+            },
+            "PUT" | "POST" => {
+                let body = request.body.unwrap_or_else(|| json!({}));
+                let value = body
+                    .get("value")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("");
+                match store.put_secret(&scope, &name, value) {
+                    Ok(secret) => ApiResponse::json(200, json!({"secret": secret})),
+                    Err(error) => error_response(error),
+                }
+            }
+            "DELETE" => match store.delete_secret(&scope, &name) {
+                Ok(secret) => ApiResponse::json(200, json!({"deleted": secret})),
+                Err(error) => error_response(error),
+            },
+            _ => ApiResponse::json(
+                405,
+                json!({
+                    "error": {
+                        "code": "method_not_allowed",
+                        "message": "secret route supports GET, PUT, POST, and DELETE"
+                    }
+                }),
+            ),
+        }
+    }
+
     pub(super) fn handle_diagnostics(&self) -> ApiResponse {
         let projection = match self.current_projection_with_runtime() {
             Ok(projection) => projection,
@@ -401,4 +466,15 @@ impl InProcessWebServer {
             }),
         )
     }
+}
+
+fn secret_scope_name_from_path(path: &str) -> Option<(String, String)> {
+    let rest = path.strip_prefix("/agents/secrets/")?;
+    let mut parts = rest.split('/');
+    let scope = parts.next()?.trim();
+    let name = parts.next()?.trim();
+    if scope.is_empty() || name.is_empty() || parts.next().is_some() {
+        return None;
+    }
+    Some((scope.to_string(), name.to_string()))
 }

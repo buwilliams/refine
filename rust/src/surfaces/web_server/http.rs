@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::thread::{self, JoinHandle};
 
 use serde_json::{Value, json};
 
@@ -105,6 +106,17 @@ impl LocalHttpDaemon {
             RefineError::Io(format!("failed to accept daemon HTTP request: {error}"))
         })?;
         self.handle_stream(stream)
+    }
+
+    pub fn serve_next_concurrent(
+        &self,
+        listener: &TcpListener,
+    ) -> RefineResult<JoinHandle<RefineResult<()>>> {
+        let (stream, _) = listener.accept().map_err(|error| {
+            RefineError::Io(format!("failed to accept daemon HTTP request: {error}"))
+        })?;
+        let daemon = self.clone();
+        Ok(thread::spawn(move || daemon.handle_stream(stream)))
     }
 
     pub fn handle_stream(&self, mut stream: TcpStream) -> RefineResult<()> {
@@ -293,8 +305,9 @@ impl LocalDaemonWebServer for LocalHttpDaemon {
     fn serve(&self, port: u16) -> RefineResult<DaemonStatus> {
         self.recover_runtime_state()?;
         let listener = Self::bind_loopback(port)?;
-        self.serve_next(&listener)?;
-        Ok(self.server.status.clone())
+        loop {
+            self.serve_next_concurrent(&listener)?;
+        }
     }
 
     fn server_sent_events(&self, stream: &str) -> RefineResult<String> {

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
 
-use crate::core::host::cluster::{ClusterNodeUpdate, FileClusterRegistryService};
+use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
 use crate::core::host::process_supervision::FileProcessSupervisor;
 use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::core::product::project_registry::{
@@ -222,6 +222,14 @@ impl InProcessWebServer {
                 .get("ssh_host")
                 .and_then(|value| value.as_str())
                 .map(str::to_string),
+            ssh_user: body
+                .get("ssh_user")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
+            ssh_identity_path: body
+                .get("ssh_identity_path")
+                .and_then(|value| value.as_str())
+                .map(str::to_string),
             ssh_port: body.get("ssh_port").and_then(|value| value.as_u64()),
             refine_checkout: body
                 .get("refine_checkout")
@@ -235,6 +243,23 @@ impl InProcessWebServer {
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
         match FileClusterRegistryService::new(durable_root).upsert_node(id, update) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_cluster_node_delete(&self, node_id: Option<String>) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "remove cluster node");
+        let Some(node_id) = node_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return error_response(RefineError::InvalidInput(
+                "cluster node id is required".to_string(),
+            ));
+        };
+        match FileClusterRegistryService::new(durable_root).remove_node(node_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -262,6 +287,75 @@ impl InProcessWebServer {
             .bootstrap_node_response(node_id, dry_run)
         {
             Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_cluster_node_run(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "run cluster command");
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("run cluster command");
+        };
+        let Some(node_id) = request
+            .path
+            .strip_prefix("/cluster/nodes/")
+            .and_then(|path| path.strip_suffix("/run"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return error_response(RefineError::InvalidInput(
+                "cluster node id is required".to_string(),
+            ));
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let command = body
+            .get("command")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        match FileClusterRegistryService::with_runtime_root(durable_root, runtime_root)
+            .run_remote_response(node_id, command)
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_cluster_node_transfer(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "transfer cluster item");
+        let Some(node_id) = request
+            .path
+            .strip_prefix("/cluster/nodes/")
+            .and_then(|path| path.strip_suffix("/transfer"))
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            return error_response(RefineError::InvalidInput(
+                "cluster node id is required".to_string(),
+            ));
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let item_id = body
+            .get("item_id")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim();
+        if item_id.is_empty() {
+            return error_response(RefineError::InvalidInput("item_id is required".to_string()));
+        }
+        if let Err(error) =
+            FileClusterRegistryService::new(&durable_root).transfer(item_id, node_id)
+        {
+            return error_response(error);
+        }
+        let selection = BulkGapSelection {
+            selected_ids: Some(vec![item_id.to_string()]),
+            ..BulkGapSelection::default()
+        };
+        match self
+            .work_item_service(durable_root)
+            .bulk_transfer_gaps_to_node(node_id, selection)
+        {
+            Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
     }

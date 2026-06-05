@@ -92,6 +92,12 @@ pub(in crate::surfaces::web_server) fn is_unauthenticated_mutation(path: &str) -
     matches!(path, "/activity/ui-error" | "/sessions")
 }
 
+pub(in crate::surfaces::web_server) fn protected_get_route(path: &str) -> bool {
+    path == "/agents/secrets"
+        || path == "/agents/secrets/status"
+        || path.starts_with("/agents/secrets/")
+}
+
 pub(in crate::surfaces::web_server) fn parse_surface_kind(value: &str) -> Option<SurfaceKind> {
     match value {
         "desktop" => Some(SurfaceKind::Desktop),

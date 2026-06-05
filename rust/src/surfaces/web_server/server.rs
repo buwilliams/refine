@@ -7,19 +7,18 @@ impl InProcessWebServer {
     pub fn handle(&self, mut request: ApiRequest) -> ApiResponse {
         let raw_path = request.path.clone();
         request.path = normalize_api_path(&request.path);
-        if request.method != "GET"
-            && !is_unauthenticated_mutation(&request.path)
-            && !self.authorized(&request)
-        {
-            return ApiResponse::json(
-                401,
-                json!({
-                    "error": {
-                        "code": "unauthorized",
-                        "message": "mutation request requires local authorization"
-                    }
-                }),
-            );
+        if request.method != "GET" || protected_get_route(&request.path) {
+            if !is_unauthenticated_mutation(&request.path) && !self.authorized(&request) {
+                return ApiResponse::json(
+                    401,
+                    json!({
+                        "error": {
+                            "code": "unauthorized",
+                            "message": "request requires local authorization"
+                        }
+                    }),
+                );
+            }
         }
 
         if request.method == "GET" && request.path == "/system/version" {
@@ -129,6 +128,18 @@ impl InProcessWebServer {
             return self.handle_agent_diagnostics(request);
         }
 
+        if request.method == "GET" && request.path == "/agents/secrets" {
+            return self.handle_agent_secrets_list();
+        }
+
+        if request.method == "GET" && request.path == "/agents/secrets/status" {
+            return self.handle_agent_secrets_status();
+        }
+
+        if request.path.starts_with("/agents/secrets/") {
+            return self.handle_agent_secret(request);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/agents/")
             && request.path.ends_with("/configure")
@@ -192,11 +203,30 @@ impl InProcessWebServer {
             return self.handle_cluster_node_upsert(request, node_id);
         }
 
+        if request.method == "DELETE" && request.path.starts_with("/cluster/nodes/") {
+            let node_id = cluster_node_id_from_path(&request.path);
+            return self.handle_cluster_node_delete(node_id);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/cluster/nodes/")
             && request.path.ends_with("/bootstrap")
         {
             return self.handle_cluster_node_bootstrap(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/cluster/nodes/")
+            && request.path.ends_with("/run")
+        {
+            return self.handle_cluster_node_run(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/cluster/nodes/")
+            && request.path.ends_with("/transfer")
+        {
+            return self.handle_cluster_node_transfer(request);
         }
 
         if request.method == "GET" && request.path == "/target-app/status" {

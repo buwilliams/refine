@@ -151,6 +151,7 @@ pub fn process_spec(command: &str, args: &[&str]) -> ManagedProcessSpec {
         env: Vec::new(),
         stdin: None,
         limits: Some(ProcessResourceLimits::default()),
+        authorization_command: None,
     }
 }
 

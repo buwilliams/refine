@@ -454,6 +454,24 @@ pub enum ClusterAction {
     EditNode {
         id: String,
         #[arg(long)]
+        display_name: Option<String>,
+        #[arg(long)]
+        ssh_host: Option<String>,
+        #[arg(long)]
+        ssh_user: Option<String>,
+        #[arg(long)]
+        ssh_identity_path: Option<String>,
+        #[arg(long)]
+        ssh_port: Option<u16>,
+        #[arg(long)]
+        refine_checkout: Option<String>,
+        #[arg(long)]
+        target_app_path: Option<String>,
+        #[arg(long)]
+        refine_port: Option<u16>,
+        #[arg(long)]
+        enabled: Option<bool>,
+        #[arg(long)]
         durable_root: Option<PathBuf>,
     },
     EnableNode {

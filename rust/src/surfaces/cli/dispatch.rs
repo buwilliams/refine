@@ -8,7 +8,7 @@ use serde_json::json;
 use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::core::host::cluster::{ClusterService, FileClusterRegistryService};
+use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
 use crate::core::host::installation::{FileInstallationService, InstallationService};
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
@@ -371,11 +371,33 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 ClusterAction::EditNode {
                     id,
+                    display_name,
+                    ssh_host,
+                    ssh_user,
+                    ssh_identity_path,
+                    ssh_port,
+                    refine_checkout,
+                    target_app_path,
+                    refine_port,
+                    enabled,
                     durable_root: Some(durable_root),
                 },
         } => {
-            let node = FileClusterRegistryService::new(durable_root).show(&id)?;
-            println!("{}", serde_json::to_string_pretty(&node).unwrap());
+            let cluster = FileClusterRegistryService::new(durable_root).upsert_node(
+                &id,
+                ClusterNodeUpdate {
+                    display_name,
+                    ssh_host,
+                    ssh_user,
+                    ssh_identity_path,
+                    ssh_port: ssh_port.map(u64::from),
+                    refine_checkout,
+                    target_app_path,
+                    refine_port: refine_port.map(u64::from),
+                    enabled,
+                },
+            )?;
+            println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
         Commands::Cluster {
@@ -1446,7 +1468,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 daemon.serve_next(&listener)?;
             } else {
                 loop {
-                    daemon.serve_next(&listener)?;
+                    daemon.serve_next_concurrent(&listener)?;
                     if !lifecycle.status(actual_port)?.daemon_healthy {
                         break;
                     }
@@ -1914,11 +1936,30 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         } => daemon_json("POST", "/cluster/nodes", Some(json!({ "id": id })))?,
         ClusterAction::EditNode {
             id,
+            display_name,
+            ssh_host,
+            ssh_user,
+            ssh_identity_path,
+            ssh_port,
+            refine_checkout,
+            target_app_path,
+            refine_port,
+            enabled,
             durable_root: None,
         } => daemon_json(
             "PATCH",
             &format!("/cluster/nodes/{}", path_segment(&id)),
-            Some(json!({})),
+            Some(cluster_node_edit_body(
+                display_name,
+                ssh_host,
+                ssh_user,
+                ssh_identity_path,
+                ssh_port,
+                refine_checkout,
+                target_app_path,
+                refine_port,
+                enabled,
+            )),
         )?,
         ClusterAction::EnableNode {
             id,
@@ -1936,6 +1977,32 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
             &format!("/cluster/nodes/{}", path_segment(&id)),
             Some(json!({ "enabled": false })),
         )?,
+        ClusterAction::RemoveNode {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "DELETE",
+            &format!("/cluster/nodes/{}", path_segment(&id)),
+            None,
+        )?,
+        ClusterAction::Run {
+            id,
+            command,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/cluster/nodes/{}/run", path_segment(&id)),
+            Some(json!({ "command": command })),
+        )?,
+        ClusterAction::Transfer {
+            id,
+            item_id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/cluster/nodes/{}/transfer", path_segment(&id)),
+            Some(json!({ "item_id": item_id })),
+        )?,
         ClusterAction::Maintenance { durable_root: None } => {
             let cluster = daemon_json("GET", "/cluster", None)?;
             json!({
@@ -1950,6 +2017,49 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
     };
     print_json(&response);
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn cluster_node_edit_body(
+    display_name: Option<String>,
+    ssh_host: Option<String>,
+    ssh_user: Option<String>,
+    ssh_identity_path: Option<String>,
+    ssh_port: Option<u16>,
+    refine_checkout: Option<String>,
+    target_app_path: Option<String>,
+    refine_port: Option<u16>,
+    enabled: Option<bool>,
+) -> serde_json::Value {
+    let mut body = serde_json::Map::new();
+    if let Some(value) = display_name {
+        body.insert("display_name".to_string(), json!(value));
+    }
+    if let Some(value) = ssh_host {
+        body.insert("ssh_host".to_string(), json!(value));
+    }
+    if let Some(value) = ssh_user {
+        body.insert("ssh_user".to_string(), json!(value));
+    }
+    if let Some(value) = ssh_identity_path {
+        body.insert("ssh_identity_path".to_string(), json!(value));
+    }
+    if let Some(value) = ssh_port {
+        body.insert("ssh_port".to_string(), json!(value));
+    }
+    if let Some(value) = refine_checkout {
+        body.insert("refine_checkout".to_string(), json!(value));
+    }
+    if let Some(value) = target_app_path {
+        body.insert("target_app_path".to_string(), json!(value));
+    }
+    if let Some(value) = refine_port {
+        body.insert("refine_port".to_string(), json!(value));
+    }
+    if let Some(value) = enabled {
+        body.insert("enabled".to_string(), json!(value));
+    }
+    serde_json::Value::Object(body)
 }
 
 fn daemon_json(

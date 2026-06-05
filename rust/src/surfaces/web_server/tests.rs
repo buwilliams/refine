@@ -169,6 +169,78 @@ fn web_server_issues_session_tokens_for_local_surface_mutations() {
 }
 
 #[test]
+fn web_server_manages_agent_secrets_with_local_auth() {
+    let temp_root = unique_temp_dir("http-agent-secrets");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.auth_token = None;
+    server.runtime_root = Some(runtime_root.clone());
+
+    let unauthorized = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/agents/secrets".to_string(),
+        auth_token: None,
+        body: None,
+    });
+    assert_eq!(unauthorized.status, 401);
+
+    let session = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/sessions".to_string(),
+        auth_token: None,
+        body: Some(json!({"surface": "cli"})),
+    });
+    let token = session.body["session"]["token"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    let put = server.handle(ApiRequest {
+        method: "PUT".to_string(),
+        path: "/api/agents/secrets/provider/smoke_ai_token".to_string(),
+        auth_token: Some(token.clone()),
+        body: Some(json!({"value": "secret-value"})),
+    });
+    assert_eq!(put.status, 200);
+    assert_eq!(put.body["secret"]["name"], "smoke_ai_token");
+
+    let listed = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/agents/secrets".to_string(),
+        auth_token: Some(token.clone()),
+        body: None,
+    });
+    assert_eq!(listed.status, 200);
+    assert_eq!(listed.body["secrets"][0]["scope"], "provider");
+    assert!(
+        serde_json::to_string(&listed.body)
+            .unwrap()
+            .find("secret-value")
+            .is_none()
+    );
+
+    let revealed = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/agents/secrets/provider/smoke_ai_token".to_string(),
+        auth_token: Some(token.clone()),
+        body: None,
+    });
+    assert_eq!(revealed.status, 200);
+    assert_eq!(revealed.body["value"], "secret-value");
+
+    let deleted = server.handle(ApiRequest {
+        method: "DELETE".to_string(),
+        path: "/api/agents/secrets/provider/smoke_ai_token".to_string(),
+        auth_token: Some(token),
+        body: None,
+    });
+    assert_eq!(deleted.status, 200);
+    assert!(runtime_root.join("secrets/secret-index.json").exists());
+
+    fs::remove_dir_all(temp_root).unwrap_or(());
+}
+
+#[test]
 fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
     let daemon = LocalHttpDaemon {
         server: server_with_projection(),
@@ -353,6 +425,29 @@ fn local_http_daemon_serves_projection_routes_over_tcp() {
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert!(response.contains("\"id\": \"GAP1\""));
     assert!(response.contains("\"counts\""));
+}
+
+#[test]
+fn local_http_daemon_handles_tcp_requests_on_worker_threads() {
+    let daemon = LocalHttpDaemon {
+        server: server_with_projection(),
+        static_root: None,
+    };
+    let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
+    let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
+    let accept = thread::spawn(move || daemon.serve_next_concurrent(&listener).unwrap());
+
+    let mut stream = TcpStream::connect(addr).unwrap();
+    stream
+        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        .unwrap();
+    let mut response = String::new();
+    stream.read_to_string(&mut response).unwrap();
+    let worker = accept.join().unwrap();
+    worker.join().unwrap().unwrap();
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("\"product\": \"refine\""));
 }
 
 #[test]
@@ -1475,12 +1570,19 @@ fn web_server_manages_cluster_node_registry() {
             "id": "node-1",
             "display_name": "Node One",
             "ssh_host": "example.com",
+            "ssh_user": "deploy",
+            "ssh_identity_path": "~/.ssh/refine_ed25519",
             "target_app_path": "/srv/app"
         })),
     });
     assert_eq!(registered.status, 200);
     assert_eq!(registered.body["enabled"], true);
     assert_eq!(registered.body["nodes"][0]["ssh_host"], "example.com");
+    assert_eq!(registered.body["nodes"][0]["ssh_user"], "deploy");
+    assert_eq!(
+        registered.body["nodes"][0]["ssh_identity_path"],
+        "~/.ssh/refine_ed25519"
+    );
     assert!(durable_root.join("cluster.json").exists());
 
     let disabled = server.handle(ApiRequest {
@@ -1507,6 +1609,18 @@ fn web_server_manages_cluster_node_registry() {
             .as_str()
             .unwrap()
             .contains("ssh -p 2222")
+    );
+    assert!(
+        bootstrap.body["result"]["command"]
+            .as_str()
+            .unwrap()
+            .contains("-i '~/.ssh/refine_ed25519'")
+    );
+    assert!(
+        bootstrap.body["result"]["command"]
+            .as_str()
+            .unwrap()
+            .contains("'deploy@example.com'")
     );
     assert_eq!(
         bootstrap.body["cluster"]["nodes"][0]["health"]["status"],
@@ -1890,6 +2004,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             env: Vec::new(),
             stdin: None,
             limits: None,
+            authorization_command: None,
         })
         .unwrap();
     let mut server = server_with_projection();

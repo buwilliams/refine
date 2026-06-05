@@ -13,6 +13,10 @@ pub struct ClusterNode {
     pub id: String,
     pub display_name: String,
     pub ssh_host: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub ssh_user: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub ssh_identity_path: String,
     pub ssh_port: u16,
     pub refine_checkout: String,
     pub target_app_path: String,
@@ -55,6 +59,14 @@ pub fn valid_ssh_host(host: &str) -> bool {
     !host.is_empty() && !host.contains('@')
 }
 
+pub fn valid_ssh_user(user: &str) -> bool {
+    user.is_empty()
+        || (user.len() <= 64
+            && user
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.')))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,5 +85,13 @@ mod tests {
     fn ssh_host_is_not_user_at_host() {
         assert!(valid_ssh_host("example.com"));
         assert!(!valid_ssh_host("user@example.com"));
+    }
+
+    #[test]
+    fn ssh_user_validation_allows_explicit_identity_user() {
+        assert!(valid_ssh_user(""));
+        assert!(valid_ssh_user("deploy_user.1"));
+        assert!(!valid_ssh_user("deploy/user"));
+        assert!(!valid_ssh_user("deploy@example"));
     }
 }

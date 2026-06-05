@@ -1,0 +1,25 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Refine",
+  "version": "0.1.0",
+  "identifier": "com.refine.desktop",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://127.0.0.1:8080"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Refine",
+        "url": "http://127.0.0.1:8080",
+        "width": 1280,
+        "height": 900,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  }
+}

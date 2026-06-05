@@ -13,6 +13,7 @@ use crate::core::host::process_supervision::{
 };
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::security::FileSecurityService;
 use crate::model::JsonObject;
 
 pub const TARGET_APP_STATE_FILE: &str = "target-app-state.json";
@@ -135,16 +136,22 @@ impl FileTargetAppService {
             return Ok(snapshot);
         }
         let (shell, args) = shell_program_args(&command);
-        let process =
-            FileProcessSupervisor::new(&self.runtime_root).launch(ManagedProcessSpec {
-                owner: ProcessOwner::TargetApp,
-                command: shell,
-                args,
-                cwd: Some(self.command_cwd(&settings).display().to_string()),
-                env: command_env(&settings)?,
-                stdin: None,
-                limits: None,
-            })?;
+        let security =
+            FileSecurityService::from_project_settings(&self.runtime_root, &self.durable_root)?;
+        let process = FileProcessSupervisor::with_allowed_commands(
+            &self.runtime_root,
+            security.allowed_commands.iter().cloned(),
+        )
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::TargetApp,
+            command: shell,
+            args,
+            cwd: Some(self.command_cwd(&settings).display().to_string()),
+            env: command_env(&settings)?,
+            stdin: None,
+            limits: None,
+            authorization_command: Some(command.clone()),
+        })?;
         let operation = TargetAppOperation {
             id: new_operation_id("target-start"),
             kind: "start".to_string(),
@@ -345,6 +352,8 @@ impl FileTargetAppService {
         settings: &JsonObject,
     ) -> RefineResult<TargetAppOperation> {
         let started_at = now_timestamp();
+        FileSecurityService::from_project_settings(&self.runtime_root, &self.durable_root)?
+            .authorize_host_command("target_app", command)?;
         let output = shell_command(command)
             .current_dir(self.command_cwd(settings))
             .envs(command_env(settings)?)

@@ -68,6 +68,7 @@ struct InstallStateDocument {
 pub struct FileInstallationService {
     pub runtime_root: PathBuf,
     pub current_version: String,
+    pub path_inputs: RuntimePathInputs,
 }
 
 impl FileInstallationService {
@@ -75,6 +76,19 @@ impl FileInstallationService {
         Self {
             runtime_root: runtime_root.into(),
             current_version: current_version.into(),
+            path_inputs: RuntimePathInputs::from_env(),
+        }
+    }
+
+    pub fn with_path_inputs(
+        runtime_root: impl Into<PathBuf>,
+        current_version: impl Into<String>,
+        path_inputs: RuntimePathInputs,
+    ) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            current_version: current_version.into(),
+            path_inputs,
         }
     }
 
@@ -164,15 +178,29 @@ impl FileInstallationService {
 
     fn register_backend(&self, target: InstallTarget) -> RefineResult<InstallBackendRegistration> {
         let now = now_timestamp();
-        let mut backend = backend_for_target(target, &now);
+        let mut backend = backend_for_target(target, &now, self.path_inputs.clone());
         if let Some(existing) = self.load_backend()? {
             backend.created_at = existing.created_at;
         }
+        self.register_os_backend(&mut backend)?;
         self.save_backend(&backend)?;
         Ok(backend)
     }
 
     fn unregister_backend(&self) -> RefineResult<()> {
+        if let Some(backend) = self.load_backend()?
+            && let Some(path) = backend.service_metadata_path
+        {
+            let path = PathBuf::from(path);
+            if path.exists() {
+                fs::remove_file(&path).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to remove service metadata {}: {error}",
+                        path.display()
+                    ))
+                })?;
+            }
+        }
         if self.backend_path().exists() {
             fs::remove_file(self.backend_path()).map_err(|error| {
                 RefineError::Io(format!(
@@ -182,6 +210,132 @@ impl FileInstallationService {
             })?;
         }
         Ok(())
+    }
+
+    fn register_os_backend(&self, backend: &mut InstallBackendRegistration) -> RefineResult<()> {
+        if let Some(path) = &backend.service_metadata_path {
+            let path = PathBuf::from(path);
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to create service metadata directory {}: {error}",
+                        parent.display()
+                    ))
+                })?;
+            }
+            if let Some(app_support_dir) = &backend.app_support_dir {
+                fs::create_dir_all(app_support_dir).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to create app support directory {app_support_dir}: {error}"
+                    ))
+                })?;
+            }
+            if let Some(cache_dir) = &backend.cache_dir {
+                fs::create_dir_all(cache_dir).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to create cache directory {cache_dir}: {error}"
+                    ))
+                })?;
+            }
+            if let Some(logs_dir) = &backend.logs_dir {
+                fs::create_dir_all(logs_dir).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to create logs directory {logs_dir}: {error}"
+                    ))
+                })?;
+            }
+            let metadata = self.service_metadata(backend)?;
+            fs::write(&path, metadata).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to write service metadata {}: {error}",
+                    path.display()
+                ))
+            })?;
+            backend.registered = true;
+            backend.notes.push(format!(
+                "native service metadata written to {}",
+                path.display()
+            ));
+            backend.notes.push(
+                "service manager enable/load is left to the installer or operator".to_string(),
+            );
+        } else {
+            backend.registered = false;
+            backend
+                .notes
+                .push("no native service metadata path is available on this platform".to_string());
+        }
+        backend.updated_at = now_timestamp();
+        Ok(())
+    }
+
+    fn service_metadata(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
+        match backend.target {
+            InstallTarget::LinuxCliWeb => self.systemd_user_unit(backend),
+            InstallTarget::MacOsAppBundle => self.launchd_plist(backend),
+            InstallTarget::WindowsInstaller => self.windows_service_manifest(backend),
+        }
+    }
+
+    fn systemd_user_unit(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
+        let exe = current_exe_string()?;
+        let logs_dir = backend.logs_dir.as_deref().unwrap_or(".");
+        Ok(format!(
+            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system web --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
+            systemd_escape_arg(&exe),
+            systemd_escape_arg(&self.runtime_root.display().to_string()),
+            systemd_escape_arg(backend.app_support_dir.as_deref().unwrap_or(".")),
+            logs_dir,
+            logs_dir
+        ))
+    }
+
+    fn launchd_plist(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
+        let exe = xml_escape(&current_exe_string()?);
+        let runtime_root = xml_escape(&self.runtime_root.display().to_string());
+        let logs_dir = xml_escape(backend.logs_dir.as_deref().unwrap_or("."));
+        Ok(format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.refine.daemon</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{exe}</string>
+    <string>system</string>
+    <string>web</string>
+    <string>--runtime-root</string>
+    <string>{runtime_root}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>{logs_dir}/daemon.log</string>
+  <key>StandardErrorPath</key><string>{logs_dir}/daemon.err.log</string>
+</dict>
+</plist>
+"#
+        ))
+    }
+
+    fn windows_service_manifest(
+        &self,
+        backend: &InstallBackendRegistration,
+    ) -> RefineResult<String> {
+        let manifest = serde_json::json!({
+            "service_name": "Refine",
+            "display_name": "Refine daemon",
+            "executable": current_exe_string()?,
+            "arguments": ["system", "web", "--runtime-root", self.runtime_root.display().to_string()],
+            "app_support_dir": backend.app_support_dir,
+            "logs_dir": backend.logs_dir,
+            "notes": "Windows service creation is represented as installer metadata; installer should register this manifest with the service manager."
+        });
+        serde_json::to_string_pretty(&manifest).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to encode Windows service manifest: {error}"
+            ))
+        })
     }
 
     fn default_target(&self) -> InstallTarget {
@@ -328,7 +482,11 @@ fn default_state(target: InstallTarget, current_version: &str) -> InstallStateDo
     }
 }
 
-fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendRegistration {
+fn backend_for_target(
+    target: InstallTarget,
+    timestamp: &str,
+    path_inputs: RuntimePathInputs,
+) -> InstallBackendRegistration {
     let (os, service_manager, credential_store, desktop_bundle, notes) = match target {
         InstallTarget::MacOsAppBundle => (
             RuntimeOs::Macos,
@@ -339,7 +497,6 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
                 "signed app bundle and notarization are represented by release packaging metadata"
                     .to_string(),
                 "daemon auto-start uses launchd/Login Item registration".to_string(),
-                "native OS registration is not performed by this Rust backend yet".to_string(),
             ],
         ),
         InstallTarget::WindowsInstaller => (
@@ -351,7 +508,6 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
                 "signed installer metadata is represented by release packaging metadata"
                     .to_string(),
                 "daemon auto-start uses a user-session service strategy".to_string(),
-                "native OS registration is not performed by this Rust backend yet".to_string(),
             ],
         ),
         InstallTarget::LinuxCliWeb => (
@@ -363,11 +519,10 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
                 "Linux install supports CLI/web with systemd user service when available"
                     .to_string(),
                 "falls back to explicit process mode when systemd is unavailable".to_string(),
-                "native OS registration is not performed by this Rust backend yet".to_string(),
             ],
         ),
     };
-    let layout = RuntimePathLayout::for_os(os, DEFAULT_APP_ID, RuntimePathInputs::from_env());
+    let layout = RuntimePathLayout::for_os(os, DEFAULT_APP_ID, path_inputs);
     InstallBackendRegistration {
         target,
         service_manager: service_manager.to_string(),
@@ -387,6 +542,32 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
     }
 }
 
+fn current_exe_string() -> RefineResult<String> {
+    std::env::current_exe()
+        .map(|path| path.display().to_string())
+        .map_err(|error| RefineError::Io(format!("failed to resolve current executable: {error}")))
+}
+
+fn systemd_escape_arg(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':'))
+    {
+        value.to_string()
+    } else {
+        format!("\"{}\"", value.replace('"', "\\\""))
+    }
+}
+
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
 fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
@@ -394,26 +575,40 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn file_installation_service_persists_update_and_rollback_state() {
         let temp_root = unique_temp_dir("installation");
         let runtime_root = temp_root.join("run");
-        let service = FileInstallationService::new(&runtime_root, "1.0.0");
+        let service = test_installation_service(&runtime_root, "1.0.0", &temp_root);
 
         let initial = service.status().unwrap();
         assert!(!initial.installed);
 
         let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
         assert!(installed.installed);
-        assert!(installed.partial);
+        assert!(!installed.partial);
         assert_eq!(installed.version.as_deref(), Some("1.0.0"));
         assert_eq!(
             installed.backend.as_ref().unwrap().service_manager,
             "systemd_user"
         );
-        assert!(!installed.backend.as_ref().unwrap().registered);
+        assert!(installed.backend.as_ref().unwrap().registered);
+        let service_metadata_path = PathBuf::from(
+            installed
+                .backend
+                .as_ref()
+                .unwrap()
+                .service_metadata_path
+                .as_ref()
+                .unwrap(),
+        );
+        assert!(service_metadata_path.exists());
+        let unit = fs::read_to_string(&service_metadata_path).unwrap();
+        assert!(unit.contains("ExecStart="));
+        assert!(unit.contains("system web"));
         assert!(service.path().exists());
         assert!(service.backend_path().exists());
 
@@ -423,7 +618,7 @@ mod tests {
             updated.backend.as_ref().unwrap().target,
             InstallTarget::LinuxCliWeb
         );
-        let stale = FileInstallationService::new(&runtime_root, "1.2.0")
+        let stale = test_installation_service(&runtime_root, "1.2.0", &temp_root)
             .status()
             .unwrap();
         assert!(stale.stale);
@@ -434,6 +629,7 @@ mod tests {
         service.uninstall().unwrap();
         assert!(!service.status().unwrap().installed);
         assert!(!service.backend_path().exists());
+        assert!(!service_metadata_path.exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -442,7 +638,7 @@ mod tests {
     fn file_installation_service_detects_partial_and_conflicting_backend_state() {
         let temp_root = unique_temp_dir("installation-backend");
         let runtime_root = temp_root.join("run");
-        let service = FileInstallationService::new(&runtime_root, "1.0.0");
+        let service = test_installation_service(&runtime_root, "1.0.0", &temp_root);
 
         service.install(InstallTarget::LinuxCliWeb).unwrap();
         fs::remove_file(service.backend_path()).unwrap();
@@ -458,6 +654,26 @@ mod tests {
         assert!(conflicting.conflicting);
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn test_installation_service(
+        runtime_root: &PathBuf,
+        version: &str,
+        temp_root: &Path,
+    ) -> FileInstallationService {
+        FileInstallationService::with_path_inputs(
+            runtime_root,
+            version,
+            RuntimePathInputs {
+                home: Some(temp_root.join("home")),
+                local_app_data: Some(temp_root.join("local-app-data")),
+                app_data: Some(temp_root.join("app-data")),
+                program_data: Some(temp_root.join("program-data")),
+                xdg_cache_home: Some(temp_root.join("cache")),
+                xdg_state_home: Some(temp_root.join("state")),
+                xdg_config_home: Some(temp_root.join("config")),
+            },
+        )
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

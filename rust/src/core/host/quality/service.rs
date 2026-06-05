@@ -10,6 +10,7 @@ use serde_json::json;
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
+use crate::core::supervisor::security::FileSecurityService;
 use crate::model::log::LogEntry;
 
 use super::types::*;
@@ -17,12 +18,24 @@ use super::types::*;
 #[derive(Clone, Debug)]
 pub struct FileQualityService {
     pub durable_root: PathBuf,
+    pub runtime_root: Option<PathBuf>,
 }
 
 impl FileQualityService {
     pub fn new(durable_root: impl Into<PathBuf>) -> Self {
         Self {
             durable_root: durable_root.into(),
+            runtime_root: None,
+        }
+    }
+
+    pub fn with_runtime_root(
+        durable_root: impl Into<PathBuf>,
+        runtime_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            durable_root: durable_root.into(),
+            runtime_root: Some(runtime_root.into()),
         }
     }
 
@@ -784,7 +797,7 @@ impl QualityJobRunner {
                 })),
             ),
         )?;
-        let service = FileQualityService::new(&self.durable_root);
+        let service = FileQualityService::with_runtime_root(&self.durable_root, &self.runtime_root);
         let result = service.run_checks(request)?;
         registry.append_log(
             &job.id,
@@ -827,6 +840,8 @@ impl QualityService for FileQualityService {
                 })
             };
         }
+        self.security()?
+            .authorize_host_command("quality", &request.command)?;
         let output = shell_command(&request.command)
             .current_dir(self.project_root())
             .output()
@@ -932,6 +947,16 @@ impl QualityService for FileQualityService {
                 regressions.diagnostics
             },
         })
+    }
+}
+
+impl FileQualityService {
+    fn security(&self) -> RefineResult<FileSecurityService> {
+        let runtime_root = self
+            .runtime_root
+            .clone()
+            .unwrap_or_else(|| self.durable_root.join("runtime"));
+        FileSecurityService::from_project_settings(runtime_root, &self.durable_root)
     }
 }
 
