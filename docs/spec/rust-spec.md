@@ -81,7 +81,7 @@ Responsibilities:
 - Provide the full Refine product UI.
 - Work locally inside Desktop's webview and in an external browser.
 - Support remote or headless installs where Desktop is not present.
-- Use the same HTTP, WebSocket, or server-sent-event APIs as Desktop.
+- Use the same HTTP and server-sent-event APIs as Desktop.
 
 The web surface should remain deployable as static assets served by the daemon.
 Business logic belongs in Rust core services, not in frontend-only code. The
@@ -117,7 +117,7 @@ Desktop shell      Browser UI          CLI
           port-scoped Refine daemon
                       |
               local web server
-     HTTP, WebSocket, SSE, static assets,
+     HTTP, SSE, static assets,
      auth, request parsing, response shaping
                       |
                     core
@@ -132,8 +132,8 @@ Desktop shell      Browser UI          CLI
 ```
 
 The supervisor daemon is the single local authority. It contains the local web
-server that serves UI assets and exposes the HTTP, WebSocket, and
-server-sent-event routes used by Desktop, browser, and CLI surfaces. Route
+server that serves UI assets and exposes the HTTP and server-sent-event routes
+used by Desktop, browser, and CLI surfaces. Route
 handlers are transport adapters: they handle HTTP concerns, translate requests
 and responses, and call `core` for real work. Surfaces do not directly mutate
 durable state or own long-lived OS processes.
@@ -188,17 +188,12 @@ and which operations are allowed.
 
 Responsibilities:
 
-- Gap, Feature, Round, Project, App, Node, Job, Process, Provider, Quality,
-  Chat, Settings, Event, and Error data types.
-- Workflow-state enums and transition tables.
-- The allowed-operation matrix for a Gap at a given workflow state, including
-  which process kinds may be started, resumed, cancelled, retried, reviewed, or
-  merged.
-- Process-kind, ownership, and lifecycle enums used by supervisor and host
-  modules.
-- Durable record versions and migration-facing model definitions.
-- Serializable request, response, and event payload types where they represent
-  product state rather than transport mechanics.
+- Canonical product models: Project, Gap, Feature, Workflow, Cluster, Node, and
+  Log.
+- Workflow-state enums, transition tables, and allowed-operation rules.
+- Durable model versions and migration-facing definitions.
+- Serializable request and response payload types when they represent product
+  state rather than HTTP, CLI, or desktop transport mechanics.
 - Validation helpers that are pure functions over model values.
 - Test fixtures for representative valid and invalid model states.
 
@@ -208,6 +203,243 @@ Rules:
   requests, or know about UI surfaces.
 - Processing modules ask `model` what states and operations are valid
   before mutating state or launching work.
+- Avoid vague top-level buckets such as `process`, `events`, or `records`.
+  OS process behavior belongs under `core::host::process_supervision`; event
+  delivery belongs under the daemon web server and observability; persisted
+  record shapes live beside the product model they describe.
+
+### Model Modules
+
+The initial Rust model modules should mirror the product concepts already
+visible in the Python implementation:
+
+```text
+rust/src/model/
+  project/
+  gap/
+  feature/
+  workflow/
+  cluster/
+  node/
+  log/
+```
+
+These properties are the current Python-derived baseline. Rust can refine type
+names and split nested structs, but it should preserve the product vocabulary
+unless a migration intentionally changes it.
+
+### Project Model
+
+Module: `model::project`; path: `rust/src/model/project/`.
+
+Owns the canonical shape of a Refine target-app attachment and project state.
+This covers both durable `.refine` state in the target app and port-scoped
+runtime selection state under the Refine checkout's `run/` directory.
+
+Properties:
+
+- `ProjectConfig`: `schema_version`, `refine.version`, `created_at`,
+  `updated_at`, and project-level `settings`.
+- `ProjectStatus`: `attached`, `registry_enabled`, `client_repo`,
+  `volume_root`, `config_path`, `schema`, `maintenance`, `apps`,
+  `active_node_id`, `active_node`, and `message` when detached or invalid.
+- `ProjectSchemaStatus`: `compatible`, `migration_required`,
+  `schema_version`, `current_schema_version`, `reason`, `migration_id`,
+  `migration_description`, `safe_auto`, `requires_cluster_quiescence`, and
+  `operator_instructions`.
+- `ProjectMaintenance`: `active`, `created_at`, `updated_at`, plus
+  operator-supplied fields such as reason or details.
+- `AppRegistry`: `version`, `active_app`, and `apps`.
+- `RegisteredApp`: `name`, `path`, `added_at`, and `last_used_at`.
+- `PrimaryRuntime`: `port` and `active_node_id` from `run/primary.json`.
+
+Rules:
+
+- `model::project` defines project identity, attachment status, schema status,
+  app registry entries, and runtime-selection record shapes.
+- It should not choose paths, read TOML/JSON, scan Git, or mutate `run/`; those
+  behaviors belong in `core::product::project_registry`,
+  `core::product::project_state`, and `core::supervisor::runtime`.
+
+### Gap Model
+
+Module: `model::gap`; path: `rust/src/model/gap/`.
+
+Owns the canonical Gap, round, note, and Gap-owned quality/governance state.
+The Python baseline stores durable Gap state in `gap.json` and projects common
+fields into `gaps_index` as a rebuildable cache.
+
+Properties:
+
+- `Gap`: `id`, `name`, `status`, `priority`, `branch_name`, `feature_id`,
+  `feature_order`, `node_id`, `created`, `updated`, `notes`, and `rounds`.
+- `GapIndexProjection`: `id`, `name`, `status`, `priority`, `reporter`,
+  `round_count`, `created`, `updated`, `branch_name`, `node_id`,
+  `feature_id`, `feature_order`, and `json_path`.
+- `GapNote`: `id`, `author`, `body`, `created`, and `updated`.
+- `GapRound`: `reporter`, `actual`, `target`, `created`, `updated`, optional
+  `guidance_decision`, and derived `logs` when a response hydrates sidecar
+  round logs.
+- `RoundGovernance`: `rule_state`, `meta_rule_state`, `product_state`,
+  `constitution_state`, `governance_message`, `governance_details`,
+  `governance_checked_at`, and `governance_rule_actions`.
+- `RoundQuality`: `quality_state`, `quality_message`, `quality_details`, and
+  `quality_checked_at`.
+- `GapPriority`: `low`, `medium`, or `high`.
+
+Rules:
+
+- `status` must use `model::workflow::GapStatus`.
+- `feature_id` and `feature_order` associate a Gap with a Feature; the ordered
+  Feature membership is stored on the Gap.
+- Round logs are represented by `model::log` entries. Storage may keep them in
+  a sidecar JSONL file, but the model shape is shared with activity logs.
+
+### Feature Model
+
+Module: `model::feature`; path: `rust/src/model/feature/`.
+
+Owns Feature metadata and the derived rollup produced from ordered Gaps.
+The Python baseline stores durable Feature metadata in `feature.json` and
+projects common fields into `features_index`.
+
+Properties:
+
+- `Feature`: `id`, `name`, `description`, `reporter`, `node_id`, `created`,
+  `updated`, and `json_path`.
+- `FeatureIndexProjection`: `id`, `name`, `description`, `reporter`,
+  `node_id`, `created`, `updated`, and `json_path`.
+- `FeatureDetail`: `Feature` plus `gaps`, `node_display_name`, and rollup
+  fields.
+- `FeatureRollup`: `status`, `gap_count`, `done_count`, `active_count`,
+  `failed_count`, `cancelled_count`, `blocked_count`, and `next_gap`.
+
+Rules:
+
+- A Feature's workflow status is derived from its ordered Gaps; it is not an
+  independent durable field in the Python baseline.
+- Feature workflow actions can move eligible Gaps to `backlog` or `todo`.
+  Protected Gap statuses are `review`, `done`, `ready-merge`, and
+  `awaiting-rebuild`.
+- Cancelling a Feature cancels non-terminal Gaps where allowed and skips
+  already terminal or ineligible Gaps.
+
+### Workflow Model
+
+Module: `model::workflow`; path: `rust/src/model/workflow/`.
+
+Owns workflow states, transition rules, and allowed-operation decisions for
+Gap and Feature workflows.
+
+Properties:
+
+- `GapStatus`: `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`,
+  `awaiting-rebuild`, `review`, `done`, `failed`, and `cancelled`.
+- `TerminalGapStatus`: `done` and `cancelled`.
+- `AutomatedGapStatus`: `in-progress`, `qa`, `ready-merge`, and
+  `awaiting-rebuild`.
+- `UserStatusTransition`: currently `backlog -> todo`, `todo -> backlog`,
+  `review -> todo`, `done -> review`, `failed -> todo`, and
+  `cancelled -> todo`; same-status updates are no-ops.
+- `BulkStatusTarget`: any Gap status except `in-progress`, `qa`, and
+  `ready-merge`, plus the special `__last_workflow_state` restore operation.
+- `FeatureWorkflowTarget`: `backlog` or `todo`.
+- `FeatureProtectedStatus`: `review`, `done`, `ready-merge`, and
+  `awaiting-rebuild`.
+
+Rules:
+
+- Manual status updates cannot enter system-owned states through ordinary
+  metadata edits; dedicated workflow actions own those transitions.
+- The model should answer whether an operation is allowed for a given Gap or
+  Feature state. `core` performs the operation only after the model approves
+  it.
+- Examples of operations the model should name: create Gap, edit Gap metadata,
+  edit notes, submit new round, edit latest round, start implementation,
+  cancel automation, retry agent, retry QA, retry merge, verify/review, merge,
+  undo, delete, assign to Feature, remove from Feature, reorder in Feature,
+  move Feature workflow, and cancel Feature.
+
+### Cluster Model
+
+Module: `model::cluster`; path: `rust/src/model/cluster/`.
+
+Owns the git-synced cluster registry shape and cluster-level state. Runtime SSH
+execution belongs in `core::host::cluster`; the model only defines the records
+and validation vocabulary.
+
+Properties:
+
+- `Cluster`: `nodes` and `updated_at`.
+- `ClusterNode`: `id`, `display_name`, `ssh_host`, `ssh_port`,
+  `refine_checkout`, `target_app_path`, `refine_port`, `enabled`, `health`,
+  `created_at`, and `updated_at`.
+- `ClusterHealth`: at minimum `status` and `checked_at`, with room for
+  provider-specific details.
+- `RemoteRunResult`: `node_id`, `command`, `remote_command`, `exit_code`,
+  `stdout`, `stderr`, and `ok`.
+
+Rules:
+
+- Cluster node ids are lowercase ids that start with a letter or digit and use
+  only lowercase letters, digits, `_`, or `-`.
+- `ssh_host` must be a host, not a `user@host` string.
+- Disabled cluster nodes remain registered but cannot run remote Refine
+  commands.
+
+### Node Model
+
+Module: `model::node`; path: `rust/src/model/node/`.
+
+Owns local Refine node identity and node-scoped settings. A node is the unit of
+ownership for Gaps and Features inside one target app; a cluster node is the
+remote-registration form of a node.
+
+Properties:
+
+- `Node`: `id`, `display_name`, `created_at`, `updated_at`, and `archived`.
+- `NodeRegistry`: `nodes`.
+- `ActiveNodeSelection`: `active_node_id`, `volume_root`, and `updated_at`.
+- `NodeSettings`: application, runtime, target-app config, and target-app
+  runtime setting maps scoped to a node.
+- `NodeOwnership`: the `node_id` fields on Gap and Feature records.
+
+Rules:
+
+- The active node cannot be archived.
+- Runtime automation owns exactly one local node for the lifetime of the
+  supervisor/worker process, even if the UI browses another node.
+- Mutating a Gap or Feature requires ownership by the active local node unless
+  a transfer operation explicitly changes ownership first.
+
+### Log Model
+
+Module: `model::log`; path: `rust/src/model/log/`.
+
+Owns the canonical log and activity entry shape. Writing, retention, indexing,
+streaming, and support-bundle export belong in `core::observability`.
+
+Properties:
+
+- `LogEntry`: `datetime`, `severity`, `category`, `message`, optional
+  `details`, optional `actions`, optional `actor`, and optional `gap_id`.
+- `ActivityEntry`: `id`, `datetime`, `severity`, `category`, `message`,
+  optional `gap_id`, optional `actor`, optional `details`, and optional
+  `actions`.
+- `RoundLogEntry`: `LogEntry` plus `round_idx` when stored in sidecar JSONL.
+- `LogAction`: action objects attached to an entry; the exact variants should
+  become typed as Rust implementations replace Python's free-form dictionaries.
+- `LogQuery`: `limit`, `offset`, `gap_id`, `since_id`, `severity`,
+  `category`, `actor`, `q`, `sort`, and `direction`.
+
+Rules:
+
+- Activity entries and round logs share the same entry shape.
+- Workflow transitions should be representable as log entries with
+  `category = "state"` and messages that can identify the previous and next
+  workflow state.
+- `model::log` defines data; `core::observability` owns append, search,
+  cleanup, metrics, streaming, diagnostics, and support bundles.
 - Storage serializes and deserializes model records; it does not invent shadow
   model definitions.
 - UI, CLI, API, scheduler, process, provider, and quality code should all use
@@ -293,13 +525,24 @@ Requirements:
 
 Module: `core::product::project_state`; path: `rust/src/core/product/project_state/`.
 
-Owns abstractions for: initialize, read, mutate, migrate, sync, rebuild indexes.
+Owns abstractions for: initialize, read, mutate, migrate, sync, rebuild
+projections.
 
 Requirements:
 
 - Durable Refine workflow state lives in project-local storage.
 - Runtime state lives outside tracked target-app files.
-- SQLite or another index can accelerate queries, but durable records must be
+- Rust should maintain a materialized projection of model records for fast
+  list, count, filter, sort, and lookup queries.
+- The first pass should persist the projection snapshot under
+  `run/<port>/cache/`, including source-file fingerprints, so startup can load
+  the snapshot and rescan only changed, missing, or new durable records.
+- The projection snapshot and required indexes are part of
+  `core::product::project_state`; routes should ask core for query results
+  instead of rebuilding ad hoc indexes per surface.
+- A full durable-record scan remains the fallback when the projection snapshot
+  is missing, corrupt, incompatible, or intentionally discarded.
+- Durable records remain the source of truth. Projection state must be
   rebuildable after corruption or version upgrades.
 - Mutations flow through shared core services and emit audit/activity events.
 - Migrations are versioned, idempotent, and observable.
@@ -557,11 +800,10 @@ refine/
         gap/
         feature/
         workflow/
-        operations/
-        process/
         project/
-        events/
-        records/
+        cluster/
+        node/
+        log/
     desktop/
       src-tauri/
         Cargo.toml
@@ -584,8 +826,9 @@ workflow logic.
 `run/` is a repository-root runtime directory, not part of the Rust source
 tree. It should be gitignored and retained as the local runtime-state home used
 by the current Python implementation: `run/primary.json` for the primary local
-runtime record and `run/<port>/cache/` for port-scoped caches such as SQLite
-indexes. Rust should keep this convention unless a migration explicitly
+runtime record and `run/<port>/cache/` for port-scoped caches such as
+projection snapshots and rebuilt query indexes. Rust should keep this
+convention unless a migration explicitly
 documents a replacement.
 
 ### Module Direction
@@ -604,7 +847,7 @@ core
   core::host::{process_supervision, target_apps, git_worktrees, ...}
       |
 model
-  model::{gap, workflow, operations, process, records, ...}
+  model::{project, gap, feature, workflow, cluster, node, log}
 
 side channel for all processing layers
 observability
@@ -670,9 +913,9 @@ product capability:
   Initial assets should come from `python/refine_ui/static/` and live under
   `rust/src/surfaces/web/static/`.
 - `surfaces::web_server`; path: `rust/src/surfaces/web_server/`. Owns the
-  local daemon web server: HTTP routes, WebSocket endpoints,
-  server-sent-event streams, static asset serving, auth extraction, request
-  parsing, response shaping, and translation into supervisor and core services.
+  local daemon web server: HTTP routes, server-sent-event streams, static asset
+  serving, auth extraction, request parsing, response shaping, and translation
+  into supervisor and core services.
 
 `rust/xtask/` should contain repository automation that is not part of the
 shipped product: code generation, API contract export, fixture refresh, release
@@ -687,8 +930,8 @@ Responsibilities:
 
 - Serve the web UI assets used by both the external browser and Tauri webview.
 - Expose HTTP routes for request/response operations.
-- Expose WebSocket or server-sent-event streams for operation events, logs,
-  chat, and UI updates.
+- Expose server-sent-event streams for operation events, logs, chat, and UI
+  updates.
 - Handle auth, local-origin checks, request parsing, response shaping, and API
   version negotiation.
 - Translate transport requests into supervisor-facing core services.
@@ -744,10 +987,139 @@ the source of truth for which records remain collaboration-visible and which
 records are local runtime state. Any change to that split should be documented
 as an intentional Rust architecture decision.
 
-Durable records should deserialize into `model` types. Storage code may
-own file layout, atomic writes, indexes, and cache rebuilds, but it should not
-define a second set of workflow structs or status enums. Cache/index records
-mirror model records and must be rebuildable from them.
+Durable records should deserialize into `model` types. Storage code may own
+file layout, atomic writes, materialized projections, cache snapshots, and
+cache rebuilds, but it should not define a second set of workflow structs or
+status enums. Projection records mirror model records and must be rebuildable
+from them.
+
+The Rust first pass should include a persisted projection snapshot, not only an
+in-memory startup scan. The daemon should:
+
+- Load the projection snapshot from `run/<port>/cache/` during startup.
+- Validate the snapshot version and source-file fingerprints for durable
+  records such as `gap.json` and `feature.json`.
+- Rescan only changed, missing, or newly discovered durable records.
+- Build in-memory indexes from the validated projection for nearly instant UI
+  counts, facets, filters, sorts, and lookups.
+- Update durable records and projection state together on every mutation.
+- Emit SSE updates after projection changes so surfaces can refresh without
+  rescanning.
+- Fall back to a full durable-record scan when the snapshot is absent,
+  incompatible, or corrupt.
+
+This projection layer is the required cache abstraction. Common UI queries
+such as "how many Gaps are done?" must be answered by the projection API, not
+by introducing a separate query database.
+
+The first Rust cache choice is therefore:
+
+- Durable model records remain JSON/source records.
+- `run/<port>/cache/` stores a versioned projection snapshot with durable
+  source fingerprints.
+- The daemon loads the snapshot, incrementally refreshes changed records, and
+  builds in-memory indexes.
+- The projection API is the only supported query abstraction for surfaces.
+- The first pass does not use a query database. It uses durable model records,
+  projection snapshots, and in-memory indexes.
+
+### Required Projection Indexes
+
+The current Python web UI has been scanned for cache needs. The Rust projection
+layer must support at least the query patterns used by the Gaps, Features,
+Dashboard, Logs, Changes, Gap Detail, and bulk-operation surfaces.
+
+Gap projection:
+
+- Keep `GapSummaryProjection` keyed by `gap_id` with `id`, `name`, `status`,
+  `priority`, `reporter`, `round_count`, `created`, `updated`, `branch_name`,
+  `node_id`, `feature_id`, `feature_order`, durable JSON path, and display
+  fields such as `node_display_name`.
+- Index by status for workflow counts and status filters.
+- Index by node, including current-node, all-node, and unknown-node queries.
+- Index by reporter, priority, feature id, standalone/no-feature membership,
+  and round count range.
+- Maintain sorted views for `name`, `status`, `priority`, `reporter`,
+  `round_count`, `node`, `updated`, `created`, and `id`, with stable
+  tie-breakers.
+- Maintain a text-search projection over Gap name, reporter, round content,
+  and notes content.
+- Maintain activity-linked Gap membership by severity, category, and actor so
+  Gap list filters can include log/activity dimensions.
+- Return stable matching Gap id sets for bulk update, transfer, feature
+  assignment, and bulk delete operations across pagination.
+- Return filtered status counts so workflow visualizations can reflect the
+  current filter set without a second durable scan.
+
+Feature projection:
+
+- Keep `FeatureSummaryProjection` keyed by `feature_id` with `id`, `name`,
+  `description`, `reporter`, `node_id`, `created`, `updated`, and durable JSON
+  path.
+- Index by node, reporter, derived feature status, updated, created, name, and
+  id.
+- Maintain ordered Gap ids per Feature by `feature_order`, with deterministic
+  fallback ordering.
+- Maintain derived rollups per Feature: `status`, `gap_count`, `done_count`,
+  `active_count`, `failed_count`, `cancelled_count`, `blocked_count`, and
+  `next_gap`.
+- Maintain the current-node standalone Gap candidate set for assigning Gaps to
+  Features.
+
+Activity and log projection:
+
+- Keep activity entries keyed by activity id and indexed by datetime/id,
+  severity, category, actor, and `gap_id`.
+- Maintain distinct category, actor, and severity facet values.
+- Maintain text search over activity message and details.
+- Maintain the recent activity feed used by Dashboard.
+- Maintain per-Gap and per-round log summaries: count, latest log, latest
+  error log, latest state log, latest workflow log, and paged log entries.
+- Support activity table sorting by datetime, severity, category, actor,
+  `gap_id`, message, and id.
+
+Change projection:
+
+- Keep Refine merge rows keyed by commit and branch with commit sha, committed
+  time, subject, `gap_id`, branch, and joined Gap display fields.
+- Index by branch plus committed time, `gap_id`, Gap status, Gap priority, and
+  text search over Gap name, commit, status, and subject.
+
+Dashboard projection:
+
+- Derive dashboard status counts from Gap indexes for all nodes and for the
+  current node.
+- Derive reporter stats grouped by reporter and status.
+- Derive attention indicators from failed Gap counts, preflight state, runner
+  reachability, and relevant runtime state.
+- Reuse the recent activity projection instead of reading logs separately.
+
+Runtime projection:
+
+- Keep supervisor, process, background-job, target-app, performance, and
+  preflight snapshots in local runtime cache state rather than Git-visible
+  durable model records.
+- These runtime projections still need indexed lookup and pagination where the
+  UI asks for process, performance, or job tables, but they are not part of the
+  portable workflow model.
+
+Project, settings, and source-tree caches:
+
+- Keep project registry, active-project status, node registry, cluster registry,
+  reporters, guidance, governance, quality, and application settings as small
+  keyed maps with typed lookups. The current UI needs quick list and lookup
+  behavior for these, not heavy secondary indexes.
+- Keep file tree, file read, and file search caches separate from workflow
+  projections. They describe the target application's source tree, not Refine
+  workflow state, and should be invalidated by filesystem fingerprints or Git
+  metadata.
+- Keep chat sessions and import preparation jobs in runtime/job state. They may
+  need lookup by session id or job id, but they should not become durable model
+  indexes unless a product workflow explicitly requires collaboration-visible
+  state.
+- Keep cache rebuild, cleanup, and projection diagnostics observable through
+  logs and performance metrics so the UI can explain slow startup or rebuild
+  work.
 
 The checkout root keeps a gitignored `run/` directory for local runtime state.
 Rust should preserve this convention because the Python implementation already
@@ -755,7 +1127,8 @@ uses it successfully:
 
 - `run/primary.json`: primary local runtime record.
 - `run/<port>/`: port-scoped daemon, process, socket, and UI runtime state.
-- `run/<port>/cache/`: port-scoped caches such as rebuilt SQLite indexes.
+- `run/<port>/cache/`: port-scoped caches, projection snapshots, and any
+  rebuilt query indexes.
 
 `run/` is Refine-owned runtime bookkeeping. It must stay outside tracked
 target-app files and should not be written into a target app's tracked
@@ -776,6 +1149,9 @@ Refine itself should be native and should not require host Python.
 Dependency classes:
 
 - Required core dependencies: bundled with Refine or implemented in Rust.
+- Cache/query dependencies: use the projection snapshot and in-memory indexes
+  described in the Storage Model. Do not add a query database dependency for
+  workflow list, count, facet, search, sort, or lookup behavior.
 - External prerequisites: Git is likely required for most useful workflows and
   should be detected early, but it is not bundled into the desktop app.
 - Workflow prerequisites: browser automation dependencies, provider CLIs,
@@ -799,7 +1175,7 @@ Suggested order:
 
 1. Install, daemon lifecycle, status, doctor.
 2. Target-app registry: attach, switch, detach, no-app mode.
-3. Durable storage and index rebuild.
+3. Durable storage, projection snapshots, and projection rebuild.
 4. Gap list/create/update/transition.
 5. CLI parity for the above.
 6. Web UI connected to Rust APIs.
@@ -879,6 +1255,9 @@ implementation details.
 - The document includes migration and testing strategy for a vertical port.
 - The document defines `model` as the centralized model module for
   canonical state, workflow states, and allowed operations.
+- The document defines the Rust cache choice as durable model records plus a
+  persisted projection snapshot under `run/<port>/cache/` and in-memory indexes
+  for the current UI's list, count, facet, search, sort, and lookup needs.
 - The document records the resolved daemon, provider, storage, dependency, UI,
   and implementation-scope decisions.
 - The document defines a core Rust package under `rust/`, leaves room for a
