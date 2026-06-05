@@ -628,7 +628,8 @@ pub enum SystemAction {
         repo_root: PathBuf,
     },
     ApiGroups,
-    Serve {
+    #[command(name = "web")]
+    Web {
         #[arg(long, default_value_t = 8080)]
         port: u16,
         #[arg(long)]
@@ -641,6 +642,8 @@ pub enum SystemAction {
         token: Option<String>,
         #[arg(long)]
         once: bool,
+        #[arg(long, hide = true)]
+        foreground: bool,
     },
 }
 

@@ -46,11 +46,11 @@ fn project_sync_rebuilds_projection_from_cli_surface() {
 }
 
 #[test]
-fn system_serve_starts_without_durable_root_argument() {
+fn system_web_starts_without_durable_root_argument() {
     let parsed = Cli::try_parse_from([
         "refine",
         "system",
-        "serve",
+        "web",
         "--port",
         "0",
         "--runtime-root",
@@ -59,19 +59,18 @@ fn system_serve_starts_without_durable_root_argument() {
     ])
     .unwrap();
     let Commands::System {
-        action: SystemAction::Serve {
+        action: SystemAction::Web {
             port, runtime_root, ..
         },
     } = parsed.command
     else {
-        panic!("expected system serve command");
+        panic!("expected system web command");
     };
     assert_eq!(port, 0);
     assert_eq!(runtime_root, PathBuf::from("run"));
 
-    assert!(
-        Cli::try_parse_from(["refine", "system", "serve", "--durable-root", ".refine"]).is_err()
-    );
+    assert!(Cli::try_parse_from(["refine", "system", "web", "--durable-root", ".refine"]).is_err());
+    assert!(Cli::try_parse_from(["refine", "system", "serve", "--once"]).is_err());
 }
 
 #[test]

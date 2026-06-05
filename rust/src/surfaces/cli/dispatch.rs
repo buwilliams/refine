@@ -1,4 +1,9 @@
-use std::path::PathBuf;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::thread;
+use std::time::Duration;
 
 use clap::Parser;
 use serde_json::json;
@@ -21,7 +26,8 @@ use crate::core::product::scheduling::{FileSchedulingService, SchedulingService}
 use crate::core::product::work_items::{
     BulkGapFilter, BulkGapSelection, BulkGapUpdate, FileWorkItemService,
 };
-use crate::core::supervisor::errors::RefineResult;
+use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::lifecycle::DaemonStatus;
 use crate::core::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
 use crate::core::supervisor::runtime::RuntimeRoot;
 use crate::model::workflow::{GapStatus, user_status_transition};
@@ -601,24 +607,30 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action: SystemAction::Start { port, runtime_root },
         } => {
-            let status =
-                FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root }).start(port)?;
+            let status = start_background_daemon(port, &runtime_root, None, None, None)?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
         Commands::System {
             action: SystemAction::Stop { port, runtime_root },
         } => {
-            let status =
-                FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root }).stop(port)?;
+            let status = FileDaemonLifecycleService::new(RuntimeRoot {
+                root: runtime_root.clone(),
+            })
+            .stop(port)?;
+            let _ = http_probe(port);
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
         Commands::System {
             action: SystemAction::Restart { port, runtime_root },
         } => {
-            let status = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root })
-                .restart(port)?;
+            let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
+                root: runtime_root.clone(),
+            });
+            let _ = lifecycle.stop(port)?;
+            let _ = http_probe(port);
+            let status = start_background_daemon(port, &runtime_root, None, None, None)?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -1291,15 +1303,30 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::System {
             action:
-                SystemAction::Serve {
+                SystemAction::Web {
                     port,
                     cache_dir,
                     static_root,
                     runtime_root,
                     token,
                     once,
+                    foreground,
                 },
         } => {
+            if !foreground && !once {
+                let status = start_background_daemon(
+                    port,
+                    &runtime_root,
+                    cache_dir.as_deref(),
+                    static_root.as_deref(),
+                    token.as_deref(),
+                )?;
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&web_response(status)).unwrap()
+                );
+                return Ok(());
+            }
             let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
             let snapshot = if let Some(client_repo) = project_status.client_repo {
                 let durable_root = PathBuf::from(client_repo).join(".refine");
@@ -1312,10 +1339,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             } else {
                 ProjectionSnapshot::default()
             };
+            let listener = LocalHttpDaemon::bind_loopback(port)?;
+            let addr = LocalHttpDaemon::local_addr(&listener)?;
+            let actual_port = addr.port();
             let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
                 root: runtime_root.clone(),
             });
-            let status = lifecycle.start(port)?;
+            let status = lifecycle.start(actual_port)?;
             let daemon = LocalHttpDaemon {
                 server: InProcessWebServer {
                     status,
@@ -1326,14 +1356,15 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
                 static_root: static_root.or_else(default_static_root),
             };
-            let listener = LocalHttpDaemon::bind_loopback(port)?;
-            let addr = LocalHttpDaemon::local_addr(&listener)?;
-            eprintln!("serving Refine daemon API at http://{addr}");
+            eprintln!("running foreground Refine daemon web server at http://{addr}");
             if once {
                 daemon.serve_next(&listener)?;
             } else {
                 loop {
                     daemon.serve_next(&listener)?;
+                    if !lifecycle.status(actual_port)?.daemon_healthy {
+                        break;
+                    }
                 }
             }
             Ok(())
@@ -1344,4 +1375,127 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             ),
         )),
     }
+}
+
+fn start_background_daemon(
+    port: u16,
+    runtime_root: &Path,
+    cache_dir: Option<&Path>,
+    static_root: Option<&Path>,
+    token: Option<&str>,
+) -> RefineResult<DaemonStatus> {
+    if port == 0 {
+        return Err(RefineError::InvalidInput(
+            "background daemon start requires a concrete port".to_string(),
+        ));
+    }
+    let exe = std::env::current_exe().map_err(|error| {
+        RefineError::Io(format!("failed to locate current executable: {error}"))
+    })?;
+    std::fs::create_dir_all(runtime_root).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to create daemon runtime root {}: {error}",
+            runtime_root.display()
+        ))
+    })?;
+    let log_path = runtime_root.join(format!("daemon-{port}.log"));
+    let log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to open daemon log {}: {error}",
+                log_path.display()
+            ))
+        })?;
+    let mut command = detached_command(&exe);
+    command
+        .arg("system")
+        .arg("web")
+        .arg("--foreground")
+        .arg("--port")
+        .arg(port.to_string())
+        .arg("--runtime-root")
+        .arg(runtime_root)
+        .stdin(std::process::Stdio::null())
+        .stdout(log.try_clone().map_err(|error| {
+            RefineError::Io(format!("failed to clone daemon log handle: {error}"))
+        })?)
+        .stderr(log);
+    if let Some(cache_dir) = cache_dir {
+        command.arg("--cache-dir").arg(cache_dir);
+    }
+    if let Some(static_root) = static_root {
+        command.arg("--static-root").arg(static_root);
+    }
+    if let Some(token) = token {
+        command.arg("--token").arg(token);
+    }
+    let mut child = command
+        .spawn()
+        .map_err(|error| RefineError::Io(format!("failed to start daemon process: {error}")))?;
+    for _ in 0..50 {
+        if let Some(status) = child.try_wait().map_err(|error| {
+            RefineError::Io(format!("failed to inspect daemon process: {error}"))
+        })? {
+            return Err(RefineError::Conflict(format!(
+                "daemon process exited before becoming reachable: {status}"
+            )));
+        }
+        if http_probe(port).is_ok() {
+            return FileDaemonLifecycleService::new(RuntimeRoot {
+                root: runtime_root.to_path_buf(),
+            })
+            .status(port);
+        }
+        thread::sleep(Duration::from_millis(100));
+    }
+    Err(RefineError::Degraded(format!(
+        "daemon did not become reachable on 127.0.0.1:{port}"
+    )))
+}
+
+fn detached_command(exe: &Path) -> Command {
+    #[cfg(unix)]
+    {
+        let mut command = Command::new("setsid");
+        command.arg(exe);
+        command
+    }
+    #[cfg(not(unix))]
+    {
+        Command::new(exe)
+    }
+}
+
+fn web_response(status: DaemonStatus) -> serde_json::Value {
+    json!({
+        "url": format!("http://127.0.0.1:{}/", status.port),
+        "status": status
+    })
+}
+
+fn http_probe(port: u16) -> RefineResult<()> {
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
+        RefineError::Io(format!(
+            "daemon is not reachable on 127.0.0.1:{port}: {error}"
+        ))
+    })?;
+    stream
+        .set_read_timeout(Some(Duration::from_secs(1)))
+        .map_err(|error| RefineError::Io(format!("failed to set daemon probe timeout: {error}")))?;
+    stream
+        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        .map_err(|error| RefineError::Io(format!("failed to write daemon probe: {error}")))?;
+    let mut buffer = [0_u8; 64];
+    let read = stream
+        .read(&mut buffer)
+        .map_err(|error| RefineError::Io(format!("failed to read daemon probe: {error}")))?;
+    if read == 0 || !buffer[..read].starts_with(b"HTTP/1.1 200") {
+        return Err(RefineError::Degraded(
+            "daemon probe did not return HTTP 200".to_string(),
+        ));
+    }
+    Ok(())
 }
