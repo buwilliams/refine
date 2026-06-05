@@ -97,14 +97,54 @@ CLI is the operator and automation surface.
 
 Responsibilities:
 
-- Start, stop, restart, status, doctor, update, and logs.
-- Attach, switch, detach, and inspect target apps.
-- Create, list, update, import, schedule, review, and merge Refine work.
+- Expose model-oriented command groups that match Rust model vocabulary.
+- Put actions under the model they operate on rather than copying the old Python
+  CLI groupings.
 - Emit human-readable output and structured JSON for automation.
 - Call the same daemon APIs and core operations as the UI surfaces.
 
 The CLI may also run limited bootstrap commands when the daemon is not yet
 installed, but normal operation should go through the daemon.
+
+The Rust CLI is an intentional improvement over the Python CLI, not a
+compatibility shell. Product commands should be grouped by Rust model nouns,
+with verbs expressed as actions on those models. Temporary Python-compatible
+aliases may exist during migration, but they should delegate into the
+model-oriented command surface and should not define the architecture.
+
+Representative model-oriented CLI groups:
+
+- `refine project`: attachment, registry, schema, migration, sync, and active
+  app state. Actions include `status`, `attach`, `switch`, `detach`,
+  `register`, `remove`, `migrate`, `sync`, and `doctor`.
+- `refine gap`: executable Gap records and Gap-owned rounds, notes, quality,
+  governance, implementation, review, merge, and deletion. Actions include
+  `create`, `list`, `show`, `edit`, `note`, `round`, `start`, `cancel`,
+  `retry`, `verify`, `merge`, `undo`, `delete`, `assign-feature`, and
+  `remove-feature`.
+- `refine feature`: Feature metadata, ordered Gap membership, derived status,
+  workflow movement, import-backed creation, cancellation, and deletion.
+  Actions include `create`, `list`, `show`, `edit`, `add-gap`, `remove-gap`,
+  `reorder-gap`, `move`, `cancel`, `delete`, and `import`.
+- `refine workflow`: cross-model workflow decisions and bulk state operations
+  whose primary object is the state machine rather than one record. Actions
+  include `allowed`, `transition`, `bulk-transition`, `schedule`, `pause`,
+  `resume`, `restore`, and `enforce`.
+- `refine node`: local node identity, active-node selection, ownership, and
+  transfer. Actions include `list`, `show`, `create`, `activate`, `archive`,
+  `rename`, `settings`, and `transfer`.
+- `refine cluster`: cluster registry, remote nodes, project-state sync,
+  maintenance, and bounded remote operations. Actions include `list`, `show`,
+  `add-node`, `edit-node`, `enable-node`, `disable-node`, `remove-node`,
+  `sync`, `run`, `transfer`, and `maintenance`.
+- `refine log`: activity, round logs, diagnostics logs, support bundles, and
+  exported evidence. Actions include `list`, `tail`, `show`, `query`,
+  `export`, and `bundle`.
+
+Host and supervisor operations that do not belong to a product model should use
+small explicit groups such as `refine system` for daemon lifecycle,
+installation, update, status, and recovery. These commands are allowed because
+they operate on Refine as installed software rather than on a project model.
 
 ## System Model
 
@@ -128,7 +168,7 @@ Desktop shell      Browser UI          CLI
        canonical records, workflow states,
        allowed operations, process kinds
                       |
- durable project state + run/<port>/ runtime state
+ durable project state + local runtime root/<port>/ runtime state
 ```
 
 The supervisor daemon is the single local authority. It contains the local web
@@ -321,8 +361,13 @@ Rules:
 - Feature workflow actions can move eligible Gaps to `backlog` or `todo`.
   Protected Gap statuses are `review`, `done`, `ready-merge`, and
   `awaiting-rebuild`.
-- Cancelling a Feature cancels non-terminal Gaps where allowed and skips
-  already terminal or ineligible Gaps.
+- Cancelling a Feature is a system-owned cascade operation. It cancels
+  `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`, `awaiting-rebuild`,
+  `review`, and `failed` Gaps through the shared Gap cancel path, skips `done`
+  Gaps, and skips already `cancelled` Gaps.
+- Feature cancel must stop or reconcile active work before recording the final
+  cancellation result, so users do not see running agent, QA, merge, or rebuild
+  jobs continue after the Feature was cancelled.
 
 ### Workflow Model
 
@@ -346,6 +391,8 @@ Properties:
 - `FeatureWorkflowTarget`: `backlog` or `todo`.
 - `FeatureProtectedStatus`: `review`, `done`, `ready-merge`, and
   `awaiting-rebuild`.
+- `FeatureCancelStatus`: `backlog`, `todo`, `in-progress`, `qa`,
+  `ready-merge`, `awaiting-rebuild`, `review`, and `failed`.
 
 Rules:
 
@@ -534,9 +581,10 @@ Requirements:
 - Runtime state lives outside tracked target-app files.
 - Rust should maintain a materialized projection of model records for fast
   list, count, filter, sort, and lookup queries.
-- The first pass should persist the projection snapshot under
-  `run/<port>/cache/`, including source-file fingerprints, so startup can load
-  the snapshot and rescan only changed, missing, or new durable records.
+- The first pass should persist the projection snapshot under the selected
+  local runtime root's `<port>/cache/` directory, including source-file
+  fingerprints, so startup can load the snapshot and rescan only changed,
+  missing, or new durable records.
 - The projection snapshot and required indexes are part of
   `core::product::project_state`; routes should ask core for query results
   instead of rebuilding ad hoc indexes per surface.
@@ -679,6 +727,21 @@ Requirements:
   semantics.
 - Long-running provider priming or resume steps are observable.
 - Chat events can produce importable rounds, Gaps, or Feature plans.
+- Chat records are durable enough to survive daemon restart: Refine session id,
+  mode, provider, provider session id when known, attached Gap or Feature id,
+  created/updated timestamps, transcript events, importable artifacts, and
+  closed/interrupted status are persisted outside in-memory process state.
+- In-flight provider processes are runtime jobs, not durable conversation
+  state. After a daemon crash or restart, unfinished turns are marked
+  interrupted with enough diagnostic detail for the UI or CLI to show what
+  happened and let the user resume or start a new turn.
+- Provider resumption uses the persisted provider session id when the adapter
+  supports resume. If the provider cannot resume, Refine still preserves the
+  transcript and starts a fresh provider session with explicit user-visible
+  status.
+- Gap-attached and Feature-attached chats rebuild their product context from
+  durable Refine records on resume. Persisted transcripts should not be the only
+  source of Gap, Feature, or round state.
 
 ### Observability And Diagnostics
 
@@ -823,12 +886,14 @@ If Tauri requires a separate package, it should live under
 own capabilities, durable state rules, process lifecycle, provider behavior, or
 workflow logic.
 
-`run/` is a repository-root runtime directory, not part of the Rust source
-tree. It should be gitignored and retained as the local runtime-state home used
-by the current Python implementation: `run/primary.json` for the primary local
-runtime record and `run/<port>/cache/` for port-scoped caches such as
-projection snapshots and rebuilt query indexes. Rust should keep this
-convention unless a migration explicitly
+The local runtime root is not part of the Rust source tree. In checkout-based
+development it may be the repository-root gitignored `run/` directory used by
+the current Python implementation. In an installed desktop or service
+deployment it may live under the OS-specific app support, cache, or service
+state location. The shape inside that root should remain familiar:
+`primary.json` for the primary local runtime record and `<port>/cache/` for
+port-scoped caches such as projection snapshots and rebuilt query indexes.
+Rust should keep this logical convention unless a migration explicitly
 documents a replacement.
 
 ### Module Direction
@@ -904,7 +969,8 @@ product capability:
   black-box fixtures, fake supervisors, fake providers, fake process handles,
   and contract-test helpers.
 - `surfaces::cli`; path: `rust/src/surfaces/cli/`. Owns the CLI
-  surface and structured output formatting.
+  surface, model-oriented command tree, action-to-API adapters, and structured
+  output formatting.
 - `surfaces::desktop`; path: `rust/src/surfaces/desktop/`. Owns
   desktop shell integration, native menu and tray hooks, update prompts, and
   narrow bridge command definitions used by the Tauri wrapper.
@@ -944,6 +1010,11 @@ HTTP/JSON contracts. It may run limited bootstrap commands when the daemon is
 not available, such as locating the checkout runtime, starting the daemon, or
 printing diagnostics from local runtime files.
 
+The daemon API does not have to mirror the CLI command tree. API groups can be
+transport- and capability-oriented where that produces cleaner contracts, while
+the CLI remains model-oriented for operator ergonomics and script stability.
+The CLI adapter maps model actions onto the appropriate daemon routes.
+
 API requirements:
 
 - Stable typed contracts.
@@ -974,6 +1045,7 @@ Storage should distinguish:
 - Known target-app registry.
 - Active target-app project state.
 - Refine workflow state inside or alongside the target app.
+- Durable chat session and transcript records.
 - Index/cache state.
 - Logs and telemetry.
 
@@ -994,15 +1066,19 @@ status enums. Projection records mirror model records and must be rebuildable
 from them.
 
 The Rust first pass should include a persisted projection snapshot, not only an
-in-memory startup scan. The daemon should:
+in-memory startup scan. The snapshot is an implementation detail behind the
+projection API; surfaces do not know whether the backend uses in-memory indexes,
+cache files, or another cache structure. The daemon should:
 
-- Load the projection snapshot from `run/<port>/cache/` during startup.
+- Load the projection snapshot from the selected local runtime root's
+  `<port>/cache/` directory during startup.
 - Validate the snapshot version and source-file fingerprints for durable
   records such as `gap.json` and `feature.json`.
 - Rescan only changed, missing, or newly discovered durable records.
 - Build in-memory indexes from the validated projection for nearly instant UI
   counts, facets, filters, sorts, and lookups.
-- Update durable records and projection state together on every mutation.
+- Update durable records first on every mutation, then update the in-memory
+  projection and persisted snapshot for responsiveness.
 - Emit SSE updates after projection changes so surfaces can refresh without
   rescanning.
 - Fall back to a full durable-record scan when the snapshot is absent,
@@ -1010,18 +1086,22 @@ in-memory startup scan. The daemon should:
 
 This projection layer is the required cache abstraction. Common UI queries
 such as "how many Gaps are done?" must be answered by the projection API, not
-by introducing a separate query database.
+by each surface scanning durable records or inventing its own query path.
 
 The first Rust cache choice is therefore:
 
 - Durable model records remain JSON/source records.
-- `run/<port>/cache/` stores a versioned projection snapshot with durable
-  source fingerprints.
+- The local runtime root's `<port>/cache/` directory stores a versioned
+  projection snapshot with durable source fingerprints.
 - The daemon loads the snapshot, incrementally refreshes changed records, and
   builds in-memory indexes.
 - The projection API is the only supported query abstraction for surfaces.
 - The first pass does not use a query database. It uses durable model records,
   projection snapshots, and in-memory indexes.
+- Projection updates do not need to provide database-style ACID semantics.
+  Durable records remain the source of truth; projection corruption, partial
+  snapshot writes, or missed cache updates are recovered by discarding the
+  snapshot and rebuilding from durable records.
 
 ### Required Projection Indexes
 
@@ -1113,25 +1193,25 @@ Project, settings, and source-tree caches:
   projections. They describe the target application's source tree, not Refine
   workflow state, and should be invalidated by filesystem fingerprints or Git
   metadata.
-- Keep chat sessions and import preparation jobs in runtime/job state. They may
-  need lookup by session id or job id, but they should not become durable model
-  indexes unless a product workflow explicitly requires collaboration-visible
-  state.
+- Keep in-flight chat turns, provider processes, and import preparation jobs in
+  runtime/job state. Durable chat records preserve session metadata,
+  transcripts, provider resume ids, and interrupted/closed status, but runtime
+  process handles and transient progress buffers remain local runtime state.
 - Keep cache rebuild, cleanup, and projection diagnostics observable through
   logs and performance metrics so the UI can explain slow startup or rebuild
   work.
 
-The checkout root keeps a gitignored `run/` directory for local runtime state.
-Rust should preserve this convention because the Python implementation already
-uses it successfully:
+Rust should preserve the current logical runtime-state convention while allowing
+the physical root to vary by deployment:
 
-- `run/primary.json`: primary local runtime record.
-- `run/<port>/`: port-scoped daemon, process, socket, and UI runtime state.
-- `run/<port>/cache/`: port-scoped caches, projection snapshots, and any
-  rebuilt query indexes.
+- `primary.json`: primary local runtime record.
+- `<port>/`: port-scoped daemon, process, socket, and UI runtime state.
+- `<port>/cache/`: port-scoped caches, projection snapshots, and any rebuilt
+  query indexes.
 
-`run/` is Refine-owned runtime bookkeeping. It must stay outside tracked
-target-app files and should not be written into a target app's tracked
+The runtime root is Refine-owned runtime bookkeeping. It may be checkout-local
+for development or OS-local for an installed product, but it must stay outside
+tracked target-app files and should not be written into a target app's tracked
 `.gitignore`. If a target app needs an ignore rule for Refine runtime
 bookkeeping, use repo-local Git exclude behavior rather than mutating tracked
 application files.
@@ -1177,7 +1257,7 @@ Suggested order:
 2. Target-app registry: attach, switch, detach, no-app mode.
 3. Durable storage, projection snapshots, and projection rebuild.
 4. Gap list/create/update/transition.
-5. CLI parity for the above.
+5. Model-oriented CLI coverage for the above.
 6. Web UI connected to Rust APIs.
 7. Desktop shell over the same APIs.
 8. Agent provider detection and one provider execution path.
@@ -1207,7 +1287,7 @@ Required layers:
 - Integration tests for storage, migrations, Git, process supervision, and
   provider adapters.
 - Contract tests for daemon web-server request/response and event contracts.
-- CLI tests with JSON output checks.
+- CLI tests with JSON output checks for the model-oriented command groups.
 - Web/Desktop UI smoke tests through the shared API.
 - Surface parity tests that verify core capabilities are available through the
   CLI, browser UI, and Desktop webview.
@@ -1256,11 +1336,13 @@ implementation details.
 - The document defines `model` as the centralized model module for
   canonical state, workflow states, and allowed operations.
 - The document defines the Rust cache choice as durable model records plus a
-  persisted projection snapshot under `run/<port>/cache/` and in-memory indexes
-  for the current UI's list, count, facet, search, sort, and lookup needs.
+  persisted projection snapshot under the selected local runtime root's
+  `<port>/cache/` directory and in-memory indexes for the current UI's list,
+  count, facet, search, sort, and lookup needs.
 - The document records the resolved daemon, provider, storage, dependency, UI,
   and implementation-scope decisions.
 - The document defines a core Rust package under `rust/`, leaves room for a
   thin Tauri wrapper package, assigns capabilities to modules and directory
-  paths inside the concrete `core::*` containers, preserves repo-root
-  gitignored `run/` runtime state.
+  paths inside the concrete `core::*` containers, and preserves the current
+  logical runtime-state shape while allowing the physical runtime root to vary
+  between checkout and installed deployments.
