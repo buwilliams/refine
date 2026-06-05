@@ -1,10 +1,12 @@
 # Refine Rust Port — Spec Conformance Report
 
 **Scope:** `docs/spec/rust-spec.md` against all of `rust/src/`, `rust/xtask/`, `rust/desktop/`.
-**Method:** full re-read after the refactor; I re-verified each prior finding against source. This pass I also
-built and ran the suite: `cargo test` is green — **159 passed, 0 failed**, and the test binaries compile clean.
-**Status vs previous report:** the two headline structural findings are now substantially resolved, along with
-most of the secondary gaps. What remains is a smaller, well-understood residual tier.
+**Method:** full re-read after the second round of conformance commits (`16f7d21`, `d087ea5`); I re-verified each
+prior finding and residual against source. Built and ran the suite: `cargo test` is green — **161 passed, 0
+failed**, and the test binaries compile clean.
+**Status vs previous report:** the two headline structural findings remain resolved, and three of the prior
+residuals (installation activation, support-bundle depth, layout) are now closed too. What's left is a single
+architectural residual plus dependency-bounded integration depth.
 
 ---
 
@@ -17,10 +19,13 @@ owns the projection cache, node ownership is enforced at the mutation boundary, 
 spawned, secret storage and command authorization exist, the desktop package is a real (feature-gated) Tauri 2
 app, and the web server is no longer single-threaded.
 
-The remaining deviations are narrower: an in-process CLI escape hatch that still bypasses the daemon when a
-caller passes `--durable-root`, OS-service *activation* (as opposed to file generation) that installation does
-not perform, and cluster SSH that still shells out to the system `ssh` binary. None of these contradict the
-architecture the way the prior two findings did.
+The latest commits closed most of what was left. Installation now *activates* services (real `systemctl` /
+`launchctl` calls), the support bundle redacts secrets by default, cluster SSH gained real preflight guards, and
+the spec itself was updated to list `imports/` and `nodes/` in the layout. The one architectural residual that
+persists is the in-process CLI escape hatch: when a caller passes `--durable-root`, the CLI still mutates
+durable state directly instead of going through the daemon. The other open items are dependency-bounded
+integration depth (cluster SSH is a guarded shell-out rather than a native crate; no code signing/notarization),
+not architectural contradictions.
 
 ---
 
@@ -39,6 +44,10 @@ architecture the way the prior two findings did.
 | Web server single-threaded | Limitation | **Resolved** | `serve_next_concurrent` spawns a thread per connection (`http.rs:111-119`, used at `http.rs:309`). |
 | `model::log` `actions` not optional | Cosmetic | **Resolved** | `#[serde(default, skip_serializing_if = "Vec::is_empty")]` on both `LogEntry.actions` and `ActivityEntry.actions` (`model/log/mod.rs`). |
 | Quality QA depth unconfirmed | Unknown | **Improved** | `run_playwright` invokes a real `playwright test <spec>` and captures `screenshot.png` (`quality/service.rs:304-378`). |
+| Installation writes service files but never activates | Residual #2 | **Resolved** | `activate_os_backend` executes the commands via `run_service_command` — `systemctl --user daemon-reload`+`enable` (`installation/mod.rs:640-648`), `launchctl bootstrap`+`enable` (`:661-667`); `activated`/`activation_error` reflect the real outcome; `deactivate_os_backend` mirrors it. |
+| Cluster SSH silently depends on external `ssh` | Residual #3 | **Narrowed** | Still a shell-out, but now guarded: `validate_ssh_prerequisites` → `ensure_ssh_binary_available` (`cluster/mod.rs:513-530`) probes `ssh` and reports a clear error; identity-file preflight + `user@host` destination handling; tested (`:714-725`). No native SSH crate yet. |
+| Support-bundle depth unconfirmed | Residual #6 | **Resolved** | `export` redacts by default via `redact_json`/`should_redact_key` covering secret/token/password/key (`support_bundle/mod.rs:151-179`); tested (`:191-198`). |
+| `imports/`/`nodes/` missing from spec layout | Residual #5 | **Resolved (spec)** | Spec now lists both under `core/product/` in the suggested layout. |
 
 ---
 
@@ -53,28 +62,22 @@ architecture the way the prior two findings did.
    files. Worth either documenting as an intentional offline/bootstrap-only path or guarding against use while
    a daemon holds the port.
 
-2. **Installation generates service files but does not activate them.** `register_os_backend` now writes a real
-   systemd user unit and a launchd plist, and `registered`/`partial` reflect whether the write actually
-   succeeded (`installation/mod.rs:215-263,360`) — a genuine improvement over the previously hardcoded
-   `registered = true`. But it stops at writing the unit file; nothing runs `systemctl --user enable` /
-   `launchctl load`, and there is no code signing or notarization. The daemon won't actually auto-start on
-   login from this alone. This is honest now (the `partial` flag surfaces it), just incomplete.
+2. **Cluster SSH is a guarded shell-out, not a native integration** (`cluster/mod.rs:503`, `Command::new("ssh")`).
+   The latest commit added the right guardrails — `ensure_ssh_binary_available` probes for `ssh` and surfaces a
+   clear error, and identity-file preflight is tested — so it no longer fails silently. But it still depends on
+   a working external `ssh` and the user's `~/.ssh` setup; there is no SSH crate. Fine for now; worth revisiting
+   if remote execution becomes load-bearing.
 
-3. **Cluster SSH still shells out to the system `ssh` binary** (`cluster/mod.rs:502`, `Command::new("ssh")`).
-   No SSH crate, no key/identity management; remote execution silently depends on a working external `ssh` and
-   `~/.ssh` setup. Functional but fragile, and unchanged from the prior review.
+3. **Installation activates services but still can't sign or notarize.** `activate_os_backend` now really runs
+   `systemctl`/`launchctl`, so daemon auto-start works on Linux/macOS where those managers are present. What's
+   left is genuinely installer-territory: code signing, notarization, and the Windows service path are deferred
+   to "the platform installer" (the note emitted when no activation commands apply). Not a gap in the daemon
+   architecture, just packaging work that lives outside this crate.
 
 4. **Core `Cargo.toml` is still deliberately minimal** — `clap, chrono, serde, serde_json, thiserror, uuid`;
    no async runtime, HTTP, SSH, or OS-service crates. The hand-rolled thread-per-connection HTTP server is fine
-   for a local daemon, and avoiding heavy deps is a defensible choice, but it's the root reason #2 and #3 above
-   are shell-out / file-generation rather than native integrations. Flagging it as the shared cause, not a bug.
-
-5. **Layout nit:** `core/product/imports/` and `core/product/nodes/` exist and are sensible but still aren't in
-   the spec's "suggested layout." Fold them into the spec or note them as intentional.
-
-6. **Not re-verified in depth this pass:** `observability::{metrics, support_bundle}` internals and the full
-   chat transcript/resume surface. They compile and their tests pass; I did not re-read them line-by-line after
-   the refactor.
+   for a local daemon, and avoiding heavy deps is a defensible choice, but it's the root reason cluster SSH is a
+   shell-out rather than a native integration. Flagging it as the shared cause, not a bug.
 
 ---
 
@@ -91,14 +94,14 @@ architecture the way the prior two findings did.
 | `core::product::project_registry` | ✅ | register/attach/switch/detach/remove/inspect/**clone** all present. |
 | `core::host::{git_worktrees, process_supervision, target_apps, agent_providers}` | ✅ | Real subprocess work; git audit log; typed `ProcessOwner`; provider detect + JSON-event parse. |
 | `core::host::quality` | ✅ (shell-dep) | Real `playwright test` invocation + screenshot capture; depends on external playwright. |
-| `core::host::cluster` | ⚠️ Fragile | Real but shells out to system `ssh`; no key management. |
-| `core::host::installation` | ⚠️ Writes, doesn't activate | Generates real systemd/launchd files; `partial` flag honest; no enable/load, no signing. |
+| `core::host::cluster` | ✅ (shell-dep) | Real remote run; now preflight-guarded (`ensure_ssh_binary_available`, identity check); shells out to system `ssh`, no native crate. |
+| `core::host::installation` | ✅ (no signing) | Generates **and activates** systemd/launchd services via real `systemctl`/`launchctl`; code signing/notarization deferred to platform installer. |
 | `core::supervisor::lifecycle` | ✅ | **Really spawns** the daemon (`current_exe` + `setsid`), status/health/recover. |
 | `core::supervisor::security` | ✅ | Token auth, redaction, audit, **secret store**, **command ACL** enforced. |
 | `core::supervisor::{sessions,jobs,runtime,config,errors}` | ✅ | Auth + registry, file-backed jobs, OS path layout, settings/governance, categorized errors. |
 | `core::supervisor::testing` | ✅ | Real fixtures + fakes + contract helper. |
 | `core::observability::{logs,activity,diagnostics}` | ✅ | JSONL sidecars, multi-filter query + retention, 9-category doctor. |
-| `core::observability::{metrics,support_bundle}` | ◐ | Present; not re-verified in depth (tests pass). |
+| `core::observability::{metrics,support_bundle}` | ✅ | Support bundle redacts secrets by default (`redact_json`); metrics present. |
 | `surfaces::web_server` | ✅ | std `TcpListener` HTTP/1.1, **thread-per-connection**; static serving with traversal guards; SSE; auth + local-origin; idempotency; version negotiation; serves every route the CLI calls. |
 | `surfaces::web/static` | ✅ | 55 assets copied from `python/refine_ui/static/`; xtask verifies parity. |
 | `surfaces::cli` | ✅ default / ⚠️ escape hatch | All 9 model-oriented groups + actions; **daemon-routed by default**; in-process only with explicit `--durable-root`. |
@@ -119,7 +122,8 @@ The two criteria that previously failed now pass as wired:
   The daemon loads/refreshes the `<port>/cache/` snapshot, builds indexes, and refreshes after mutation; CLI,
   scheduling, and chat consume it.
 
-The remaining shortfalls against the spec are integration-depth rather than architecture: installation activates
-nothing (residual #2), cluster SSH and the HTTP/SSH layers are shell-outs bounded by the minimal dependency set
-(residuals #3–#4). These are reasonable next targets but don't undercut the daemon-centric design the spec asks
-for.
+The remaining shortfalls are integration-depth rather than architecture: cluster SSH is a guarded shell-out
+bounded by the minimal dependency set (residuals #2, #4), and installer-grade signing/notarization is deferred
+to packaging (residual #3). The single architectural residual is the in-process CLI `--durable-root` escape
+hatch (residual #1) — opt-in, but still a way to mutate durable state off-daemon. None of these undercut the
+daemon-centric design the spec asks for.
