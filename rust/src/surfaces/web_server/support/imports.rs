@@ -98,6 +98,7 @@ pub(in crate::surfaces::web_server) fn gap_id_and_action(path: &str) -> Option<(
 
 pub(in crate::surfaces::web_server) fn gap_action_message(action: &str) -> &'static str {
     match action {
+        "start" => "Started",
         "verify" => "Verified",
         "retry-quality" => "Queued for QA",
         "retry-merge" => "Queued for merge",

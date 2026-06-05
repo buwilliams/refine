@@ -176,6 +176,53 @@ fn project_registry_commands_use_shared_file_project_registry_service() {
 }
 
 #[test]
+fn project_clone_uses_shared_file_project_registry_service() {
+    let temp_root = unique_temp_dir("cli-project-clone");
+    let runtime_root = temp_root.join("run");
+    let source = temp_root.join("source");
+    let destination = temp_root.join("clone-destination");
+    fs::create_dir_all(&source).unwrap();
+    let output = std::process::Command::new("git")
+        .arg("init")
+        .arg(&source)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "clone",
+            source.to_str().unwrap(),
+            destination.to_str().unwrap(),
+            "--name",
+            "cloned",
+            "--make-current",
+            "--runtime-root",
+            runtime_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    assert!(destination.join(".git").exists());
+    let registry: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(runtime_root.join("apps.json")).unwrap()).unwrap();
+    assert_eq!(registry["active_app"], destination.to_str().unwrap());
+    assert_eq!(
+        registry["apps"][destination.to_str().unwrap()]["name"],
+        "cloned"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn project_and_system_doctor_and_migrate_use_observability_services() {
     let temp_root = unique_temp_dir("cli-doctor-migrate");
     let durable_root = temp_root.join(".refine");

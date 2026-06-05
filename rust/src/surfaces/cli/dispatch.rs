@@ -1,9 +1,6 @@
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::thread;
-use std::time::Duration;
+use std::path::PathBuf;
 
 use clap::Parser;
 use serde_json::json;
@@ -27,8 +24,10 @@ use crate::core::product::work_items::{
     BulkGapFilter, BulkGapSelection, BulkGapUpdate, FileWorkItemService,
 };
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::lifecycle::DaemonStatus;
-use crate::core::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::core::supervisor::lifecycle::{
+    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+    http_probe,
+};
 use crate::core::supervisor::runtime::RuntimeRoot;
 use crate::model::workflow::{GapStatus, user_status_transition};
 use crate::surfaces::web_server::{API_GROUPS, InProcessWebServer, LocalHttpDaemon};
@@ -240,35 +239,54 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Node {
-            action: NodeAction::List { durable_root },
+            action:
+                NodeAction::List {
+                    durable_root: Some(durable_root),
+                },
         } => {
             let nodes = FileNodeRegistryService::new(durable_root).list_response()?;
             println!("{}", serde_json::to_string_pretty(&nodes).unwrap());
             Ok(())
         }
         Commands::Node {
-            action: NodeAction::Show { id, durable_root },
+            action:
+                NodeAction::Show {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let node = FileNodeRegistryService::new(durable_root).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
         Commands::Node {
-            action: NodeAction::Create { id, durable_root },
+            action:
+                NodeAction::Create {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let node = FileNodeRegistryService::new(durable_root).create(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
         Commands::Node {
-            action: NodeAction::Activate { id, durable_root },
+            action:
+                NodeAction::Activate {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let nodes = FileNodeRegistryService::new(durable_root).activate(&id)?;
             println!("{}", serde_json::to_string_pretty(&nodes).unwrap());
             Ok(())
         }
         Commands::Node {
-            action: NodeAction::Archive { id, durable_root },
+            action:
+                NodeAction::Archive {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let node = FileNodeRegistryService::new(durable_root).archive(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
@@ -279,7 +297,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 NodeAction::Rename {
                     id,
                     name,
-                    durable_root,
+                    durable_root: Some(durable_root),
                 },
         } => {
             let node = FileNodeRegistryService::new(durable_root).rename(&id, &name)?;
@@ -287,7 +305,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Node {
-            action: NodeAction::Settings { id, durable_root },
+            action:
+                NodeAction::Settings {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let settings = FileNodeRegistryService::new(durable_root).settings(&id)?;
             println!("{}", serde_json::to_string_pretty(&settings).unwrap());
@@ -314,56 +336,86 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::List { durable_root },
+            action:
+                ClusterAction::List {
+                    durable_root: Some(durable_root),
+                },
         } => {
             let cluster = FileClusterRegistryService::new(durable_root).list_response()?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::Show { id, durable_root },
+            action:
+                ClusterAction::Show {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let node = FileClusterRegistryService::new(durable_root).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::AddNode { id, durable_root },
+            action:
+                ClusterAction::AddNode {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let cluster = FileClusterRegistryService::new(durable_root).add_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::EditNode { id, durable_root },
+            action:
+                ClusterAction::EditNode {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let node = FileClusterRegistryService::new(durable_root).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::EnableNode { id, durable_root },
+            action:
+                ClusterAction::EnableNode {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let cluster = FileClusterRegistryService::new(durable_root).set_enabled(&id, true)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::DisableNode { id, durable_root },
+            action:
+                ClusterAction::DisableNode {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let cluster = FileClusterRegistryService::new(durable_root).set_enabled(&id, false)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::RemoveNode { id, durable_root },
+            action:
+                ClusterAction::RemoveNode {
+                    id,
+                    durable_root: Some(durable_root),
+                },
         } => {
             let cluster = FileClusterRegistryService::new(durable_root).remove_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::Sync { durable_root },
+            action:
+                ClusterAction::Sync {
+                    durable_root: Some(durable_root),
+                },
         } => {
             let sync = FileClusterRegistryService::new(durable_root).sync_response()?;
             println!("{}", serde_json::to_string_pretty(&sync).unwrap());
@@ -374,7 +426,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ClusterAction::Run {
                     id,
                     command,
-                    durable_root,
+                    durable_root: Some(durable_root),
                 },
         } => {
             let result = FileClusterRegistryService::new(durable_root).run_remote(&id, &command)?;
@@ -386,7 +438,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 ClusterAction::Transfer {
                     id,
                     item_id,
-                    durable_root,
+                    durable_root: Some(durable_root),
                 },
         } => {
             let service = FileClusterRegistryService::new(&durable_root);
@@ -403,7 +455,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::Cluster {
-            action: ClusterAction::Maintenance { durable_root },
+            action:
+                ClusterAction::Maintenance {
+                    durable_root: Some(durable_root),
+                },
         } => {
             let maintenance =
                 FileClusterRegistryService::new(durable_root).maintenance_response()?;
@@ -607,7 +662,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action: SystemAction::Start { port, runtime_root },
         } => {
-            let status = start_background_daemon(port, &runtime_root, None, None, None)?;
+            let status = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root })
+                .start_background_daemon(BackgroundDaemonConfig {
+                    port,
+                    ..Default::default()
+                })?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -630,7 +689,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             });
             let _ = lifecycle.stop(port)?;
             let _ = http_probe(port);
-            let status = start_background_daemon(port, &runtime_root, None, None, None)?;
+            let status = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root })
+                .start_background_daemon(BackgroundDaemonConfig {
+                    port,
+                    ..Default::default()
+                })?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -702,6 +765,26 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let registry = FileProjectRegistryService::new(runtime_root, durable_root)
                 .register_path(Some(&name), &path, false)?;
             println!("{}", serde_json::to_string_pretty(&registry).unwrap());
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::Clone {
+                    source,
+                    destination,
+                    name,
+                    make_current,
+                    runtime_root,
+                    durable_root,
+                },
+        } => {
+            let status = FileProjectRegistryService::new(runtime_root, durable_root).clone_app(
+                &source,
+                &destination,
+                name.as_deref(),
+                make_current,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
         Commands::Project {
@@ -1314,13 +1397,15 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             if !foreground && !once {
-                let status = start_background_daemon(
+                let status = FileDaemonLifecycleService::new(RuntimeRoot {
+                    root: runtime_root.clone(),
+                })
+                .start_background_daemon(BackgroundDaemonConfig {
                     port,
-                    &runtime_root,
-                    cache_dir.as_deref(),
-                    static_root.as_deref(),
-                    token.as_deref(),
-                )?;
+                    cache_dir,
+                    static_root,
+                    token,
+                })?;
                 println!(
                     "{}",
                     serde_json::to_string_pretty(&web_response(status)).unwrap()
@@ -1369,6 +1454,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             }
             Ok(())
         }
+        Commands::Gap { action } => dispatch_gap_daemon(action),
+        Commands::Feature { action } => dispatch_feature_daemon(action),
+        Commands::Workflow { action } => dispatch_workflow_daemon(action),
+        Commands::Node { action } => dispatch_node_daemon(action),
+        Commands::Cluster { action } => dispatch_cluster_daemon(action),
         other => Err(crate::core::supervisor::errors::RefineError::InvalidInput(
             format!(
                 "CLI command is missing required options or cannot run in this mode: {other:?}"
@@ -1377,96 +1467,638 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     }
 }
 
-fn start_background_daemon(
-    port: u16,
-    runtime_root: &Path,
-    cache_dir: Option<&Path>,
-    static_root: Option<&Path>,
-    token: Option<&str>,
-) -> RefineResult<DaemonStatus> {
-    if port == 0 {
-        return Err(RefineError::InvalidInput(
-            "background daemon start requires a concrete port".to_string(),
-        ));
-    }
-    let exe = std::env::current_exe().map_err(|error| {
-        RefineError::Io(format!("failed to locate current executable: {error}"))
-    })?;
-    std::fs::create_dir_all(runtime_root).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to create daemon runtime root {}: {error}",
-            runtime_root.display()
-        ))
-    })?;
-    let log_path = runtime_root.join(format!("daemon-{port}.log"));
-    let log = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .map_err(|error| {
-            RefineError::Io(format!(
-                "failed to open daemon log {}: {error}",
-                log_path.display()
-            ))
-        })?;
-    let mut command = detached_command(&exe);
-    command
-        .arg("system")
-        .arg("web")
-        .arg("--foreground")
-        .arg("--port")
-        .arg(port.to_string())
-        .arg("--runtime-root")
-        .arg(runtime_root)
-        .stdin(std::process::Stdio::null())
-        .stdout(log.try_clone().map_err(|error| {
-            RefineError::Io(format!("failed to clone daemon log handle: {error}"))
-        })?)
-        .stderr(log);
-    if let Some(cache_dir) = cache_dir {
-        command.arg("--cache-dir").arg(cache_dir);
-    }
-    if let Some(static_root) = static_root {
-        command.arg("--static-root").arg(static_root);
-    }
-    if let Some(token) = token {
-        command.arg("--token").arg(token);
-    }
-    let mut child = command
-        .spawn()
-        .map_err(|error| RefineError::Io(format!("failed to start daemon process: {error}")))?;
-    for _ in 0..50 {
-        if let Some(status) = child.try_wait().map_err(|error| {
-            RefineError::Io(format!("failed to inspect daemon process: {error}"))
-        })? {
-            return Err(RefineError::Conflict(format!(
-                "daemon process exited before becoming reachable: {status}"
+fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
+    let response = match action {
+        GapAction::Create {
+            name,
+            durable_root: None,
+            id,
+        } => daemon_json(
+            "POST",
+            "/work/gaps",
+            Some(json!({
+                "name": name,
+                "id": id
+            })),
+        )?,
+        GapAction::List { durable_root: None } => {
+            daemon_json("GET", "/work/gaps?limit=1000", None)?
+        }
+        GapAction::Show {
+            id,
+            durable_root: None,
+        } => daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?,
+        GapAction::Edit {
+            id,
+            durable_root: None,
+            name,
+            priority,
+        } => daemon_json(
+            "PATCH",
+            &format!("/work/gaps/{}", path_segment(&id)),
+            Some(json!({
+                "name": name,
+                "priority": priority
+            })),
+        )?,
+        GapAction::Note {
+            id,
+            body,
+            durable_root: None,
+            author,
+        } => daemon_json(
+            "POST",
+            &format!("/work/gaps/{}/notes", path_segment(&id)),
+            Some(json!({
+                "body": body,
+                "author": author
+            })),
+        )?,
+        GapAction::Round {
+            id,
+            durable_root: None,
+            reporter,
+            actual,
+            target,
+            edit_latest,
+        } => {
+            let method = if edit_latest { "PATCH" } else { "POST" };
+            let suffix = if edit_latest {
+                "/rounds/latest"
+            } else {
+                "/rounds"
+            };
+            daemon_json(
+                method,
+                &format!("/work/gaps/{}{}", path_segment(&id), suffix),
+                Some(json!({
+                    "reporter": reporter,
+                    "actual": actual,
+                    "target": target
+                })),
+            )?
+        }
+        GapAction::Start {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/gaps/{}/start", path_segment(&id)),
+            None,
+        )?,
+        GapAction::Cancel {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/gaps/{}/cancel", path_segment(&id)),
+            None,
+        )?,
+        GapAction::Retry {
+            id,
+            durable_root: None,
+            stage,
+        } => {
+            let action = if stage.trim().eq_ignore_ascii_case("merge") {
+                "retry-merge"
+            } else {
+                "retry-quality"
+            };
+            daemon_json(
+                "POST",
+                &format!("/work/gaps/{}/{}", path_segment(&id), action),
+                None,
+            )?
+        }
+        GapAction::Verify {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/gaps/{}/verify", path_segment(&id)),
+            None,
+        )?,
+        GapAction::Merge {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/gaps/{}/merge", path_segment(&id)),
+            None,
+        )?,
+        GapAction::Undo {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/gaps/{}/undo", path_segment(&id)),
+            None,
+        )?,
+        GapAction::Delete {
+            id,
+            durable_root: None,
+        } => daemon_json("DELETE", &format!("/work/gaps/{}", path_segment(&id)), None)?,
+        GapAction::AssignFeature {
+            id,
+            feature_id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!(
+                "/work/features/{}/gaps/{}",
+                path_segment(&feature_id),
+                path_segment(&id)
+            ),
+            None,
+        )?,
+        GapAction::RemoveFeature {
+            id,
+            durable_root: None,
+        } => {
+            let current = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
+            let feature_id = current
+                .get("gap")
+                .and_then(|gap| gap.get("feature_id"))
+                .and_then(|value| value.as_str())
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!("Gap {id} is not assigned to a Feature"))
+                })?;
+            daemon_json(
+                "DELETE",
+                &format!(
+                    "/work/features/{}/gaps/{}",
+                    path_segment(feature_id),
+                    path_segment(&id)
+                ),
+                None,
+            )?
+        }
+        other => {
+            return Err(RefineError::InvalidInput(format!(
+                "Gap command cannot be routed to the daemon in this mode: {other:?}"
             )));
         }
-        if http_probe(port).is_ok() {
-            return FileDaemonLifecycleService::new(RuntimeRoot {
-                root: runtime_root.to_path_buf(),
-            })
-            .status(port);
-        }
-        thread::sleep(Duration::from_millis(100));
-    }
-    Err(RefineError::Degraded(format!(
-        "daemon did not become reachable on 127.0.0.1:{port}"
-    )))
+    };
+    print_json(&response);
+    Ok(())
 }
 
-fn detached_command(exe: &Path) -> Command {
-    #[cfg(unix)]
-    {
-        let mut command = Command::new("setsid");
-        command.arg(exe);
-        command
+fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
+    let response = match action {
+        FeatureAction::Create {
+            name,
+            durable_root: None,
+            id,
+            description,
+            reporter,
+        } => daemon_json(
+            "POST",
+            "/work/features",
+            Some(json!({
+                "name": name,
+                "id": id,
+                "description": description,
+                "reporter": reporter
+            })),
+        )?,
+        FeatureAction::List { durable_root: None } => {
+            daemon_json("GET", "/work/features?limit=1000", None)?
+        }
+        FeatureAction::Show {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "GET",
+            &format!("/work/features/{}", path_segment(&id)),
+            None,
+        )?,
+        FeatureAction::Edit {
+            id,
+            durable_root: None,
+            name,
+            description,
+            reporter,
+        } => daemon_json(
+            "PATCH",
+            &format!("/work/features/{}", path_segment(&id)),
+            Some(json!({
+                "name": name,
+                "description": description,
+                "reporter": reporter
+            })),
+        )?,
+        FeatureAction::AddGap {
+            id,
+            gap_id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!(
+                "/work/features/{}/gaps/{}",
+                path_segment(&id),
+                path_segment(&gap_id)
+            ),
+            None,
+        )?,
+        FeatureAction::RemoveGap {
+            id,
+            gap_id,
+            durable_root: None,
+        } => daemon_json(
+            "DELETE",
+            &format!(
+                "/work/features/{}/gaps/{}",
+                path_segment(&id),
+                path_segment(&gap_id)
+            ),
+            None,
+        )?,
+        FeatureAction::ReorderGap {
+            id,
+            gap_id,
+            order,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!(
+                "/work/features/{}/gaps/{}/reorder",
+                path_segment(&id),
+                path_segment(&gap_id)
+            ),
+            Some(json!({ "order": order })),
+        )?,
+        FeatureAction::Move {
+            id,
+            target,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/features/{}/move", path_segment(&id)),
+            Some(json!({ "status": target })),
+        )?,
+        FeatureAction::Cancel {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/features/{}/cancel", path_segment(&id)),
+            None,
+        )?,
+        FeatureAction::Delete {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "DELETE",
+            &format!("/work/features/{}", path_segment(&id)),
+            None,
+        )?,
+        other => {
+            return Err(RefineError::InvalidInput(format!(
+                "Feature command cannot be routed to the daemon in this mode: {other:?}"
+            )));
+        }
+    };
+    print_json(&response);
+    Ok(())
+}
+
+fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
+    let response = match action {
+        WorkflowAction::Transition {
+            id,
+            target,
+            durable_root: None,
+        } => {
+            let status: GapStatus = target.into();
+            daemon_json(
+                "POST",
+                &format!("/work/gaps/{}/transition", path_segment(&id)),
+                Some(json!({ "status": status.as_str() })),
+            )?
+        }
+        WorkflowAction::BulkTransition {
+            target,
+            durable_root: None,
+            selected_ids,
+            status,
+            q,
+        } => {
+            let target: GapStatus = target.into();
+            daemon_json(
+                "POST",
+                "/work/gaps/bulk",
+                Some(json!({
+                    "filter": {
+                        "status": status,
+                        "q": q
+                    },
+                    "selected_ids": if selected_ids.is_empty() { None } else { Some(selected_ids) },
+                    "exclude_ids": [],
+                    "update": {
+                        "field": "status",
+                        "value": target.as_str()
+                    }
+                })),
+            )?
+        }
+        other => {
+            return Err(RefineError::InvalidInput(format!(
+                "Workflow command cannot be routed to the daemon in this mode: {other:?}"
+            )));
+        }
+    };
+    print_json(&response);
+    Ok(())
+}
+
+fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
+    let response = match action {
+        NodeAction::List { durable_root: None } => daemon_json("GET", "/nodes", None)?,
+        NodeAction::Show {
+            id,
+            durable_root: None,
+        } => {
+            let nodes = daemon_json("GET", "/nodes", None)?;
+            let active_node_id = nodes
+                .get("active_node_id")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            let node = nodes
+                .get("nodes")
+                .and_then(|value| value.as_array())
+                .and_then(|nodes| {
+                    nodes.iter().find(|node| {
+                        node.get("id").and_then(|value| value.as_str()) == Some(id.as_str())
+                    })
+                })
+                .cloned()
+                .ok_or_else(|| RefineError::NotFound(format!("node {id} was not found")))?;
+            json!({
+                "node": node,
+                "active": id == active_node_id
+            })
+        }
+        NodeAction::Create {
+            id,
+            durable_root: None,
+        } => daemon_json("POST", "/nodes", Some(json!({ "id": id })))?,
+        NodeAction::Activate {
+            id,
+            durable_root: None,
+        } => daemon_json("POST", "/nodes/activate", Some(json!({ "node_id": id })))?,
+        NodeAction::Archive {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "PATCH",
+            &format!("/nodes/{}", path_segment(&id)),
+            Some(json!({ "archived": true })),
+        )?,
+        NodeAction::Rename {
+            id,
+            name,
+            durable_root: None,
+        } => daemon_json(
+            "PATCH",
+            &format!("/nodes/{}", path_segment(&id)),
+            Some(json!({ "display_name": name })),
+        )?,
+        NodeAction::Transfer {
+            id,
+            item_id,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            "/nodes/transfer-gaps",
+            Some(json!({
+                "target_node_id": id,
+                "selected_ids": [item_id],
+                "exclude_ids": []
+            })),
+        )?,
+        other => {
+            return Err(RefineError::NotImplemented(format!(
+                "Node command is not available through the daemon API yet: {other:?}"
+            )));
+        }
+    };
+    print_json(&response);
+    Ok(())
+}
+
+fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
+    let response = match action {
+        ClusterAction::List { durable_root: None } | ClusterAction::Sync { durable_root: None } => {
+            daemon_json("GET", "/cluster", None)?
+        }
+        ClusterAction::Show {
+            id,
+            durable_root: None,
+        } => {
+            let cluster = daemon_json("GET", "/cluster", None)?;
+            let node = cluster
+                .get("nodes")
+                .and_then(|value| value.as_array())
+                .and_then(|nodes| {
+                    nodes.iter().find(|node| {
+                        node.get("id").and_then(|value| value.as_str()) == Some(id.as_str())
+                    })
+                })
+                .cloned()
+                .ok_or_else(|| RefineError::NotFound(format!("cluster node {id} was not found")))?;
+            json!({ "node": node })
+        }
+        ClusterAction::AddNode {
+            id,
+            durable_root: None,
+        } => daemon_json("POST", "/cluster/nodes", Some(json!({ "id": id })))?,
+        ClusterAction::EditNode {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "PATCH",
+            &format!("/cluster/nodes/{}", path_segment(&id)),
+            Some(json!({})),
+        )?,
+        ClusterAction::EnableNode {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "PATCH",
+            &format!("/cluster/nodes/{}", path_segment(&id)),
+            Some(json!({ "enabled": true })),
+        )?,
+        ClusterAction::DisableNode {
+            id,
+            durable_root: None,
+        } => daemon_json(
+            "PATCH",
+            &format!("/cluster/nodes/{}", path_segment(&id)),
+            Some(json!({ "enabled": false })),
+        )?,
+        ClusterAction::Maintenance { durable_root: None } => {
+            let cluster = daemon_json("GET", "/cluster", None)?;
+            json!({
+                "maintenance": cluster.get("maintenance").cloned().unwrap_or(serde_json::Value::Null)
+            })
+        }
+        other => {
+            return Err(RefineError::NotImplemented(format!(
+                "Cluster command is not available through the daemon API yet: {other:?}"
+            )));
+        }
+    };
+    print_json(&response);
+    Ok(())
+}
+
+fn daemon_json(
+    method: &str,
+    path: &str,
+    body: Option<serde_json::Value>,
+) -> RefineResult<serde_json::Value> {
+    let body_bytes = body
+        .map(|value| serde_json::to_vec(&value))
+        .transpose()
+        .map_err(|error| {
+            RefineError::Serialization(format!("failed to encode daemon request: {error}"))
+        })?
+        .unwrap_or_default();
+    let port = daemon_port();
+    let auth_token = if method == "GET" {
+        None
+    } else {
+        Some(daemon_session_token(port)?)
+    };
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
+        RefineError::Degraded(format!(
+            "Refine daemon is not reachable at http://127.0.0.1:{port}: {error}"
+        ))
+    })?;
+    let auth_header = auth_token
+        .as_ref()
+        .map(|token| format!("Authorization: Bearer {token}\r\n"))
+        .unwrap_or_default();
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n{auth_header}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: cli-{}\r\n\r\n",
+        body_bytes.len(),
+        new_cli_idempotency_key()
+    );
+    stream
+        .write_all(request.as_bytes())
+        .and_then(|_| stream.write_all(&body_bytes))
+        .map_err(|error| RefineError::Io(format!("failed to write daemon request: {error}")))?;
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .map_err(|error| RefineError::Io(format!("failed to read daemon response: {error}")))?;
+    parse_daemon_response(&response)
+}
+
+fn daemon_session_token(port: u16) -> RefineResult<String> {
+    let body_bytes = serde_json::to_vec(&json!({ "surface": "cli" })).map_err(|error| {
+        RefineError::Serialization(format!("failed to encode daemon session request: {error}"))
+    })?;
+    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
+        RefineError::Degraded(format!(
+            "Refine daemon is not reachable at http://127.0.0.1:{port}: {error}"
+        ))
+    })?;
+    let request = format!(
+        "POST /sessions HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\n\r\n",
+        body_bytes.len()
+    );
+    stream
+        .write_all(request.as_bytes())
+        .and_then(|_| stream.write_all(&body_bytes))
+        .map_err(|error| {
+            RefineError::Io(format!("failed to write daemon session request: {error}"))
+        })?;
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).map_err(|error| {
+        RefineError::Io(format!("failed to read daemon session response: {error}"))
+    })?;
+    let value = parse_daemon_response(&response)?;
+    value
+        .get("session")
+        .and_then(|session| session.get("token"))
+        .and_then(|token| token.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| {
+            RefineError::Serialization("daemon session response missing token".to_string())
+        })
+}
+
+fn daemon_port() -> u16 {
+    std::env::var("REFINE_DAEMON_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|port| *port > 0)
+        .unwrap_or(8080)
+}
+
+fn parse_daemon_response(response: &[u8]) -> RefineResult<serde_json::Value> {
+    let split = response
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .ok_or_else(|| RefineError::Serialization("daemon response missing headers".to_string()))?;
+    let (head, body) = response.split_at(split);
+    let body = &body[4..];
+    let head = String::from_utf8_lossy(head);
+    let status = head
+        .lines()
+        .next()
+        .and_then(|line| line.split_whitespace().nth(1))
+        .and_then(|code| code.parse::<u16>().ok())
+        .ok_or_else(|| RefineError::Serialization("daemon response missing status".to_string()))?;
+    let value = if body.is_empty() {
+        json!({})
+    } else {
+        serde_json::from_slice::<serde_json::Value>(body).map_err(|error| {
+            RefineError::Serialization(format!("failed to parse daemon response body: {error}"))
+        })?
+    };
+    if status < 400 {
+        return Ok(value);
     }
-    #[cfg(not(unix))]
-    {
-        Command::new(exe)
+    let message = value
+        .get("error")
+        .and_then(|error| error.get("message"))
+        .and_then(|message| message.as_str())
+        .unwrap_or("daemon request failed")
+        .to_string();
+    match status {
+        400 => Err(RefineError::InvalidInput(message)),
+        401 | 403 => Err(RefineError::Unauthorized(message)),
+        404 => Err(RefineError::NotFound(message)),
+        409 => Err(RefineError::Conflict(message)),
+        _ => Err(RefineError::Degraded(message)),
     }
+}
+
+fn print_json(value: &serde_json::Value) {
+    println!("{}", serde_json::to_string_pretty(value).unwrap());
+}
+
+fn path_segment(value: &str) -> String {
+    let mut escaped = String::new();
+    for byte in value.as_bytes() {
+        match *byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                escaped.push(*byte as char)
+            }
+            other => escaped.push_str(&format!("%{other:02X}")),
+        }
+    }
+    escaped
+}
+
+fn new_cli_idempotency_key() -> String {
+    format!(
+        "{}:{}",
+        std::process::id(),
+        chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default()
+    )
 }
 
 fn web_response(status: DaemonStatus) -> serde_json::Value {
@@ -1474,28 +2106,4 @@ fn web_response(status: DaemonStatus) -> serde_json::Value {
         "url": format!("http://127.0.0.1:{}/", status.port),
         "status": status
     })
-}
-
-fn http_probe(port: u16) -> RefineResult<()> {
-    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
-        RefineError::Io(format!(
-            "daemon is not reachable on 127.0.0.1:{port}: {error}"
-        ))
-    })?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(1)))
-        .map_err(|error| RefineError::Io(format!("failed to set daemon probe timeout: {error}")))?;
-    stream
-        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
-        .map_err(|error| RefineError::Io(format!("failed to write daemon probe: {error}")))?;
-    let mut buffer = [0_u8; 64];
-    let read = stream
-        .read(&mut buffer)
-        .map_err(|error| RefineError::Io(format!("failed to read daemon probe: {error}")))?;
-    if read == 0 || !buffer[..read].starts_with(b"HTTP/1.1 200") {
-        return Err(RefineError::Degraded(
-            "daemon probe did not return HTTP 200".to_string(),
-        ));
-    }
-    Ok(())
 }

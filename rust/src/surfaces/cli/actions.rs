@@ -89,6 +89,18 @@ pub enum ProjectAction {
         #[arg(long)]
         durable_root: Option<PathBuf>,
     },
+    Clone {
+        source: String,
+        destination: String,
+        #[arg(long)]
+        name: Option<String>,
+        #[arg(long)]
+        make_current: bool,
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+        #[arg(long)]
+        durable_root: Option<PathBuf>,
+    },
     Remove {
         name: String,
         #[arg(long, default_value = "run")]
@@ -382,38 +394,38 @@ impl From<CliGapStatus> for GapStatus {
 pub enum NodeAction {
     List {
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Show {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Create {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Activate {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Archive {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Rename {
         id: String,
         name: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Settings {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Transfer {
         id: String,
@@ -427,57 +439,57 @@ pub enum NodeAction {
 pub enum ClusterAction {
     List {
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Show {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     AddNode {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     EditNode {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     EnableNode {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     DisableNode {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     RemoveNode {
         id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Sync {
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Run {
         id: String,
         command: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Transfer {
         id: String,
         item_id: String,
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
     Maintenance {
         #[arg(long)]
-        durable_root: PathBuf,
+        durable_root: Option<PathBuf>,
     },
 }
 

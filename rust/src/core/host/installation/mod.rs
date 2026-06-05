@@ -203,7 +203,7 @@ impl InstallationService for FileInstallationService {
                 target,
                 version: Some(self.current_version.clone()),
                 stale: false,
-                partial: false,
+                partial: !backend.registered,
                 conflicting: false,
                 backend: Some(backend),
             },
@@ -218,10 +218,11 @@ impl InstallationService for FileInstallationService {
     fn repair(&self) -> RefineResult<InstallStatus> {
         let mut state = self.load()?;
         state.status.installed = true;
-        state.status.partial = false;
+        let backend = self.register_backend(state.status.target.clone())?;
+        state.status.partial = !backend.registered;
         state.status.conflicting = false;
         state.status.stale = false;
-        state.status.backend = Some(self.register_backend(state.status.target.clone())?);
+        state.status.backend = Some(backend);
         if state.status.version.is_none() {
             state.status.version = Some(self.current_version.clone());
         }
@@ -243,7 +244,7 @@ impl InstallationService for FileInstallationService {
         state.status.installed = true;
         state.status.version = Some(version.to_string());
         state.status.stale = false;
-        state.status.partial = false;
+        state.status.partial = !backend.registered;
         state.status.conflicting = false;
         state.status.backend = Some(backend);
         state.updated_at = now_timestamp();
@@ -265,9 +266,10 @@ impl InstallationService for FileInstallationService {
         state.status.installed = true;
         state.status.version = Some(previous);
         state.status.stale = false;
-        state.status.partial = false;
+        let backend = self.register_backend(state.status.target.clone())?;
+        state.status.partial = !backend.registered;
         state.status.conflicting = false;
-        state.status.backend = Some(self.register_backend(state.status.target.clone())?);
+        state.status.backend = Some(backend);
         state.previous_version = current;
         state.updated_at = now_timestamp();
         self.save(&state)?;
@@ -294,11 +296,15 @@ impl InstallationService for FileInstallationService {
             state.status.stale = true;
         }
         let backend = self.load_backend()?;
-        state.status.partial = state.status.installed && backend.is_none();
+        state.status.partial = state.status.installed
+            && backend
+                .as_ref()
+                .map(|backend| !backend.registered)
+                .unwrap_or(true);
         state.status.conflicting = state.status.installed
             && backend
                 .as_ref()
-                .map(|backend| backend.target != state.status.target || !backend.registered)
+                .map(|backend| backend.target != state.status.target)
                 .unwrap_or(false);
         state.status.backend = backend;
         Ok(state.status)
@@ -333,6 +339,7 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
                 "signed app bundle and notarization are represented by release packaging metadata"
                     .to_string(),
                 "daemon auto-start uses launchd/Login Item registration".to_string(),
+                "native OS registration is not performed by this Rust backend yet".to_string(),
             ],
         ),
         InstallTarget::WindowsInstaller => (
@@ -344,6 +351,7 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
                 "signed installer metadata is represented by release packaging metadata"
                     .to_string(),
                 "daemon auto-start uses a user-session service strategy".to_string(),
+                "native OS registration is not performed by this Rust backend yet".to_string(),
             ],
         ),
         InstallTarget::LinuxCliWeb => (
@@ -355,6 +363,7 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
                 "Linux install supports CLI/web with systemd user service when available"
                     .to_string(),
                 "falls back to explicit process mode when systemd is unavailable".to_string(),
+                "native OS registration is not performed by this Rust backend yet".to_string(),
             ],
         ),
     };
@@ -371,7 +380,7 @@ fn backend_for_target(target: InstallTarget, timestamp: &str) -> InstallBackendR
         logs_dir: Some(layout.logs_dir.display().to_string()),
         credential_store: credential_store.to_string(),
         desktop_bundle,
-        registered: true,
+        registered: false,
         created_at: timestamp.to_string(),
         updated_at: timestamp.to_string(),
         notes,
@@ -398,11 +407,13 @@ mod tests {
 
         let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
         assert!(installed.installed);
+        assert!(installed.partial);
         assert_eq!(installed.version.as_deref(), Some("1.0.0"));
         assert_eq!(
             installed.backend.as_ref().unwrap().service_manager,
             "systemd_user"
         );
+        assert!(!installed.backend.as_ref().unwrap().registered);
         assert!(service.path().exists());
         assert!(service.backend_path().exists());
 

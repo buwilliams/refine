@@ -11,7 +11,7 @@ use crate::core::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, FileProjectStateStore,
     GapProjectionQuery, PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectStateStore, ProjectionQuery,
 };
-use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
+use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::RefineError;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
@@ -56,7 +56,10 @@ impl InProcessWebServer {
             );
         };
 
-        match FileWorkItemService::new(durable_root).transition_gap_status(gap_id, status) {
+        match self
+            .work_item_service(durable_root)
+            .transition_gap_status(gap_id, status)
+        {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
             Err(error) => error_response(error),
         }
@@ -67,8 +70,9 @@ impl InProcessWebServer {
         let Some((gap_id, action)) = gap_id_and_action(&request.path) else {
             return gap_id_required();
         };
-        let service = FileWorkItemService::new(durable_root);
+        let service = self.work_item_service(durable_root);
         let result = match action {
+            "start" => service.start_gap_workflow(gap_id),
             "verify" => service.verify_gap_summary(gap_id),
             "retry-quality" => service.retry_gap_quality_summary(gap_id),
             "retry-merge" => service.retry_gap_merge_summary(gap_id),
@@ -123,7 +127,10 @@ impl InProcessWebServer {
             .and_then(|body| body.get("id"))
             .and_then(|id| id.as_str());
 
-        match FileWorkItemService::new(durable_root).create_gap_summary(name, id) {
+        match self
+            .work_item_service(durable_root)
+            .create_gap_summary(name, id)
+        {
             Ok(gap) => ApiResponse::json(201, json!({"gap": gap.gap})),
             Err(error) => error_response(error),
         }
@@ -141,7 +148,10 @@ impl InProcessWebServer {
         let Some(update) = parse_bulk_gap_update(body) else {
             return invalid_bulk_body();
         };
-        match FileWorkItemService::new(durable_root).bulk_update_gaps(selection, update) {
+        match self
+            .work_item_service(durable_root)
+            .bulk_update_gaps(selection, update)
+        {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
@@ -156,7 +166,10 @@ impl InProcessWebServer {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
-        match FileWorkItemService::new(durable_root).bulk_delete_gaps(selection) {
+        match self
+            .work_item_service(durable_root)
+            .bulk_delete_gaps(selection)
+        {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
@@ -195,7 +208,7 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("reporter"))
             .and_then(|reporter| reporter.as_str());
-        match FileWorkItemService::new(durable_root).create_feature_summary(
+        match self.work_item_service(durable_root).create_feature_summary(
             name,
             id,
             description,
@@ -219,12 +232,14 @@ impl InProcessWebServer {
             return feature_id_required();
         };
         let body = request.body.unwrap_or_else(|| json!({}));
-        match FileWorkItemService::new(durable_root).update_feature_metadata_summary(
-            feature_id,
-            body.get("name").and_then(|value| value.as_str()),
-            body.get("description").and_then(|value| value.as_str()),
-            body.get("reporter").and_then(|value| value.as_str()),
-        ) {
+        match self
+            .work_item_service(durable_root)
+            .update_feature_metadata_summary(
+                feature_id,
+                body.get("name").and_then(|value| value.as_str()),
+                body.get("description").and_then(|value| value.as_str()),
+                body.get("reporter").and_then(|value| value.as_str()),
+            ) {
             Ok(feature) => ApiResponse::json(
                 200,
                 json!({
@@ -254,7 +269,8 @@ impl InProcessWebServer {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
-        match FileWorkItemService::new(durable_root)
+        match self
+            .work_item_service(durable_root)
             .bulk_assign_gaps_to_feature(feature_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -281,7 +297,8 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("priority"))
             .and_then(|priority| priority.as_str());
-        match FileWorkItemService::new(durable_root)
+        match self
+            .work_item_service(durable_root)
             .update_gap_metadata_summary(gap_id, name, priority)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -321,7 +338,10 @@ impl InProcessWebServer {
             .and_then(|body| body.get("author"))
             .and_then(|author| author.as_str())
             .unwrap_or("");
-        match FileWorkItemService::new(durable_root).add_gap_note_summary(gap_id, author, body) {
+        match self
+            .work_item_service(durable_root)
+            .add_gap_note_summary(gap_id, author, body)
+        {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
             Err(error) => error_response(error),
         }
@@ -361,7 +381,8 @@ impl InProcessWebServer {
         else {
             return invalid_round_body();
         };
-        match FileWorkItemService::new(durable_root)
+        match self
+            .work_item_service(durable_root)
             .append_gap_round_summary(gap_id, reporter, actual, target)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -394,7 +415,8 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("target"))
             .and_then(|value| value.as_str());
-        match FileWorkItemService::new(durable_root)
+        match self
+            .work_item_service(durable_root)
             .edit_latest_gap_round_summary(gap_id, reporter, actual, target)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
@@ -419,7 +441,10 @@ impl InProcessWebServer {
                 json!({"error": {"code": "invalid_round", "message": "round index is required"}}),
             );
         };
-        let gap = match FileWorkItemService::new(&durable_root).show_gap_summary(gap_id) {
+        let gap = match self
+            .work_item_service(&durable_root)
+            .show_gap_summary(gap_id)
+        {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
         };
@@ -488,7 +513,10 @@ impl InProcessWebServer {
         else {
             return gap_id_required();
         };
-        let gap = match FileWorkItemService::new(&durable_root).show_gap_summary(gap_id) {
+        let gap = match self
+            .work_item_service(&durable_root)
+            .show_gap_summary(gap_id)
+        {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
         };
@@ -529,7 +557,10 @@ impl InProcessWebServer {
         else {
             return gap_id_required();
         };
-        match FileWorkItemService::new(durable_root).delete_gap_record(gap_id) {
+        match self
+            .work_item_service(durable_root)
+            .delete_gap_record(gap_id)
+        {
             Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": gap_id})),
             Err(error) => error_response(error),
         }
@@ -545,7 +576,10 @@ impl InProcessWebServer {
         else {
             return gap_id_required();
         };
-        match FileWorkItemService::new(durable_root).cancel_gap_summary(gap_id) {
+        match self
+            .work_item_service(durable_root)
+            .cancel_gap_summary(gap_id)
+        {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
             Err(error) => error_response(error),
         }
@@ -605,7 +639,10 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match FileWorkItemService::new(durable_root).assign_gap_to_feature(feature_id, gap_id) {
+        match self
+            .work_item_service(durable_root)
+            .assign_gap_to_feature(feature_id, gap_id)
+        {
             Ok(feature) => ApiResponse::json(
                 200,
                 json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
@@ -626,7 +663,10 @@ impl InProcessWebServer {
         if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
             return feature_id_required();
         }
-        match FileWorkItemService::new(durable_root).assign_gap_to_feature(feature_id, gap_id) {
+        match self
+            .work_item_service(durable_root)
+            .assign_gap_to_feature(feature_id, gap_id)
+        {
             Ok(feature) => ApiResponse::json(
                 200,
                 json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
@@ -647,7 +687,10 @@ impl InProcessWebServer {
         if feature_id.is_empty() || gap_id.is_empty() || gap_id.contains('/') {
             return feature_id_required();
         }
-        match FileWorkItemService::new(durable_root).remove_gap_from_feature(feature_id, gap_id) {
+        match self
+            .work_item_service(durable_root)
+            .remove_gap_from_feature(feature_id, gap_id)
+        {
             Ok(feature) => ApiResponse::json(
                 200,
                 json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
@@ -683,7 +726,8 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match FileWorkItemService::new(durable_root)
+        match self
+            .work_item_service(durable_root)
             .reorder_gap_in_feature(feature_id, gap_id, order)
         {
             Ok(feature) => ApiResponse::json(
@@ -721,7 +765,10 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match FileWorkItemService::new(durable_root).move_feature_workflow(feature_id, target) {
+        match self
+            .work_item_service(durable_root)
+            .move_feature_workflow(feature_id, target)
+        {
             Ok(feature) => ApiResponse::json(
                 200,
                 json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
@@ -752,7 +799,10 @@ impl InProcessWebServer {
             Ok(summary) => summary,
             Err(error) => return error_response(error),
         };
-        match FileWorkItemService::new(durable_root).cancel_feature_summary(feature_id) {
+        match self
+            .work_item_service(durable_root)
+            .cancel_feature_summary(feature_id)
+        {
             Ok(feature) => ApiResponse::json(
                 200,
                 json!({
@@ -778,7 +828,10 @@ impl InProcessWebServer {
         else {
             return feature_id_required();
         };
-        match FileWorkItemService::new(durable_root).delete_feature_record(feature_id) {
+        match self
+            .work_item_service(durable_root)
+            .delete_feature_record(feature_id)
+        {
             Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": feature_id})),
             Err(error) => error_response(error),
         }
@@ -1351,7 +1404,7 @@ impl InProcessWebServer {
             Ok(drafts) => drafts,
             Err(error) => return error_response(error),
         };
-        let service = FileWorkItemService::new(&durable_root);
+        let service = self.work_item_service(&durable_root);
         let mut failures = Vec::new();
         let mut feature_response = serde_json::Value::Null;
         let feature_id = match import_destination_feature_id(&service, &body) {

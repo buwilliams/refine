@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessPauseState};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
-    FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
+    FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
 };
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
@@ -301,6 +301,38 @@ impl FileSchedulingService {
             target_app_id: policy.target_app_id.clone(),
         })
     }
+
+    fn projection_snapshot(&self, durable_root: &Path) -> RefineResult<ProjectionSnapshot> {
+        FileProjectStateStore::new(durable_root)
+            .load_or_refresh_projection(&self.runtime_root.join("cache"))
+    }
+
+    fn feature_dispatch_eligible(
+        snapshot: &ProjectionSnapshot,
+        gap: &GapSummaryProjection,
+    ) -> bool {
+        let Some(feature_id) = gap.gap.feature_id.as_deref() else {
+            return true;
+        };
+        let Some(feature_order) = gap.gap.feature_order else {
+            return false;
+        };
+        let node_id = gap.gap.node_id.as_deref().unwrap_or("default");
+        !snapshot.gaps.values().any(|other| {
+            other.gap.feature_id.as_deref() == Some(feature_id)
+                && other.gap.node_id.as_deref().unwrap_or("default") == node_id
+                && other
+                    .gap
+                    .feature_order
+                    .is_some_and(|order| order < feature_order)
+                && !matches!(other.gap.status, GapStatus::Done | GapStatus::Cancelled)
+        }) && !snapshot.gaps.values().any(|other| {
+            other.gap.id != gap.gap.id
+                && other.gap.feature_id.as_deref() == Some(feature_id)
+                && other.gap.node_id.as_deref().unwrap_or("default") == node_id
+                && matches!(other.gap.status, GapStatus::InProgress | GapStatus::Qa)
+        })
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -343,12 +375,12 @@ impl SchedulingService for FileSchedulingService {
                 .filter(|reservation| reservation.state == ReservationState::Reserved)
                 .count());
         };
-        let store = FileProjectStateStore::new(durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = self.projection_snapshot(durable_root)?;
         let mut eligible = snapshot
             .gaps
             .values()
             .filter(|projection| projection.gap.status == GapStatus::Todo)
+            .filter(|projection| Self::feature_dispatch_eligible(&snapshot, projection))
             .cloned()
             .collect::<Vec<_>>();
         eligible.sort_by(|a, b| {
@@ -412,10 +444,16 @@ impl SchedulingService for FileSchedulingService {
             return Ok(existing.reservation_id.clone());
         }
         let gap = if let Some(durable_root) = &self.durable_root {
-            let snapshot = FileProjectStateStore::new(durable_root).rebuild_projection()?;
-            Some(snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
+            let snapshot = self.projection_snapshot(durable_root)?;
+            let gap = snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
                 RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
-            })?)
+            })?;
+            if !Self::feature_dispatch_eligible(&snapshot, &gap) {
+                return Err(RefineError::Conflict(format!(
+                    "Gap {gap_id} is blocked by Feature order"
+                )));
+            }
+            Some(gap)
         } else {
             None
         };
@@ -466,6 +504,23 @@ impl SchedulingService for FileSchedulingService {
             return Err(RefineError::Conflict(format!(
                 "reservation {reservation_id} is not reserved"
             )));
+        }
+        if let Some(durable_root) = &self.durable_root {
+            let policy = self.policy()?;
+            let snapshot = self.projection_snapshot(durable_root)?;
+            let gap = snapshot.gaps.get(&reservation.gap_id).ok_or_else(|| {
+                RefineError::NotFound(format!(
+                    "Gap {} was not found in durable state",
+                    reservation.gap_id
+                ))
+            })?;
+            self.reservation_metadata(Some(gap), &policy)?;
+            if !Self::feature_dispatch_eligible(&snapshot, gap) {
+                return Err(RefineError::Conflict(format!(
+                    "Gap {} is blocked by Feature order",
+                    reservation.gap_id
+                )));
+            }
         }
         let job = self
             .job_registry
@@ -760,6 +815,63 @@ mod tests {
         assert!(state.reservations.iter().any(|reservation| {
             reservation.reservation_id == remote_reservation && reservation.node_id == "remote-node"
         }));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_respects_feature_order_on_promote_reserve_and_dispatch() {
+        let temp_root = unique_temp_dir("scheduler-feature-order");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        let dispatch_runtime_root = temp_root.join("run/8081");
+        FileSettingsService::new(&durable_root)
+            .update(&json!({
+                "parallel_run_cap": 2,
+                "parallel_per_node_cap": 2
+            }))
+            .unwrap();
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_feature_summary("Feature", Some("FEAT1"), None, None)
+            .unwrap();
+        for id in ["FIRST", "SECOND"] {
+            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items
+                .transition_gap_status(id, GapStatus::Todo)
+                .unwrap();
+            work_items.assign_gap_to_feature("FEAT1", id).unwrap();
+        }
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert!(scheduler.reserve("SECOND").is_err());
+        assert_eq!(scheduler.promote().unwrap(), 1);
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.reservations.len(), 1);
+        assert_eq!(state.reservations[0].gap_id, "FIRST");
+
+        work_items
+            .bulk_update_gaps(
+                BulkGapSelection {
+                    selected_ids: Some(vec!["FIRST".to_string()]),
+                    ..Default::default()
+                },
+                crate::core::product::work_items::BulkGapUpdate::Status("done".to_string()),
+            )
+            .unwrap();
+        let dispatch_scheduler =
+            FileSchedulingService::with_durable_root(&dispatch_runtime_root, &durable_root);
+        let second_reservation = dispatch_scheduler.reserve("SECOND").unwrap();
+        work_items
+            .bulk_update_gaps(
+                BulkGapSelection {
+                    selected_ids: Some(vec!["FIRST".to_string()]),
+                    ..Default::default()
+                },
+                crate::core::product::work_items::BulkGapUpdate::Status("todo".to_string()),
+            )
+            .unwrap();
+        assert!(dispatch_scheduler.dispatch(&second_reservation).is_err());
 
         fs::remove_dir_all(temp_root).unwrap();
     }

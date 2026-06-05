@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::Utc;
 use serde_json::{Map, Value};
 
+use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
 };
@@ -50,12 +51,75 @@ pub fn validate_manual_gap_transition(from: &GapStatus, to: &GapStatus) -> Refin
 #[derive(Clone, Debug)]
 pub struct FileWorkItemService {
     pub durable_root: PathBuf,
+    pub projection_cache_dir: Option<PathBuf>,
 }
 
 impl FileWorkItemService {
     pub fn new(durable_root: impl Into<PathBuf>) -> Self {
         Self {
             durable_root: durable_root.into(),
+            projection_cache_dir: None,
+        }
+    }
+
+    pub fn with_projection_cache(
+        durable_root: impl Into<PathBuf>,
+        cache_dir: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            durable_root: durable_root.into(),
+            projection_cache_dir: Some(cache_dir.into()),
+        }
+    }
+
+    fn projection_snapshot(
+        &self,
+    ) -> RefineResult<crate::core::product::project_state::ProjectionSnapshot> {
+        let store = FileProjectStateStore::new(&self.durable_root);
+        if let Some(cache_dir) = &self.projection_cache_dir {
+            store.load_or_refresh_projection(cache_dir)
+        } else {
+            store.rebuild_projection()
+        }
+    }
+
+    fn active_node_id(&self) -> RefineResult<String> {
+        FileNodeRegistryService::new(&self.durable_root).active_node_id()
+    }
+
+    fn ensure_gap_owned(&self, gap: &GapSummaryProjection) -> RefineResult<()> {
+        let owner = gap
+            .gap
+            .node_id
+            .as_deref()
+            .filter(|node_id| !node_id.is_empty())
+            .unwrap_or("default");
+        let active = self.active_node_id()?;
+        if owner == active {
+            Ok(())
+        } else {
+            Err(RefineError::Conflict(format!(
+                "Gap {} is owned by node {owner}, not active node {active}",
+                gap.gap.id
+            )))
+        }
+    }
+
+    fn ensure_feature_owned(&self, feature: &FeatureSummaryProjection) -> RefineResult<()> {
+        let owner = feature
+            .feature
+            .node_id
+            .as_deref()
+            .filter(|node_id| !node_id.is_empty())
+            .unwrap_or("default");
+        let active = self.active_node_id()?;
+        if owner == active {
+            Ok(())
+        } else {
+            Err(RefineError::Conflict(format!(
+                "Feature {} is owned by node {owner}, not active node {active}",
+                feature.feature.id
+            )))
         }
     }
 
@@ -86,6 +150,7 @@ impl FileWorkItemService {
                 "Gap {gap_id} already exists"
             )));
         }
+        let node_id = self.active_node_id()?;
         let now = now_timestamp();
         let mut object = Map::new();
         object.insert("id".to_string(), Value::String(gap_id.clone()));
@@ -95,7 +160,7 @@ impl FileWorkItemService {
         object.insert("branch_name".to_string(), Value::Null);
         object.insert("feature_id".to_string(), Value::Null);
         object.insert("feature_order".to_string(), Value::Null);
-        object.insert("node_id".to_string(), Value::String("default".to_string()));
+        object.insert("node_id".to_string(), Value::String(node_id));
         object.insert("created".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
         object.insert("notes".to_string(), Value::Array(Vec::new()));
@@ -105,16 +170,14 @@ impl FileWorkItemService {
     }
 
     pub fn show_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
-        let store = FileProjectStateStore::new(&self.durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = self.projection_snapshot()?;
         snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
         })
     }
 
     pub fn list_gap_summaries(&self) -> RefineResult<Vec<GapSummaryProjection>> {
-        let store = FileProjectStateStore::new(&self.durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = self.projection_snapshot()?;
         Ok(snapshot.gaps.into_values().collect())
     }
 
@@ -147,6 +210,7 @@ impl FileWorkItemService {
                 "Feature {feature_id} already exists"
             )));
         }
+        let node_id = self.active_node_id()?;
         let now = now_timestamp();
         let mut object = Map::new();
         object.insert("id".to_string(), Value::String(feature_id.clone()));
@@ -159,7 +223,7 @@ impl FileWorkItemService {
             "reporter".to_string(),
             Value::String(reporter.unwrap_or("").trim().to_string()),
         );
-        object.insert("node_id".to_string(), Value::String("default".to_string()));
+        object.insert("node_id".to_string(), Value::String(node_id));
         object.insert("created".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
         write_json_atomically(&feature_path, &Value::Object(object))?;
@@ -167,8 +231,7 @@ impl FileWorkItemService {
     }
 
     pub fn show_feature_summary(&self, feature_id: &str) -> RefineResult<FeatureSummaryProjection> {
-        let store = FileProjectStateStore::new(&self.durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = self.projection_snapshot()?;
         snapshot.features.get(feature_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!(
                 "Feature {feature_id} was not found in durable state"
@@ -183,7 +246,8 @@ impl FileWorkItemService {
         description: Option<&str>,
         reporter: Option<&str>,
     ) -> RefineResult<FeatureSummaryProjection> {
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let feature_path = feature_json_path(&self.durable_root, feature_id);
         let bytes = fs::read(&feature_path).map_err(|error| {
             RefineError::Io(format!(
@@ -230,8 +294,7 @@ impl FileWorkItemService {
     }
 
     pub fn list_feature_summaries(&self) -> RefineResult<Vec<FeatureSummaryProjection>> {
-        let store = FileProjectStateStore::new(&self.durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = self.projection_snapshot()?;
         Ok(snapshot.features.into_values().collect())
     }
 
@@ -240,8 +303,10 @@ impl FileWorkItemService {
         feature_id: &str,
         gap_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let current_gap = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current_gap)?;
         validate_gap_operation(&current_gap.gap.status, &GapOperation::AssignToFeature)?;
         let next_order = self.next_feature_order(feature_id)?;
         self.set_gap_feature_membership(gap_id, Some(feature_id), Some(next_order))?;
@@ -253,8 +318,10 @@ impl FileWorkItemService {
         feature_id: &str,
         gap_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let current_gap = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current_gap)?;
         if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
             return Err(RefineError::Conflict(format!(
                 "Gap {gap_id} is not assigned to Feature {feature_id}"
@@ -277,8 +344,10 @@ impl FileWorkItemService {
                 "feature order must be at least 1".to_string(),
             ));
         }
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let current_gap = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current_gap)?;
         if current_gap.gap.feature_id.as_deref() != Some(feature_id) {
             return Err(RefineError::Conflict(format!(
                 "Gap {gap_id} is not assigned to Feature {feature_id}"
@@ -321,7 +390,8 @@ impl FileWorkItemService {
                 "Feature workflow target must be backlog or todo".to_string(),
             ));
         }
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let mut gaps: Vec<_> = self
             .list_gap_summaries()?
             .into_iter()
@@ -347,7 +417,8 @@ impl FileWorkItemService {
         &self,
         feature_id: &str,
     ) -> RefineResult<FeatureSummaryProjection> {
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let gaps = self.feature_gap_summaries(feature_id)?;
         validate_feature_operation(
             &gaps
@@ -365,7 +436,8 @@ impl FileWorkItemService {
     }
 
     pub fn delete_feature_record(&self, feature_id: &str) -> RefineResult<()> {
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let gaps = self.feature_gap_summaries(feature_id)?;
         validate_feature_operation(
             &gaps
@@ -425,6 +497,7 @@ impl FileWorkItemService {
         let (gaps, skipped_details) = self.select_bulk_gap_summaries(&selection, skip_automated)?;
         let mut ids = Vec::new();
         for gap in gaps {
+            self.ensure_gap_owned(&gap)?;
             match field.as_str() {
                 "priority" => self.set_gap_priority_unchecked(&gap.gap.id, &raw_value)?,
                 "status" if raw_value == "__last_workflow_state" => {
@@ -460,6 +533,7 @@ impl FileWorkItemService {
         let mut ids = Vec::new();
         let mut feature_ids = BTreeSet::new();
         for gap in gaps {
+            self.ensure_gap_owned(&gap)?;
             if let Some(feature_id) = &gap.gap.feature_id {
                 feature_ids.insert(feature_id.clone());
             }
@@ -482,12 +556,14 @@ impl FileWorkItemService {
         feature_id: &str,
         selection: BulkGapSelection,
     ) -> RefineResult<BulkAssignFeatureResult> {
-        self.show_feature_summary(feature_id)?;
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
         let (gaps, mut skipped_details) = self.select_bulk_gap_summaries(&selection, false)?;
         let mut next_order = self.next_feature_order(feature_id)?;
         let mut old_feature_ids = BTreeSet::new();
         let mut ids = Vec::new();
         for gap in gaps {
+            self.ensure_gap_owned(&gap)?;
             if gap.gap.feature_id.as_deref() == Some(feature_id) {
                 skipped_details.push(BulkSkippedDetail {
                     id: gap.gap.id,
@@ -614,7 +690,7 @@ impl FileWorkItemService {
     }
 
     pub fn workflow_enforcement_summary(&self) -> RefineResult<WorkflowEnforcementSummary> {
-        let snapshot = FileProjectStateStore::new(&self.durable_root).rebuild_projection()?;
+        let snapshot = self.projection_snapshot()?;
         let automated = snapshot
             .gaps
             .values()
@@ -633,11 +709,11 @@ impl FileWorkItemService {
         gap_id: &str,
         target: GapStatus,
     ) -> RefineResult<GapSummaryProjection> {
-        let store = FileProjectStateStore::new(&self.durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = self.projection_snapshot()?;
         let current = snapshot.gaps.get(gap_id).ok_or_else(|| {
             RefineError::NotFound(format!("Gap {gap_id} was not found in durable state"))
         })?;
+        self.ensure_gap_owned(current)?;
         validate_manual_gap_transition(&current.gap.status, &target)?;
 
         let gap_path = self.durable_root.join(&current.gap.json_path);
@@ -664,7 +740,7 @@ impl FileWorkItemService {
 
         write_json_atomically(&gap_path, &value)?;
 
-        let refreshed = store.rebuild_projection()?;
+        let refreshed = self.projection_snapshot()?;
         refreshed.gaps.get(gap_id).cloned().ok_or_else(|| {
             RefineError::NotFound(format!("Gap {gap_id} disappeared after transition"))
         })
@@ -851,6 +927,7 @@ impl FileWorkItemService {
 
     pub fn delete_gap_record(&self, gap_id: &str) -> RefineResult<()> {
         let current = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current)?;
         validate_gap_operation(&current.gap.status, &GapOperation::Delete)?;
         let gap_path = self.durable_root.join(&current.gap.json_path);
         fs::remove_file(&gap_path).map_err(|error| {
@@ -867,6 +944,14 @@ impl FileWorkItemService {
 
     fn read_gap_value(&self, gap_id: &str) -> RefineResult<(PathBuf, Value)> {
         let current = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current)?;
+        self.read_gap_value_unchecked(&current)
+    }
+
+    fn read_gap_value_unchecked(
+        &self,
+        current: &GapSummaryProjection,
+    ) -> RefineResult<(PathBuf, Value)> {
         let gap_path = self.durable_root.join(&current.gap.json_path);
         let bytes = fs::read(&gap_path).map_err(|error| {
             RefineError::Io(format!(
@@ -937,7 +1022,8 @@ impl FileWorkItemService {
     }
 
     fn set_gap_node_unchecked(&self, gap_id: &str, node_id: &str) -> RefineResult<()> {
-        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let current = self.show_gap_summary(gap_id)?;
+        let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
         })?;

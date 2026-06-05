@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use chrono::Utc;
 
@@ -14,6 +15,13 @@ pub trait ProjectRegistryService {
     fn attach(&self, path: &str) -> RefineResult<ProjectStatus>;
     fn switch(&self, name: &str) -> RefineResult<ProjectStatus>;
     fn detach(&self) -> RefineResult<ProjectStatus>;
+    fn clone_app(
+        &self,
+        source: &str,
+        destination: &str,
+        name: Option<&str>,
+        make_current: bool,
+    ) -> RefineResult<ProjectStatus>;
     fn remove(&self, name: &str) -> RefineResult<AppRegistry>;
     fn inspect(&self, path: &str) -> RefineResult<ProjectStatus>;
 }
@@ -182,6 +190,47 @@ impl FileProjectRegistryService {
         self.save(&registry)?;
         Ok(registry)
     }
+
+    fn clone_repository(&self, source: &str, destination: &Path) -> RefineResult<()> {
+        let source = source.trim();
+        if source.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "clone source is required".to_string(),
+            ));
+        }
+        if destination.exists() {
+            return Err(RefineError::Conflict(format!(
+                "clone destination {} already exists",
+                destination.display()
+            )));
+        }
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to create clone destination parent {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        let output = Command::new("git")
+            .arg("clone")
+            .arg(source)
+            .arg(destination)
+            .output()
+            .map_err(|error| RefineError::Io(format!("failed to run git clone: {error}")))?;
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(RefineError::Conflict(format!(
+                "git clone failed{}",
+                if stderr.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {stderr}")
+                }
+            )));
+        }
+        Ok(())
+    }
 }
 
 impl ProjectRegistryService for FileProjectRegistryService {
@@ -259,6 +308,19 @@ impl ProjectRegistryService for FileProjectRegistryService {
             active_node: None,
             message: Some("No refine project is attached.".to_string()),
         })
+    }
+
+    fn clone_app(
+        &self,
+        source: &str,
+        destination: &str,
+        name: Option<&str>,
+        make_current: bool,
+    ) -> RefineResult<ProjectStatus> {
+        let destination = normalize_app_path(destination)?;
+        self.clone_repository(source, &destination)?;
+        self.register_path(name, &destination.display().to_string(), make_current)?;
+        self.inspect(&destination.display().to_string())
     }
 
     fn remove(&self, name: &str) -> RefineResult<AppRegistry> {
@@ -372,6 +434,55 @@ mod tests {
 
         service.detach().unwrap();
         assert!(service.load().unwrap().active_app.is_none());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_project_registry_clones_and_registers_app() {
+        let temp_root = unique_temp_dir("project-registry-clone");
+        let runtime_root = temp_root.join("run/8080");
+        let source = temp_root.join("source");
+        let destination = temp_root.join("cloned-app");
+        fs::create_dir_all(&source).unwrap();
+        let output = Command::new("git")
+            .arg("init")
+            .arg(&source)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let service = FileProjectRegistryService::new(&runtime_root, None);
+        let status = service
+            .clone_app(
+                source.to_str().unwrap(),
+                destination.to_str().unwrap(),
+                Some("cloned"),
+                true,
+            )
+            .unwrap();
+        assert!(destination.join(".git").exists());
+        assert_eq!(
+            status.client_repo.as_deref(),
+            Some(destination.to_str().unwrap())
+        );
+        let registry = service.load().unwrap();
+        assert_eq!(
+            registry.active_app.as_deref(),
+            Some(destination.to_str().unwrap())
+        );
+        assert_eq!(
+            registry
+                .apps
+                .get(destination.to_str().unwrap())
+                .unwrap()
+                .name,
+            "cloned"
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

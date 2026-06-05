@@ -566,7 +566,8 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/work/gaps/")
-            && (request.path.ends_with("/verify")
+            && (request.path.ends_with("/start")
+                || request.path.ends_with("/verify")
                 || request.path.ends_with("/retry-quality")
                 || request.path.ends_with("/retry-merge")
                 || request.path.ends_with("/merge")

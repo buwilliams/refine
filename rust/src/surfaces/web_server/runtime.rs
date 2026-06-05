@@ -7,6 +7,7 @@ use crate::core::product::project_registry::FileProjectRegistryService;
 use crate::core::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionSnapshot, RuntimeProjection,
 };
+use crate::core::product::work_items::FileWorkItemService;
 use crate::core::supervisor::errors::RefineResult;
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
@@ -42,6 +43,18 @@ impl InProcessWebServer {
             FileChatService::with_runtime_root(durable_root, runtime_root)
         } else {
             FileChatService::new(durable_root)
+        }
+    }
+
+    pub(super) fn work_item_service(
+        &self,
+        durable_root: impl Into<PathBuf>,
+    ) -> FileWorkItemService {
+        let durable_root = durable_root.into();
+        if let Some(runtime_root) = &self.runtime_root {
+            FileWorkItemService::with_projection_cache(durable_root, runtime_root.join("cache"))
+        } else {
+            FileWorkItemService::new(durable_root)
         }
     }
 

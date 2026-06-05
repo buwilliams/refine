@@ -9,6 +9,7 @@ pub struct LogEntry {
     pub category: String,
     pub message: String,
     pub details: Option<JsonObject>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<LogAction>,
     pub actor: Option<String>,
     pub gap_id: Option<String>,
@@ -24,6 +25,7 @@ pub struct ActivityEntry {
     pub gap_id: Option<String>,
     pub actor: Option<String>,
     pub details: Option<JsonObject>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub actions: Vec<LogAction>,
 }
 

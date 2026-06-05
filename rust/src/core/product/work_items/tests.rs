@@ -335,6 +335,60 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
 }
 
 #[test]
+fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
+    let temp_root = unique_temp_dir("work-item-node-ownership");
+    let durable_root = temp_root.join(".refine");
+    let nodes = crate::core::product::nodes::FileNodeRegistryService::new(&durable_root);
+    nodes.create("remote-node").unwrap();
+    nodes.activate("remote-node").unwrap();
+
+    let service = FileWorkItemService::new(&durable_root);
+    let local_gap = service
+        .create_gap_summary("Remote-owned", Some("GAP1"))
+        .unwrap();
+    assert_eq!(local_gap.gap.node_id.as_deref(), Some("remote-node"));
+    let local_feature = service
+        .create_feature_summary("Remote feature", Some("FEA1"), None, None)
+        .unwrap();
+    assert_eq!(
+        local_feature.feature.node_id.as_deref(),
+        Some("remote-node")
+    );
+
+    nodes.activate("default").unwrap();
+    let err = service
+        .update_gap_metadata_summary("GAP1", Some("Blocked"), None)
+        .unwrap_err();
+    assert_eq!(
+        err.category(),
+        crate::core::supervisor::errors::ErrorCategory::Conflict
+    );
+    let err = service
+        .update_feature_metadata_summary("FEA1", Some("Blocked"), None, None)
+        .unwrap_err();
+    assert_eq!(
+        err.category(),
+        crate::core::supervisor::errors::ErrorCategory::Conflict
+    );
+
+    service
+        .bulk_transfer_gaps_to_node(
+            "default",
+            BulkGapSelection {
+                selected_ids: Some(vec!["GAP1".to_string()]),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    let updated = service
+        .update_gap_metadata_summary("GAP1", Some("Default-owned"), None)
+        .unwrap();
+    assert_eq!(updated.gap.name, "Default-owned");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_work_item_service_rejects_invalid_manual_transition() {
     let temp_root = unique_temp_dir("work-item-invalid-transition");
     let durable_root = temp_root.join(".refine");

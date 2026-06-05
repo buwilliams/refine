@@ -11,7 +11,7 @@ use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_
 use crate::core::product::project_registry::{
     FileProjectRegistryService, ProjectRegistryService, registry_apps_array,
 };
-use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
+use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 
 use super::support::*;
@@ -70,6 +70,18 @@ impl InProcessWebServer {
     pub(super) fn handle_node_create(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "create node");
         let body = request.body.unwrap_or_else(|| json!({}));
+        if let Some(node_id) = body.get("id").and_then(|value| value.as_str()) {
+            let node_id = node_id.trim();
+            if node_id.is_empty() {
+                return error_response(RefineError::InvalidInput(
+                    "node id is required".to_string(),
+                ));
+            }
+            return match FileNodeRegistryService::new(&durable_root).create(node_id) {
+                Ok(_) => self.handle_nodes(),
+                Err(error) => error_response(error),
+            };
+        }
         let display_name = body
             .get("display_name")
             .and_then(|value| value.as_str())
@@ -141,7 +153,8 @@ impl InProcessWebServer {
             Ok(selection) => selection,
             Err(_) => return invalid_bulk_body(),
         };
-        match FileWorkItemService::new(durable_root)
+        match self
+            .work_item_service(durable_root)
             .bulk_transfer_gaps_to_node(target_node_id, selection)
         {
             Ok(result) => ApiResponse::json(200, json!(result)),
@@ -572,7 +585,10 @@ impl InProcessWebServer {
             .and_then(|body| body.get("name"))
             .and_then(|value| value.as_str())
             .unwrap_or("Scaffold target application");
-        match FileWorkItemService::new(durable_root).create_gap_summary(name, None) {
+        match self
+            .work_item_service(durable_root)
+            .create_gap_summary(name, None)
+        {
             Ok(gap) => ApiResponse::json(201, json!({"ok": true, "gap": gap.gap})),
             Err(error) => error_response(error),
         }

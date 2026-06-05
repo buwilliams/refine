@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use crate::core::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
-use crate::core::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::core::product::project_state::FileProjectStateStore;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::model::log::LogEntry;
@@ -561,7 +561,7 @@ impl FileChatService {
 
     fn attached_product_context(&self, record: &ChatSessionRecord) -> RefineResult<String> {
         let store = FileProjectStateStore::new(&self.durable_root);
-        let snapshot = store.rebuild_projection()?;
+        let snapshot = store.load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         match &record.attachment {
             ChatAttachment::Gap(id) => {
                 let Some(gap) = snapshot.gaps.get(id) else {
