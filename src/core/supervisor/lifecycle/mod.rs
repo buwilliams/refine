@@ -74,6 +74,7 @@ impl FileDaemonLifecycleService {
             ));
         }
         let runtime_root = &self.runtime_root.root;
+        let port_runtime_root = self.runtime_root.port_root(port);
         let exe = std::env::current_exe().map_err(|error| {
             RefineError::Io(format!("failed to locate current executable: {error}"))
         })?;
@@ -101,7 +102,7 @@ impl FileDaemonLifecycleService {
             args.push("--static-root".to_string());
             args.push(static_root.display().to_string());
         }
-        let supervisor = FileProcessSupervisor::new(runtime_root);
+        let supervisor = FileProcessSupervisor::new(&port_runtime_root);
         let process = supervisor.launch(ManagedProcessSpec {
             owner: ProcessOwner::Daemon,
             command,
@@ -323,6 +324,34 @@ mod tests {
         let stopped = service.stop(4555).unwrap();
         assert!(!stopped.daemon_healthy);
         assert_eq!(service.status(4555).unwrap().worker_state, "stopped");
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn background_daemon_launch_records_are_port_scoped() {
+        let temp_root = unique_temp_dir("lifecycle-background");
+        let runtime_root = RuntimeRoot {
+            root: temp_root.join("run"),
+        };
+        let service = FileDaemonLifecycleService::new(runtime_root.clone());
+
+        let result = service.start_background_daemon(BackgroundDaemonConfig {
+            port: 4555,
+            cache_dir: None,
+            static_root: None,
+        });
+
+        assert!(result.is_err());
+        assert!(!runtime_root.root.join("processes").exists());
+        assert!(!runtime_root.root.join("security-audit.jsonl").exists());
+        assert!(runtime_root.port_root(4555).join("processes").exists());
+        assert!(
+            !runtime_root
+                .port_root(4555)
+                .join("security-audit.jsonl")
+                .exists()
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

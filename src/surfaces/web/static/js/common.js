@@ -1542,11 +1542,40 @@ function renderBanners(items) {
 // ---- SSE --------------------------------------------------------------------
 
 let sseSource = null;
+const sseReplaySignatures = {
+  Activity: "",
+  Project: "",
+  Status: "",
+  SystemOperation: "",
+};
+
+function sseReplaySignature(key, event) {
+  if (key !== "SystemOperation") return event?.data || "";
+  try {
+    const payload = JSON.parse(event?.data || "{}");
+    delete payload.timestamp;
+    return JSON.stringify(payload);
+  } catch {
+    return event?.data || "";
+  }
+}
+
+function sseEventChanged(key, event) {
+  const signature = sseReplaySignature(key, event);
+  if (!sseReplaySignatures[key]) {
+    sseReplaySignatures[key] = signature;
+    return false;
+  }
+  if (sseReplaySignatures[key] === signature) return false;
+  sseReplaySignatures[key] = signature;
+  return true;
+}
 
 function initSSE() {
   if (sseSource) sseSource.close();
   sseSource = new EventSource("/api/sse");
   sseSource.addEventListener("activity_added", (e) => {
+    if (!sseEventChanged("Activity", e)) return;
     try {
       const entry = JSON.parse(e.data || "{}");
       if (typeof recordSystemOperation === "function") {
@@ -1566,8 +1595,10 @@ function initSSE() {
     if (state.currentRoute === "logs") loadLogs();
     if (state.currentRoute === "changes") loadChanges();
   });
-  sseSource.addEventListener("status_change", () => {
+  sseSource.addEventListener("status_change", (e) => {
+    if (!sseEventChanged("Status", e)) return;
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
+    if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
     // Refresh only the table on background updates so an in-progress
     // keystroke in the search box isn't interrupted by a full re-render.
@@ -1596,10 +1627,12 @@ function initSSE() {
       refreshCurrentSettingsSurface();
     }
   });
-  sseSource.addEventListener("project_updated", async () => {
+  sseSource.addEventListener("project_updated", async (e) => {
+    if (!sseEventChanged("Project", e)) return;
     await refreshProjectStatus();
     await refreshReporters();
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
+    if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
     if (state.currentRoute === "gaps") refreshGapsTable();
     if (state.currentRoute === "logs") loadLogs();
@@ -1613,6 +1646,7 @@ function initSSE() {
     if (state.currentRoute === "logs") loadLogs();
   });
   sseSource.addEventListener("system_operation", (e) => {
+    if (!sseEventChanged("SystemOperation", e)) return;
     try {
       const payload = JSON.parse(e.data || "{}");
       if (typeof recordSystemOperation === "function") {

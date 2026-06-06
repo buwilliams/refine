@@ -1,9 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use serde_json::{Value, json};
 
@@ -68,6 +69,12 @@ fn sse_event(event: &str, data: Value) -> RefineResult<String> {
 }
 
 #[derive(Clone, Debug)]
+struct SseEventFrame {
+    event: &'static str,
+    data: Value,
+}
+
+#[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
     pub server: InProcessWebServer,
     pub static_root: Option<PathBuf>,
@@ -124,8 +131,50 @@ impl LocalHttpDaemon {
             RefineError::Io(format!("failed to set TCP_NODELAY on HTTP stream: {error}"))
         })?;
         let request = read_http_request(&mut stream)?;
+        if request.method == "GET" && (request.path == "/events" || request.path == "/api/sse") {
+            return self.handle_sse_stream(&mut stream, "events");
+        }
         let response = self.handle_wire_request(request);
         write_http_response(&mut stream, response)
+    }
+
+    fn handle_sse_stream(&self, stream: &mut TcpStream, stream_name: &str) -> RefineResult<()> {
+        write_sse_headers(stream)?;
+        stream
+            .write_all(b"retry: 10000\n\n")
+            .and_then(|_| stream.flush())
+            .map_err(|error| RefineError::Io(format!("failed to start SSE stream: {error}")))?;
+
+        let mut last_state_signatures = BTreeMap::new();
+        let mut seen_stream_signatures: BTreeMap<&'static str, BTreeSet<String>> = BTreeMap::new();
+        let mut ticks_until_heartbeat = 0_u8;
+        loop {
+            let frames = self.server_sent_event_frames(stream_name)?;
+            let mut wrote_event = false;
+            for frame in frames {
+                if should_write_sse_frame(
+                    &frame,
+                    &mut last_state_signatures,
+                    &mut seen_stream_signatures,
+                ) {
+                    if !write_sse_frame(stream, &frame)? {
+                        return Ok(());
+                    }
+                    wrote_event = true;
+                }
+            }
+            if wrote_event {
+                ticks_until_heartbeat = 0;
+            } else if ticks_until_heartbeat >= 7 {
+                if !write_sse_heartbeat(stream)? {
+                    return Ok(());
+                }
+                ticks_until_heartbeat = 0;
+            } else {
+                ticks_until_heartbeat += 1;
+            }
+            thread::sleep(Duration::from_secs(2));
+        }
     }
 
     pub fn handle_wire_request(&self, request: HttpRequest) -> WireResponse {
@@ -307,73 +356,96 @@ impl LocalDaemonWebServer for LocalHttpDaemon {
     }
 
     fn server_sent_events(&self, stream: &str) -> RefineResult<String> {
-        let projection = self.server.current_projection_with_runtime()?;
         let mut events = String::new();
         events.push_str("retry: 3000\n");
-        events.push_str(&sse_event(
-            "ready",
-            json!({
-                "stream": stream,
-                "backend": "native",
-                "timestamp": now_timestamp_web()
-            }),
-        )?);
-        events.push_str(&sse_event(
-            "project_updated",
-            json!({
-                "gap_count": projection.gaps.len(),
-                "feature_count": projection.features.len(),
-                "status_counts": projection.status_counts(),
-                "dashboard": projection.dashboard
-            }),
-        )?);
-        events.push_str(&sse_event(
-            "status_change",
-            json!({
-                "status_counts": projection.status_counts(),
-                "attention": projection.dashboard.attention_indicators
-            }),
-        )?);
+        for frame in self.server_sent_event_frames(stream)? {
+            events.push_str(&sse_event(frame.event, frame.data)?);
+        }
+        Ok(events)
+    }
+}
+
+impl LocalHttpDaemon {
+    fn server_sent_event_frames(&self, stream: &str) -> RefineResult<Vec<SseEventFrame>> {
+        let projection = self.server.current_projection_with_runtime()?;
+        let mut events = vec![
+            SseEventFrame {
+                event: "ready",
+                data: json!({
+                    "stream": stream,
+                    "backend": "native",
+                    "timestamp": now_timestamp_web()
+                }),
+            },
+            SseEventFrame {
+                event: "project_updated",
+                data: json!({
+                    "gap_count": projection.gaps.len(),
+                    "feature_count": projection.features.len(),
+                    "status_counts": projection.status_counts(),
+                    "dashboard": projection.dashboard
+                }),
+            },
+            SseEventFrame {
+                event: "status_change",
+                data: json!({
+                    "status_counts": projection.status_counts(),
+                    "attention": projection.dashboard.attention_indicators
+                }),
+            },
+        ];
         if let Some(durable_root) = self.server.current_durable_root()? {
             if let Some(entry) = FileActivityService::new(&durable_root)
                 .recent(1)?
                 .into_iter()
                 .next()
             {
-                events.push_str(&sse_event("activity_added", json!(entry))?);
+                events.push(SseEventFrame {
+                    event: "activity_added",
+                    data: json!(entry),
+                });
             }
             for payload in recent_chat_sse_events(&durable_root, 10)? {
-                events.push_str(&sse_event("chat_event", payload)?);
+                events.push(SseEventFrame {
+                    event: "chat_event",
+                    data: payload,
+                });
             }
         }
         if let Some(runtime_root) = &self.server.runtime_root {
             let process = process_summary_response(runtime_root).body;
-            events.push_str(&sse_event(
-                "system_operation",
-                json!({
+            events.push(SseEventFrame {
+                event: "system_operation",
+                data: json!({
                     "message": "Process snapshot refreshed",
                     "status": "info",
                     "category": "process",
                     "timestamp": now_timestamp_web(),
                     "details": process
                 }),
-            )?);
+            });
             for payload in recent_process_sse_events(runtime_root, 10)? {
-                events.push_str(&sse_event("process_output", payload)?);
+                events.push(SseEventFrame {
+                    event: "process_output",
+                    data: payload,
+                });
             }
             for payload in recent_job_sse_events(runtime_root, 10)? {
-                events.push_str(&sse_event("job_progress", payload)?);
+                events.push(SseEventFrame {
+                    event: "job_progress",
+                    data: payload,
+                });
             }
             for event in recent_api_mutation_events(runtime_root, 25)? {
-                events.push_str(&sse_event(
-                    "api_mutation",
-                    json!({
+                events.push(SseEventFrame {
+                    event: "api_mutation",
+                    data: json!({
                         "method": event.method,
                         "path": event.path,
                         "status": event.status,
                         "timestamp": event.created_at
                     }),
-                )?);
+                });
             }
         }
         Ok(events)
@@ -481,6 +553,103 @@ fn write_http_response(stream: &mut TcpStream, response: WireResponse) -> Refine
         .and_then(|_| stream.write_all(&response.body))
         .and_then(|_| stream.flush())
         .map_err(|error| RefineError::Io(format!("failed to write HTTP response: {error}")))
+}
+
+fn write_sse_headers(stream: &mut TcpStream) -> RefineResult<()> {
+    stream
+        .write_all(
+            b"HTTP/1.1 200 OK\r\n\
+              Content-Type: text/event-stream\r\n\
+              Cache-Control: no-cache\r\n\
+              Connection: keep-alive\r\n\
+              Access-Control-Allow-Origin: http://127.0.0.1\r\n\
+              X-Accel-Buffering: no\r\n\
+              \r\n",
+        )
+        .and_then(|_| stream.flush())
+        .map_err(|error| RefineError::Io(format!("failed to write SSE headers: {error}")))
+}
+
+fn write_sse_frame(stream: &mut TcpStream, frame: &SseEventFrame) -> RefineResult<bool> {
+    write_sse_bytes(
+        stream,
+        sse_event(frame.event, frame.data.clone())?.as_bytes(),
+    )
+}
+
+fn write_sse_heartbeat(stream: &mut TcpStream) -> RefineResult<bool> {
+    write_sse_bytes(
+        stream,
+        format!(": heartbeat {}\n\n", now_timestamp_web()).as_bytes(),
+    )
+}
+
+fn write_sse_bytes(stream: &mut TcpStream, bytes: &[u8]) -> RefineResult<bool> {
+    match stream.write_all(bytes).and_then(|_| stream.flush()) {
+        Ok(()) => Ok(true),
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::NotConnected
+            ) =>
+        {
+            Ok(false)
+        }
+        Err(error) => Err(RefineError::Io(format!(
+            "failed to write SSE event: {error}"
+        ))),
+    }
+}
+
+fn should_write_sse_frame(
+    frame: &SseEventFrame,
+    last_state_signatures: &mut BTreeMap<&'static str, String>,
+    seen_stream_signatures: &mut BTreeMap<&'static str, BTreeSet<String>>,
+) -> bool {
+    if frame.event == "ready" {
+        return last_state_signatures
+            .insert(frame.event, sse_frame_signature(frame))
+            .is_none();
+    }
+    let signature = sse_frame_signature(frame);
+    if state_sse_event(frame.event) {
+        if last_state_signatures
+            .get(frame.event)
+            .is_some_and(|previous| previous == &signature)
+        {
+            return false;
+        }
+        last_state_signatures.insert(frame.event, signature);
+        return true;
+    }
+    seen_stream_signatures
+        .entry(frame.event)
+        .or_default()
+        .insert(signature)
+}
+
+fn state_sse_event(event: &str) -> bool {
+    matches!(
+        event,
+        "project_updated" | "status_change" | "activity_added" | "system_operation"
+    )
+}
+
+fn sse_frame_signature(frame: &SseEventFrame) -> String {
+    let mut data = frame.data.clone();
+    if frame.event == "system_operation"
+        && let Some(object) = data.as_object_mut()
+    {
+        object.remove("timestamp");
+    }
+    serde_json::to_string(&json!({
+        "event": frame.event,
+        "data": data
+    }))
+    .unwrap_or_else(|_| format!("{}:{:?}", frame.event, frame.data))
 }
 
 fn is_within(root: &Path, path: &Path) -> bool {

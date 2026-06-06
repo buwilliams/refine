@@ -26,9 +26,6 @@ function initTargetAppToggle() {
   const indicator = document.getElementById("target-app-indicator");
   if (indicator) refreshTargetAppToggle();
   refreshAgentStatusIndicator();
-  // Backup poll so the dot isn't stale if SSE drops.
-  setInterval(refreshTargetAppToggle, 30000);
-  setInterval(refreshAgentStatusIndicator, 30000);
 }
 
 async function refreshTargetAppToggle() {

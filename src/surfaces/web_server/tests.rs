@@ -14,7 +14,7 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use super::*;
 use crate::core::host::process_supervision::{
@@ -400,6 +400,59 @@ fn local_http_daemon_serves_projection_routes_over_tcp() {
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert!(response.contains("\"id\": \"GAP1\""));
     assert!(response.contains("\"counts\""));
+}
+
+#[test]
+fn local_http_daemon_keeps_sse_stream_open_over_tcp() {
+    let daemon = LocalHttpDaemon {
+        server: server_with_projection(),
+        static_root: None,
+    };
+    let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
+    let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
+    let _handle = thread::spawn(move || daemon.serve_next(&listener).unwrap());
+
+    let mut stream = TcpStream::connect(addr).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_millis(250)))
+        .unwrap();
+    stream
+        .write_all(b"GET /api/sse HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        .unwrap();
+
+    let mut response = String::new();
+    let mut chunk = [0_u8; 512];
+    while !response.contains("event: status_change") {
+        let read = match stream.read(&mut chunk) {
+            Ok(read) => read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => panic!("unexpected SSE stream read error: {error}"),
+        };
+        assert_ne!(read, 0, "SSE stream closed during initial event replay");
+        response.push_str(std::str::from_utf8(&chunk[..read]).unwrap());
+    }
+
+    let idle_read = loop {
+        match stream.read(&mut chunk) {
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            result => break result,
+        }
+    };
+    match idle_read {
+        Ok(0) => panic!("SSE stream closed after initial event replay"),
+        Ok(_) => {}
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+            ) => {}
+        Err(error) => panic!("unexpected SSE stream read error: {error}"),
+    }
+
+    assert!(response.starts_with("HTTP/1.1 200 OK"));
+    assert!(response.contains("Content-Type: text/event-stream"));
+    assert!(response.contains("Connection: keep-alive"));
+    assert!(response.contains("event: ready"));
 }
 
 #[test]

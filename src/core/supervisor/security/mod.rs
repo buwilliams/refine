@@ -493,6 +493,9 @@ impl FileSecurityService {
                 "audit actor and command are required".to_string(),
             ));
         }
+        if self.allowed_commands.is_empty() {
+            return Ok(());
+        }
         if !self.command_allowed(command) {
             self.append_audit_event(actor, command, "denied")?;
             return Err(RefineError::Unauthorized(format!(
