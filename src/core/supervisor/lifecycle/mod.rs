@@ -180,12 +180,20 @@ pub fn http_probe(port: u16) -> RefineResult<()> {
         .set_read_timeout(Some(Duration::from_secs(1)))
         .map_err(|error| RefineError::Io(format!("failed to set daemon probe timeout: {error}")))?;
     stream
-        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+        .write_all(b"GET /system/version HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
         .map_err(|error| RefineError::Io(format!("failed to write daemon probe: {error}")))?;
-    let mut response = String::new();
-    stream
-        .read_to_string(&mut response)
-        .map_err(|error| RefineError::Io(format!("failed to read daemon probe: {error}")))?;
+    let mut response = Vec::new();
+    let mut chunk = [0_u8; 512];
+    while !response.windows(4).any(|window| window == b"\r\n\r\n") && response.len() < 8192 {
+        let read = stream
+            .read(&mut chunk)
+            .map_err(|error| RefineError::Io(format!("failed to read daemon probe: {error}")))?;
+        if read == 0 {
+            break;
+        }
+        response.extend_from_slice(&chunk[..read]);
+    }
+    let response = String::from_utf8_lossy(&response);
     if response.starts_with("HTTP/1.1 200") {
         Ok(())
     } else {
@@ -214,6 +222,23 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
     }
 
     fn stop(&self, port: u16) -> RefineResult<DaemonStatus> {
+        let supervisor = FileProcessSupervisor::new(self.runtime_root.port_root(port));
+        for process in supervisor.list()? {
+            if process.owner == ProcessOwner::Daemon {
+                let process = supervisor.wait(&process.id)?;
+                if process.state == "running" {
+                    let _ = supervisor.signal(&process.id, "terminate");
+                    thread::sleep(Duration::from_millis(100));
+                    if supervisor
+                        .wait(&process.id)
+                        .map(|process| process.state == "running")
+                        .unwrap_or(false)
+                    {
+                        let _ = supervisor.signal(&process.id, "kill");
+                    }
+                }
+            }
+        }
         let mut status = self
             .read_status(port)
             .unwrap_or_else(|_| stopped_status(port, vec!["daemon-status-missing".to_string()]));

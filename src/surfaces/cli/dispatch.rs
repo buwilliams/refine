@@ -1624,14 +1624,9 @@ fn run_system_start(
     daemon.recover_runtime_state()?;
     eprintln!("running foreground Refine daemon at http://{addr}");
     if once {
-        daemon.serve_next(&listener)?;
+        daemon.serve_once(listener)?;
     } else {
-        loop {
-            daemon.serve_next_concurrent(&listener)?;
-            if !lifecycle.status(actual_port)?.daemon_healthy {
-                break;
-            }
-        }
+        daemon.serve_until_unhealthy(listener, lifecycle, actual_port)?;
     }
     Ok(())
 }

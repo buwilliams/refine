@@ -387,7 +387,7 @@ fn local_http_daemon_serves_projection_routes_over_tcp() {
     };
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
-    let handle = thread::spawn(move || daemon.serve_next(&listener).unwrap());
+    let handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
 
     let mut stream = TcpStream::connect(addr).unwrap();
     stream
@@ -410,7 +410,7 @@ fn local_http_daemon_keeps_sse_stream_open_over_tcp() {
     };
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
-    let _handle = thread::spawn(move || daemon.serve_next(&listener).unwrap());
+    let _handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
 
     let mut stream = TcpStream::connect(addr).unwrap();
     stream
@@ -449,9 +449,9 @@ fn local_http_daemon_keeps_sse_stream_open_over_tcp() {
         Err(error) => panic!("unexpected SSE stream read error: {error}"),
     }
 
+    let response_lower = response.to_ascii_lowercase();
     assert!(response.starts_with("HTTP/1.1 200 OK"));
-    assert!(response.contains("Content-Type: text/event-stream"));
-    assert!(response.contains("Connection: keep-alive"));
+    assert!(response_lower.contains("content-type: text/event-stream"));
     assert!(response.contains("event: ready"));
 }
 
@@ -463,7 +463,7 @@ fn local_http_daemon_handles_tcp_requests_on_worker_threads() {
     };
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
-    let accept = thread::spawn(move || daemon.serve_next_concurrent(&listener).unwrap());
+    let handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
 
     let mut stream = TcpStream::connect(addr).unwrap();
     stream
@@ -471,8 +471,7 @@ fn local_http_daemon_handles_tcp_requests_on_worker_threads() {
         .unwrap();
     let mut response = String::new();
     stream.read_to_string(&mut response).unwrap();
-    let worker = accept.join().unwrap();
-    worker.join().unwrap().unwrap();
+    handle.join().unwrap();
 
     assert!(response.starts_with("HTTP/1.1 200 OK"));
     assert!(response.contains("\"product\": \"refine\""));

@@ -723,6 +723,7 @@ fn signal_os_process(pid: u32, signal: &str) -> RefineResult<Option<String>> {
         let status = Command::new("kill")
             .arg(os_signal)
             .arg(pid.to_string())
+            .stderr(Stdio::null())
             .status()
             .map_err(|error| {
                 RefineError::Io(format!("failed to signal process {pid} with kill: {error}"))

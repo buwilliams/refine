@@ -1,19 +1,31 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::convert::Infallible;
 use std::fs;
-use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
-use std::thread::{self, JoinHandle};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 
+use axum::Router;
+use axum::body::{Body, Bytes};
+use axum::extract::{OriginalUri, State};
+use axum::http::header::{ACCESS_CONTROL_ALLOW_ORIGIN, CONTENT_TYPE};
+use axum::http::{HeaderMap, Method, StatusCode, Uri};
+use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::{IntoResponse, Response};
+use axum::routing::any;
 use serde_json::{Value, json};
+use tokio::sync::{Notify, oneshot};
+use tokio_stream::wrappers::ReceiverStream;
 
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::metrics::FileMetricsService;
 use crate::core::product::project_state::ProjectionQuery;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::lifecycle::DaemonStatus;
+use crate::core::supervisor::lifecycle::{
+    DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+};
 
 use super::support::*;
 use super::*;
@@ -61,6 +73,26 @@ impl WireResponse {
             ],
         }
     }
+
+    fn into_axum_response(self) -> Response {
+        let status = StatusCode::from_u16(self.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        let mut builder = Response::builder()
+            .status(status)
+            .header(CONTENT_TYPE, self.content_type)
+            .header(ACCESS_CONTROL_ALLOW_ORIGIN, "http://127.0.0.1");
+        for (name, value) in self.extra_headers {
+            builder = builder.header(name, value);
+        }
+        builder
+            .body(Body::from(self.body))
+            .unwrap_or_else(|_| Response::new(Body::from("{}")))
+    }
+}
+
+impl IntoResponse for WireResponse {
+    fn into_response(self) -> Response {
+        self.into_axum_response()
+    }
 }
 
 fn sse_event(event: &str, data: Value) -> RefineResult<String> {
@@ -90,6 +122,12 @@ static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry
 pub struct LocalHttpDaemon {
     pub server: InProcessWebServer,
     pub static_root: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug)]
+struct AxumDaemonState {
+    daemon: LocalHttpDaemon,
+    complete_after_request: Option<Arc<Notify>>,
 }
 
 impl LocalHttpDaemon {
@@ -130,73 +168,70 @@ impl LocalHttpDaemon {
         })
     }
 
-    pub fn serve_next(&self, listener: &TcpListener) -> RefineResult<()> {
-        let (stream, _) = listener.accept().map_err(|error| {
-            RefineError::Io(format!("failed to accept daemon HTTP request: {error}"))
-        })?;
-        self.handle_stream(stream)
+    pub fn serve_once(&self, listener: TcpListener) -> RefineResult<()> {
+        self.serve_listener(listener, Some(serve_once_shutdown()))
     }
 
-    pub fn serve_next_concurrent(
+    pub fn serve_until_unhealthy(
         &self,
-        listener: &TcpListener,
-    ) -> RefineResult<JoinHandle<RefineResult<()>>> {
-        let (stream, _) = listener.accept().map_err(|error| {
-            RefineError::Io(format!("failed to accept daemon HTTP request: {error}"))
-        })?;
+        listener: TcpListener,
+        lifecycle: FileDaemonLifecycleService,
+        port: u16,
+    ) -> RefineResult<()> {
+        self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
+    }
+
+    fn serve_listener(
+        &self,
+        listener: TcpListener,
+        shutdown: Option<AxumShutdown>,
+    ) -> RefineResult<()> {
         let daemon = self.clone();
-        Ok(thread::spawn(move || daemon.handle_stream(stream)))
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| RefineError::Io(format!("failed to start Tokio runtime: {error}")))?;
+        runtime.block_on(async move {
+            listener.set_nonblocking(true).map_err(|error| {
+                RefineError::Io(format!("failed to configure daemon listener: {error}"))
+            })?;
+            let listener = tokio::net::TcpListener::from_std(listener).map_err(|error| {
+                RefineError::Io(format!("failed to hand daemon listener to Tokio: {error}"))
+            })?;
+            let app = daemon.axum_router(
+                shutdown
+                    .as_ref()
+                    .and_then(|shutdown| shutdown.complete_after_request.as_ref().map(Arc::clone)),
+            );
+            let server = axum::serve(listener, app);
+            match shutdown {
+                Some(shutdown) => server
+                    .with_graceful_shutdown(shutdown.wait())
+                    .await
+                    .map_err(|error| {
+                        RefineError::Io(format!("Axum daemon server failed: {error}"))
+                    }),
+                None => server.await.map_err(|error| {
+                    RefineError::Io(format!("Axum daemon server failed: {error}"))
+                }),
+            }
+        })
     }
 
-    pub fn handle_stream(&self, mut stream: TcpStream) -> RefineResult<()> {
-        stream.set_nodelay(true).map_err(|error| {
-            RefineError::Io(format!("failed to set TCP_NODELAY on HTTP stream: {error}"))
-        })?;
-        let request = read_http_request(&mut stream)?;
+    fn axum_router(&self, complete_after_request: Option<Arc<Notify>>) -> Router {
+        Router::new()
+            .fallback(any(axum_entrypoint))
+            .with_state(AxumDaemonState {
+                daemon: self.clone(),
+                complete_after_request,
+            })
+    }
+
+    fn handle_axum_request(&self, request: HttpRequest) -> Response {
         if request.method == "GET" && (request.path == "/events" || request.path == "/api/sse") {
-            return self.handle_sse_stream(&mut stream, "events");
+            return self.sse_response("events");
         }
-        let response = self.handle_wire_request(request);
-        write_http_response(&mut stream, response)
-    }
-
-    fn handle_sse_stream(&self, stream: &mut TcpStream, stream_name: &str) -> RefineResult<()> {
-        write_sse_headers(stream)?;
-        stream
-            .write_all(b"retry: 10000\n\n")
-            .and_then(|_| stream.flush())
-            .map_err(|error| RefineError::Io(format!("failed to start SSE stream: {error}")))?;
-
-        let mut last_state_signatures = BTreeMap::new();
-        let mut seen_stream_signatures: BTreeMap<&'static str, BTreeSet<String>> = BTreeMap::new();
-        let mut ticks_until_heartbeat = 0_u8;
-        loop {
-            let frames = self.server_sent_event_frames(stream_name)?;
-            let mut wrote_event = false;
-            for frame in frames {
-                if should_write_sse_frame(
-                    &frame,
-                    &mut last_state_signatures,
-                    &mut seen_stream_signatures,
-                ) {
-                    if !write_sse_frame(stream, &frame)? {
-                        return Ok(());
-                    }
-                    wrote_event = true;
-                }
-            }
-            if wrote_event {
-                ticks_until_heartbeat = 0;
-            } else if ticks_until_heartbeat >= 7 {
-                if !write_sse_heartbeat(stream)? {
-                    return Ok(());
-                }
-                ticks_until_heartbeat = 0;
-            } else {
-                ticks_until_heartbeat += 1;
-            }
-            thread::sleep(Duration::from_secs(2));
-        }
+        self.handle_wire_request(request).into_response()
     }
 
     pub fn handle_wire_request(&self, request: HttpRequest) -> WireResponse {
@@ -388,13 +423,106 @@ impl LocalHttpDaemon {
     }
 }
 
+struct AxumShutdown {
+    complete_after_request: Option<Arc<Notify>>,
+    receiver: oneshot::Receiver<()>,
+}
+
+impl AxumShutdown {
+    async fn wait(self) {
+        let _ = self.receiver.await;
+    }
+}
+
+fn serve_once_shutdown() -> AxumShutdown {
+    let notify = Arc::new(Notify::new());
+    let wait_notify = Arc::clone(&notify);
+    let (tx, rx) = oneshot::channel();
+    thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build();
+        if let Ok(runtime) = runtime {
+            runtime.block_on(wait_notify.notified());
+        }
+        let _ = tx.send(());
+    });
+    AxumShutdown {
+        complete_after_request: Some(notify),
+        receiver: rx,
+    }
+}
+
+fn lifecycle_shutdown(lifecycle: FileDaemonLifecycleService, port: u16) -> AxumShutdown {
+    let (tx, rx) = oneshot::channel();
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_millis(500));
+            match lifecycle.status(port) {
+                Ok(status) if status.daemon_healthy => {}
+                _ => break,
+            }
+        }
+        let _ = tx.send(());
+    });
+    AxumShutdown {
+        complete_after_request: None,
+        receiver: rx,
+    }
+}
+
+async fn axum_entrypoint(
+    State(state): State<AxumDaemonState>,
+    method: Method,
+    OriginalUri(uri): OriginalUri,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
+    let request = HttpRequest {
+        method: method.as_str().to_string(),
+        path: uri_path_and_query(&uri),
+        headers: headers_to_map(&headers),
+        body: if body.is_empty() {
+            None
+        } else {
+            Some(body.to_vec())
+        },
+    };
+    let response = state.daemon.handle_axum_request(request);
+    if let Some(notify) = state.complete_after_request {
+        notify.notify_one();
+    }
+    response
+}
+
+fn uri_path_and_query(uri: &Uri) -> String {
+    uri.path_and_query()
+        .map(|path| path.as_str().to_string())
+        .unwrap_or_else(|| uri.path().to_string())
+}
+
+fn headers_to_map(headers: &HeaderMap) -> BTreeMap<String, String> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|value| (name.as_str().to_ascii_lowercase(), value.to_string()))
+        })
+        .collect()
+}
+
 impl LocalDaemonWebServer for LocalHttpDaemon {
     fn serve(&self, port: u16) -> RefineResult<DaemonStatus> {
         self.recover_runtime_state()?;
         let listener = Self::bind_loopback(port)?;
-        loop {
-            self.serve_next_concurrent(&listener)?;
-        }
+        let addr = Self::local_addr(&listener)?;
+        let status = self.server.status.clone();
+        self.serve_listener(listener, None)?;
+        let mut status = status;
+        status.port = addr.port();
+        Ok(status)
     }
 
     fn server_sent_events(&self, stream: &str) -> RefineResult<String> {
@@ -408,6 +536,55 @@ impl LocalDaemonWebServer for LocalHttpDaemon {
 }
 
 impl LocalHttpDaemon {
+    fn sse_response(&self, stream_name: &'static str) -> Response {
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(32);
+        let daemon = self.clone();
+        tokio::spawn(async move {
+            let mut last_state_signatures = BTreeMap::new();
+            let mut seen_stream_signatures: BTreeMap<&'static str, BTreeSet<String>> =
+                BTreeMap::new();
+            loop {
+                let frames = match daemon.server_sent_event_frames(stream_name) {
+                    Ok(frames) => frames,
+                    Err(error) => {
+                        let event = Event::default()
+                            .event("error")
+                            .data(json!({"message": error.to_string()}).to_string());
+                        let _ = tx.send(Ok(event)).await;
+                        break;
+                    }
+                };
+                for frame in frames {
+                    if should_write_sse_frame(
+                        &frame,
+                        &mut last_state_signatures,
+                        &mut seen_stream_signatures,
+                    ) {
+                        let encoded = match serde_json::to_string(&frame.data) {
+                            Ok(encoded) => encoded,
+                            Err(_) => continue,
+                        };
+                        if tx
+                            .send(Ok(Event::default().event(frame.event).data(encoded)))
+                            .await
+                            .is_err()
+                        {
+                            return;
+                        }
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        });
+        Sse::new(ReceiverStream::new(rx))
+            .keep_alive(
+                KeepAlive::new()
+                    .interval(Duration::from_secs(15))
+                    .text("heartbeat"),
+            )
+            .into_response()
+    }
+
     fn server_sent_event_frames(&self, stream: &str) -> RefineResult<Vec<SseEventFrame>> {
         let projection = self.server.current_projection_with_runtime()?;
         let mut events = vec![
@@ -500,150 +677,6 @@ pub struct HttpRequest {
     pub path: String,
     pub headers: BTreeMap<String, String>,
     pub body: Option<Vec<u8>>,
-}
-
-fn read_http_request(stream: &mut TcpStream) -> RefineResult<HttpRequest> {
-    let mut buffer = Vec::new();
-    let mut chunk = [0_u8; 8192];
-    loop {
-        let read = stream
-            .read(&mut chunk)
-            .map_err(|error| RefineError::Io(format!("failed to read HTTP request: {error}")))?;
-        if read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..read]);
-        if buffer.windows(4).any(|window| window == b"\r\n\r\n") {
-            break;
-        }
-        if buffer.len() > 1024 * 1024 {
-            return Err(RefineError::InvalidInput(
-                "HTTP request headers exceed 1 MiB".to_string(),
-            ));
-        }
-    }
-
-    let header_end = buffer
-        .windows(4)
-        .position(|window| window == b"\r\n\r\n")
-        .ok_or_else(|| RefineError::InvalidInput("malformed HTTP request".to_string()))?
-        + 4;
-    let header_text = std::str::from_utf8(&buffer[..header_end]).map_err(|error| {
-        RefineError::InvalidInput(format!("HTTP headers are not valid UTF-8: {error}"))
-    })?;
-    let mut lines = header_text.split("\r\n").filter(|line| !line.is_empty());
-    let request_line = lines
-        .next()
-        .ok_or_else(|| RefineError::InvalidInput("missing HTTP request line".to_string()))?;
-    let mut request_parts = request_line.split_whitespace();
-    let method = request_parts
-        .next()
-        .ok_or_else(|| RefineError::InvalidInput("missing HTTP method".to_string()))?
-        .to_string();
-    let path = request_parts
-        .next()
-        .ok_or_else(|| RefineError::InvalidInput("missing HTTP path".to_string()))?
-        .to_string();
-    let mut headers = BTreeMap::new();
-    for line in lines {
-        if let Some((name, value)) = line.split_once(':') {
-            headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
-        }
-    }
-
-    let content_length = headers
-        .get("content-length")
-        .and_then(|value| value.parse::<usize>().ok())
-        .unwrap_or(0);
-    while buffer.len() < header_end + content_length {
-        let read = stream
-            .read(&mut chunk)
-            .map_err(|error| RefineError::Io(format!("failed to read HTTP body: {error}")))?;
-        if read == 0 {
-            break;
-        }
-        buffer.extend_from_slice(&chunk[..read]);
-    }
-    let body = if content_length > 0 && buffer.len() >= header_end + content_length {
-        Some(buffer[header_end..header_end + content_length].to_vec())
-    } else {
-        None
-    };
-
-    Ok(HttpRequest {
-        method,
-        path,
-        headers,
-        body,
-    })
-}
-
-fn write_http_response(stream: &mut TcpStream, response: WireResponse) -> RefineResult<()> {
-    let mut headers = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nAccess-Control-Allow-Origin: http://127.0.0.1\r\n",
-        response.status,
-        response.reason,
-        response.content_type,
-        response.body.len()
-    );
-    for (name, value) in response.extra_headers {
-        headers.push_str(&format!("{name}: {value}\r\n"));
-    }
-    headers.push_str("\r\n");
-    stream
-        .write_all(headers.as_bytes())
-        .and_then(|_| stream.write_all(&response.body))
-        .and_then(|_| stream.flush())
-        .map_err(|error| RefineError::Io(format!("failed to write HTTP response: {error}")))
-}
-
-fn write_sse_headers(stream: &mut TcpStream) -> RefineResult<()> {
-    stream
-        .write_all(
-            b"HTTP/1.1 200 OK\r\n\
-              Content-Type: text/event-stream\r\n\
-              Cache-Control: no-cache\r\n\
-              Connection: keep-alive\r\n\
-              Access-Control-Allow-Origin: http://127.0.0.1\r\n\
-              X-Accel-Buffering: no\r\n\
-              \r\n",
-        )
-        .and_then(|_| stream.flush())
-        .map_err(|error| RefineError::Io(format!("failed to write SSE headers: {error}")))
-}
-
-fn write_sse_frame(stream: &mut TcpStream, frame: &SseEventFrame) -> RefineResult<bool> {
-    write_sse_bytes(
-        stream,
-        sse_event(frame.event, frame.data.clone())?.as_bytes(),
-    )
-}
-
-fn write_sse_heartbeat(stream: &mut TcpStream) -> RefineResult<bool> {
-    write_sse_bytes(
-        stream,
-        format!(": heartbeat {}\n\n", now_timestamp_web()).as_bytes(),
-    )
-}
-
-fn write_sse_bytes(stream: &mut TcpStream, bytes: &[u8]) -> RefineResult<bool> {
-    match stream.write_all(bytes).and_then(|_| stream.flush()) {
-        Ok(()) => Ok(true),
-        Err(error)
-            if matches!(
-                error.kind(),
-                std::io::ErrorKind::BrokenPipe
-                    | std::io::ErrorKind::ConnectionReset
-                    | std::io::ErrorKind::ConnectionAborted
-                    | std::io::ErrorKind::NotConnected
-            ) =>
-        {
-            Ok(false)
-        }
-        Err(error) => Err(RefineError::Io(format!(
-            "failed to write SSE event: {error}"
-        ))),
-    }
 }
 
 fn warm_static_cache_dir(static_root: &Path, root: &Path) -> RefineResult<()> {
