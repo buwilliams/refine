@@ -131,6 +131,7 @@ function ensureChatTabQueueState(tab) {
   tab.queuedMessages = normalizeQueuedMessages(tab.queuedMessages);
   tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages);
   tab.starting = !!tab.starting;
+  tab.sending = !!tab.sending;
   return tab;
 }
 
@@ -702,7 +703,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                     rows="2"
                     placeholder="${htmlEscape(inputPlaceholder)}"></textarea>
         </div>
-        <button id="btn-chat-send" class="primary">Send</button>
+        <button id="btn-chat-send" class="primary" ${active.sending ? "disabled" : ""}>Send</button>
       </div>
     `;
 }
@@ -1715,7 +1716,7 @@ function applyPendingIndicator(tab) {
     input.placeholder = chatInputPlaceholder(tab);
     input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));
   }
-  if (send) send.disabled = !tab;
+  if (send) send.disabled = !tab || !!tab.sending;
   syncChatActionButtons(tab);
 }
 
@@ -2154,13 +2155,14 @@ async function pollChat() {
 async function sendChatLine() {
   const t = currentChatTab();
   if (!t) return;
+  if (t.sending) return;
   const input = $("#chat-input");
   const text = input.value;
   if (!text.trim()) return;
   input.value = "";
   resizeChatInput(input);
   requestChatInputFocus();
-  await sendChatText(text);
+  await sendChatText(text, t);
   requestChatInputFocus();
 }
 
@@ -2244,14 +2246,29 @@ function focusChatInputSoon() {
   }, 0);
 }
 
-async function sendChatText(text) {
-  const t = currentChatTab();
+async function sendChatText(text, tab = currentChatTab()) {
+  const t = tab;
   if (!t) return;
   text = String(text || "");
   if (!text.trim()) return;
+  if (t.sending) return;
+  t.sending = true;
+  saveChatStateToStorage();
+  drawToolbar();
+  try {
+    await sendChatTextUnlocked(t, text);
+  } finally {
+    t.sending = false;
+    saveChatStateToStorage();
+    drawToolbar();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
+  }
+}
+
+async function sendChatTextUnlocked(t, text) {
   if (!t.sessionId) {
     queueChatTextForTab(t, text);
-    ensureChatSession(t);
+    await ensureChatSession(t);
     saveChatStateToStorage();
     drawToolbar();
     requestChatInputFocus();
