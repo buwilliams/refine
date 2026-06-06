@@ -1155,7 +1155,12 @@ impl InProcessWebServer {
         let Some(source_root) = self.source_root() else {
             return durable_root_unavailable("undo Git changes");
         };
-        match FileGitWorktreeService::new(source_root).revert_commit(commit) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("undo Git changes");
+        };
+        match FileGitWorktreeService::with_runtime_root(source_root, runtime_root)
+            .revert_commit(commit)
+        {
             Ok(result) => ApiResponse::json(
                 200,
                 json!({
@@ -1310,7 +1315,10 @@ impl InProcessWebServer {
         let Some(source_root) = self.source_root() else {
             return durable_root_unavailable("hard-reset Git worktree");
         };
-        match FileGitWorktreeService::new(source_root).hard_reset() {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("hard-reset Git worktree");
+        };
+        match FileGitWorktreeService::with_runtime_root(source_root, runtime_root).hard_reset() {
             Ok(result) => ApiResponse::json(
                 200,
                 json!({

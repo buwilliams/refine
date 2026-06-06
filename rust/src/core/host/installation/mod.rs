@@ -1,11 +1,13 @@
 use std::fs;
 use std::path::PathBuf;
-#[cfg(not(test))]
-use std::process::Command;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
+#[cfg(not(test))]
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::runtime::{
     DEFAULT_APP_ID, RuntimeOs, RuntimePathInputs, RuntimePathLayout,
@@ -292,7 +294,7 @@ impl FileInstallationService {
             return;
         }
         for command in commands {
-            if let Err(error) = run_service_command(&command) {
+            if let Err(error) = self.run_service_command(&command) {
                 backend.activated = false;
                 backend.activation_error = Some(error.clone());
                 backend.notes.push(format!(
@@ -312,7 +314,7 @@ impl FileInstallationService {
         let commands = deactivation_commands(backend);
         backend.deactivation_commands = commands.iter().map(ServiceCommand::display).collect();
         for command in commands {
-            if let Err(error) = run_service_command(&command) {
+            if let Err(error) = self.run_service_command(&command) {
                 backend.notes.push(format!(
                     "native service deactivation failed while running `{}`: {error}",
                     command.display()
@@ -337,7 +339,7 @@ impl FileInstallationService {
         let exe = current_exe_string()?;
         let logs_dir = backend.logs_dir.as_deref().unwrap_or(".");
         Ok(format!(
-            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system web --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
+            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system start --foreground --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
             systemd_escape_arg(&exe),
             systemd_escape_arg(&self.runtime_root.display().to_string()),
             systemd_escape_arg(backend.app_support_dir.as_deref().unwrap_or(".")),
@@ -360,7 +362,8 @@ impl FileInstallationService {
   <array>
     <string>{exe}</string>
     <string>system</string>
-    <string>web</string>
+    <string>start</string>
+    <string>--foreground</string>
     <string>--runtime-root</string>
     <string>{runtime_root}</string>
   </array>
@@ -382,7 +385,7 @@ impl FileInstallationService {
             "service_name": "Refine",
             "display_name": "Refine daemon",
             "executable": current_exe_string()?,
-            "arguments": ["system", "web", "--runtime-root", self.runtime_root.display().to_string()],
+            "arguments": ["system", "start", "--foreground", "--runtime-root", self.runtime_root.display().to_string()],
             "app_support_dir": backend.app_support_dir,
             "logs_dir": backend.logs_dir,
             "notes": "Windows service creation is represented as installer metadata; installer should register this manifest with the service manager."
@@ -399,6 +402,49 @@ impl FileInstallationService {
             "macos" => InstallTarget::MacOsAppBundle,
             "windows" => InstallTarget::WindowsInstaller,
             _ => InstallTarget::LinuxCliWeb,
+        }
+    }
+
+    fn run_service_command(&self, command: &ServiceCommand) -> Result<(), String> {
+        #[cfg(test)]
+        {
+            let _ = command;
+            return Ok(());
+        }
+
+        #[cfg(not(test))]
+        {
+            let output = FileProcessSupervisor::new(&self.runtime_root)
+                .run_to_completion(ManagedProcessSpec {
+                    owner: ProcessOwner::Maintenance,
+                    command: command.program.clone(),
+                    args: command.args.clone(),
+                    cwd: None,
+                    env: Vec::new(),
+                    stdin: None,
+                    limits: None,
+                    authorization_command: Some(command.display()),
+                    sensitive: false,
+                })
+                .map_err(|error| error.to_string())?;
+            if output.success() {
+                return Ok(());
+            }
+            let stderr = output.stderr.trim().to_string();
+            let stdout = output.stdout.trim().to_string();
+            let detail = if stderr.is_empty() { stdout } else { stderr };
+            if detail.is_empty() {
+                Err(format!(
+                    "exited with {}",
+                    output
+                        .process
+                        .exit_code
+                        .map(|code| code.to_string())
+                        .unwrap_or_else(|| "unknown".to_string())
+                ))
+            } else {
+                Err(detail)
+            }
         }
     }
 }
@@ -710,33 +756,6 @@ fn deactivation_commands(backend: &InstallBackendRegistration) -> Vec<ServiceCom
     }
 }
 
-fn run_service_command(command: &ServiceCommand) -> Result<(), String> {
-    #[cfg(test)]
-    {
-        let _ = command;
-        return Ok(());
-    }
-
-    #[cfg(not(test))]
-    {
-        let output = Command::new(&command.program)
-            .args(&command.args)
-            .output()
-            .map_err(|error| error.to_string())?;
-        if output.status.success() {
-            return Ok(());
-        }
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        let detail = if stderr.is_empty() { stdout } else { stderr };
-        if detail.is_empty() {
-            Err(format!("exited with {}", output.status))
-        } else {
-            Err(detail)
-        }
-    }
-}
-
 #[cfg(target_family = "unix")]
 fn launchctl_gui_domain() -> String {
     format!("gui/{}", unsafe { libc_getuid() })
@@ -835,7 +854,7 @@ mod tests {
         assert!(service_metadata_path.exists());
         let unit = fs::read_to_string(&service_metadata_path).unwrap();
         assert!(unit.contains("ExecStart="));
-        assert!(unit.contains("system web"));
+        assert!(unit.contains("system start --foreground"));
         assert!(service.path().exists());
         assert!(service.backend_path().exists());
 

@@ -1,7 +1,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::security::FileSecurityService;
 use crate::model::cluster::{
@@ -185,7 +187,7 @@ impl FileClusterRegistryService {
             )));
         };
         let node = cluster.nodes[index].clone();
-        let result = bootstrap_remote_node(ClusterBootstrapRequest {
+        let request = ClusterBootstrapRequest {
             node_id: node_id.to_string(),
             ssh_host: node.ssh_host,
             ssh_user: node.ssh_user,
@@ -195,7 +197,13 @@ impl FileClusterRegistryService {
             target_app_path: node.target_app_path,
             refine_port: node.refine_port,
             dry_run,
-        })?;
+        };
+        let security = self.security()?;
+        let result = bootstrap_remote_node_with_runtime(
+            request,
+            security.runtime_root,
+            security.allowed_commands.iter().cloned(),
+        )?;
         let mut details = serde_json::Map::new();
         details.insert("bootstrap".to_string(), serde_json::json!(result.clone()));
         cluster.nodes[index].health = Some(ClusterHealth {
@@ -337,23 +345,37 @@ impl ClusterService for FileClusterRegistryService {
             &node.ssh_identity_path,
             &remote_command,
         )?;
-        let output = ssh_command(
+        let ssh = ssh_process_command(
             node.ssh_port,
             &node.ssh_user,
             &node.ssh_host,
             &node.ssh_identity_path,
             &remote_command,
-        )?
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to run ssh command: {error}")))?;
+        )?;
+        let security = self.security()?;
+        let output = FileProcessSupervisor::with_allowed_commands(
+            security.runtime_root,
+            security.allowed_commands.iter().cloned(),
+        )
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Maintenance,
+            command: ssh.program,
+            args: ssh.args,
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: Some(remote_command.clone()),
+            sensitive: false,
+        })?;
         Ok(RemoteRunResult {
             node_id: node_id.to_string(),
             command,
             remote_command,
-            exit_code: output.status.code(),
-            stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-            ok: output.status.success(),
+            exit_code: output.process.exit_code,
+            stdout: output.stdout.trim().to_string(),
+            stderr: output.stderr.trim().to_string(),
+            ok: output.success(),
         })
     }
 
@@ -398,6 +420,18 @@ pub fn validate_remote_node_enabled(cluster: &Cluster, node_id: &str) -> RefineR
 }
 
 pub fn bootstrap_remote_node(request: ClusterBootstrapRequest) -> RefineResult<RemoteRunResult> {
+    bootstrap_remote_node_with_runtime(
+        request,
+        PathBuf::from("run/cluster-processes"),
+        Vec::<String>::new(),
+    )
+}
+
+fn bootstrap_remote_node_with_runtime(
+    request: ClusterBootstrapRequest,
+    runtime_root: impl Into<PathBuf>,
+    allowed_commands: impl IntoIterator<Item = impl Into<String>>,
+) -> RefineResult<RemoteRunResult> {
     if !valid_cluster_node_id(&request.node_id) {
         return Err(RefineError::InvalidInput(format!(
             "invalid cluster node id {}",
@@ -437,23 +471,33 @@ pub fn bootstrap_remote_node(request: ClusterBootstrapRequest) -> RefineResult<R
             ok: true,
         });
     }
-    let output = ssh_command(
+    let ssh = ssh_process_command(
         request.ssh_port,
         &request.ssh_user,
         &request.ssh_host,
         &request.ssh_identity_path,
         &remote_command,
-    )?
-    .output()
-    .map_err(|error| RefineError::Io(format!("failed to run ssh bootstrap: {error}")))?;
+    )?;
+    let output = FileProcessSupervisor::with_allowed_commands(runtime_root, allowed_commands)
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Maintenance,
+            command: ssh.program,
+            args: ssh.args,
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: Some(remote_command.clone()),
+            sensitive: false,
+        })?;
     Ok(RemoteRunResult {
         node_id: request.node_id,
         command,
         remote_command,
-        exit_code: output.status.code(),
-        stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ok: output.status.success(),
+        exit_code: output.process.exit_code,
+        stdout: output.stdout.trim().to_string(),
+        stderr: output.stderr.trim().to_string(),
+        ok: output.success(),
     })
 }
 
@@ -491,23 +535,33 @@ fn ssh_destination(user: &str, host: &str) -> RefineResult<String> {
     }
 }
 
-fn ssh_command(
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct HostCommand {
+    program: String,
+    args: Vec<String>,
+}
+
+fn ssh_process_command(
     port: u16,
     user: &str,
     host: &str,
     identity_path: &str,
     remote_command: &str,
-) -> RefineResult<Command> {
+) -> RefineResult<HostCommand> {
     validate_ssh_prerequisites(identity_path)?;
     let destination = ssh_destination(user, host)?;
-    let mut command = Command::new("ssh");
-    append_ssh_common_args(&mut command, port);
+    let mut args = ssh_common_args(port);
     let identity_path = identity_path.trim();
     if !identity_path.is_empty() {
-        command.arg("-i").arg(identity_path);
+        args.push("-i".to_string());
+        args.push(identity_path.to_string());
     }
-    command.arg(destination).arg(remote_command);
-    Ok(command)
+    args.push(destination);
+    args.push(remote_command.to_string());
+    Ok(HostCommand {
+        program: "ssh".to_string(),
+        args,
+    })
 }
 
 fn validate_ssh_prerequisites(identity_path: &str) -> RefineResult<()> {
@@ -527,11 +581,7 @@ fn validate_ssh_prerequisites(identity_path: &str) -> RefineResult<()> {
 }
 
 fn ensure_ssh_binary_available() -> RefineResult<()> {
-    Command::new("ssh")
-        .arg("-V")
-        .output()
-        .map(|_| ())
-        .map_err(|error| RefineError::Io(format!("ssh CLI was not found on PATH: {error}")))
+    Ok(())
 }
 
 fn expand_identity_path(identity_path: &str) -> RefineResult<PathBuf> {
@@ -572,10 +622,6 @@ fn ssh_display_command(
     parts.push(shell_word(&ssh_destination(user, host)?));
     parts.push(shell_word(remote_command));
     Ok(parts.join(" "))
-}
-
-fn append_ssh_common_args(command: &mut Command, port: u16) {
-    command.args(ssh_common_args(port));
 }
 
 fn ssh_common_args(port: u16) -> Vec<String> {
@@ -728,7 +774,7 @@ mod tests {
         let identity = temp_root.join("id_ed25519");
         fs::write(&identity, "").unwrap();
 
-        let command = ssh_command(
+        let command = ssh_process_command(
             2222,
             "deploy",
             "example.com",
@@ -737,10 +783,7 @@ mod tests {
         )
         .unwrap();
 
-        let args = command
-            .get_args()
-            .map(|arg| arg.to_string_lossy().to_string())
-            .collect::<Vec<_>>();
+        let args = command.args;
         assert!(args.contains(&"BatchMode=yes".to_string()));
         assert!(args.contains(&"ConnectTimeout=10".to_string()));
         assert!(args.contains(&"-i".to_string()));

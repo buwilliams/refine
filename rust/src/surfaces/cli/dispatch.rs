@@ -785,16 +785,25 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::System {
-            action: SystemAction::Start { port, runtime_root },
-        } => {
-            let status = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root })
-                .start_background_daemon(BackgroundDaemonConfig {
+            action:
+                SystemAction::Start {
                     port,
-                    ..Default::default()
-                })?;
-            println!("{}", serde_json::to_string_pretty(&status).unwrap());
-            Ok(())
-        }
+                    cache_dir,
+                    static_root,
+                    runtime_root,
+                    token,
+                    once,
+                    foreground,
+                },
+        } => run_system_start(
+            port,
+            cache_dir,
+            static_root,
+            runtime_root,
+            token,
+            once,
+            foreground,
+        ),
         Commands::System {
             action: SystemAction::Stop { port, runtime_root },
         } => {
@@ -1556,81 +1565,79 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
-        Commands::System {
-            action:
-                SystemAction::Web {
-                    port,
-                    cache_dir,
-                    static_root,
-                    runtime_root,
-                    token,
-                    once,
-                    foreground,
-                },
-        } => {
-            if !foreground && !once {
-                let status = FileDaemonLifecycleService::new(RuntimeRoot {
-                    root: runtime_root.clone(),
-                })
-                .start_background_daemon(BackgroundDaemonConfig {
-                    port,
-                    cache_dir,
-                    static_root,
-                    token,
-                })?;
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&web_response(status)).unwrap()
-                );
-                return Ok(());
-            }
-            let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
-            let snapshot = if let Some(client_repo) = project_status.client_repo {
-                let durable_root = PathBuf::from(client_repo).join(".refine");
-                let store = FileProjectStateStore::new(&durable_root);
-                let cache_root = cache_dir
-                    .clone()
-                    .unwrap_or_else(|| runtime_root.join("cache"));
-                store.load_or_refresh_projection(&cache_root)?
-            } else {
-                ProjectionSnapshot::default()
-            };
-            let listener = LocalHttpDaemon::bind_loopback(port)?;
-            let addr = LocalHttpDaemon::local_addr(&listener)?;
-            let actual_port = addr.port();
-            let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
-                root: runtime_root.clone(),
-            });
-            let status = lifecycle.start(actual_port)?;
-            let daemon = LocalHttpDaemon {
-                server: InProcessWebServer {
-                    status,
-                    projection: snapshot,
-                    auth_token: token,
-                    durable_root: None,
-                    runtime_root: Some(runtime_root),
-                },
-                static_root: static_root.or_else(default_static_root),
-            };
-            eprintln!("running foreground Refine daemon web server at http://{addr}");
-            if once {
-                daemon.serve_next(&listener)?;
-            } else {
-                loop {
-                    daemon.serve_next_concurrent(&listener)?;
-                    if !lifecycle.status(actual_port)?.daemon_healthy {
-                        break;
-                    }
-                }
-            }
-            Ok(())
-        }
         Commands::Gap { action } => dispatch_gap_daemon(action),
         Commands::Feature { action } => dispatch_feature_daemon(action),
         Commands::Workflow { action } => dispatch_workflow_daemon(action),
         Commands::Node { action } => dispatch_node_daemon(action),
         Commands::Cluster { action } => dispatch_cluster_daemon(action),
     }
+}
+
+fn run_system_start(
+    port: u16,
+    cache_dir: Option<PathBuf>,
+    static_root: Option<PathBuf>,
+    runtime_root: PathBuf,
+    token: Option<String>,
+    once: bool,
+    foreground: bool,
+) -> RefineResult<()> {
+    if !foreground && !once {
+        let status = FileDaemonLifecycleService::new(RuntimeRoot {
+            root: runtime_root.clone(),
+        })
+        .start_background_daemon(BackgroundDaemonConfig {
+            port,
+            cache_dir,
+            static_root,
+            token,
+        })?;
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&web_response(status)).unwrap()
+        );
+        return Ok(());
+    }
+    let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
+    let snapshot = if let Some(client_repo) = project_status.client_repo {
+        let durable_root = PathBuf::from(client_repo).join(".refine");
+        let store = FileProjectStateStore::new(&durable_root);
+        let cache_root = cache_dir
+            .clone()
+            .unwrap_or_else(|| runtime_root.join("cache"));
+        store.load_or_refresh_projection(&cache_root)?
+    } else {
+        ProjectionSnapshot::default()
+    };
+    let listener = LocalHttpDaemon::bind_loopback(port)?;
+    let addr = LocalHttpDaemon::local_addr(&listener)?;
+    let actual_port = addr.port();
+    let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
+        root: runtime_root.clone(),
+    });
+    let status = lifecycle.start(actual_port)?;
+    let daemon = LocalHttpDaemon {
+        server: InProcessWebServer {
+            status,
+            projection: snapshot,
+            auth_token: token,
+            durable_root: None,
+            runtime_root: Some(runtime_root),
+        },
+        static_root: static_root.or_else(default_static_root),
+    };
+    eprintln!("running foreground Refine daemon at http://{addr}");
+    if once {
+        daemon.serve_next(&listener)?;
+    } else {
+        loop {
+            daemon.serve_next_concurrent(&listener)?;
+            if !lifecycle.status(actual_port)?.daemon_healthy {
+                break;
+            }
+        }
+    }
+    Ok(())
 }
 
 #[cfg(not(test))]
@@ -2506,8 +2513,7 @@ pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf>
             | SystemAction::Stop { .. }
             | SystemAction::Restart { .. }
             | SystemAction::Status { .. }
-            | SystemAction::ApiGroups
-            | SystemAction::Web { .. } => None,
+            | SystemAction::ApiGroups => None,
         },
     }
     .filter(|path| !skipped_durable_root(path))

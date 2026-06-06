@@ -694,8 +694,18 @@ pub enum SystemAction {
     Start {
         #[arg(long, default_value_t = 8080)]
         port: u16,
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+        #[arg(long)]
+        static_root: Option<PathBuf>,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
+        #[arg(long)]
+        token: Option<String>,
+        #[arg(long)]
+        once: bool,
+        #[arg(long)]
+        foreground: bool,
     },
     Stop {
         #[arg(long, default_value_t = 8080)]
@@ -725,23 +735,6 @@ pub enum SystemAction {
         repo_root: PathBuf,
     },
     ApiGroups,
-    #[command(name = "web")]
-    Web {
-        #[arg(long, default_value_t = 8080)]
-        port: u16,
-        #[arg(long)]
-        cache_dir: Option<PathBuf>,
-        #[arg(long)]
-        static_root: Option<PathBuf>,
-        #[arg(long, default_value = "run")]
-        runtime_root: PathBuf,
-        #[arg(long)]
-        token: Option<String>,
-        #[arg(long)]
-        once: bool,
-        #[arg(long, hide = true)]
-        foreground: bool,
-    },
 }
 
 #[derive(Clone, Debug, ValueEnum)]

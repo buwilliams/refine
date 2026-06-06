@@ -1,12 +1,14 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
@@ -373,7 +375,7 @@ impl FileQualityService {
         screenshot_path: &Path,
         target_url: &str,
     ) -> RefineResult<RegressionExecution> {
-        let Some(mut command) = self.playwright_command() else {
+        let Some(command) = self.playwright_command() else {
             return Ok(RegressionExecution {
                 command: format!("playwright test {}", regression.spec_path),
                 ok: false,
@@ -391,25 +393,32 @@ impl FileQualityService {
             out_dir.display(),
             regression.timeout_seconds.saturating_mul(1000)
         );
-        command
-            .command
-            .arg("test")
-            .arg(self.spec_file(regression))
-            .arg("--reporter=json")
-            .arg("--output")
-            .arg(out_dir)
-            .arg("--timeout")
-            .arg(regression.timeout_seconds.saturating_mul(1000).to_string())
-            .env("REFINE_TARGET_APP_URL", target_url)
-            .env("REFINE_REGRESSION_SCREENSHOT", screenshot_path)
-            .current_dir(self.project_root());
-        let output = command.command.output().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to run Playwright regression command: {error}"
-            ))
-        })?;
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let mut args = command.args;
+        args.extend([
+            "test".to_string(),
+            self.spec_file(regression).display().to_string(),
+            "--reporter=json".to_string(),
+            "--output".to_string(),
+            out_dir.display().to_string(),
+            "--timeout".to_string(),
+            regression.timeout_seconds.saturating_mul(1000).to_string(),
+        ]);
+        let output = self.run_quality_process(
+            command.program,
+            args,
+            Some(vec![
+                ("REFINE_TARGET_APP_URL".to_string(), target_url.to_string()),
+                (
+                    "REFINE_REGRESSION_SCREENSHOT".to_string(),
+                    screenshot_path.display().to_string(),
+                ),
+            ]),
+            &command_display,
+        )?;
+        let ok = output.success();
+        let exit_code = output.process.exit_code;
+        let stdout = output.stdout;
+        let stderr = output.stderr;
         let report_path = out_dir.join("report.json");
         let json_report_written = if stdout.trim().is_empty() {
             false
@@ -422,7 +431,6 @@ impl FileQualityService {
             })?;
             true
         };
-        let ok = output.status.success();
         Ok(RegressionExecution {
             command: command_display,
             ok,
@@ -432,9 +440,7 @@ impl FileQualityService {
             } else {
                 format!(
                     "Playwright regression failed{}",
-                    output
-                        .status
-                        .code()
+                    exit_code
                         .map(|code| format!(" with exit code {code}"))
                         .unwrap_or_default()
                 )
@@ -630,24 +636,51 @@ impl FileQualityService {
         if local.is_file() {
             return Some(PlaywrightCommand {
                 display: local.display().to_string(),
-                command: Command::new(local),
+                program: local.display().to_string(),
+                args: Vec::new(),
             });
         }
         if project_root.join("package.json").is_file() {
-            let mut command = Command::new(if cfg!(windows) { "npx.cmd" } else { "npx" });
-            command.arg("playwright");
             return Some(PlaywrightCommand {
                 display: "npx playwright".to_string(),
-                command,
+                program: if cfg!(windows) { "npx.cmd" } else { "npx" }.to_string(),
+                args: vec!["playwright".to_string()],
             });
         }
         Some(PlaywrightCommand {
             display: "playwright".to_string(),
-            command: Command::new(if cfg!(windows) {
+            program: if cfg!(windows) {
                 "playwright.cmd"
             } else {
                 "playwright"
-            }),
+            }
+            .to_string(),
+            args: Vec::new(),
+        })
+    }
+
+    fn run_quality_process(
+        &self,
+        command: String,
+        args: Vec<String>,
+        env: Option<Vec<(String, String)>>,
+        authorization_command: &str,
+    ) -> RefineResult<crate::core::host::process_supervision::ManagedProcessOutput> {
+        let security = self.security()?;
+        FileProcessSupervisor::with_allowed_commands(
+            security.runtime_root,
+            security.allowed_commands.iter().cloned(),
+        )
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Quality,
+            command,
+            args,
+            cwd: Some(self.project_root().display().to_string()),
+            env: env.unwrap_or_default(),
+            stdin: None,
+            limits: None,
+            authorization_command: Some(authorization_command.to_string()),
+            sensitive: false,
         })
     }
 }
@@ -655,7 +688,8 @@ impl FileQualityService {
 #[derive(Debug)]
 struct PlaywrightCommand {
     display: String,
-    command: Command,
+    program: String,
+    args: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -840,14 +874,12 @@ impl QualityService for FileQualityService {
                 })
             };
         }
-        self.security()?
-            .authorize_host_command("quality", &request.command)?;
-        let output = shell_command(&request.command)
-            .current_dir(self.project_root())
-            .output()
-            .map_err(|error| RefineError::Io(format!("failed to run quality command: {error}")))?;
-        let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let (shell, args) = shell_program_args(&request.command);
+        let output = self.run_quality_process(shell, args, None, &request.command)?;
+        let ok = output.success();
+        let exit_code = output.process.exit_code;
+        let stdout = output.stdout;
+        let stderr = output.stderr;
         let mut diagnostics = Vec::new();
         if let Some(stdout) = tail_text(&stdout, 4000) {
             diagnostics.push(stdout);
@@ -856,11 +888,16 @@ impl QualityService for FileQualityService {
             diagnostics.push(stderr);
         }
         if diagnostics.is_empty() {
-            diagnostics.push(format!("quality command exited {}", output.status));
+            diagnostics.push(format!(
+                "quality command exited {}",
+                exit_code
+                    .map(|code| code.to_string())
+                    .unwrap_or_else(|| "unknown".to_string())
+            ));
         }
         Ok(QualityCheckResult {
             owner_id: request.owner_id,
-            ok: output.status.success(),
+            ok,
             diagnostics,
         })
     }
@@ -1149,18 +1186,20 @@ pub(super) fn quality_job_log(
     }
 }
 
-pub(super) fn shell_command(command: &str) -> Command {
+pub(super) fn shell_program_args(command: &str) -> (String, Vec<String>) {
     #[cfg(windows)]
     {
-        let mut cmd = Command::new("cmd");
-        cmd.arg("/C").arg(command);
-        cmd
+        (
+            "cmd".to_string(),
+            vec!["/C".to_string(), command.to_string()],
+        )
     }
     #[cfg(not(windows))]
     {
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(command);
-        cmd
+        (
+            "sh".to_string(),
+            vec!["-c".to_string(), command.to_string()],
+        )
     }
 }
 

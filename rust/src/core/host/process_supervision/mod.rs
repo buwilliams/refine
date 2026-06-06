@@ -51,6 +51,8 @@ pub struct ManagedProcessSpec {
     pub limits: Option<ProcessResourceLimits>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authorization_command: Option<String>,
+    #[serde(default)]
+    pub sensitive: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -80,6 +82,19 @@ pub struct ManagedProcess {
     pub started_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ManagedProcessOutput {
+    pub process: ManagedProcess,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+impl ManagedProcessOutput {
+    pub fn success(&self) -> bool {
+        self.process.exit_code == Some(0)
+    }
 }
 
 impl ManagedProcess {
@@ -265,10 +280,116 @@ impl FileProcessSupervisor {
         self.write_process(&process)?;
         Ok(process)
     }
-}
 
-impl ProcessSupervisor for FileProcessSupervisor {
-    fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
+    pub fn run_to_completion(
+        &self,
+        spec: ManagedProcessSpec,
+    ) -> RefineResult<ManagedProcessOutput> {
+        self.validate_launch(&spec)?;
+        fs::create_dir_all(self.processes_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process registry {}: {error}",
+                self.processes_dir().display()
+            ))
+        })?;
+        let process_id = new_process_id();
+        let stdout_path = self
+            .processes_dir()
+            .join(format!("{process_id}.stdout.log"));
+        let stderr_path = self
+            .processes_dir()
+            .join(format!("{process_id}.stderr.log"));
+
+        let mut command = process_command(&spec);
+        command.stdout(Stdio::piped()).stderr(Stdio::piped());
+        if spec.stdin.is_some() {
+            command.stdin(Stdio::piped());
+        } else {
+            command.stdin(Stdio::null());
+        }
+
+        let mut child = command.spawn().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to launch managed process {}: {error}",
+                spec.command
+            ))
+        })?;
+        let stdin_path = if let Some(stdin) = spec.stdin.as_deref() {
+            let path = self.processes_dir().join(format!("{process_id}.stdin.txt"));
+            if !spec.sensitive {
+                fs::write(&path, stdin).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to write process stdin {}: {error}",
+                        path.display()
+                    ))
+                })?;
+            }
+            if let Some(mut child_stdin) = child.stdin.take() {
+                child_stdin.write_all(stdin.as_bytes()).map_err(|error| {
+                    RefineError::Io(format!("failed to send managed process stdin: {error}"))
+                })?;
+            }
+            if spec.sensitive {
+                None
+            } else {
+                Some(path.display().to_string())
+            }
+        } else {
+            None
+        };
+        let mut process = ManagedProcess {
+            id: process_id,
+            owner: spec.owner,
+            pid: Some(child.id()),
+            state: "running".to_string(),
+            label: Some(spec.command),
+            details: Some(if spec.sensitive {
+                "redacted".to_string()
+            } else {
+                spec.args.join(" ")
+            }),
+            stdout_path: Some(stdout_path.display().to_string()),
+            stderr_path: Some(stderr_path.display().to_string()),
+            stdin_path,
+            limits: spec.limits,
+            started_at: now_millis_string(),
+            exit_code: None,
+        };
+        self.write_process(&process)?;
+
+        let output = child.wait_with_output().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to wait for managed process {}: {error}",
+                process.id
+            ))
+        })?;
+        fs::write(&stdout_path, &output.stdout).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to write process stdout log {}: {error}",
+                stdout_path.display()
+            ))
+        })?;
+        fs::write(&stderr_path, &output.stderr).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to write process stderr log {}: {error}",
+                stderr_path.display()
+            ))
+        })?;
+        process.state = if output.status.success() {
+            "exited".to_string()
+        } else {
+            "failed".to_string()
+        };
+        process.exit_code = output.status.code();
+        self.write_process(&process)?;
+        Ok(ManagedProcessOutput {
+            process,
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+        })
+    }
+
+    fn validate_launch(&self, spec: &ManagedProcessSpec) -> RefineResult<()> {
         let pause_state = self.pause_state()?;
         if pause_state.agents_paused && spec.owner == ProcessOwner::Agent {
             return Err(RefineError::Conflict(
@@ -288,12 +409,18 @@ impl ProcessSupervisor for FileProcessSupervisor {
         let authorization_command = spec
             .authorization_command
             .clone()
-            .unwrap_or_else(|| process_command_line(&spec));
+            .unwrap_or_else(|| process_command_line(spec));
         FileSecurityService::with_allowed_commands(
             &self.runtime_root,
             self.allowed_commands.iter().cloned(),
         )
-        .authorize_host_command("process_supervisor", &authorization_command)?;
+        .authorize_host_command("process_supervisor", &authorization_command)
+    }
+}
+
+impl ProcessSupervisor for FileProcessSupervisor {
+    fn launch(&self, spec: ManagedProcessSpec) -> RefineResult<ManagedProcess> {
+        self.validate_launch(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create process registry {}: {error}",
@@ -320,12 +447,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             ))
         })?;
 
-        let mut command = Command::new(&spec.command);
-        command.args(&spec.args);
-        if let Some(cwd) = spec.cwd.as_deref().filter(|cwd| !cwd.trim().is_empty()) {
-            command.current_dir(cwd);
-        }
-        command.envs(spec.env.iter().map(|(key, value)| (key, value)));
+        let mut command = process_command(&spec);
         command.stdout(Stdio::from(stdout));
         command.stderr(Stdio::from(stderr));
         if spec.stdin.is_some() {
@@ -342,18 +464,24 @@ impl ProcessSupervisor for FileProcessSupervisor {
         })?;
         let stdin_path = if let Some(stdin) = spec.stdin.as_deref() {
             let path = self.processes_dir().join(format!("{process_id}.stdin.txt"));
-            fs::write(&path, stdin).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to write process stdin {}: {error}",
-                    path.display()
-                ))
-            })?;
+            if !spec.sensitive {
+                fs::write(&path, stdin).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to write process stdin {}: {error}",
+                        path.display()
+                    ))
+                })?;
+            }
             if let Some(mut child_stdin) = child.stdin.take() {
                 child_stdin.write_all(stdin.as_bytes()).map_err(|error| {
                     RefineError::Io(format!("failed to send managed process stdin: {error}"))
                 })?;
             }
-            Some(path.display().to_string())
+            if spec.sensitive {
+                None
+            } else {
+                Some(path.display().to_string())
+            }
         } else {
             None
         };
@@ -364,7 +492,11 @@ impl ProcessSupervisor for FileProcessSupervisor {
             pid: Some(child.id()),
             state: "running".to_string(),
             label: Some(spec.command),
-            details: Some(spec.args.join(" ")),
+            details: Some(if spec.sensitive {
+                "redacted".to_string()
+            } else {
+                spec.args.join(" ")
+            }),
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: Some(stderr_path.display().to_string()),
             stdin_path,
@@ -508,6 +640,16 @@ fn process_command_line(spec: &ManagedProcessSpec) -> String {
         .chain(spec.args.iter().map(String::as_str))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn process_command(spec: &ManagedProcessSpec) -> Command {
+    let mut command = Command::new(&spec.command);
+    command.args(&spec.args);
+    if let Some(cwd) = spec.cwd.as_deref().filter(|cwd| !cwd.trim().is_empty()) {
+        command.current_dir(cwd);
+    }
+    command.envs(spec.env.iter().map(|(key, value)| (key, value)));
+    command
 }
 
 fn process_isolation_label(limits: Option<&ProcessResourceLimits>) -> &'static str {
@@ -678,6 +820,7 @@ mod tests {
                     kill_on_parent_exit: false,
                 }),
                 authorization_command: None,
+                sensitive: false,
             })
             .unwrap();
         assert_eq!(supervisor.list().unwrap().len(), 1);
@@ -781,6 +924,7 @@ mod tests {
             stdin: None,
             limits: None,
             authorization_command: None,
+            sensitive: false,
         });
         assert!(rejected.is_err());
         supervisor.set_agents_paused(false).unwrap();
@@ -822,11 +966,46 @@ mod tests {
             stdin: None,
             limits: None,
             authorization_command: Some("rm -rf target".to_string()),
+            sensitive: false,
         });
 
         assert!(matches!(denied, Err(RefineError::Unauthorized(_))));
         let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
         assert!(audit.contains("\"outcome\":\"denied\""));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_redacts_sensitive_process_details_and_stdin() {
+        let temp_root = unique_temp_dir("process-sensitive");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+
+        let process = supervisor
+            .run_to_completion(ManagedProcessSpec {
+                owner: ProcessOwner::Maintenance,
+                command: shell_binary().to_string(),
+                args: shell_args("cat >/dev/null").to_vec(),
+                cwd: None,
+                env: Vec::new(),
+                stdin: Some("secret-value".to_string()),
+                limits: None,
+                authorization_command: None,
+                sensitive: true,
+            })
+            .unwrap()
+            .process;
+
+        assert_eq!(process.details.as_deref(), Some("redacted"));
+        assert!(process.stdin_path.is_none());
+        let registry = fs::read_to_string(
+            supervisor
+                .processes_dir()
+                .join(format!("{}.json", process.id)),
+        )
+        .unwrap();
+        assert!(!registry.contains("secret-value"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

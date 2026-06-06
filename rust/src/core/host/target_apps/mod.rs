@@ -1,7 +1,6 @@
 use std::fs;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Duration;
 
 use chrono::Utc;
@@ -151,6 +150,7 @@ impl FileTargetAppService {
             stdin: None,
             limits: None,
             authorization_command: Some(command.clone()),
+            sensitive: false,
         })?;
         let operation = TargetAppOperation {
             id: new_operation_id("target-start"),
@@ -354,26 +354,33 @@ impl FileTargetAppService {
         let started_at = now_timestamp();
         FileSecurityService::from_project_settings(&self.runtime_root, &self.durable_root)?
             .authorize_host_command("target_app", command)?;
-        let output = shell_command(command)
-            .current_dir(self.command_cwd(settings))
-            .envs(command_env(settings)?)
-            .output()
-            .map_err(|error| {
-                RefineError::Io(format!("failed to run target app {kind} command: {error}"))
-            })?;
+        let (shell, args) = shell_program_args(command);
+        let output = FileProcessSupervisor::new(&self.runtime_root).run_to_completion(
+            ManagedProcessSpec {
+                owner: ProcessOwner::TargetApp,
+                command: shell,
+                args,
+                cwd: Some(self.command_cwd(settings).display().to_string()),
+                env: command_env(settings)?,
+                stdin: None,
+                limits: None,
+                authorization_command: Some(command.to_string()),
+                sensitive: false,
+            },
+        )?;
         Ok(TargetAppOperation {
             id: new_operation_id(&format!("target-{kind}")),
             kind: kind.to_string(),
-            state: if output.status.success() {
+            state: if output.success() {
                 "complete".to_string()
             } else {
                 "failed".to_string()
             },
             started_at,
             finished_at: now_timestamp(),
-            exit_code: output.status.code(),
-            stdout: String::from_utf8_lossy(&output.stdout).trim().to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).trim().to_string(),
+            exit_code: output.process.exit_code,
+            stdout: output.stdout.trim().to_string(),
+            stderr: output.stderr.trim().to_string(),
         })
     }
 
@@ -684,21 +691,6 @@ fn command_env(settings: &JsonObject) -> RefineResult<Vec<(String, String)>> {
                 })
         })
         .collect())
-}
-
-fn shell_command(command: &str) -> Command {
-    #[cfg(windows)]
-    {
-        let mut cmd = Command::new("cmd");
-        cmd.arg("/C").arg(command);
-        cmd
-    }
-    #[cfg(not(windows))]
-    {
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c").arg(command);
-        cmd
-    }
 }
 
 fn shell_program_args(command: &str) -> (String, Vec<String>) {

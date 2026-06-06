@@ -1,12 +1,16 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+#[cfg(test)]
+use std::process::Command;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 
 pub const GIT_AUDIT_FILE: &str = "refine-audit.jsonl";
@@ -50,11 +54,22 @@ pub trait GitWorktreeService {
 #[derive(Clone, Debug)]
 pub struct FileGitWorktreeService {
     pub root: PathBuf,
+    pub runtime_root: Option<PathBuf>,
 }
 
 impl FileGitWorktreeService {
     pub fn new(root: impl Into<PathBuf>) -> Self {
-        Self { root: root.into() }
+        Self {
+            root: root.into(),
+            runtime_root: None,
+        }
+    }
+
+    pub fn with_runtime_root(root: impl Into<PathBuf>, runtime_root: impl Into<PathBuf>) -> Self {
+        Self {
+            root: root.into(),
+            runtime_root: Some(runtime_root.into()),
+        }
     }
 
     pub fn audit_path(&self) -> RefineResult<PathBuf> {
@@ -86,7 +101,7 @@ impl FileGitWorktreeService {
     pub fn revert_commit(&self, commit: &str) -> RefineResult<MergeResult> {
         validate_commitish(commit)?;
         let output = self.git_raw(&["revert", "--no-edit", commit])?;
-        if output.status.success() {
+        if output.success {
             let result = MergeResult {
                 ok: true,
                 conflicts: Vec::new(),
@@ -118,27 +133,42 @@ impl FileGitWorktreeService {
         }
     }
 
-    fn git_output(&self, args: &[&str]) -> RefineResult<Output> {
+    fn git_output(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
         let output = self.git_raw(args)?;
-        if output.status.success() {
+        if output.success {
             Ok(output)
         } else {
             Err(RefineError::Conflict(trimmed_command_text(&output)))
         }
     }
 
-    fn git_raw(&self, args: &[&str]) -> RefineResult<Output> {
-        Command::new("git")
-            .arg("-C")
-            .arg(&self.root)
-            .args(args)
-            .output()
-            .map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to run git in {}: {error}",
-                    self.root.display()
-                ))
-            })
+    fn git_raw(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
+        let mut process_args = vec!["-C".to_string(), self.root.display().to_string()];
+        process_args.extend(args.iter().map(|arg| arg.to_string()));
+        let output = FileProcessSupervisor::new(self.process_runtime_root()).run_to_completion(
+            ManagedProcessSpec {
+                owner: ProcessOwner::Maintenance,
+                command: "git".to_string(),
+                args: process_args,
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: Some(format!("git {}", args.join(" "))),
+                sensitive: false,
+            },
+        )?;
+        Ok(HostCommandOutput {
+            success: output.success(),
+            stdout: output.stdout.into_bytes(),
+            stderr: output.stderr.into_bytes(),
+        })
+    }
+
+    fn process_runtime_root(&self) -> PathBuf {
+        self.runtime_root
+            .clone()
+            .unwrap_or_else(|| self.root.join(".refine/runtime"))
     }
 
     fn conflicts(&self) -> RefineResult<Vec<String>> {
@@ -191,12 +221,15 @@ impl FileGitWorktreeService {
 
 impl GitWorktreeService for FileGitWorktreeService {
     fn inspect(&self, path: &str) -> RefineResult<GitStatus> {
-        let service = FileGitWorktreeService::new(self.root_for(path));
+        let service = FileGitWorktreeService {
+            root: self.root_for(path),
+            runtime_root: self.runtime_root.clone(),
+        };
         let root = stdout(service.git_output(&["rev-parse", "--show-toplevel"])?)?
             .trim()
             .to_string();
         let branch_output = service.git_raw(&["branch", "--show-current"])?;
-        let branch = if branch_output.status.success() {
+        let branch = if branch_output.success {
             let branch = stdout(branch_output)?.trim().to_string();
             if branch.is_empty() {
                 None
@@ -272,7 +305,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         validate_branch_name(branch)?;
         let output = self.git_raw(&["merge", "--no-edit", branch])?;
         let result = MergeResult {
-            ok: output.status.success(),
+            ok: output.success,
             conflicts: self.conflicts().unwrap_or_default(),
             message: Some(trimmed_command_text(&output)),
         };
@@ -292,7 +325,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         validate_branch_name(branch)?;
         let output = self.git_raw(&["rebase", branch])?;
         let result = MergeResult {
-            ok: output.status.success(),
+            ok: output.success,
             conflicts: self.conflicts().unwrap_or_default(),
             message: Some(trimmed_command_text(&output)),
         };
@@ -347,7 +380,7 @@ impl GitWorktreeService for FileGitWorktreeService {
     fn hard_reset(&self) -> RefineResult<MergeResult> {
         let output = self.git_raw(&["reset", "--hard", "HEAD"])?;
         let result = MergeResult {
-            ok: output.status.success(),
+            ok: output.success,
             conflicts: self.conflicts().unwrap_or_default(),
             message: Some(trimmed_command_text(&output)),
         };
@@ -363,7 +396,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         let merge = self.git_raw(&["merge", "--abort"])?;
         let rebase = self.git_raw(&["rebase", "--abort"])?;
         let result = MergeResult {
-            ok: merge.status.success() || rebase.status.success(),
+            ok: merge.success || rebase.success,
             conflicts: self.conflicts().unwrap_or_default(),
             message: Some(format!(
                 "{}\n{}",
@@ -380,12 +413,19 @@ impl GitWorktreeService for FileGitWorktreeService {
     }
 }
 
-fn stdout(output: Output) -> RefineResult<String> {
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct HostCommandOutput {
+    success: bool,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+fn stdout(output: HostCommandOutput) -> RefineResult<String> {
     String::from_utf8(output.stdout)
         .map_err(|error| RefineError::Serialization(format!("git output was not UTF-8: {error}")))
 }
 
-fn trimmed_command_text(output: &Output) -> String {
+fn trimmed_command_text(output: &HostCommandOutput) -> String {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     format!("{}\n{}", stdout.trim(), stderr.trim())
@@ -547,7 +587,13 @@ mod tests {
         if output.status.success() {
             Ok(())
         } else {
-            Err(RefineError::Conflict(trimmed_command_text(&output)))
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            Err(RefineError::Conflict(
+                format!("{}\n{}", stdout.trim(), stderr.trim())
+                    .trim()
+                    .to_string(),
+            ))
         }
     }
 

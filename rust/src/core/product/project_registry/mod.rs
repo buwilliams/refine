@@ -1,10 +1,12 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use chrono::Utc;
 
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::model::project::{AppRegistry, ProjectStatus, RegisteredApp};
 
@@ -212,14 +214,25 @@ impl FileProjectRegistryService {
                 ))
             })?;
         }
-        let output = Command::new("git")
-            .arg("clone")
-            .arg(source)
-            .arg(destination)
-            .output()
-            .map_err(|error| RefineError::Io(format!("failed to run git clone: {error}")))?;
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let output = FileProcessSupervisor::new(&self.runtime_root).run_to_completion(
+            ManagedProcessSpec {
+                owner: ProcessOwner::Maintenance,
+                command: "git".to_string(),
+                args: vec![
+                    "clone".to_string(),
+                    source.to_string(),
+                    destination.display().to_string(),
+                ],
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: Some("git clone".to_string()),
+                sensitive: false,
+            },
+        )?;
+        if !output.success() {
+            let stderr = output.stderr.trim().to_string();
             return Err(RefineError::Conflict(format!(
                 "git clone failed{}",
                 if stderr.is_empty() {
@@ -409,6 +422,7 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]

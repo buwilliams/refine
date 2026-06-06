@@ -1,15 +1,15 @@
 use std::fs;
-use std::fs::OpenOptions;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
+};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
 use crate::core::supervisor::runtime::RuntimeRoot;
@@ -84,49 +84,46 @@ impl FileDaemonLifecycleService {
                 runtime_root.display()
             ))
         })?;
-        let log_path = runtime_root.join(format!("daemon-{port}.log"));
-        let log = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-            .map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to open daemon log {}: {error}",
-                    log_path.display()
-                ))
-            })?;
-        let mut command = detached_command(&exe);
-        command
-            .arg("system")
-            .arg("web")
-            .arg("--foreground")
-            .arg("--port")
-            .arg(port.to_string())
-            .arg("--runtime-root")
-            .arg(runtime_root)
-            .stdin(Stdio::null())
-            .stdout(log.try_clone().map_err(|error| {
-                RefineError::Io(format!("failed to clone daemon log handle: {error}"))
-            })?)
-            .stderr(log);
+        let (command, mut args) = detached_command_parts(&exe);
+        args.extend([
+            "system".to_string(),
+            "start".to_string(),
+            "--foreground".to_string(),
+            "--port".to_string(),
+            port.to_string(),
+            "--runtime-root".to_string(),
+            runtime_root.display().to_string(),
+        ]);
         if let Some(cache_dir) = config.cache_dir {
-            command.arg("--cache-dir").arg(cache_dir);
+            args.push("--cache-dir".to_string());
+            args.push(cache_dir.display().to_string());
         }
         if let Some(static_root) = config.static_root {
-            command.arg("--static-root").arg(static_root);
+            args.push("--static-root".to_string());
+            args.push(static_root.display().to_string());
         }
         if let Some(token) = config.token {
-            command.arg("--token").arg(token);
+            args.push("--token".to_string());
+            args.push(token);
         }
-        let mut child = command
-            .spawn()
-            .map_err(|error| RefineError::Io(format!("failed to start daemon process: {error}")))?;
+        let supervisor = FileProcessSupervisor::new(runtime_root);
+        let process = supervisor.launch(ManagedProcessSpec {
+            owner: ProcessOwner::Daemon,
+            command,
+            args,
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: Some("refine daemon start".to_string()),
+            sensitive: true,
+        })?;
         for _ in 0..50 {
-            if let Some(status) = child.try_wait().map_err(|error| {
-                RefineError::Io(format!("failed to inspect daemon process: {error}"))
-            })? {
+            let managed = supervisor.wait(&process.id)?;
+            if managed.state != "running" {
                 return Err(RefineError::Conflict(format!(
-                    "daemon process exited before becoming reachable: {status}"
+                    "daemon process exited before becoming reachable: {}",
+                    managed.state
                 )));
             }
             if http_probe(port).is_ok() {
@@ -202,16 +199,14 @@ pub fn http_probe(port: u16) -> RefineResult<()> {
     }
 }
 
-fn detached_command(exe: &Path) -> Command {
+fn detached_command_parts(exe: &std::path::Path) -> (String, Vec<String>) {
     #[cfg(unix)]
     {
-        let mut command = Command::new("setsid");
-        command.arg(exe);
-        command
+        ("setsid".to_string(), vec![exe.display().to_string()])
     }
     #[cfg(not(unix))]
     {
-        Command::new(exe)
+        (exe.display().to_string(), Vec::new())
     }
 }
 

@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use std::process::Command;
 
 use serde::{Deserialize, Serialize};
 
@@ -8,7 +7,9 @@ use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServic
 use crate::core::host::installation::{
     FileInstallationService, InstallTarget, InstallationService,
 };
-use crate::core::host::process_supervision::FileProcessSupervisor;
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::observability::activity::FileActivityService;
 use crate::core::product::project_registry::FileProjectRegistryService;
 use crate::core::supervisor::errors::RefineResult;
@@ -75,34 +76,37 @@ impl DiagnosticsService for FileDiagnosticsService {
                     )
                 })
                 .unwrap_or_else(|error| format!("install status unavailable: {error}"));
-        let git_status = FileGitWorktreeService::new(&self.repo_root)
-            .inspect("")
-            .map(|status| {
-                if status.dirty_user_changes {
-                    format!(
-                        "git worktree has user changes on {}",
-                        status.branch.unwrap_or_else(|| "detached".to_string())
-                    )
-                } else {
-                    format!(
-                        "git worktree clean on {}",
-                        status.branch.unwrap_or_else(|| "detached".to_string())
-                    )
-                }
-            })
-            .unwrap_or_else(|error| format!("git inspection unavailable: {error}"));
+        let git_status =
+            FileGitWorktreeService::with_runtime_root(&self.repo_root, &self.runtime_root)
+                .inspect("")
+                .map(|status| {
+                    if status.dirty_user_changes {
+                        format!(
+                            "git worktree has user changes on {}",
+                            status.branch.unwrap_or_else(|| "detached".to_string())
+                        )
+                    } else {
+                        format!(
+                            "git worktree clean on {}",
+                            status.branch.unwrap_or_else(|| "detached".to_string())
+                        )
+                    }
+                })
+                .unwrap_or_else(|error| format!("git inspection unavailable: {error}"));
         let activity_count = self
             .durable_root
             .as_ref()
             .and_then(|root| FileActivityService::new(root).count().ok())
             .unwrap_or(0);
         let browser_status = command_status(
+            &self.runtime_root,
             "playwright",
             &["--version"],
             "playwright CLI available",
             "playwright CLI not found; browser QA remains task-scoped",
         );
         let docker_status = command_status(
+            &self.runtime_root,
             "docker",
             &["--version"],
             "docker CLI available",
@@ -159,10 +163,28 @@ impl DiagnosticsService for FileDiagnosticsService {
     }
 }
 
-fn command_status(command: &str, args: &[&str], available: &str, missing: &str) -> String {
-    match Command::new(command).args(args).output() {
-        Ok(output) if output.status.success() => {
-            let version = String::from_utf8_lossy(&output.stdout)
+fn command_status(
+    runtime_root: &std::path::Path,
+    command: &str,
+    args: &[&str],
+    available: &str,
+    missing: &str,
+) -> String {
+    let output = FileProcessSupervisor::new(runtime_root).run_to_completion(ManagedProcessSpec {
+        owner: ProcessOwner::Maintenance,
+        command: command.to_string(),
+        args: args.iter().map(|arg| arg.to_string()).collect(),
+        cwd: None,
+        env: Vec::new(),
+        stdin: None,
+        limits: None,
+        authorization_command: Some(format!("{} {}", command, args.join(" "))),
+        sensitive: false,
+    });
+    match output {
+        Ok(output) if output.success() => {
+            let version = output
+                .stdout
                 .lines()
                 .next()
                 .unwrap_or("")
@@ -174,7 +196,14 @@ fn command_status(command: &str, args: &[&str], available: &str, missing: &str) 
                 format!("{available}: {version}")
             }
         }
-        Ok(output) => format!("{missing}: exited {}", output.status),
+        Ok(output) => format!(
+            "{missing}: exited {}",
+            output
+                .process
+                .exit_code
+                .map(|code| code.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        ),
         Err(_) => missing.to_string(),
     }
 }

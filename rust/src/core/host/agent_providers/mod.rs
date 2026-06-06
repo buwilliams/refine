@@ -1,9 +1,11 @@
 use std::env;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use serde::{Deserialize, Serialize};
 
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -46,11 +48,19 @@ pub trait AgentProviderService {
 #[derive(Clone, Debug, Default)]
 pub struct HostAgentProviderService {
     pub path_override: Option<String>,
+    pub runtime_root: Option<PathBuf>,
 }
 
 impl HostAgentProviderService {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn with_runtime_root(runtime_root: impl Into<PathBuf>) -> Self {
+        Self {
+            runtime_root: Some(runtime_root.into()),
+            ..Self::default()
+        }
     }
 
     fn spec(provider: &str) -> Option<ProviderSpec> {
@@ -147,7 +157,7 @@ impl HostAgentProviderService {
             invocation.session_id.as_deref(),
             cwd,
         );
-        run_provider_command_result(&args, cwd, spec.output_format)
+        self.run_provider_command_result(&args, cwd, spec.output_format)
     }
 
     pub fn resume_detailed(
@@ -163,7 +173,66 @@ impl HostAgentProviderService {
             )));
         }
         let args = spec.chat_args(&binary, "", Some(session_id), None);
-        run_provider_command_result(&args, None, spec.output_format)
+        self.run_provider_command_result(&args, None, spec.output_format)
+    }
+
+    fn run_provider_command_result(
+        &self,
+        args: &[String],
+        cwd: Option<&Path>,
+        output_format: &str,
+    ) -> RefineResult<ProviderInvocationResult> {
+        let Some((binary, rest)) = args.split_first() else {
+            return Err(RefineError::InvalidInput(
+                "provider command cannot be empty".to_string(),
+            ));
+        };
+        let runtime_root = self
+            .runtime_root
+            .clone()
+            .unwrap_or_else(|| PathBuf::from("run/agent-processes"));
+        let output =
+            FileProcessSupervisor::new(runtime_root).run_to_completion(ManagedProcessSpec {
+                owner: ProcessOwner::Agent,
+                command: binary.to_string(),
+                args: rest.to_vec(),
+                cwd: cwd.map(|path| path.display().to_string()),
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: Some(args.join(" ")),
+                sensitive: false,
+            })?;
+        let success = output.success();
+        let exit_code = output.process.exit_code;
+        let stdout = output.stdout;
+        let stderr = output.stderr;
+        if !success {
+            let message = last_non_empty_line(&stderr)
+                .or_else(|| last_non_empty_line(&stdout))
+                .unwrap_or_else(|| {
+                    let exit = exit_code
+                        .map(|code| code.to_string())
+                        .unwrap_or_else(|| "unknown".to_string());
+                    format!("provider command exited {exit}")
+                });
+            return Err(RefineError::Degraded(message));
+        }
+        let final_text = extract_final_text(&stdout, output_format);
+        let provider_session_id = extract_provider_session_id(&stdout);
+        if final_text.trim().is_empty() {
+            Ok(ProviderInvocationResult {
+                output: stdout.clone(),
+                provider_session_id,
+                raw_output: stdout,
+            })
+        } else {
+            Ok(ProviderInvocationResult {
+                output: final_text,
+                provider_session_id,
+                raw_output: stdout,
+            })
+        }
     }
 }
 
@@ -383,55 +452,6 @@ fn executable_file(path: &Path) -> bool {
     path.is_file()
 }
 
-fn run_provider_command_result(
-    args: &[String],
-    cwd: Option<&Path>,
-    output_format: &str,
-) -> RefineResult<ProviderInvocationResult> {
-    let Some((binary, rest)) = args.split_first() else {
-        return Err(RefineError::InvalidInput(
-            "provider command cannot be empty".to_string(),
-        ));
-    };
-    let mut command = Command::new(binary);
-    command
-        .args(rest)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
-    }
-    let output = command.output().map_err(|error| {
-        RefineError::Degraded(format!(
-            "failed to launch provider command {binary}: {error}"
-        ))
-    })?;
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-    if !output.status.success() {
-        let message = last_non_empty_line(&stderr)
-            .or_else(|| last_non_empty_line(&stdout))
-            .unwrap_or_else(|| format!("provider command exited {}", output.status));
-        return Err(RefineError::Degraded(message));
-    }
-    let final_text = extract_final_text(&stdout, output_format);
-    let provider_session_id = extract_provider_session_id(&stdout);
-    if final_text.trim().is_empty() {
-        Ok(ProviderInvocationResult {
-            output: stdout.clone(),
-            provider_session_id,
-            raw_output: stdout,
-        })
-    } else {
-        Ok(ProviderInvocationResult {
-            output: final_text,
-            provider_session_id,
-            raw_output: stdout,
-        })
-    }
-}
-
 fn extract_final_text(stdout: &str, output_format: &str) -> String {
     if output_format == "plain" {
         return stdout.trim().to_string();
@@ -584,6 +604,7 @@ mod tests {
 
         let service = HostAgentProviderService {
             path_override: Some(bin_dir.display().to_string()),
+            ..HostAgentProviderService::default()
         };
         let providers = service.detect().unwrap();
         let codex = providers
@@ -617,6 +638,7 @@ mod tests {
 
         let service = HostAgentProviderService {
             path_override: Some(bin_dir.display().to_string()),
+            runtime_root: Some(temp_root.join("run/8080")),
         };
         let output = service
             .invoke(ProviderInvocation {
@@ -627,6 +649,10 @@ mod tests {
             })
             .unwrap();
         assert!(output.contains("agent_message"));
+        let process_dir = temp_root.join("run/8080/processes");
+        assert!(process_dir.exists());
+        let records = fs::read_dir(&process_dir).unwrap().count();
+        assert!(records >= 3);
 
         fs::remove_dir_all(temp_root).unwrap();
     }

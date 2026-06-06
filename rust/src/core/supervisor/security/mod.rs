@@ -2,12 +2,14 @@ use std::collections::BTreeSet;
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+};
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::sessions::{active_session_tokens, validate_session_token};
@@ -260,7 +262,8 @@ impl NativeSecretStore {
     ) -> RefineResult<()> {
         match backend {
             SecretStoreBackend::MacosKeychain => run_status(
-                Command::new("security")
+                &self.runtime_root,
+                HostCommand::new("security")
                     .arg("add-generic-password")
                     .arg("-U")
                     .arg("-s")
@@ -272,7 +275,8 @@ impl NativeSecretStore {
                 "store secret in macOS Keychain",
             ),
             SecretStoreBackend::LinuxSecretService => run_with_stdin(
-                Command::new("secret-tool")
+                &self.runtime_root,
+                HostCommand::new("secret-tool")
                     .arg("store")
                     .arg("--label")
                     .arg(format!("Refine {scope}/{name}"))
@@ -286,7 +290,8 @@ impl NativeSecretStore {
                 "store secret in Linux Secret Service",
             ),
             SecretStoreBackend::WindowsCredentialManager => run_status(
-                Command::new("cmdkey")
+                &self.runtime_root,
+                HostCommand::new("cmdkey")
                     .arg(format!("/add:{}", secret_service_name(scope, name)?))
                     .arg(format!("/user:{scope}"))
                     .arg(format!("/pass:{value}")),
@@ -306,7 +311,8 @@ impl NativeSecretStore {
     ) -> RefineResult<String> {
         match backend {
             SecretStoreBackend::MacosKeychain => run_output(
-                Command::new("security")
+                &self.runtime_root,
+                HostCommand::new("security")
                     .arg("find-generic-password")
                     .arg("-w")
                     .arg("-s")
@@ -316,7 +322,8 @@ impl NativeSecretStore {
                 "read secret from macOS Keychain",
             ),
             SecretStoreBackend::LinuxSecretService => run_output(
-                Command::new("secret-tool")
+                &self.runtime_root,
+                HostCommand::new("secret-tool")
                     .arg("lookup")
                     .arg("application")
                     .arg("refine")
@@ -344,7 +351,8 @@ impl NativeSecretStore {
     ) -> RefineResult<()> {
         match backend {
             SecretStoreBackend::MacosKeychain => run_status(
-                Command::new("security")
+                &self.runtime_root,
+                HostCommand::new("security")
                     .arg("delete-generic-password")
                     .arg("-s")
                     .arg(secret_service_name(scope, name)?)
@@ -353,7 +361,8 @@ impl NativeSecretStore {
                 "delete secret from macOS Keychain",
             ),
             SecretStoreBackend::LinuxSecretService => run_status(
-                Command::new("secret-tool")
+                &self.runtime_root,
+                HostCommand::new("secret-tool")
                     .arg("clear")
                     .arg("application")
                     .arg("refine")
@@ -364,7 +373,8 @@ impl NativeSecretStore {
                 "delete secret from Linux Secret Service",
             ),
             SecretStoreBackend::WindowsCredentialManager => run_status(
-                Command::new("cmdkey")
+                &self.runtime_root,
+                HostCommand::new("cmdkey")
                     .arg(format!("/delete:{}", secret_service_name(scope, name)?)),
                 "delete secret from Windows Credential Manager",
             ),
@@ -709,54 +719,88 @@ fn write_secret_file(path: &Path, bytes: &[u8]) -> RefineResult<()> {
     })
 }
 
-fn run_status(command: &mut Command, action: &str) -> RefineResult<()> {
-    let output = command
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to {action}: {error}")))?;
-    if output.status.success() {
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct HostCommand {
+    program: String,
+    args: Vec<String>,
+}
+
+impl HostCommand {
+    fn new(program: impl Into<String>) -> Self {
+        Self {
+            program: program.into(),
+            args: Vec::new(),
+        }
+    }
+
+    fn arg(mut self, arg: impl Into<String>) -> Self {
+        self.args.push(arg.into());
+        self
+    }
+
+    fn authorization_command(&self) -> String {
+        self.program.clone()
+    }
+}
+
+fn run_status(runtime_root: &Path, command: HostCommand, action: &str) -> RefineResult<()> {
+    let output = run_managed_command(runtime_root, command, None, action)?;
+    if output.success() {
         return Ok(());
     }
     Err(RefineError::Degraded(format!(
         "failed to {action}: {}",
-        String::from_utf8_lossy(&output.stderr).trim()
+        output.stderr.trim()
     )))
 }
 
-fn run_output(command: &mut Command, action: &str) -> RefineResult<String> {
-    let output = command
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to {action}: {error}")))?;
-    if output.status.success() {
-        return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+fn run_output(runtime_root: &Path, command: HostCommand, action: &str) -> RefineResult<String> {
+    let output = run_managed_command(runtime_root, command, None, action)?;
+    if output.success() {
+        return Ok(output.stdout.trim().to_string());
     }
     Err(RefineError::Degraded(format!(
         "failed to {action}: {}",
-        String::from_utf8_lossy(&output.stderr).trim()
+        output.stderr.trim()
     )))
 }
 
-fn run_with_stdin(command: &mut Command, stdin_value: &str, action: &str) -> RefineResult<()> {
-    let mut child = command
-        .stdin(Stdio::piped())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|error| RefineError::Io(format!("failed to {action}: {error}")))?;
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(stdin_value.as_bytes())
-            .map_err(|error| RefineError::Io(format!("failed to write secret stdin: {error}")))?;
-    }
-    let output = child
-        .wait_with_output()
-        .map_err(|error| RefineError::Io(format!("failed to wait for {action}: {error}")))?;
-    if output.status.success() {
+fn run_with_stdin(
+    runtime_root: &Path,
+    command: HostCommand,
+    stdin_value: &str,
+    action: &str,
+) -> RefineResult<()> {
+    let output = run_managed_command(runtime_root, command, Some(stdin_value.to_string()), action)?;
+    if output.success() {
         return Ok(());
     }
     Err(RefineError::Degraded(format!(
         "failed to {action}: {}",
-        String::from_utf8_lossy(&output.stderr).trim()
+        output.stderr.trim()
     )))
+}
+
+fn run_managed_command(
+    runtime_root: &Path,
+    command: HostCommand,
+    stdin: Option<String>,
+    action: &str,
+) -> RefineResult<crate::core::host::process_supervision::ManagedProcessOutput> {
+    let authorization_command = command.authorization_command();
+    FileProcessSupervisor::new(runtime_root)
+        .run_to_completion(ManagedProcessSpec {
+            owner: ProcessOwner::Maintenance,
+            command: command.program,
+            args: command.args,
+            cwd: None,
+            env: Vec::new(),
+            stdin,
+            limits: None,
+            authorization_command: Some(authorization_command),
+            sensitive: true,
+        })
+        .map_err(|error| RefineError::Io(format!("failed to {action}: {error}")))
 }
 
 #[cfg(test)]

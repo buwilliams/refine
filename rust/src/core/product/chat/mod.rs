@@ -222,6 +222,7 @@ impl FileChatService {
         let job = self.register_provider_job(&record, "resume")?;
         let provider = HostAgentProviderService {
             path_override: self.provider_path_override(),
+            runtime_root: Some(self.runtime_root.clone()),
         };
         match provider.resume_detailed(&record.provider, &provider_session_id) {
             Ok(result) => {
@@ -472,6 +473,7 @@ impl ChatService for FileChatService {
         let job = self.register_provider_job(&record, "invoke")?;
         let provider = HostAgentProviderService {
             path_override: self.provider_path_override(),
+            runtime_root: Some(self.runtime_root.clone()),
         };
         match provider.invoke_detailed(ProviderInvocation {
             provider: record.provider.clone(),

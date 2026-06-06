@@ -67,11 +67,11 @@ fn project_sync_rebuilds_projection_from_cli_surface() {
 }
 
 #[test]
-fn system_web_starts_without_durable_root_argument() {
+fn system_start_owns_foreground_web_options() {
     let parsed = Cli::try_parse_from([
         "refine",
         "system",
-        "web",
+        "start",
         "--port",
         "0",
         "--runtime-root",
@@ -80,16 +80,24 @@ fn system_web_starts_without_durable_root_argument() {
     ])
     .unwrap();
     let Commands::System {
-        action: SystemAction::Web {
-            port, runtime_root, ..
-        },
+        action:
+            SystemAction::Start {
+                port,
+                runtime_root,
+                once,
+                foreground,
+                ..
+            },
     } = parsed.command
     else {
-        panic!("expected system web command");
+        panic!("expected system start command");
     };
     assert_eq!(port, 0);
     assert_eq!(runtime_root, PathBuf::from("run"));
+    assert!(once);
+    assert!(!foreground);
 
+    assert!(Cli::try_parse_from(["refine", "system", "web"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "web", "--durable-root", ".refine"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "serve", "--once"]).is_err());
 }

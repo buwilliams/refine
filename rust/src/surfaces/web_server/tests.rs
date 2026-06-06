@@ -1347,6 +1347,7 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
 fn web_server_lists_git_changes_and_reverts_commits() {
     let temp_root = unique_temp_dir("http-git-changes");
     let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -1359,6 +1360,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
 
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root);
+    server.runtime_root = Some(runtime_root.clone());
 
     let changes = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -1382,6 +1384,13 @@ fn web_server_lists_git_changes_and_reverts_commits() {
         fs::read_to_string(temp_root.join("app.txt")).unwrap(),
         "one\n"
     );
+    assert!(
+        FileProcessSupervisor::new(&runtime_root)
+            .list()
+            .unwrap()
+            .iter()
+            .any(|process| process.label.as_deref() == Some("git"))
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1390,6 +1399,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
 fn web_server_hard_resets_git_worktree() {
     let temp_root = unique_temp_dir("http-git-reset");
     let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
@@ -1401,6 +1411,7 @@ fn web_server_hard_resets_git_worktree() {
 
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root);
+    server.runtime_root = Some(runtime_root.clone());
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/runner-workers/merger/hard-reset-worktree".to_string(),
@@ -1412,6 +1423,13 @@ fn web_server_hard_resets_git_worktree() {
     assert_eq!(
         fs::read_to_string(temp_root.join("app.txt")).unwrap(),
         "committed\n"
+    );
+    assert!(
+        FileProcessSupervisor::new(&runtime_root)
+            .list()
+            .unwrap()
+            .iter()
+            .any(|process| process.label.as_deref() == Some("git"))
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -2005,6 +2023,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             stdin: None,
             limits: None,
             authorization_command: None,
+            sensitive: false,
         })
         .unwrap();
     let mut server = server_with_projection();
