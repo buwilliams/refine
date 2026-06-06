@@ -63,6 +63,49 @@ impl FileDaemonLifecycleService {
         self.runtime_root.port_root(port).join(DAEMON_STATUS_FILE)
     }
 
+    pub fn running_statuses(&self) -> RefineResult<Vec<DaemonStatus>> {
+        let entries = match fs::read_dir(&self.runtime_root.root) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read runtime root {}: {error}",
+                    self.runtime_root.root.display()
+                )));
+            }
+        };
+        let mut statuses = Vec::new();
+        for entry in entries {
+            let entry = entry.map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read runtime root entry {}: {error}",
+                    self.runtime_root.root.display()
+                ))
+            })?;
+            let file_type = entry.file_type().map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to inspect runtime root entry {}: {error}",
+                    entry.path().display()
+                ))
+            })?;
+            if !file_type.is_dir() {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+                continue;
+            };
+            let Ok(port) = name.parse::<u16>() else {
+                continue;
+            };
+            let status = self.status(port)?;
+            if status.daemon_healthy && status.web_available && http_probe(port).is_ok() {
+                statuses.push(status);
+            }
+        }
+        statuses.sort_by_key(|status| status.port);
+        Ok(statuses)
+    }
+
     pub fn start_background_daemon(
         &self,
         config: BackgroundDaemonConfig,

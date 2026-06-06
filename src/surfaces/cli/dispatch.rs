@@ -31,7 +31,9 @@ use crate::core::supervisor::lifecycle::{
 };
 use crate::core::supervisor::runtime::RuntimeRoot;
 use crate::model::workflow::{GapStatus, user_status_transition};
-use crate::surfaces::web_server::{API_GROUPS, InProcessWebServer, LocalHttpDaemon};
+use crate::surfaces::web_server::{
+    API_CONTRACT_VERSION, API_GROUPS, InProcessWebServer, LocalHttpDaemon,
+};
 
 use super::actions::*;
 use super::helpers::*;
@@ -823,11 +825,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::System {
-            action: SystemAction::Status { port, runtime_root },
+            action:
+                SystemAction::Status {
+                    port: _,
+                    runtime_root,
+                },
         } => {
-            let status =
-                FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root }).status(port)?;
-            println!("{}", serde_json::to_string_pretty(&status).unwrap());
+            print_json(&system_status_response(runtime_root)?);
             Ok(())
         }
         Commands::Project {
@@ -1629,6 +1633,20 @@ fn run_system_start(
         daemon.serve_until_unhealthy(listener, lifecycle, actual_port)?;
     }
     Ok(())
+}
+
+pub(super) fn system_status_response(runtime_root: PathBuf) -> RefineResult<serde_json::Value> {
+    let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root });
+    let ports = lifecycle.running_statuses()?;
+    let running_ports: Vec<u16> = ports.iter().map(|status| status.port).collect();
+    Ok(json!({
+        "product": "refine",
+        "version": env!("CARGO_PKG_VERSION"),
+        "current_version": env!("CARGO_PKG_VERSION"),
+        "api_contract_version": API_CONTRACT_VERSION,
+        "running_ports": running_ports,
+        "ports": ports,
+    }))
 }
 
 pub(super) fn absolute_cli_path(path: PathBuf) -> RefineResult<PathBuf> {

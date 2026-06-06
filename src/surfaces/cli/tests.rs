@@ -1,12 +1,19 @@
-use super::dispatch::{absolute_cli_path, dispatch, explicit_durable_root_path};
+use super::dispatch::{
+    absolute_cli_path, dispatch, explicit_durable_root_path, system_status_response,
+};
 use super::*;
 use crate::core::observability::activity::ActivityService;
 use crate::core::observability::activity::FileActivityService;
 use crate::core::product::project_state::PROJECTION_SNAPSHOT_FILE;
 use crate::core::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::core::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::core::supervisor::runtime::RuntimeRoot;
 use clap::Parser;
 use std::fs;
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::path::PathBuf;
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -372,6 +379,46 @@ fn system_install_update_rollback_and_uninstall_use_installation_service() {
             .unwrap();
     assert_eq!(state["status"]["installed"], false);
     assert_eq!(state["status"]["version"], "1.0.0");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn system_status_reports_current_version_and_running_ports() {
+    let temp_root = unique_temp_dir("cli-system-status");
+    let runtime_root = temp_root.join("run");
+    let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
+        root: runtime_root.clone(),
+    });
+    let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let live_port = listener.local_addr().unwrap().port();
+    let probe_thread = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut buffer = [0_u8; 512];
+        let _ = stream.read(&mut buffer);
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\n{}")
+            .unwrap();
+    });
+    let stale_listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+    let stale_port = stale_listener.local_addr().unwrap().port();
+    drop(stale_listener);
+
+    lifecycle.start(live_port).unwrap();
+    lifecycle.start(stale_port).unwrap();
+    lifecycle.start(4556).unwrap();
+    lifecycle.stop(4556).unwrap();
+    fs::create_dir_all(runtime_root.join("not-a-port")).unwrap();
+
+    let status = system_status_response(runtime_root).unwrap();
+    probe_thread.join().unwrap();
+    assert_eq!(status["product"], "refine");
+    assert_eq!(status["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(status["current_version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(status["running_ports"], serde_json::json!([live_port]));
+    assert_eq!(status["ports"].as_array().unwrap().len(), 1);
+    assert_eq!(status["ports"][0]["port"], live_port);
+    assert!(status["ports"][0]["daemon_healthy"].as_bool().unwrap());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
