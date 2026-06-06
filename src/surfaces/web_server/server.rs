@@ -474,6 +474,20 @@ impl InProcessWebServer {
             return self.handle_chat_input(request);
         }
 
+        if request.method == "PATCH"
+            && request.path.starts_with("/chat/")
+            && request.path.contains("/queue/")
+        {
+            return self.handle_chat_queue_update(request);
+        }
+
+        if request.method == "DELETE"
+            && request.path.starts_with("/chat/")
+            && request.path.contains("/queue/")
+        {
+            return self.handle_chat_queue_delete(request);
+        }
+
         if request.method == "GET"
             && request.path.starts_with("/chat/")
             && request.path.ends_with("/read")

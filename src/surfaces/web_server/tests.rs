@@ -2529,12 +2529,9 @@ fn web_server_manages_durable_chat_sessions() {
         body: Some(json!({"text": "What should I test?"})),
     });
     assert_eq!(input.status, 200);
+    assert_eq!(input.body["queued_messages"].as_array().unwrap().len(), 1);
 
-    let read = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: format!("/api/chat/{session_id}/read"),
-        body: None,
-    });
+    let read = wait_for_chat_read_line(&server, &session_id, "web provider output");
     assert_eq!(read.status, 200);
     assert_eq!(read.body["alive"], true);
     assert!(
@@ -2590,6 +2587,63 @@ fn web_server_manages_durable_chat_sessions() {
     });
     assert_eq!(stopped.status, 200);
     assert_eq!(stopped.body["alive"], false);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_edits_and_removes_queued_chat_messages() {
+    let temp_root = unique_temp_dir("http-chat-queue");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/chat/start".to_string(),
+        body: Some(json!({"provider": "smoke-ai"})),
+    });
+    assert_eq!(started.status, 201);
+    let session_id = started.body["session_id"].as_str().unwrap().to_string();
+    let session_path = durable_root.join(format!("chat/sessions/{session_id}.json"));
+    let mut persisted: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(&session_path).unwrap()).unwrap();
+    persisted["queue_dispatching"] = json!(true);
+    fs::write(
+        &session_path,
+        serde_json::to_string_pretty(&persisted).unwrap(),
+    )
+    .unwrap();
+
+    let input = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/chat/{session_id}/input"),
+        body: Some(json!({"text": "queued text"})),
+    });
+    assert_eq!(input.status, 200);
+    let message_id = input.body["queued_messages"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let updated = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: format!("/api/chat/{session_id}/queue/{message_id}"),
+        body: Some(json!({"text": "edited queued text"})),
+    });
+    assert_eq!(updated.status, 200);
+    assert_eq!(
+        updated.body["queued_messages"][0]["text"],
+        "edited queued text"
+    );
+    let removed = server.handle(ApiRequest {
+        method: "DELETE".to_string(),
+        path: format!("/api/chat/{session_id}/queue/{message_id}"),
+        body: None,
+    });
+    assert_eq!(removed.status, 200);
+    assert_eq!(removed.body["queued_messages"].as_array().unwrap().len(), 0);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -3310,6 +3364,36 @@ fn wait_for_http_request_metrics(
         thread::sleep(Duration::from_millis(25));
     }
     Vec::new()
+}
+
+fn wait_for_chat_read_line(
+    server: &InProcessWebServer,
+    session_id: &str,
+    needle: &str,
+) -> ApiResponse {
+    for _ in 0..100 {
+        let read = server.handle(ApiRequest {
+            method: "GET".to_string(),
+            path: format!("/api/chat/{session_id}/read"),
+            body: None,
+        });
+        let has_line = read
+            .body
+            .get("lines")
+            .and_then(|value| value.as_array())
+            .into_iter()
+            .flatten()
+            .any(|line| line.as_str().unwrap_or("").contains(needle));
+        if has_line {
+            return read;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: format!("/api/chat/{session_id}/read"),
+        body: None,
+    })
 }
 
 fn write_fake_playwright(root: &Path, exit_code: i32) {

@@ -373,7 +373,66 @@ impl InProcessWebServer {
         };
         let service = self.chat_service(&durable_root);
         match service.append_user_message(session_id, text) {
-            Ok(()) => ApiResponse::json(200, json!({"ok": true})),
+            Ok(session) => ApiResponse::json(
+                200,
+                json!({
+                    "ok": true,
+                    "queued_messages": session.queued_messages
+                }),
+            ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_chat_queue_update(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "update queued chat input");
+        let Some((session_id, message_id)) = chat_queue_path_parts(&request.path) else {
+            return chat_session_id_required();
+        };
+        let Some(text) = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("text"))
+            .and_then(|value| value.as_str())
+            .filter(|value| !value.trim().is_empty())
+        else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "bad_request",
+                        "message": "text is required"
+                    }
+                }),
+            );
+        };
+        let service = self.chat_service(&durable_root);
+        match service.update_queued_message(session_id, message_id, text) {
+            Ok(session) => ApiResponse::json(
+                200,
+                json!({
+                    "ok": true,
+                    "queued_messages": session.queued_messages
+                }),
+            ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_chat_queue_delete(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "remove queued chat input");
+        let Some((session_id, message_id)) = chat_queue_path_parts(&request.path) else {
+            return chat_session_id_required();
+        };
+        let service = self.chat_service(&durable_root);
+        match service.remove_queued_message(session_id, message_id) {
+            Ok(session) => ApiResponse::json(
+                200,
+                json!({
+                    "ok": true,
+                    "queued_messages": session.queued_messages
+                }),
+            ),
             Err(error) => error_response(error),
         }
     }
@@ -444,4 +503,18 @@ fn effective_chat_provider(configured: Option<String>) -> Option<String> {
         .and_then(Value::as_str)
         .map(str::to_string)
         .or(configured)
+}
+
+fn chat_queue_path_parts(path: &str) -> Option<(&str, &str)> {
+    let rest = path.strip_prefix("/chat/")?;
+    let (session_id, rest) = rest.split_once("/queue/")?;
+    let message_id = rest.trim();
+    if session_id.is_empty()
+        || session_id.contains('/')
+        || message_id.is_empty()
+        || message_id.contains('/')
+    {
+        return None;
+    }
+    Some((session_id, message_id))
 }

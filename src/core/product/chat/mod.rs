@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
@@ -34,6 +35,10 @@ pub struct ChatSessionRecord {
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub transcript_events: Vec<JsonObject>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub queued_messages: Vec<ChatQueuedMessage>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub queue_dispatching: bool,
     pub importable_artifacts: Vec<JsonObject>,
     pub closed: bool,
     #[serde(default, skip_serializing)]
@@ -44,12 +49,21 @@ pub struct ChatSessionRecord {
     pub interruption_detail: Option<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ChatQueuedMessage {
+    pub id: String,
+    pub text: String,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct ChatReadResult {
     pub alive: bool,
     pub session_id: String,
     pub lines: Vec<String>,
     pub progress_lines: Vec<String>,
+    pub queued_messages: Vec<ChatQueuedMessage>,
     pub importable_artifacts: Vec<JsonObject>,
     pub closed_reason: Option<String>,
     pub in_flight: bool,
@@ -59,7 +73,11 @@ pub struct ChatReadResult {
 pub trait ChatService {
     fn start(&self, attachment: ChatAttachment) -> RefineResult<ChatSessionRecord>;
     fn resume(&self, session_id: &str) -> RefineResult<ChatSessionRecord>;
-    fn append_user_message(&self, session_id: &str, message: &str) -> RefineResult<()>;
+    fn append_user_message(
+        &self,
+        session_id: &str,
+        message: &str,
+    ) -> RefineResult<ChatSessionRecord>;
     fn interrupt(&self, session_id: &str, detail: &str) -> RefineResult<ChatSessionRecord>;
 }
 
@@ -110,6 +128,8 @@ impl FileChatService {
             created_at: now.clone(),
             updated_at: now,
             transcript_events: Vec::new(),
+            queued_messages: Vec::new(),
+            queue_dispatching: false,
             importable_artifacts: Vec::new(),
             closed: false,
             in_flight: false,
@@ -137,9 +157,10 @@ impl FileChatService {
             session_id: record.id.clone(),
             lines,
             progress_lines,
+            queued_messages: record.queued_messages.clone(),
             importable_artifacts: record.importable_artifacts.clone(),
             closed_reason: record.interruption_detail.clone(),
-            in_flight: record.in_flight || active_job,
+            in_flight: record.in_flight || record.queue_dispatching || active_job,
             provider_session_id: record.provider_session_id.clone(),
         })
     }
@@ -306,7 +327,7 @@ impl FileChatService {
                     entry.path().display()
                 ))
             })?;
-            if !record.in_flight {
+            if !record.in_flight && !record.queue_dispatching {
                 continue;
             }
             self.mark_record_interrupted(&mut record, message);
@@ -381,6 +402,7 @@ impl FileChatService {
 
     fn mark_record_interrupted(&self, record: &mut ChatSessionRecord, detail: &str) {
         record.in_flight = false;
+        record.queue_dispatching = false;
         record.last_turn_started_at = None;
         record.interrupted = true;
         record.interruption_detail = Some(detail.to_string());
@@ -437,6 +459,162 @@ impl FileChatService {
                 )
         }))
     }
+
+    fn ensure_queue_dispatch(&self, record: &mut ChatSessionRecord) -> RefineResult<()> {
+        if record.closed || record.queued_messages.is_empty() || record.queue_dispatching {
+            return Ok(());
+        }
+        record.queue_dispatching = true;
+        record.in_flight = true;
+        record.last_turn_started_at = Some(now_timestamp());
+        record.updated_at = now_timestamp();
+        self.write_record(record)?;
+        let service = self.clone();
+        let session_id = record.id.clone();
+        thread::spawn(move || {
+            if let Err(error) = service.dispatch_queued_messages(&session_id) {
+                let _ = service.mark_dispatch_failure(&session_id, &format!("{error}"));
+            }
+        });
+        Ok(())
+    }
+
+    fn dispatch_queued_messages(&self, session_id: &str) -> RefineResult<()> {
+        loop {
+            let mut record = self.load_record(session_id)?;
+            if record.closed {
+                record.queue_dispatching = false;
+                record.in_flight = false;
+                record.last_turn_started_at = None;
+                record.updated_at = now_timestamp();
+                self.write_record(&record)?;
+                return Ok(());
+            }
+            if record.queued_messages.is_empty() {
+                record.queue_dispatching = false;
+                record.in_flight = false;
+                record.last_turn_started_at = None;
+                record.updated_at = now_timestamp();
+                self.write_record(&record)?;
+                return Ok(());
+            }
+            let queued = std::mem::take(&mut record.queued_messages);
+            let message = combined_queued_message(&queued);
+            record.transcript_events.push(chat_event(
+                "user",
+                &message,
+                false,
+                record.provider_session_id.clone(),
+                None,
+            ));
+            record.transcript_events.push(chat_event(
+                "progress",
+                &format!(
+                    "Sent {} queued message{} to the provider.",
+                    queued.len(),
+                    if queued.len() == 1 { "" } else { "s" }
+                ),
+                true,
+                record.provider_session_id.clone(),
+                None,
+            ));
+            record.in_flight = true;
+            record.last_turn_started_at = Some(now_timestamp());
+            record.updated_at = now_timestamp();
+            self.write_record(&record)?;
+
+            let job = self.register_provider_job(&record, "invoke")?;
+            let provider = HostAgentProviderService {
+                path_override: self.provider_path_override(),
+                runtime_root: Some(self.runtime_root.clone()),
+            };
+            match provider.invoke_detailed(ProviderInvocation {
+                provider: record.provider.clone(),
+                prompt: self.chat_prompt(&record, &message),
+                session_id: record.provider_session_id.clone(),
+                cwd: Some(self.project_root().display().to_string()),
+            }) {
+                Ok(result) => {
+                    self.apply_provider_success(&mut record, result, "Provider turn completed.");
+                    self.finish_provider_job(
+                        &job.id,
+                        JobState::Succeeded,
+                        "Provider turn completed",
+                    )?;
+                }
+                Err(error) => {
+                    self.apply_provider_failure(
+                        &mut record,
+                        format!("Provider turn failed: {error}"),
+                    );
+                    self.finish_provider_job(&job.id, JobState::Failed, "Provider turn failed")?;
+                }
+            }
+            record.updated_at = now_timestamp();
+            self.write_record(&record)?;
+        }
+    }
+
+    fn mark_dispatch_failure(&self, session_id: &str, detail: &str) -> RefineResult<()> {
+        let mut record = self.load_record(session_id)?;
+        record.queue_dispatching = false;
+        record.in_flight = false;
+        record.last_turn_started_at = None;
+        record.interrupted = true;
+        record.interruption_detail = Some(detail.to_string());
+        record.updated_at = now_timestamp();
+        record
+            .transcript_events
+            .push(chat_event("system", detail, false, None, None));
+        self.write_record(&record)
+    }
+
+    pub fn update_queued_message(
+        &self,
+        session_id: &str,
+        message_id: &str,
+        text: &str,
+    ) -> RefineResult<ChatSessionRecord> {
+        let mut record = self.load_record(session_id)?;
+        let text = text.trim();
+        if text.is_empty() {
+            return Err(RefineError::InvalidInput("text is required".to_string()));
+        }
+        let Some(message) = record
+            .queued_messages
+            .iter_mut()
+            .find(|message| message.id == message_id)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "Queued chat message {message_id} was not found"
+            )));
+        };
+        message.text = text.to_string();
+        message.updated_at = now_timestamp();
+        record.updated_at = now_timestamp();
+        self.write_record(&record)?;
+        Ok(record)
+    }
+
+    pub fn remove_queued_message(
+        &self,
+        session_id: &str,
+        message_id: &str,
+    ) -> RefineResult<ChatSessionRecord> {
+        let mut record = self.load_record(session_id)?;
+        let before = record.queued_messages.len();
+        record
+            .queued_messages
+            .retain(|message| message.id != message_id);
+        if record.queued_messages.len() == before {
+            return Err(RefineError::NotFound(format!(
+                "Queued chat message {message_id} was not found"
+            )));
+        }
+        record.updated_at = now_timestamp();
+        self.write_record(&record)?;
+        Ok(record)
+    }
 }
 
 impl ChatService for FileChatService {
@@ -448,50 +626,32 @@ impl ChatService for FileChatService {
         self.load_record(session_id)
     }
 
-    fn append_user_message(&self, session_id: &str, message: &str) -> RefineResult<()> {
+    fn append_user_message(
+        &self,
+        session_id: &str,
+        message: &str,
+    ) -> RefineResult<ChatSessionRecord> {
         let mut record = self.load_record(session_id)?;
         if record.closed {
             return Err(RefineError::Conflict(format!(
                 "Chat session {session_id} is closed"
             )));
         }
-        record
-            .transcript_events
-            .push(chat_event("user", message, false, None, None));
-        record.transcript_events.push(chat_event(
-            "progress",
-            "Message persisted; starting provider turn.",
-            true,
-            None,
-            None,
-        ));
-        record.in_flight = true;
-        record.last_turn_started_at = Some(now_timestamp());
+        let text = message.trim();
+        if text.is_empty() {
+            return Err(RefineError::InvalidInput("text is required".to_string()));
+        }
+        let now = now_timestamp();
+        record.queued_messages.push(ChatQueuedMessage {
+            id: new_queued_message_id(),
+            text: text.to_string(),
+            created_at: now.clone(),
+            updated_at: now,
+        });
         record.updated_at = now_timestamp();
         self.write_record(&record)?;
-
-        let job = self.register_provider_job(&record, "invoke")?;
-        let provider = HostAgentProviderService {
-            path_override: self.provider_path_override(),
-            runtime_root: Some(self.runtime_root.clone()),
-        };
-        match provider.invoke_detailed(ProviderInvocation {
-            provider: record.provider.clone(),
-            prompt: self.chat_prompt(&record, message),
-            session_id: record.provider_session_id.clone(),
-            cwd: Some(self.project_root().display().to_string()),
-        }) {
-            Ok(result) => {
-                self.apply_provider_success(&mut record, result, "Provider turn completed.");
-                self.finish_provider_job(&job.id, JobState::Succeeded, "Provider turn completed")?;
-            }
-            Err(error) => {
-                self.apply_provider_failure(&mut record, format!("Provider turn failed: {error}"));
-                self.finish_provider_job(&job.id, JobState::Failed, "Provider turn failed")?;
-            }
-        }
-        record.updated_at = now_timestamp();
-        self.write_record(&record)
+        self.ensure_queue_dispatch(&mut record)?;
+        self.load_record(session_id)
     }
 
     fn interrupt(&self, session_id: &str, detail: &str) -> RefineResult<ChatSessionRecord> {
@@ -499,6 +659,8 @@ impl ChatService for FileChatService {
         record.closed = true;
         record.interrupted = true;
         record.interruption_detail = Some(detail.trim().to_string());
+        record.queue_dispatching = false;
+        record.queued_messages.clear();
         record.updated_at = now_timestamp();
         record
             .transcript_events
@@ -726,9 +888,25 @@ fn recognized_artifact(object: &JsonObject) -> bool {
     )
 }
 
+fn combined_queued_message(messages: &[ChatQueuedMessage]) -> String {
+    if messages.len() == 1 {
+        return messages[0].text.clone();
+    }
+    messages
+        .iter()
+        .enumerate()
+        .map(|(idx, message)| format!("Message {}:\n{}", idx + 1, message.text))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
 fn nonempty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {
     let value = value.trim();
     if value.is_empty() { fallback } else { value }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 fn validate_session_id(session_id: &str) -> RefineResult<()> {
@@ -771,6 +949,19 @@ fn new_event_id() -> String {
     format!(
         "evt-{}-{}",
         now.as_millis(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    )
+}
+
+fn new_queued_message_id() -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
+    format!(
+        "qm-{:x}{:x}{:x}",
+        now.as_millis(),
+        std::process::id(),
         COUNTER.fetch_add(1, Ordering::Relaxed)
     )
 }
@@ -826,7 +1017,9 @@ mod tests {
         service
             .append_user_message(&session.id, "What should I test?")
             .unwrap();
-        let read = service.read(&session.id).unwrap();
+        let queued = service.read(&session.id).unwrap();
+        assert!(queued.in_flight || !queued.queued_messages.is_empty());
+        let read = wait_for_chat_line(&service, &session.id, "provider says hello");
         assert!(read.alive);
         assert!(
             read.lines
@@ -894,7 +1087,9 @@ mod tests {
         service
             .append_user_message(&session.id, "draft follow-up")
             .unwrap();
-        let resumed = service.resume(&session.id).unwrap();
+        let resumed = wait_for_chat_record(&service, &session.id, |record| {
+            record.importable_artifacts.len() == 2
+        });
         assert_eq!(resumed.importable_artifacts.len(), 2);
         assert_eq!(resumed.importable_artifacts[0]["type"], "round");
         assert_eq!(resumed.importable_artifacts[1]["type"], "gap");
@@ -922,7 +1117,7 @@ mod tests {
             .unwrap();
 
         service.append_user_message(&session.id, "hello").unwrap();
-        let resumed = service.resume(&session.id).unwrap();
+        let resumed = wait_for_chat_record(&service, &session.id, |record| record.interrupted);
         assert!(resumed.interrupted);
         assert!(
             resumed
@@ -951,7 +1146,9 @@ mod tests {
             .unwrap();
 
         service.append_user_message(&session.id, "hello").unwrap();
-        let resumed = service.resume(&session.id).unwrap();
+        let resumed = wait_for_chat_record(&service, &session.id, |record| {
+            record.provider_session_id.as_deref() == Some("prov-1")
+        });
         assert_eq!(resumed.provider_session_id.as_deref(), Some("prov-1"));
         assert!(!resumed.in_flight);
         assert_eq!(resumed.last_turn_started_at, None);
@@ -973,6 +1170,56 @@ mod tests {
         let read = service.read(&session.id).unwrap();
         assert!(!read.in_flight);
         assert_eq!(read.provider_session_id.as_deref(), Some("prov-1"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_chat_service_edits_removes_and_batches_queued_messages() {
+        let temp_root = unique_temp_dir("chat-queue");
+        let durable_root = temp_root.join(".refine");
+        write_fake_provider(&durable_root, "smoke-ai", 0, "queued provider response");
+        let service = FileChatService::new(&durable_root);
+        let session = service
+            .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
+            .unwrap();
+        let mut busy = service.resume(&session.id).unwrap();
+        busy.queue_dispatching = true;
+        service.write_record(&busy).unwrap();
+
+        let queued = service.append_user_message(&session.id, "first").unwrap();
+        let first_id = queued.queued_messages[0].id.clone();
+        let queued = service.append_user_message(&session.id, "second").unwrap();
+        let second_id = queued.queued_messages[1].id.clone();
+        service
+            .update_queued_message(&session.id, &first_id, "first edited")
+            .unwrap();
+        service
+            .remove_queued_message(&session.id, &second_id)
+            .unwrap();
+        service.append_user_message(&session.id, "third").unwrap();
+
+        let mut ready = service.resume(&session.id).unwrap();
+        assert_eq!(ready.queued_messages.len(), 2);
+        ready.queue_dispatching = false;
+        service.write_record(&ready).unwrap();
+        service.ensure_queue_dispatch(&mut ready).unwrap();
+        wait_for_chat_line(&service, &session.id, "queued provider response");
+        let record = service.resume(&session.id).unwrap();
+        let user_events = record
+            .transcript_events
+            .iter()
+            .filter(|event| event.get("role").and_then(|value| value.as_str()) == Some("user"))
+            .collect::<Vec<_>>();
+        assert_eq!(user_events.len(), 1);
+        let user_text = user_events[0]
+            .get("text")
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        assert!(user_text.contains("first edited"));
+        assert!(user_text.contains("third"));
+        assert!(!user_text.contains("second"));
+        assert!(record.queued_messages.is_empty());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1054,6 +1301,41 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn wait_for_chat_line(
+        service: &FileChatService,
+        session_id: &str,
+        needle: &str,
+    ) -> ChatReadResult {
+        for _ in 0..100 {
+            let read = service.read(session_id).unwrap();
+            if read.lines.iter().any(|line| line.contains(needle))
+                || read.progress_lines.iter().any(|line| line.contains(needle))
+            {
+                return read;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        service.read(session_id).unwrap()
+    }
+
+    fn wait_for_chat_record<F>(
+        service: &FileChatService,
+        session_id: &str,
+        predicate: F,
+    ) -> ChatSessionRecord
+    where
+        F: Fn(&ChatSessionRecord) -> bool,
+    {
+        for _ in 0..100 {
+            let record = service.resume(session_id).unwrap();
+            if predicate(&record) {
+                return record;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        service.resume(session_id).unwrap()
     }
 
     fn write_fake_provider(durable_root: &PathBuf, name: &str, exit_code: i32, output: &str) {

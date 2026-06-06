@@ -68,6 +68,7 @@ function ensureStandaloneTab() {
       agentResponded: false, progress: "", showProgress: true,
     };
   }
+  ensureChatTabQueueState(chatState.tabs.standalone);
   ensureFilesTab();
   ensureSystemTab();
   reorderStandardToolbarTabs();
@@ -81,6 +82,7 @@ function ensureFilesTab() {
       agentResponded: false, progress: "", showProgress: true,
     };
   }
+  ensureChatTabQueueState(chatState.tabs[FILES_TAB_ID]);
 }
 
 function ensureSystemTab() {
@@ -91,10 +93,12 @@ function ensureSystemTab() {
       agentResponded: false, progress: "", showProgress: true,
     };
   }
+  ensureChatTabQueueState(chatState.tabs[SYSTEM_TAB_ID]);
 }
 
 function reorderStandardToolbarTabs() {
   const existing = chatState.tabs || {};
+  for (const tab of Object.values(existing)) ensureChatTabQueueState(tab);
   const ordered = {};
   for (const id of STANDARD_TOOLBAR_TAB_ORDER) {
     if (existing[id]) ordered[id] = existing[id];
@@ -103,6 +107,27 @@ function reorderStandardToolbarTabs() {
     if (!STANDARD_TOOLBAR_TAB_ORDER.includes(id)) ordered[id] = tab;
   }
   chatState.tabs = ordered;
+}
+
+function ensureChatTabQueueState(tab) {
+  if (!tab) return tab;
+  tab.queuedMessages = normalizeQueuedMessages(tab.queuedMessages);
+  tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages);
+  tab.starting = !!tab.starting;
+  return tab;
+}
+
+function normalizeQueuedMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages
+    .map((message) => ({
+      id: String(message?.id || newLocalQueuedMessageId()),
+      text: String(message?.text || ""),
+      created_at: String(message?.created_at || new Date().toISOString()),
+      updated_at: String(message?.updated_at || message?.created_at || new Date().toISOString()),
+      local: !!message?.local,
+    }))
+    .filter((message) => message.text.trim());
 }
 
 function loadChatStateFromStorage() {
@@ -143,6 +168,9 @@ function saveChatStateToStorage() {
         showProgress: t.showProgress !== false,
         closedReason: t.closedReason,
         agentResponded: !!t.agentResponded,
+        queuedMessages: normalizeQueuedMessages(t.queuedMessages),
+        localQueuedMessages: normalizeQueuedMessages(t.localQueuedMessages),
+        starting: !!t.starting,
     };
   }
   try {
@@ -269,6 +297,7 @@ function openChatDock({ gapId = null, gapStatus = null } = {}) {
         gapStatus: gapStatus || "",
         sessionId: null, output: "", progress: "", showProgress: true,
         closedReason: null, agentResponded: false,
+        queuedMessages: [], localQueuedMessages: [], starting: false,
       };
     } else if (gapStatus) {
       chatState.tabs[gapId].gapStatus = gapStatus;
@@ -302,6 +331,9 @@ function ensurePlanTab() {
       showProgress: true,
       closedReason: null,
       agentResponded: false,
+      queuedMessages: [],
+      localQueuedMessages: [],
+      starting: false,
     };
   }
 }
@@ -316,17 +348,22 @@ async function openPlanChatDock(options = {}) {
   saveChatStateToStorage();
   drawToolbar();
   const t = chatState.tabs.plan;
-  let started = Promise.resolve();
   if (t && !t.sessionId) {
-    started = startPlanChatSession(t);
+    startPlanChatSession(t);
   }
   if (initialPrompt.trim()) {
-    await started;
-    await sendChatText(initialPrompt);
+    queueChatTextForTab(t, initialPrompt);
+    saveChatStateToStorage();
+    drawToolbar();
+    if (t?.sessionId) flushLocalQueuedMessages(t);
   }
 }
 
 async function startPlanChatSession(tab) {
+  if (!tab || tab.starting || tab.sessionId) return;
+  tab.starting = true;
+  saveChatStateToStorage();
+  applyPendingIndicator(tab);
   try {
     const r = await api("POST", "/api/chat/start", { purpose: "plan" });
     tab.sessionId = r.session_id;
@@ -334,29 +371,75 @@ async function startPlanChatSession(tab) {
     tab.mode = "plan";
     tab.progress = "";
     tab.showProgress = true;
+    tab.starting = false;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
+    await flushLocalQueuedMessages(tab);
     drawToolbar();
     $("#chat-input")?.focus();
   } catch (e) {
+    tab.starting = false;
+    saveChatStateToStorage();
+    applyPendingIndicator(tab);
     toast("Could not start plan: " + e.message, "error");
   }
 }
 
 async function startGapChatSession(tab) {
+  if (!tab || tab.starting || tab.sessionId) return;
+  tab.starting = true;
+  saveChatStateToStorage();
+  applyPendingIndicator(tab);
   try {
     const r = await api("POST", "/api/chat/start", { gap_id: tab.gapId });
     tab.sessionId = r.session_id;
     tab.closedReason = null;
     tab.progress = "";
     tab.showProgress = true;
+    tab.starting = false;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
+    await flushLocalQueuedMessages(tab);
     drawToolbar();
     $("#chat-input")?.focus();
   } catch (e) {
+    tab.starting = false;
+    saveChatStateToStorage();
+    applyPendingIndicator(tab);
     toast("Could not start chat: " + e.message, "error");
   }
+}
+
+async function startStandaloneChatSession(tab) {
+  if (!tab || tab.starting || tab.sessionId) return;
+  tab.starting = true;
+  saveChatStateToStorage();
+  applyPendingIndicator(tab);
+  try {
+    const r = await api("POST", "/api/chat/start", {});
+    tab.sessionId = r.session_id;
+    tab.closedReason = null;
+    tab.progress = "";
+    tab.showProgress = true;
+    tab.starting = false;
+    saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
+    await flushLocalQueuedMessages(tab);
+    drawToolbar();
+    $("#chat-input")?.focus();
+  } catch (e) {
+    tab.starting = false;
+    saveChatStateToStorage();
+    applyPendingIndicator(tab);
+    toast("Could not start chat: " + e.message, "error");
+  }
+}
+
+function ensureChatSession(tab) {
+  if (!tab || tab.sessionId || tab.starting) return;
+  if (tab.mode === "plan") startPlanChatSession(tab);
+  else if (tab.gapId) startGapChatSession(tab);
+  else startStandaloneChatSession(tab);
 }
 
 function toggleToolbar() {
@@ -510,6 +593,12 @@ function drawToolbar() {
     $("#chat-input")?.addEventListener("input", (e) => {
       resizeChatInput(e.currentTarget);
     });
+    $$("[data-queued-message-save]", root).forEach((button) => {
+      button.addEventListener("click", () => saveQueuedChatMessage(button.dataset.queuedMessageSave || ""));
+    });
+    $$("[data-queued-message-remove]", root).forEach((button) => {
+      button.addEventListener("click", () => removeQueuedChatMessage(button.dataset.queuedMessageRemove || ""));
+    });
     resizeChatInput($("#chat-input"));
   }
 
@@ -537,6 +626,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
   const showInputDots = chatActivityIsPulsing(active);
   const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
   const inputPlaceholder = chatInputPlaceholder(active);
+  const queuedMessages = allQueuedMessages(active);
   return `
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
@@ -551,7 +641,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
             Draft Round
           </button>` : ""}
         <button id="btn-chat-clear" class="secondary"
-                ${(active.output || active.progress || active.sessionId) ? "" : "disabled"}>
+                ${(active.output || active.progress || active.sessionId || queuedMessages.length) ? "" : "disabled"}>
           Clear history
         </button>
         ${active.gapId ? `
@@ -580,6 +670,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           <div id="chat-progress" class="chat-progress">${renderChatProgress(progressText)}</div>
         </div>
       </div>
+      ${renderQueuedChatMessages(queuedMessages)}
       <div class="actions" style="margin-top:8px">
         <div class="chat-input-wrap">
           <span id="chat-input-pending-dots"
@@ -590,11 +681,36 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           <textarea id="chat-input"
                     class="${showInputDots ? "chat-input-waiting" : ""}"
                     rows="2"
-                    placeholder="${htmlEscape(inputPlaceholder)}"
-                    ${hasSession && !active.pending ? "" : "disabled"}></textarea>
+                    placeholder="${htmlEscape(inputPlaceholder)}"></textarea>
         </div>
       </div>
     `;
+}
+
+function allQueuedMessages(tab) {
+  return [
+    ...normalizeQueuedMessages(tab?.localQueuedMessages).map((message) => ({ ...message, local: true })),
+    ...normalizeQueuedMessages(tab?.queuedMessages).map((message) => ({ ...message, local: false })),
+  ];
+}
+
+function renderQueuedChatMessages(messages) {
+  if (!messages.length) return "";
+  return `
+    <div class="chat-queue" id="chat-queue">
+      <div class="chat-queue-header">
+        <span>Queued messages</span>
+        <span class="muted small">${messages.length}</span>
+      </div>
+      ${messages.map((message) => `
+        <div class="chat-queue-item" data-queued-message-id="${htmlEscape(message.id)}" data-queued-message-local="${message.local ? "1" : "0"}">
+          <textarea class="chat-queue-edit" rows="2" data-queued-message-text>${htmlEscape(message.text)}</textarea>
+          <div class="chat-queue-actions">
+            <button class="secondary small" data-queued-message-save="${htmlEscape(message.id)}">Save</button>
+            <button class="danger small" data-queued-message-remove="${htmlEscape(message.id)}">Remove</button>
+          </div>
+        </div>`).join("")}
+    </div>`;
 }
 
 function renderChatProgress(text) {
@@ -1574,7 +1690,7 @@ function applyPendingIndicator(tab) {
   if (dots) dots.hidden = !chatActivityIsPulsing(tab);
   if (label) label.textContent = chatActivityLabel(tab);
   if (input) {
-    input.disabled = !tab || !tab.sessionId || tab.pending;
+    input.disabled = !tab;
     input.placeholder = chatInputPlaceholder(tab);
     input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));
   }
@@ -1595,11 +1711,10 @@ function chatActivityLabel(tab) {
 }
 
 function chatInputPlaceholder(tab) {
-  if (!tab?.sessionId) {
-    return "Click Start to begin session before sending messages is enabled.";
-  }
-  if (tab.pending) return "Waiting on agent...";
-  return "Type and press enter.";
+  if (!tab?.sessionId && tab?.starting) return "Starting session. Type to queue messages.";
+  if (!tab?.sessionId) return "Type to queue a message and start the session.";
+  if (tab.pending) return "Agent is busy. Press Enter to queue another message.";
+  return "Type and press Enter.";
 }
 
 function syncChatActionButtons(tab) {
@@ -1655,7 +1770,7 @@ async function closeChatTab(tabId) {
 async function clearActiveChat() {
   const t = chatState.tabs[chatState.activeTabId];
   if (!t) return;
-  if (!t.output && !t.progress && !t.sessionId) return;     // nothing to clear
+  if (!t.output && !t.progress && !t.sessionId && !allQueuedMessages(t).length) return;
   const btn = $("#btn-chat-clear");
   const ok = await modalConfirm(
     "Clear this chat's history? Any active session will be stopped and " +
@@ -1675,6 +1790,9 @@ async function clearActiveChat() {
     t.showProgress = true;
     t.closedReason = null;
     t.pending = false;
+    t.queuedMessages = [];
+    t.localQueuedMessages = [];
+    t.starting = false;
     t.agentResponded = false;
     saveChatStateToStorage();
     drawChat();
@@ -1697,22 +1815,7 @@ async function toggleActiveChat() {
     return;
   }
   await withButtonBusy(btn, "Starting…", async () => {
-    try {
-      const r = await api("POST", "/api/chat/start",
-                          t.gapId ? { gap_id: t.gapId } : t.mode === "plan" ? { purpose: "plan" } : {});
-      t.sessionId = r.session_id;
-      t.closedReason = null;
-      t.output = "";
-      t.progress = "";
-      t.showProgress = true;
-      t.agentResponded = false;
-      saveChatStateToStorage();
-      refreshProcessesTabForChatChange();
-      drawChat();
-      $("#chat-input")?.focus();
-    } catch (e) {
-      toast("Could not start chat: " + e.message, "error");
-    }
+    ensureChatSession(t);
   });
 }
 
@@ -2001,10 +2104,18 @@ async function pollChat() {
     // Pending state is authoritative from the runner: `in_flight` is true
     // while an agent CLI subprocess is running for this session.
     const wasPending = !!t.pending;
+    const queuedBefore = JSON.stringify(normalizeQueuedMessages(t.queuedMessages));
     t.pending = !!r.in_flight;
+    t.queuedMessages = normalizeQueuedMessages(r.queued_messages);
+    const queuedChanged = queuedBefore !== JSON.stringify(t.queuedMessages);
     applyPendingIndicator(t);
     syncChatActionButtons(t);
     if (wasPending !== t.pending) refreshProcessesTabForChatChange();
+    if (queuedChanged && chatState.activeTabId in chatState.tabs) {
+      saveChatStateToStorage();
+      drawToolbar();
+      return;
+    }
     if (r.alive === false) {
       t.closedReason = r.closed_reason || "session ended";
       t.sessionId = null;
@@ -2020,7 +2131,7 @@ async function pollChat() {
 
 async function sendChatLine() {
   const t = chatState.tabs[chatState.activeTabId];
-  if (!t || !t.sessionId || t.pending) return;
+  if (!t) return;
   const input = $("#chat-input");
   const text = input.value;
   if (!text.trim()) return;
@@ -2029,33 +2140,131 @@ async function sendChatLine() {
   await sendChatText(text);
 }
 
+async function saveQueuedChatMessage(messageId) {
+  const tab = chatState.tabs[chatState.activeTabId];
+  if (!tab || !messageId) return;
+  const row = document.querySelector(`[data-queued-message-id="${cssEscape(messageId)}"]`);
+  const text = row?.querySelector("[data-queued-message-text]")?.value || "";
+  if (!text.trim()) return toast("Queued message cannot be empty.", "error");
+  const isLocal = row?.dataset.queuedMessageLocal === "1";
+  if (isLocal || !tab.sessionId) {
+    const message = normalizeQueuedMessages(tab.localQueuedMessages)
+      .find((item) => item.id === messageId);
+    if (!message) return;
+    message.text = text.trim();
+    message.updated_at = new Date().toISOString();
+    message.local = true;
+    tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages)
+      .map((item) => item.id === messageId ? message : item);
+    saveChatStateToStorage();
+    drawToolbar();
+    return;
+  }
+  try {
+    const r = await api("PATCH", `/api/chat/${tab.sessionId}/queue/${encodeURIComponent(messageId)}`, {
+      text: text.trim(),
+    });
+    tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
+    saveChatStateToStorage();
+    drawToolbar();
+  } catch (e) {
+    toast("Could not update queued message: " + e.message, "error");
+  }
+}
+
+async function removeQueuedChatMessage(messageId) {
+  const tab = chatState.tabs[chatState.activeTabId];
+  if (!tab || !messageId) return;
+  const row = document.querySelector(`[data-queued-message-id="${cssEscape(messageId)}"]`);
+  const isLocal = row?.dataset.queuedMessageLocal === "1";
+  if (isLocal || !tab.sessionId) {
+    tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages)
+      .filter((item) => item.id !== messageId);
+    saveChatStateToStorage();
+    drawToolbar();
+    return;
+  }
+  try {
+    const r = await api("DELETE", `/api/chat/${tab.sessionId}/queue/${encodeURIComponent(messageId)}`);
+    tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
+    saveChatStateToStorage();
+    drawToolbar();
+  } catch (e) {
+    toast("Could not remove queued message: " + e.message, "error");
+  }
+}
+
+function cssEscape(value) {
+  if (window.CSS?.escape) return CSS.escape(value);
+  return String(value).replace(/["\\]/g, "\\$&");
+}
+
 async function sendChatText(text) {
   const t = chatState.tabs[chatState.activeTabId];
-  if (!t || !t.sessionId || t.pending) return;
+  if (!t) return;
   text = String(text || "");
   if (!text.trim()) return;
-  const quotedText = text.split(/\r?\n/).map((line) => `> ${line}`).join("\n");
-  const echo = `\n${quotedText}\n`;
-  t.output = (t.output || "") + echo;
-  const out = $("#chat-output");
-  if (out) {
-    out.innerHTML = mdToHtml(t.output || "");
-    out.scrollTop = out.scrollHeight;
+  if (!t.sessionId) {
+    queueChatTextForTab(t, text);
+    ensureChatSession(t);
+    saveChatStateToStorage();
+    drawToolbar();
+    return;
   }
-  // Optimistically flip into pending so the indicator appears immediately
-  // (the next poll will confirm via `in_flight`).
-  t.pending = true;
-  applyPendingIndicator(t);
+  if (normalizeQueuedMessages(t.localQueuedMessages).length) {
+    queueChatTextForTab(t, text);
+    await flushLocalQueuedMessages(t);
+    return;
+  }
+  await queueChatTextOnServer(t, text);
+}
+
+function queueChatTextForTab(tab, text) {
+  if (!tab) return;
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return;
+  ensureChatTabQueueState(tab);
+  tab.localQueuedMessages.push({
+    id: newLocalQueuedMessageId(),
+    text: trimmed,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    local: true,
+  });
+}
+
+function newLocalQueuedMessageId() {
+  return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+async function flushLocalQueuedMessages(tab) {
+  if (!tab?.sessionId) return;
+  ensureChatTabQueueState(tab);
+  if (!tab.localQueuedMessages.length) return;
+  const messages = tab.localQueuedMessages.slice();
+  const text = messages.length === 1
+    ? messages[0].text
+    : messages.map((message, idx) => `Message ${idx + 1}:\n${message.text}`).join("\n\n");
+  tab.localQueuedMessages = [];
   saveChatStateToStorage();
-  refreshProcessesTabForChatChange();
+  drawToolbar();
+  await queueChatTextOnServer(tab, text);
+}
+
+async function queueChatTextOnServer(tab, text) {
+  if (!tab?.sessionId) return;
   try {
-    await api("POST", `/api/chat/${t.sessionId}/input`, { text });
-    // Trigger a poll right away so we pick up `in_flight` and (likely soon)
-    // the response without waiting the full 800ms tick.
+    const r = await api("POST", `/api/chat/${tab.sessionId}/input`, { text });
+    tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
+    tab.closedReason = null;
+    saveChatStateToStorage();
+    refreshProcessesTabForChatChange();
+    drawToolbar();
     pollChat();
   } catch (e) {
-    t.pending = false;
-    applyPendingIndicator(t);
+    queueChatTextForTab(tab, text);
+    saveChatStateToStorage();
+    drawToolbar();
     toast("Could not send: " + e.message, "error");
   }
 }
