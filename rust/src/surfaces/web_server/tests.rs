@@ -2337,6 +2337,13 @@ fn web_server_reports_project_registry_and_updates_settings() {
         attached.body["client_repo"],
         other_app.display().to_string()
     );
+    let dashboard = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard".to_string(),
+        body: None,
+    });
+    assert_eq!(dashboard.status, 200);
+    assert_eq!(dashboard.body["attached"], true);
 
     let switched = server.handle(ApiRequest {
         method: "POST".to_string(),

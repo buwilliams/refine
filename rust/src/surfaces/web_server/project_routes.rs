@@ -19,6 +19,10 @@ use super::*;
 
 impl InProcessWebServer {
     pub(super) fn handle_dashboard(&self) -> ApiResponse {
+        let attached = match self.current_durable_root() {
+            Ok(value) => value.is_some(),
+            Err(error) => return error_response(error),
+        };
         let projection = match self.current_projection_with_runtime() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
@@ -55,7 +59,7 @@ impl InProcessWebServer {
                 "active_node_id": "default",
                 "active_node_display_name": "Default",
                 "needs_attention": projection.dashboard.attention_indicators,
-                "attached": self.durable_root.is_some()
+                "attached": attached
             }),
         )
     }
