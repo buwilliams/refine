@@ -771,7 +771,7 @@ impl InProcessWebServer {
         let command = std::env::current_exe()
             .ok()
             .map(|path| path.display().to_string())
-            .unwrap_or_else(|| "refine-native".to_string());
+            .unwrap_or_else(|| "refine".to_string());
         ApiResponse::json(
             200,
             json!({

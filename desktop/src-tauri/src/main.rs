@@ -13,8 +13,8 @@ fn main() {
 
 #[cfg(not(feature = "real-tauri"))]
 mod bridge_shell {
-    use refine_native::core::supervisor::runtime::{DEFAULT_APP_ID, RuntimeRoot};
-    use refine_native::surfaces::desktop::{
+    use refine::core::supervisor::runtime::{DEFAULT_APP_ID, RuntimeRoot};
+    use refine::surfaces::desktop::{
         DesktopShellBridge, FileDesktopShellBridge, desktop_shell_manifest,
     };
 
@@ -47,8 +47,8 @@ mod bridge_shell {
 
 #[cfg(feature = "real-tauri")]
 mod real_tauri {
-    use refine_native::core::supervisor::runtime::{DEFAULT_APP_ID, RuntimeRoot};
-    use refine_native::surfaces::desktop::{
+    use refine::core::supervisor::runtime::{DEFAULT_APP_ID, RuntimeRoot};
+    use refine::surfaces::desktop::{
         DesktopShellBridge, FileDesktopShellBridge, desktop_shell_manifest,
     };
     use tauri::menu::{Menu, MenuItem};

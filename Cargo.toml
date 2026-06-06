@@ -1,5 +1,5 @@
 [package]
-name = "refine-native"
+name = "refine"
 version = "0.1.0"
 edition = "2024"
 

@@ -162,7 +162,7 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
         .unwrap()
         .as_nanos();
     std::env::temp_dir().join(format!(
-        "refine-native-test-{prefix}-{}-{nanos}",
+        "refine-test-{prefix}-{}-{nanos}",
         std::process::id()
     ))
 }

@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use refine_native::core::supervisor::runtime::{DEFAULT_APP_ID, RuntimePathLayout};
-use refine_native::surfaces::web_server::{API_CONTRACT_VERSION, API_GROUPS};
+use refine::core::supervisor::runtime::{DEFAULT_APP_ID, RuntimePathLayout};
+use refine::surfaces::web_server::{API_CONTRACT_VERSION, API_GROUPS};
 use serde_json::json;
 
 fn main() {

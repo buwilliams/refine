@@ -1045,10 +1045,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        std::env::temp_dir().join(format!(
-            "refine-native-{prefix}-{}-{nanos}",
-            std::process::id()
-        ))
+        std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
     }
 
     fn write_fake_provider(durable_root: &PathBuf, name: &str, exit_code: i32, output: &str) {

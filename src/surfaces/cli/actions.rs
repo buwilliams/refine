@@ -7,7 +7,7 @@ use crate::model::workflow::GapStatus;
 
 #[derive(Debug, Parser)]
 #[command(name = "refine")]
-#[command(about = "Native Refine CLI surface")]
+#[command(about = "Refine - Your team's agentic software delivery system.")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,

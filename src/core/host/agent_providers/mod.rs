@@ -701,9 +701,6 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        env::temp_dir().join(format!(
-            "refine-native-{prefix}-{}-{nanos}",
-            std::process::id()
-        ))
+        env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
     }
 }

@@ -2436,17 +2436,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "refine-desktop"
-version = "0.1.0"
-dependencies = [
- "refine-native",
- "serde_json",
- "tauri",
- "tauri-build",
-]
-
-[[package]]
-name = "refine-native"
+name = "refine"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -2455,6 +2445,16 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "uuid",
+]
+
+[[package]]
+name = "refine-desktop"
+version = "0.1.0"
+dependencies = [
+ "refine",
+ "serde_json",
+ "tauri",
+ "tauri-build",
 ]
 
 [[package]]
