@@ -641,7 +641,12 @@ impl InProcessWebServer {
             return runtime_root_unavailable("detach project");
         };
         match service.detach() {
-            Ok(status) => ApiResponse::json(200, project_status_value(status)),
+            Ok(status) => {
+                if let Err(error) = self.refresh_runtime_projection_cache() {
+                    return error_response(error);
+                }
+                ApiResponse::json(200, project_status_value(status))
+            }
             Err(error) => error_response(error),
         }
     }
@@ -682,9 +687,16 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_sync(&self) -> ApiResponse {
-        let projection = match self.current_projection() {
-            Ok(projection) => projection,
-            Err(error) => return error_response(error),
+        let projection = if self.runtime_root.is_some() {
+            match self.rebuild_current_projection_cache() {
+                Ok(projection) => projection,
+                Err(error) => return error_response(error),
+            }
+        } else {
+            match self.current_projection() {
+                Ok(projection) => projection,
+                Err(error) => return error_response(error),
+            }
         };
         ApiResponse::json(
             200,

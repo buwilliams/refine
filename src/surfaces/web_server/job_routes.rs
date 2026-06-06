@@ -1,4 +1,6 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
@@ -7,12 +9,20 @@ use crate::core::host::installation::{FileInstallationService, InstallationServi
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
-use crate::core::supervisor::errors::RefineError;
+use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
 use crate::core::supervisor::security::{NativeSecretStore, SecretStore};
 
 use super::support::*;
 use super::*;
+
+#[derive(Clone, Debug)]
+struct DiagnosticsCacheEntry {
+    value: Value,
+}
+
+static DIAGNOSTICS_CACHE: OnceLock<Mutex<BTreeMap<String, DiagnosticsCacheEntry>>> =
+    OnceLock::new();
 
 impl InProcessWebServer {
     pub(super) fn handle_job_status(&self, request: ApiRequest) -> ApiResponse {
@@ -144,14 +154,19 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_processes(&self) -> ApiResponse {
+    pub(super) fn handle_processes(&self, raw_path: &str) -> ApiResponse {
         if self.runtime_root.is_none() {
             return runtime_root_unavailable("read managed processes");
         }
         match self.current_projection_with_runtime() {
-            Ok(projection) => {
-                ApiResponse::json(200, runtime_process_summary_value(&projection.runtime))
-            }
+            Ok(projection) => ApiResponse::json(
+                200,
+                if query_param(raw_path, "summary").as_deref() == Some("1") {
+                    runtime_process_status_value(&projection.runtime)
+                } else {
+                    runtime_process_summary_value(&projection.runtime)
+                },
+            ),
             Err(error) => error_response(error),
         }
     }
@@ -199,7 +214,7 @@ impl InProcessWebServer {
             .and_then(|stopped| stopped.as_bool())
             .unwrap_or(!current.background_processes_stopped);
         match supervisor.set_background_processes_stopped(stopped) {
-            Ok(_) => self.handle_processes(),
+            Ok(_) => self.handle_processes("/processes"),
             Err(error) => error_response(error),
         }
     }
@@ -220,7 +235,7 @@ impl InProcessWebServer {
             .and_then(|paused| paused.as_bool())
             .unwrap_or(!current.agents_paused);
         match supervisor.set_agents_paused(paused) {
-            Ok(_) => self.handle_processes(),
+            Ok(_) => self.handle_processes("/processes"),
             Err(error) => error_response(error),
         }
     }
@@ -425,47 +440,92 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_diagnostics(&self) -> ApiResponse {
-        let projection = match self.current_projection_with_runtime() {
-            Ok(projection) => projection,
-            Err(error) => return error_response(error),
-        };
-        let Some(runtime_root) = &self.runtime_root else {
+        if self.runtime_root.is_none() {
             return runtime_root_unavailable("read diagnostics");
+        }
+        match self.diagnostics_value(false) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn warm_diagnostics_cache(&self) -> RefineResult<()> {
+        if self.runtime_root.is_none() {
+            return Ok(());
+        }
+        self.diagnostics_value(true).map(|_| ())
+    }
+
+    fn diagnostics_value(&self, refresh: bool) -> RefineResult<Value> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return Err(RefineError::InvalidInput(
+                "runtime root is required to read diagnostics".to_string(),
+            ));
         };
         let repo_root = self
             .source_root()
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-        let doctor = match FileDiagnosticsService::new(
-            self.current_durable_root().ok().flatten(),
-            runtime_root.clone(),
-            repo_root,
-        )
-        .doctor()
-        {
-            Ok(report) => report,
-            Err(error) => return error_response(error),
+        let durable_root = self.current_durable_root().ok().flatten();
+        let cache_key = diagnostics_cache_key(runtime_root, durable_root.as_ref(), &repo_root);
+        if !refresh {
+            let cache = DIAGNOSTICS_CACHE
+                .get_or_init(|| Mutex::new(BTreeMap::new()))
+                .lock()
+                .map_err(|_| RefineError::Io("diagnostics cache lock was poisoned".to_string()))?;
+            if let Some(entry) = cache.get(&cache_key) {
+                return Ok(entry.value.clone());
+            }
+        }
+        let projection = match self.current_projection_with_runtime() {
+            Ok(projection) => projection,
+            Err(error) => return Err(error),
         };
+        let doctor =
+            FileDiagnosticsService::new(durable_root, runtime_root.clone(), repo_root).doctor()?;
         let provider = projection
             .runtime
             .preflight
             .clone()
             .map(Value::Object)
             .unwrap_or_else(|| json!({"ok": false, "providers": []}));
-        let process = runtime_process_summary_value(&projection.runtime);
-        ApiResponse::json(
-            200,
-            json!({
-                "reachable": true,
-                "backend": {
-                    "process_model": "supervisor",
-                    "native": true
+        let process = runtime_process_status_value(&projection.runtime);
+        let value = json!({
+            "reachable": true,
+            "backend": {
+                "process_model": "supervisor",
+                "native": true
+            },
+            "provider": provider,
+            "processes": process,
+            "doctor": doctor
+        });
+        DIAGNOSTICS_CACHE
+            .get_or_init(|| Mutex::new(BTreeMap::new()))
+            .lock()
+            .map_err(|_| RefineError::Io("diagnostics cache lock was poisoned".to_string()))?
+            .insert(
+                cache_key,
+                DiagnosticsCacheEntry {
+                    value: value.clone(),
                 },
-                "provider": provider,
-                "processes": process,
-                "doctor": doctor
-            }),
-        )
+            );
+        Ok(value)
     }
+}
+
+fn diagnostics_cache_key(
+    runtime_root: &std::path::Path,
+    durable_root: Option<&PathBuf>,
+    repo_root: &std::path::Path,
+) -> String {
+    format!(
+        "{}|{}|{}",
+        runtime_root.display(),
+        durable_root
+            .map(|path| path.display().to_string())
+            .unwrap_or_else(|| "none".to_string()),
+        repo_root.display()
+    )
 }
 
 fn secret_scope_name_from_path(path: &str) -> Option<(String, String)> {

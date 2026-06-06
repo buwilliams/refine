@@ -4,7 +4,19 @@ use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
-    pub fn handle(&self, mut request: ApiRequest) -> ApiResponse {
+    pub fn handle(&self, request: ApiRequest) -> ApiResponse {
+        let method = request.method.clone();
+        let response = self.handle_inner(request);
+        if method != "GET"
+            && response.status < 400
+            && let Err(error) = self.refresh_projection_cache_after_mutation()
+        {
+            return error_response(error);
+        }
+        response
+    }
+
+    fn handle_inner(&self, mut request: ApiRequest) -> ApiResponse {
         let raw_path = request.path.clone();
         request.path = normalize_api_path(&request.path);
 
@@ -77,7 +89,7 @@ impl InProcessWebServer {
         }
 
         if request.method == "GET" && request.path == "/processes" {
-            return self.handle_processes();
+            return self.handle_processes(&raw_path);
         }
 
         if request.method == "GET" && request.path == "/system/install" {

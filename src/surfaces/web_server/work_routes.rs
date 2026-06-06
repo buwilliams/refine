@@ -10,8 +10,8 @@ use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::product::imports::{FileImportService, import_drafts_from_value};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
-    ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, FileProjectStateStore,
-    GapProjectionQuery, PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectStateStore, ProjectionQuery,
+    ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
+    PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
 use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::RefineError;
@@ -1240,19 +1240,14 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_cache_rebuild(&self) -> ApiResponse {
-        let durable_root = require_durable_root!(self, "rebuild projection cache");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("rebuild projection cache");
         };
-        let store = FileProjectStateStore::new(durable_root);
-        let projection = match store.rebuild_projection() {
+        let projection = match self.rebuild_current_projection_cache() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };
         let cache_dir = runtime_root.join("cache");
-        if let Err(error) = store.persist_projection_snapshot(&cache_dir, &projection) {
-            return error_response(error);
-        }
         ApiResponse::json(
             200,
             json!({
@@ -1280,6 +1275,12 @@ impl InProcessWebServer {
                 _ => None,
             }),
         };
+        if query == PerformanceQuery::default()
+            && let Ok(runtime) = self.current_runtime_projection()
+            && let Some(performance) = runtime.performance
+        {
+            return ApiResponse::json(200, serde_json::Value::Object(performance));
+        }
         match performance_report_value(runtime_root, query) {
             Ok(value) => {
                 let response = ApiResponse::json(200, value.clone());

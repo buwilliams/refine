@@ -1621,6 +1621,7 @@ fn run_system_start(
         },
         static_root: static_root.or_else(default_static_root),
     };
+    daemon.recover_runtime_state()?;
     eprintln!("running foreground Refine daemon at http://{addr}");
     if once {
         daemon.serve_next(&listener)?;

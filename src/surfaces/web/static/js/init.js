@@ -18,20 +18,11 @@ function tickRunningCells() {
 async function init() {
   const attached = await ensureProjectAttached();
   if (!attached && state.project?.attached !== false) return;
-  if (attached) {
-    try {
-      await refreshReporters();
-    } catch (e) {
-      // not fatal — likely fresh install with no reporters yet
-    }
-  }
   initToolbar();
   if (typeof initGuide === "function") initGuide();
   if (typeof initCommandPalette === "function") initCommandPalette();
-  initTargetAppToggle();
-  if (attached) {
-    initSSE();
-  } else {
+  if (!attached) {
+    initTargetAppToggle();
     enterNoProjectMode(state.project, { openGuidePanel: true });
   }
   setInterval(tickRunningCells, 1000);
@@ -39,6 +30,20 @@ async function init() {
     recoverImportSessionOnLoad();
   }
   navigate();
+  if (attached) {
+    setTimeout(async () => {
+      try {
+        await refreshReporters();
+        if (state.currentRoute === "dashboard") refreshDashboard();
+      } catch (e) {
+        // not fatal — likely fresh install with no reporters yet
+      }
+      initTargetAppToggle();
+      initSSE();
+      if (typeof scheduleStartupProjectSync === "function") scheduleStartupProjectSync();
+      if (typeof scheduleMainScreenPrefetch === "function") scheduleMainScreenPrefetch();
+    }, 250);
+  }
 }
 
 init();

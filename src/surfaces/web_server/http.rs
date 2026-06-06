@@ -3,12 +3,14 @@ use std::fs;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime};
 
 use serde_json::{Value, json};
 
 use crate::core::observability::activity::{ActivityService, FileActivityService};
+use crate::core::observability::metrics::FileMetricsService;
 use crate::core::product::project_state::ProjectionQuery;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::lifecycle::DaemonStatus;
@@ -75,6 +77,16 @@ struct SseEventFrame {
 }
 
 #[derive(Clone, Debug)]
+struct StaticAssetCacheEntry {
+    modified: Option<SystemTime>,
+    content_type: String,
+    bytes: Vec<u8>,
+}
+
+static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry>>> =
+    OnceLock::new();
+
+#[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
     pub server: InProcessWebServer,
     pub static_root: Option<PathBuf>,
@@ -89,7 +101,17 @@ impl LocalHttpDaemon {
                     "Daemon restarted before the provider turn completed.",
                 )?;
         }
+        let _ = self.server.warm_current_projection_cache()?;
+        self.server.warm_diagnostics_cache()?;
+        self.warm_static_cache()?;
         Ok(())
+    }
+
+    fn warm_static_cache(&self) -> RefineResult<()> {
+        let Some(static_root) = &self.static_root else {
+            return Ok(());
+        };
+        warm_static_cache_dir(static_root, static_root)
     }
 
     pub fn bind_loopback(port: u16) -> RefineResult<TcpListener> {
@@ -178,6 +200,7 @@ impl LocalHttpDaemon {
     }
 
     pub fn handle_wire_request(&self, request: HttpRequest) -> WireResponse {
+        let started = Instant::now();
         if request.path == "/events" || request.path == "/api/sse" {
             return match self.server_sent_events("events") {
                 Ok(events) => WireResponse::sse(events),
@@ -228,7 +251,7 @@ impl LocalHttpDaemon {
         }
 
         if let Some(response) = self.try_static_response(&request.path) {
-            return response;
+            return self.with_request_metric(&request, "static", started, response);
         }
 
         let idempotency_key = request.headers.get("idempotency-key").cloned();
@@ -246,7 +269,12 @@ impl LocalHttpDaemon {
         ) {
             match load_idempotency_record(runtime_root, key) {
                 Ok(Some(record)) if record.fingerprint == fingerprint => {
-                    return WireResponse::json(record.response);
+                    return self.with_request_metric(
+                        &request,
+                        "idempotency",
+                        started,
+                        WireResponse::json(record.response),
+                    );
                 }
                 Ok(Some(_)) => {
                     return WireResponse::json(ApiResponse::json(
@@ -281,12 +309,6 @@ impl LocalHttpDaemon {
         {
             return WireResponse::json(error_response(error));
         }
-        if method != "GET"
-            && response.status < 400
-            && let Err(error) = self.server.refresh_projection_cache_after_mutation()
-        {
-            return WireResponse::json(error_response(error));
-        }
         if let (Some(runtime_root), Some(key), Some(fingerprint)) = (
             self.server.runtime_root.as_ref(),
             idempotency_key.as_deref(),
@@ -296,7 +318,17 @@ impl LocalHttpDaemon {
                 return WireResponse::json(error_response(error));
             }
         }
-        WireResponse::json(response)
+        self.with_request_metric(
+            &HttpRequest {
+                method,
+                path,
+                headers: BTreeMap::new(),
+                body: None,
+            },
+            "hot",
+            started,
+            WireResponse::json(response),
+        )
     }
 
     fn try_static_response(&self, path: &str) -> Option<WireResponse> {
@@ -324,8 +356,8 @@ impl LocalHttpDaemon {
         if !is_within(static_root, &full_path) || !full_path.is_file() {
             return None;
         }
-        let bytes = match fs::read(&full_path) {
-            Ok(bytes) => bytes,
+        let entry = match cached_static_asset(static_root, &full_path) {
+            Ok(entry) => entry,
             Err(error) => {
                 return Some(WireResponse::json(ApiResponse::json(
                     500,
@@ -338,11 +370,21 @@ impl LocalHttpDaemon {
                 )));
             }
         };
-        Some(WireResponse::bytes(
-            200,
-            content_type_for_path(&full_path),
-            bytes,
-        ))
+        Some(WireResponse::bytes(200, entry.content_type, entry.bytes))
+    }
+
+    fn with_request_metric(
+        &self,
+        request: &HttpRequest,
+        cache_mode: &'static str,
+        started: Instant,
+        response: WireResponse,
+    ) -> WireResponse {
+        let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+        if !record_http_request_metric(&self.server, request, &response, cache_mode, elapsed_ms) {
+            return response;
+        }
+        response
     }
 }
 
@@ -602,6 +644,153 @@ fn write_sse_bytes(stream: &mut TcpStream, bytes: &[u8]) -> RefineResult<bool> {
             "failed to write SSE event: {error}"
         ))),
     }
+}
+
+fn warm_static_cache_dir(static_root: &Path, root: &Path) -> RefineResult<()> {
+    if !root.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(root).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read static directory {}: {error}",
+            root.display()
+        ))
+    })? {
+        let entry = entry
+            .map_err(|error| RefineError::Io(format!("failed to read static entry: {error}")))?;
+        let path = entry.path();
+        let metadata = entry.metadata().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to stat static asset {}: {error}",
+                path.display()
+            ))
+        })?;
+        if metadata.is_dir() {
+            warm_static_cache_dir(static_root, &path)?;
+        } else if metadata.is_file() {
+            let _ = cached_static_asset(static_root, &path)?;
+        }
+    }
+    Ok(())
+}
+
+fn cached_static_asset(
+    static_root: &Path,
+    full_path: &Path,
+) -> RefineResult<StaticAssetCacheEntry> {
+    let metadata = fs::metadata(full_path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to stat static asset {}: {error}",
+            full_path.display()
+        ))
+    })?;
+    let modified = metadata.modified().ok();
+    let key = static_asset_key(static_root, full_path);
+    let cache = STATIC_ASSET_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+    {
+        let cache = cache
+            .lock()
+            .map_err(|_| RefineError::Io("static asset cache lock was poisoned".to_string()))?;
+        if let Some(entry) = cache.get(&key)
+            && entry.modified == modified
+        {
+            return Ok(entry.clone());
+        }
+    }
+
+    let entry = StaticAssetCacheEntry {
+        modified,
+        content_type: content_type_for_path(full_path).to_string(),
+        bytes: fs::read(full_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read static asset {}: {error}",
+                full_path.display()
+            ))
+        })?,
+    };
+    cache
+        .lock()
+        .map_err(|_| RefineError::Io("static asset cache lock was poisoned".to_string()))?
+        .insert(key, entry.clone());
+    Ok(entry)
+}
+
+fn static_asset_key(static_root: &Path, full_path: &Path) -> String {
+    format!("{}|{}", static_root.display(), full_path.display())
+}
+
+fn record_http_request_metric(
+    server: &InProcessWebServer,
+    request: &HttpRequest,
+    response: &WireResponse,
+    cache_mode: &'static str,
+    elapsed_ms: f64,
+) -> bool {
+    let Some(runtime_root) = server.runtime_root.clone() else {
+        return false;
+    };
+    if !screen_critical_http_request(&request.method, &request.path, cache_mode) {
+        return false;
+    }
+    let method = request.method.clone();
+    let raw_path = request.path.clone();
+    let normalized_path = normalize_api_path(&raw_path);
+    let status = response.status;
+    let bytes = response.body.len() as u64;
+    thread::spawn(move || {
+        let _ = FileMetricsService::new(runtime_root).record_operation(
+            "http.request",
+            elapsed_ms,
+            status < 400,
+            json!({
+                "method": method,
+                "path": normalized_path,
+                "raw_path": raw_path,
+                "status": status,
+                "bytes": bytes,
+                "cache_mode": cache_mode,
+                "budget_ms": 75.0,
+                "over_budget": elapsed_ms > 75.0
+            }),
+        );
+    });
+    true
+}
+
+fn screen_critical_http_request(method: &str, path: &str, cache_mode: &str) -> bool {
+    if method != "GET" {
+        return false;
+    }
+    if cache_mode == "static" {
+        return true;
+    }
+    let normalized = normalize_api_path(path);
+    if matches!(normalized.as_str(), "/performance" | "/events") {
+        return false;
+    }
+    matches!(
+        normalized.as_str(),
+        "/project/status"
+            | "/apps/status"
+            | "/dashboard"
+            | "/work/gaps"
+            | "/work/features"
+            | "/activity"
+            | "/changes"
+            | "/nodes"
+            | "/settings"
+            | "/processes"
+            | "/diagnostics"
+            | "/agents"
+            | "/governance"
+            | "/guidance"
+            | "/reporters"
+            | "/cluster"
+            | "/quality"
+            | "/upgrade"
+            | "/target-app/status"
+    ) || normalized.starts_with("/work/gaps/")
+        || normalized.starts_with("/work/features/")
 }
 
 fn should_write_sse_frame(

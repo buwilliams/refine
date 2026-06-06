@@ -1,5 +1,5 @@
 use crate::core::observability::activity::{ActivityService, FileActivityService};
-use crate::core::observability::metrics::FileMetricsService;
+use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::product::chat::{ChatAttachment, ChatService, FileChatService};
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
@@ -14,7 +14,7 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
 use crate::core::host::process_supervision::{
@@ -493,6 +493,7 @@ fn local_http_daemon_serves_static_assets() {
         server: server_with_projection(),
         static_root: Some(temp_root.clone()),
     };
+    daemon.recover_runtime_state().unwrap();
 
     let response = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
@@ -519,6 +520,21 @@ fn local_http_daemon_serves_static_assets() {
             .contains("color: black")
     );
 
+    thread::sleep(Duration::from_millis(10));
+    fs::write(temp_root.join("css/base.css"), "body { color: blue; }").unwrap();
+    let updated_css = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/static/css/base.css".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(updated_css.status, 200);
+    assert!(
+        String::from_utf8(updated_css.body)
+            .unwrap()
+            .contains("color: blue")
+    );
+
     let traversal = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
         path: "/static/../Cargo.toml".to_string(),
@@ -526,6 +542,75 @@ fn local_http_daemon_serves_static_assets() {
         body: None,
     });
     assert_eq!(traversal.status, 400);
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
+    let temp_root = unique_temp_dir("http-hot-projection-metrics");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let daemon = LocalHttpDaemon {
+        server,
+        static_root: None,
+    };
+    daemon.recover_runtime_state().unwrap();
+
+    let create = daemon.handle_wire_request(HttpRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        headers: BTreeMap::new(),
+        body: Some(br#"{"id":"HOT1","name":"Hot cached Gap"}"#.to_vec()),
+    });
+    assert_eq!(create.status, 201);
+
+    let list = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps?limit=50&offset=0".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(list.status, 200);
+    let body: serde_json::Value = serde_json::from_slice(&list.body).unwrap();
+    assert_eq!(body["gaps"][0]["id"], "HOT1");
+
+    let events = wait_for_http_request_metrics(&runtime_root);
+    assert!(events.iter().any(|event| {
+        event.operation == "http.request"
+            && event.details.get("path").and_then(|value| value.as_str()) == Some("/work/gaps")
+    }));
+
+    for path in [
+        "/api/dashboard?node=current",
+        "/api/gaps?limit=50&offset=0",
+        "/api/features?limit=50&offset=0",
+        "/api/activity?limit=50&offset=0",
+        "/api/changes?limit=50&offset=0",
+        "/api/nodes",
+        "/api/settings",
+        "/api/processes",
+        "/api/diagnostics",
+        "/api/performance?limit=50&offset=0",
+    ] {
+        let started = Instant::now();
+        let response = daemon.handle_wire_request(HttpRequest {
+            method: "GET".to_string(),
+            path: path.to_string(),
+            headers: BTreeMap::new(),
+            body: None,
+        });
+        let elapsed = started.elapsed();
+        assert_eq!(response.status, 200, "{path}");
+        assert!(
+            elapsed < Duration::from_millis(75),
+            "{path} took {:?}",
+            elapsed
+        );
+    }
+
     fs::remove_dir_all(temp_root).unwrap();
 }
 
@@ -2007,6 +2092,15 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(listed.status, 200);
     assert_eq!(listed.body["processes"][0]["kind"], "agent");
     assert_eq!(listed.body["runner_reachable"], true);
+    let summary = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/processes?summary=1".to_string(),
+        body: None,
+    });
+    assert_eq!(summary.status, 200);
+    assert_eq!(summary.body["agent_count"], 1);
+    assert_eq!(summary.body["process_count"], 1);
+    assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
@@ -3063,6 +3157,24 @@ fn git(repo: &Path, args: &[&str]) -> RefineResult<()> {
             .to_string(),
         ))
     }
+}
+
+fn wait_for_http_request_metrics(
+    runtime_root: &Path,
+) -> Vec<crate::core::observability::metrics::PerformanceEvent> {
+    for _ in 0..20 {
+        let report = FileMetricsService::new(runtime_root)
+            .report(PerformanceQuery {
+                operation: Some("http.request".to_string()),
+                ..PerformanceQuery::default()
+            })
+            .unwrap();
+        if !report.events.is_empty() {
+            return report.events;
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
+    Vec::new()
 }
 
 fn write_fake_playwright(root: &Path, exit_code: i32) {

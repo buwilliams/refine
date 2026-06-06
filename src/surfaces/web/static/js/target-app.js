@@ -74,7 +74,7 @@ async function refreshAgentStatusIndicator() {
     return;
   }
   try {
-    const snap = await api("GET", "/api/processes");
+    const snap = await api("GET", "/api/processes?summary=1");
     applyAgentStatusSnapshot(snap);
   } catch {
     applyAgentStatusSnapshot({
@@ -90,7 +90,9 @@ function applyAgentStatusSnapshot(snap) {
   const indicator = document.getElementById("agent-status-indicator");
   if (!indicator) return;
   const processes = Array.isArray(snap.processes) ? snap.processes : [];
-  const agentCount = processes.filter((proc) => proc.kind === "agent").length;
+  const agentCount = Number.isFinite(snap.agent_count)
+    ? snap.agent_count
+    : processes.filter((proc) => proc.kind === "agent").length;
   const status = !snap.runner_reachable
     ? "down"
     : snap.paused

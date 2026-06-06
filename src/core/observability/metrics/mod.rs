@@ -3,6 +3,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::{Duration, Utc};
@@ -13,6 +14,8 @@ use crate::core::supervisor::errors::{RefineError, RefineResult};
 
 pub const METRICS_LOG_FILE: &str = "metrics/performance.jsonl";
 pub const DEFAULT_METRICS_RETENTION_DAYS: i64 = 30;
+
+static METRICS_LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct MetricSample {
@@ -238,6 +241,10 @@ impl FileMetricsService {
     }
 
     fn append_event(&self, event: &PerformanceEvent) -> RefineResult<()> {
+        let _guard = METRICS_LOG_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .map_err(|_| RefineError::Io("metrics log lock was poisoned".to_string()))?;
         let path = self.path();
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
@@ -290,18 +297,16 @@ impl FileMetricsService {
             if line.trim().is_empty() {
                 continue;
             }
-            let event = serde_json::from_str::<PerformanceEvent>(&line).map_err(|error| {
-                RefineError::Serialization(format!(
-                    "failed to parse metrics event in {}: {error}",
-                    path.display()
-                ))
-            })?;
-            events.push(event);
+            events.extend(parse_performance_events_line(&line));
         }
         Ok(events)
     }
 
     fn replace_all(&self, events: &[PerformanceEvent]) -> RefineResult<()> {
+        let _guard = METRICS_LOG_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .map_err(|_| RefineError::Io("metrics log lock was poisoned".to_string()))?;
         let path = self.path();
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
@@ -450,6 +455,20 @@ fn operations(events: &[PerformanceEvent]) -> Vec<String> {
         .collect()
 }
 
+fn parse_performance_events_line(line: &str) -> Vec<PerformanceEvent> {
+    if let Ok(event) = serde_json::from_str::<PerformanceEvent>(line) {
+        return vec![event];
+    }
+    let mut events = Vec::new();
+    for event in serde_json::Deserializer::from_str(line).into_iter::<PerformanceEvent>() {
+        match event {
+            Ok(event) => events.push(event),
+            Err(_) => break,
+        }
+    }
+    events
+}
+
 fn event_tags(event: &PerformanceEvent) -> Vec<(String, String)> {
     let mut tags = vec![
         ("operation".to_string(), event.operation.clone()),
@@ -545,6 +564,55 @@ mod tests {
         let cleared = service.cleanup(true).unwrap();
         assert_eq!(cleared.deleted, 2);
         assert!(!service.path().exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_metrics_service_tolerates_concatenated_jsonl_events() {
+        let temp_root = unique_temp_dir("metrics-corrupt-jsonl");
+        let service = FileMetricsService::new(temp_root.join("run/8080"));
+        let event_a = PerformanceEvent {
+            id: "a".to_string(),
+            occurred_at: "2026-01-01T00:00:00Z".to_string(),
+            operation: "http.request".to_string(),
+            elapsed_ms: 1.0,
+            success: true,
+            gap_id: None,
+            provider: None,
+            query_mode: None,
+            rows_returned: None,
+            rows_scanned: None,
+            details: json!({"path": "/nodes"}),
+        };
+        let event_b = PerformanceEvent {
+            id: "b".to_string(),
+            occurred_at: "2026-01-01T00:00:01Z".to_string(),
+            operation: "http.request".to_string(),
+            elapsed_ms: 2.0,
+            success: true,
+            gap_id: None,
+            provider: None,
+            query_mode: None,
+            rows_returned: None,
+            rows_scanned: None,
+            details: json!({"path": "/dashboard"}),
+        };
+        fs::create_dir_all(service.path().parent().unwrap()).unwrap();
+        fs::write(
+            service.path(),
+            format!(
+                "{}{}\nnot-json\n",
+                serde_json::to_string(&event_a).unwrap(),
+                serde_json::to_string(&event_b).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let report = service.report(PerformanceQuery::default()).unwrap();
+        assert_eq!(report.total_event_count, 2);
+        assert_eq!(report.events[0].id, "b");
+        assert_eq!(report.events[1].id, "a");
 
         fs::remove_dir_all(temp_root).unwrap();
     }

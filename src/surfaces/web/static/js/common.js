@@ -17,6 +17,7 @@ const state = {
   // is what they land back on.
   underlayHash: "#/",
   pendingSystemOperations: [],
+  screenDataCache: new Map(),
 };
 
 const WORKFLOW_STATUSES = [
@@ -181,40 +182,211 @@ function refreshCurrentSettingsSurface(options = {}) {
 
 // ---- API helpers ------------------------------------------------------------
 
+const SCREEN_DATA_CACHE_TTL_MS = 5000;
+const SCREEN_PREFETCH_COOLDOWN_MS = 30000;
+const SCREEN_PREFETCH_DELAY_MS = 2000;
+const SCREEN_PREFETCH_CONCURRENCY = 2;
+const SCREEN_PREFETCH_BETWEEN_REQUESTS_MS = 50;
+
+function screenDataCacheablePath(path) {
+  const route = String(path || "").split("?", 1)[0];
+  return [
+    "/api/project/status",
+    "/api/apps/status",
+    "/api/dashboard",
+    "/api/gaps",
+    "/api/features",
+    "/api/activity",
+    "/api/changes",
+    "/api/nodes",
+    "/api/settings",
+    "/api/processes?summary=1",
+    "/api/diagnostics",
+    "/api/agents",
+    "/api/governance",
+    "/api/guidance",
+    "/api/reporters",
+    "/api/cluster",
+    "/api/quality",
+    "/api/performance",
+    "/api/upgrade",
+    "/api/target-app/status",
+  ].includes(route);
+}
+
+function invalidateScreenDataCache() {
+  state.screenDataCache.clear();
+}
+
+function scheduleMainScreenPrefetch({ force = false, delayMs = SCREEN_PREFETCH_DELAY_MS } = {}) {
+  const now = Date.now();
+  if (state._prefetchInFlight) {
+    state._prefetchRequested = state._prefetchRequested || force;
+    return;
+  }
+  if (
+    !force &&
+    now - (state._lastPrefetchAt || 0) < SCREEN_PREFETCH_COOLDOWN_MS
+  ) {
+    return;
+  }
+  if (state._prefetchTimer) clearTimeout(state._prefetchTimer);
+  state._prefetchTimer = setTimeout(() => {
+    state._prefetchTimer = null;
+    scheduleBrowserIdle(() => prefetchMainScreenData({ force }));
+  }, delayMs);
+}
+
+function defaultScreenDataPaths() {
+  return [
+    "/api/project/status",
+    "/api/dashboard?node=current",
+    "/api/features?limit=50&offset=0",
+    "/api/gaps?limit=50&offset=0&facets=1",
+    "/api/activity?limit=50&offset=0&facets=1",
+    "/api/changes?limit=50&offset=0",
+    "/api/nodes",
+    "/api/settings",
+    "/api/processes",
+    "/api/diagnostics",
+    "/api/performance?limit=50&offset=0",
+  ];
+}
+
+async function prefetchMainScreenData({ force = false } = {}) {
+  if (state.project?.attached === false) return;
+  const now = Date.now();
+  if (state._prefetchInFlight) {
+    state._prefetchRequested = state._prefetchRequested || force;
+    return;
+  }
+  if (
+    !force &&
+    now - (state._lastPrefetchAt || 0) < SCREEN_PREFETCH_COOLDOWN_MS
+  ) {
+    return;
+  }
+  state._prefetchInFlight = true;
+  state._lastPrefetchAt = now;
+  state._prefetchRequested = false;
+  try {
+    await prefetchPaths(defaultScreenDataPaths());
+  } finally {
+    state._prefetchInFlight = false;
+  }
+  if (state._prefetchRequested) {
+    state._prefetchRequested = false;
+    scheduleMainScreenPrefetch({ force: true, delayMs: 250 });
+  }
+}
+
+async function prefetchPaths(paths) {
+  let cursor = 0;
+  async function worker() {
+    while (cursor < paths.length) {
+      const path = paths[cursor++];
+      try {
+        await api("GET", path, undefined, { prefetch: true });
+      } catch {}
+      if (SCREEN_PREFETCH_BETWEEN_REQUESTS_MS > 0) {
+        await sleep(SCREEN_PREFETCH_BETWEEN_REQUESTS_MS);
+      }
+    }
+  }
+  const workers = [];
+  const count = Math.min(SCREEN_PREFETCH_CONCURRENCY, paths.length);
+  for (let i = 0; i < count; i++) workers.push(worker());
+  await Promise.allSettled(workers);
+}
+
+function scheduleBrowserIdle(callback) {
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(callback, { timeout: 1500 });
+  } else {
+    setTimeout(callback, 0);
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function api(method, path, body, options = {}) {
+  const useScreenCache = method === "GET" &&
+    options.cache !== false &&
+    screenDataCacheablePath(path);
+  if (useScreenCache) {
+    const cached = state.screenDataCache.get(path);
+    if (cached && cached.expiresAt > Date.now()) {
+      if (cached.promise) return cached.promise;
+      return cached.data;
+    }
+  }
   const opts = { method, headers: {} };
   if (options.signal) opts.signal = options.signal;
   if (body !== undefined) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(path, opts);
-  let data = null;
-  try { data = await res.json(); } catch {}
-  if (!res.ok) {
-    let msg = data?.error?.message || res.statusText || "Request failed";
-    const details = data?.error?.details;
-    const code = data?.error?.code;
-    if (code === "background_job_active" && details) {
-      msg = `${msg} Active operation: ${details}.`;
+  const requestPromise = (async () => {
+    const res = await fetch(path, opts);
+    let data = null;
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+      let msg = data?.error?.message || res.statusText || "Request failed";
+      const details = data?.error?.details;
+      const code = data?.error?.code;
+      if (code === "background_job_active" && details) {
+        msg = `${msg} Active operation: ${details}.`;
+      }
+      const err = new Error(msg);
+      err.status = res.status;
+      err.details = details;
+      err.code = code;
+      err.error = data?.error || null;
+      err.__uiLogged = true;
+      state.lastApiErrorLog = { message: msg, at: Date.now() };
+      if (!options.prefetch) {
+        recordUiError(msg, {
+          source: "api",
+          path,
+          status: res.status,
+          code,
+          details,
+        });
+      }
+      throw err;
     }
-    const err = new Error(msg);
-    err.status = res.status;
-    err.details = details;
-    err.code = code;
-    err.error = data?.error || null;
-    err.__uiLogged = true;
-    state.lastApiErrorLog = { message: msg, at: Date.now() };
-    recordUiError(msg, {
-      source: "api",
-      path,
-      status: res.status,
-      code,
-      details,
+    if (method !== "GET") {
+      invalidateScreenDataCache();
+      if (
+        path !== "/api/project/sync" &&
+        /^\/api\/(project|apps|gaps|features|activity|changes|nodes|settings|cache)\b/.test(path)
+      ) {
+        scheduleMainScreenPrefetch({ force: true, delayMs: 250 });
+      }
+    }
+    return data;
+  })();
+  if (useScreenCache) {
+    state.screenDataCache.set(path, {
+      promise: requestPromise,
+      expiresAt: Date.now() + SCREEN_DATA_CACHE_TTL_MS,
     });
-    throw err;
   }
-  return data;
+  try {
+    const data = await requestPromise;
+    if (useScreenCache) {
+      state.screenDataCache.set(path, {
+        data,
+        expiresAt: Date.now() + SCREEN_DATA_CACHE_TTL_MS,
+      });
+    }
+    return data;
+  } catch (error) {
+    if (useScreenCache) state.screenDataCache.delete(path);
+    throw error;
+  }
 }
 
 async function waitForBackgroundJob(jobOrId, {
@@ -564,7 +736,6 @@ async function ensureProjectAttached() {
   if (snap.attached) {
     const schema = snap.schema || {};
     if (schema.compatible !== false) {
-      await syncProjectUpdates({ silent: true });
       return true;
     }
     if (schema.migration_required) {
@@ -643,6 +814,24 @@ async function syncProjectUpdates({ silent = false } = {}) {
     if (!silent) throw e;
     return null;
   }
+}
+
+function scheduleStartupProjectSync() {
+  if (state._startupProjectSyncScheduled || !hasAttachedProject()) return;
+  state._startupProjectSyncScheduled = true;
+  setTimeout(() => {
+    scheduleBrowserIdle(async () => {
+      await syncProjectUpdates({ silent: true });
+      invalidateScreenDataCache();
+      if (state.currentRoute === "dashboard") refreshDashboard();
+      if (state.currentRoute === "gaps") refreshGapsTable();
+      if (state.currentRoute === "logs") loadLogs();
+      if (state.currentRoute === "changes") loadChanges();
+      if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+        refreshCurrentSettingsSurface();
+      }
+    });
+  }, 1500);
 }
 
 function openProjectAttachModal({
@@ -1576,6 +1765,7 @@ function initSSE() {
   sseSource = new EventSource("/api/sse");
   sseSource.addEventListener("activity_added", (e) => {
     if (!sseEventChanged("Activity", e)) return;
+    invalidateScreenDataCache();
     try {
       const entry = JSON.parse(e.data || "{}");
       if (typeof recordSystemOperation === "function") {
@@ -1597,6 +1787,7 @@ function initSSE() {
   });
   sseSource.addEventListener("status_change", (e) => {
     if (!sseEventChanged("Status", e)) return;
+    invalidateScreenDataCache();
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
@@ -1629,8 +1820,17 @@ function initSSE() {
   });
   sseSource.addEventListener("project_updated", async (e) => {
     if (!sseEventChanged("Project", e)) return;
+    invalidateScreenDataCache();
     await refreshProjectStatus();
-    await refreshReporters();
+    if (
+      state.currentRoute === "features" ||
+      state.currentRoute === "gaps" ||
+      state.currentRoute === "dashboard" ||
+      (state.currentRoute === "node"
+        && document.querySelector('[data-tab-pane="reporters"].active'))
+    ) {
+      await refreshReporters();
+    }
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();

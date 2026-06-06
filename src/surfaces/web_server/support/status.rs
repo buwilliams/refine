@@ -364,6 +364,37 @@ pub(in crate::surfaces::web_server) fn runtime_process_summary_value(
     Value::Object(summary)
 }
 
+pub(in crate::surfaces::web_server) fn runtime_process_status_value(
+    runtime: &RuntimeProjection,
+) -> Value {
+    let mut summary = runtime
+        .supervisor
+        .clone()
+        .unwrap_or_else(|| serde_json::Map::new());
+    let process_count = runtime.processes.len();
+    let agent_count = runtime
+        .processes
+        .iter()
+        .filter(|process| process.get("kind").and_then(Value::as_str) == Some("agent"))
+        .count();
+    let running_count = runtime
+        .processes
+        .iter()
+        .filter(|process| process.get("status").and_then(Value::as_str) == Some("running"))
+        .count();
+    summary.insert("process_count".to_string(), json!(process_count));
+    summary.insert("agent_count".to_string(), json!(agent_count));
+    summary.insert("running_process_count".to_string(), json!(running_count));
+    summary.insert("processes".to_string(), Value::Array(Vec::new()));
+    summary
+        .entry("runner_reachable".to_string())
+        .or_insert(Value::Bool(false));
+    summary
+        .entry("runner_work".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()));
+    Value::Object(summary)
+}
+
 pub(in crate::surfaces::web_server) fn value_object(value: Value) -> Option<JsonObject> {
     match value {
         Value::Object(object) => Some(object),

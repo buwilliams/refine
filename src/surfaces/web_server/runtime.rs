@@ -1,4 +1,8 @@
+use std::collections::BTreeMap;
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
 use crate::core::observability::metrics::PerformanceQuery;
@@ -8,11 +12,35 @@ use crate::core::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionSnapshot, RuntimeProjection,
 };
 use crate::core::product::work_items::FileWorkItemService;
-use crate::core::supervisor::errors::RefineResult;
+use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
 use super::support::*;
 use super::*;
+
+const RUNTIME_PROJECTION_CACHE_TTL: Duration = Duration::from_millis(250);
+
+#[derive(Clone, Debug)]
+struct RuntimeProjectionCacheEntry {
+    projection: RuntimeProjection,
+    refreshed_at: Instant,
+    fingerprint: RuntimeProjectionFingerprint,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct RuntimeProjectionFingerprint {
+    entries: BTreeMap<String, RuntimePathFingerprint>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct RuntimePathFingerprint {
+    len: u64,
+    modified_unix_ms: Option<u128>,
+}
+
+static HOT_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, ProjectionSnapshot>>> = OnceLock::new();
+static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectionCacheEntry>>> =
+    OnceLock::new();
 
 impl InProcessWebServer {
     pub(super) fn app_registry_runtime_root(&self) -> Option<PathBuf> {
@@ -41,10 +69,17 @@ impl InProcessWebServer {
 
     pub(super) fn current_projection(&self) -> RefineResult<ProjectionSnapshot> {
         if let Some(durable_root) = self.current_durable_root()? {
-            let store = FileProjectStateStore::new(durable_root);
             if let Some(runtime_root) = &self.runtime_root {
-                store.load_or_refresh_projection(&runtime_root.join("cache"))
+                let key = projection_cache_key(&durable_root, runtime_root);
+                if let Some(snapshot) = hot_projection(&key)? {
+                    return Ok(snapshot);
+                }
+                let store = FileProjectStateStore::new(&durable_root);
+                let snapshot = store.load_or_refresh_projection(&runtime_root.join("cache"))?;
+                store_hot_projection(key, snapshot.clone())?;
+                Ok(snapshot)
             } else {
+                let store = FileProjectStateStore::new(durable_root);
                 store.rebuild_projection()
             }
         } else {
@@ -84,15 +119,79 @@ impl InProcessWebServer {
 
     pub(super) fn current_projection_with_runtime(&self) -> RefineResult<ProjectionSnapshot> {
         let mut projection = self.current_projection()?;
-        let runtime = self.runtime_projection()?;
+        let runtime = self.current_runtime_projection()?;
         if projection.runtime != runtime {
             projection.runtime = runtime;
             self.persist_runtime_projection_snapshot(&projection)?;
+            if let (Some(runtime_root), Some(durable_root)) =
+                (&self.runtime_root, self.current_durable_root()?)
+            {
+                store_hot_projection(
+                    projection_cache_key(&durable_root, runtime_root),
+                    projection.clone(),
+                )?;
+            }
         }
         Ok(projection)
     }
 
-    pub(super) fn runtime_projection(&self) -> RefineResult<RuntimeProjection> {
+    pub(super) fn current_runtime_projection(&self) -> RefineResult<RuntimeProjection> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return Ok(RuntimeProjection::default());
+        };
+        let key = runtime_cache_key(runtime_root);
+        let current_fingerprint = runtime_projection_fingerprint(runtime_root)?;
+        {
+            let cache = HOT_RUNTIME_PROJECTIONS
+                .get_or_init(|| Mutex::new(BTreeMap::new()))
+                .lock()
+                .map_err(|_| {
+                    RefineError::Io("runtime projection cache lock was poisoned".to_string())
+                })?;
+            if let Some(entry) = cache.get(&key)
+                && entry.refreshed_at.elapsed() < RUNTIME_PROJECTION_CACHE_TTL
+                && entry.fingerprint == current_fingerprint
+            {
+                return Ok(entry.projection.clone());
+            }
+        }
+        self.refresh_runtime_projection_cache_with_fingerprint(current_fingerprint)
+    }
+
+    pub(super) fn refresh_runtime_projection_cache(&self) -> RefineResult<RuntimeProjection> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return Ok(RuntimeProjection::default());
+        };
+        let fingerprint = runtime_projection_fingerprint(runtime_root)?;
+        self.refresh_runtime_projection_cache_with_fingerprint(fingerprint)
+    }
+
+    fn refresh_runtime_projection_cache_with_fingerprint(
+        &self,
+        fingerprint: RuntimeProjectionFingerprint,
+    ) -> RefineResult<RuntimeProjection> {
+        let runtime = self.runtime_projection_uncached()?;
+        if let Some(runtime_root) = &self.runtime_root {
+            let key = runtime_cache_key(runtime_root);
+            let mut cache = HOT_RUNTIME_PROJECTIONS
+                .get_or_init(|| Mutex::new(BTreeMap::new()))
+                .lock()
+                .map_err(|_| {
+                    RefineError::Io("runtime projection cache lock was poisoned".to_string())
+                })?;
+            cache.insert(
+                key,
+                RuntimeProjectionCacheEntry {
+                    projection: runtime.clone(),
+                    refreshed_at: Instant::now(),
+                    fingerprint,
+                },
+            );
+        }
+        Ok(runtime)
+    }
+
+    fn runtime_projection_uncached(&self) -> RefineResult<RuntimeProjection> {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(RuntimeProjection::default());
         };
@@ -139,9 +238,50 @@ impl InProcessWebServer {
         let Some(durable_root) = self.current_durable_root()? else {
             return Ok(());
         };
-        FileProjectStateStore::new(durable_root)
-            .load_or_refresh_projection(&runtime_root.join("cache"))
-            .map(|_| ())
+        let snapshot = FileProjectStateStore::new(&durable_root)
+            .load_or_refresh_projection(&runtime_root.join("cache"))?;
+        store_hot_projection(projection_cache_key(&durable_root, runtime_root), snapshot)?;
+        let _ = self.refresh_runtime_projection_cache()?;
+        Ok(())
+    }
+
+    pub(super) fn warm_current_projection_cache(&self) -> RefineResult<Option<ProjectionSnapshot>> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return Ok(None);
+        };
+        let Some(durable_root) = self.current_durable_root()? else {
+            return Ok(None);
+        };
+        let snapshot = FileProjectStateStore::new(&durable_root)
+            .load_or_refresh_projection(&runtime_root.join("cache"))?;
+        store_hot_projection(
+            projection_cache_key(&durable_root, runtime_root),
+            snapshot.clone(),
+        )?;
+        let _ = self.refresh_runtime_projection_cache()?;
+        Ok(Some(snapshot))
+    }
+
+    pub(super) fn rebuild_current_projection_cache(&self) -> RefineResult<ProjectionSnapshot> {
+        let Some(runtime_root) = &self.runtime_root else {
+            return Err(RefineError::InvalidInput(
+                "runtime root is required to rebuild projection cache".to_string(),
+            ));
+        };
+        let Some(durable_root) = self.current_durable_root()? else {
+            return Err(RefineError::InvalidInput(
+                "durable root is required to rebuild projection cache".to_string(),
+            ));
+        };
+        let store = FileProjectStateStore::new(&durable_root);
+        let projection = store.rebuild_projection()?;
+        store.persist_projection_snapshot(&runtime_root.join("cache"), &projection)?;
+        store_hot_projection(
+            projection_cache_key(&durable_root, runtime_root),
+            projection.clone(),
+        )?;
+        let _ = self.refresh_runtime_projection_cache()?;
+        Ok(projection)
     }
 
     pub(super) fn persist_runtime_projection_override(
@@ -205,4 +345,95 @@ impl InProcessWebServer {
             .flatten()
             .and_then(|root| root.parent().map(Path::to_path_buf))
     }
+}
+
+fn projection_cache_key(durable_root: &Path, runtime_root: &Path) -> String {
+    format!(
+        "{}|{}",
+        durable_root.display(),
+        runtime_root.join("cache").display()
+    )
+}
+
+fn runtime_cache_key(runtime_root: &Path) -> String {
+    runtime_root.display().to_string()
+}
+
+fn hot_projection(key: &str) -> RefineResult<Option<ProjectionSnapshot>> {
+    HOT_PROJECTIONS
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .map_err(|_| RefineError::Io("projection cache lock was poisoned".to_string()))
+        .map(|cache| cache.get(key).cloned())
+}
+
+fn store_hot_projection(key: String, snapshot: ProjectionSnapshot) -> RefineResult<()> {
+    HOT_PROJECTIONS
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .map_err(|_| RefineError::Io("projection cache lock was poisoned".to_string()))?
+        .insert(key, snapshot);
+    Ok(())
+}
+
+fn runtime_projection_fingerprint(
+    runtime_root: &Path,
+) -> RefineResult<RuntimeProjectionFingerprint> {
+    let mut fingerprint = RuntimeProjectionFingerprint::default();
+    for path in [
+        runtime_root.join("processes"),
+        runtime_root.join("process-control.json"),
+        runtime_root.join("jobs"),
+        runtime_root.join("target-app-state.json"),
+        runtime_root.join("metrics/performance.jsonl"),
+    ] {
+        collect_runtime_path_fingerprint(runtime_root, &path, &mut fingerprint.entries)?;
+    }
+    Ok(fingerprint)
+}
+
+fn collect_runtime_path_fingerprint(
+    runtime_root: &Path,
+    path: &Path,
+    entries: &mut BTreeMap<String, RuntimePathFingerprint>,
+) -> RefineResult<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    let metadata = fs::metadata(path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to stat runtime path {}: {error}",
+            path.display()
+        ))
+    })?;
+    let relative = path
+        .strip_prefix(runtime_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    entries.insert(
+        relative,
+        RuntimePathFingerprint {
+            len: metadata.len(),
+            modified_unix_ms: metadata
+                .modified()
+                .ok()
+                .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+                .map(|duration| duration.as_millis()),
+        },
+    );
+    if metadata.is_dir() {
+        for entry in fs::read_dir(path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read runtime directory {}: {error}",
+                path.display()
+            ))
+        })? {
+            let entry = entry.map_err(|error| {
+                RefineError::Io(format!("failed to read runtime entry: {error}"))
+            })?;
+            collect_runtime_path_fingerprint(runtime_root, &entry.path(), entries)?;
+        }
+    }
+    Ok(())
 }
