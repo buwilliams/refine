@@ -36,7 +36,7 @@ async function refreshSettings(options = {}) {
     _targetAppDraftDirty &&
     !options.force &&
     state.currentRoute === "node" &&
-    document.querySelector('[data-tab-pane="application"].active')
+    document.querySelector('[data-tab-pane="target-app"].active')
   ) {
     return;
   }
@@ -64,7 +64,7 @@ async function refreshSettingsTab(slug, options = {}) {
   }
   if (
     state.currentRoute === "node" &&
-    activeSlug === "application" &&
+    activeSlug === "target-app" &&
     _targetAppDraftDirty &&
     !options.force
   ) {
@@ -182,15 +182,29 @@ function settingsSurfaceDataNeeds(surface, slug) {
       needs.performance = true;
     }
   } else if (surface === SETTINGS_SURFACES.node) {
-    if (slug === "nodes") {
+    if (slug === "application") {
       needs.nodes = true;
       needs.cluster = true;
     } else if (slug === "reporters") {
       needs.reporters = true;
       needs.nodes = true;
-    } else if (slug === "application" || slug === "runtime") {
+    } else if (slug === "target-app" || slug === "runtime") {
       needs.settings = true;
       needs.nodes = true;
+    } else if (slug === "processes") {
+      needs.settings = true;
+      needs.diagnostics = true;
+      needs.dashboard = true;
+      needs.processes = true;
+    } else if (slug === "performance") {
+      needs.settings = true;
+      needs.diagnostics = true;
+      needs.reporters = true;
+      needs.governance = true;
+      needs.dashboard = true;
+      needs.nodes = true;
+      needs.guidance = true;
+      needs.performance = true;
     }
   } else if (surface === SETTINGS_SURFACES.project) {
     if (slug === "quality") needs.quality = true;
@@ -601,8 +615,8 @@ function bindSettingsMarkdownFields(root) {
 
 const SETTINGS_SURFACES = {
   settings: {
-    title: "System",
-    basePath: "#/system",
+    title: "Node",
+    basePath: "#/node",
     storageKey: "refine_system_tab",
     tabs: [
       { slug: "processes", label: "Processes" },
@@ -614,20 +628,21 @@ const SETTINGS_SURFACES = {
     basePath: "#/node",
     storageKey: "refine_node_tab",
     tabs: [
-      { slug: "nodes", label: "Nodes" },
-      { slug: "reporters", label: "Reporters" },
       { slug: "application", label: "Application" },
-      { slug: "runtime", label: "Runtime" },
+      { slug: "reporters", label: "Reporters" },
+      { slug: "processes", label: "Processes" },
+      { slug: "performance", label: "Performance" },
+      { slug: "target-app", label: "Target App Config" },
+      { slug: "runtime", label: "Refine Runtime Config" },
     ],
   },
   project: {
-    title: "Project",
+    title: "Governance",
     basePath: "#/project",
     storageKey: "refine_project_tab",
     tabs: [
-      { slug: "application", label: "Application" },
-      { slug: "quality", label: "Quality" },
       { slug: "governance", label: "Governance" },
+      { slug: "quality", label: "Quality" },
       { slug: "guidance", label: "Guidance" },
     ],
   },
@@ -647,6 +662,9 @@ function isSettingsRoute(route = state.currentRoute) {
 function normalizeSettingsTab(slug, surface = settingsSurfaceForRoute()) {
   if (slug === "system") return "processes";
   if (slug === "agents") return "processes";
+  if (surface === SETTINGS_SURFACES.node && (slug === "application-config" || slug === "target-app-config")) {
+    return "target-app";
+  }
   if (slug === "project") return surface.tabs[0]?.slug || null;
   return surface.tabs.some((t) => t.slug === slug) ? slug : null;
 }
@@ -789,7 +807,7 @@ function bindRebuildCacheHandler() {
 
 function renderSettingsTabBody(surface, slug, data) {
   if (data.noProject) {
-    if (surface === SETTINGS_SURFACES.project && slug === "application") {
+    if (surface === SETTINGS_SURFACES.node && slug === "application") {
       return renderSettingsApplicationTab({
         projectApps: data.projectApps,
         currentProject: data.currentProject,
@@ -797,7 +815,7 @@ function renderSettingsTabBody(surface, slug, data) {
         appOptions: data.appOptions,
       });
     }
-    if (surface === SETTINGS_SURFACES.node && slug === "application") {
+    if (surface === SETTINGS_SURFACES.node && slug === "target-app") {
       return renderDetachedNodeConfig(
         renderNodeApplicationConfigSections({
           s: data.s || {},
@@ -821,18 +839,31 @@ function renderSettingsTabBody(surface, slug, data) {
     }
   }
   if (surface === SETTINGS_SURFACES.node) {
-    if (slug === "nodes") {
-      return renderSettingsNodesTab({
-        nodes: data.nodes,
-        nodeCounts: data.nodeCounts,
-        activeNodeId: data.activeNodeId,
-        clusterNodes: data.clusterNodes,
-      });
+    if (slug === "processes") {
+      return renderProcessesTab(data.processes, data.s, data.diag, data.dash);
+    }
+    if (slug === "performance") {
+      return renderSettingsPerformanceTab(data.performance, data.performanceBackend);
     }
     if (slug === "reporters") {
       return renderSettingsReportersTab(data.reps, data.activeNodeLabel);
     }
     if (slug === "application") {
+      return `
+        ${renderSettingsApplicationTab({
+          projectApps: data.projectApps,
+          currentProject: data.currentProject,
+          projectRegistryEnabled: data.projectRegistryEnabled,
+          appOptions: data.appOptions,
+        })}
+        ${renderSettingsNodesTab({
+          nodes: data.nodes,
+          nodeCounts: data.nodeCounts,
+          activeNodeId: data.activeNodeId,
+          clusterNodes: data.clusterNodes,
+        })}`;
+    }
+    if (slug === "target-app") {
       return renderNodeApplicationConfigSections({
         s: data.s,
         activeNodeLabel: data.activeNodeLabel,
@@ -843,14 +874,6 @@ function renderSettingsTabBody(surface, slug, data) {
     }
   }
   if (surface === SETTINGS_SURFACES.project) {
-    if (slug === "application") {
-      return renderSettingsApplicationTab({
-        projectApps: data.projectApps,
-        currentProject: data.currentProject,
-        projectRegistryEnabled: data.projectRegistryEnabled,
-        appOptions: data.appOptions,
-      });
-    }
     if (slug === "quality") return renderSettingsQualityTab(data.quality);
     if (slug === "governance") return renderSettingsGovernanceTab(data.gov);
     if (slug === "guidance") return renderSettingsGuidanceTab(data.guidanceItems);
@@ -901,7 +924,7 @@ function bindSettingsNoProjectTab() {
 
 function bindSettingsTabBody(surface, slug, data) {
   if (data.noProject) {
-    if (surface === SETTINGS_SURFACES.project && slug === "application") {
+    if (surface === SETTINGS_SURFACES.node && slug === "application") {
       bindSettingsApplicationTab(data.currentProject);
     } else {
       bindSettingsNoProjectTab();
@@ -918,13 +941,23 @@ function bindSettingsTabBody(surface, slug, data) {
       );
     }
   } else if (surface === SETTINGS_SURFACES.node) {
-    if (slug === "nodes") bindSettingsNodesTab();
+    if (slug === "processes") bindSettingsProcessesTab(data.s);
+    else if (slug === "performance") {
+      bindSettingsPerformanceTab(
+        data.s, data.diag, data.reps, null, data.gov,
+        data.dash, { nodes: data.nodes, counts: data.nodeCounts },
+        { guidance: data.guidanceItems }, data.performanceBackend,
+      );
+    }
     else if (slug === "reporters") bindSettingsReportersTab();
-    else if (slug === "application") bindNodeApplicationConfigControls();
+    else if (slug === "application") {
+      bindSettingsApplicationTab(data.currentProject);
+      bindSettingsNodesTab();
+    }
+    else if (slug === "target-app") bindNodeApplicationConfigControls();
     else if (slug === "runtime") bindNodeRuntimeConfigControls();
   } else if (surface === SETTINGS_SURFACES.project) {
-    if (slug === "application") bindSettingsApplicationTab(data.currentProject);
-    else if (slug === "quality") bindSettingsQualityTab();
+    if (slug === "quality") bindSettingsQualityTab();
     else if (slug === "governance") bindSettingsGovernanceTab();
     else if (slug === "guidance") bindSettingsGuidanceTab(data.guidanceItems);
   }

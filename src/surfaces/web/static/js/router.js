@@ -42,12 +42,16 @@ function parseHash() {
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "changes") return { route: "changes" };
   if (parts[0] === "system" || parts[0] === "settings") {
-    return { route: "settings", tab: parts[1] || null };
+    return { route: "node", tab: parts[1] || "processes" };
   }
   if (parts[0] === "node") {
     return { route: "node", tab: parts[1] || null };
   }
+  if (parts[0] === "governance") {
+    return { route: "project", tab: parts[1] || "governance" };
+  }
   if (parts[0] === "project") {
+    if (parts[1] === "application") return { route: "node", tab: "application" };
     return { route: "project", tab: parts[1] || null };
   }
   return { route: "dashboard" };

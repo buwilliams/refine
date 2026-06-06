@@ -35,6 +35,7 @@ function gapsHash(parts) {
 async function renderGapsList() {
   if (renderNoProjectIfDetached("Gaps")) return;
   renderBanners([]);
+  await ensureGapsNodeOptions();
   const f = gapsFilterFromHash();
   // Preserve the filter shell's open/closed state across full re-renders
   // (Clear filters, bulk-op completion, etc.). First-ever render defaults
@@ -82,6 +83,8 @@ async function renderGapsList() {
           <option value="unknown" ${f.node === "unknown" ? "selected" : ""}>unknown node</option>
           ${(state.project?.nodes || []).map((inst) =>
             `<option value="${htmlEscape(inst.id)}" ${inst.id === f.node ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
+          ${f.node && !["current", "unknown"].includes(f.node) && !(state.project?.nodes || []).some((inst) => inst.id === f.node)
+            ? `<option value="${htmlEscape(f.node)}" selected>${htmlEscape(f.node)}</option>` : ""}
         </select>
         <input type="text" id="filter-feature" class="filter-feature"
                placeholder="Feature ID or standalone" value="${htmlEscape(f.feature)}">
@@ -176,6 +179,21 @@ async function renderGapsList() {
   });
 
   await refreshGapsTable();
+}
+
+async function ensureGapsNodeOptions() {
+  try {
+    const data = await api("GET", "/api/nodes");
+    if (!Array.isArray(data?.nodes)) return;
+    state.project = {
+      ...(state.project || {}),
+      nodes: data.nodes,
+      active_node_id: data.active_node_id || state.project?.active_node_id,
+      active_node: data.active_node || state.project?.active_node,
+    };
+  } catch (_) {
+    // Keep rendering with the project-status nodes if the node registry is unavailable.
+  }
 }
 
 // Snapshot the current Gaps filter from the URL hash.

@@ -74,7 +74,7 @@ function bindSettingsNodesTab() {
     await withButtonBusy(btn, "Creating...", async () => {
       try {
         await api("POST", "/api/nodes", { display_name: name.trim() });
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   });
@@ -91,7 +91,7 @@ function bindSettingsNodesTab() {
         updateActiveNodeLabel();
         await refreshNodeScopedState();
         toast("Node activated", "info");
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }));
@@ -104,7 +104,7 @@ function bindSettingsNodesTab() {
         await api("PATCH", "/api/nodes/" + encodeURIComponent(b.dataset.nodeRename), {
           display_name: name.trim(),
         });
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }));
@@ -119,7 +119,7 @@ function bindSettingsNodesTab() {
         await api("PATCH", "/api/nodes/" + encodeURIComponent(b.dataset.nodeArchive), {
           archived: true,
         });
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }));
@@ -139,7 +139,7 @@ function bindSettingsNodesTab() {
           ssh_host: sshHost.trim(),
           target_app_path: targetAppPath.trim(),
         });
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   });
@@ -166,7 +166,7 @@ function bindSettingsNodesTab() {
           target_app_path: targetAppPath.trim(),
           refine_port: Number(refinePort) || 8080,
         });
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }));
@@ -177,7 +177,7 @@ function bindSettingsNodesTab() {
         await api("PATCH", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.clusterToggle), {
           enabled,
         });
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }));
@@ -191,7 +191,7 @@ function bindSettingsNodesTab() {
       try {
         const result = await api("POST", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.clusterBootstrap) + "/bootstrap", {});
         toast(result.ok ? "Cluster node bootstrapped" : "Cluster bootstrap failed", result.ok ? "info" : "error");
-        await refreshSettingsTab("nodes", { force: true });
+        await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });
   }));

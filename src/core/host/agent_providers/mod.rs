@@ -457,8 +457,25 @@ fn find_executable(binary: &str, path_override: Option<&str>) -> Option<PathBuf>
         .or_else(|| env::var("PATH").ok())
         .unwrap_or_default();
     env::split_paths(&path)
+        .chain(user_executable_dirs(path_override))
         .map(|dir| dir.join(binary))
         .find(|path| executable_file(path))
+}
+
+fn user_executable_dirs(path_override: Option<&str>) -> Vec<PathBuf> {
+    if path_override.is_some() {
+        return Vec::new();
+    }
+    let Some(home) = env::var_os("HOME").map(PathBuf::from) else {
+        return Vec::new();
+    };
+    [
+        home.join(".local/bin"),
+        home.join(".npm-global/bin"),
+        home.join(".cargo/bin"),
+    ]
+    .into_iter()
+    .collect()
 }
 
 fn executable_file(path: &Path) -> bool {

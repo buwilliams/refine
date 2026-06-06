@@ -2899,6 +2899,12 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         path: "/api/gaps".to_string(),
         body: Some(json!({"id": "GAP3", "name": "Cancelled Dashboard Gap"})),
     });
+    let create_node = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes".to_string(),
+        body: Some(json!({"id": "refine2"})),
+    });
+    assert_eq!(create_node.status, 200);
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP1/rounds".to_string(),
@@ -2930,6 +2936,16 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
             "update": {"status": "cancelled"}
         })),
     });
+    let transfer = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes/transfer-gaps".to_string(),
+        body: Some(json!({
+            "target_node_id": "refine2",
+            "selected_ids": ["GAP3"],
+            "filter": {}
+        })),
+    });
+    assert_eq!(transfer.status, 200);
     FileActivityService::new(&durable_root)
         .append(ActivityEntry {
             id: "act-dashboard".to_string(),
@@ -2956,9 +2972,27 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         body: None,
     });
     assert_eq!(dashboard.status, 200);
+    assert_eq!(dashboard.body["node_filter"], "current");
     assert_eq!(dashboard.body["counts"]["backlog"], 1);
+    assert_eq!(
+        dashboard.body["counts"]["cancelled"],
+        serde_json::Value::Null
+    );
     assert_eq!(dashboard.body["active_node_id"], "default");
     assert_eq!(dashboard.body["activity"][0]["id"], "act-dashboard");
+    let all_dashboard = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard?node=all".to_string(),
+        body: None,
+    });
+    assert_eq!(all_dashboard.status, 200);
+    assert_eq!(all_dashboard.body["node_filter"], "all");
+    assert_eq!(all_dashboard.body["counts"]["backlog"], 1);
+    assert_eq!(all_dashboard.body["counts"]["cancelled"], 1);
+    assert_eq!(
+        all_dashboard.body["counts"],
+        all_dashboard.body["all_node_counts"]
+    );
     let reporter_stats = dashboard.body["reporter_stats"].as_array().unwrap();
     let alice = reporter_stats
         .iter()

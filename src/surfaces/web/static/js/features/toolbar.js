@@ -1555,7 +1555,8 @@ function wireChatDockResize(root) { wireToolbarResize(root); }
 function drawChat() { drawToolbar(); }
 
 function refreshProcessesTabForChatChange() {
-  if (state.currentRoute !== "settings") return;
+  if (state.currentRoute !== "node") return;
+  if (typeof readSettingsTab === "function" && readSettingsTab() !== "processes") return;
   if (typeof refreshSettings !== "function") return;
   refreshSettings().catch(() => {});
 }

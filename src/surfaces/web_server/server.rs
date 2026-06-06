@@ -166,7 +166,7 @@ impl InProcessWebServer {
         }
 
         if request.method == "GET" && request.path == "/dashboard" {
-            return self.handle_dashboard();
+            return self.handle_dashboard(&raw_path);
         }
 
         if request.method == "GET" && request.path == "/nodes" {

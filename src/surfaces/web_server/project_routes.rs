@@ -17,7 +17,7 @@ use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
-    pub(super) fn handle_dashboard(&self) -> ApiResponse {
+    pub(super) fn handle_dashboard(&self, raw_path: &str) -> ApiResponse {
         let attached = match self.current_durable_root() {
             Ok(value) => value.is_some(),
             Err(error) => return error_response(error),
@@ -40,10 +40,20 @@ impl InProcessWebServer {
             .clone()
             .map(Value::Object)
             .unwrap_or_else(|| json!({"ok": false, "providers": []}));
+        let node_filter = if query_param(raw_path, "node").as_deref() == Some("all") {
+            "all"
+        } else {
+            "current"
+        };
+        let counts = if node_filter == "all" {
+            projection.dashboard.all_node_status_counts.clone()
+        } else {
+            projection.dashboard.current_node_status_counts.clone()
+        };
         ApiResponse::json(
             200,
             json!({
-                "counts": projection.dashboard.current_node_status_counts,
+                "counts": counts,
                 "all_node_counts": projection.dashboard.all_node_status_counts,
                 "running": [],
                 "merger": null,
@@ -52,8 +62,8 @@ impl InProcessWebServer {
                 "activity": activity,
                 "runner_reachable": process.get("runner_reachable").and_then(|value| value.as_bool()).unwrap_or(false),
                 "reporter_stats": reporter_stats_rows(&projection.dashboard.reporter_stats),
-                "node_scope": "current",
-                "node_filter": "current",
+                "node_scope": node_filter,
+                "node_filter": node_filter,
                 "quality_timing": self.quality_timing_setting(),
                 "active_node_id": "default",
                 "active_node_display_name": "Default",

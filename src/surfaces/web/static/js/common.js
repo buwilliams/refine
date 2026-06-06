@@ -1096,7 +1096,7 @@ async function applyProjectAttachResult(result, options = {}) {
   updateActiveNodeLabel();
   state.dashboard = null;
   state.currentGap = null;
-  state.underlayHash = "#/project/application";
+  state.underlayHash = "#/node/application";
   if (typeof gapsExcludedIds !== "undefined") gapsExcludedIds.clear();
   if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
@@ -1104,8 +1104,8 @@ async function applyProjectAttachResult(result, options = {}) {
   await syncProjectUpdates({ silent: true });
   await refreshNodeScopedState({ selectReporterFallback: true });
   await refreshTargetAppToggle();
-  if (location.hash !== "#/project/application") {
-    location.hash = "#/project/application";
+  if (location.hash !== "#/node/application") {
+    location.hash = "#/node/application";
   } else if (["settings", "node", "project"].includes(state.currentRoute || "")) {
     await refreshSettings();
   } else {
@@ -1114,7 +1114,7 @@ async function applyProjectAttachResult(result, options = {}) {
   if (options.openGuide && typeof openGuide === "function") {
     openGuide({
       context: result.config_created ? "app-created" : "app-existing",
-      categoryId: "project",
+      categoryId: "node",
       itemId: "project-application",
     });
   }

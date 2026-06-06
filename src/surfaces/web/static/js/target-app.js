@@ -1,9 +1,9 @@
-// ---- Target application status (topbar indicator + System controls) --------
+// ---- Target application status (topbar indicator + Node controls) ----------
 //
 // The topbar dot is a *read-only* status indicator (deliberately not a
 // one-click toggle, so typical users can't take the app down by
 // accident). Green/running links to the configured App URL when present;
-// every other state links to System, where the Start / Stop controls live.
+// every other state links to Node, where the Start / Stop controls live.
 // The visible label names the active project.
 
 let _targetAppSnapshot = null;
@@ -99,7 +99,7 @@ function applyAgentStatusSnapshot(snap) {
       ? "paused"
       : "running";
   indicator.dataset.state = status;
-  indicator.href = "#/system/processes";
+  indicator.href = "#/node/processes";
   indicator.removeAttribute("target");
   indicator.removeAttribute("rel");
   const label = `Agents (${agentCount})`;
@@ -141,7 +141,7 @@ function applyTargetAppSnapshot(snap) {
   const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
   const appUrl = (snap.app_url || "").trim();
   const opensApp = appState === "running" && appUrl;
-  indicator.href = opensApp ? appUrl : "#/system/processes";
+  indicator.href = opensApp ? appUrl : "#/node/processes";
   if (opensApp) {
     indicator.target = "_blank";
     indicator.rel = "noopener noreferrer";
@@ -156,12 +156,11 @@ function applyTargetAppSnapshot(snap) {
         ? ` · last check ${checkOk ? "OK" : "FAIL"} at ${fmtTime(checkAt)}`
         : "")
     + (snap.last_error ? ` · ${snap.last_error}` : "")
-    + (opensApp ? " — open target application" : " — click to manage in System");
+    + (opensApp ? " — open target application" : " — click to manage in Node");
   const lbl = indicator.querySelector(".target-app-label");
   if (lbl) lbl.textContent = projectLabel;
-  // Repaint the System status block (and the start/stop button)
-  // whenever the System screen is visible.
-  if (state.currentRoute === "settings") {
+  // Repaint the Node process block (and the start/stop button) whenever it is visible.
+  if (state.currentRoute === "node" && typeof readSettingsTab === "function" && readSettingsTab() === "processes") {
     drawTargetAppStatusBlock(snap);
   }
 }

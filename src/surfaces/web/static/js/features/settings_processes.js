@@ -74,7 +74,7 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
   const backgroundStopped = !!pauseState.backgroundStopped;
   const agentsPaused = !!pauseState.agentsPaused;
   const rows = (processes || [])
-    .filter(isLongLivedManagedProcess)
+    .filter(isCurrentLongLivedManagedProcess)
     .map((proc) => {
       if (proc.kind !== "runner") return proc;
       return {
@@ -82,6 +82,9 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
         details: runnerProcessDetails(backend, runnerReachable, diag),
       };
     });
+  if (!rows.some((proc) => proc.kind === "target_app")) {
+    rows.push(syntheticTargetAppProcess());
+  }
   const background = {
     id: "background-processes",
     kind: "background_processes",
@@ -133,6 +136,33 @@ function normalizeManagedProcess(proc = {}) {
 
 function isLongLivedManagedProcess(proc = {}) {
   return new Set(["supervisor", "ui", "runner", "target_app"]).has(proc.kind);
+}
+
+function isCurrentLongLivedManagedProcess(proc = {}) {
+  if (!isLongLivedManagedProcess(proc)) return false;
+  return !new Set(["exited", "failed", "stopped", "cancelled", "complete", "completed"]).has(proc.status);
+}
+
+function syntheticTargetAppProcess() {
+  const snap = {
+    state: "unknown",
+    has_start_command: false,
+    has_stop_command: false,
+    has_rebuild_command: false,
+    has_status_checks: false,
+  };
+  return {
+    id: "target-app",
+    kind: "target_app",
+    label: "Application",
+    status: snap.state,
+    pid: null,
+    target_app: snap,
+    details: targetAppProcessDetails(snap),
+    actions: [],
+    cpu_priority: { label: "-" },
+    max_memory: { label: "-" },
+  };
 }
 
 function isSubprocessRecord(proc = {}) {
@@ -876,7 +906,7 @@ function bindSettingsProcessesTab(s) {
 function scheduleProcessesTabRefreshes() {
   for (const delay of [750, 2000]) {
     setTimeout(() => {
-      if (state.currentRoute !== "settings") return;
+      if (state.currentRoute !== "node") return;
       if (!document.querySelector('[data-tab-pane="processes"].active')) return;
       if (typeof refreshActiveSettingsTab === "function") {
         refreshActiveSettingsTab({ force: true });

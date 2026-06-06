@@ -540,6 +540,14 @@ impl FileChatService {
         let mut paths = Vec::new();
         paths.push(self.durable_root.join("provider-bin"));
         paths.push(self.project_root().join("node_modules/.bin"));
+        if let Some(path) = std::env::var_os("PATH") {
+            paths.extend(std::env::split_paths(&path));
+        }
+        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+            paths.push(home.join(".local/bin"));
+            paths.push(home.join(".npm-global/bin"));
+            paths.push(home.join(".cargo/bin"));
+        }
         let joined = std::env::join_paths(paths).ok()?;
         Some(joined.to_string_lossy().to_string())
     }

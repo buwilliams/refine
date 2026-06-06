@@ -247,7 +247,7 @@ async function autosaveSettingsApplication(options = {}) {
   _targetAppDraftDirty = false;
   refreshTargetAppStatus();
   if (options.refresh) {
-    await refreshSettingsTab("application", { force: true });
+    await refreshSettingsTab("target-app", { force: true });
   }
 }
 
@@ -286,7 +286,7 @@ function applyGeneratedTargetAppConfig(cfg) {
         `Target-app config autosave failed: ${e?.message || "Request failed"}\n\nThe fields were restored to the last saved values.`,
         { title: "Save failed" },
       );
-      await refreshSettingsTab("application", { force: true });
+      await refreshSettingsTab("target-app", { force: true });
     });
 }
 
@@ -399,7 +399,7 @@ function refreshProjectApplicationsSectionOnly(project) {
 function bindNodeApplicationConfigControls() {
   bindCommand("#s-application-copy-node", "settings.application.copy_node");
   bindCommand("#s-target-generate-ai", "target_app.generate");
-  const root = document.querySelector('[data-tab-pane="application"]');
+  const root = document.querySelector('[data-tab-pane="target-app"]');
   const autoRebuild = $("#s-target-auto-rebuild");
   const autoRebuildHour = $("#s-target-auto-rebuild-hour-utc");
   if (autoRebuild && autoRebuildHour) {

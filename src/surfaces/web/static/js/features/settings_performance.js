@@ -28,7 +28,7 @@ function performanceHashFromFilters(f) {
     next.set("limit", String(f.limit));
   }
   if (f.page && f.page > 1) next.set("page", String(f.page));
-  return "#/system/performance" + (next.toString() ? "?" + next : "");
+  return "#/node/performance" + (next.toString() ? "?" + next : "");
 }
 
 function performanceApiPath(f = performanceFiltersFromHash()) {
@@ -225,7 +225,7 @@ function bindSettingsPerformanceTab(
       page: 1,
     }));
   $("#performance-filter-clear")?.addEventListener("click", () => {
-    history.replaceState(null, "", "#/system/performance");
+    history.replaceState(null, "", "#/node/performance");
     loadPerformanceEvents(performanceBackend || diag?.backend || {});
   });
   const root = document.querySelector('[data-tab-pane="performance"]');

@@ -3,6 +3,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use chrono::Utc;
+use serde_json::{Value, json};
 
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::model::log::{LogEntry, LogQuery, RoundLogEntry};
@@ -116,7 +117,7 @@ impl FileLogService {
             if line.trim().is_empty() {
                 continue;
             }
-            let entry = serde_json::from_str::<RoundLogEntry>(&line).map_err(|error| {
+            let entry = parse_round_log_line(&line).map_err(|error| {
                 RefineError::Serialization(format!(
                     "failed to parse Gap log sidecar {}: {error}",
                     path.display()
@@ -125,6 +126,44 @@ impl FileLogService {
             entries.push(entry);
         }
         Ok(entries)
+    }
+}
+
+fn parse_round_log_line(line: &str) -> serde_json::Result<RoundLogEntry> {
+    let value = serde_json::from_str::<Value>(line)?;
+    serde_json::from_value(normalize_round_log_value(value))
+}
+
+fn normalize_round_log_value(value: Value) -> Value {
+    match value {
+        Value::String(message) => json!({
+            "datetime": now_timestamp(),
+            "severity": "info",
+            "category": "state",
+            "message": message,
+            "details": null,
+            "actions": [],
+            "actor": null,
+            "gap_id": null,
+            "round_idx": null
+        }),
+        Value::Object(mut object) => {
+            if object
+                .get("details")
+                .is_some_and(|details| !details.is_object() && !details.is_null())
+                && let Some(details) = object.remove("details")
+            {
+                object.insert("details".to_string(), json!({ "value": details }));
+            }
+            if object
+                .get("actions")
+                .is_some_and(|actions| !actions.is_array() && !actions.is_null())
+            {
+                object.insert("actions".to_string(), json!([]));
+            }
+            Value::Object(object)
+        }
+        other => other,
     }
 }
 
@@ -208,6 +247,31 @@ mod tests {
         assert_eq!(total, 1);
         assert_eq!(page[0].entry.gap_id.as_deref(), Some("GAP1"));
         assert_eq!(service.round_logs("GAP1", 0).unwrap().len(), 0);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_log_service_tolerates_legacy_string_details_in_round_sidecar() {
+        let temp_root = unique_temp_dir("round-logs-legacy-details");
+        let durable_root = temp_root.join(".refine");
+        let path = gap_logs_path(&durable_root, "GAP1");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(
+            &path,
+            r#"{"datetime":"2026-06-06T00:00:00Z","severity":"warn","category":"quality","message":"Provider note","details":"Moving code into src/ may be acceptable","actions":[],"actor":"refine","gap_id":"GAP1","round_idx":1}"#,
+        )
+        .unwrap();
+
+        let service = FileLogService::new(&durable_root);
+        let logs = service.round_logs("GAP1", 1).unwrap();
+
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].entry.message, "Provider note");
+        assert_eq!(
+            logs[0].entry.details.as_ref().unwrap()["value"],
+            "Moving code into src/ may be acceptable"
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

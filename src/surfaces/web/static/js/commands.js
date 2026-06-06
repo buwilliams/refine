@@ -466,7 +466,7 @@ registerCommand({
     const agentsPaused = s.agents_paused === "1";
     await withButtonBusy(button, agentsPaused ? "Unpausing..." : "Pausing...", async () => {
       await api("POST", "/api/processes/agents", { paused: !agentsPaused });
-      if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
       if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
       if (agentsPaused) scheduleProcessesTabRefreshes();
     });
@@ -492,7 +492,7 @@ registerCommand({
     await withButtonBusy(button, "Resetting...", async () => {
       const r = await api("POST", "/api/runner-workers/merger/hard-reset-worktree");
       toast(r.message || "Target worktree reset", "info");
-      if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
@@ -511,7 +511,7 @@ for (const action of ["start", "stop", "rebuild"]) {
     run: async ({ button } = {}) => {
       await withButtonBusy(button, busyLabel, async () => {
         await runTargetAppAction(action);
-        if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
+        if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
       });
     },
   });
@@ -526,7 +526,7 @@ registerCommand({
     await withButtonBusy(button, "Syncing...", async () => {
       await syncProjectUpdates();
       await refreshReporters({ selectFallback: true });
-      if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
@@ -542,7 +542,7 @@ registerCommand({
       const ok = "last_check_ok" in r ? r.last_check_ok : r.last_health_ok;
       toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"), ok ? "info" : "error");
       drawTargetAppStatusBlock(r);
-      if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
@@ -558,14 +558,15 @@ registerCommand({
   ),
   run: async ({ button } = {}) => {
     if (state.currentRoute !== "node") {
-      location.hash = "#/node/application";
+      location.hash = "#/node/target-app";
     } else {
-      setSettingsTab("application");
+      setSettingsTab("target-app");
+      await refreshSettingsTab("target-app", { force: true });
     }
     await withButtonBusy(button, "Generating...", async () => {
       const r = await api("POST", "/api/target-app/generate-instructions", { kind: "all" });
       if (r.ok && r.config) {
-        setSettingsTab("application");
+        setSettingsTab("target-app");
         applyGeneratedTargetAppConfig(r.config);
         toast("Generated target-app config saved", "info");
       } else {
@@ -584,7 +585,7 @@ registerCommand({
     await withButtonBusy(button, "Checking...", async () => {
       const r = await api("POST", "/api/settings/recheck-auth");
       toast(r.ok ? "Auth OK" : `Auth failed: ${r.message || "(no message)"}`, r.ok ? "info" : "error");
-      if (state.currentRoute === "settings") {
+      if (state.currentRoute === "node" && typeof readSettingsTab === "function" && readSettingsTab() === "processes") {
         await refreshSettingsTab("processes", { force: true });
       } else if (state.currentRoute === "node") {
         await refreshSettingsTab("runtime", { force: true });
@@ -683,7 +684,7 @@ registerCommand({
     await withButtonBusy(button, "Cleaning...", async () => {
       const r = await api("POST", "/api/activity/cleanup", { days });
       toast(`Deleted ${r.deleted} log entr${r.deleted === 1 ? "y" : "ies"}.`, "info");
-      if (state.currentRoute === "settings") await refreshProcessesSettingsTab({ force: true });
+      if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
@@ -695,7 +696,7 @@ registerCommand({
   aliases: ["copy-application-settings"],
   run: ({ button } = {}) => copySettingsFromNode("application", {
     title: "Copy application settings",
-    refreshTab: "application",
+    refreshTab: "target-app",
     button,
   }),
 });
