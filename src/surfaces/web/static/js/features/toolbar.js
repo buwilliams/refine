@@ -36,6 +36,7 @@ const chatState = {
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
   fullscreen: false,       // when true, panel fills viewport below the topbar
+  focusInputUntil: 0,
 };
 const systemOperationState = {
   messages: [],
@@ -392,7 +393,7 @@ async function startPlanChatSession(tab) {
     refreshProcessesTabForChatChange();
     await flushLocalQueuedMessages(tab);
     drawToolbar();
-    $("#chat-input")?.focus();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
   } catch (e) {
     tab.starting = false;
     saveChatStateToStorage();
@@ -417,7 +418,7 @@ async function startGapChatSession(tab) {
     refreshProcessesTabForChatChange();
     await flushLocalQueuedMessages(tab);
     drawToolbar();
-    $("#chat-input")?.focus();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
   } catch (e) {
     tab.starting = false;
     saveChatStateToStorage();
@@ -442,7 +443,7 @@ async function startStandaloneChatSession(tab) {
     refreshProcessesTabForChatChange();
     await flushLocalQueuedMessages(tab);
     drawToolbar();
-    $("#chat-input")?.focus();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
   } catch (e) {
     tab.starting = false;
     saveChatStateToStorage();
@@ -617,6 +618,7 @@ function drawToolbar() {
       button.addEventListener("click", () => removeQueuedChatMessage(button.dataset.queuedMessageRemove || ""));
     });
     resizeChatInput($("#chat-input"));
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
   }
 
   wireToolbarResize(root);
@@ -2157,9 +2159,9 @@ async function sendChatLine() {
   if (!text.trim()) return;
   input.value = "";
   resizeChatInput(input);
-  focusChatInputSoon();
+  requestChatInputFocus();
   await sendChatText(text);
-  focusChatInputSoon();
+  requestChatInputFocus();
 }
 
 async function saveQueuedChatMessage(messageId) {
@@ -2221,6 +2223,15 @@ function cssEscape(value) {
   return String(value).replace(/["\\]/g, "\\$&");
 }
 
+function requestChatInputFocus() {
+  chatState.focusInputUntil = Date.now() + 3000;
+  focusChatInputSoon();
+}
+
+function shouldKeepChatInputFocused() {
+  return Date.now() < (chatState.focusInputUntil || 0);
+}
+
 function focusChatInputSoon() {
   setTimeout(() => {
     const input = $("#chat-input");
@@ -2243,6 +2254,7 @@ async function sendChatText(text) {
     ensureChatSession(t);
     saveChatStateToStorage();
     drawToolbar();
+    requestChatInputFocus();
     return;
   }
   if (normalizeQueuedMessages(t.localQueuedMessages).length) {
@@ -2282,6 +2294,7 @@ async function flushLocalQueuedMessages(tab) {
   tab.localQueuedMessages = [];
   saveChatStateToStorage();
   drawToolbar();
+  if (shouldKeepChatInputFocused()) focusChatInputSoon();
   await queueChatTextOnServer(tab, text);
 }
 
@@ -2294,11 +2307,13 @@ async function queueChatTextOnServer(tab, text) {
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
     drawToolbar();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
     pollChat();
   } catch (e) {
     queueChatTextForTab(tab, text);
     saveChatStateToStorage();
     drawToolbar();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
     toast("Could not send: " + e.message, "error");
   }
 }
