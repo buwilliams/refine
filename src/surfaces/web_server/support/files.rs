@@ -252,7 +252,12 @@ pub(in crate::surfaces::web_server) fn read_file_entries(
         let b_type = b.get("type").and_then(|value| value.as_str()).unwrap_or("");
         let a_name = a.get("name").and_then(|value| value.as_str()).unwrap_or("");
         let b_name = b.get("name").and_then(|value| value.as_str()).unwrap_or("");
-        b_type.cmp(a_type).then_with(|| a_name.cmp(b_name))
+        let a_rank = if a_type == "directory" { 0 } else { 1 };
+        let b_rank = if b_type == "directory" { 0 } else { 1 };
+        a_rank
+            .cmp(&b_rank)
+            .then_with(|| a_name.to_lowercase().cmp(&b_name.to_lowercase()))
+            .then_with(|| a_name.cmp(b_name))
     });
     let _ = source_root;
     Ok(entries)

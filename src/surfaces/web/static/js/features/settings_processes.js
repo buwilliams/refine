@@ -10,7 +10,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     ? processData.agents_paused
     : settings.agents_paused === "1";
   const backend = processData.backend || diag.backend || dash.backend || {};
-  const processes = processData.processes || [];
+  const processes = (processData.processes || []).map(normalizeManagedProcess);
   const runnerWork = processData.runner_work || [];
   const runnerReachable = typeof processData.runner_reachable === "boolean"
     ? processData.runner_reachable
@@ -19,10 +19,11 @@ function renderProcessesTab(processData, settings, diag, dash) {
   const rows = buildManagedProcessRows(
     processes, { backgroundStopped, agentsPaused }, backend, runnerReachable, diag,
   ).map((proc) => renderManagedProcessRow(proc)).join("");
-  const agentRows = (processes || [])
-    .filter((proc) => proc.kind === "agent" || proc.kind === "chat")
-    .map((proc) => renderAgentProcessRow(proc, anchorMs)).join("");
+  const subprocessRows = (processes || [])
+    .filter(isSubprocessRecord)
+    .map((proc) => renderSubprocessProcessRow(proc, anchorMs)).join("");
   const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
+  const subprocessBody = [subprocessRows, workRows].filter(Boolean).join("");
   return `
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Process management", "process-management")}</h3>
@@ -46,46 +47,25 @@ function renderProcessesTab(processData, settings, diag, dash) {
     </section>
 
     <section class="settings-section">
-      <h3>${renderSettingsGuideLabel("Agent processes", "process-agent-processes")}</h3>
-      ${agentRows ? `
-        <table class="table process-table agents-process-table mobile-card-table">
+      <h3>${renderSettingsGuideLabel("Subprocesses", "process-runner-processes")}</h3>
+      ${subprocessBody ? `
+        <table class="table process-table runner-workers-table mobile-card-table">
           <colgroup>
-            <col class="agent-col">
+            <col class="worker-col">
             <col class="status-col">
             <col class="pid-col">
-            <col class="round-col">
             <col class="cpu-col">
             <col class="memory-col">
             <col class="elapsed-col">
-            <col class="idle-col">
-            <col class="agent-actions-col">
+            <col class="details-col">
+            <col class="worker-actions-col">
           </colgroup>
           <thead><tr>
-            <th>Agent</th><th>Status</th><th>PID</th><th>Context</th>
-            <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Idle</th><th></th>
+            <th>Subprocess</th><th>Status</th><th>PID</th>
+            <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Details</th><th></th>
           </tr></thead>
-          <tbody>${agentRows}</tbody>
-        </table>` : `<p class="muted">No active agent subprocesses or chat sessions.</p>`}
-    </section>
-
-    <section class="settings-section">
-      <h3>${renderSettingsGuideLabel("Runner processes", "process-runner-processes")}</h3>
-      <table class="table process-table runner-workers-table mobile-card-table">
-        <colgroup>
-          <col class="worker-col">
-          <col class="status-col">
-          <col class="gap-col">
-          <col class="elapsed-col">
-          <col class="queue-col">
-          <col class="details-col">
-          <col class="worker-actions-col">
-        </colgroup>
-        <thead><tr>
-          <th>Worker</th><th>Status</th><th>Gap</th>
-          <th>Elapsed</th><th>Queue</th><th>Details</th><th></th>
-        </tr></thead>
-        <tbody>${workRows}</tbody>
-      </table>
+          <tbody>${subprocessBody}</tbody>
+        </table>` : `<p class="muted">No subprocesses recorded.</p>`}
       <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
     </section>`;
 }
@@ -94,7 +74,7 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
   const backgroundStopped = !!pauseState.backgroundStopped;
   const agentsPaused = !!pauseState.agentsPaused;
   const rows = (processes || [])
-    .filter((proc) => proc.kind !== "agent" && proc.kind !== "chat")
+    .filter(isLongLivedManagedProcess)
     .map((proc) => {
       if (proc.kind !== "runner") return proc;
       return {
@@ -138,6 +118,25 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
   return orderManagedProcessRows(
     rows, agentScheduler, background, backend.process_model === "supervisor",
   );
+}
+
+function normalizeManagedProcess(proc = {}) {
+  const label = String(proc.label || "");
+  if (proc.kind === "daemon") {
+    return { ...proc, kind: "supervisor", label: "Supervisor" };
+  }
+  if (label === "setsid" && (!proc.kind || proc.kind === "process")) {
+    return { ...proc, kind: "supervisor", label: "Supervisor" };
+  }
+  return proc;
+}
+
+function isLongLivedManagedProcess(proc = {}) {
+  return new Set(["supervisor", "ui", "runner", "target_app"]).has(proc.kind);
+}
+
+function isSubprocessRecord(proc = {}) {
+  return !isLongLivedManagedProcess(proc);
 }
 
 function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
@@ -292,6 +291,38 @@ function renderAgentProcessRow(proc, anchorMs) {
     </tr>`;
 }
 
+function renderSubprocessProcessRow(proc, anchorMs) {
+  const kind = proc.kind || "process";
+  const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
+  const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
+    ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
+    : `<span class="muted small">-</span>`;
+  const label = kind === "chat"
+    ? `${htmlEscape(proc.mode === "gap" ? "Gap chat" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
+    : kind === "agent" && proc.gap_id
+      ? `<a href="#/gaps/${htmlEscape(proc.gap_id)}">${htmlEscape(proc.gap_id.slice(0, 10))}...</a>`
+      : htmlEscape(proc.label || processKindLabel(kind));
+  const details = [
+    proc.gap_id ? `Gap ${proc.gap_id}` : "",
+    proc.round_idx != null ? `round ${Number(proc.round_idx) + 1}` : "",
+    managedProcessDetails(proc),
+  ].filter(Boolean).join(" · ");
+  const detailsAttrs = details
+    ? ` class="process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Subprocess details" title="${htmlEscape(details)}"`
+    : "";
+  return `
+    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+      <td data-label="Subprocess">${label}</td>
+      <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+      <td data-label="PID">${pid}</td>
+      <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
+      <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
+      <td data-label="Elapsed">${elapsed}</td>
+      <td data-label="Details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
+    </tr>`;
+}
+
 function managedProcessDetails(proc) {
   if (proc.details) return proc.details;
   if (proc.kind === "target_app") return targetAppProcessDetails(proc.target_app || {});
@@ -329,14 +360,19 @@ function targetAppProcessDetails(snap = {}) {
 function processKindLabel(kind) {
   return {
     ui: "UI",
-    supervisor: "supervisor",
-    runner: "runner",
-    target_app: "application",
+    supervisor: "Supervisor",
+    daemon: "Supervisor",
+    runner: "Runner",
+    target_app: "Application",
     agent_scheduler: "agent scheduler",
     background_processes: "background processes",
-    agent: "agent",
-    chat: "chat",
-  }[kind] || "process";
+    agent: "Agent",
+    chat: "Chat",
+    quality: "Quality check",
+    import: "Import",
+    maintenance: "Maintenance",
+    user_helper: "Helper",
+  }[kind] || "Process";
 }
 
 function processStatusLabel(status) {
@@ -356,6 +392,8 @@ function processStatusLabel(status) {
     active: "active",
     paused: "paused",
     idle: "idle",
+    exited: "exited",
+    interrupted: "interrupted",
   }[status] || status || "unknown";
 }
 
@@ -446,14 +484,15 @@ function bindSupervisorProcessToggle() {
 }
 
 function renderRunnerWorkRow(work, anchorMs) {
-  const gap = work.gap_id
-    ? `<a href="#/gaps/${htmlEscape(work.gap_id)}">${htmlEscape(work.gap_id.slice(0, 10))}...</a>`
-    : `<span class="muted small">-</span>`;
   const elapsed = Number.isFinite(Number(work.elapsed_seconds))
     ? `<span class="js-elapsed-tick" data-base="${Number(work.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(work.elapsed_seconds || 0)}</span>`
     : `<span class="muted small">-</span>`;
   const queued = Number(work.queued || 0);
-  const details = work.details || work.last_outcome || "";
+  const details = [
+    work.gap_id ? `Gap ${work.gap_id}` : "",
+    queued ? `queue ${fmtCount(queued)}` : "",
+    work.details || work.last_outcome || "",
+  ].filter(Boolean).join(" · ");
   const detailsAttrs = details
     ? ` class="runner-work-details process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Runner worker details" title="${htmlEscape(details)}"`
     : ` class="runner-work-details"`;
@@ -461,9 +500,10 @@ function renderRunnerWorkRow(work, anchorMs) {
     <tr>
       <td data-label="Worker">${htmlEscape(runnerWorkKindLabel(work.kind))}</td>
       <td data-label="Status">${htmlEscape(processStatusLabel(work.status || ""))}</td>
-      <td data-label="Gap">${gap}</td>
+      <td data-label="PID"><span class="muted small">-</span></td>
+      <td data-label="CPU priority"><span class="muted small">-</span></td>
+      <td data-label="Max memory"><span class="muted small">-</span></td>
       <td data-label="Elapsed">${elapsed}</td>
-      <td data-label="Queue">${queued ? fmtCount(queued) : `<span class="muted small">-</span>`}</td>
       <td data-label="Details"${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
       <td data-label="Actions" class="process-actions"><div class="actions">${renderRunnerWorkActions(work)}</div></td>
     </tr>`;
@@ -500,7 +540,7 @@ function runnerWorkKindLabel(kind) {
     governance: "governance",
     target_app_rebuilder: "target-app rebuilder",
     target_app_config_generator: "target-app config generator",
-    sqlite_cache_rebuild: "SQLite cache rebuilder",
+    sqlite_cache_rebuild: "projection cache rebuilder",
     activity_log_cleanup: "activity log cleanup",
     import_prepare: "import preparer",
     import_persist: "import persister",

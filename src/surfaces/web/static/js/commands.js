@@ -623,13 +623,13 @@ registerCommand({
 
 registerCommand({
   id: "system.cache.rebuild",
-  title: "Rebuild SQLite cache",
+  title: "Rebuild projection cache",
   group: "System",
   aliases: ["rebuild-cache", "sqlite-cache"],
-  errorTitle: "SQLite cache rebuild failed",
+  errorTitle: "Projection cache rebuild failed",
   confirm: () => modalConfirm(
-    "Rebuild the SQLite cache from canonical .refine JSON? If the existing database is corrupted, Refine will replace it and SQLite-only runtime history may be lost.",
-    { title: "Rebuild SQLite cache", okLabel: "Rebuild" },
+    "Rebuild the runtime projection cache from canonical .refine JSON?",
+    { title: "Rebuild projection cache", okLabel: "Rebuild" },
   ),
   run: async ({ button } = {}) => {
     await withButtonBusy(button, "Rebuilding...", async () => {
@@ -641,14 +641,14 @@ registerCommand({
         });
         if (result.http_status && result.http_status >= 400) {
           const raw = result.error || {};
-          const err = new Error(raw.message || "SQLite cache rebuild failed");
+          const err = new Error(raw.message || "Projection cache rebuild failed");
           err.details = raw.details;
           err.code = raw.code;
           throw err;
         }
       }
       const verb = result.mode === "recreated" ? "recreated" : "rebuilt";
-      toast(`SQLite cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
+      toast(`Projection cache ${verb}; ${result.gaps || 0} Gap${result.gaps === 1 ? "" : "s"} indexed`, "info");
       if (["settings", "node", "project"].includes(state.currentRoute || "")) await refreshSettings({ force: true });
     });
   },

@@ -311,9 +311,26 @@ impl InProcessWebServer {
             .get("purpose")
             .or_else(|| body.get("mode"))
             .and_then(|value| value.as_str());
-        let provider = body.get("provider").and_then(|value| value.as_str());
+        let configured_provider = || {
+            FileSettingsService::new(&durable_root)
+                .load()
+                .ok()
+                .and_then(|settings| {
+                    settings
+                        .get("agent_cli")
+                        .and_then(|value| value.as_str())
+                        .map(str::to_string)
+                })
+        };
+        let requested_provider = body
+            .get("provider")
+            .and_then(|value| value.as_str())
+            .map(str::to_string);
+        let provider = requested_provider
+            .clone()
+            .or_else(|| effective_chat_provider(configured_provider()));
         let service = self.chat_service(&durable_root);
-        match service.start_with_options(attachment, provider, mode) {
+        match service.start_with_options(attachment, provider.as_deref(), mode) {
             Ok(session) => ApiResponse::json(
                 201,
                 json!({
@@ -402,4 +419,29 @@ impl InProcessWebServer {
             Err(error) => error_response(error),
         }
     }
+}
+
+fn effective_chat_provider(configured: Option<String>) -> Option<String> {
+    let configured = configured
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    let status = provider_status_value().ok()?;
+    let providers = status.get("providers").and_then(Value::as_array);
+    let configured_installed = configured.as_deref().is_some_and(|configured| {
+        providers.into_iter().flatten().any(|provider| {
+            provider.get("name").and_then(Value::as_str) == Some(configured)
+                && provider
+                    .get("installed")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false)
+        })
+    });
+    if configured_installed {
+        return configured;
+    }
+    status
+        .get("selected_provider")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or(configured)
 }

@@ -153,12 +153,12 @@ function renderSettingsPerformanceTab(performance, performanceBackend) {
       <h3>${renderSettingsGuideLabel("Performance", "performance-overview")}</h3>
       <p class="scope-label muted small">Local runtime history</p>
       <p class="muted small" style="margin-top:0">
-        SQLite-only metrics for Refine operations. Retention is
+        Runtime metrics for Refine operations. Retention is
         ${Number(performance.retention_days || 30)} days.
       </p>
       <dl class="kv">
         <dt>Process model</dt><dd>${htmlEscape(backendProcessLabel(performanceBackend))}</dd>
-        <dt>Metric store</dt><dd>Shared SQLite runtime history</dd>
+        <dt>Metric store</dt><dd>${htmlEscape(performanceMetricStoreLabel(performanceBackend))}</dd>
         <dt>Events retained</dt><dd>${fmtCount(performance.event_count || 0)}</dd>
         <dt>Total stored</dt><dd>${fmtCount(performance.total_event_count || 0)}</dd>
       </dl>
@@ -176,6 +176,11 @@ function renderSettingsPerformanceTab(performance, performanceBackend) {
       <h3>Recent events</h3>
       ${renderPerformanceEvents(performance)}
     </section>`;
+}
+
+function performanceMetricStoreLabel(backend = {}) {
+  if (backend.store === "jsonl") return "Local JSONL runtime history";
+  return "Local runtime history";
 }
 
 function bindSettingsPerformanceTab(

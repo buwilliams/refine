@@ -186,9 +186,7 @@ function drawChanges(data, f) {
         ${changes.map((c) => `
           <tr data-commit="${htmlEscape(c.commit)}" data-gap-id="${htmlEscape(c.gap_id)}">
             <td class="muted small" data-label="When">${fmtTime(c.committed)}</td>
-            <td data-label="Gap">${c.name
-              ? `<a href="#/gaps/${htmlEscape(c.gap_id)}">${htmlEscape(c.name)}</a>`
-              : `<a href="#/gaps/${htmlEscape(c.gap_id)}" class="muted">(deleted)</a>`}</td>
+            <td data-label="Gap">${renderChangeGapCell(c)}</td>
             <td data-label="Status">${c.status ? `<span class="status-pill ${c.status}">${c.status}</span>` : `<span class="muted small">-</span>`}</td>
             <td data-label="Priority">${c.priority
               ? `<span class="priority-pill priority-${c.priority}">${c.priority}</span>`
@@ -240,6 +238,14 @@ function drawChanges(data, f) {
       });
     });
   });
+}
+
+function renderChangeGapCell(change = {}) {
+  const gapId = String(change.gap_id || "").trim();
+  const name = String(change.name || "").trim();
+  const label = name || (gapId ? `Gap ${gapId}` : "Unlinked Gap");
+  if (!gapId) return `<span class="muted">${htmlEscape(label)}</span>`;
+  return `<a href="#/gaps/${htmlEscape(gapId)}" ${name ? "" : `class="muted"`}>${htmlEscape(label)}</a>`;
 }
 
 function applyChangesFilterIndicator(f) {

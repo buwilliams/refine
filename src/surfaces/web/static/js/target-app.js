@@ -117,7 +117,9 @@ function applyTargetAppSnapshot(snap) {
   _targetAppSnapshot = snap;
   const indicator = document.getElementById("target-app-indicator");
   if (!indicator) return;
-  const appState = snap.state || "unknown";
+  const appState = snap.state === "running" && snap.has_status_checks === false
+    ? "unknown"
+    : snap.state || "unknown";
   indicator.dataset.state = appState;
   const contextMenu = document.getElementById("nav-context-menu");
   if (contextMenu) contextMenu.dataset.state = appState;

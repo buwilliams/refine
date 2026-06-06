@@ -203,6 +203,10 @@ function settingsSurfaceDataNeeds(surface, slug) {
 function detachedSettingsSurfaceData(project = {}) {
   const projectApps = project?.apps || [];
   const currentProject = project?.client_repo || "";
+  const nodeList = project?.nodes || [];
+  const activeNodeId = project?.active_node_id || "";
+  const activeNode = nodeList.find((i) => i.id === activeNodeId) || null;
+  const activeNodeLabel = activeNode?.display_name || project?.active_node || activeNodeId || "Default";
   const appOptions = projectApps.map((app) => `
     <option value="${htmlEscape(app.path)}" ${app.path === currentProject ? "selected" : ""}>
       ${htmlEscape(app.name || app.path)}
@@ -216,11 +220,11 @@ function detachedSettingsSurfaceData(project = {}) {
     gov: {},
     quality: { regressions: [] },
     dash: {},
-    nodes: [],
+    nodes: nodeList,
     nodeCounts: {},
     clusterNodes: [],
-    activeNodeId: "",
-    activeNodeLabel: "No app",
+    activeNodeId,
+    activeNodeLabel,
     guidanceItems: [],
     performance: {},
     performanceBackend: {},
@@ -235,6 +239,7 @@ function detachedSettingsSurfaceData(project = {}) {
     currentProject,
     projectRegistryEnabled: project?.registry_enabled !== false,
     appOptions,
+    cli: "claude",
   };
 }
 
@@ -731,13 +736,13 @@ function bindSettingsTabHandlers() {
 function renderSqliteCacheSection(error = null) {
   return `
     <section class="settings-section">
-      <h3>SQLite cache</h3>
+      <h3>Projection cache</h3>
       ${error ? `<p class="muted small" style="color:var(--error);margin-top:0">${htmlEscape(error.message || String(error))}</p>` : ""}
       <p class="muted small" style="margin-top:0">
-        Rebuilds <code>index.sqlite</code> from canonical <code>.refine</code> JSON.
+        Rebuilds the runtime projection from canonical <code>.refine</code> JSON.
       </p>
       <div class="actions">
-        <button class="danger" id="s-rebuild-cache">Rebuild SQLite cache</button>
+        <button class="danger" id="s-rebuild-cache">Rebuild projection cache</button>
       </div>
       <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
     </section>`;
@@ -749,7 +754,7 @@ function drawSqliteCacheProgress(progress = {}) {
   const total = Number(progress.total || 0);
   const completed = Number(progress.completed || 0);
   const message = progress.message || (
-    total ? `Processing ${completed} of ${total} Gaps` : "Rebuilding SQLite cache"
+    total ? `Processing ${completed} of ${total} Gaps` : "Rebuilding projection cache"
   );
   const detail = total
     ? `${Math.min(completed, total)} / ${total} Gap${total === 1 ? "" : "s"} processed`
@@ -791,6 +796,19 @@ function renderSettingsTabBody(surface, slug, data) {
         projectRegistryEnabled: data.projectRegistryEnabled,
         appOptions: data.appOptions,
       });
+    }
+    if (surface === SETTINGS_SURFACES.node && slug === "application") {
+      return renderDetachedNodeConfig(
+        renderNodeApplicationConfigSections({
+          s: data.s || {},
+          activeNodeLabel: data.activeNodeLabel,
+        }),
+      );
+    }
+    if (surface === SETTINGS_SURFACES.node && slug === "runtime") {
+      return renderDetachedNodeConfig(
+        renderNodeRuntimeConfigSections(data.s || {}, data.activeNodeLabel, data.cli || "claude"),
+      );
     }
     return renderSettingsNoProjectTab(surface.title);
   }
@@ -847,6 +865,23 @@ function renderSettingsNoProjectTab(title = "Settings") {
       <p class="muted">Open the Guide to configure Refine and attach an app before using ${htmlEscape(title)} settings.</p>
       <button type="button" class="secondary" data-settings-open-guide>Open Guide</button>
     </section>`;
+}
+
+function renderDetachedNodeConfig(body) {
+  return `
+    <section class="settings-section">
+      <h3>No app attached.</h3>
+      <p class="muted">
+        Node configuration is shown for reference. Attach an app before saving
+        application or runtime settings.
+      </p>
+      <button type="button" class="secondary" data-settings-open-guide>Open Guide</button>
+    </section>
+    ${disableSettingsControls(body)}`;
+}
+
+function disableSettingsControls(markup) {
+  return markup.replace(/<(input|select|textarea|button)\b(?![^>]*\bdisabled\b)/g, "<$1 disabled");
 }
 
 function bindSettingsNoProjectTab() {

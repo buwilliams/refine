@@ -294,8 +294,8 @@ fn fresh_provider_status_value() -> RefineResult<Value> {
     let providers = service.detect()?;
     let selected = providers
         .iter()
-        .find(|provider| provider.name == "claude")
-        .or_else(|| providers.iter().find(|provider| provider.installed));
+        .find(|provider| provider.installed)
+        .or_else(|| providers.iter().find(|provider| provider.name == "claude"));
     let ok = selected.map(|provider| provider.installed).unwrap_or(false);
     let message = if ok {
         selected

@@ -7,6 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::Utc;
 use serde_json::{Map, Value};
 
+use crate::core::observability::logs::{FileLogService, LogService};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection, ProjectStateStore,
@@ -176,9 +177,76 @@ impl FileWorkItemService {
         })
     }
 
+    pub fn show_gap_detail(&self, gap_id: &str) -> RefineResult<Value> {
+        let current = self.show_gap_summary(gap_id)?;
+        let (_, mut value) = self.read_gap_value_unchecked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Gap {gap_id} is not a JSON object"))
+        })?;
+        object.insert(
+            "reporter".to_string(),
+            current
+                .gap
+                .reporter
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
+        );
+        object.insert(
+            "round_count".to_string(),
+            Value::from(current.gap.round_count),
+        );
+        if let Some(display_name) = current
+            .node_display_name
+            .or_else(|| self.node_display_name(current.gap.node_id.as_deref()))
+        {
+            object.insert("node_display_name".to_string(), Value::String(display_name));
+        }
+        self.attach_round_logs(gap_id, object)?;
+        Ok(value)
+    }
+
     pub fn list_gap_summaries(&self) -> RefineResult<Vec<GapSummaryProjection>> {
         let snapshot = self.projection_snapshot()?;
         Ok(snapshot.gaps.into_values().collect())
+    }
+
+    fn node_display_name(&self, node_id: Option<&str>) -> Option<String> {
+        let node_id = node_id.unwrap_or("default");
+        FileNodeRegistryService::new(&self.durable_root)
+            .show(node_id)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("node")
+                    .and_then(|node| node.get("display_name"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string)
+            })
+    }
+
+    fn attach_round_logs(&self, gap_id: &str, object: &mut Map<String, Value>) -> RefineResult<()> {
+        let Some(rounds) = object.get_mut("rounds").and_then(Value::as_array_mut) else {
+            return Ok(());
+        };
+        let log_service = FileLogService::new(&self.durable_root);
+        let round_count = rounds.len();
+        for (idx, round) in rounds.iter_mut().enumerate() {
+            let logs = log_service.round_logs(gap_id, idx)?;
+            let Some(round_object) = round.as_object_mut() else {
+                continue;
+            };
+            if !logs.is_empty() {
+                let value = serde_json::to_value(&logs).map_err(|error| {
+                    RefineError::Serialization(format!("failed to encode Gap logs: {error}"))
+                })?;
+                round_object.insert("logs".to_string(), value);
+            }
+            if idx + 1 == round_count {
+                attach_latest_log_fields(round_object, &logs)?;
+            }
+        }
+        Ok(())
     }
 
     pub fn create_feature_summary(
@@ -1240,6 +1308,36 @@ fn restore_last_workflow_status(status: &GapStatus) -> GapStatus {
         GapStatus::Failed | GapStatus::Review | GapStatus::Cancelled => GapStatus::Todo,
         other => other.clone(),
     }
+}
+
+fn attach_latest_log_fields(
+    round: &mut Map<String, Value>,
+    logs: &[crate::model::log::RoundLogEntry],
+) -> RefineResult<()> {
+    let latest_log = logs.last();
+    let latest_error_log = logs
+        .iter()
+        .rev()
+        .find(|log| log.entry.severity == "error" || log.entry.severity == "warn");
+    let latest_state_log = logs.iter().rev().find(|log| log.entry.category == "state");
+    let latest_workflow_log = logs
+        .iter()
+        .rev()
+        .find(|log| log.entry.message.contains("Workflow status changed:"));
+    for (key, value) in [
+        ("latest_log", latest_log),
+        ("latest_error_log", latest_error_log),
+        ("latest_state_log", latest_state_log),
+        ("latest_workflow_log", latest_workflow_log),
+    ] {
+        if let Some(log) = value {
+            let value = serde_json::to_value(log).map_err(|error| {
+                RefineError::Serialization(format!("failed to encode latest Gap log: {error}"))
+            })?;
+            round.insert(key.to_string(), value);
+        }
+    }
+    Ok(())
 }
 
 fn new_round_value(reporter: &str, actual: &str, target: &str) -> Value {

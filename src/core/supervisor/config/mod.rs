@@ -337,7 +337,15 @@ impl FileReporterService {
 
     fn load_reporters(&self) -> RefineResult<Vec<Value>> {
         let value = read_json_or_default(self.durable_root.join(REPORTERS_FILE), json!([]))?;
-        Ok(normalize_reporters(&value))
+        let reporters = normalize_reporters(&value);
+        if reporters.is_empty() {
+            let seeded = self.seed_reporters_from_gap_rounds()?;
+            if !seeded.is_empty() {
+                self.save_reporters(&seeded)?;
+                return Ok(seeded);
+            }
+        }
+        Ok(reporters)
     }
 
     fn save_reporters(&self, reporters: &[Value]) -> RefineResult<()> {
@@ -345,6 +353,21 @@ impl FileReporterService {
             self.durable_root.join(REPORTERS_FILE),
             &Value::Array(reporters.to_vec()),
         )
+    }
+
+    fn seed_reporters_from_gap_rounds(&self) -> RefineResult<Vec<Value>> {
+        let gaps_root = self.durable_root.join("gaps");
+        if !gaps_root.exists() {
+            return Ok(Vec::new());
+        }
+        let mut names = BTreeSet::new();
+        collect_gap_reporter_names(&gaps_root, &mut names)?;
+        let now = now_timestamp();
+        Ok(names
+            .into_iter()
+            .enumerate()
+            .map(|(idx, name)| json!({"id": idx + 1, "name": name, "created": now}))
+            .collect())
     }
 }
 
@@ -745,6 +768,48 @@ fn normalize_reporters(value: &Value) -> Vec<Value> {
             )
     });
     reporters
+}
+
+fn collect_gap_reporter_names(
+    path: &std::path::Path,
+    names: &mut BTreeSet<String>,
+) -> RefineResult<()> {
+    for entry in fs::read_dir(path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read Gap directory {}: {error}",
+            path.display()
+        ))
+    })? {
+        let entry = entry.map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read Gap directory entry {}: {error}",
+                path.display()
+            ))
+        })?;
+        let path = entry.path();
+        if path.is_dir() {
+            collect_gap_reporter_names(&path, names)?;
+            continue;
+        }
+        if path.file_name().and_then(|value| value.to_str()) != Some("gap.json") {
+            continue;
+        }
+        let value = read_json_or_default(path.clone(), json!({}))?;
+        for round in value
+            .get("rounds")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(name) = round.get("reporter").and_then(Value::as_str) {
+                let clean = name.trim();
+                if !clean.is_empty() {
+                    names.insert(clean.to_string());
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn normalize_reporter_name(name: &str) -> RefineResult<String> {

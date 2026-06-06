@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use serde_json::json;
@@ -7,6 +8,7 @@ use crate::core::observability::activity::{ActivityService, FileActivityService}
 use crate::core::observability::logs::FileLogService;
 use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::product::imports::{FileImportService, import_drafts_from_value};
+use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, FileProjectStateStore,
     GapProjectionQuery, PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectStateStore, ProjectionQuery,
@@ -20,6 +22,47 @@ use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
+    fn active_node_id_for_routes(&self) -> String {
+        self.current_durable_root()
+            .ok()
+            .flatten()
+            .and_then(|durable_root| {
+                FileNodeRegistryService::new(durable_root)
+                    .active_node_id()
+                    .ok()
+            })
+            .filter(|node_id| !node_id.trim().is_empty())
+            .unwrap_or_else(|| "default".to_string())
+    }
+
+    fn node_display_names_for_routes(&self) -> BTreeMap<String, String> {
+        self.current_durable_root()
+            .ok()
+            .flatten()
+            .and_then(|durable_root| {
+                FileNodeRegistryService::new(durable_root)
+                    .list_response()
+                    .ok()
+            })
+            .and_then(|value| {
+                value
+                    .get("nodes")
+                    .and_then(|nodes| nodes.as_array())
+                    .cloned()
+            })
+            .into_iter()
+            .flatten()
+            .filter_map(|node| {
+                let id = node.get("id").and_then(|value| value.as_str())?;
+                let display_name = node
+                    .get("display_name")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or(id);
+                Some((id.to_string(), display_name.to_string()))
+            })
+            .collect()
+    }
+
     pub(super) fn handle_gap_transition(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "mutate work items");
         let Some(gap_id) = request
@@ -853,19 +896,9 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match self.current_projection() {
-            Ok(projection) => match projection.gaps.get(gap_id) {
-                Some(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
-                None => ApiResponse::json(
-                    404,
-                    json!({
-                        "error": {
-                            "code": "not_found",
-                            "message": format!("Gap {gap_id} was not found")
-                        }
-                    }),
-                ),
-            },
+        let durable_root = require_durable_root!(self, "read Gap detail");
+        match self.work_item_service(durable_root).show_gap_detail(gap_id) {
+            Ok(gap) => ApiResponse::json(200, json!({"gap": gap})),
             Err(error) => error_response(error),
         }
     }
@@ -880,6 +913,7 @@ impl InProcessWebServer {
         let offset = query_param(raw_path, "offset")
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or_else(|| (page - 1).saturating_mul(limit));
+        let current_node_id = self.active_node_id_for_routes();
         let query = GapProjectionQuery {
             page: PageRequest {
                 limit,
@@ -891,7 +925,7 @@ impl InProcessWebServer {
             status: query_param(raw_path, "status").and_then(|value| GapStatus::parse_wire(&value)),
             reporter: query_param(raw_path, "reporter"),
             node: query_param(raw_path, "node"),
-            current_node_id: Some("default".to_string()),
+            current_node_id: Some(current_node_id),
             feature: query_param(raw_path, "feature"),
             rounds_gte: query_param(raw_path, "rounds_gte")
                 .and_then(|value| value.parse::<usize>().ok()),
@@ -909,8 +943,27 @@ impl InProcessWebServer {
         let facet_status_counts =
             include_facets.then(|| projection.list_gaps(facet_query).filtered_status_counts);
         let result = projection.list_gaps(query);
+        let node_names = self.node_display_names_for_routes();
+        let gaps = result
+            .gaps
+            .into_iter()
+            .map(|gap| {
+                let node_display_name = gap
+                    .node_id
+                    .as_deref()
+                    .and_then(|node_id| node_names.get(node_id))
+                    .cloned();
+                let mut value = json!(gap);
+                if let Some(display_name) = node_display_name
+                    && let Some(object) = value.as_object_mut()
+                {
+                    object.insert("node_display_name".to_string(), json!(display_name));
+                }
+                value
+            })
+            .collect::<Vec<_>>();
         let mut body = json!({
-            "gaps": result.gaps,
+            "gaps": gaps,
             "counts": projection.status_counts(),
             "filtered_counts": result.filtered_status_counts,
             "matching_ids": result.matching_ids,
@@ -941,6 +994,7 @@ impl InProcessWebServer {
         let offset = query_param(raw_path, "offset")
             .and_then(|value| value.parse::<usize>().ok())
             .unwrap_or_else(|| (page - 1).saturating_mul(limit));
+        let current_node_id = self.active_node_id_for_routes();
         let query = FeatureProjectionQuery {
             page: PageRequest {
                 limit,
@@ -952,7 +1006,7 @@ impl InProcessWebServer {
             status: query_param(raw_path, "status").and_then(|value| GapStatus::parse_wire(&value)),
             reporter: query_param(raw_path, "reporter"),
             node: query_param(raw_path, "node"),
-            current_node_id: Some("default".to_string()),
+            current_node_id: Some(current_node_id),
         };
         let result = projection.list_features(query);
         let features: Vec<_> = result

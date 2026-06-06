@@ -670,6 +670,25 @@ fn web_server_appends_and_edits_latest_round() {
     assert!(written.contains("\"reporter\": \"Reviewer\""));
     assert!(written.contains("\"actual\": \"Revised\""));
 
+    let detail = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps/GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(detail.status, 200);
+    assert_eq!(detail.body["gap"]["round_count"], 1);
+    assert_eq!(detail.body["gap"]["rounds"][0]["reporter"], "Reviewer");
+    assert_eq!(detail.body["gap"]["rounds"][0]["actual"], "Revised");
+
+    let reporters = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/reporters".to_string(),
+        body: None,
+    });
+    assert_eq!(reporters.status, 200);
+    assert_eq!(reporters.body["reporters"][0]["name"], "Reviewer");
+    assert!(durable_root.join("reporters.json").exists());
+
     fs::remove_dir_all(temp_root).unwrap();
 }
 
@@ -1500,6 +1519,17 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     });
     assert_eq!(transfer.status, 200);
     assert_eq!(transfer.body["updated"], 2);
+    let current_node_gaps = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps?node=current".to_string(),
+        body: None,
+    });
+    assert_eq!(current_node_gaps.status, 200);
+    assert_eq!(current_node_gaps.body["page"]["total"], 2);
+    assert_eq!(
+        current_node_gaps.body["gaps"][0]["node_display_name"],
+        "Remote QA"
+    );
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1".to_string(),
@@ -1622,6 +1652,15 @@ fn web_server_serves_source_file_tree_read_and_search() {
     );
     assert!(root_entries.iter().any(|entry| entry["path"] == "src"));
     assert!(!root_entries.iter().any(|entry| entry["path"] == ".refine"));
+    let src_index = root_entries
+        .iter()
+        .position(|entry| entry["path"] == "src")
+        .unwrap();
+    let readme_index = root_entries
+        .iter()
+        .position(|entry| entry["path"] == "README.md")
+        .unwrap();
+    assert!(src_index < readme_index);
     assert!(
         tree.body["entries_by_path"]["src"]
             .as_array()
