@@ -1,6 +1,6 @@
 # Refine Rust Port — Spec Conformance Report
 
-**Scope:** `docs/spec/rust-spec.md` against all of `rust/src/`, `rust/xtask/`, `rust/desktop/`.
+**Scope:** `docs/spec/rust-spec.md` against all of `src/`, `xtask/`, `desktop/`.
 **Method:** full re-read after the second round of conformance commits (`16f7d21`, `d087ea5`) plus the
 `--durable-root` follow-up; I re-verified each prior finding and residual against source. Built and ran the
 suite: `cargo test` is green, and the test binaries compile clean.
@@ -94,7 +94,7 @@ signing/notarization), not architectural contradictions.
 | `core::observability::{logs,activity,diagnostics}` | ✅ | JSONL sidecars, multi-filter query + retention, 9-category doctor. |
 | `core::observability::{metrics,support_bundle}` | ✅ | Support bundle redacts secrets by default (`redact_json`); metrics present. |
 | `surfaces::web_server` | ✅ | std `TcpListener` HTTP/1.1, **thread-per-connection**; static serving with traversal guards; SSE; local-origin checks; idempotency; version negotiation; serves every route the CLI calls. |
-| `surfaces::web/static` | ✅ | 55 assets copied from `python/refine_ui/static/`; xtask verifies parity. |
+| `surfaces::web/static` | ✅ | 55 Rust-owned static assets live under `src/surfaces/web/static/`; xtask verifies they are present. |
 | `surfaces::cli` | ✅ | All 9 model-oriented groups + actions; **daemon-routed in normal builds**; concrete durable roots are rejected before in-process service branches can mutate durable state. |
 | `surfaces::desktop` + `desktop/src-tauri` | ✅ feature-gated | Bridge shell by default; real Tauri 2 webview/tray/menu under `--features real-tauri`. |
 | `xtask` | ✅ | api-contract export, static-asset parity, runtime-layout. |

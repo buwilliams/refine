@@ -85,11 +85,8 @@ Responsibilities:
 
 The web surface should remain deployable as static assets served by the daemon.
 Business logic belongs in Rust core services, not in frontend-only code. The
-existing fully baked UI under `python/refine_ui/static/` should be copied into
-the Rust project so native Refine is self-contained. During the port, that copy
-is the Rust-owned web UI asset tree; once the Rust port is complete, the
-`python/` directory can be deprecated without leaving the Rust product
-dependent on Python-owned static files.
+Rust-owned web UI asset tree lives under `src/surfaces/web/static/`, so native
+Refine is self-contained and does not depend on Python-owned static files.
 
 ### CLI
 
@@ -221,7 +218,7 @@ instead of being rebuilt inside the Gap execution code.
 
 ## Model
 
-Module: `model`; path: `rust/src/model/`.
+Module: `model`; path: `src/model/`.
 
 The Rust architecture should be data-first. State, model definitions, and
 workflow rules are the stable center of the system; processing modules are
@@ -263,7 +260,7 @@ The initial Rust model modules should mirror the product concepts already
 visible in the Python implementation:
 
 ```text
-rust/src/model/
+src/model/
   project/
   gap/
   feature/
@@ -279,7 +276,7 @@ unless a migration intentionally changes it.
 
 ### Project Model
 
-Module: `model::project`; path: `rust/src/model/project/`.
+Module: `model::project`; path: `src/model/project/`.
 
 Owns the canonical shape of a Refine target-app attachment and project state.
 This covers both durable `.refine` state in the target app and port-scoped
@@ -312,7 +309,7 @@ Rules:
 
 ### Gap Model
 
-Module: `model::gap`; path: `rust/src/model/gap/`.
+Module: `model::gap`; path: `src/model/gap/`.
 
 Owns the canonical Gap, round, note, and Gap-owned quality/governance state.
 The Python baseline stores durable Gap state in `gap.json` and projects common
@@ -346,7 +343,7 @@ Rules:
 
 ### Feature Model
 
-Module: `model::feature`; path: `rust/src/model/feature/`.
+Module: `model::feature`; path: `src/model/feature/`.
 
 Owns Feature metadata and the derived rollup produced from ordered Gaps.
 The Python baseline stores durable Feature metadata in `feature.json` and
@@ -380,7 +377,7 @@ Rules:
 
 ### Workflow Model
 
-Module: `model::workflow`; path: `rust/src/model/workflow/`.
+Module: `model::workflow`; path: `src/model/workflow/`.
 
 Owns workflow states, transition rules, and allowed-operation decisions for
 Gap and Feature workflows.
@@ -418,7 +415,7 @@ Rules:
 
 ### Cluster Model
 
-Module: `model::cluster`; path: `rust/src/model/cluster/`.
+Module: `model::cluster`; path: `src/model/cluster/`.
 
 Owns the git-synced cluster registry shape and cluster-level state. Runtime SSH
 execution belongs in `core::host::cluster`; the model only defines the records
@@ -445,7 +442,7 @@ Rules:
 
 ### Node Model
 
-Module: `model::node`; path: `rust/src/model/node/`.
+Module: `model::node`; path: `src/model/node/`.
 
 Owns local Refine node identity and node-scoped settings. A node is the unit of
 ownership for Gaps and Features inside one target app; a cluster node is the
@@ -470,7 +467,7 @@ Rules:
 
 ### Log Model
 
-Module: `model::log`; path: `rust/src/model/log/`.
+Module: `model::log`; path: `src/model/log/`.
 
 Owns the canonical log and activity entry shape. Writing, retention, indexing,
 streaming, and support-bundle export belong in `core::observability`.
@@ -507,7 +504,7 @@ Rules:
 
 ### Installation And Update
 
-Module: `core::host::installation`; path: `rust/src/core/host/installation/`.
+Module: `core::host::installation`; path: `src/core/host/installation/`.
 
 Owns abstractions for: install, repair, update, rollback, uninstall.
 
@@ -531,7 +528,7 @@ OS backends:
 
 ### Daemon Lifecycle
 
-Module: `core::supervisor::lifecycle`; path: `rust/src/core/supervisor/lifecycle/`.
+Module: `core::supervisor::lifecycle`; path: `src/core/supervisor/lifecycle/`.
 
 Owns abstractions for: start, stop, restart, status, health, recover.
 
@@ -555,7 +552,7 @@ Requirements:
 
 ### Surface Events
 
-Module: `core::supervisor::runtime`; path: `rust/src/core/supervisor/runtime/`.
+Module: `core::supervisor::runtime`; path: `src/core/supervisor/runtime/`.
 
 Owns abstractions for: open UI, stream state, deliver notifications, and surface
 runtime context.
@@ -570,7 +567,7 @@ Requirements:
 
 ### Project Registry
 
-Module: `core::product::project_registry`; path: `rust/src/core/product/project_registry/`.
+Module: `core::product::project_registry`; path: `src/core/product/project_registry/`.
 
 Owns abstractions for: register, attach, switch, detach, clone, remove, inspect.
 
@@ -585,7 +582,7 @@ Requirements:
 
 ### Project State
 
-Module: `core::product::project_state`; path: `rust/src/core/product/project_state/`.
+Module: `core::product::project_state`; path: `src/core/product/project_state/`.
 
 Owns abstractions for: initialize, read, mutate, migrate, sync, rebuild
 projections.
@@ -612,7 +609,7 @@ Requirements:
 
 ### Work Items
 
-Module: `core::product::work_items`; path: `rust/src/core/product/work_items/`.
+Module: `core::product::work_items`; path: `src/core/product/work_items/`.
 
 Owns abstractions for: create, import, deduplicate, list, update, transition, cancel,
 delete, assign, reorder.
@@ -628,7 +625,7 @@ Requirements:
 
 ### Scheduling And Execution
 
-Module: `core::product::scheduling`; path: `rust/src/core/product/scheduling/`.
+Module: `core::product::scheduling`; path: `src/core/product/scheduling/`.
 
 Owns abstractions for: promote, reserve, dispatch, pause, resume, cancel, retry.
 
@@ -644,7 +641,7 @@ Requirements:
 
 ### Agent Providers
 
-Module: `core::host::agent_providers`; path: `rust/src/core/host/agent_providers/`.
+Module: `core::host::agent_providers`; path: `src/core/host/agent_providers/`.
 
 Owns abstractions for: detect, configure, authenticate, invoke, parse, resume, diagnose.
 
@@ -660,7 +657,7 @@ Requirements:
 
 ### Process Supervision
 
-Module: `core::host::process_supervision`; path: `rust/src/core/host/process_supervision/`.
+Module: `core::host::process_supervision`; path: `src/core/host/process_supervision/`.
 
 Owns abstractions for: launch, signal, wait, stream, inspect, limit, clean up.
 
@@ -693,7 +690,7 @@ OS backends should cover:
 
 ### Target App Operations
 
-Module: `core::host::target_apps`; path: `rust/src/core/host/target_apps/`.
+Module: `core::host::target_apps`; path: `src/core/host/target_apps/`.
 
 Owns abstractions for: configure, start, stop, restart, status, rebuild, open, diagnose.
 
@@ -708,7 +705,7 @@ Requirements:
 
 ### Git And Worktrees
 
-Module: `core::host::git_worktrees`; path: `rust/src/core/host/git_worktrees/`.
+Module: `core::host::git_worktrees`; path: `src/core/host/git_worktrees/`.
 
 Owns abstractions for: inspect, branch, worktree, diff, merge, rebase, commit, reset,
 push, recover.
@@ -726,7 +723,7 @@ Requirements:
 
 ### Quality And Verification
 
-Module: `core::host::quality`; path: `rust/src/core/host/quality/`.
+Module: `core::host::quality`; path: `src/core/host/quality/`.
 
 Owns abstractions for: run checks, browser QA, regressions, screenshots, compare, gate.
 
@@ -740,7 +737,7 @@ Requirements:
 
 ### Chat And Planning
 
-Module: `core::product::chat`; path: `rust/src/core/product/chat/`.
+Module: `core::product::chat`; path: `src/core/product/chat/`.
 
 Owns abstractions for: start, resume, stream, attach to Gap or Feature, persist context.
 
@@ -769,7 +766,7 @@ Requirements:
 
 ### Observability And Diagnostics
 
-Module: `core::observability`; path: `rust/src/core/observability/`.
+Module: `core::observability`; path: `src/core/observability/`.
 
 Owns abstractions for: activity, logs, metrics, doctor, support bundle.
 
@@ -785,7 +782,7 @@ Requirements:
 
 ### Security And Permissions
 
-Module: `core::supervisor::security`; path: `rust/src/core/supervisor/security/`.
+Module: `core::supervisor::security`; path: `src/core/supervisor/security/`.
 
 Owns abstractions for: secret storage, command allowlists, redaction, and audit.
 
@@ -800,7 +797,7 @@ Requirements:
 
 ### Cluster And Multi-Node
 
-Module: `core::host::cluster`; path: `rust/src/core/host/cluster/`.
+Module: `core::host::cluster`; path: `src/core/host/cluster/`.
 
 Owns abstractions for: node registry, transfer, sync, remote command, ownership.
 
@@ -815,14 +812,11 @@ Requirements:
 
 ## Component Architecture
 
-The Rust implementation should live entirely under `rust/`. That directory is
-the Rust project root for native Refine. The current Python implementation
-lives under `python/`, and the two implementations should remain side-by-side
-during the port instead of interleaving Rust modules with Python packages at the
-repository root.
+Native Refine now owns the repository root. The long-lived `python` branch
+preserves the 2.3.8 Python implementation; `main` is the Rust implementation.
 
-Start with one core product Cargo package under `rust/`. Use Rust modules for
-namespaces, code ownership, service traits, and abstraction boundaries. The Rust
+Use one core product Cargo package at the repository root. Use Rust modules for
+namespaces, code ownership, service traits, and abstraction boundaries. The
 project may become a small Cargo workspace to host a thin desktop Tauri wrapper,
 but capabilities should not be split into separate packages. The core product
 remains one package; the desktop package exists only for native shell packaging
@@ -832,89 +826,83 @@ Suggested repository layout:
 
 ```text
 refine/
+  Cargo.toml
   docs/
-  python/
   run/
     primary.json
     <port>/
       cache/
-  rust/
-    Cargo.toml
-    src/
-      main.rs
-      lib.rs
-      surfaces/
-        cli/
-        desktop/
-        web/
-          static/
-            css/
-            images/
-            js/
-        web_server/
-      core/
-        product/
-          project_registry/
-          project_state/
-          work_items/
-          scheduling/
-          chat/
-          imports/
-          nodes/
-        host/
-          installation/
-          process_supervision/
-          target_apps/
-          git_worktrees/
-          agent_providers/
-          quality/
-          cluster/
-        supervisor/
-          lifecycle/
-          jobs/
-          security/
-          runtime/
-          config/
-          errors/
-          testing/
-        observability/
-          activity/
-          logs/
-          metrics/
-          diagnostics/
-          support_bundle/
-      model/
-        gap/
-        feature/
-        workflow/
-        project/
+  src/
+    main.rs
+    lib.rs
+    surfaces/
+      cli/
+      desktop/
+      web/
+        static/
+          css/
+          images/
+          js/
+      web_server/
+    core/
+      product/
+        project_registry/
+        project_state/
+        work_items/
+        scheduling/
+        chat/
+        imports/
+        nodes/
+      host/
+        installation/
+        process_supervision/
+        target_apps/
+        git_worktrees/
+        agent_providers/
+        quality/
         cluster/
-        node/
-        log/
-    desktop/
-      src-tauri/
-        Cargo.toml
-        src/
-          main.rs
-    xtask/
+      supervisor/
+        lifecycle/
+        jobs/
+        security/
+        runtime/
+        config/
+        errors/
+        testing/
+      observability/
+        activity/
+        logs/
+        metrics/
+        diagnostics/
+        support_bundle/
+    model/
+      gap/
+      feature/
+      workflow/
+      project/
+      cluster/
+      node/
+      log/
+  desktop/
+    src-tauri/
+      Cargo.toml
+      src/
+        main.rs
+  xtask/
 ```
 
-`python/` remains the current implementation and behavior oracle during the
-port. The existing UI assets in `python/refine_ui/static/` should be copied
-into `rust/src/surfaces/web/static/` so the Rust project has its own complete
-UI asset tree. New core product code should live under `rust/src/`, and
-repository automation should live under `rust/xtask/`, so the native
-architecture is explicit and contained within the Rust project.
-If Tauri requires a separate package, it should live under
-`rust/desktop/src-tauri/` and depend on the core product package. It should not
-own capabilities, durable state rules, process lifecycle, provider behavior, or
-workflow logic.
+The complete web UI asset tree lives under `src/surfaces/web/static/`.
+Core product code lives under `src/`, and repository automation lives under
+`xtask/`, so the native architecture is explicit at the repository root. The
+Tauri wrapper lives under `desktop/src-tauri/` and depends on the core product
+package. It should not own capabilities, durable state rules, process lifecycle,
+provider behavior, or workflow logic.
 
 The local runtime root is not part of the Rust source tree. In checkout-based
-development it may be the repository-root gitignored `run/` directory used by
-the current Python implementation. In an installed desktop or service
-deployment it may live under the OS-specific app support, cache, or service
-state location. The shape inside that root should remain familiar:
+development it may be the repository-root gitignored `run/` directory. In an
+installed desktop or service deployment it may live under the OS-specific app
+support, cache, or service state location. The shape inside that root should
+remain familiar:
 `primary.json` for the primary local runtime record and `<port>/cache/` for
 port-scoped caches such as projection snapshots and rebuilt query indexes.
 Rust should keep this logical convention unless a migration explicitly
@@ -922,9 +910,9 @@ documents a replacement.
 
 ### Module Direction
 
-The architecture is conceptual: the repository already separates runtimes
-through `python/` and `rust/`, and the Rust package should focus on the modules
-it directly implements. Rust modules should follow a one-way dependency graph:
+The architecture is module-first: the root Cargo package should focus on the
+modules it directly implements. Rust modules should follow a one-way dependency
+graph:
 
 ```text
 surfaces
@@ -974,39 +962,38 @@ Rules:
 The following modules support the overall architecture rather than a single
 product capability:
 
-- `model`; path: `rust/src/model/`. Owns canonical state types,
+- `model`; path: `src/model/`. Owns canonical state types,
   workflow-state enums, allowed-operation rules, persisted record definitions, and
   pure validation.
-- `core::supervisor::runtime`; path: `rust/src/core/supervisor/runtime/`. Owns
+- `core::supervisor::runtime`; path: `src/core/supervisor/runtime/`. Owns
   runtime bootstrap, OS path selection, instance identity, process startup
   context, and repo-root `run/` path resolution.
-- `core::supervisor::jobs`; path: `rust/src/core/supervisor/jobs/`. Owns the
+- `core::supervisor::jobs`; path: `src/core/supervisor/jobs/`. Owns the
   job registry, operation handles, cancellation plumbing, and operation
   recovery coordination.
-- `core::supervisor::config`; path: `rust/src/core/supervisor/config/`. Owns
+- `core::supervisor::config`; path: `src/core/supervisor/config/`. Owns
   loading, validating, and merging user, project, and runtime configuration.
-- `core::supervisor::errors`; path: `rust/src/core/supervisor/errors/`. Owns
+- `core::supervisor::errors`; path: `src/core/supervisor/errors/`. Owns
   error categories and translation into daemon web-server responses and CLI
   output.
-- `core::supervisor::testing`; path: `rust/src/core/supervisor/testing/`. Owns
+- `core::supervisor::testing`; path: `src/core/supervisor/testing/`. Owns
   black-box fixtures, fake supervisors, fake providers, fake process handles,
   and contract-test helpers.
-- `surfaces::cli`; path: `rust/src/surfaces/cli/`. Owns the CLI
+- `surfaces::cli`; path: `src/surfaces/cli/`. Owns the CLI
   surface, model-oriented command tree, action-to-API adapters, and structured
   output formatting.
-- `surfaces::desktop`; path: `rust/src/surfaces/desktop/`. Owns
+- `surfaces::desktop`; path: `src/surfaces/desktop/`. Owns
   desktop shell integration, native menu and tray hooks, update prompts, and
   narrow bridge command definitions used by the Tauri wrapper.
-- `surfaces::web`; path: `rust/src/surfaces/web/`. Owns the Rust copy of the
-  web UI assets, generated client bindings, and asset packaging metadata.
-  Initial assets should come from `python/refine_ui/static/` and live under
-  `rust/src/surfaces/web/static/`.
-- `surfaces::web_server`; path: `rust/src/surfaces/web_server/`. Owns the
+- `surfaces::web`; path: `src/surfaces/web/`. Owns the native web UI assets,
+  generated client bindings, and asset packaging metadata. Static assets live
+  under `src/surfaces/web/static/`.
+- `surfaces::web_server`; path: `src/surfaces/web_server/`. Owns the
   local daemon web server: HTTP routes, server-sent-event streams, static asset
   serving, local-origin checks, request parsing, response shaping, and
   translation into supervisor and core services.
 
-`rust/xtask/` should contain repository automation that is not part of the
+`xtask/` should contain repository automation that is not part of the
 shipped product: code generation, API contract export, fixture refresh, release
 packaging, installer smoke tests, and migration checks.
 
@@ -1358,9 +1345,9 @@ implementation details.
 - Business logic is shared across surfaces.
 - Web, desktop, and CLI surfaces are expected to reach complete feature parity
   through shared `core` modules.
-- The Rust project contains its own copied web UI asset tree derived from
-  `python/refine_ui/static/`, so Rust does not depend on Python-owned static
-  files after the port is complete.
+- The Rust project contains its own web UI asset tree under
+  `src/surfaces/web/static/`, so it does not depend on Python-owned static
+  files.
 - The document includes migration and testing strategy for a vertical port.
 - The document defines `model` as the centralized model module for
   canonical state, workflow states, and allowed operations.
@@ -1370,8 +1357,8 @@ implementation details.
   count, facet, search, sort, and lookup needs.
 - The document records the resolved daemon, provider, storage, dependency, UI,
   and implementation-scope decisions.
-- The document defines a core Rust package under `rust/`, leaves room for a
-  thin Tauri wrapper package, assigns capabilities to modules and directory
-  paths inside the concrete `core::*` containers, and preserves the current
-  logical runtime-state shape while allowing the physical runtime root to vary
-  between checkout and installed deployments.
+- The document defines a core Rust package at the repository root, leaves room
+  for a thin Tauri wrapper package, assigns capabilities to modules and
+  directory paths inside the concrete `core::*` containers, and preserves the
+  current logical runtime-state shape while allowing the physical runtime root
+  to vary between checkout and installed deployments.

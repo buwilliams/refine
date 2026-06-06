@@ -292,35 +292,18 @@ dry_run() {
 }
 
 is_refine_checkout() {
-  [ -f "$1/python/pyproject.toml" ] &&
-    [ -f "$1/python/refine_cli/cli.py" ] &&
+  [ -f "$1/Cargo.toml" ] &&
+    [ -f "$1/src/main.rs" ] &&
+    [ -x "$1/r" ] &&
     [ -f "$1/scripts/install.sh" ]
 }
 
-is_legacy_refine_checkout() {
-  [ -f "$1/pyproject.toml" ] &&
-    [ -f "$1/refine_cli/cli.py" ] &&
-    [ -f "$1/install.sh" ]
-}
-
 is_any_refine_checkout() {
-  is_refine_checkout "$1" || is_legacy_refine_checkout "$1"
-}
-
-refine_project_dir() {
-  local project_dir="$REFINE_CHECKOUT/python"
-  if [ ! -f "$project_dir/pyproject.toml" ]; then
-    project_dir="$REFINE_CHECKOUT"
-  fi
-  printf '%s\n' "$project_dir"
+  is_refine_checkout "$1"
 }
 
 refine_manual_prefix() {
-  if [ -f "$REFINE_CHECKOUT/python/pyproject.toml" ]; then
-    printf 'cd %s && uv --project python run refine' "$REFINE_CHECKOUT"
-  else
-    printf 'cd %s && uv run refine' "$REFINE_CHECKOUT"
-  fi
+  printf 'cd %s && ./r' "$REFINE_CHECKOUT"
 }
 
 current_refine_checkout() {
@@ -361,22 +344,8 @@ bound_target_app() {
 recorded_primary_port() {
   local checkout="$1"
   [ -n "$checkout" ] || return 1
-  python3 - "$checkout" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1]) / "run" / "primary.json"
-try:
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    port = int(raw.get("port"))
-except Exception:
-    raise SystemExit(1)
-if 0 < port <= 65535:
-    print(port)
-else:
-    raise SystemExit(1)
-PY
+  [ -f "$checkout/run/primary.json" ] || return 1
+  sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$checkout/run/primary.json" | head -n 1
 }
 
 resolve_refine_port() {
@@ -748,58 +717,60 @@ download_and_run() {
   rm -f "$tmp"
 }
 
-install_uv_with_pipx() {
-  if ! have pipx; then
-    warn "pipx is not installed"
-    install_packages pipx || true
-  fi
-  if ! have pipx; then
-    warn "Still missing pipx. Install it with: sudo apt install pipx"
+install_rust_toolchain() {
+  local tmp=""
+  if ! have curl; then
+    warn "curl is required for rustup"
     return 1
   fi
-  run pipx install uv || {
-    warn "pipx uv install failed"
+  if dry_run; then
+    log_detail "${DIM}+ curl -fsSL https://sh.rustup.rs -o /tmp/refine-rustup && sh /tmp/refine-rustup -y${RESET}"
+    return 0
+  fi
+  tmp="$(mktemp)"
+  if ! curl -fsSL https://sh.rustup.rs -o "$tmp"; then
+    rm -f "$tmp"
+    warn "Could not download rustup"
     return 1
-  }
-  append_path_now "$HOME/.local/bin"
+  fi
+  if ! sh "$tmp" -y; then
+    rm -f "$tmp"
+    warn "rustup installer failed"
+    return 1
+  fi
+  rm -f "$tmp"
   append_path_now "$HOME/.cargo/bin"
 }
 
-ensure_uv() {
-  append_path_now "$HOME/.local/bin"
+ensure_cargo() {
   append_path_now "$HOME/.cargo/bin"
-  if have uv; then
-    local uv_path
-    uv_path="$(command -v uv)"
-    ok "uv found: $uv_path"
-    if [ -z "$(path_command "$ORIGINAL_PATH" uv)" ]; then
-      ensure_profile_path "$(dirname "$uv_path")"
+  if have cargo; then
+    local cargo_path
+    cargo_path="$(command -v cargo)"
+    ok "Cargo found: $cargo_path"
+    if [ -z "$(path_command "$ORIGINAL_PATH" cargo)" ]; then
+      ensure_profile_path "$(dirname "$cargo_path")"
     fi
-    ensure_command_on_original_path uv
+    ensure_command_on_original_path cargo
     return 0
   fi
-  warn "uv is not installed"
-  if confirm "Install uv from Astral's official installer" "y"; then
-    download_and_run "https://astral.sh/uv/install.sh" sh "uv installer" || true
-    append_path_now "$HOME/.local/bin"
-    append_path_now "$HOME/.cargo/bin"
+  warn "Rust Cargo is not installed"
+  if confirm "Install Rust with rustup" "y"; then
+    install_rust_toolchain || true
   fi
-  if ! have uv && confirm "Install uv with pipx" "y"; then
-    install_uv_with_pipx || true
-  fi
-  if have uv; then
-    local uv_path_after
-    uv_path_after="$(command -v uv)"
-    ok "uv installed: $uv_path_after"
-    ensure_profile_path "$(dirname "$uv_path_after")"
-    ensure_command_on_original_path uv
+  if have cargo; then
+    local cargo_path_after
+    cargo_path_after="$(command -v cargo)"
+    ok "Cargo installed: $cargo_path_after"
+    ensure_profile_path "$(dirname "$cargo_path_after")"
+    ensure_command_on_original_path cargo
     return 0
   fi
   die_issue \
-    "uv install" \
-    "Refine uses uv to install dependencies and run the Refine CLI." \
-    "Install uv with: curl -LsSf https://astral.sh/uv/install.sh | sh, or sudo apt install pipx && pipx install uv, then re-run install.sh." \
-    "uv is required. Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh, or sudo apt install pipx && pipx install uv"
+    "Rust Cargo install" \
+    "Refine uses Cargo to build and run the native CLI." \
+    "Install Rust with: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh, then re-run install.sh." \
+    "Cargo is required. Install Rust with rustup, then re-run install.sh."
 }
 
 provider_binary() {
@@ -1030,74 +1001,18 @@ latest_semver_from_lines() {
     tail -n 1
 }
 
-github_repo_slug_from_url() {
-  local url="$1"
-  case "$url" in
-    https://github.com/*)
-      url="${url#https://github.com/}"
-      ;;
-    git@github.com:*)
-      url="${url#git@github.com:}"
-      ;;
-    ssh://git@github.com/*)
-      url="${url#ssh://git@github.com/}"
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-  url="${url%.git}"
-  url="${url%/}"
-  case "$url" in
-    */*) printf '%s\n' "$url" ;;
-    *) return 1 ;;
-  esac
-}
-
-github_api_get() {
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    curl -fsSL \
-      -H "Accept: application/vnd.github+json" \
-      -H "Authorization: Bearer $GITHUB_TOKEN" \
-      "$1"
-  else
-    curl -fsSL \
-      -H "Accept: application/vnd.github+json" \
-      "$1"
-  fi
-}
-
 latest_remote_semver_release_tag() {
-  local slug api
+  local ref
   if dry_run; then
     printf '%s\n' "${REFINE_INSTALL_DRY_RUN_RELEASE_TAG:-1.0.0}"
     return 0
   fi
-  slug="$(github_repo_slug_from_url "$REFINE_REPO_URL")" || return 1
-  api="https://api.github.com/repos/$slug/releases?per_page=100"
-  github_api_get "$api" | python3 -c '
-import json
-import re
-import sys
-
-release_re = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
-try:
-    releases = json.load(sys.stdin)
-except Exception:
-    sys.exit(1)
-versions = []
-for release in releases if isinstance(releases, list) else []:
-    if not isinstance(release, dict):
-        continue
-    if release.get("draft") or release.get("prerelease"):
-        continue
-    tag = release.get("tag_name")
-    if isinstance(tag, str) and release_re.match(tag):
-        versions.append(tag)
-versions.sort(key=lambda v: tuple(int(part) for part in v.split(".")))
-if versions:
-    print(versions[-1])
-'
+  git ls-remote --tags --refs "$REFINE_REPO_URL" 2>/dev/null |
+    while read -r _ ref; do
+      ref="${ref#refs/tags/}"
+      is_semver_tag "$ref" && printf '%s\n' "$ref"
+    done |
+    latest_semver_from_lines
 }
 
 current_checkout_semver_tag() {
@@ -1290,47 +1205,6 @@ choose_target_app() {
   ok "Target app: $TARGET_APP_PATH"
 }
 
-configure_refine_setting() {
-  local key="$1"
-  local value="$2"
-  local port
-  port="$(resolve_refine_port)"
-  if dry_run; then
-    log_detail "${DIM}+ set Refine setting $key=$value on port $port${RESET}"
-    return 0
-  fi
-  REFINE_UI_PORT="$port" REFINE_UI_SCOPE="$port" REFINE_SETTING_KEY="$key" REFINE_SETTING_VALUE="$value" uv --project "$(refine_project_dir)" run python - <<'PY'
-import os
-from refine_server import config, db
-
-cfg = config.get(reload=True)
-db.init_db(cfg.sqlite_path)
-conn = db.connect(cfg.sqlite_path)
-try:
-    db.set_setting(conn, os.environ["REFINE_SETTING_KEY"], os.environ["REFINE_SETTING_VALUE"])
-finally:
-    conn.close()
-PY
-}
-
-configure_target_app_commands() {
-  if ! confirm "Configure target app run/build/status commands now" "n"; then
-    info "You can configure the application later in Refine Settings -> Application."
-    return 0
-  fi
-  local start_cmd stop_cmd rebuild_cmd status_cmd app_url
-  start_cmd="$(prompt "Start command" "")"
-  stop_cmd="$(prompt "Stop command" "")"
-  rebuild_cmd="$(prompt "Rebuild command" "")"
-  status_cmd="$(prompt "Status command" "")"
-  app_url="$(prompt "Application URL" "")"
-  [ -n "$start_cmd" ] && configure_refine_setting "target_app_start_command" "$start_cmd"
-  [ -n "$stop_cmd" ] && configure_refine_setting "target_app_stop_command" "$stop_cmd"
-  [ -n "$rebuild_cmd" ] && configure_refine_setting "target_app_rebuild_command" "$rebuild_cmd"
-  [ -n "$status_cmd" ] && configure_refine_setting "target_app_status_command" "$status_cmd"
-  [ -n "$app_url" ] && configure_refine_setting "target_app_url" "$app_url"
-}
-
 target_refine() {
   section "Refine target app"
   [ -d "$REFINE_CHECKOUT" ] || die_issue \
@@ -1352,15 +1226,12 @@ target_refine() {
     "Refine needs the target application directory to attach work to it." \
     "Check $TARGET_APP_PATH or choose another target app, then re-run install.sh." \
     "Target app missing: $TARGET_APP_PATH"
-  local port
-  port="$(resolve_refine_port)"
-  run uv --project "$(refine_project_dir)" run refine target "$TARGET_APP_PATH" --force --port "$port" || die_issue \
+  run ./r project attach "$TARGET_APP_PATH" --runtime-root run || die_issue \
     "Refine target attachment" \
     "Target attachment tells Refine which application repository it should manage." \
-    "Run manually: $(refine_manual_prefix) target $TARGET_APP_PATH --force --port $port" \
-    "refine target failed"
-  configure_refine_setting "agent_cli" "$SELECTED_PROVIDER"
-  configure_target_app_commands
+    "Run manually: $(refine_manual_prefix) project attach $TARGET_APP_PATH --runtime-root run" \
+    "refine project attach failed"
+  info "Configure provider selection and target-app commands in Refine Settings after startup."
 }
 
 start_refine() {
@@ -1368,38 +1239,38 @@ start_refine() {
   local port
   local refine_started="1"
   port="$(prompt "Refine port" "$(resolve_refine_port)")"
-  if has_systemd && confirm "Install Refine as a persistent service with: uv --project python run refine install $port" "y"; then
-    if run uv --project "$(refine_project_dir)" run refine install "$port"; then
+  if has_systemd && confirm "Prepare Refine as a persistent service with: ./r system install --target linux-cli-web" "y"; then
+    if run ./r system install --target linux-cli-web --runtime-root run; then
       ok "Refine installed as a persistent service"
     else
       warn_issue \
         "Persistent Refine service install" \
         "The persistent service keeps Refine running after terminal close and host restarts." \
-        "Run manually: $(refine_manual_prefix) install $port" \
+        "Run manually: $(refine_manual_prefix) system install --target linux-cli-web --runtime-root run" \
         "Persistent install failed. Trying non-installed background start."
-      if ! run uv --project "$(refine_project_dir)" run refine start "$port"; then
+      if ! run ./r system start --port "$port" --runtime-root run; then
         warn_issue \
           "Refine background start" \
           "Refine must be running for the browser UI." \
-          "Run manually: $(refine_manual_prefix) start $port" \
-          "Could not start Refine. Run manually: $(refine_manual_prefix) start $port"
+          "Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run" \
+          "Could not start Refine. Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run"
         refine_started="0"
       fi
     fi
   else
     if ! has_systemd; then
-      info "Persistent service install requires systemd. Starting with: uv --project python run refine start $port"
+      info "Persistent service install requires systemd. Starting with: ./r system start --port $port --runtime-root run"
     fi
-    if ! run uv --project "$(refine_project_dir)" run refine start "$port"; then
+    if ! run ./r system start --port "$port" --runtime-root run; then
       warn_issue \
         "Refine background start" \
         "Refine must be running for the browser UI." \
-        "Run manually: $(refine_manual_prefix) start $port" \
-        "Could not start Refine. Run manually: $(refine_manual_prefix) start $port"
+        "Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run" \
+        "Could not start Refine. Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run"
       refine_started="0"
     fi
   fi
-  run uv --project "$(refine_project_dir)" run refine status "$port" || true
+  run ./r system status --port "$port" --runtime-root run || true
   say
   if [ "$refine_started" = "1" ]; then
     ok "Open Refine: http://localhost:$port"
@@ -1415,7 +1286,7 @@ restart_refine_after_upgrade() {
   [ -n "$release" ] || release="the new release"
   port="$(resolve_refine_port)"
   if ! confirm "Restart Refine now to run $release" "y"; then
-    info "Refine was upgraded but not restarted. Restart later with: $(refine_manual_prefix) restart $port"
+    info "Refine was upgraded but not restarted. Restart later with: $(refine_manual_prefix) system restart --port $port --runtime-root run"
     return 0
   fi
   run cd "$REFINE_CHECKOUT" || die_issue \
@@ -1423,37 +1294,19 @@ restart_refine_after_upgrade() {
     "The installer needs to enter the Refine checkout before restarting Refine." \
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not enter $REFINE_CHECKOUT"
-  if run uv --project "$(refine_project_dir)" run refine restart "$port"; then
-    refresh_target_app_after_upgrade "$port"
+  if run ./r system restart --port "$port" --runtime-root run; then
+    ok "Refine restarted"
   else
     warn_issue \
     "Refine restart after upgrade" \
     "The running service must restart before it uses the upgraded Refine release." \
-    "Run manually: $(refine_manual_prefix) restart $port" \
-    "Could not restart Refine. Run manually: $(refine_manual_prefix) restart $port"
+    "Run manually: $(refine_manual_prefix) system restart --port $port --runtime-root run" \
+    "Could not restart Refine. Run manually: $(refine_manual_prefix) system restart --port $port --runtime-root run"
   fi
-}
-
-refresh_target_app_after_upgrade() {
-  local port="$1"
-  [ "$REFINE_UPDATE_TARGET_APP" != "0" ] || {
-    info "Skipping target application refresh after update."
-    return 0
-  }
-  section "Refresh target application"
-  run uv --project "$(refine_project_dir)" run refine app rebuild --port "$port" || warn_issue \
-    "Target application refresh after update" \
-    "The upgraded Refine runner should restart or rebuild the managed application so stale app state is cleared." \
-    "Run manually: $(refine_manual_prefix) app rebuild --port $port" \
-    "Could not refresh the target application. Run manually: $(refine_manual_prefix) app rebuild --port $port"
 }
 
 preflight() {
   section "System check"
-  local python_package="python3"
-  if [ "$(package_manager)" = "brew" ]; then
-    python_package="python"
-  fi
   if is_wsl; then
     ok "Running inside WSL"
   elif is_linux; then
@@ -1473,12 +1326,7 @@ preflight() {
     "Refine uses git to clone, update, and manage the Refine and target app repositories." \
     "Install git with your OS package manager, then re-run install.sh." \
     "git is required"
-  ensure_command python3 "$python_package" || die_issue \
-    "Python 3 install" \
-    "Refine is a Python application and the installer uses Python helper checks." \
-    "Install Python 3 with your OS package manager, then re-run install.sh." \
-    "Python 3 is required"
-  ensure_uv
+  ensure_cargo
 }
 
 provider_flow() {
@@ -1498,6 +1346,12 @@ provider_flow() {
     SELECTED_PROVIDER="$(choice "Provider" "$(first_provider_or_default "$installed_providers")" claude codex gemini copilot smoke-ai)"
   fi
   ensure_provider_cli "$SELECTED_PROVIDER" || true
+  run cd "$REFINE_CHECKOUT" || return 0
+  run ./r agent configure --provider "$SELECTED_PROVIDER" || warn_issue \
+    "AI provider configure check" \
+    "Provider configuration verifies that the selected agent CLI is known to native Refine." \
+    "Configure the provider manually after startup: $(refine_manual_prefix) agent configure --provider $SELECTED_PROVIDER" \
+    "Could not verify provider configuration for $SELECTED_PROVIDER"
 }
 
 main() {

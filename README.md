@@ -1,6 +1,6 @@
 # Refine – Your Team's Agentic Software Delivery System
 
-<img src="python/refine_ui/static/images/refine_logo_transparent.png" alt="refine" style="width: 100%; height: auto;">
+<img src="src/surfaces/web/static/images/refine_logo_transparent.png" alt="refine" style="width: 100%; height: auto;">
 
 refine is an agentic software delivery system that coordinates people and agents across distributed machines. Product, support, and customers — anyone who can articulate what the app does today vs what it should do instead - can make meaningful contributions to your software. Build new apps, implement features, and fix bugs while keeping feedback cheap, local, and repeatable.
 
@@ -18,7 +18,7 @@ Linux, macOS, or Ubuntu/WSL:
 curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
 ```
 
-The installer checks the host, installs or repairs missing tools when you approve, asks which AI provider to use, and starts Refine. Attach a target application from the browser Guide after startup.
+The installer checks the host, installs or repairs missing tools when you approve, and starts Refine. Attach a target application from the browser Guide after startup, or pass `REFINE_INSTALL_TARGET_APP=/path/to/app` to attach one during install.
 
 refine has a robust CLI:
 
