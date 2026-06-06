@@ -221,14 +221,18 @@ impl HostAgentProviderService {
         let stdout = output.stdout;
         let stderr = output.stderr;
         if !success {
-            let message = last_non_empty_line(&stderr)
+            let message = provider_error_message(&stdout, &stderr)
+                .or_else(|| last_non_empty_line(&stderr))
                 .or_else(|| last_non_empty_line(&stdout))
                 .unwrap_or_else(|| {
                     let exit = exit_code
                         .map(|code| code.to_string())
                         .unwrap_or_else(|| "unknown".to_string());
                     format!("provider command exited {exit}")
-                });
+            });
+            return Err(RefineError::Degraded(message));
+        }
+        if let Some(message) = provider_error_message(&stdout, &stderr) {
             return Err(RefineError::Degraded(message));
         }
         let final_text = extract_final_text(&stdout, output_format);
@@ -550,6 +554,44 @@ fn extract_final_text(stdout: &str, output_format: &str) -> String {
     }
 }
 
+fn provider_error_message(stdout: &str, stderr: &str) -> Option<String> {
+    for text in [stderr, stdout] {
+        for line in text.lines().rev() {
+            let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+                continue;
+            };
+            let Some(object) = event.as_object() else {
+                continue;
+            };
+            let is_error = object
+                .get("is_error")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            let has_api_error = object.get("api_error_status").is_some();
+            if !is_error && !has_api_error {
+                continue;
+            }
+            let message = object
+                .get("result")
+                .or_else(|| object.get("message"))
+                .or_else(|| object.get("error"))
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("provider returned an error");
+            let status = object
+                .get("api_error_status")
+                .and_then(|value| value.as_i64())
+                .map(|value| value.to_string());
+            return Some(match status {
+                Some(status) => format!("{message} ({status})"),
+                None => message.to_string(),
+            });
+        }
+    }
+    None
+}
+
 fn extract_provider_session_id(stdout: &str) -> Option<String> {
     for line in stdout.lines() {
         let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
@@ -703,6 +745,15 @@ mod tests {
             "{\"type\":\"assistant.message_delta\",\"data\":{\"deltaContent\":\"lo\"}}\n"
         );
         assert_eq!(extract_final_text(copilot, "copilot_json"), "hello");
+    }
+
+    #[test]
+    fn provider_error_message_summarizes_codex_api_error() {
+        let stdout = r#"{"type":"result","subtype":"success","is_error":true,"api_error_status":401,"result":"Invalid API key - Fix external API key"}"#;
+        assert_eq!(
+            provider_error_message(stdout, ""),
+            Some("Invalid API key - Fix external API key (401)".to_string())
+        );
     }
 
     #[test]

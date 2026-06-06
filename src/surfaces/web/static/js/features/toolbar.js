@@ -109,6 +109,22 @@ function reorderStandardToolbarTabs() {
   chatState.tabs = ordered;
 }
 
+function currentToolbarTab() {
+  ensureStandaloneTab();
+  let tab = chatState.tabs[chatState.activeTabId];
+  if (!tab) {
+    chatState.activeTabId = "standalone";
+    tab = chatState.tabs.standalone;
+  }
+  return ensureChatTabQueueState(tab);
+}
+
+function currentChatTab() {
+  const tab = currentToolbarTab();
+  if (!tab || tab.mode === "files" || tab.mode === "system") return null;
+  return tab;
+}
+
 function ensureChatTabQueueState(tab) {
   if (!tab) return tab;
   tab.queuedMessages = normalizeQueuedMessages(tab.queuedMessages);
@@ -435,11 +451,11 @@ async function startStandaloneChatSession(tab) {
   }
 }
 
-function ensureChatSession(tab) {
+async function ensureChatSession(tab) {
   if (!tab || tab.sessionId || tab.starting) return;
-  if (tab.mode === "plan") startPlanChatSession(tab);
-  else if (tab.gapId) startGapChatSession(tab);
-  else startStandaloneChatSession(tab);
+  if (tab.mode === "plan") await startPlanChatSession(tab);
+  else if (tab.gapId) await startGapChatSession(tab);
+  else await startStandaloneChatSession(tab);
 }
 
 function toggleToolbar() {
@@ -474,9 +490,9 @@ function drawToolbar() {
   const root = $("#toolbar-dock");
   if (!root) return;
   ensureStandaloneTab();
+  const active = currentToolbarTab();
   const tabs = chatState.tabs;
   const activeId = chatState.activeTabId;
-  const active = tabs[activeId] || tabs.standalone;
   const filesActive = active.mode === "files";
   const systemActive = active.mode === "system";
   const hasSession = !!active.sessionId;
@@ -590,6 +606,7 @@ function drawToolbar() {
         sendChatLine();
       }
     });
+    $("#btn-chat-send")?.addEventListener("click", sendChatLine);
     $("#chat-input")?.addEventListener("input", (e) => {
       resizeChatInput(e.currentTarget);
     });
@@ -683,6 +700,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
                     rows="2"
                     placeholder="${htmlEscape(inputPlaceholder)}"></textarea>
         </div>
+        <button id="btn-chat-send" class="primary">Send</button>
       </div>
     `;
 }
@@ -1682,6 +1700,7 @@ function applyPendingIndicator(tab) {
   const dots = $("#chat-input-pending-dots");
   const label = $("#chat-activity-label");
   const input = $("#chat-input");
+  const send = $("#btn-chat-send");
   if (toggle) {
     toggle.hidden = !tab || !(tab.sessionId || tab.progress);
     toggle.setAttribute("aria-expanded", tab?.showProgress === false ? "false" : "true");
@@ -1694,6 +1713,7 @@ function applyPendingIndicator(tab) {
     input.placeholder = chatInputPlaceholder(tab);
     input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));
   }
+  if (send) send.disabled = !tab;
   syncChatActionButtons(tab);
 }
 
@@ -1768,7 +1788,7 @@ async function closeChatTab(tabId) {
 }
 
 async function clearActiveChat() {
-  const t = chatState.tabs[chatState.activeTabId];
+  const t = currentChatTab();
   if (!t) return;
   if (!t.output && !t.progress && !t.sessionId && !allQueuedMessages(t).length) return;
   const btn = $("#btn-chat-clear");
@@ -1800,7 +1820,7 @@ async function clearActiveChat() {
 }
 
 async function toggleActiveChat() {
-  const t = chatState.tabs[chatState.activeTabId];
+  const t = currentChatTab();
   if (!t) return;
   const btn = $("#btn-chat-toggle");
   if (t.sessionId) {
@@ -1815,7 +1835,7 @@ async function toggleActiveChat() {
     return;
   }
   await withButtonBusy(btn, "Starting…", async () => {
-    ensureChatSession(t);
+    await ensureChatSession(t);
   });
 }
 
@@ -2130,7 +2150,7 @@ async function pollChat() {
 }
 
 async function sendChatLine() {
-  const t = chatState.tabs[chatState.activeTabId];
+  const t = currentChatTab();
   if (!t) return;
   const input = $("#chat-input");
   const text = input.value;
@@ -2141,7 +2161,7 @@ async function sendChatLine() {
 }
 
 async function saveQueuedChatMessage(messageId) {
-  const tab = chatState.tabs[chatState.activeTabId];
+  const tab = currentChatTab();
   if (!tab || !messageId) return;
   const row = document.querySelector(`[data-queued-message-id="${cssEscape(messageId)}"]`);
   const text = row?.querySelector("[data-queued-message-text]")?.value || "";
@@ -2173,7 +2193,7 @@ async function saveQueuedChatMessage(messageId) {
 }
 
 async function removeQueuedChatMessage(messageId) {
-  const tab = chatState.tabs[chatState.activeTabId];
+  const tab = currentChatTab();
   if (!tab || !messageId) return;
   const row = document.querySelector(`[data-queued-message-id="${cssEscape(messageId)}"]`);
   const isLocal = row?.dataset.queuedMessageLocal === "1";
@@ -2200,7 +2220,7 @@ function cssEscape(value) {
 }
 
 async function sendChatText(text) {
-  const t = chatState.tabs[chatState.activeTabId];
+  const t = currentChatTab();
   if (!t) return;
   text = String(text || "");
   if (!text.trim()) return;
