@@ -171,6 +171,108 @@ fn web_server_route_groups_cover_static_web_surface() {
     ] {
         assert!(groups.contains(prefix), "missing route group {prefix}");
     }
+
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static/js");
+    let guide = fs::read_to_string(static_root.join("features/guide.js")).unwrap();
+    let guide_ids = extract_prefixed_string_literals(&guide, "guideItem(\"")
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut settings_ids = std::collections::BTreeSet::new();
+    for entry in fs::read_dir(static_root.join("features")).unwrap() {
+        let entry = entry.unwrap();
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !name.starts_with("settings") || !name.ends_with(".js") {
+            continue;
+        }
+        let source = fs::read_to_string(entry.path()).unwrap();
+        settings_ids.extend(extract_settings_guide_label_ids(&source));
+        settings_ids.extend(extract_prefixed_string_literals(&source, "guideItemId: \""));
+    }
+    let missing_ids = settings_ids
+        .difference(&guide_ids)
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(
+        missing_ids.is_empty(),
+        "settings Guide labels without guideItem targets: {missing_ids:?}"
+    );
+
+    let guide_hashes = extract_prefixed_string_literals(&guide, "hash: \"");
+    let stale_hashes = guide_hashes
+        .into_iter()
+        .filter(|hash| {
+            hash.starts_with("#/system")
+                || hash.starts_with("#/settings")
+                || hash.starts_with("#/project/application")
+                || hash.starts_with("#/node/nodes")
+                || hash.contains("application-config")
+                || hash.contains("target-app-config")
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        stale_hashes.is_empty(),
+        "Guide targets point at removed screen locations: {stale_hashes:?}"
+    );
+}
+
+fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut rest = source;
+    while let Some(idx) = rest.find(prefix) {
+        let after = &rest[idx + prefix.len()..];
+        let Some(end) = after.find('"') else { break };
+        values.push(after[..end].to_string());
+        rest = &after[end + 1..];
+    }
+    values
+}
+
+fn extract_settings_guide_label_ids(source: &str) -> Vec<String> {
+    let mut ids = Vec::new();
+    let mut rest = source;
+    while let Some(idx) = rest.find("renderSettingsGuideLabel(") {
+        let after = &rest[idx + "renderSettingsGuideLabel(".len()..];
+        if !after.trim_start().starts_with('"') {
+            rest = &after[1..];
+            continue;
+        }
+        let window = &after[..after.len().min(600)];
+        let literals = string_literals(window);
+        if let Some(id) = literals.get(1).filter(|id| !id.is_empty()) {
+            ids.push(id.clone());
+        }
+        rest = &after[1..];
+    }
+    ids
+}
+
+fn string_literals(source: &str) -> Vec<String> {
+    let mut values = Vec::new();
+    let mut chars = source.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch != '"' {
+            continue;
+        }
+        let mut value = String::new();
+        let mut escaped = false;
+        for ch in chars.by_ref() {
+            if escaped {
+                value.push(ch);
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == '"' {
+                break;
+            }
+            value.push(ch);
+        }
+        values.push(value);
+    }
+    values
 }
 
 #[test]

@@ -77,6 +77,11 @@ const GUIDE_CATEGORIES = [
         "Nodes separate machine-local ownership, runtime configuration, reporters, and application commands while sharing project-level policy.",
         "Default: keep one active node unless another machine or environment needs separate ownership.",
         { hash: "#/node/application", selector: "#node-add" }),
+      guideItem("cluster-manage", "Cluster", "Educate and configure",
+        "Cluster lists remote nodes that can be bootstrapped or maintained over SSH for the same target app.",
+        "Default: no cluster nodes unless the project needs remote Refine nodes.",
+        { hash: "#/node/application", selector: "#cluster-node-add" },
+        { canUseDefault: false }),
       guideItem("project-application", "Application", "Educate",
         "Add an existing app path, paste a Git clone URL, or create a new directory. refine will attach the app and initialize .refine state when needed.",
         "Default: keep the current app unless you are setting up a new target app.",
@@ -138,6 +143,10 @@ const GUIDE_CATEGORIES = [
         "Automatic rebuild controls when merged work is rebuilt before review.",
         "Default: on worktree merge.",
         { hash: "#/node/target-app", selector: "#s-target-auto-rebuild" }),
+      guideItem("application-auto-rebuild-time", "Daily rebuild time", "Educate and optional config",
+        "Daily rebuild time chooses the UTC whole-hour rebuild window when Automatic application rebuild is set to Daily.",
+        "Default: 00:00 UTC.",
+        { hash: "#/node/target-app", selector: "#s-target-auto-rebuild-hour-utc" }),
       guideItem("application-status", "Status command", "Educate and configure",
         "The status command exits 0 only when the app is healthy or running. It is the most deterministic health check when available.",
         "Default: blank until a reliable local status command exists.",
@@ -711,7 +720,7 @@ function initGuide() {
     e.preventDefault();
     e.stopPropagation();
     const itemId = button.dataset.guideLabelItem || "";
-    if (itemId) openGuide({ itemId, openTarget: false });
+    if (itemId) openGuide({ itemId });
   });
 }
 
