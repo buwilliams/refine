@@ -701,8 +701,6 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
         #[arg(long)]
-        token: Option<String>,
-        #[arg(long)]
         once: bool,
         #[arg(long)]
         foreground: bool,

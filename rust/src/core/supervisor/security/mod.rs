@@ -12,18 +12,11 @@ use crate::core::host::process_supervision::{
 };
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::sessions::{active_session_tokens, validate_session_token};
 
 pub const SECURITY_AUDIT_FILE: &str = "security-audit.jsonl";
 pub const SECRET_INDEX_FILE: &str = "secret-index.json";
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AuthToken {
-    pub token: String,
-}
-
 pub trait SecurityService {
-    fn authorize_mutation(&self, token: &AuthToken, command: &str) -> RefineResult<()>;
     fn redact(&self, value: &str) -> String;
     fn audit(&self, actor: &str, command: &str) -> RefineResult<()>;
 }
@@ -559,31 +552,8 @@ impl FileSecurityService {
 }
 
 impl SecurityService for FileSecurityService {
-    fn authorize_mutation(&self, token: &AuthToken, command: &str) -> RefineResult<()> {
-        let command = command.trim();
-        if command.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "authorized command is required".to_string(),
-            ));
-        }
-        validate_session_token(&self.runtime_root, &token.token)?;
-        if !self.allowed_commands.is_empty() && !self.allowed_commands.contains(command) {
-            self.append_audit_event("local_surface", command, "denied")?;
-            return Err(RefineError::Unauthorized(format!(
-                "command {command} is not authorized for this surface"
-            )));
-        }
-        self.append_audit_event("local_surface", command, "authorized")
-    }
-
     fn redact(&self, value: &str) -> String {
-        let mut redacted = value.to_string();
-        if let Ok(tokens) = active_session_tokens(&self.runtime_root) {
-            for token in tokens {
-                redacted = redacted.replace(&token, "[redacted]");
-            }
-        }
-        redact_assignment(&redacted, "token")
+        redact_assignment(value, "token")
     }
 
     fn audit(&self, actor: &str, command: &str) -> RefineResult<()> {
@@ -806,41 +776,17 @@ fn run_managed_command(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::supervisor::sessions::{FileSessionService, SessionService, SurfaceKind};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
-    fn file_security_service_authorizes_local_session_tokens_and_audits() {
+    fn file_security_service_audits_and_enforces_host_command_allowlist() {
         let temp_root = unique_temp_dir("security");
-        let sessions = FileSessionService::new(&temp_root, "http://127.0.0.1:8080");
-        let session = sessions
-            .authenticate_local_surface(SurfaceKind::Browser)
-            .unwrap();
         let security =
             FileSecurityService::with_allowed_commands(&temp_root, ["gap.create", "gap.edit"]);
 
-        security
-            .authorize_mutation(
-                &AuthToken {
-                    token: session.token.clone(),
-                },
-                "gap.create",
-            )
-            .unwrap();
-        assert!(
-            security
-                .authorize_mutation(
-                    &AuthToken {
-                        token: session.token.clone(),
-                    },
-                    "system.shell"
-                )
-                .is_err()
-        );
-        assert!(
-            security
-                .redact(&format!("Authorization token={}", session.token))
-                .contains("[redacted]")
+        assert_eq!(
+            security.redact("Authorization token=secret"),
+            "Authorization token=[redacted]"
         );
         security.audit("cli", "gap.edit").unwrap();
         security
@@ -857,26 +803,6 @@ mod tests {
         assert!(audit.contains("recorded"));
 
         fs::remove_dir_all(temp_root).unwrap();
-    }
-
-    #[test]
-    fn file_security_service_rejects_unknown_tokens() {
-        let temp_root = unique_temp_dir("security-unknown");
-        let security = FileSecurityService::new(&temp_root);
-
-        assert!(
-            security
-                .authorize_mutation(
-                    &AuthToken {
-                        token: "missing".to_string(),
-                    },
-                    "gap.create"
-                )
-                .is_err()
-        );
-        assert!(security.audit("", "gap.create").is_err());
-
-        fs::remove_dir_all(temp_root).unwrap_or(());
     }
 
     #[test]

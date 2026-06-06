@@ -791,19 +791,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     cache_dir,
                     static_root,
                     runtime_root,
-                    token,
                     once,
                     foreground,
                 },
-        } => run_system_start(
-            port,
-            cache_dir,
-            static_root,
-            runtime_root,
-            token,
-            once,
-            foreground,
-        ),
+        } => run_system_start(port, cache_dir, static_root, runtime_root, once, foreground),
         Commands::System {
             action: SystemAction::Stop { port, runtime_root },
         } => {
@@ -1578,7 +1569,6 @@ fn run_system_start(
     cache_dir: Option<PathBuf>,
     static_root: Option<PathBuf>,
     runtime_root: PathBuf,
-    token: Option<String>,
     once: bool,
     foreground: bool,
 ) -> RefineResult<()> {
@@ -1590,7 +1580,6 @@ fn run_system_start(
             port,
             cache_dir,
             static_root,
-            token,
         })?;
         println!(
             "{}",
@@ -1620,7 +1609,6 @@ fn run_system_start(
         server: InProcessWebServer {
             status,
             projection: snapshot,
-            auth_token: token,
             durable_root: None,
             runtime_root: Some(runtime_root),
         },
@@ -2280,22 +2268,13 @@ fn daemon_json(
         })?
         .unwrap_or_default();
     let port = daemon_port();
-    let auth_token = if method == "GET" {
-        None
-    } else {
-        Some(daemon_session_token(port)?)
-    };
     let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
         RefineError::Degraded(format!(
             "Refine daemon is not reachable at http://127.0.0.1:{port}: {error}"
         ))
     })?;
-    let auth_header = auth_token
-        .as_ref()
-        .map(|token| format!("Authorization: Bearer {token}\r\n"))
-        .unwrap_or_default();
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\n{auth_header}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: cli-{}\r\n\r\n",
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: cli-{}\r\n\r\n",
         body_bytes.len(),
         new_cli_idempotency_key()
     );
@@ -2308,40 +2287,6 @@ fn daemon_json(
         .read_to_end(&mut response)
         .map_err(|error| RefineError::Io(format!("failed to read daemon response: {error}")))?;
     parse_daemon_response(&response)
-}
-
-fn daemon_session_token(port: u16) -> RefineResult<String> {
-    let body_bytes = serde_json::to_vec(&json!({ "surface": "cli" })).map_err(|error| {
-        RefineError::Serialization(format!("failed to encode daemon session request: {error}"))
-    })?;
-    let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
-        RefineError::Degraded(format!(
-            "Refine daemon is not reachable at http://127.0.0.1:{port}: {error}"
-        ))
-    })?;
-    let request = format!(
-        "POST /sessions HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\n\r\n",
-        body_bytes.len()
-    );
-    stream
-        .write_all(request.as_bytes())
-        .and_then(|_| stream.write_all(&body_bytes))
-        .map_err(|error| {
-            RefineError::Io(format!("failed to write daemon session request: {error}"))
-        })?;
-    let mut response = Vec::new();
-    stream.read_to_end(&mut response).map_err(|error| {
-        RefineError::Io(format!("failed to read daemon session response: {error}"))
-    })?;
-    let value = parse_daemon_response(&response)?;
-    value
-        .get("session")
-        .and_then(|session| session.get("token"))
-        .and_then(|token| token.as_str())
-        .map(str::to_string)
-        .ok_or_else(|| {
-            RefineError::Serialization("daemon session response missing token".to_string())
-        })
 }
 
 fn daemon_port() -> u16 {

@@ -100,6 +100,7 @@ fn system_start_owns_foreground_web_options() {
     assert!(Cli::try_parse_from(["refine", "system", "web"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "web", "--durable-root", ".refine"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "serve", "--once"]).is_err());
+    assert!(Cli::try_parse_from(["refine", "system", "start", "--token", "secret"]).is_err());
 }
 
 #[test]

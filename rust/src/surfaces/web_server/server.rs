@@ -7,19 +7,6 @@ impl InProcessWebServer {
     pub fn handle(&self, mut request: ApiRequest) -> ApiResponse {
         let raw_path = request.path.clone();
         request.path = normalize_api_path(&request.path);
-        if request.method != "GET" || protected_get_route(&request.path) {
-            if !is_unauthenticated_mutation(&request.path) && !self.authorized(&request) {
-                return ApiResponse::json(
-                    401,
-                    json!({
-                        "error": {
-                            "code": "unauthorized",
-                            "message": "request requires local authorization"
-                        }
-                    }),
-                );
-            }
-        }
 
         if request.method == "GET" && request.path == "/system/version" {
             return ApiResponse::json(
@@ -31,10 +18,6 @@ impl InProcessWebServer {
                     "supported_api_contract_versions": [API_CONTRACT_VERSION]
                 }),
             );
-        }
-
-        if request.method == "POST" && request.path == "/sessions" {
-            return self.handle_session_create(request);
         }
 
         if request.method == "POST" && request.path == "/workflow/schedule" {

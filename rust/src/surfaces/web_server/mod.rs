@@ -67,7 +67,6 @@ pub trait LocalDaemonWebServer {
 pub struct ApiRequest {
     pub method: String,
     pub path: String,
-    pub auth_token: Option<String>,
     pub body: Option<serde_json::Value>,
 }
 
@@ -108,7 +107,6 @@ struct ApiMutationEvent {
 pub struct InProcessWebServer {
     pub status: DaemonStatus,
     pub projection: ProjectionSnapshot,
-    pub auth_token: Option<String>,
     /// Test/bootstrap fixture root. The served daemon resolves real app state
     /// from the runtime app registry at request time.
     pub durable_root: Option<PathBuf>,

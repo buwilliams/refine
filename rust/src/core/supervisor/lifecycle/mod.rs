@@ -32,7 +32,6 @@ pub struct BackgroundDaemonConfig {
     pub port: u16,
     pub cache_dir: Option<PathBuf>,
     pub static_root: Option<PathBuf>,
-    pub token: Option<String>,
 }
 
 pub trait DaemonLifecycleService {
@@ -101,10 +100,6 @@ impl FileDaemonLifecycleService {
         if let Some(static_root) = config.static_root {
             args.push("--static-root".to_string());
             args.push(static_root.display().to_string());
-        }
-        if let Some(token) = config.token {
-            args.push("--token".to_string());
-            args.push(token);
         }
         let supervisor = FileProcessSupervisor::new(runtime_root);
         let process = supervisor.launch(ManagedProcessSpec {

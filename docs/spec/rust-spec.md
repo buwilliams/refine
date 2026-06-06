@@ -146,6 +146,15 @@ small explicit groups such as `refine system` for daemon lifecycle,
 installation, update, status, and recovery. These commands are allowed because
 they operate on Refine as installed software rather than on a project model.
 
+`refine system start` is the public command for starting the local Refine
+daemon. Starting the daemon also starts the daemon's local web/API server; this
+is not a separate product mode. `system start` may expose foreground,
+single-request, static-asset, cache, runtime-root, and port options needed by
+development, tests, installers, and service managers. There should not be a
+separate public `refine system web` command. Service metadata and daemon
+bootstrap paths should use `refine system start --foreground` when they need a
+long-running foreground process.
+
 ## System Model
 
 ```text
@@ -158,7 +167,7 @@ Desktop shell      Browser UI          CLI
                       |
               local web server
      HTTP, SSE, static assets,
-     auth, request parsing, response shaping
+     local-origin checks, request parsing, response shaping
                       |
                     core
    supervisor, product workflow, host adapters,
@@ -530,7 +539,13 @@ Requirements:
 
 - One daemon owns one port-scoped local Refine runtime authority, matching the
   current Python runtime model.
-- The daemon exposes local authenticated web-server routes for surfaces.
+- The daemon exposes local web-server routes for surfaces. The supported
+  boundary is loopback/local access, not per-surface API authorization.
+- Starting the daemon starts this local web/API server. Running without opening
+  a browser is still a normal daemon start; running without the local
+  web/API server is not a supported public mode.
+- Foreground daemon execution is a lifecycle option for service managers,
+  tests, and development, not a separate daemon mode.
 - Status distinguishes daemon health, web availability, worker state, target-app
   state, active operations, and degraded integrations.
 - Restart preserves attached app selection and running operation records.
@@ -538,18 +553,18 @@ Requirements:
 - Stop terminates or detaches managed processes according to their ownership
   policy.
 
-### Surface Session
+### Surface Events
 
-Module: `core::supervisor::sessions`; path: `rust/src/core/supervisor/sessions/`.
+Module: `core::supervisor::runtime`; path: `rust/src/core/supervisor/runtime/`.
 
-Owns abstractions for: open UI, authenticate local surface, stream state, deliver
-notifications.
+Owns abstractions for: open UI, stream state, deliver notifications, and surface
+runtime context.
 
 Requirements:
 
-- Desktop, browser, and CLI use a shared local auth model.
-- The daemon should not expose unauthenticated mutation APIs on a public
-  interface.
+- Desktop, browser, and CLI use the same local daemon routes.
+- The daemon must bind and expose supported HTTP APIs only as a local control
+  surface. Local mutation routes do not require authorization tokens.
 - Web UI can stream activity, process output, job progress, and chat events.
 - Desktop can subscribe to events for badges, tray state, and notifications.
 
@@ -656,6 +671,15 @@ Requirements:
   helper processes directly.
 - Managed processes have typed ownership: daemon, target app, agent, quality,
   import, maintenance, or user-initiated helper.
+- Daemon bootstrap, provider CLIs, target-app commands, quality checks, Git and
+  SSH maintenance commands, service-manager commands, diagnostics probes, and
+  native secret-store command helpers should enter through process supervision
+  unless they are inside the process-supervision backend itself.
+- Short-lived commands still produce managed process records with captured
+  stdout, stderr, exit status, ownership, and command context.
+- Sensitive commands, such as native secret-store operations, must redact
+  command details and avoid persisting secret stdin or token-bearing arguments
+  in process records.
 - Process groups, child cleanup, stdout/stderr streaming, stdin, exit status,
   resource limits, and cancellation are modeled explicitly.
 - Resource isolation is capability-detected by OS backend.
@@ -763,12 +787,11 @@ Requirements:
 
 Module: `core::supervisor::security`; path: `rust/src/core/supervisor/security/`.
 
-Owns abstractions for: local auth, secret storage, command authorization, audit.
+Owns abstractions for: secret storage, command allowlists, redaction, and audit.
 
 Requirements:
 
-- Local mutation APIs require an authorization token or equivalent local trust
-  mechanism.
+- Local daemon HTTP mutation APIs do not require authorization tokens.
 - Desktop should store tokens and provider-related local secrets in OS-native
   secret storage when Refine owns them.
 - Command execution must pass through explicit capability APIs.
@@ -848,7 +871,6 @@ refine/
           cluster/
         supervisor/
           lifecycle/
-          sessions/
           jobs/
           security/
           runtime/
@@ -909,7 +931,7 @@ surfaces
   surfaces::{cli, desktop, web, web_server}
       |
 core
-  core::supervisor::{lifecycle, sessions, jobs, security, runtime, config}
+  core::supervisor::{lifecycle, jobs, security, runtime, config}
   core::product::{work_items, scheduling, project_state, ...}
   core::host::{process_supervision, target_apps, git_worktrees, ...}
       |
@@ -931,9 +953,8 @@ Rules:
 - `core::host::*` modules own OS, Git, process, provider, browser, Docker,
   toolchain, target-app, quality, and cluster integration using model-defined
   process and ownership types.
-- `core::supervisor::*` modules own daemon authority, runtime lifecycle,
-  sessions, jobs, security, configuration, error translation, and testing
-  support.
+- `core::supervisor::*` modules own daemon authority, runtime lifecycle, jobs,
+  security, configuration, error translation, and testing support.
 - `core::observability::*` modules own the single abstraction for logs,
   activity, metrics, diagnostics, and support bundles. Processing modules emit
   through this abstraction; model modules do not.
@@ -982,8 +1003,8 @@ product capability:
   `rust/src/surfaces/web/static/`.
 - `surfaces::web_server`; path: `rust/src/surfaces/web_server/`. Owns the
   local daemon web server: HTTP routes, server-sent-event streams, static asset
-  serving, auth extraction, request parsing, response shaping, and translation
-  into supervisor and core services.
+  serving, local-origin checks, request parsing, response shaping, and
+  translation into supervisor and core services.
 
 `rust/xtask/` should contain repository automation that is not part of the
 shipped product: code generation, API contract export, fixture refresh, release
@@ -1000,8 +1021,8 @@ Responsibilities:
 - Expose HTTP routes for request/response operations.
 - Expose server-sent-event streams for operation events, logs, chat, and UI
   updates.
-- Handle auth, local-origin checks, request parsing, response shaping, and API
-  version negotiation.
+- Handle local-origin checks, request parsing, response shaping, and API version
+  negotiation.
 - Translate transport requests into supervisor-facing core services.
 - Keep route handlers thin; workflow logic, state mutation, process lifecycle,
   provider execution, Git behavior, and storage orchestration belong in
@@ -1011,6 +1032,12 @@ The CLI should normally talk to the same daemon web server using structured
 HTTP/JSON contracts. It may run limited bootstrap commands when the daemon is
 not available, such as locating the checkout runtime, starting the daemon, or
 printing diagnostics from local runtime files.
+
+The local daemon web server is part of daemon lifecycle. CLI bootstrap should
+use `refine system start` to create the port-scoped daemon and
+`refine system start --foreground` for service-manager, test, and development
+foreground execution. The CLI should not expose a separate user-facing
+`system web` command for the same behavior.
 
 The daemon API does not have to mirror the CLI command tree. API groups can be
 transport- and capability-oriented where that produces cleaner contracts, while

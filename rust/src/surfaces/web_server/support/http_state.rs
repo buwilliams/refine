@@ -8,7 +8,6 @@ use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSuper
 use crate::core::product::chat::ChatSessionRecord;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
-use crate::core::supervisor::sessions::SurfaceKind;
 
 use super::super::http::HttpRequest;
 use super::super::*;
@@ -68,8 +67,6 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
         format!("/agents{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/settings") {
         format!("/settings{rest}")
-    } else if let Some(rest) = path.strip_prefix("/api/sessions") {
-        format!("/sessions{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/workflow") {
         format!("/workflow{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/system") {
@@ -86,25 +83,6 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
             .unwrap_or(normalized);
     }
     normalized
-}
-
-pub(in crate::surfaces::web_server) fn is_unauthenticated_mutation(path: &str) -> bool {
-    matches!(path, "/activity/ui-error" | "/sessions")
-}
-
-pub(in crate::surfaces::web_server) fn protected_get_route(path: &str) -> bool {
-    path == "/agents/secrets"
-        || path == "/agents/secrets/status"
-        || path.starts_with("/agents/secrets/")
-}
-
-pub(in crate::surfaces::web_server) fn parse_surface_kind(value: &str) -> Option<SurfaceKind> {
-    match value {
-        "desktop" => Some(SurfaceKind::Desktop),
-        "browser" => Some(SurfaceKind::Browser),
-        "cli" => Some(SurfaceKind::Cli),
-        _ => None,
-    }
 }
 
 pub(in crate::surfaces::web_server) fn local_origin_allowed(request: &HttpRequest) -> bool {

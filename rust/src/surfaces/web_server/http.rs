@@ -179,12 +179,6 @@ impl LocalHttpDaemon {
             return response;
         }
 
-        let auth_token = request
-            .headers
-            .get("authorization")
-            .and_then(|header| header.strip_prefix("Bearer "))
-            .map(str::to_string)
-            .or_else(|| request.headers.get("x-refine-token").cloned());
         let idempotency_key = request.headers.get("idempotency-key").cloned();
         let fingerprint = idempotency_key.as_ref().map(|_| {
             idempotency_fingerprint(
@@ -223,7 +217,6 @@ impl LocalHttpDaemon {
         let response = self.server.handle(ApiRequest {
             method: request.method,
             path: request.path,
-            auth_token,
             body: request
                 .body
                 .and_then(|body| serde_json::from_slice(&body).ok()),

@@ -86,7 +86,6 @@ fn web_server_routes_work_gap_queries_through_projection() {
     let response = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/work/gaps".to_string(),
-        auth_token: None,
         body: None,
     });
 
@@ -99,7 +98,6 @@ fn web_server_routes_work_gap_queries_through_projection() {
         method: "GET".to_string(),
         path: "/api/gaps?reporter=Alice&feature=FEA1&rounds_gte=2&sort=priority&dir=desc&limit=1"
             .to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(filtered.status, 200);
@@ -111,7 +109,6 @@ fn web_server_routes_work_gap_queries_through_projection() {
     let features = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/features?q=settings&status=done&reporter=Alice&node=node-b".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(features.status, 200);
@@ -120,85 +117,15 @@ fn web_server_routes_work_gap_queries_through_projection() {
 }
 
 #[test]
-fn web_server_rejects_unauthorized_mutations() {
-    let response = server_with_projection().handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/work/gaps".to_string(),
-        auth_token: None,
-        body: None,
-    });
-
-    assert_eq!(response.status, 401);
-    assert_eq!(response.body["error"]["code"], "unauthorized");
-}
-
-#[test]
-fn web_server_issues_session_tokens_for_local_surface_mutations() {
-    let temp_root = unique_temp_dir("http-session-auth");
-    let durable_root = temp_root.join(".refine");
-    let runtime_root = temp_root.join("run/8080");
-    let mut server = server_with_projection();
-    server.auth_token = None;
-    server.durable_root = Some(durable_root.clone());
-    server.runtime_root = Some(runtime_root.clone());
-
-    let session = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/sessions".to_string(),
-        auth_token: None,
-        body: Some(json!({"surface": "desktop"})),
-    });
-    assert_eq!(session.status, 201);
-    let token = session.body["session"]["token"]
-        .as_str()
-        .unwrap()
-        .to_string();
-
-    let create = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        auth_token: Some(token),
-        body: Some(json!({"id": "GAP1", "name": "Session API Gap"})),
-    });
-    assert_eq!(create.status, 201);
-    assert!(durable_root.join("gaps/GA/P1/gap.json").exists());
-    assert!(runtime_root.join("surface-sessions.json").exists());
-    assert!(runtime_root.join("security-audit.jsonl").exists());
-
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
-fn web_server_manages_agent_secrets_with_local_auth() {
+fn web_server_manages_agent_secrets() {
     let temp_root = unique_temp_dir("http-agent-secrets");
     let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
-    server.auth_token = None;
     server.runtime_root = Some(runtime_root.clone());
-
-    let unauthorized = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/agents/secrets".to_string(),
-        auth_token: None,
-        body: None,
-    });
-    assert_eq!(unauthorized.status, 401);
-
-    let session = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/sessions".to_string(),
-        auth_token: None,
-        body: Some(json!({"surface": "cli"})),
-    });
-    let token = session.body["session"]["token"]
-        .as_str()
-        .unwrap()
-        .to_string();
 
     let put = server.handle(ApiRequest {
         method: "PUT".to_string(),
         path: "/api/agents/secrets/provider/smoke_ai_token".to_string(),
-        auth_token: Some(token.clone()),
         body: Some(json!({"value": "secret-value"})),
     });
     assert_eq!(put.status, 200);
@@ -207,7 +134,6 @@ fn web_server_manages_agent_secrets_with_local_auth() {
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/agents/secrets".to_string(),
-        auth_token: Some(token.clone()),
         body: None,
     });
     assert_eq!(listed.status, 200);
@@ -222,7 +148,6 @@ fn web_server_manages_agent_secrets_with_local_auth() {
     let revealed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/agents/secrets/provider/smoke_ai_token".to_string(),
-        auth_token: Some(token.clone()),
         body: None,
     });
     assert_eq!(revealed.status, 200);
@@ -231,7 +156,6 @@ fn web_server_manages_agent_secrets_with_local_auth() {
     let deleted = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/api/agents/secrets/provider/smoke_ai_token".to_string(),
-        auth_token: Some(token),
         body: None,
     });
     assert_eq!(deleted.status, 200);
@@ -285,10 +209,7 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
         static_root: None,
     };
     let body = br#"{"id":"GAP1","name":"Idempotent Gap"}"#.to_vec();
-    let headers = BTreeMap::from([
-        ("authorization".to_string(), "Bearer secret".to_string()),
-        ("idempotency-key".to_string(), "create-gap-1".to_string()),
-    ]);
+    let headers = BTreeMap::from([("idempotency-key".to_string(), "create-gap-1".to_string())]);
 
     let first = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
@@ -340,13 +261,10 @@ fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
         server,
         static_root: None,
     };
-    let headers = BTreeMap::from([
-        ("authorization".to_string(), "Bearer secret".to_string()),
-        (
-            "idempotency-key".to_string(),
-            "create-gap-conflict".to_string(),
-        ),
-    ]);
+    let headers = BTreeMap::from([(
+        "idempotency-key".to_string(),
+        "create-gap-conflict".to_string(),
+    )]);
 
     let first = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
@@ -384,7 +302,7 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
     let create = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        headers: BTreeMap::from([("authorization".to_string(), "Bearer secret".to_string())]),
+        headers: BTreeMap::new(),
         body: Some(br#"{"id":"GAP1","name":"SSE Gap"}"#.to_vec()),
     });
     assert_eq!(create.status, 201);
@@ -502,7 +420,7 @@ fn local_http_daemon_serves_static_assets() {
 }
 
 #[test]
-fn web_server_transitions_gap_with_local_auth_and_durable_root() {
+fn web_server_transitions_gap_and_durable_root() {
     let temp_root = unique_temp_dir("http-transition");
     let durable_root = temp_root.join(".refine");
     let gap_dir = durable_root.join("gaps").join("01").join("GAP1");
@@ -530,7 +448,6 @@ fn web_server_transitions_gap_with_local_auth_and_durable_root() {
     let response = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps/GAP1/transition".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"status": "todo"})),
     });
 
@@ -545,7 +462,7 @@ fn web_server_transitions_gap_with_local_auth_and_durable_root() {
 }
 
 #[test]
-fn web_server_creates_and_shows_gap_with_local_auth() {
+fn web_server_creates_and_shows_gap() {
     let temp_root = unique_temp_dir("http-create-show");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -554,7 +471,6 @@ fn web_server_creates_and_shows_gap_with_local_auth() {
     let create = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Created by API"})),
     });
     assert_eq!(create.status, 201);
@@ -564,7 +480,6 @@ fn web_server_creates_and_shows_gap_with_local_auth() {
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/work/gaps/GAP1".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(show.status, 200);
@@ -574,7 +489,7 @@ fn web_server_creates_and_shows_gap_with_local_auth() {
 }
 
 #[test]
-fn web_server_edits_notes_and_deletes_gap_with_local_auth() {
+fn web_server_edits_notes_and_deletes_gap() {
     let temp_root = unique_temp_dir("http-edit-note-delete");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -582,14 +497,12 @@ fn web_server_edits_notes_and_deletes_gap_with_local_auth() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Original"})),
     });
 
     let edit = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/work/gaps/GAP1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"name": "Renamed", "priority": "high"})),
     });
     assert_eq!(edit.status, 200);
@@ -599,7 +512,6 @@ fn web_server_edits_notes_and_deletes_gap_with_local_auth() {
     let note = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps/GAP1/notes".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"author": "Reviewer", "body": "Needs context"})),
     });
     assert_eq!(note.status, 200);
@@ -609,7 +521,6 @@ fn web_server_edits_notes_and_deletes_gap_with_local_auth() {
     let delete = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/work/gaps/GAP1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(delete.status, 200);
@@ -619,7 +530,7 @@ fn web_server_edits_notes_and_deletes_gap_with_local_auth() {
 }
 
 #[test]
-fn web_server_appends_and_edits_latest_round_with_local_auth() {
+fn web_server_appends_and_edits_latest_round() {
     let temp_root = unique_temp_dir("http-rounds");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -627,14 +538,12 @@ fn web_server_appends_and_edits_latest_round_with_local_auth() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Round Gap"})),
     });
 
     let append = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps/GAP1/rounds".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"reporter": "Reporter", "actual": "Actual", "target": "Target"})),
     });
     assert_eq!(append.status, 200);
@@ -643,7 +552,6 @@ fn web_server_appends_and_edits_latest_round_with_local_auth() {
     let edit = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/work/gaps/GAP1/rounds/latest".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"reporter": "Reviewer", "actual": "Revised"})),
     });
     assert_eq!(edit.status, 200);
@@ -656,7 +564,7 @@ fn web_server_appends_and_edits_latest_round_with_local_auth() {
 }
 
 #[test]
-fn web_server_appends_and_reads_gap_round_logs_with_local_auth() {
+fn web_server_appends_and_reads_gap_round_logs() {
     let temp_root = unique_temp_dir("http-gap-round-logs");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -664,20 +572,17 @@ fn web_server_appends_and_reads_gap_round_logs_with_local_auth() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Logged Gap"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP1/rounds".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"reporter": "Reporter", "actual": "Actual", "target": "Target"})),
     });
 
     let append = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP1/rounds/0/logs".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "severity": "info",
             "category": "state",
@@ -691,7 +596,6 @@ fn web_server_appends_and_reads_gap_round_logs_with_local_auth() {
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1/logs".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(logs.status, 200);
@@ -705,7 +609,7 @@ fn web_server_appends_and_reads_gap_round_logs_with_local_auth() {
 }
 
 #[test]
-fn web_server_creates_features_and_updates_membership_with_local_auth() {
+fn web_server_creates_features_and_updates_membership() {
     let temp_root = unique_temp_dir("http-feature-membership");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -713,14 +617,12 @@ fn web_server_creates_features_and_updates_membership_with_local_auth() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Gap One"})),
     });
 
     let create_feature = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "FEA1", "name": "Feature One"})),
     });
     assert_eq!(create_feature.status, 201);
@@ -729,7 +631,6 @@ fn web_server_creates_features_and_updates_membership_with_local_auth() {
     let add_gap = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features/FEA1/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"gap_id": "GAP1"})),
     });
     assert_eq!(add_gap.status, 200);
@@ -738,7 +639,6 @@ fn web_server_creates_features_and_updates_membership_with_local_auth() {
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/work/features/FEA1".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(show.status, 200);
@@ -747,7 +647,6 @@ fn web_server_creates_features_and_updates_membership_with_local_auth() {
     let remove_gap = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/work/features/FEA1/gaps/GAP1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(remove_gap.status, 200);
@@ -757,7 +656,7 @@ fn web_server_creates_features_and_updates_membership_with_local_auth() {
 }
 
 #[test]
-fn web_server_reorders_and_moves_feature_workflow_with_local_auth() {
+fn web_server_reorders_and_moves_feature_workflow() {
     let temp_root = unique_temp_dir("http-feature-reorder-move");
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -766,21 +665,18 @@ fn web_server_reorders_and_moves_feature_workflow_with_local_auth() {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/work/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"id": id, "name": name})),
         });
     }
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "FEA1", "name": "Feature One"})),
     });
     for gap_id in ["GAP1", "GAP2"] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/work/features/FEA1/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"gap_id": gap_id})),
         });
     }
@@ -788,7 +684,6 @@ fn web_server_reorders_and_moves_feature_workflow_with_local_auth() {
     let reorder = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features/FEA1/gaps/GAP2/reorder".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"order": 1})),
     });
     assert_eq!(reorder.status, 200);
@@ -797,7 +692,6 @@ fn web_server_reorders_and_moves_feature_workflow_with_local_auth() {
     let move_feature = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features/FEA1/move".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"status": "todo"})),
     });
     assert_eq!(move_feature.status, 200);
@@ -825,21 +719,18 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"id": id, "name": name})),
         });
     }
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "FEA1", "name": "Original Feature"})),
     });
 
     let feature = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/features/FEA1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "name": "Renamed Feature",
             "description": "Updated description",
@@ -856,7 +747,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/bulk".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "selected_ids": ["GAP1"],
             "update": {"status": "review"}
@@ -865,7 +755,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let verified = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP1/verify".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(verified.status, 200);
@@ -875,7 +764,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/bulk".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "selected_ids": ["GAP2", "GAP3"],
             "update": {"status": "failed"}
@@ -884,7 +772,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let retry_quality = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP2/retry-quality".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(retry_quality.status, 200);
@@ -893,7 +780,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let retry_merge = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP3/retry-merge".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(retry_merge.status, 200);
@@ -902,7 +788,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let merge = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP3/merge".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(merge.status, 200);
@@ -911,7 +796,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     let undo = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP3/undo".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(undo.status, 200);
@@ -932,20 +816,17 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Schedulable"})),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP1/transition".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"status": "todo"})),
     });
 
     let schedule = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/workflow/schedule".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(schedule.status, 200);
@@ -957,7 +838,7 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
 }
 
 #[test]
-fn web_server_cancels_and_deletes_features_with_local_auth() {
+fn web_server_cancels_and_deletes_features() {
     let temp_root = unique_temp_dir("http-feature-cancel-delete");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -968,21 +849,18 @@ fn web_server_cancels_and_deletes_features_with_local_auth() {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/work/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"id": id, "name": name})),
         });
     }
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "FEA1", "name": "Feature One"})),
     });
     for gap_id in ["GAP1", "GAP2"] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/work/features/FEA1/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"gap_id": gap_id})),
         });
     }
@@ -990,7 +868,6 @@ fn web_server_cancels_and_deletes_features_with_local_auth() {
     let gap_cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/gaps/GAP1/cancel".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(gap_cancel.status, 200);
@@ -1020,7 +897,6 @@ fn web_server_cancels_and_deletes_features_with_local_auth() {
     let feature_cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/work/features/FEA1/cancel".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(feature_cancel.status, 200);
@@ -1039,7 +915,6 @@ fn web_server_cancels_and_deletes_features_with_local_auth() {
     let feature_delete = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/work/features/FEA1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(feature_delete.status, 200);
@@ -1060,14 +935,12 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let create_gap = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Gap One"})),
     });
     assert_eq!(create_gap.status, 201);
     let create_feature = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "FEA1", "name": "Feature One"})),
     });
     assert_eq!(create_feature.status, 201);
@@ -1075,7 +948,6 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let add_gap = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features/FEA1/gaps/GAP1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(add_gap.status, 200);
@@ -1084,7 +956,6 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let workflow = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features/FEA1/workflow".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"status": "todo"})),
     });
     assert_eq!(workflow.status, 200);
@@ -1093,7 +964,6 @@ fn web_server_accepts_static_ui_api_aliases_for_work_routes() {
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP1/cancel".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(cancel.status, 200);
@@ -1112,7 +982,6 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
         let create = server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"id": id, "name": name})),
         });
         assert_eq!(create.status, 201);
@@ -1120,7 +989,6 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let create_feature = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "FEA1", "name": "Bulk Feature"})),
     });
     assert_eq!(create_feature.status, 201);
@@ -1128,7 +996,6 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let bulk_status = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/bulk".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "selected_ids": ["GAP1", "GAP2"],
             "update": {"status": "todo"}
@@ -1140,7 +1007,6 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let bulk_assign = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/features/FEA1/gaps/bulk".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"selected_ids": ["GAP1", "GAP2"]})),
     });
     assert_eq!(bulk_assign.status, 200);
@@ -1155,7 +1021,6 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     let bulk_delete = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/bulk/delete".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"selected_ids": ["GAP1"]})),
     });
     assert_eq!(bulk_delete.status, 200);
@@ -1176,7 +1041,6 @@ fn web_server_records_and_lists_activity_for_static_ui() {
     let recorded = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/activity/ui-error".to_string(),
-        auth_token: None,
         body: Some(json!({"message": "Boom", "source": "test"})),
     });
     assert_eq!(recorded.status, 200);
@@ -1186,7 +1050,6 @@ fn web_server_records_and_lists_activity_for_static_ui() {
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/activity".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(listed.status, 200);
@@ -1196,7 +1059,6 @@ fn web_server_records_and_lists_activity_for_static_ui() {
     let filtered = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/activity?q=source&limit=1".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(filtered.status, 200);
@@ -1216,7 +1078,6 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     let parsed = server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/import/csv/parse".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({
                 "text": "name,actual,target,reporter,priority\nCSV Gap,Actual state,Target state,QA,high\n"
             })),
@@ -1228,7 +1089,6 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     let persisted = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/import/persist".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "new_feature_name": "Imported Feature",
             "drafts": [{
@@ -1249,7 +1109,6 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: format!("/api/gaps/{gap_id}"),
-        auth_token: None,
         body: None,
     });
     assert_eq!(gap.status, 200);
@@ -1273,13 +1132,11 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Cached Gap"})),
     });
     let rebuilt = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/cache/rebuild".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"background": true})),
     });
     assert_eq!(rebuilt.status, 200);
@@ -1294,7 +1151,6 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
     let changes = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/changes?limit=10".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(changes.status, 200);
@@ -1316,7 +1172,6 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
     let performance = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/performance?operation=cache.rebuild&limit=10".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(performance.status, 200);
@@ -1365,7 +1220,6 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     let changes = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/changes?limit=5".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(changes.status, 200);
@@ -1375,7 +1229,6 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     let undo = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/changes/undo".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"commit": commit})),
     });
     assert_eq!(undo.status, 200);
@@ -1415,7 +1268,6 @@ fn web_server_hard_resets_git_worktree() {
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/runner-workers/merger/hard-reset-worktree".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(reset.status, 200);
@@ -1445,14 +1297,12 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/activity/ui-error".to_string(),
-        auth_token: None,
         body: Some(json!({"message": "Boom"})),
     });
     assert!(durable_root.join("logs/activity.jsonl").exists());
     let cleanup = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/activity/cleanup".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"days": 0})),
     });
     assert_eq!(cleanup.status, 200);
@@ -1468,7 +1318,6 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     let performance_cleanup = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/performance/cleanup".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"clear": true})),
     });
     assert_eq!(performance_cleanup.status, 200);
@@ -1478,7 +1327,6 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     let undo = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/changes/undo".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"commit": "abc123"})),
     });
     assert_eq!(undo.status, 200);
@@ -1487,7 +1335,6 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/runner-workers/merger/hard-reset-worktree".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(reset.status, 200);
@@ -1506,7 +1353,6 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/gaps".to_string(),
-            auth_token: Some("secret".to_string()),
             body: Some(json!({"id": id, "name": name})),
         });
     }
@@ -1514,7 +1360,6 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/nodes".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"display_name": "Remote QA"})),
     });
     assert_eq!(created.status, 200);
@@ -1529,7 +1374,6 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let activated = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/nodes/activate".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"node_id": "remote-qa"})),
     });
     assert_eq!(activated.status, 200);
@@ -1539,7 +1383,6 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let transfer = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/nodes/transfer-gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "selected_ids": ["GAP1", "GAP2"],
             "target_node_id": "remote-qa"
@@ -1550,7 +1393,6 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(gap.body["gap"]["node_id"], "remote-qa");
@@ -1558,7 +1400,6 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let renamed = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/nodes/remote-qa".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"display_name": "Remote QA Renamed"})),
     });
     assert_eq!(renamed.status, 200);
@@ -1583,7 +1424,6 @@ fn web_server_manages_cluster_node_registry() {
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/cluster/nodes".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "id": "node-1",
             "display_name": "Node One",
@@ -1606,7 +1446,6 @@ fn web_server_manages_cluster_node_registry() {
     let disabled = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/cluster/nodes/node-1".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"enabled": false, "ssh_port": 2222})),
     });
     assert_eq!(disabled.status, 200);
@@ -1616,7 +1455,6 @@ fn web_server_manages_cluster_node_registry() {
     let bootstrap = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/cluster/nodes/node-1/bootstrap".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"dry_run": true})),
     });
     assert_eq!(bootstrap.status, 200);
@@ -1663,7 +1501,6 @@ fn web_server_serves_source_file_tree_read_and_search() {
     let tree = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/files/tree?path=&recursive=1&max_depth=2&max_entries=20".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(tree.status, 200);
@@ -1686,7 +1523,6 @@ fn web_server_serves_source_file_tree_read_and_search() {
     let read = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/files/read?path=README.md&offset=0&limit=6".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(read.status, 200);
@@ -1698,7 +1534,6 @@ fn web_server_serves_source_file_tree_read_and_search() {
     let search = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/files/search?q=main&max_entries=5".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(search.status, 200);
@@ -1707,7 +1542,6 @@ fn web_server_serves_source_file_tree_read_and_search() {
     let traversal = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/files/read?path=../Cargo.toml".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(traversal.status, 400);
@@ -1733,7 +1567,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
             "/api/project/path?path={}",
             percent_encode_for_test(temp_root.to_str().unwrap())
         ),
-        auth_token: None,
         body: None,
     });
     assert_eq!(path.status, 200);
@@ -1746,7 +1579,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
             "/api/project/directories?path={}&max_entries=10",
             percent_encode_for_test(temp_root.to_str().unwrap())
         ),
-        auth_token: None,
         body: None,
     });
     assert_eq!(directories.status, 200);
@@ -1761,7 +1593,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let upgrade = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/upgrade".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(upgrade.status, 200);
@@ -1772,7 +1603,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let install = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/system/install".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"target": "linux-cli-web", "version": "1.0.0"})),
     });
     assert_eq!(install.status, 200);
@@ -1782,7 +1612,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let install_status = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/system/install".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(install_status.status, 200);
@@ -1791,7 +1620,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let update = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/system/update".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"version": "1.1.0"})),
     });
     assert_eq!(update.status, 200);
@@ -1800,7 +1628,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let rollback = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/system/rollback".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(rollback.status, 200);
@@ -1809,7 +1636,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let uninstall = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/system/uninstall".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(uninstall.status, 200);
@@ -1818,7 +1644,6 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let health = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/target-app/health".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(health.status, 200);
@@ -1908,7 +1733,6 @@ fn web_server_reads_and_cancels_runtime_jobs() {
     let status = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: format!("/api/jobs/{}", job.id),
-        auth_token: None,
         body: None,
     });
     assert_eq!(status.status, 200);
@@ -1923,7 +1747,6 @@ fn web_server_reads_and_cancels_runtime_jobs() {
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/jobs/{}/cancel", job.id),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(cancel.status, 200);
@@ -1931,7 +1754,6 @@ fn web_server_reads_and_cancels_runtime_jobs() {
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: format!("/api/jobs/{}/logs?limit=10", job.id),
-        auth_token: None,
         body: None,
     });
     assert_eq!(logs.status, 200);
@@ -1968,7 +1790,6 @@ fn web_server_retries_scheduler_jobs_and_reads_retry_logs() {
     let retry = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/jobs/{job_id}/retry"),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(retry.status, 200);
@@ -1979,7 +1800,6 @@ fn web_server_retries_scheduler_jobs_and_reads_retry_logs() {
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: format!("/api/jobs/{job_id}/logs?limit=1"),
-        auth_token: None,
         body: None,
     });
     assert_eq!(logs.status, 200);
@@ -2033,7 +1853,6 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/processes".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(listed.status, 200);
@@ -2072,7 +1891,6 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let stream = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/processes/stream-test/stream".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(stream.status, 200);
@@ -2093,7 +1911,6 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let background = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/processes/background".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"stopped": true})),
     });
     assert_eq!(background.status, 200);
@@ -2102,7 +1919,6 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let agents = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/processes/agents".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"paused": true})),
     });
     assert_eq!(agents.status, 200);
@@ -2127,7 +1943,6 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let agents = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/agents".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(agents.status, 200);
@@ -2137,7 +1952,6 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let diagnostics = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/agents/smoke-ai/diagnostics".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(diagnostics.status, 200);
@@ -2153,7 +1967,6 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let configured = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/agents/smoke-ai/configure".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(configured.status, 200);
@@ -2162,7 +1975,6 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let auth = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/agents/smoke-ai/auth".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert!(auth.status == 200 || auth.status == 503);
@@ -2173,7 +1985,6 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let invalid = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/agents/not-a-provider/diagnostics".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(invalid.status, 400);
@@ -2182,7 +1993,6 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
     let recheck = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/settings/recheck-auth".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(recheck.status, 200);
@@ -2202,7 +2012,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let app_settings = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"target_app_url": "http://127.0.0.1:3000"})),
     });
     assert_eq!(app_settings.status, 200);
@@ -2210,7 +2019,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let initial = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/quality".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(initial.status, 200);
@@ -2220,7 +2028,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let saved = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/quality".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "enabled": "1",
             "timing": "post_rebuild",
@@ -2238,7 +2045,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let checks = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/quality/checks".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "owner_id": "GAP1",
             "command": "printf quality-ok"
@@ -2269,7 +2075,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/quality/regressions".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "title": "Dashboard smoke",
             "prompt": "Open the dashboard",
@@ -2287,7 +2092,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let run = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/quality/regressions/run".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({})),
     });
     assert_eq!(run.status, 200);
@@ -2307,7 +2111,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let screenshots = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/quality/screenshots?owner_id=GAP1".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(screenshots.status, 200);
@@ -2323,7 +2126,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/quality".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(listed.status, 200);
@@ -2332,7 +2134,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let disabled = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/quality/regressions/dashboard-smoke".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"enabled": false})),
     });
     assert_eq!(disabled.status, 200);
@@ -2341,7 +2142,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     let deleted = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/api/quality/regressions/dashboard-smoke".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(deleted.status, 200);
@@ -2368,7 +2168,6 @@ fn web_server_manages_durable_chat_sessions() {
     let started = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/chat/start".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"gap_id": "GAP1", "provider": "smoke-ai"})),
     });
     assert_eq!(started.status, 201);
@@ -2383,7 +2182,6 @@ fn web_server_manages_durable_chat_sessions() {
     let input = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/chat/{session_id}/input"),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"text": "What should I test?"})),
     });
     assert_eq!(input.status, 200);
@@ -2391,7 +2189,6 @@ fn web_server_manages_durable_chat_sessions() {
     let read = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: format!("/api/chat/{session_id}/read"),
-        auth_token: None,
         body: None,
     });
     assert_eq!(read.status, 200);
@@ -2436,7 +2233,6 @@ fn web_server_manages_durable_chat_sessions() {
     let job = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: format!("/api/jobs/{}", jobs[0].id),
-        auth_token: None,
         body: None,
     });
     assert_eq!(job.status, 200);
@@ -2446,7 +2242,6 @@ fn web_server_manages_durable_chat_sessions() {
     let stopped = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/chat/{session_id}/stop"),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(stopped.status, 200);
@@ -2514,7 +2309,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let status = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/project/status".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(status.status, 200);
@@ -2526,7 +2320,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let app_status = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/apps/status".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(app_status.status, 200);
@@ -2537,7 +2330,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let attached = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/attach".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"path": other_app.display().to_string()})),
     });
     assert_eq!(attached.status, 200);
@@ -2549,7 +2341,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let switched = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/switch".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"path": app_root.display().to_string()})),
     });
     assert_eq!(switched.status, 200);
@@ -2560,7 +2351,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let registered = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/register".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "name": "third-app",
             "path": third_app.display().to_string()
@@ -2585,7 +2375,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let cloned = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/clone".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "source": clone_source.display().to_string(),
             "destination": clone_destination.display().to_string(),
@@ -2600,7 +2389,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let switched_by_name = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/switch".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"name": "third-app"})),
     });
     assert_eq!(switched_by_name.status, 200);
@@ -2612,7 +2400,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let detached = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/apps/detach".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(detached.status, 200);
@@ -2622,7 +2409,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/apps".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(listed.status, 200);
@@ -2632,7 +2418,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let settings = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/settings".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(settings.status, 200);
@@ -2642,7 +2427,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let updated = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "agent_cli": "smoke-ai",
             "parallel_run_cap": 3,
@@ -2664,7 +2448,6 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let removed = server.handle(ApiRequest {
         method: "DELETE".to_string(),
         path: "/api/apps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"path": other_app.display().to_string()})),
     });
     assert_eq!(removed.status, 200);
@@ -2687,7 +2470,6 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let detached_settings = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/settings".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(detached_settings.status, 503);
@@ -2699,7 +2481,6 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let attached = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/attach".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"path": app_root.display().to_string()})),
     });
     assert_eq!(attached.status, 200);
@@ -2708,7 +2489,6 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let settings = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"agent_cli": "smoke-ai"})),
     });
     assert_eq!(settings.status, 200);
@@ -2718,7 +2498,6 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let created = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"name": "Detached attach gap", "id": "GAP1"})),
     });
     assert_eq!(created.status, 201);
@@ -2737,7 +2516,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let governance = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/governance".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "product": "Refine",
             "constitution": "Be useful",
@@ -2751,7 +2529,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let generated = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/governance/generate-rules".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"product": "Refine", "constitution": "Be useful"})),
     });
     assert_eq!(generated.status, 200);
@@ -2761,7 +2538,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let guidance = server.handle(ApiRequest {
         method: "PUT".to_string(),
         path: "/api/guidance".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"guidance": [{
             "name": "Accessibility",
             "rule": "When UI changes",
@@ -2775,7 +2551,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let reporter_one = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/reporters".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"name": "Buddy"})),
     });
     assert_eq!(reporter_one.status, 201);
@@ -2783,7 +2558,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let reporter_two = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/reporters".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"name": "Alex"})),
     });
     let reporter_two_id = reporter_two.body["reporter"]["id"].as_u64().unwrap();
@@ -2791,7 +2565,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let renamed = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: format!("/api/reporters/{reporter_one_id}"),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"name": "Buddy Williams"})),
     });
     assert_eq!(renamed.status, 200);
@@ -2800,7 +2573,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let merged = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/reporters/{reporter_one_id}/merge"),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"target_id": reporter_two_id})),
     });
     assert_eq!(merged.status, 200);
@@ -2809,7 +2581,6 @@ fn web_server_manages_governance_guidance_and_reporters() {
     let listed = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/reporters".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(listed.status, 200);
@@ -2838,7 +2609,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({
             "target_app_url": "http://127.0.0.1:3000",
             "target_app_start_command": "npm run dev",
@@ -2848,7 +2618,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"id": "GAP1", "name": "Dashboard Gap"})),
     });
     FileActivityService::new(&durable_root)
@@ -2868,7 +2637,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let dashboard = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/dashboard?node=current".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(dashboard.status, 200);
@@ -2891,7 +2659,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let diagnostics = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/diagnostics".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(diagnostics.status, 200);
@@ -2939,7 +2706,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let target = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/target-app/status".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(target.status, 200);
@@ -2949,7 +2715,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let generated = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/target-app/generate-instructions".to_string(),
-        auth_token: Some("secret".to_string()),
         body: Some(json!({"kind": "all"})),
     });
     assert_eq!(generated.status, 200);
@@ -2963,7 +2728,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let rebuild = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/runner-workers/target-app-rebuilder/rebuild".to_string(),
-        auth_token: Some("secret".to_string()),
         body: None,
     });
     assert_eq!(rebuild.status, 200);
@@ -2972,7 +2736,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let nodes = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/nodes".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(nodes.status, 200);
@@ -2981,7 +2744,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let cluster = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/cluster".to_string(),
-        auth_token: None,
         body: None,
     });
     assert_eq!(cluster.status, 200);
@@ -3037,7 +2799,6 @@ fn server_with_projection() -> InProcessWebServer {
             dashboard: DashboardProjection::default(),
             runtime: RuntimeProjection::default(),
         },
-        auth_token: Some("secret".to_string()),
         durable_root: None,
         runtime_root: None,
     }

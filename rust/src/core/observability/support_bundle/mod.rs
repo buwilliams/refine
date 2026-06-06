@@ -209,7 +209,7 @@ mod tests {
                 actor: Some("test".to_string()),
                 details: Some(
                     serde_json::json!({
-                        "auth_token": "activity-secret",
+                        "provider_token": "activity-secret",
                         "visible": "ok"
                     })
                     .as_object()

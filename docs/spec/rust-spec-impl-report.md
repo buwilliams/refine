@@ -33,7 +33,7 @@ signing/notarization), not architectural contradictions.
 
 | Prior finding | Prior status | Now | Evidence |
 |---|---|---|---|
-| **#1 CLI bypasses daemon, mutates durable state in-process** | Largest deviation | **Resolved** | `dispatch.rs` rejects a concrete durable root in non-test dispatch before the in-process service branches are reachable; the normal `Gap/Feature/Workflow/Node/Cluster` path routes to `dispatch_*_daemon`; `daemon_json` is a real HTTP client with session-token auth, `Idempotency-Key`, and `X-Refine-API-Version: 1`. Production CLI parsing also rejects `--durable-root` on mutating commands. |
+| **#1 CLI bypasses daemon, mutates durable state in-process** | Largest deviation | **Resolved** | `dispatch.rs` rejects a concrete durable root in non-test dispatch before the in-process service branches are reachable; the normal `Gap/Feature/Workflow/Node/Cluster` path routes to `dispatch_*_daemon`; `daemon_json` is a real HTTP client with `Idempotency-Key` and `X-Refine-API-Version: 1`. Production CLI parsing also rejects `--durable-root` on mutating commands. |
 | **#2 Projection cache built but never read in production** | Dead code | **Resolved (daemon path)** | Daemon wires `FileWorkItemService::with_projection_cache(..., runtime_root/cache)` (`web_server/runtime.rs:55`); `projection_snapshot()` prefers `load_or_refresh_projection` when a cache dir is set (`work_items/service.rs:75-82`); scheduling and chat now call `load_or_refresh_projection` (`scheduling/mod.rs:305-307`, `chat/mod.rs:564`); cache is refreshed after each mutation (`http.rs:241`). |
 | Node ownership not enforced in `work_items` | Asymmetric | **Resolved** | `ensure_gap_owned` / `ensure_feature_owned` return `RefineError::Conflict` when `gap.node_id != active_node_id` (`work_items/service.rs:90-123`). |
 | Daemon lifecycle never spawns the process | State-only | **Resolved** | `start_background_daemon` spawns `current_exe`, `try_wait`s for readiness, and uses `setsid` to detach (`lifecycle/mod.rs:67-122,208`). The spawn now lives in core, not the CLI surface. |
@@ -88,12 +88,12 @@ signing/notarization), not architectural contradictions.
 | `core::host::cluster` | ✅ (shell-dep) | Real remote run; now preflight-guarded (`ensure_ssh_binary_available`, identity check); shells out to system `ssh`, no native crate. |
 | `core::host::installation` | ✅ (no signing) | Generates **and activates** systemd/launchd services via real `systemctl`/`launchctl`; code signing/notarization deferred to platform installer. |
 | `core::supervisor::lifecycle` | ✅ | **Really spawns** the daemon (`current_exe` + `setsid`), status/health/recover. |
-| `core::supervisor::security` | ✅ | Token auth, redaction, audit, **secret store**, **command ACL** enforced. |
-| `core::supervisor::{sessions,jobs,runtime,config,errors}` | ✅ | Auth + registry, file-backed jobs, OS path layout, settings/governance, categorized errors. |
+| `core::supervisor::security` | ✅ | Redaction, audit, **secret store**, **command ACL** enforced. |
+| `core::supervisor::{jobs,runtime,config,errors}` | ✅ | File-backed jobs, OS path layout, settings/governance, categorized errors. |
 | `core::supervisor::testing` | ✅ | Real fixtures + fakes + contract helper. |
 | `core::observability::{logs,activity,diagnostics}` | ✅ | JSONL sidecars, multi-filter query + retention, 9-category doctor. |
 | `core::observability::{metrics,support_bundle}` | ✅ | Support bundle redacts secrets by default (`redact_json`); metrics present. |
-| `surfaces::web_server` | ✅ | std `TcpListener` HTTP/1.1, **thread-per-connection**; static serving with traversal guards; SSE; auth + local-origin; idempotency; version negotiation; serves every route the CLI calls. |
+| `surfaces::web_server` | ✅ | std `TcpListener` HTTP/1.1, **thread-per-connection**; static serving with traversal guards; SSE; local-origin checks; idempotency; version negotiation; serves every route the CLI calls. |
 | `surfaces::web/static` | ✅ | 55 assets copied from `python/refine_ui/static/`; xtask verifies parity. |
 | `surfaces::cli` | ✅ | All 9 model-oriented groups + actions; **daemon-routed in normal builds**; concrete durable roots are rejected before in-process service branches can mutate durable state. |
 | `surfaces::desktop` + `desktop/src-tauri` | ✅ feature-gated | Bridge shell by default; real Tauri 2 webview/tray/menu under `--features real-tauri`. |
