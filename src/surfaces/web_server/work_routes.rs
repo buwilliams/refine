@@ -21,6 +21,18 @@ use crate::model::workflow::GapStatus;
 use super::support::*;
 use super::*;
 
+fn derive_gap_name(actual: &str, target: &str) -> Option<String> {
+    let source = [target.trim(), actual.trim()]
+        .into_iter()
+        .find(|value| !value.is_empty())?;
+    let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut name = collapsed.chars().take(80).collect::<String>();
+    if collapsed.chars().count() > 80 {
+        name = name.trim_end_matches(|ch: char| !ch.is_alphanumeric()).to_string();
+    }
+    (!name.trim().is_empty()).then(|| name.trim().to_string())
+}
+
 impl InProcessWebServer {
     fn active_node_id_for_routes(&self) -> String {
         self.current_durable_root()
@@ -148,35 +160,87 @@ impl InProcessWebServer {
 
     pub(super) fn handle_gap_create(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "create work items");
-        let Some(name) = request
-            .body
-            .as_ref()
+        let body = request.body.as_ref();
+        let actual = body
+            .and_then(|body| body.get("actual"))
+            .and_then(|actual| actual.as_str())
+            .unwrap_or("")
+            .trim();
+        let target = body
+            .and_then(|body| body.get("target"))
+            .and_then(|target| target.as_str())
+            .unwrap_or("")
+            .trim();
+        let Some(name) = body
             .and_then(|body| body.get("name"))
             .and_then(|name| name.as_str())
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+            .or_else(|| derive_gap_name(actual, target))
         else {
             return ApiResponse::json(
                 400,
                 json!({
                     "error": {
                         "code": "invalid_name",
-                        "message": "body.name is required"
+                        "message": "body.name, body.actual, or body.target is required"
                     }
                 }),
             );
         };
-        let id = request
-            .body
-            .as_ref()
+        let id = body
             .and_then(|body| body.get("id"))
             .and_then(|id| id.as_str());
-
-        match self
-            .work_item_service(durable_root)
-            .create_gap_summary(name, id)
-        {
-            Ok(gap) => ApiResponse::json(201, json!({"gap": gap.gap})),
-            Err(error) => error_response(error),
+        let reporter = body
+            .and_then(|body| body.get("reporter"))
+            .and_then(|reporter| reporter.as_str())
+            .unwrap_or("")
+            .trim();
+        let priority = body
+            .and_then(|body| body.get("priority"))
+            .and_then(|priority| priority.as_str())
+            .unwrap_or("low")
+            .trim();
+        let feature_id = body
+            .and_then(|body| body.get("feature_id"))
+            .and_then(|feature_id| feature_id.as_str())
+            .map(str::trim)
+            .filter(|feature_id| !feature_id.is_empty());
+        if !matches!(priority, "low" | "medium" | "high") {
+            return error_response(RefineError::InvalidInput(
+                "priority must be one of low, medium, or high".to_string(),
+            ));
         }
+
+        let service = self.work_item_service(durable_root);
+        let mut gap = match service.create_gap_summary(&name, id) {
+            Ok(gap) => gap,
+            Err(error) => return error_response(error),
+        };
+        if priority != "low" {
+            match service.update_gap_metadata_summary(&gap.gap.id, None, Some(priority)) {
+                Ok(updated) => gap = updated,
+                Err(error) => return error_response(error),
+            }
+        }
+        if !reporter.is_empty() && !actual.is_empty() && !target.is_empty() {
+            match service.append_gap_round_summary(&gap.gap.id, reporter, actual, target) {
+                Ok(updated) => gap = updated,
+                Err(error) => return error_response(error),
+            }
+        }
+        if let Some(feature_id) = feature_id {
+            if let Err(error) = service.assign_gap_to_feature(feature_id, &gap.gap.id) {
+                return error_response(error);
+            }
+            match service.show_gap_summary(&gap.gap.id) {
+                Ok(updated) => gap = updated,
+                Err(error) => return error_response(error),
+            }
+        }
+
+        ApiResponse::json(201, json!({"gap": gap.gap}))
     }
 
     pub(super) fn handle_gap_bulk_update(&self, request: ApiRequest) -> ApiResponse {

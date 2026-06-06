@@ -409,6 +409,46 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
 }
 
 #[test]
+fn web_server_creates_gap_from_new_gap_modal_payload() {
+    let temp_root = unique_temp_dir("http-gap-create-modal");
+    let durable_root = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+
+    let created = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({
+            "reporter": "Alice",
+            "actual": "The game does not pause when the pause key is pressed.",
+            "target": "Pressing pause should freeze the board and show a paused state.",
+            "priority": "high"
+        })),
+    });
+
+    assert_eq!(created.status, 201);
+    let gap_id = created.body["gap"]["id"].as_str().unwrap();
+    assert_eq!(
+        created.body["gap"]["name"],
+        "Pressing pause should freeze the board and show a paused state."
+    );
+    assert_eq!(created.body["gap"]["priority"], "high");
+    assert_eq!(created.body["gap"]["reporter"], "Alice");
+    assert_eq!(created.body["gap"]["round_count"], 1);
+
+    let detail = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: format!("/api/gaps/{gap_id}"),
+        body: None,
+    });
+    assert_eq!(detail.status, 200);
+    assert_eq!(detail.body["gap"]["rounds"][0]["actual"], "The game does not pause when the pause key is pressed.");
+    assert_eq!(detail.body["gap"]["rounds"][0]["target"], "Pressing pause should freeze the board and show a paused state.");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
     let temp_root = unique_temp_dir("http-idempotency-conflict");
     let durable_root = temp_root.join(".refine");
