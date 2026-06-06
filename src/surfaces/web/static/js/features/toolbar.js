@@ -2157,7 +2157,9 @@ async function sendChatLine() {
   if (!text.trim()) return;
   input.value = "";
   resizeChatInput(input);
+  focusChatInputSoon();
   await sendChatText(text);
+  focusChatInputSoon();
 }
 
 async function saveQueuedChatMessage(messageId) {
@@ -2217,6 +2219,18 @@ async function removeQueuedChatMessage(messageId) {
 function cssEscape(value) {
   if (window.CSS?.escape) return CSS.escape(value);
   return String(value).replace(/["\\]/g, "\\$&");
+}
+
+function focusChatInputSoon() {
+  setTimeout(() => {
+    const input = $("#chat-input");
+    if (!input || input.disabled) return;
+    input.focus();
+    const end = input.value.length;
+    if (typeof input.setSelectionRange === "function") {
+      input.setSelectionRange(end, end);
+    }
+  }, 0);
 }
 
 async function sendChatText(text) {

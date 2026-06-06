@@ -567,7 +567,10 @@ fn provider_error_message(stdout: &str, stderr: &str) -> Option<String> {
                 .get("is_error")
                 .and_then(|value| value.as_bool())
                 .unwrap_or(false);
-            let has_api_error = object.get("api_error_status").is_some();
+            let has_api_error = object
+                .get("api_error_status")
+                .map(|value| !value.is_null())
+                .unwrap_or(false);
             if !is_error && !has_api_error {
                 continue;
             }
@@ -754,6 +757,12 @@ mod tests {
             provider_error_message(stdout, ""),
             Some("Invalid API key - Fix external API key (401)".to_string())
         );
+    }
+
+    #[test]
+    fn provider_error_message_ignores_success_with_null_api_status() {
+        let stdout = r#"{"type":"result","subtype":"success","is_error":false,"api_error_status":null,"result":"Hello"}"#;
+        assert_eq!(provider_error_message(stdout, ""), None);
     }
 
     #[test]
