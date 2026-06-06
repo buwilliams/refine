@@ -357,7 +357,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_recheck_auth(&self) -> ApiResponse {
-        provider_status_response()
+        provider_status_response_refresh()
     }
 
     pub(super) fn handle_agent_secrets_status(&self) -> ApiResponse {

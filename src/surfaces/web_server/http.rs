@@ -120,6 +120,9 @@ impl LocalHttpDaemon {
     }
 
     pub fn handle_stream(&self, mut stream: TcpStream) -> RefineResult<()> {
+        stream.set_nodelay(true).map_err(|error| {
+            RefineError::Io(format!("failed to set TCP_NODELAY on HTTP stream: {error}"))
+        })?;
         let request = read_http_request(&mut stream)?;
         let response = self.handle_wire_request(request);
         write_http_response(&mut stream, response)

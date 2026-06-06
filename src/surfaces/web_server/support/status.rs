@@ -1,4 +1,6 @@
 use std::path::Path;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
@@ -15,6 +17,16 @@ use crate::model::JsonObject;
 
 use super::super::*;
 use super::*;
+
+const PROVIDER_STATUS_CACHE_TTL: Duration = Duration::from_secs(30);
+
+#[derive(Clone, Debug)]
+struct ProviderStatusCacheEntry {
+    value: Value,
+    refreshed_at: Instant,
+}
+
+static PROVIDER_STATUS_CACHE: OnceLock<Mutex<Option<ProviderStatusCacheEntry>>> = OnceLock::new();
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(in crate::surfaces::web_server) struct RuntimeReconcileSummary {
@@ -241,7 +253,43 @@ pub(in crate::surfaces::web_server) fn provider_status_response() -> ApiResponse
     }
 }
 
+pub(in crate::surfaces::web_server) fn provider_status_response_refresh() -> ApiResponse {
+    match provider_status_value_refresh() {
+        Ok(value) => ApiResponse::json(200, value),
+        Err(error) => error_response(error),
+    }
+}
+
 pub(in crate::surfaces::web_server) fn provider_status_value() -> RefineResult<Value> {
+    cached_provider_status_value(false)
+}
+
+pub(in crate::surfaces::web_server) fn provider_status_value_refresh() -> RefineResult<Value> {
+    cached_provider_status_value(true)
+}
+
+fn cached_provider_status_value(refresh: bool) -> RefineResult<Value> {
+    let cache = PROVIDER_STATUS_CACHE.get_or_init(|| Mutex::new(None));
+    let mut cache = cache.lock().map_err(|_| {
+        crate::core::supervisor::errors::RefineError::Io(
+            "provider status cache lock was poisoned".to_string(),
+        )
+    })?;
+    if !refresh
+        && let Some(entry) = cache.as_ref()
+        && entry.refreshed_at.elapsed() < PROVIDER_STATUS_CACHE_TTL
+    {
+        return Ok(entry.value.clone());
+    }
+    let value = fresh_provider_status_value()?;
+    *cache = Some(ProviderStatusCacheEntry {
+        value: value.clone(),
+        refreshed_at: Instant::now(),
+    });
+    Ok(value)
+}
+
+fn fresh_provider_status_value() -> RefineResult<Value> {
     let service = HostAgentProviderService::new();
     let providers = service.detect()?;
     let selected = providers

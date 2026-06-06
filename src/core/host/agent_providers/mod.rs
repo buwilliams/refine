@@ -107,12 +107,17 @@ impl HostAgentProviderService {
     }
 
     fn detect_spec(&self, spec: ProviderSpec) -> ProviderCapability {
-        let binary = if spec.name == "smoke-ai" {
-            env::var("REFINE_SMOKE_AI_PATH").unwrap_or_else(|_| spec.binary.to_string())
+        let smoke_ai_binary = (spec.name == "smoke-ai")
+            .then(|| self.smoke_ai_binary(&spec))
+            .flatten();
+        let binary = smoke_ai_binary
+            .clone()
+            .unwrap_or_else(|| spec.binary.to_string());
+        let path = if spec.name == "smoke-ai" && smoke_ai_binary.is_none() {
+            None
         } else {
-            spec.binary.to_string()
+            find_executable(&binary, self.path_override.as_deref())
         };
-        let path = find_executable(&binary, self.path_override.as_deref());
         ProviderCapability {
             name: spec.name.to_string(),
             display_name: spec.display_name.to_string(),
@@ -124,6 +129,14 @@ impl HostAgentProviderService {
             supports_cli: true,
             output_format: spec.output_format.to_string(),
         }
+    }
+
+    fn smoke_ai_binary(&self, spec: &ProviderSpec) -> Option<String> {
+        env::var("REFINE_SMOKE_AI_PATH")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| self.path_override.as_ref().map(|_| spec.binary.to_string()))
     }
 
     fn resolve_binary_for_provider(&self, provider: &str) -> RefineResult<(ProviderSpec, String)> {
@@ -601,6 +614,7 @@ mod tests {
         let bin_dir = temp_root.join("bin");
         fs::create_dir_all(&bin_dir).unwrap();
         fs::write(bin_dir.join("codex"), "#!/bin/sh\n").unwrap();
+        fs::write(bin_dir.join("smoke-ai"), "#!/bin/sh\n").unwrap();
 
         let service = HostAgentProviderService {
             path_override: Some(bin_dir.display().to_string()),
@@ -614,6 +628,11 @@ mod tests {
         assert!(codex.installed);
         assert!(codex.supports_resume);
         assert_eq!(codex.output_format, "codex_json");
+        let smoke_ai = providers
+            .iter()
+            .find(|provider| provider.name == "smoke-ai")
+            .unwrap();
+        assert!(smoke_ai.installed);
         let claude = providers
             .iter()
             .find(|provider| provider.name == "claude")

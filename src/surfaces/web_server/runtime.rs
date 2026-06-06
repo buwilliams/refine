@@ -84,8 +84,11 @@ impl InProcessWebServer {
 
     pub(super) fn current_projection_with_runtime(&self) -> RefineResult<ProjectionSnapshot> {
         let mut projection = self.current_projection()?;
-        projection.runtime = self.runtime_projection()?;
-        self.persist_runtime_projection_snapshot(&projection)?;
+        let runtime = self.runtime_projection()?;
+        if projection.runtime != runtime {
+            projection.runtime = runtime;
+            self.persist_runtime_projection_snapshot(&projection)?;
+        }
         Ok(projection)
     }
 
