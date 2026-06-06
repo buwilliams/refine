@@ -8,11 +8,10 @@ use serde_json::{Value, json};
 use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
 use crate::core::host::process_supervision::FileProcessSupervisor;
 use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
-use crate::core::product::project_registry::{
-    FileProjectRegistryService, ProjectRegistryService, registry_apps_array,
-};
+use crate::core::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::model::workflow::GapStatus;
 
 use super::support::*;
 use super::*;
@@ -52,7 +51,7 @@ impl InProcessWebServer {
                 "preflight": preflight,
                 "activity": activity,
                 "runner_reachable": process.get("runner_reachable").and_then(|value| value.as_bool()).unwrap_or(false),
-                "reporter_stats": projection.dashboard.reporter_stats,
+                "reporter_stats": reporter_stats_rows(&projection.dashboard.reporter_stats),
                 "node_scope": "current",
                 "node_filter": "current",
                 "quality_timing": self.quality_timing_setting(),
@@ -477,10 +476,10 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_status(&self) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("read project status");
         };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).status() {
+        match service.status() {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
         }
@@ -514,19 +513,17 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_list(&self) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("list projects");
         };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone())
-            .list_response()
-        {
+        match service.list_response() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_project_attach(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("attach projects");
         };
         let Some(path) = request
@@ -546,15 +543,14 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).attach(path)
-        {
+        match service.attach(path) {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_project_register(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("register projects");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
@@ -570,9 +566,7 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .filter(|value| !value.trim().is_empty())
             .map(str::trim);
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone())
-            .register_path(name, path, false)
-        {
+        match service.register_path(name, path, false) {
             Ok(registry) => ApiResponse::json(
                 201,
                 json!({
@@ -587,7 +581,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_clone(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("clone projects");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
@@ -615,19 +609,14 @@ impl InProcessWebServer {
             .get("make_current")
             .and_then(|value| value.as_bool())
             .unwrap_or(true);
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).clone_app(
-            source,
-            destination,
-            name,
-            make_current,
-        ) {
+        match service.clone_app(source, destination, name, make_current) {
             Ok(status) => ApiResponse::json(201, project_status_value(status)),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_project_switch(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("switch projects");
         };
         let body = request.body.unwrap_or_else(|| json!({}));
@@ -641,25 +630,24 @@ impl InProcessWebServer {
                 "name or path is required".to_string(),
             ));
         };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).switch(name)
-        {
+        match service.switch(name) {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_project_detach(&self) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("detach project");
         };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).detach() {
+        match service.detach() {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
         }
     }
 
     pub(super) fn handle_project_remove(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
+        let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("remove projects");
         };
         let Some(path) = request
@@ -679,8 +667,7 @@ impl InProcessWebServer {
                 }),
             );
         };
-        match FileProjectRegistryService::new(runtime_root, self.durable_root.clone()).remove(path)
-        {
+        match service.remove(path) {
             Ok(registry) => ApiResponse::json(
                 200,
                 json!({
@@ -910,4 +897,31 @@ impl InProcessWebServer {
             Err(error) => error_response(error),
         }
     }
+}
+
+fn reporter_stats_rows(stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>) -> Vec<Value> {
+    stats
+        .iter()
+        .map(|(reporter, counts)| {
+            let reported = counts.values().copied().sum::<usize>();
+            let done = counts.get(&GapStatus::Done).copied().unwrap_or_default();
+            let cancelled = counts
+                .get(&GapStatus::Cancelled)
+                .copied()
+                .unwrap_or_default();
+            let active = reported.saturating_sub(done + cancelled);
+            let completion_rate = if reported == 0 {
+                0.0
+            } else {
+                (done as f64 / reported as f64) * 100.0
+            };
+            json!({
+                "reporter": reporter,
+                "active": active,
+                "done": done,
+                "reported": reported,
+                "completion_rate": completion_rate
+            })
+        })
+        .collect()
 }

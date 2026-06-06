@@ -2,7 +2,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 
@@ -16,6 +17,8 @@ use crate::model::workflow::GapStatus;
 
 use super::helpers::*;
 use super::types::*;
+
+static PROJECTION_SNAPSHOT_TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub trait ProjectStateStore {
     fn initialize(&self) -> RefineResult<()>;
@@ -45,6 +48,20 @@ impl FileProjectStateStore {
 
     pub fn snapshot_path(cache_dir: &Path) -> PathBuf {
         cache_dir.join(PROJECTION_SNAPSHOT_FILE)
+    }
+
+    fn snapshot_temp_path(cache_dir: &Path) -> PathBuf {
+        let counter = PROJECTION_SNAPSHOT_TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        cache_dir.join(format!(
+            ".{PROJECTION_SNAPSHOT_FILE}.{}.{}.{}.tmp",
+            std::process::id(),
+            timestamp,
+            counter
+        ))
     }
 
     pub fn fingerprint(path: &Path) -> RefineResult<SourceFingerprint> {
@@ -417,7 +434,7 @@ impl ProjectStateStore for FileProjectStateStore {
             ))
         })?;
         let snapshot_path = Self::snapshot_path(cache_dir);
-        let temp_path = snapshot_path.with_extension("json.tmp");
+        let temp_path = Self::snapshot_temp_path(cache_dir);
         let bytes = serde_json::to_vec_pretty(snapshot).map_err(|error| {
             RefineError::Serialization(format!("failed to encode projection snapshot: {error}"))
         })?;

@@ -350,7 +350,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
     if (!ok) return;
     await withButtonBusy(btn, "Removing…", async () => {
       try {
-        const result = await api("DELETE", "/api/projects", { path });
+        const result = await api("DELETE", "/api/apps", { path });
         if (result.auto_attached) {
           await applyProjectAttachResult(result, { toast: false });
           toast("App removed; loaded next app", "info");

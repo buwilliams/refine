@@ -15,6 +15,30 @@ use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
+    pub(super) fn app_registry_runtime_root(&self) -> Option<PathBuf> {
+        self.runtime_root.as_ref().map(|runtime_root| {
+            if runtime_root
+                .file_name()
+                .and_then(|value| value.to_str())
+                .and_then(|value| value.parse::<u16>().ok())
+                .is_some()
+            {
+                runtime_root
+                    .parent()
+                    .map(Path::to_path_buf)
+                    .unwrap_or_else(|| runtime_root.clone())
+            } else {
+                runtime_root.clone()
+            }
+        })
+    }
+
+    pub(super) fn project_registry_service(&self) -> Option<FileProjectRegistryService> {
+        self.app_registry_runtime_root().map(|runtime_root| {
+            FileProjectRegistryService::new(runtime_root, self.durable_root.clone())
+        })
+    }
+
     pub(super) fn current_projection(&self) -> RefineResult<ProjectionSnapshot> {
         if let Some(durable_root) = self.current_durable_root()? {
             let store = FileProjectStateStore::new(durable_root);
@@ -29,7 +53,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn current_durable_root(&self) -> RefineResult<Option<PathBuf>> {
-        if let Some(runtime_root) = &self.runtime_root {
+        if let Some(runtime_root) = self.app_registry_runtime_root() {
             let registry = FileProjectRegistryService::new(runtime_root, None);
             if let Some(active_app) = registry.load()?.active_app {
                 return Ok(Some(PathBuf::from(active_app).join(".refine")));

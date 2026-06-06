@@ -1572,6 +1572,9 @@ fn run_system_start(
     once: bool,
     foreground: bool,
 ) -> RefineResult<()> {
+    let runtime_root = absolute_cli_path(runtime_root)?;
+    let cache_dir = cache_dir.map(absolute_cli_path).transpose()?;
+    let static_root = static_root.map(absolute_cli_path).transpose()?;
     if !foreground && !once {
         let status = FileDaemonLifecycleService::new(RuntimeRoot {
             root: runtime_root.clone(),
@@ -1587,20 +1590,24 @@ fn run_system_start(
         );
         return Ok(());
     }
+    let listener = LocalHttpDaemon::bind_loopback(port)?;
+    let addr = LocalHttpDaemon::local_addr(&listener)?;
+    let actual_port = addr.port();
+    let port_runtime_root = RuntimeRoot {
+        root: runtime_root.clone(),
+    }
+    .port_root(actual_port);
     let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
     let snapshot = if let Some(client_repo) = project_status.client_repo {
         let durable_root = PathBuf::from(client_repo).join(".refine");
         let store = FileProjectStateStore::new(&durable_root);
         let cache_root = cache_dir
             .clone()
-            .unwrap_or_else(|| runtime_root.join("cache"));
+            .unwrap_or_else(|| port_runtime_root.join("cache"));
         store.load_or_refresh_projection(&cache_root)?
     } else {
         ProjectionSnapshot::default()
     };
-    let listener = LocalHttpDaemon::bind_loopback(port)?;
-    let addr = LocalHttpDaemon::local_addr(&listener)?;
-    let actual_port = addr.port();
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
         root: runtime_root.clone(),
     });
@@ -1610,7 +1617,7 @@ fn run_system_start(
             status,
             projection: snapshot,
             durable_root: None,
-            runtime_root: Some(runtime_root),
+            runtime_root: Some(port_runtime_root),
         },
         static_root: static_root.or_else(default_static_root),
     };
@@ -1626,6 +1633,17 @@ fn run_system_start(
         }
     }
     Ok(())
+}
+
+pub(super) fn absolute_cli_path(path: PathBuf) -> RefineResult<PathBuf> {
+    if path.is_absolute() {
+        Ok(path)
+    } else {
+        let cwd = std::env::current_dir().map_err(|error| {
+            RefineError::Io(format!("failed to resolve current directory: {error}"))
+        })?;
+        Ok(cwd.join(path))
+    }
 }
 
 #[cfg(not(test))]

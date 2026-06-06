@@ -11,6 +11,8 @@ use crate::model::feature::FeatureIndexProjection;
 use crate::model::gap::{GapIndexProjection, GapPriority};
 use crate::model::log::ActivityEntry;
 use std::process::Command;
+use std::sync::{Arc, Barrier};
+use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -209,6 +211,42 @@ fn file_store_persists_and_loads_projection_snapshot() {
     let loaded = store.load_projection_snapshot(&cache_dir).unwrap().unwrap();
     assert_eq!(loaded.gaps.len(), 1);
     assert_eq!(loaded.version, PROJECTION_SNAPSHOT_VERSION);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_store_persists_projection_snapshot_concurrently() {
+    let temp_root = unique_temp_dir("projection-store-concurrent");
+    let durable_root = temp_root.join("durable");
+    let cache_dir = temp_root.join("run").join("cache");
+    let store = FileProjectStateStore::new(&durable_root);
+    store.initialize().unwrap();
+
+    let barrier = Arc::new(Barrier::new(12));
+    let handles = (0..12)
+        .map(|index| {
+            let store = store.clone();
+            let cache_dir = cache_dir.clone();
+            let barrier = barrier.clone();
+            thread::spawn(move || {
+                let mut snapshot = ProjectionSnapshot::default();
+                snapshot.generated_at = format!("concurrent-{index}");
+                barrier.wait();
+                store.persist_projection_snapshot(&cache_dir, &snapshot)
+            })
+        })
+        .collect::<Vec<_>>();
+
+    for handle in handles {
+        handle.join().unwrap().unwrap();
+    }
+    assert!(
+        store
+            .load_projection_snapshot(&cache_dir)
+            .unwrap()
+            .is_some()
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

@@ -105,6 +105,23 @@ fn web_server_routes_work_gap_queries_through_projection() {
     assert_eq!(filtered.body["filtered_counts"]["done"], 1);
     assert_eq!(filtered.body["matching_ids"], json!(["GAP2"]));
     assert_eq!(filtered.body["page"]["total"], 1);
+    assert!(filtered.body.get("facets").is_none());
+
+    let status_facets = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps?status=todo&reporter=Alice&feature=FEA1&rounds_gte=2&facets=1".to_string(),
+        body: None,
+    });
+    assert_eq!(status_facets.status, 200);
+    assert_eq!(status_facets.body["gaps"].as_array().unwrap().len(), 0);
+    assert_eq!(
+        status_facets.body["filtered_counts"]
+            .as_object()
+            .unwrap()
+            .len(),
+        0
+    );
+    assert_eq!(status_facets.body["facets"]["status_counts"]["done"], 1);
 
     let features = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -114,6 +131,46 @@ fn web_server_routes_work_gap_queries_through_projection() {
     assert_eq!(features.status, 200);
     assert_eq!(features.body["features"][0]["feature"]["id"], "FEA1");
     assert_eq!(features.body["matching_ids"], json!(["FEA1"]));
+}
+
+#[test]
+fn web_server_route_groups_cover_static_web_surface() {
+    let groups = API_GROUPS
+        .iter()
+        .map(|group| group.prefix)
+        .collect::<std::collections::BTreeSet<_>>();
+    for prefix in [
+        "/activity",
+        "/agents",
+        "/apps",
+        "/cache",
+        "/changes",
+        "/chat",
+        "/cluster",
+        "/dashboard",
+        "/diagnostics",
+        "/events",
+        "/files",
+        "/governance",
+        "/guidance",
+        "/import",
+        "/jobs",
+        "/nodes",
+        "/performance",
+        "/processes",
+        "/project",
+        "/quality",
+        "/reporters",
+        "/runner-workers",
+        "/settings",
+        "/system",
+        "/target-app",
+        "/upgrade",
+        "/work",
+        "/workflow",
+    ] {
+        assert!(groups.contains(prefix), "missing route group {prefix}");
+    }
 }
 
 #[test]
@@ -2301,6 +2358,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     let app_root = temp_root.join("app");
     let durable_root = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let app_registry_root = temp_root.join("run");
     fs::create_dir_all(&durable_root).unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
@@ -2315,7 +2373,8 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(status.body["attached"], true);
     assert_eq!(status.body["client_repo"], app_root.display().to_string());
     assert_eq!(status.body["apps"].as_array().unwrap().len(), 1);
-    assert!(runtime_root.join("apps.json").exists());
+    assert!(app_registry_root.join("apps.json").exists());
+    assert!(!runtime_root.join("apps.json").exists());
 
     let app_status = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -2469,6 +2528,7 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let app_root = temp_root.join("app");
     let durable_root = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let app_registry_root = temp_root.join("run");
     fs::create_dir_all(&durable_root).unwrap();
     let mut server = server_with_projection();
     server.durable_root = None;
@@ -2492,6 +2552,8 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     });
     assert_eq!(attached.status, 200);
     assert_eq!(attached.body["client_repo"], app_root.display().to_string());
+    assert!(app_registry_root.join("apps.json").exists());
+    assert!(!runtime_root.join("apps.json").exists());
 
     let settings = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -2509,6 +2571,21 @@ fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     });
     assert_eq!(created.status, 201);
     assert!(durable_root.join("gaps/GA/P1/gap.json").exists());
+
+    let daemon = LocalHttpDaemon {
+        server,
+        static_root: None,
+    };
+    let sse = daemon.handle_wire_request(HttpRequest {
+        method: "GET".to_string(),
+        path: "/api/sse".to_string(),
+        headers: BTreeMap::new(),
+        body: None,
+    });
+    assert_eq!(sse.status, 200);
+    let sse_body = String::from_utf8(sse.body).unwrap();
+    assert!(sse_body.contains("event: project_updated"));
+    assert!(sse_body.contains("\"gap_count\":1"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2627,6 +2704,47 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         path: "/api/gaps".to_string(),
         body: Some(json!({"id": "GAP1", "name": "Dashboard Gap"})),
     });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({"id": "GAP2", "name": "Finished Dashboard Gap"})),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({"id": "GAP3", "name": "Cancelled Dashboard Gap"})),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP1/rounds".to_string(),
+        body: Some(json!({"reporter": "Alice", "actual": "Needs work", "target": "Works"})),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP2/rounds".to_string(),
+        body: Some(json!({"reporter": "Alice", "actual": "Needs work", "target": "Works"})),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP3/rounds".to_string(),
+        body: Some(json!({"reporter": "Bob", "actual": "Needs work", "target": "Works"})),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["GAP2"],
+            "update": {"status": "done"}
+        })),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["GAP3"],
+            "update": {"status": "cancelled"}
+        })),
+    });
     FileActivityService::new(&durable_root)
         .append(ActivityEntry {
             id: "act-dashboard".to_string(),
@@ -2640,6 +2758,12 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
             actions: Vec::new(),
         })
         .unwrap();
+    let rebuilt = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/cache/rebuild".to_string(),
+        body: None,
+    });
+    assert_eq!(rebuilt.status, 200);
 
     let dashboard = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -2650,6 +2774,22 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(dashboard.body["counts"]["backlog"], 1);
     assert_eq!(dashboard.body["active_node_id"], "default");
     assert_eq!(dashboard.body["activity"][0]["id"], "act-dashboard");
+    let reporter_stats = dashboard.body["reporter_stats"].as_array().unwrap();
+    let alice = reporter_stats
+        .iter()
+        .find(|row| row["reporter"] == "Alice")
+        .unwrap();
+    assert_eq!(alice["reported"], 2);
+    assert_eq!(alice["active"], 1);
+    assert_eq!(alice["done"], 1);
+    assert_eq!(alice["completion_rate"], 50.0);
+    let bob = reporter_stats
+        .iter()
+        .find(|row| row["reporter"] == "Bob")
+        .unwrap();
+    assert_eq!(bob["reported"], 1);
+    assert_eq!(bob["active"], 0);
+    assert_eq!(bob["done"], 0);
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()

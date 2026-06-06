@@ -901,24 +901,34 @@ impl InProcessWebServer {
             category: query_param(raw_path, "category"),
             actor: query_param(raw_path, "actor"),
         };
+        let include_facets = query_param(raw_path, "facets").is_some_and(|value| value == "1");
+        let mut facet_query = query.clone();
+        facet_query.status = None;
+        facet_query.page.offset = 0;
+        facet_query.page.limit = 0;
+        let facet_status_counts =
+            include_facets.then(|| projection.list_gaps(facet_query).filtered_status_counts);
         let result = projection.list_gaps(query);
-        ApiResponse::json(
-            200,
-            json!({
-                "gaps": result.gaps,
-                "counts": projection.status_counts(),
-                "filtered_counts": result.filtered_status_counts,
-                "matching_ids": result.matching_ids,
-                "projection_version": projection.version,
-                "page": {
-                    "limit": limit,
-                    "offset": offset,
-                    "page": page,
-                    "total": result.total,
-                    "has_more": offset + limit < result.total
-                }
-            }),
-        )
+        let mut body = json!({
+            "gaps": result.gaps,
+            "counts": projection.status_counts(),
+            "filtered_counts": result.filtered_status_counts,
+            "matching_ids": result.matching_ids,
+            "projection_version": projection.version,
+            "page": {
+                "limit": limit,
+                "offset": offset,
+                "page": page,
+                "total": result.total,
+                "has_more": offset + limit < result.total
+            }
+        });
+        if let Some(status_counts) = facet_status_counts {
+            body["facets"] = json!({
+                "status_counts": status_counts
+            });
+        }
+        ApiResponse::json(200, body)
     }
 
     pub(super) fn handle_features_list(&self, raw_path: &str) -> ApiResponse {

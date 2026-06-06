@@ -23,11 +23,35 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/apps",
-        capability: "target-app registry, attach, switch, detach, commands",
+        capability: "app registry, attach, switch, detach, clone",
+    },
+    ApiRouteGroup {
+        prefix: "/project",
+        capability: "active app status, app attach helpers, scaffold, sync",
+    },
+    ApiRouteGroup {
+        prefix: "/target-app",
+        capability: "target app lifecycle, health, generated commands",
     },
     ApiRouteGroup {
         prefix: "/work",
         capability: "Gaps, Features, imports, state transitions",
+    },
+    ApiRouteGroup {
+        prefix: "/workflow",
+        capability: "workflow scheduling, restore, enforcement",
+    },
+    ApiRouteGroup {
+        prefix: "/activity",
+        capability: "activity log, UI error events, cleanup",
+    },
+    ApiRouteGroup {
+        prefix: "/import",
+        capability: "Gap import extraction, CSV parsing, dedup, persist",
+    },
+    ApiRouteGroup {
+        prefix: "/dashboard",
+        capability: "dashboard projection and diagnostic summary",
     },
     ApiRouteGroup {
         prefix: "/agents",
@@ -38,8 +62,16 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "operation status, logs, cancel, retry",
     },
     ApiRouteGroup {
+        prefix: "/runner-workers",
+        capability: "supervised worker actions and maintenance controls",
+    },
+    ApiRouteGroup {
         prefix: "/processes",
         capability: "managed process list and controls",
+    },
+    ApiRouteGroup {
+        prefix: "/events",
+        capability: "server-sent events for app, process, job, chat updates",
     },
     ApiRouteGroup {
         prefix: "/quality",
@@ -52,6 +84,50 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     ApiRouteGroup {
         prefix: "/settings",
         capability: "project and runtime settings",
+    },
+    ApiRouteGroup {
+        prefix: "/governance",
+        capability: "governance rules and generated project rules",
+    },
+    ApiRouteGroup {
+        prefix: "/guidance",
+        capability: "operator guidance documents",
+    },
+    ApiRouteGroup {
+        prefix: "/reporters",
+        capability: "reporter registry, rename, merge, delete",
+    },
+    ApiRouteGroup {
+        prefix: "/nodes",
+        capability: "node registry, activation, ownership transfer",
+    },
+    ApiRouteGroup {
+        prefix: "/cluster",
+        capability: "cluster node registry and remote operations",
+    },
+    ApiRouteGroup {
+        prefix: "/changes",
+        capability: "git change projection and undo operations",
+    },
+    ApiRouteGroup {
+        prefix: "/cache",
+        capability: "projection cache rebuild",
+    },
+    ApiRouteGroup {
+        prefix: "/performance",
+        capability: "performance metrics and cleanup",
+    },
+    ApiRouteGroup {
+        prefix: "/files",
+        capability: "source tree, file read, source search",
+    },
+    ApiRouteGroup {
+        prefix: "/diagnostics",
+        capability: "system diagnostics",
+    },
+    ApiRouteGroup {
+        prefix: "/upgrade",
+        capability: "upgrade availability and health",
     },
 ];
 

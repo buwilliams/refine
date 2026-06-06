@@ -75,7 +75,7 @@ pub struct LocalHttpDaemon {
 
 impl LocalHttpDaemon {
     pub fn recover_runtime_state(&self) -> RefineResult<()> {
-        if let Some(durable_root) = &self.server.durable_root {
+        if let Some(durable_root) = self.server.current_durable_root()? {
             self.server
                 .chat_service(&durable_root)
                 .recover_interrupted_turns(
@@ -304,6 +304,7 @@ impl LocalDaemonWebServer for LocalHttpDaemon {
     }
 
     fn server_sent_events(&self, stream: &str) -> RefineResult<String> {
+        let projection = self.server.current_projection_with_runtime()?;
         let mut events = String::new();
         events.push_str("retry: 3000\n");
         events.push_str(&sse_event(
@@ -317,28 +318,28 @@ impl LocalDaemonWebServer for LocalHttpDaemon {
         events.push_str(&sse_event(
             "project_updated",
             json!({
-                "gap_count": self.server.projection.gaps.len(),
-                "feature_count": self.server.projection.features.len(),
-                "status_counts": self.server.projection.status_counts(),
-                "dashboard": self.server.projection.dashboard
+                "gap_count": projection.gaps.len(),
+                "feature_count": projection.features.len(),
+                "status_counts": projection.status_counts(),
+                "dashboard": projection.dashboard
             }),
         )?);
         events.push_str(&sse_event(
             "status_change",
             json!({
-                "status_counts": self.server.projection.status_counts(),
-                "attention": self.server.projection.dashboard.attention_indicators
+                "status_counts": projection.status_counts(),
+                "attention": projection.dashboard.attention_indicators
             }),
         )?);
-        if let Some(durable_root) = &self.server.durable_root {
-            if let Some(entry) = FileActivityService::new(durable_root)
+        if let Some(durable_root) = self.server.current_durable_root()? {
+            if let Some(entry) = FileActivityService::new(&durable_root)
                 .recent(1)?
                 .into_iter()
                 .next()
             {
                 events.push_str(&sse_event("activity_added", json!(entry))?);
             }
-            for payload in recent_chat_sse_events(durable_root, 10)? {
+            for payload in recent_chat_sse_events(&durable_root, 10)? {
                 events.push_str(&sse_event("chat_event", payload)?);
             }
         }

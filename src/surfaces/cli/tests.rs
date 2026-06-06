@@ -1,4 +1,4 @@
-use super::dispatch::{dispatch, explicit_durable_root_path};
+use super::dispatch::{absolute_cli_path, dispatch, explicit_durable_root_path};
 use super::*;
 use crate::core::observability::activity::ActivityService;
 use crate::core::observability::activity::FileActivityService;
@@ -28,6 +28,19 @@ fn explicit_durable_root_path_detects_internal_cli_escape_hatch() {
         },
     };
     assert_eq!(explicit_durable_root_path(&default_daemon_command), None);
+}
+
+#[test]
+fn system_start_resolves_relative_runtime_root_before_spawning_daemon() {
+    let cwd = std::env::current_dir().unwrap();
+    assert_eq!(
+        absolute_cli_path(PathBuf::from("run")).unwrap(),
+        cwd.join("run")
+    );
+    assert_eq!(
+        absolute_cli_path(cwd.join("already-absolute")).unwrap(),
+        cwd.join("already-absolute")
+    );
 }
 
 #[test]
