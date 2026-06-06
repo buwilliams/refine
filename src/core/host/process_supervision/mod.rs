@@ -649,8 +649,23 @@ fn process_command(spec: &ManagedProcessSpec) -> Command {
         command.current_dir(cwd);
     }
     command.envs(spec.env.iter().map(|(key, value)| (key, value)));
+    if spec.owner == ProcessOwner::Agent {
+        for key in AGENT_DIRECT_API_KEY_ENV {
+            command.env_remove(key);
+        }
+    }
     command
 }
+
+const AGENT_DIRECT_API_KEY_ENV: &[&str] = &[
+    "ANTHROPIC_API_KEY",
+    "CLAUDE_API_KEY",
+    "CODEX_API_KEY",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "GOOGLE_GENAI_API_KEY",
+    "OPENAI_API_KEY",
+];
 
 fn process_isolation_label(limits: Option<&ProcessResourceLimits>) -> &'static str {
     if limits.is_some() {
@@ -1008,6 +1023,39 @@ mod tests {
         .unwrap();
         assert!(!registry.contains("secret-value"));
 
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_strips_direct_api_keys_from_agent_processes() {
+        let temp_root = unique_temp_dir("process-agent-env");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+
+        let output = supervisor
+            .run_to_completion(ManagedProcessSpec {
+                owner: ProcessOwner::Agent,
+                command: shell_binary().to_string(),
+                args: shell_args(
+                    "printf '%s:%s' \"${OPENAI_API_KEY-unset}\" \"${ANTHROPIC_API_KEY-unset}\"",
+                )
+                .to_vec(),
+                cwd: None,
+                env: vec![
+                    ("OPENAI_API_KEY".to_string(), "bad-openai-key".to_string()),
+                    (
+                        "ANTHROPIC_API_KEY".to_string(),
+                        "bad-anthropic-key".to_string(),
+                    ),
+                ],
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
+            })
+            .unwrap();
+
+        assert_eq!(output.stdout, "unset:unset");
         fs::remove_dir_all(temp_root).unwrap();
     }
 

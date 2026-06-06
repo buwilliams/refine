@@ -79,10 +79,10 @@ impl HostAgentProviderService {
                 "codex",
                 "codex_json",
                 true,
-                true,
+                false,
             )),
             "gemini" => Some(ProviderSpec::new(
-                "gemini", "Gemini", "gemini", "plain", false, true,
+                "gemini", "Gemini", "gemini", "plain", false, false,
             )),
             "copilot" => Some(ProviderSpec::new(
                 "copilot",
