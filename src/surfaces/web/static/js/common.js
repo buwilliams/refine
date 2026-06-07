@@ -123,10 +123,10 @@ function renderNoProjectEmptyState(title = "Refine") {
   renderBanners([]);
   $("#main").innerHTML = `
     <h2>${htmlEscape(title)}</h2>
-    <div class="empty-state">
+    <div class="empty-state" data-testid="no-project-empty">
       <div class="empty-state-title">No app configured.</div>
       <p class="muted">Open the Guide to configure Refine and attach an app.</p>
-      <button type="button" class="secondary" id="empty-open-guide">Open Guide</button>
+      <button type="button" class="secondary" id="empty-open-guide" data-testid="no-project-open-guide">Open Guide</button>
     </div>`;
   $("#empty-open-guide")?.addEventListener("click", () => {
     if (typeof openGuide === "function") {
@@ -449,6 +449,7 @@ function toast(message, kind = "info") {
   }
   const el = document.createElement("div");
   el.className = `toast ${kind}`;
+  el.dataset.testid = "toast";
   el.textContent = message;
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 4000);
@@ -846,46 +847,46 @@ function openProjectAttachModal({
     const root = document.createElement("div");
     root.className = "modal-backdrop project-setup-backdrop";
     root.innerHTML = `
-      <div class="modal project-setup-modal" role="dialog" aria-modal="true" aria-labelledby="project-setup-title">
-        <form id="project-setup-form">
+      <div class="modal project-setup-modal" role="dialog" aria-modal="true" aria-labelledby="project-setup-title" data-testid="project-setup-modal">
+        <form id="project-setup-form" data-testid="project-setup-form">
           <div class="modal-title" id="project-setup-title">${htmlEscape(title)}</div>
           <div class="modal-body">
             <p class="muted">${htmlEscape(message)}</p>
             <div class="project-setup-field">
               <label for="project-setup-path">Project path or Git remote</label>
               <div class="project-setup-input-row">
-                <input id="project-setup-path" name="path" type="text" class="modal-input"
+                <input id="project-setup-path" name="path" type="text" class="modal-input" data-testid="project-setup-path"
                        placeholder="/path/to/app or git@github.com:org/app.git" autocomplete="off" required
                        value="${htmlEscape(defaultPath)}">
-                <button type="button" class="secondary project-setup-icon-btn" id="project-setup-path-browse"
+                <button type="button" class="secondary project-setup-icon-btn" id="project-setup-path-browse" data-testid="project-setup-path-browse"
                         title="Browse local folders" aria-label="Browse local folders">
                   ${projectSetupFolderIcon()}
                 </button>
               </div>
-              <div class="project-setup-path-preview" id="project-setup-path-preview"></div>
+              <div class="project-setup-path-preview" id="project-setup-path-preview" data-testid="project-setup-path-preview"></div>
             </div>
             <div class="project-setup-field">
               <label for="project-setup-clone-path">Local destination</label>
               <div class="project-setup-input-row">
-                <input id="project-setup-clone-path" name="clone_path" type="text" class="modal-input"
+                <input id="project-setup-clone-path" name="clone_path" type="text" class="modal-input" data-testid="project-setup-clone-path"
                        placeholder="Default: next to the Refine checkout" autocomplete="off" disabled>
-                <button type="button" class="secondary project-setup-icon-btn" id="project-setup-clone-browse"
+                <button type="button" class="secondary project-setup-icon-btn" id="project-setup-clone-browse" data-testid="project-setup-clone-browse"
                         title="Browse clone destination" aria-label="Browse clone destination" disabled>
                   ${projectSetupFolderIcon()}
                 </button>
               </div>
-              <div class="project-setup-path-preview" id="project-setup-clone-preview"></div>
+              <div class="project-setup-path-preview" id="project-setup-clone-preview" data-testid="project-setup-clone-preview"></div>
             </div>
             <p class="muted small">
               If the directory does not exist, refine will create it and run git init.
               If you paste a Git remote, refine will clone it first; private repos
               require working host credentials.
             </p>
-            <div class="form-error" id="project-setup-error" style="display:none"></div>
+            <div class="form-error" id="project-setup-error" data-testid="project-setup-error" style="display:none"></div>
           </div>
           <div class="modal-actions">
-            <button class="secondary" type="button" id="project-setup-cancel">Cancel</button>
-            <button type="submit" id="project-setup-submit">${htmlEscape(okLabel)}</button>
+            <button class="secondary" type="button" id="project-setup-cancel" data-testid="project-setup-cancel">Cancel</button>
+            <button type="submit" id="project-setup-submit" data-testid="project-setup-submit">${htmlEscape(okLabel)}</button>
           </div>
         </form>
       </div>`;
@@ -1154,24 +1155,24 @@ function openProjectTemplateModal(templates) {
     const root = document.createElement("div");
     root.className = "modal-backdrop project-template-backdrop";
     root.innerHTML = `
-      <div class="modal project-template-modal" role="dialog" aria-modal="true" aria-labelledby="project-template-title">
+      <div class="modal project-template-modal" role="dialog" aria-modal="true" aria-labelledby="project-template-title" data-testid="project-template-modal">
         <div class="modal-title" id="project-template-title">Select app template</div>
         <div class="modal-body">
           <p class="muted small">
             This app does not have application code yet. Refine will create a high-priority Gap for the selected scaffold.
           </p>
-          <div class="project-template-options">
+          <div class="project-template-options" data-testid="project-template-options">
             ${templates.map((template) => `
-              <button type="button" class="project-template-option" data-template-id="${htmlEscape(template.id)}">
+              <button type="button" class="project-template-option" data-testid="project-template-option" data-template-id="${htmlEscape(template.id)}">
                 <span class="project-template-name">${htmlEscape(template.name || template.id)}</span>
                 <span class="project-template-summary">${htmlEscape(template.summary || "")}</span>
               </button>
             `).join("")}
           </div>
-          <div class="form-error" id="project-template-error" style="display:none"></div>
+          <div class="form-error" id="project-template-error" data-testid="project-template-error" style="display:none"></div>
         </div>
         <div class="modal-actions">
-          <button class="secondary" type="button" id="project-template-cancel">Skip</button>
+          <button class="secondary" type="button" id="project-template-cancel" data-testid="project-template-cancel">Skip</button>
         </div>
       </div>`;
     document.body.appendChild(root);
@@ -1235,7 +1236,7 @@ function _openModal(buildBody, onResolveDefault, focusSel) {
     const root = document.createElement("div");
     root.className = "modal-backdrop";
     const body = buildBody();
-    root.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${body}</div>`;
+    root.innerHTML = `<div class="modal" role="dialog" aria-modal="true" data-testid="modal-dialog">${body}</div>`;
     document.body.appendChild(root);
 
     let resolved = false;
@@ -1285,11 +1286,11 @@ function modalPrompt(label, defaultValue = "", {
     ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
     <div class="modal-body">
       <label>${htmlEscape(label)}</label>
-      <input type="text" class="modal-input" value="${htmlEscape(defaultValue)}">
+      <input type="text" class="modal-input" data-testid="modal-input" value="${htmlEscape(defaultValue)}">
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>${htmlEscape(cancelLabel)}</button>
-      <button data-ok>${htmlEscape(okLabel)}</button>
+      <button class="secondary" data-cancel data-testid="modal-cancel">${htmlEscape(cancelLabel)}</button>
+      <button data-ok data-testid="modal-ok">${htmlEscape(okLabel)}</button>
     </div>`;
   return _openModal(body, { cancel: null, ok: "" }, ".modal-input");
 }
@@ -1301,8 +1302,8 @@ function modalConfirm(message, {
     ${title ? `<div class="modal-title">${htmlEscape(title)}</div>` : ""}
     <div class="modal-body modal-message-body">${htmlEscape(message)}</div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>${htmlEscape(cancelLabel)}</button>
-      <button ${danger ? 'class="danger"' : ""} data-ok>${htmlEscape(okLabel)}</button>
+      <button class="secondary" data-cancel data-testid="modal-cancel">${htmlEscape(cancelLabel)}</button>
+      <button ${danger ? 'class="danger"' : ""} data-ok data-testid="modal-ok">${htmlEscape(okLabel)}</button>
     </div>`;
   return _openModal(body, { cancel: false, ok: true }, "[data-ok]");
 }
@@ -1408,18 +1409,19 @@ function renderPaginationControls(idPrefix, pageMeta = {}, itemCount = 0,
   if (!hasPrev && !hasNext) return "";
   const start = itemCount ? offset + 1 : offset;
   const end = offset + itemCount;
+  const pluralNoun = noun === "entry" ? "entries" : `${noun}s`;
   const label = itemCount
-    ? `${start}-${end} ${noun}${itemCount === 1 ? "" : "s"}`
+    ? `${start}-${end} ${itemCount === 1 ? noun : pluralNoun}`
     : `Page ${page}`;
   return `
-    <div class="pagination" id="${htmlEscape(idPrefix)}-pagination">
+    <div class="pagination" id="${htmlEscape(idPrefix)}-pagination" data-testid="${htmlEscape(idPrefix)}-pagination">
       <span class="muted small">${htmlEscape(label)}</span>
       <span class="spacer"></span>
-      ${showBoundaries ? `<button class="secondary small" data-page="1" ${hasPrev ? "" : "disabled"}>First</button>` : ""}
-      <button class="secondary small" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>Previous</button>
-      <span class="muted small">Page ${page}</span>
-      <button class="secondary small" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Next</button>
-      ${showBoundaries ? `<button class="secondary small" data-page="${lastPage}" ${page < lastPage ? "" : "disabled"}>Last</button>` : ""}
+      ${showBoundaries ? `<button class="secondary small" data-testid="${htmlEscape(idPrefix)}-page-first" data-page="1" ${hasPrev ? "" : "disabled"}>First</button>` : ""}
+      <button class="secondary small" data-testid="${htmlEscape(idPrefix)}-page-prev" data-page="${page - 1}" ${hasPrev ? "" : "disabled"}>Previous</button>
+      <span class="muted small" data-testid="${htmlEscape(idPrefix)}-page-current">Page ${page}</span>
+      <button class="secondary small" data-testid="${htmlEscape(idPrefix)}-page-next" data-page="${page + 1}" ${hasNext ? "" : "disabled"}>Next</button>
+      ${showBoundaries ? `<button class="secondary small" data-testid="${htmlEscape(idPrefix)}-page-last" data-page="${lastPage}" ${page < lastPage ? "" : "disabled"}>Last</button>` : ""}
     </div>`;
 }
 
@@ -1661,6 +1663,8 @@ document.addEventListener("change", async (e) => {
       if (newName) e.target.dispatchEvent(new Event("change-after-add"));
     } else if (e.target.value) {
       setLastReporter(e.target.value);
+    } else {
+      setLastReporter("");
     }
   }
 });

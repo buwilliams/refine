@@ -13,3 +13,18 @@ export async function ensureAttachedProject(request: APIRequestContext): Promise
   expect(status.attached).toBe(true);
   expect(String(status.client_repo ?? "")).toMatch(/rust-test-app$/);
 }
+
+export async function projectStatus(request: APIRequestContext): Promise<Record<string, unknown>> {
+  return jsonObject(await request.get("/api/project/status"));
+}
+
+export async function detachProject(request: APIRequestContext): Promise<Record<string, unknown>> {
+  return jsonObject(await request.post("/api/project/detach"));
+}
+
+export async function attachProject(
+  request: APIRequestContext,
+  path: string,
+): Promise<Record<string, unknown>> {
+  return jsonObject(await request.post("/api/project/attach", { data: { path } }));
+}

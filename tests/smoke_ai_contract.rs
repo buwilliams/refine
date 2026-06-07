@@ -71,7 +71,10 @@ fn smoke_ai_contract() {
             "smoke-ai gap-agent response",
         ),
         ("Import these CSV rows into gaps.", "\"kind\": \"import\""),
-        ("Check the target app and report health.", "\"kind\": \"target-app\""),
+        (
+            "Check the target app and report health.",
+            "\"kind\": \"target-app\"",
+        ),
         (
             "Generate governance rules for this project.",
             "smoke-ai governance response",
@@ -83,7 +86,17 @@ fn smoke_ai_contract() {
         assert!(stdout(&result).contains(expected), "prompt: {prompt}");
     }
 
-    let stdin = run_smoke_ai(&[], Some("Please import this markdown list into Refine."), false);
+    let delayed_started_at = std::time::Instant::now();
+    let delayed = run_smoke_ai(&["Start a smoke-ai queue delay chat turn."], None, false);
+    assert!(delayed.status.success(), "stderr: {}", stderr(&delayed));
+    assert!(stdout(&delayed).contains("smoke-ai chat response"));
+    assert!(delayed_started_at.elapsed() >= std::time::Duration::from_millis(3_500));
+
+    let stdin = run_smoke_ai(
+        &[],
+        Some("Please import this markdown list into Refine."),
+        false,
+    );
     assert!(stdin.status.success());
     assert!(stdout(&stdin).contains("\"kind\": \"import\""));
 

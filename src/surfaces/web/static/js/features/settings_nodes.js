@@ -7,60 +7,61 @@ function renderSettingsNodesTab({
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Nodes", "node-manage")}</h3>
       <p class="scope-label muted small">Project-wide</p>
-      <table class="table">
+      <table class="table" data-testid="node-settings-table">
         <thead><tr><th>Name</th><th>ID</th><th>Gaps</th><th></th></tr></thead>
         <tbody>
           ${nodes.map((inst) => {
             const counts = nodeCounts[inst.id] || {};
             const total = Object.values(counts).reduce((a, b) => a + Number(b || 0), 0);
             const isActive = inst.id === activeNodeId;
-            return `<tr>
-              <td>${htmlEscape(inst.display_name || inst.id)} ${isActive ? `<span class="filter-pill">active</span>` : ""}${inst.archived ? ` <span class="muted small">archived</span>` : ""}</td>
-              <td><code>${htmlEscape(inst.id)}</code></td>
+            return `<tr data-testid="node-settings-row" data-node-id="${htmlEscape(inst.id)}">
+              <td data-testid="node-settings-name">${htmlEscape(inst.display_name || inst.id)} ${isActive ? `<span class="filter-pill">active</span>` : ""}${inst.archived ? ` <span class="muted small">archived</span>` : ""}</td>
+              <td data-testid="node-settings-id"><code>${htmlEscape(inst.id)}</code></td>
               <td class="muted small">${total}</td>
               <td class="actions">
-                <button class="secondary" data-node-activate="${htmlEscape(inst.id)}" ${isActive || inst.archived ? "disabled" : ""}>Activate</button>
-                <button class="secondary" data-node-rename="${htmlEscape(inst.id)}" data-name="${htmlEscape(inst.display_name || inst.id)}">Rename</button>
-                <button class="danger" data-node-archive="${htmlEscape(inst.id)}" ${isActive ? "disabled" : ""}>Archive</button>
+                <button class="secondary" data-node-activate="${htmlEscape(inst.id)}" data-testid="node-activate" ${isActive || inst.archived ? "disabled" : ""}>Activate</button>
+                <button class="secondary" data-node-rename="${htmlEscape(inst.id)}" data-name="${htmlEscape(inst.display_name || inst.id)}" data-testid="node-rename">Rename</button>
+                <button class="danger" data-node-archive="${htmlEscape(inst.id)}" data-testid="node-archive" ${isActive ? "disabled" : ""}>Archive</button>
               </td>
             </tr>`;
           }).join("")}
         </tbody>
       </table>
       <div class="actions" style="margin-top:8px">
-        <button id="node-add">Create node</button>
+        <button id="node-add" data-testid="node-add">Create node</button>
       </div>
     </section>
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Cluster", "cluster-manage")}</h3>
       <p class="scope-label muted small">Git-synced remote nodes</p>
-      <table class="table">
+      <table class="table" data-testid="cluster-node-table">
         <thead><tr><th>Name</th><th>Host</th><th>Port</th><th>Refine</th><th>Status</th><th></th></tr></thead>
         <tbody>
           ${(clusterNodes || []).map((node) => `
-            <tr>
-              <td>${htmlEscape(node.display_name || node.id)}<br><code>${htmlEscape(node.id)}</code></td>
-              <td>${htmlEscape(node.ssh_host || "")}</td>
-              <td>${htmlEscape(String(node.ssh_port || 22))}</td>
-              <td>${htmlEscape(String(node.refine_port || 8080))}</td>
-              <td>${node.enabled === false ? "disabled" : htmlEscape(node.health?.status || "enabled")}</td>
+            <tr data-testid="cluster-node-row" data-cluster-node-id="${htmlEscape(node.id)}">
+              <td data-testid="cluster-node-name">${htmlEscape(node.display_name || node.id)}<br><code>${htmlEscape(node.id)}</code></td>
+              <td data-testid="cluster-node-host">${htmlEscape(node.ssh_host || "")}</td>
+              <td data-testid="cluster-node-ssh-port">${htmlEscape(String(node.ssh_port || 22))}</td>
+              <td data-testid="cluster-node-refine-port">${htmlEscape(String(node.refine_port || 8080))}</td>
+              <td data-testid="cluster-node-status">${node.enabled === false ? "disabled" : htmlEscape(node.health?.status || "enabled")}</td>
               <td class="actions">
                 <button class="secondary"
                         data-cluster-configure="${htmlEscape(node.id)}"
+                        data-testid="cluster-node-configure"
                         data-name="${htmlEscape(node.display_name || node.id)}"
                         data-ssh-host="${htmlEscape(node.ssh_host || "")}"
                         data-ssh-port="${htmlEscape(String(node.ssh_port || 22))}"
                         data-refine-checkout="${htmlEscape(node.refine_checkout || "~/refine")}"
                         data-target-app-path="${htmlEscape(node.target_app_path || "")}"
                         data-refine-port="${htmlEscape(String(node.refine_port || 8080))}">Configure</button>
-                <button class="secondary" data-cluster-bootstrap="${htmlEscape(node.id)}">Bootstrap</button>
-                <button class="secondary" data-cluster-toggle="${htmlEscape(node.id)}" data-enabled="${node.enabled === false ? "0" : "1"}">${node.enabled === false ? "Enable" : "Disable"}</button>
+                <button class="secondary" data-cluster-bootstrap="${htmlEscape(node.id)}" data-testid="cluster-node-bootstrap">Bootstrap</button>
+                <button class="secondary" data-cluster-toggle="${htmlEscape(node.id)}" data-enabled="${node.enabled === false ? "0" : "1"}" data-testid="cluster-node-toggle">${node.enabled === false ? "Enable" : "Disable"}</button>
               </td>
-            </tr>`).join("") || `<tr><td colspan="6" class="muted">No cluster nodes registered.</td></tr>`}
+            </tr>`).join("") || `<tr data-testid="cluster-node-empty"><td colspan="6" class="muted">No cluster nodes registered.</td></tr>`}
         </tbody>
       </table>
       <div class="actions" style="margin-top:8px">
-        <button id="cluster-node-add">Register cluster node</button>
+        <button id="cluster-node-add" data-testid="cluster-node-add">Register cluster node</button>
       </div>
     </section>`;
 }

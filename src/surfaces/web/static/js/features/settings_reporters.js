@@ -5,21 +5,21 @@ function renderSettingsReportersTab(reps, activeNodeLabel) {
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Reporters", "reporter-manage")}</h3>
       <p class="scope-label muted small">Node: ${htmlEscape(activeNodeLabel)}</p>
-      <table class="table">
+      <table class="table" data-testid="reporters-table">
         <thead><tr><th>Name</th><th></th></tr></thead>
         <tbody>
-          ${reps.map((r) => `<tr>
-            <td>${htmlEscape(r.name)}</td>
+          ${reps.map((r) => `<tr data-testid="reporter-row" data-reporter-id="${htmlEscape(r.id)}" data-reporter-name="${htmlEscape(r.name)}">
+            <td data-testid="reporter-name">${htmlEscape(r.name)}</td>
             <td class="actions">
-              <button class="secondary" data-rename="${r.id}" data-name="${htmlEscape(r.name)}">Rename</button>
-              <button class="secondary" data-rmerge="${r.id}" data-name="${htmlEscape(r.name)}" ${reps.length > 1 ? "" : "disabled"}>Merge</button>
-              <button class="danger" data-rdel="${r.id}">Remove</button>
+              <button class="secondary" data-testid="reporter-rename" data-rename="${r.id}" data-name="${htmlEscape(r.name)}">Rename</button>
+              <button class="secondary" data-testid="reporter-merge" data-rmerge="${r.id}" data-name="${htmlEscape(r.name)}" ${reps.length > 1 ? "" : "disabled"}>Merge</button>
+              <button class="danger" data-testid="reporter-remove" data-rdel="${r.id}">Remove</button>
             </td>
           </tr>`).join("")}
         </tbody>
       </table>
       <div class="actions" style="margin-top:8px">
-        <button id="r-add">+ Add reporter</button>
+        <button id="r-add" data-testid="reporter-add">+ Add reporter</button>
       </div>
       <p class="muted small" style="margin-top:6px">
         Renaming a reporter cascades through every Gap's rounds so historical
@@ -111,15 +111,15 @@ function openReporterMergeModal(source) {
         from the dropdown.
       </p>
       <label>${renderSettingsGuideLabel("Merge into", "reporter-merge-into")}</label>
-      <select class="modal-input" style="width:100%">
+      <select class="modal-input" data-testid="reporter-merge-target" style="width:100%">
         ${targets.map((r) => `
           <option value="${r.id}">${htmlEscape(r.name)}</option>
         `).join("")}
       </select>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button class="danger" data-ok>Merge</button>
+      <button class="secondary" data-cancel data-testid="modal-cancel">Cancel</button>
+      <button class="danger" data-ok data-testid="modal-ok">Merge</button>
     </div>`;
   return _openModal(body, { cancel: null, ok: "" }, ".modal-input");
 }

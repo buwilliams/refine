@@ -694,9 +694,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             if skipped_durable_root(&durable_root) {
-                return Err(RefineError::NotImplemented(
-                    "log bundle is not available through the daemon API yet".to_string(),
-                ));
+                let response = daemon_json(
+                    "POST",
+                    "/diagnostics/support-bundle",
+                    Some(json!({ "redact_secrets": redact_secrets })),
+                )?;
+                print_json(&response);
+                return Ok(());
             }
             let bundle = FileSupportBundleService::new(durable_root, runtime_root, repo_root)
                 .export(redact_secrets)?;
@@ -2042,8 +2046,7 @@ fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
                     "selected_ids": if selected_ids.is_empty() { None } else { Some(selected_ids) },
                     "exclude_ids": [],
                     "update": {
-                        "field": "status",
-                        "value": target.as_str()
+                        "status": target.as_str()
                     }
                 })),
             )?
@@ -2110,6 +2113,28 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
             &format!("/nodes/{}", path_segment(&id)),
             Some(json!({ "display_name": name })),
         )?,
+        NodeAction::Settings {
+            id,
+            durable_root: None,
+        } => {
+            let nodes = daemon_json("GET", "/nodes", None)?;
+            let exists = nodes
+                .get("nodes")
+                .and_then(|value| value.as_array())
+                .is_some_and(|nodes| {
+                    nodes.iter().any(|node| {
+                        node.get("id").and_then(|value| value.as_str()) == Some(id.as_str())
+                    })
+                });
+            if !exists {
+                return Err(RefineError::NotFound(format!("node {id} was not found")));
+            }
+            let settings = daemon_json("GET", "/settings", None)?;
+            json!({
+                "node_id": id,
+                "settings": settings.get("settings").cloned().unwrap_or(settings)
+            })
+        }
         NodeAction::Transfer {
             id,
             item_id,

@@ -822,10 +822,12 @@ function drawGuide() {
     <div class="guide-resize" id="guide-resize"
          role="separator" aria-orientation="vertical"
          aria-label="Resize Guide"
+         data-testid="guide-resize"
          title="Drag to resize"></div>
     <div class="guide-header">
       <h2>Guide</h2>
       <button type="button" class="secondary guide-close" id="guide-close"
+              data-testid="guide-close"
               aria-label="Close Guide" title="Close Guide">x</button>
     </div>
     <div class="guide-body">
@@ -899,6 +901,7 @@ function renderGuideTabStrip() {
           <button type="button"
                   class="settings-tab ${guideState.activeTab === tab.slug ? "active" : ""}"
                   data-guide-tab="${tab.slug}"
+                  data-testid="guide-tab-${htmlEscape(tab.slug)}"
                   role="tab"
                   aria-selected="${guideState.activeTab === tab.slug ? "true" : "false"}">
             ${htmlEscape(tab.label)}
@@ -926,6 +929,7 @@ function renderGuideReferencePane() {
           <span class="guide-reference-search-icon">${guideSearchIcon()}</span>
           <input type="search"
                  data-guide-reference-search
+                 data-testid="guide-reference-search"
                  aria-label="Search reference"
                  placeholder="Search reference"
                  value="${htmlEscape(guideState.referenceQuery)}">
@@ -952,7 +956,7 @@ function renderGuideCategory(category) {
     || category.items.some((item) => item.id === guideState.activeItem);
   const completeIcon = checklistComplete ? guideCategoryCompleteIcon() : "";
   return `
-    <details class="guide-category" data-guide-category="${htmlEscape(category.id)}" ${open ? "open" : ""}>
+    <details class="guide-category" data-guide-category="${htmlEscape(category.id)}" data-testid="guide-category-${htmlEscape(category.id)}" ${open ? "open" : ""}>
       <summary>
         <span class="guide-category-summary">
           ${guideChevronIcon()}
@@ -976,21 +980,22 @@ function renderGuideItem(item) {
   const status = guideItemStatus(item.id);
   const previous = checklist ? guideItemByOffset(item.id, -1) : null;
   const defaultButton = checklist && item.canUseDefault
-    ? `<button type="button" class="secondary" data-guide-default="${htmlEscape(item.id)}">Use default</button>`
+    ? `<button type="button" class="secondary" data-guide-default="${htmlEscape(item.id)}" data-testid="guide-default-${htmlEscape(item.id)}">Use default</button>`
     : "";
   const actions = checklist
     ? `<div class="guide-item-actions">
-          <button type="button" class="secondary" data-guide-prev="${htmlEscape(item.id)}" ${previous ? "" : "disabled"}>Prev</button>
+          <button type="button" class="secondary" data-guide-prev="${htmlEscape(item.id)}" data-testid="guide-prev-${htmlEscape(item.id)}" ${previous ? "" : "disabled"}>Prev</button>
           ${defaultButton}
-          <button type="button" class="secondary" data-guide-skip="${htmlEscape(item.id)}">Skip</button>
-          <button type="button" data-guide-complete="${htmlEscape(item.id)}">Complete</button>
+          <button type="button" class="secondary" data-guide-skip="${htmlEscape(item.id)}" data-testid="guide-skip-${htmlEscape(item.id)}">Skip</button>
+          <button type="button" data-guide-complete="${htmlEscape(item.id)}" data-testid="guide-complete-${htmlEscape(item.id)}">Complete</button>
         </div>`
     : "";
   return `
-    <div class="guide-item ${open ? "active" : ""}" data-guide-item="${htmlEscape(item.id)}">
+    <div class="guide-item ${open ? "active" : ""}" data-guide-item="${htmlEscape(item.id)}" data-testid="guide-item-${htmlEscape(item.id)}">
       <div class="guide-item-summary">
         <button type="button" class="guide-item-open"
                 data-guide-open-item="${htmlEscape(item.id)}"
+                data-testid="guide-open-item-${htmlEscape(item.id)}"
                 aria-expanded="${open ? "true" : "false"}">
           ${guideChevronIcon()}
           <span class="guide-item-title">${htmlEscape(item.title)}</span>
@@ -1016,6 +1021,7 @@ function guideStatusButton(item, status) {
     <button type="button"
             class="guide-status guide-status-${htmlEscape(status)}"
             data-guide-status="${htmlEscape(item.id)}"
+            data-testid="guide-status-${htmlEscape(item.id)}"
             aria-label="${label}: ${htmlEscape(item.title)}"
             title="${label}. Click to change checklist state.">
       ${guideStatusIcon(status)}

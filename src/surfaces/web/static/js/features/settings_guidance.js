@@ -2,9 +2,9 @@
 
 function renderGuidanceRows(items) {
   const rows = (items || []).map((item, idx) => renderGuidanceRow(item, idx)).join("");
-  if (!rows) return `<p class="muted" data-guidance-empty>No guidance configured.</p>`;
+  if (!rows) return `<p class="muted" data-guidance-empty data-testid="guidance-empty">No guidance configured.</p>`;
   return `
-    <table class="table guidance-table">
+    <table class="table guidance-table" data-testid="guidance-table">
       <thead><tr><th>Name</th><th>Status</th><th>Rule</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -16,10 +16,11 @@ function renderGuidanceRow(item = {}, idx = 0) {
   const statusText = enabled ? "Enabled" : "Disabled";
   return `
     <tr class="guidance-table-row" data-guidance-row data-guidance-open="${idx}"
+        data-testid="guidance-row"
         role="button" tabindex="0">
-      <td>${htmlEscape(item.name || "Untitled guidance")}</td>
-      <td><span class="status-pill ${statusClass}">${statusText}</span></td>
-      <td class="muted small">${htmlEscape(item.rule || "No rule provided.")}</td>
+      <td data-testid="guidance-row-name">${htmlEscape(item.name || "Untitled guidance")}</td>
+      <td><span class="status-pill ${statusClass}" data-testid="guidance-row-status">${statusText}</span></td>
+      <td class="muted small" data-testid="guidance-row-rule">${htmlEscape(item.rule || "No rule provided.")}</td>
     </tr>`;
 }
 
@@ -35,6 +36,7 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true"
+         data-testid="guidance-modal"
          aria-labelledby="guidance-modal-title" style="max-width:680px">
       <div class="modal-title" id="guidance-modal-title">${editing ? "Edit guidance" : "New guidance"}</div>
       <div class="modal-body" style="max-height:70vh;overflow:auto">
@@ -42,17 +44,20 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
           <div class="form-row">
             <label>${renderSettingsGuideLabel("Name", "guidance-name")}</label>
             <input type="text" name="name"
+                   data-testid="guidance-name-input"
                    value="${htmlEscape(current.name || "")}"
                    placeholder="e.g. Frontend accessibility">
           </div>
           <div class="form-row">
             <label>${renderSettingsGuideLabel("Rule", "guidance-rule")}</label>
             <textarea name="rule" rows="4"
+                      data-testid="guidance-rule-input"
                       placeholder="When should this guidance apply?">${htmlEscape(current.rule || "")}</textarea>
           </div>
           <div class="form-row">
             <label>${renderSettingsGuideLabel("Instructions", "guidance-instructions")}</label>
             <textarea name="instructions" rows="8"
+                      data-testid="guidance-instructions-input"
                       placeholder="What additional context should the agent receive?">${htmlEscape(current.instructions || "")}</textarea>
           </div>
           <div class="form-row guidance-status-row">
@@ -61,7 +66,7 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
               <span class="status-pill ${guidanceEnabled ? "guidance-enabled" : "guidance-disabled"}" data-enabled-status>
                 ${guidanceEnabled ? "Enabled" : "Disabled"}
               </span>
-              <button class="secondary" type="button" data-toggle-enabled>
+              <button class="secondary" type="button" data-toggle-enabled data-testid="guidance-status-toggle">
                 ${guidanceEnabled ? "Disable guidance" : "Enable guidance"}
               </button>
             </div>
@@ -69,9 +74,9 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
         </form>
       </div>
       <div class="modal-actions">
-        ${editing ? '<button class="danger" type="button" data-delete>Delete guidance</button><span class="spacer"></span>' : ""}
-        <button class="secondary" type="button" data-cancel>Cancel</button>
-        <button type="button" data-ok>${editing ? "Save guidance" : "Create guidance"}</button>
+        ${editing ? '<button class="danger" type="button" data-delete data-testid="guidance-delete">Delete guidance</button><span class="spacer"></span>' : ""}
+        <button class="secondary" type="button" data-cancel data-testid="guidance-cancel">Cancel</button>
+        <button type="button" data-ok data-testid="guidance-submit">${editing ? "Save guidance" : "Create guidance"}</button>
       </div>
     </div>`;
   document.body.appendChild(root);
@@ -176,28 +181,30 @@ function renderSettingsGuidanceTab(guidanceItems) {
         Guidance is classified against each Gap before work starts. Accepted
         guidance instructions are prepended to the agent's work prompt.
       </p>
-      <div id="guidance-list">
+      <div id="guidance-list" data-testid="guidance-list">
         ${renderGuidanceRows(guidanceItems)}
       </div>
       <div class="actions" style="margin-top:10px">
-        <button class="secondary" id="guidance-add">Add guidance</button>
+        <button class="secondary" id="guidance-add" data-testid="guidance-add">Add guidance</button>
       </div>
     </section>`;
 }
 
 function bindSettingsGuidanceTab(guidanceItems, refreshTab = "guidance") {
-  $("#guidance-list")?.addEventListener("click", (e) => {
+  const list = $("#guidance-list");
+  if (list) list.onclick = (e) => {
     const row = e.target.closest("[data-guidance-open]");
     if (row) openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab);
-  });
-  $("#guidance-list")?.addEventListener("keydown", (e) => {
+  };
+  if (list) list.onkeydown = (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     const row = e.target.closest("[data-guidance-open]");
     if (!row) return;
     e.preventDefault();
     openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab);
-  });
-  $("#guidance-add")?.addEventListener("click", () => {
+  };
+  const add = $("#guidance-add");
+  if (add) add.onclick = () => {
     openGuidanceModal(guidanceItems, null, refreshTab);
-  });
+  };
 }

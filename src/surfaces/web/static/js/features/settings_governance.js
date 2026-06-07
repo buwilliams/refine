@@ -4,18 +4,19 @@ function renderGovernanceRuleRows(rules) {
   const rows = (rules || []).map((rule) => `
     <div class="governance-rule-row">
       <input type="text" class="governance-rule-input"
+             data-testid="governance-rule-input"
              value="${htmlEscape(rule.text || "")}"
              data-rule-id="${htmlEscape(rule.id || "")}"
              data-created="${htmlEscape(rule.created || "")}"
              data-source="${htmlEscape(rule.source || "manual")}">
-      <button class="danger" data-governance-remove-rule>Remove</button>
+      <button class="danger" data-governance-remove-rule data-testid="governance-remove-rule">Remove</button>
     </div>`).join("");
   return rows || `<p class="muted small" data-empty-governance-rules>No rules yet.</p>`;
 }
 
 function renderGovernanceRules(rules) {
   return `
-    <div id="governance-rules-list">
+    <div id="governance-rules-list" data-testid="governance-rules-list">
       ${renderGovernanceRuleRows(rules)}
     </div>`;
 }
@@ -54,9 +55,10 @@ function addGovernanceRuleRow(text = "") {
   row.className = "governance-rule-row";
   row.innerHTML = `
     <input type="text" class="governance-rule-input"
+           data-testid="governance-rule-input"
            value="${htmlEscape(text)}"
            data-rule-id="" data-created="" data-source="manual">
-    <button class="danger" data-governance-remove-rule>Remove</button>
+    <button class="danger" data-governance-remove-rule data-testid="governance-remove-rule">Remove</button>
   `;
   list.appendChild(row);
   row.querySelector("[data-governance-remove-rule]").addEventListener("click", () => {
@@ -103,8 +105,8 @@ function renderSettingsGovernanceTab(gov) {
         </p>`}
       ${renderGovernanceRules(gov.rules || [])}
       <div class="actions" style="margin-top:10px">
-        <button class="secondary" id="s-governance-add-rule">Add rule</button>
-        <button class="secondary" id="s-governance-generate">Generate rules</button>
+        <button class="secondary" id="s-governance-add-rule" data-testid="governance-add-rule">Add rule</button>
+        <button class="secondary" id="s-governance-generate" data-testid="governance-generate">Generate rules</button>
       </div>
     </section>`;
 }

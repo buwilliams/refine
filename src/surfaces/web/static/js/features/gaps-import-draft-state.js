@@ -63,41 +63,41 @@ function normalizeImportFeatureDestination(raw = null) {
 function renderImportFeatureDestination(destination) {
   const dest = normalizeImportFeatureDestination(destination);
   return `
-    <div class="import-feature-destination">
+    <div class="import-feature-destination" data-testid="import-feature-destination">
       <div class="small" style="font-weight:600">Save destination</div>
       <div class="filter-row">
         <label class="checkbox-row">
-          <input type="radio" name="import-feature-mode" value="standalone" ${dest.mode === "standalone" ? "checked" : ""}>
+          <input type="radio" name="import-feature-mode" value="standalone" data-testid="import-feature-mode-standalone" ${dest.mode === "standalone" ? "checked" : ""}>
           <span>Standalone Gaps</span>
         </label>
         <label class="checkbox-row">
-          <input type="radio" name="import-feature-mode" value="new" ${dest.mode === "new" ? "checked" : ""}>
+          <input type="radio" name="import-feature-mode" value="new" data-testid="import-feature-mode-new" ${dest.mode === "new" ? "checked" : ""}>
           <span>New Feature</span>
         </label>
         <label class="checkbox-row">
-          <input type="radio" name="import-feature-mode" value="existing" ${dest.mode === "existing" ? "checked" : ""}>
+          <input type="radio" name="import-feature-mode" value="existing" data-testid="import-feature-mode-existing" ${dest.mode === "existing" ? "checked" : ""}>
           <span>Existing Feature</span>
         </label>
       </div>
       <div class="import-feature-destination-fields" data-import-feature-fields="new" ${dest.mode === "new" ? "" : "hidden"}>
         <div class="form-row">
           <label>Feature name</label>
-          <input type="text" data-import-feature-new-name value="${htmlEscape(dest.newName)}" placeholder="Settings redesign">
+          <input type="text" data-import-feature-new-name data-testid="import-feature-new-name" value="${htmlEscape(dest.newName)}" placeholder="Settings redesign">
         </div>
         <div class="form-row">
           <label>Feature description</label>
-          <textarea data-import-feature-new-description rows="3">${htmlEscape(dest.newDescription)}</textarea>
+          <textarea data-import-feature-new-description data-testid="import-feature-new-description" rows="3">${htmlEscape(dest.newDescription)}</textarea>
         </div>
       </div>
       <div class="import-feature-destination-fields" data-import-feature-fields="existing" ${dest.mode === "existing" ? "" : "hidden"}>
         <div class="form-row">
           <label>Feature</label>
-          <select data-import-feature-existing class="modal-input" data-selected="${htmlEscape(dest.existingId)}">
+          <select data-import-feature-existing data-testid="import-feature-existing" class="modal-input" data-selected="${htmlEscape(dest.existingId)}">
             <option value="">Loading Features...</option>
           </select>
         </div>
       </div>
-      <p class="muted small" data-import-feature-summary>${htmlEscape(importFeatureDestinationSummary(dest))}</p>
+      <p class="muted small" data-import-feature-summary data-testid="import-feature-summary">${htmlEscape(importFeatureDestinationSummary(dest))}</p>
     </div>`;
 }
 
@@ -137,7 +137,9 @@ function readImportFeatureDestination(root) {
 async function populateImportFeatureSelect(select) {
   const selected = select.dataset.selected || "";
   const data = await api("GET", "/api/features?limit=100&node=current");
-  const features = data.features || [];
+  const features = (data.features || [])
+    .map((item) => item.feature || item)
+    .filter((feature) => feature?.id);
   select.innerHTML = features.length
     ? features.map((feature) => `
         <option value="${htmlEscape(feature.id)}" ${feature.id === selected ? "selected" : ""}>

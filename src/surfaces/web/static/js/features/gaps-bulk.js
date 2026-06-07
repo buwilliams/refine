@@ -16,18 +16,22 @@ const BULK_STATUS_OPTIONS = [
   { value: "cancelled", label: "cancelled" },
 ];
 
+function gapsBulkFilterFromHash() {
+  const f = gapsFilterFromHash();
+  const filter = {};
+  for (const key of ["status", "q", "reporter", "feature", "node"]) {
+    if (f[key]) filter[key] = f[key];
+  }
+  if (f.rounds_gte !== "") filter.rounds_gte = parseInt(f.rounds_gte, 10);
+  if (f.rounds_lte !== "") filter.rounds_lte = parseInt(f.rounds_lte, 10);
+  return filter;
+}
+
 async function openBulkModal(field) {
   // Snapshot the current filter for display context; the mutation itself
   // targets all matching Gaps unless the user has switched to an explicit
   // picked-ID selection by clearing the header checkbox.
-  const f = gapsFilterFromHash();
-  const filter = {
-    status: f.status, q: f.q, reporter: f.reporter,
-    feature: f.feature,
-    rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
-    node: f.node,
-    severity: f.severity, category: f.category, actor: f.actor,
-  };
+  const filter = gapsBulkFilterFromHash();
   const filterDesc = describeGapsFilter(filter);
   const selectionFields = _selectionRequestFields();
   if (!_hasAnyGapSelection()) {
@@ -40,12 +44,12 @@ async function openBulkModal(field) {
   let valueControlHtml = "";
   if (field === "priority") {
     valueControlHtml = `
-      <select class="modal-input" id="bulk-value-priority" style="width:100%">
+      <select class="modal-input" id="bulk-value-priority" data-testid="bulk-value-priority" style="width:100%">
         ${BULK_PRIORITY_OPTIONS.map((p) => `<option value="${p}">${p}</option>`).join("")}
       </select>`;
   } else if (field === "status") {
     valueControlHtml = `
-      <select class="modal-input" id="bulk-value-status" style="width:100%">
+      <select class="modal-input" id="bulk-value-status" data-testid="bulk-value-status" style="width:100%">
         ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s.value}">${htmlEscape(s.label)}</option>`).join("")}
       </select>
       <p class="muted small" style="margin-top:6px">
@@ -58,7 +62,7 @@ async function openBulkModal(field) {
       .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
       .join("");
     valueControlHtml = `
-      <select class="modal-input" id="bulk-value-reporter" style="width:100%">
+      <select class="modal-input" id="bulk-value-reporter" data-testid="bulk-value-reporter" style="width:100%">
         <option value="">— pick reporter —</option>
         ${opts}
       </select>
@@ -79,8 +83,8 @@ async function openBulkModal(field) {
       ${valueControlHtml}
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>Apply</button>
+      <button class="secondary" data-cancel data-testid="bulk-cancel">Cancel</button>
+      <button data-ok data-testid="bulk-apply">Apply</button>
     </div>`;
   const next = await _openModal(
     body, { cancel: null, ok: "" }, ".modal-input",
@@ -162,14 +166,7 @@ function applyGapsFilterIndicator(f) {
 }
 
 async function openBulkTransferNodeModal() {
-  const f = gapsFilterFromHash();
-  const filter = {
-    status: f.status, q: f.q, reporter: f.reporter,
-    feature: f.feature,
-    rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
-    node: f.node,
-    severity: f.severity, category: f.category, actor: f.actor,
-  };
+  const filter = gapsBulkFilterFromHash();
   const filterDesc = describeGapsFilter(filter);
   const selectionFields = _selectionRequestFields();
   if (!_hasAnyGapSelection()) {
@@ -208,7 +205,7 @@ async function openBulkTransferNodeModal() {
         ${htmlEscape(filterDesc)}.
       </div>
       <label for="bulk-transfer-node-value">Target node</label>
-      <select class="modal-input" id="bulk-transfer-node-value" style="width:100%">
+      <select class="modal-input" id="bulk-transfer-node-value" data-testid="bulk-transfer-node-value" style="width:100%">
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
@@ -216,8 +213,8 @@ async function openBulkTransferNodeModal() {
       </p>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>Transfer</button>
+      <button class="secondary" data-cancel data-testid="bulk-transfer-cancel">Cancel</button>
+      <button data-ok data-testid="bulk-transfer-apply">Transfer</button>
     </div>`;
   const target = await _openModal(
     body, { cancel: null, ok: choices[0].id }, ".modal-input",
@@ -235,14 +232,7 @@ async function openBulkTransferNodeModal() {
 }
 
 async function openBulkAssignFeatureModal({ button = null } = {}) {
-  const f = gapsFilterFromHash();
-  const filter = {
-    status: f.status, q: f.q, reporter: f.reporter,
-    feature: f.feature,
-    rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
-    node: f.node,
-    severity: f.severity, category: f.category, actor: f.actor,
-  };
+  const filter = gapsBulkFilterFromHash();
   const filterDesc = describeGapsFilter(filter);
   const selectionFields = _selectionRequestFields();
   if (!_hasAnyGapSelection()) {
@@ -269,7 +259,14 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
     toast("No current-node Features available.", "warn");
     return;
   }
-  const opts = features.map((feature) => `
+  const featureChoices = features
+    .map((entry) => normalizeFeatureEntry(entry))
+    .filter((feature) => feature.id);
+  if (!featureChoices.length) {
+    toast("No current-node Features available.", "warn");
+    return;
+  }
+  const opts = featureChoices.map((feature) => `
     <option value="${htmlEscape(feature.id)}">
       ${htmlEscape(feature.name || feature.id)}
       · ${htmlEscape(feature.status || "backlog")}
@@ -283,7 +280,7 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
         ${htmlEscape(filterDesc)}.
       </div>
       <label for="bulk-assign-feature-value">Feature</label>
-      <select class="modal-input" id="bulk-assign-feature-value" style="width:100%">
+      <select class="modal-input" id="bulk-assign-feature-value" data-testid="bulk-assign-feature-value" style="width:100%">
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
@@ -291,11 +288,11 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
       </p>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>Assign</button>
+      <button class="secondary" data-cancel data-testid="bulk-feature-cancel">Cancel</button>
+      <button data-ok data-testid="bulk-feature-apply">Assign</button>
     </div>`;
   const featureId = await _openModal(
-    body, { cancel: null, ok: features[0].id }, ".modal-input",
+    body, { cancel: null, ok: featureChoices[0].id }, ".modal-input",
   );
   if (featureId === null) return;
   await withButtonBusy(button, "Assigning...", async () => {
@@ -308,14 +305,7 @@ async function openBulkAssignFeatureModal({ button = null } = {}) {
 }
 
 async function confirmBulkDelete() {
-  const f = gapsFilterFromHash();
-  const filter = {
-    status: f.status, q: f.q, reporter: f.reporter,
-    feature: f.feature,
-    rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
-    node: f.node,
-    severity: f.severity, category: f.category, actor: f.actor,
-  };
+  const filter = gapsBulkFilterFromHash();
   const filterDesc = describeGapsFilter(filter);
   const selectionFields = _selectionRequestFields();
   if (!_hasAnyGapSelection()) {

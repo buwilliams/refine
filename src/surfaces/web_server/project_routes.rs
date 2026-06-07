@@ -1,12 +1,18 @@
 use crate::core::supervisor::config::{
-    FileGovernanceService, FileGuidanceService, FileReporterService, FileSettingsService,
+    ConfigService, FileGovernanceService, FileGuidanceService, FileReporterService,
+    FileSettingsService,
 };
 use std::collections::BTreeMap;
 
+use chrono::Utc;
 use serde_json::{Value, json};
 
+use crate::core::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
 use crate::core::host::process_supervision::FileProcessSupervisor;
+use crate::core::host::target_apps::TargetAppGeneratedConfig;
 use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::core::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::core::product::work_items::BulkGapSelection;
@@ -15,6 +21,164 @@ use crate::model::workflow::GapStatus;
 
 use super::support::*;
 use super::*;
+
+fn configured_provider_from_settings(durable_root: &std::path::Path, body: &Value) -> String {
+    body.get("provider")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|provider| !provider.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            FileSettingsService::new(durable_root)
+                .load()
+                .ok()
+                .and_then(|settings| {
+                    settings
+                        .get("agent_cli")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|provider| !provider.is_empty())
+                        .map(str::to_string)
+                })
+        })
+        .or_else(|| {
+            provider_status_value().ok().and_then(|status| {
+                status
+                    .get("selected_provider")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|provider| !provider.is_empty())
+                    .map(str::to_string)
+            })
+        })
+        .unwrap_or_else(|| "claude".to_string())
+}
+
+fn governance_generation_prompt(product: &str, constitution: &str) -> String {
+    format!(
+        "Generate governance rules for this project. Return only concise rules, one per line, \
+         or JSON with a rules array.\n\nProduct:\n{product}\n\nConstitution:\n{constitution}"
+    )
+}
+
+fn target_app_generation_prompt(source_root: &std::path::Path) -> String {
+    format!(
+        "Generate target app config for this project. Return only JSON with kind=target-app and \
+         fields start_command, stop_command, rebuild_command, status_command, cwd, env, \
+         start_timeout_seconds, stop_timeout_seconds, rebuild_timeout_seconds, \
+         status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
+         process_check_command, and notes.\n\nProject root: {}",
+        source_root.display()
+    )
+}
+
+fn target_config_string(value: &Value, key: &str, fallback: &str) -> String {
+    value
+        .get(key)
+        .and_then(Value::as_str)
+        .unwrap_or(fallback)
+        .trim()
+        .to_string()
+}
+
+fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
+    value
+        .get(key)
+        .and_then(Value::as_u64)
+        .or_else(|| {
+            value
+                .get(key)
+                .and_then(Value::as_str)
+                .and_then(|text| text.trim().parse::<u64>().ok())
+        })
+        .unwrap_or(fallback)
+}
+
+fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedConfig> {
+    let value = serde_json::from_str::<Value>(output).ok()?;
+    let cfg = value.get("config").unwrap_or(&value);
+    let env = cfg
+        .get("env")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let start_command = target_config_string(cfg, "start_command", "");
+    let rebuild_command = target_config_string(cfg, "rebuild_command", "");
+    let status_command = target_config_string(cfg, "status_command", "");
+    if start_command.is_empty() && rebuild_command.is_empty() && status_command.is_empty() {
+        return None;
+    }
+    Some(TargetAppGeneratedConfig {
+        start_command,
+        stop_command: target_config_string(cfg, "stop_command", ""),
+        rebuild_command,
+        status_command,
+        cwd: target_config_string(cfg, "cwd", "."),
+        env,
+        start_timeout_seconds: target_config_u64(cfg, "start_timeout_seconds", 120),
+        stop_timeout_seconds: target_config_u64(cfg, "stop_timeout_seconds", 60),
+        rebuild_timeout_seconds: target_config_u64(cfg, "rebuild_timeout_seconds", 300),
+        status_timeout_seconds: target_config_u64(cfg, "status_timeout_seconds", 10),
+        log_path: target_config_string(cfg, "log_path", ""),
+        http_check_url: target_config_string(cfg, "http_check_url", ""),
+        tcp_check_host: target_config_string(cfg, "tcp_check_host", ""),
+        tcp_check_port: target_config_string(cfg, "tcp_check_port", ""),
+        process_check_command: target_config_string(cfg, "process_check_command", ""),
+        notes: target_config_string(cfg, "notes", ""),
+    })
+}
+
+fn generated_governance_rule(text: &str, index: usize) -> Value {
+    let timestamp = Utc::now().to_rfc3339();
+    json!({
+        "id": format!("generated-rule-{}-{index}", Utc::now().timestamp_millis()),
+        "text": text.chars().take(500).collect::<String>(),
+        "created": timestamp,
+        "updated": timestamp,
+        "source": "generated"
+    })
+}
+
+fn parse_generated_governance_rules(output: &str) -> Vec<Value> {
+    if let Ok(value) = serde_json::from_str::<Value>(output) {
+        let rules = value
+            .get("rules")
+            .or_else(|| value.get("items"))
+            .unwrap_or(&value);
+        if let Some(items) = rules.as_array() {
+            let parsed = items
+                .iter()
+                .enumerate()
+                .filter_map(|(index, item)| {
+                    let text = item
+                        .get("text")
+                        .or_else(|| item.get("rule"))
+                        .and_then(Value::as_str)
+                        .or_else(|| item.as_str())?
+                        .trim();
+                    (!text.is_empty()).then(|| generated_governance_rule(text, index + 1))
+                })
+                .collect::<Vec<_>>();
+            if !parsed.is_empty() {
+                return parsed;
+            }
+        }
+    }
+
+    output
+        .lines()
+        .map(|line| {
+            line.trim()
+                .trim_start_matches(|ch: char| {
+                    ch == '-' || ch == '*' || ch.is_ascii_digit() || ch == '.'
+                })
+                .trim()
+        })
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(index, line)| generated_governance_rule(line, index + 1))
+        .collect()
+}
 
 impl InProcessWebServer {
     pub(super) fn handle_dashboard(&self, raw_path: &str) -> ApiResponse {
@@ -434,10 +598,38 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_target_app_generate_instructions(&self) -> ApiResponse {
-        match self
-            .target_app_service()
-            .and_then(|service| service.generate_config())
-        {
+        let service = match self.target_app_service() {
+            Ok(service) => service,
+            Err(error) => return error_response(error),
+        };
+        let mut provider = String::new();
+        let mut source = "local".to_string();
+        let mut raw = String::new();
+        let config = match self.current_durable_root() {
+            Ok(Some(durable_root)) => {
+                provider = configured_provider_from_settings(&durable_root, &json!({}));
+                match HostAgentProviderService::new().invoke(ProviderInvocation {
+                    provider: provider.clone(),
+                    prompt: target_app_generation_prompt(&service.source_root),
+                    session_id: None,
+                    cwd: Some(service.source_root.display().to_string()),
+                }) {
+                    Ok(output) => {
+                        raw = output.clone();
+                        if let Some(config) = parse_generated_target_app_config(&output) {
+                            source = "provider".to_string();
+                            Ok(config)
+                        } else {
+                            service.generate_config()
+                        }
+                    }
+                    Err(_) => service.generate_config(),
+                }
+            }
+            Ok(None) => service.generate_config(),
+            Err(error) => Err(error),
+        };
+        match config {
             Ok(config) => {
                 let settings = json!({
                     "target_app_start_command": config.start_command.clone(),
@@ -462,7 +654,14 @@ impl InProcessWebServer {
                         "ok": true,
                         "config": config,
                         "settings": settings,
-                        "message": "Generated target-app configuration from local project files."
+                        "provider": provider,
+                        "source": source,
+                        "raw": raw,
+                        "message": if source == "provider" {
+                            "Generated target-app configuration with the configured provider."
+                        } else {
+                            "Generated target-app configuration from local project files."
+                        }
                     }),
                 )
             }
@@ -777,6 +976,13 @@ impl InProcessWebServer {
 
     pub(super) fn handle_upgrade_status(&self) -> ApiResponse {
         let current_version = env!("CARGO_PKG_VERSION");
+        let latest_version = std::env::var("REFINE_TEST_UPGRADE_LATEST_VERSION")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| current_version.to_string());
+        let upgrade_available = latest_version != current_version;
+        let local_development = !upgrade_available;
         let command = std::env::current_exe()
             .ok()
             .map(|path| path.display().to_string())
@@ -785,12 +991,16 @@ impl InProcessWebServer {
             200,
             json!({
                 "upgrade": {
-                    "available": false,
-                    "upgrade_available": false,
+                    "available": upgrade_available,
+                    "upgrade_available": upgrade_available,
                     "current_version": current_version,
-                    "latest_version": current_version,
-                    "local_development": true,
-                    "message": format!("Running native Refine {current_version}; remote release discovery is not configured for this build."),
+                    "latest_version": latest_version,
+                    "local_development": local_development,
+                    "message": if upgrade_available {
+                        format!("Refine {latest_version} is available; current version is {current_version}.")
+                    } else {
+                        format!("Running native Refine {current_version}; remote release discovery is not configured for this build.")
+                    },
                     "command": command
                 }
             }),
@@ -817,12 +1027,63 @@ impl InProcessWebServer {
 
     pub(super) fn handle_governance_generate_rules(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "generate governance rules");
-        match FileGovernanceService::new(durable_root)
-            .generate_rules(&request.body.unwrap_or_else(|| json!({})))
-        {
-            Ok(value) => ApiResponse::json(200, value),
-            Err(error) => error_response(error),
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let product = body
+            .get("product")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let constitution = body
+            .get("constitution")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if product.is_empty() || constitution.is_empty() {
+            return error_response(RefineError::InvalidInput(
+                "product and constitution are required".to_string(),
+            ));
         }
+
+        let provider = configured_provider_from_settings(&durable_root, &body);
+        let cwd = self.source_root().map(|path| path.display().to_string());
+        let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
+            provider: provider.clone(),
+            prompt: governance_generation_prompt(product, constitution),
+            session_id: None,
+            cwd,
+        }) {
+            Ok(output) => output,
+            Err(_) => {
+                return match FileGovernanceService::new(&durable_root).generate_rules(&body) {
+                    Ok(mut value) => {
+                        if let Some(object) = value.as_object_mut() {
+                            object.insert("source".to_string(), json!("static"));
+                        }
+                        ApiResponse::json(200, value)
+                    }
+                    Err(error) => error_response(error),
+                };
+            }
+        };
+        let mut rules = parse_generated_governance_rules(&output);
+        if rules.is_empty() {
+            match FileGovernanceService::new(&durable_root).generate_rules(&body) {
+                Ok(value) => {
+                    rules = value["rules"].as_array().cloned().unwrap_or_default();
+                }
+                Err(error) => return error_response(error),
+            }
+        }
+        ApiResponse::json(
+            200,
+            json!({
+                "ok": true,
+                "provider": provider,
+                "source": "provider",
+                "rules": rules,
+                "raw": output
+            }),
+        )
     }
 
     pub(super) fn handle_guidance_list(&self) -> ApiResponse {

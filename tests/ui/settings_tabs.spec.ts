@@ -1,0 +1,749 @@
+import fs from "node:fs";
+import path from "node:path";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { attachProject, ensureAttachedProject, jsonObject, projectStatus } from "./helpers";
+
+function testAppRoot(): string {
+  return process.env.REFINE_TEST_APP_ROOT ||
+    path.join(process.cwd(), "target/refine-integration/apps/rust-test-app");
+}
+
+async function answerModalPrompt(page: Page, title: string, value: string): Promise<void> {
+  await expect(page.getByTestId("modal-dialog")).toContainText(title);
+  await page.getByTestId("modal-input").fill(value);
+  await page.getByTestId("modal-ok").click();
+}
+
+test("navigates Node settings tabs from the tab strip", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  await page.goto("/#/node/application");
+  await expect(page.getByRole("heading", { name: "Node", level: 2 })).toBeVisible();
+
+  const tabs = ["application", "reporters", "processes", "performance", "target-app", "runtime"];
+  for (const tab of tabs) {
+    await page.getByTestId(`settings-tab-${tab}`).click();
+    await expect(page).toHaveURL(new RegExp(`#/node/${tab}$`));
+    await expect(page.getByTestId(`settings-tab-${tab}`)).toHaveClass(/active/);
+    await expect(page.getByTestId(`settings-pane-${tab}`)).toHaveClass(/active/);
+  }
+});
+
+test("shows runtime upgrade status on the settings surface", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const upgrade = await jsonObject(await request.get("/api/upgrade"));
+  const upgradePayload = upgrade.upgrade as Record<string, unknown>;
+  expect(upgradePayload.local_development).toBe(false);
+  expect(upgradePayload.upgrade_available).toBe(true);
+  expect(upgradePayload.latest_version).toBe("999.0.0-test");
+
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text: string) => {
+          (window as unknown as { __copiedRuntimeUpgrade?: string }).__copiedRuntimeUpgrade = text;
+        },
+      },
+    });
+  });
+
+  await page.goto("/#/settings/processes");
+  await expect(page.getByTestId("settings-pane-processes")).toHaveClass(/active/);
+  await expect(page.getByTestId("runtime-upgrade-status")).toBeVisible();
+  await expect(page.getByTestId("runtime-upgrade-message")).toHaveText("Upgrade available 999.0.0-test");
+  await expect(page.getByTestId("runtime-copy-upgrade")).toBeVisible();
+  await page.getByTestId("runtime-copy-upgrade").click();
+  await expect(page.getByText("Upgrade command copied")).toBeVisible();
+  await expect.poll(async () => page.evaluate(() =>
+    (window as unknown as { __copiedRuntimeUpgrade?: string }).__copiedRuntimeUpgrade ?? "",
+  )).toBe("./r update");
+});
+
+test("manages known apps from the Application tab", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const original = await projectStatus(request);
+  const originalPath = String(original.client_repo ?? testAppRoot());
+  const disposablePath = path.join(
+    process.cwd(),
+    `target/refine-integration/apps/application-tab-app-${Date.now()}`,
+  );
+  await request.delete("/api/apps", { data: { path: disposablePath } }).catch(() => undefined);
+  fs.rmSync(disposablePath, { recursive: true, force: true });
+
+  try {
+    await page.goto("/#/node/application");
+    await expect(page.getByTestId("project-app-select")).toContainText("rust-test-app");
+    await page.getByTestId("project-add-app").click();
+    await expect(page.getByTestId("project-setup-modal")).toBeVisible();
+    await expect(page.getByTestId("project-setup-path")).toBeFocused();
+    await page.getByTestId("project-setup-path").fill(disposablePath);
+    await expect(page.getByTestId("project-setup-path-preview")).toContainText(disposablePath);
+    const attachedNewApp = page.waitForResponse((response) =>
+      response.url().includes("/api/project/attach") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("project-setup-submit").click();
+    const attachedPayload = await (await attachedNewApp).json();
+    expect(attachedPayload.client_repo).toBe(disposablePath);
+    await expect(page.getByTestId("project-setup-modal")).toHaveCount(0);
+    await expect.poll(async () =>
+      String((await projectStatus(request)).client_repo ?? "")
+    ).toBe(disposablePath);
+    await expect(page.getByTestId("project-app-select")).toHaveValue(disposablePath);
+
+    const templates = page.waitForResponse((response) =>
+      response.url().includes("/api/project/templates") &&
+      response.request().method() === "GET" &&
+      response.status() === 200
+    );
+    await page.getByTestId("project-template").click();
+    await templates;
+    await expect(page.locator(".toast.warn", { hasText: "No app templates are available" })).toBeVisible();
+
+    await page.getByTestId("project-app-select").selectOption(originalPath);
+    const switchedBack = page.waitForResponse((response) =>
+      response.url().includes("/api/project/attach") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("project-switch-app").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Switch refine to the selected app?");
+    await page.getByTestId("modal-ok").click();
+    const switchedPayload = await (await switchedBack).json();
+    expect(switchedPayload.client_repo).toBe(originalPath);
+    await expect.poll(async () =>
+      String((await projectStatus(request)).client_repo ?? "")
+    ).toBe(originalPath);
+    await expect(page.getByTestId("project-app-select")).toHaveValue(originalPath);
+    await expect(page.getByTestId("project-app-select").locator(`option[value="${disposablePath}"]`)).toHaveCount(1);
+
+    await attachProject(request, disposablePath);
+    await page.goto("/#/node/application");
+    await expect(page.getByTestId("project-app-select")).toHaveValue(disposablePath);
+    await page.getByTestId("project-app-select").selectOption(disposablePath);
+    await expect(page.getByTestId("project-app-select")).toHaveValue(disposablePath);
+    const removed = page.waitForResponse((response) =>
+      response.url().includes("/api/apps") &&
+      response.request().method() === "DELETE" &&
+      response.status() === 200
+    );
+    await page.getByTestId("project-remove-app").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Remove this app");
+    await page.getByTestId("modal-ok").click();
+    const removedPayload = await (await removed).json();
+    expect((removedPayload.apps as Array<{ path?: string }> | undefined) ?? [])
+      .not.toEqual(expect.arrayContaining([expect.objectContaining({ path: disposablePath })]));
+    await expect.poll(async () => (await projectStatus(request)).attached).toBe(false);
+    await expect(page.getByTestId("project-app-select")).not.toContainText(path.basename(disposablePath));
+  } finally {
+    await attachProject(request, originalPath);
+    await request.delete("/api/apps", { data: { path: disposablePath } }).catch(() => undefined);
+    fs.rmSync(disposablePath, { recursive: true, force: true });
+  }
+});
+
+test("manages cluster nodes from the Application tab", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const suffix = Date.now();
+  const nodeId = `cluster-ui-${suffix}`;
+  const targetPath = `/srv/refine-target-${suffix}`;
+  await request.delete(`/api/cluster/nodes/${encodeURIComponent(nodeId)}`).catch(() => undefined);
+
+  try {
+    await page.goto("/#/node/application");
+    await expect(page.getByTestId("cluster-node-table")).toBeVisible();
+    await expect(page.getByTestId("cluster-node-add")).toBeVisible();
+
+    const registered = page.waitForResponse((response) =>
+      response.url().includes("/api/cluster/nodes") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("cluster-node-add").click();
+    await answerModalPrompt(page, "Register cluster node", nodeId);
+    await answerModalPrompt(page, "Register cluster node", "cluster.example.test");
+    await answerModalPrompt(page, "Register cluster node", targetPath);
+    const registeredPayload = await (await registered).json();
+    expect(registeredPayload.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: nodeId,
+        ssh_host: "cluster.example.test",
+        target_app_path: targetPath,
+        enabled: true,
+      }),
+    ]));
+
+    const row = page.locator(`[data-testid="cluster-node-row"][data-cluster-node-id="${nodeId}"]`);
+    await expect(row).toBeVisible();
+    await expect(row.getByTestId("cluster-node-name")).toContainText(nodeId);
+    await expect(row.getByTestId("cluster-node-host")).toHaveText("cluster.example.test");
+    await expect(row.getByTestId("cluster-node-status")).toHaveText("enabled");
+    await expect(row.getByTestId("cluster-node-toggle")).toHaveText("Disable");
+
+    const configured = page.waitForResponse((response) =>
+      response.url().includes(`/api/cluster/nodes/${nodeId}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await row.getByTestId("cluster-node-configure").click();
+    await answerModalPrompt(page, "Configure cluster node", "Cluster UI Renamed");
+    await answerModalPrompt(page, "Configure cluster node", "cluster-renamed.example.test");
+    await answerModalPrompt(page, "Configure cluster node", "2222");
+    await answerModalPrompt(page, "Configure cluster node", "~/refine-cluster");
+    await answerModalPrompt(page, "Configure cluster node", `${targetPath}/renamed`);
+    await answerModalPrompt(page, "Configure cluster node", "19090");
+    const configuredPayload = await (await configured).json();
+    expect(configuredPayload.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: nodeId,
+        display_name: "Cluster UI Renamed",
+        ssh_host: "cluster-renamed.example.test",
+        ssh_port: 2222,
+        refine_checkout: "~/refine-cluster",
+        target_app_path: `${targetPath}/renamed`,
+        refine_port: 19090,
+      }),
+    ]));
+    await expect(row.getByTestId("cluster-node-name")).toContainText("Cluster UI Renamed");
+    await expect(row.getByTestId("cluster-node-host")).toHaveText("cluster-renamed.example.test");
+    await expect(row.getByTestId("cluster-node-ssh-port")).toHaveText("2222");
+    await expect(row.getByTestId("cluster-node-refine-port")).toHaveText("19090");
+
+    const disabled = page.waitForResponse((response) =>
+      response.url().includes(`/api/cluster/nodes/${nodeId}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await row.getByTestId("cluster-node-toggle").click();
+    const disabledPayload = await (await disabled).json();
+    expect(disabledPayload.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: nodeId, enabled: false }),
+    ]));
+    await expect(row.getByTestId("cluster-node-status")).toHaveText("disabled");
+    await expect(row.getByTestId("cluster-node-toggle")).toHaveText("Enable");
+
+    const enabled = page.waitForResponse((response) =>
+      response.url().includes(`/api/cluster/nodes/${nodeId}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await row.getByTestId("cluster-node-toggle").click();
+    const enabledPayload = await (await enabled).json();
+    expect(enabledPayload.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: nodeId, enabled: true }),
+    ]));
+    await expect(row.getByTestId("cluster-node-status")).toHaveText("enabled");
+    await expect(row.getByTestId("cluster-node-toggle")).toHaveText("Disable");
+  } finally {
+    await request.delete(`/api/cluster/nodes/${encodeURIComponent(nodeId)}`).catch(() => undefined);
+  }
+});
+
+test("controls background and agent processes from the Processes tab", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  await jsonObject(await request.post("/api/processes/background", { data: { stopped: false } }));
+  await jsonObject(await request.post("/api/processes/agents", { data: { paused: false } }));
+
+  try {
+    await page.goto("/#/node/processes");
+    await expect(page.getByTestId("settings-pane-processes")).toHaveClass(/active/);
+    await expect(page.getByTestId("managed-process-table")).toBeVisible();
+
+    const backgroundRow = page.locator(
+      '[data-testid="managed-process-row"][data-process-kind="background_processes"]',
+    );
+    const agentRow = page.locator(
+      '[data-testid="managed-process-row"][data-process-kind="agent_scheduler"]',
+    );
+    await expect(backgroundRow.getByTestId("managed-process-status")).toHaveText("active");
+    await expect(backgroundRow.getByTestId("process-background-toggle")).toHaveText("Stop Background");
+    await expect(backgroundRow.getByTestId("process-hard-reset-worktree")).toBeEnabled();
+    await expect(agentRow.getByTestId("managed-process-status")).toHaveText("active");
+    await expect(agentRow.getByTestId("process-agent-toggle")).toHaveText("Pause agents");
+
+    const backgroundStopped = page.waitForResponse((response) =>
+      response.url().includes("/api/processes/background") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await backgroundRow.getByTestId("process-background-toggle").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Stop background processes?");
+    await page.getByTestId("modal-ok").click();
+    const backgroundStoppedPayload = await (await backgroundStopped).json();
+    expect(backgroundStoppedPayload.background_processes_stopped).toBe(true);
+    await expect(backgroundRow.getByTestId("managed-process-status")).toHaveText("paused");
+    await expect(backgroundRow.getByTestId("process-background-toggle")).toHaveText("Start Background");
+    await expect(backgroundRow.getByTestId("process-hard-reset-worktree")).toBeDisabled();
+
+    const backgroundStarted = page.waitForResponse((response) =>
+      response.url().includes("/api/processes/background") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await backgroundRow.getByTestId("process-background-toggle").click();
+    const backgroundStartedPayload = await (await backgroundStarted).json();
+    expect(backgroundStartedPayload.background_processes_stopped).toBe(false);
+    await expect(backgroundRow.getByTestId("managed-process-status")).toHaveText("active");
+
+    const agentsPaused = page.waitForResponse((response) =>
+      response.url().includes("/api/processes/agents") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await agentRow.getByTestId("process-agent-toggle").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Pause agent scheduling?");
+    await page.getByTestId("modal-ok").click();
+    const agentsPausedPayload = await (await agentsPaused).json();
+    expect(agentsPausedPayload.agents_paused).toBe(true);
+    await expect(agentRow.getByTestId("managed-process-status")).toHaveText("paused");
+    await expect(agentRow.getByTestId("process-agent-toggle")).toHaveText("Unpause agents");
+
+    const agentsUnpaused = page.waitForResponse((response) =>
+      response.url().includes("/api/processes/agents") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await agentRow.getByTestId("process-agent-toggle").click();
+    const agentsUnpausedPayload = await (await agentsUnpaused).json();
+    expect(agentsUnpausedPayload.agents_paused).toBe(false);
+    await expect(agentRow.getByTestId("managed-process-status")).toHaveText("active");
+  } finally {
+    await request.post("/api/processes/background", { data: { stopped: false } }).catch(() => undefined);
+    await request.post("/api/processes/agents", { data: { paused: false } }).catch(() => undefined);
+  }
+});
+
+test("autosaves Runtime Config fields", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const original = await jsonObject(await request.get("/api/settings"));
+  const originalSettings = original.settings as Record<string, unknown>;
+  const suffix = Date.now();
+  const expected = {
+    parallel_run_cap: "7",
+    branch_name_pattern: `ui-runtime-${suffix}/{gap_id}`,
+    agent_idle_timeout_seconds: "777",
+    agent_hard_cap_seconds: "9999",
+    worker_memory_limit_mb: "1536",
+    ui_memory_limit_mb: "768",
+    worker_cpu_priority: "very_low",
+    resource_isolation_mode: "best_effort",
+    agent_limit_pause_seconds: "3600",
+    chat_idle_timeout_seconds: "123",
+    backlog_promote_after_seconds: "300",
+    project_update_pulse_interval_seconds: "900",
+    file_browser_ignore_patterns: `node_modules, .git, ui-runtime-${suffix}`,
+  };
+  const restoreKeys = [...Object.keys(expected), "agent_cli"];
+  const restore = Object.fromEntries(
+    restoreKeys.map((key) => [key, String(originalSettings[key] ?? "")]),
+  );
+  const patchMatches = (responseUrl: string) => responseUrl.includes("/api/settings");
+  const fillRuntimeInput = async (testId: string, value: string) => {
+    const saved = page.waitForResponse((response) =>
+      patchMatches(response.url()) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId(testId).fill(value);
+    await page.getByTestId(testId).blur();
+    await saved;
+  };
+  const selectRuntimeOption = async (testId: string, value: string) => {
+    const saved = page.waitForResponse((response) =>
+      patchMatches(response.url()) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId(testId).selectOption(value);
+    await saved;
+  };
+
+  try {
+    await page.goto("/#/node/runtime");
+    await expect(page.getByTestId("settings-pane-runtime")).toHaveClass(/active/);
+    await fillRuntimeInput("runtime-parallel-run-cap", expected.parallel_run_cap);
+    await fillRuntimeInput("runtime-branch-name-pattern", expected.branch_name_pattern);
+    await fillRuntimeInput("runtime-agent-idle-timeout", expected.agent_idle_timeout_seconds);
+    await fillRuntimeInput("runtime-agent-hard-cap", expected.agent_hard_cap_seconds);
+    await fillRuntimeInput("runtime-worker-memory-limit", expected.worker_memory_limit_mb);
+    await fillRuntimeInput("runtime-ui-memory-limit", expected.ui_memory_limit_mb);
+    await selectRuntimeOption("runtime-worker-cpu-priority", expected.worker_cpu_priority);
+    await selectRuntimeOption("runtime-resource-isolation", expected.resource_isolation_mode);
+    await selectRuntimeOption("runtime-agent-limit-pause", expected.agent_limit_pause_seconds);
+    await fillRuntimeInput("runtime-chat-idle-timeout", expected.chat_idle_timeout_seconds);
+    await selectRuntimeOption("runtime-backlog-promote", expected.backlog_promote_after_seconds);
+    await selectRuntimeOption("runtime-project-update-pulse", expected.project_update_pulse_interval_seconds);
+    await fillRuntimeInput("runtime-file-browser-ignore", expected.file_browser_ignore_patterns);
+
+    const savedPayload = await jsonObject(await request.get("/api/settings"));
+    expect(savedPayload.settings).toEqual(expect.objectContaining(expected));
+
+    await page.reload();
+    for (const [testId, value] of [
+      ["runtime-parallel-run-cap", expected.parallel_run_cap],
+      ["runtime-branch-name-pattern", expected.branch_name_pattern],
+      ["runtime-agent-idle-timeout", expected.agent_idle_timeout_seconds],
+      ["runtime-agent-hard-cap", expected.agent_hard_cap_seconds],
+      ["runtime-worker-memory-limit", expected.worker_memory_limit_mb],
+      ["runtime-ui-memory-limit", expected.ui_memory_limit_mb],
+      ["runtime-worker-cpu-priority", expected.worker_cpu_priority],
+      ["runtime-resource-isolation", expected.resource_isolation_mode],
+      ["runtime-agent-limit-pause", expected.agent_limit_pause_seconds],
+      ["runtime-chat-idle-timeout", expected.chat_idle_timeout_seconds],
+      ["runtime-backlog-promote", expected.backlog_promote_after_seconds],
+      ["runtime-project-update-pulse", expected.project_update_pulse_interval_seconds],
+      ["runtime-file-browser-ignore", expected.file_browser_ignore_patterns],
+    ] as const) {
+      await expect(page.getByTestId(testId)).toHaveValue(value);
+    }
+  } finally {
+    await request.patch("/api/settings", { data: restore });
+  }
+});
+
+test("navigates Governance settings tabs from the tab strip", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  await page.goto("/#/project/governance");
+  await expect(page.getByRole("heading", { name: "Governance", level: 2 })).toBeVisible();
+
+  for (const tab of ["governance", "quality", "guidance"]) {
+    await page.getByTestId(`settings-tab-${tab}`).click();
+    await expect(page).toHaveURL(new RegExp(`#/project/${tab}$`));
+    await expect(page.getByTestId(`settings-tab-${tab}`)).toHaveClass(/active/);
+    await expect(page.getByTestId(`settings-pane-${tab}`)).toHaveClass(/active/);
+  }
+});
+
+async function seedPerformanceMetrics(request: APIRequestContext) {
+  for (const path of ["/", "/api/project/status", "/api/settings", "/api/reporters"]) {
+    await request.get(path);
+  }
+}
+
+async function waitForPerformanceMetrics(
+  request: APIRequestContext,
+  minEvents = 1,
+) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const payload = await jsonObject(
+      await request.get("/api/performance?operation=http.request&limit=50&offset=0"),
+    );
+    if (Number(payload.total_event_count ?? 0) >= minEvents) return payload;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return jsonObject(await request.get("/api/performance?operation=http.request&limit=50&offset=0"));
+}
+
+test("filters, refreshes, prunes, and clears Performance metrics", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  await jsonObject(await request.post("/api/performance/cleanup", { data: { clear: true } }));
+  await seedPerformanceMetrics(request);
+  const seeded = await waitForPerformanceMetrics(request, 2);
+  expect(seeded.operations).toEqual(expect.arrayContaining(["http.request"]));
+
+  await page.goto("/#/node/performance");
+  await expect(page.getByTestId("settings-pane-performance")).toHaveClass(/active/);
+  await expect(page.getByTestId("performance-summary-table")).toBeVisible();
+  await expect(
+    page.getByTestId("performance-summary-row").filter({ hasText: "http.request" }),
+  ).toHaveCount(1);
+  await expect(page.getByTestId("performance-events-table")).toBeVisible();
+  await expect(page.getByTestId("performance-event-row").first()).toContainText("http.request");
+
+  await page.getByTestId("performance-filter-shell").locator("summary").click();
+  const operationFiltered = page.waitForResponse((response) =>
+    response.url().includes("/api/performance?") &&
+    response.url().includes("operation=http.request") &&
+    response.status() === 200
+  );
+  await page.getByTestId("performance-operation-filter").selectOption("http.request");
+  await operationFiltered;
+  await expect(page).toHaveURL(/#\/node\/performance\?operation=http\.request/);
+  await expect(page.getByTestId("performance-filtered-pill")).toBeVisible();
+  await expect(page.getByTestId("performance-event-operation").first()).toHaveText("http.request");
+
+  const successFiltered = page.waitForResponse((response) =>
+    response.url().includes("/api/performance?") &&
+    response.url().includes("success=1") &&
+    response.status() === 200
+  );
+  await page.getByTestId("performance-success-filter").selectOption("1");
+  await successFiltered;
+  await expect(page).toHaveURL(/success=1/);
+  await expect(page.getByTestId("performance-event-outcome").first()).toHaveText("success");
+
+  const limitFiltered = page.waitForResponse((response) =>
+    response.url().includes("/api/performance?") &&
+    response.url().includes("limit=100") &&
+    response.status() === 200
+  );
+  await page.getByTestId("performance-limit-filter").selectOption("100");
+  await limitFiltered;
+  await expect(page).toHaveURL(/limit=100/);
+
+  await page.getByTestId("performance-clear-filters").click();
+  await expect(page).toHaveURL(/#\/node\/performance$/);
+  await expect(page.getByTestId("performance-filtered-pill")).toBeHidden();
+
+  const refreshed = page.waitForResponse((response) =>
+    response.url().includes("/api/performance?") && response.status() === 200
+  );
+  await page.getByTestId("performance-refresh").click();
+  await refreshed;
+  await expect(page.getByTestId("performance-events-table")).toBeVisible();
+
+  const pruned = page.waitForResponse((response) =>
+    response.url().includes("/api/performance/cleanup") &&
+    response.request().method() === "POST" &&
+    response.status() === 200
+  );
+  await page.getByTestId("performance-prune").click();
+  await pruned;
+  await expect(page.getByTestId("performance-events-table")).toBeVisible();
+
+  await page.getByTestId("performance-clear").click();
+  await expect(page.getByTestId("modal-dialog")).toContainText("Clear metrics");
+  const cleared = page.waitForResponse((response) =>
+    response.url().includes("/api/performance/cleanup") &&
+    response.request().method() === "POST" &&
+    response.status() === 200
+  );
+  await page.getByTestId("modal-ok").click();
+  const clearPayload = await (await cleared).json();
+  expect(clearPayload.cleared).toBe(true);
+  expect(clearPayload.retained).toBe(0);
+  expect(Number(clearPayload.deleted ?? 0)).toBeGreaterThan(0);
+  await expect(page.getByTestId("performance-total-stored")).toBeVisible();
+});
+
+test("manages reporters from Node settings", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const suffix = Date.now();
+  const sourceName = `Reporter source ${suffix}`;
+  const renamedSource = `Reporter renamed ${suffix}`;
+  const targetName = `Reporter target ${suffix}`;
+  const createdIds = new Set<string>();
+
+  const reporterNames = async () => {
+    const payload = await jsonObject(await request.get("/api/reporters"));
+    const reporters = payload.reporters as Array<{ id?: number | string; name?: string }> | undefined ?? [];
+    return reporters.map((reporter) => String(reporter.name ?? ""));
+  };
+  const rowFor = (name: string) => page.getByTestId("reporter-row").filter({ hasText: name });
+  const addReporter = async (name: string) => {
+    await page.getByTestId("reporter-add").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Add reporter");
+    await page.getByTestId("modal-input").fill(name);
+    const created = page.waitForResponse((response) =>
+      response.url().includes("/api/reporters") &&
+      response.request().method() === "POST" &&
+      response.status() === 201
+    );
+    await page.getByTestId("modal-ok").click();
+    const payload = await (await created).json();
+    const id = String(payload.reporter?.id ?? "");
+    expect(id).toBeTruthy();
+    createdIds.add(id);
+    await expect(rowFor(name)).toHaveCount(1);
+    return id;
+  };
+
+  try {
+    await page.goto("/#/node/reporters");
+    await expect(page.getByTestId("settings-pane-reporters")).toHaveClass(/active/);
+
+    const sourceId = await addReporter(sourceName);
+    const targetId = await addReporter(targetName);
+    expect(await reporterNames()).toEqual(expect.arrayContaining([sourceName, targetName]));
+
+    await rowFor(sourceName).getByTestId("reporter-rename").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Rename reporter");
+    await page.getByTestId("modal-input").fill(renamedSource);
+    const renamed = page.waitForResponse((response) =>
+      response.url().includes(`/api/reporters/${encodeURIComponent(sourceId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await renamed;
+    await expect(rowFor(renamedSource)).toHaveCount(1);
+    expect(await reporterNames()).toEqual(expect.arrayContaining([renamedSource, targetName]));
+
+    await rowFor(renamedSource).getByTestId("reporter-merge").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Merge reporter");
+    await page.getByTestId("reporter-merge-target").selectOption(targetId);
+    const merged = page.waitForResponse((response) =>
+      response.url().includes(`/api/reporters/${encodeURIComponent(sourceId)}/merge`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await merged;
+    createdIds.delete(sourceId);
+    await expect(rowFor(renamedSource)).toHaveCount(0);
+    await expect(rowFor(targetName)).toHaveCount(1);
+    expect(await reporterNames()).not.toContain(renamedSource);
+
+    await rowFor(targetName).getByTestId("reporter-remove").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Remove reporter");
+    const removed = page.waitForResponse((response) =>
+      response.url().includes(`/api/reporters/${encodeURIComponent(targetId)}`) &&
+      response.request().method() === "DELETE" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await removed;
+    createdIds.delete(targetId);
+    await expect(rowFor(targetName)).toHaveCount(0);
+    expect(await reporterNames()).not.toContain(targetName);
+  } finally {
+    for (const id of Array.from(createdIds)) {
+      await request.delete(`/api/reporters/${encodeURIComponent(id)}`);
+    }
+  }
+});
+
+test("creates, edits, disables, and deletes Guidance entries", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const originalPayload = await jsonObject(await request.get("/api/guidance"));
+  const originalGuidance = originalPayload.guidance as Array<Record<string, unknown>> | undefined ?? [];
+  const suffix = Date.now();
+  const name = `Guidance smoke ${suffix}`;
+  const renamed = `Guidance smoke renamed ${suffix}`;
+  const rule = `Apply to smoke guidance ${suffix}`;
+  const instructions = `Use deterministic guidance instructions ${suffix}.`;
+  const updatedRule = `Apply to renamed smoke guidance ${suffix}`;
+  const updatedInstructions = `Use updated deterministic guidance instructions ${suffix}.`;
+  const rowFor = (label: string) => page.getByTestId("guidance-row").filter({ hasText: label });
+
+  try {
+    await page.goto("/#/project/guidance");
+    await expect(page.getByTestId("settings-pane-guidance")).toHaveClass(/active/);
+
+    await page.getByTestId("guidance-add").click();
+    await expect(page.getByTestId("guidance-modal")).toContainText("New guidance");
+    await page.getByTestId("guidance-name-input").fill(name);
+    await page.getByTestId("guidance-rule-input").fill(rule);
+    await page.getByTestId("guidance-instructions-input").fill(instructions);
+    const created = page.waitForResponse((response) =>
+      response.url().includes("/api/guidance") &&
+      response.request().method() === "PUT" &&
+      response.status() === 200
+    );
+    await page.getByTestId("guidance-submit").click();
+    await created;
+    await expect(rowFor(name)).toHaveCount(1);
+    await expect(rowFor(name).getByTestId("guidance-row-status")).toHaveText("Enabled");
+
+    await rowFor(name).click();
+    await expect(page.getByTestId("guidance-modal")).toContainText("Edit guidance");
+    await page.getByTestId("guidance-name-input").fill(renamed);
+    await page.getByTestId("guidance-rule-input").fill(updatedRule);
+    await page.getByTestId("guidance-instructions-input").fill(updatedInstructions);
+    await page.getByTestId("guidance-status-toggle").click();
+    const edited = page.waitForResponse((response) =>
+      response.url().includes("/api/guidance") &&
+      response.request().method() === "PUT" &&
+      response.status() === 200
+    );
+    await page.getByTestId("guidance-submit").click();
+    await edited;
+    await expect(rowFor(renamed)).toHaveCount(1);
+    await expect(rowFor(renamed).getByTestId("guidance-row-status")).toHaveText("Disabled");
+    await expect(rowFor(renamed).getByTestId("guidance-row-rule")).toHaveText(updatedRule);
+
+    const guidancePayload = await jsonObject(await request.get("/api/guidance"));
+    const guidanceItems = guidancePayload.guidance as Array<{ name?: string; enabled?: boolean; instructions?: string }> | undefined ?? [];
+    expect(guidanceItems).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        name: renamed,
+        enabled: false,
+        instructions: updatedInstructions,
+      }),
+    ]));
+
+    await rowFor(renamed).click();
+    await page.getByTestId("guidance-delete").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText(`Delete guidance "${renamed}"?`);
+    const deleted = page.waitForResponse((response) =>
+      response.url().includes("/api/guidance") &&
+      response.request().method() === "PUT" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await deleted;
+    await expect(rowFor(renamed)).toHaveCount(0);
+  } finally {
+    await request.put("/api/guidance", { data: { guidance: originalGuidance } });
+  }
+});
+
+test("shows and clears the Quality requirements warning", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const original = await jsonObject(await request.get("/api/quality"));
+  const suffix = Date.now();
+  const requirements = `Quality requirements ${suffix}`;
+  const instructions = `Quality instructions ${suffix}`;
+
+  await jsonObject(await request.patch("/api/quality", {
+    data: {
+      business_requirements: "",
+      instructions: "Temporary quality instructions",
+      enabled: "0",
+      timing: "pre_merge",
+      regressions_enabled: "0",
+    },
+  }));
+
+  try {
+    await page.goto("/#/project/quality");
+    await expect(page.getByTestId("settings-pane-quality")).toHaveClass(/active/);
+    await expect(page.getByTestId("quality-enabled-toggle")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("quality-timing-select")).toHaveValue("pre_merge");
+    await expect(page.getByTestId("quality-regressions-toggle")).toHaveAttribute("aria-pressed", "false");
+    await expect(page.getByTestId("quality-config-warning")).toContainText(
+      "Quality can run once business requirements and instructions are both filled in.",
+    );
+
+    await page.getByTestId("s-quality-business-requirements-edit").click();
+    await page.getByTestId("s-quality-business-requirements").fill(requirements);
+    const requirementsSaved = page.waitForResponse((response) =>
+      response.url().includes("/api/quality") &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("s-quality-business-requirements-edit").click();
+    await requirementsSaved;
+
+    await page.getByTestId("s-quality-instructions-edit").click();
+    await page.getByTestId("s-quality-instructions").fill(instructions);
+    const instructionsSaved = page.waitForResponse((response) =>
+      response.url().includes("/api/quality") &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("s-quality-instructions-edit").click();
+    await instructionsSaved;
+
+    const saved = await jsonObject(await request.get("/api/quality"));
+    expect(saved.configured).toBe(true);
+    expect(saved.business_requirements).toBe(requirements);
+    expect(saved.instructions).toBe(instructions);
+
+    await page.reload();
+    await expect(page.getByTestId("quality-config-warning")).toHaveCount(0);
+    await expect(page.getByTestId("s-quality-business-requirements")).toHaveValue(requirements);
+    await expect(page.getByTestId("s-quality-instructions")).toHaveValue(instructions);
+  } finally {
+    await request.patch("/api/quality", {
+      data: {
+        business_requirements: String(original.business_requirements ?? ""),
+        instructions: String(original.instructions ?? ""),
+        enabled: String(original.enabled ?? "0"),
+        timing: String(original.timing ?? "pre_merge"),
+        regressions_enabled: String(original.regressions_enabled ?? "0"),
+      },
+    });
+  }
+});

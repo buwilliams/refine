@@ -299,6 +299,22 @@ pub(in crate::surfaces::web_server) fn files_read_response(
         .and_then(|value| value.to_str())
         .unwrap_or("")
         .to_string();
+    if let Some(mime_type) = image_mime_type(&rel_path) {
+        return Ok(json!({
+            "path": display_rel_path(&rel_path),
+            "name": name,
+            "kind": "image",
+            "previewable": true,
+            "mime_type": mime_type,
+            "data_url": format!("data:{mime_type};base64,{}", base64_encode(&bytes)),
+            "size": bytes.len(),
+            "offset": offset,
+            "limit": limit,
+            "has_more": false,
+            "next_offset": null,
+            "large": bytes.len() > limit
+        }));
+    }
     if is_binary_bytes(&bytes) {
         return Ok(json!({
             "path": display_rel_path(&rel_path),
@@ -468,6 +484,46 @@ pub(in crate::surfaces::web_server) fn should_skip_source_entry(name: &str) -> b
 
 pub(in crate::surfaces::web_server) fn is_binary_bytes(bytes: &[u8]) -> bool {
     bytes.iter().take(8192).any(|byte| *byte == 0)
+}
+
+pub(in crate::surfaces::web_server) fn image_mime_type(path: &Path) -> Option<&'static str> {
+    match path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "gif" => Some("image/gif"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "png" => Some("image/png"),
+        "webp" => Some("image/webp"),
+        _ => None,
+    }
+}
+
+pub(in crate::surfaces::web_server) fn base64_encode(bytes: &[u8]) -> String {
+    const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let first = chunk[0];
+        let second = *chunk.get(1).unwrap_or(&0);
+        let third = *chunk.get(2).unwrap_or(&0);
+        let triple = ((first as u32) << 16) | ((second as u32) << 8) | third as u32;
+        encoded.push(TABLE[((triple >> 18) & 0x3f) as usize] as char);
+        encoded.push(TABLE[((triple >> 12) & 0x3f) as usize] as char);
+        if chunk.len() > 1 {
+            encoded.push(TABLE[((triple >> 6) & 0x3f) as usize] as char);
+        } else {
+            encoded.push('=');
+        }
+        if chunk.len() > 2 {
+            encoded.push(TABLE[(triple & 0x3f) as usize] as char);
+        } else {
+            encoded.push('=');
+        }
+    }
+    encoded
 }
 
 pub(in crate::surfaces::web_server) fn query_param(raw_path: &str, key: &str) -> Option<String> {

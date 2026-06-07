@@ -7,6 +7,7 @@ let dashboardRefreshInFlight = false;
 let dashboardRefreshQueued = false;
 let dashboardRetryTimer = null;
 const DASHBOARD_REFRESH_TIMEOUT_MS = 6000;
+const DASHBOARD_PANEL_STORAGE_PREFIX = "refine_dashboard_panel_open:";
 function dashboardScopeFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
   return hashQs.get("node") === "all" ? "all" : "current";
@@ -18,6 +19,31 @@ function dashboardHash(scope) {
 
 function dashboardScopeParam(d = null) {
   return d?.node_filter || dashboardScopeFromHash();
+}
+
+function dashboardPanelStorageKey(panelId) {
+  return `${DASHBOARD_PANEL_STORAGE_PREFIX}${panelId}`;
+}
+
+function dashboardPanelOpen(panelId, fallback) {
+  const existing = document.getElementById(panelId);
+  if (existing) return existing.open;
+  try {
+    const stored = localStorage.getItem(dashboardPanelStorageKey(panelId));
+    if (stored === "open") return true;
+    if (stored === "closed") return false;
+  } catch (_) {}
+  return fallback;
+}
+
+function wireDashboardPanelPersistence(panelId) {
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+  panel.addEventListener("toggle", () => {
+    try {
+      localStorage.setItem(dashboardPanelStorageKey(panelId), panel.open ? "open" : "closed");
+    } catch (_) {}
+  });
 }
 
 async function renderDashboard() {
@@ -32,8 +58,8 @@ async function renderDashboard() {
       <div class="dashboard-title-row">
         <h2>Dashboard</h2>
         <div class="segmented-control dashboard-scope-switch" role="group" aria-label="Dashboard node scope">
-          <button type="button" data-dashboard-scope="current">Current</button>
-          <button type="button" data-dashboard-scope="all">All</button>
+          <button type="button" data-dashboard-scope="current" data-testid="dashboard-scope-current">Current</button>
+          <button type="button" data-dashboard-scope="all" data-testid="dashboard-scope-all">All</button>
         </div>
       </div>
       <div id="dash"><p class="muted">Loading…</p></div>`;
@@ -147,9 +173,8 @@ function drawDashboard(d, opts = {}) {
   const orderedStatuses = workflowStatuses();
   const dash = $("#dash");
   const reporterStats = d.reporter_stats || [];
-  const reviewsShell = document.getElementById("reviews-for-reporter-card");
-  const reviewsShellOpen = reviewsShell ? reviewsShell.open : true;
-  const reporterStatsShellOpen = !!document.getElementById("dashboard-reporter-stats-shell")?.open;
+  const reviewsShellOpen = dashboardPanelOpen("reviews-for-reporter-card", true);
+  const reporterStatsShellOpen = dashboardPanelOpen("dashboard-reporter-stats-shell", false);
   const showReviewPanel = !!reviewReporter || needsAttention.length > 0;
   syncDashboardScopeSwitch(scope);
   // Guard against late-arriving SSE refreshes after the user navigated
@@ -164,11 +189,11 @@ function drawDashboard(d, opts = {}) {
     })}
 
     ${showReviewPanel ? `
-    <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card"${reviewsShellOpen ? " open" : ""}>
-      <summary>
+    <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card" data-testid="dashboard-review-panel"${reviewsShellOpen ? " open" : ""}>
+      <summary data-testid="dashboard-review-summary">
         <span class="filter-shell-title">Awaiting your review</span>
         ${reviewReporter ? `<span class="muted small">${htmlEscape(reviewReporter)}</span>` : ""}
-        <span class="filter-pill">${fmtCount(reviewsForReporter.length)}</span>
+        <span class="filter-pill" data-testid="dashboard-review-count">${fmtCount(reviewsForReporter.length)}</span>
         ${needsAttention.length ? `<span class="filter-pill">Needs attention</span>` : ""}
       </summary>
       <div class="filter-shell-body">
@@ -184,7 +209,7 @@ function drawDashboard(d, opts = {}) {
           </div>` : ""}
         ${reviewsForReporter.length === 0 ? "" : `
           <div class="actions dashboard-panel-actions">
-            <button id="rev-bulk-verify" disabled>Verify selected</button>
+            <button id="rev-bulk-verify" data-testid="dashboard-review-bulk-verify" disabled>Verify selected</button>
           </div>`}
       ${!reviewReporter
         ? ""
@@ -197,6 +222,7 @@ function drawDashboard(d, opts = {}) {
             <thead><tr>
               <th class="gap-select-col">
                 <input type="checkbox" id="rev-select-all"
+                       data-testid="dashboard-review-select-all"
                        aria-label="Select all reviews">
               </th>
               <th>Gap</th>
@@ -205,8 +231,8 @@ function drawDashboard(d, opts = {}) {
             </tr></thead>
             <tbody>
               ${reviewsForReporter.map((g) => `
-                <tr data-rev-row="${g.id}">
-                  <td class="gap-select-col"><input type="checkbox" class="rev-row-check" data-rev-id="${g.id}"></td>
+                <tr data-rev-row="${g.id}" data-testid="dashboard-review-row">
+                  <td class="gap-select-col"><input type="checkbox" class="rev-row-check" data-testid="dashboard-review-check" data-rev-id="${g.id}"></td>
                   <td>
                     <a href="#/gaps/${g.id}" title="${htmlEscape(g.id)}">
                       ${htmlEscape(g.name)}
@@ -214,8 +240,9 @@ function drawDashboard(d, opts = {}) {
                   </td>
                   <td class="muted small">${fmtTime(g.updated)}</td>
                   <td class="actions" style="white-space:nowrap">
-                    <button data-rev-verify="${g.id}">Verify →</button>
+                    <button data-rev-verify="${g.id}" data-testid="dashboard-review-verify">Verify →</button>
                     <button class="secondary" data-rev-add-round="${g.id}"
+                            data-testid="dashboard-review-add-round"
                             data-rev-name="${htmlEscape(g.name)}">Add round</button>
                   </td>
                 </tr>`).join("")}
@@ -224,10 +251,10 @@ function drawDashboard(d, opts = {}) {
       </div>
     </details>` : ""}
 
-    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-reporter-stats-shell"${reporterStatsShellOpen ? " open" : ""}>
-      <summary>
+    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-reporter-stats-shell" data-testid="dashboard-reporter-stats-panel"${reporterStatsShellOpen ? " open" : ""}>
+      <summary data-testid="dashboard-reporter-stats-summary">
         <span class="filter-shell-title">Reporter throughput</span>
-        <span class="filter-pill">${fmtCount(reporterStats.length)}</span>
+        <span class="filter-pill" data-testid="dashboard-reporter-stats-count">${fmtCount(reporterStats.length)}</span>
       </summary>
       <div class="filter-shell-body">
         ${reporterStats.length === 0
@@ -243,6 +270,7 @@ function drawDashboard(d, opts = {}) {
               <tbody>
                 ${reporterStats.map((s) => `
                   <tr class="reporter-stats-row"
+                      data-testid="dashboard-reporter-stats-row"
                       data-reporter="${htmlEscape(s.reporter)}"
                       title="See Gaps reported by ${htmlEscape(s.reporter)}">
                     <td>${htmlEscape(s.reporter)}</td>
@@ -266,6 +294,8 @@ function drawDashboard(d, opts = {}) {
     });
   });
 
+  wireDashboardPanelPersistence("reviews-for-reporter-card");
+  wireDashboardPanelPersistence("dashboard-reporter-stats-shell");
   wireReviewsForReporter(reviewsForReporter);
 }
 
@@ -397,6 +427,7 @@ function openAddRoundModal({ gapId, gapName }) {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal" role="dialog" aria-modal="true"
+         data-testid="dashboard-add-round-modal"
          aria-labelledby="add-round-title" style="max-width:560px">
       <div class="modal-title" id="add-round-title">
         Add round — ${htmlEscape(gapName || gapId)}
@@ -409,17 +440,17 @@ function openAddRoundModal({ gapId, gapName }) {
         <form id="add-round-form">
           <div class="form-row">
             <label>Actual (current behavior)</label>
-            <textarea name="actual" placeholder="What's still happening?"></textarea>
+            <textarea name="actual" data-testid="dashboard-add-round-actual" placeholder="What's still happening?"></textarea>
           </div>
           <div class="form-row">
             <label>Target (desired behavior)</label>
-            <textarea name="target" placeholder="What should be happening?"></textarea>
+            <textarea name="target" data-testid="dashboard-add-round-target" placeholder="What should be happening?"></textarea>
           </div>
         </form>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button data-ok>Submit new round</button>
+        <button class="secondary" data-cancel data-testid="dashboard-add-round-cancel">Cancel</button>
+        <button data-ok data-testid="dashboard-add-round-submit">Submit new round</button>
       </div>
     </div>`;
   document.body.appendChild(root);

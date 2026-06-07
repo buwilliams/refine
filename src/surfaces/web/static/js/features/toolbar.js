@@ -55,6 +55,8 @@ const filesState = {
   searchQuery: "",
   searchResults: null,
   searchSelectedIndex: -1,
+  searchSelectedPath: "",
+  searchUserSelectedPath: "",
   searchLoading: false,
   searchError: "",
   loading: false,
@@ -253,6 +255,8 @@ function resetFilesState() {
   filesState.searchQuery = "";
   filesState.searchResults = null;
   filesState.searchSelectedIndex = -1;
+  filesState.searchSelectedPath = "";
+  filesState.searchUserSelectedPath = "";
   filesState.searchLoading = false;
   filesState.searchError = "";
   filesState.loading = false;
@@ -524,29 +528,35 @@ function drawToolbar() {
     <div class="toolbar-dock-resize" id="toolbar-dock-resize"
          role="separator" aria-orientation="horizontal"
          aria-label="Resize Toolbar"
+         data-testid="toolbar-resize"
          title="Drag to resize"></div>
     <div class="toolbar-dock-bar" id="toolbar-dock-bar"
+         data-testid="toolbar-bar"
          title="${chatState.open ? "Click to collapse" : "Click a tab to expand Toolbar"}">
       <span class="toolbar-dock-label">TOOLBAR</span>
       <div class="toolbar-tabs">
         ${Object.entries(tabs).map(([id, t]) => `
           <button class="toolbar-tab ${id === activeId ? "active" : ""}"
                   data-tab-id="${htmlEscape(id)}"
+                  data-testid="toolbar-tab-${htmlEscape(id)}"
                   title="${htmlEscape(toolbarTabTitle(t))}">
-            ${htmlEscape(t.label)}${t.sessionId ? ` <span class="toolbar-tab-dot" title="active session"></span>` : ""}
-            ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" title="Close tab">×</span>`}
+            ${htmlEscape(t.label)}${t.sessionId ? ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="active session"></span>` : ""}
+            ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
           </button>`).join("")}
       </div>
       <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
               id="btn-dock-fullscreen"
+              data-testid="toolbar-fullscreen"
               aria-label="${chatState.fullscreen ? "Exit fullscreen Toolbar" : "Fullscreen Toolbar"}"
               aria-pressed="${chatState.fullscreen ? "true" : "false"}"
               title="${chatState.fullscreen ? "Exit fullscreen" : "Fullscreen"}">⛶</button>
       <button class="toolbar-dock-toggle toolbar-dock-collapse" id="btn-dock-toggle"
+              data-testid="toolbar-collapse"
               aria-label="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}"
               title="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}">▾</button>
     </div>
     <div class="toolbar-dock-body"
+         data-testid="toolbar-body"
          style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
       ${filesActive
         ? renderFilesPanel()
@@ -649,45 +659,47 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
   const queuedMessages = allQueuedMessages(active);
   return `
       <div class="actions" style="margin-bottom:10px">
-        <button id="btn-chat-toggle" class="${toggleClass}">${htmlEscape(toggleLabel)}</button>
+        <button id="btn-chat-toggle" class="${toggleClass}" data-testid="chat-toggle">${htmlEscape(toggleLabel)}</button>
         ${active.mode === "plan" ? `
-          <button id="btn-plan-draft" class="secondary"
+          <button id="btn-plan-draft" class="secondary" data-testid="plan-draft"
                   ${planHasAgentResponse(active) ? "" : "disabled"}>
             Draft Feature
           </button>` : ""}
         ${active.gapId ? `
-          <button id="btn-gap-round-extract" class="secondary"
+          <button id="btn-gap-round-extract" class="secondary" data-testid="gap-draft-round"
                   ${gapChatCanExtractRound(active) ? "" : "disabled"}>
             Draft Round
           </button>` : ""}
-        <button id="btn-chat-clear" class="secondary"
+        <button id="btn-chat-clear" class="secondary" data-testid="chat-clear"
                 ${(active.output || active.progress || active.sessionId || queuedMessages.length) ? "" : "disabled"}>
           Clear history
         </button>
         ${active.gapId ? `
           <a id="chat-gap-link" class="chat-gap-link"
+             data-testid="chat-gap-link"
              href="#/gaps/${encodeURIComponent(active.gapId)}"
              title="Open Gap ${htmlEscape(active.gapId)}">
             Gap ${htmlEscape(active.gapId.slice(0, 10))}…
           </a>` : ""}
         <span class="spacer"></span>
-        <span id="chat-status" class="muted small">${htmlEscape(statusLine)}</span>
+        <span id="chat-status" class="muted small" data-testid="chat-status">${htmlEscape(statusLine)}</span>
       </div>
       <div class="chat-output-box">
-        <div id="chat-output" class="chat-output">${mdToHtml(active.output || "")}</div>
+        <div id="chat-output" class="chat-output" data-testid="chat-output">${mdToHtml(active.output || "")}</div>
         <button type="button"
                 id="chat-activity-toggle"
                 class="chat-activity-toggle"
+                data-testid="chat-activity-toggle"
                 aria-expanded="${showProgress ? "true" : "false"}"
                 title="${htmlEscape(progressToggleLabel)}"
                 ${hasActivityToggle ? "" : "hidden"}>
-          <span id="chat-activity-label">${htmlEscape(activityLabel)}</span>
+          <span id="chat-activity-label" data-testid="chat-activity-label">${htmlEscape(activityLabel)}</span>
           <span class="chat-activity-chevron" aria-hidden="true">
             ${toolbarIcon(showProgress ? "collapse" : "expand")}
           </span>
         </button>
         <div id="chat-progress-panel" class="chat-progress-panel" ${showActivityPanel ? "" : "hidden"}>
-          <div id="chat-progress" class="chat-progress">${renderChatProgress(progressText)}</div>
+          <div id="chat-progress" class="chat-progress" data-testid="chat-progress">${renderChatProgress(progressText)}</div>
         </div>
       </div>
       ${renderQueuedChatMessages(queuedMessages)}
@@ -699,11 +711,12 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
             <span></span><span></span><span></span>
           </span>
           <textarea id="chat-input"
+                    data-testid="chat-input"
                     class="${showInputDots ? "chat-input-waiting" : ""}"
                     rows="2"
                     placeholder="${htmlEscape(inputPlaceholder)}"></textarea>
         </div>
-        <button id="btn-chat-send" class="primary" ${active.sending ? "disabled" : ""}>Send</button>
+        <button id="btn-chat-send" class="primary" data-testid="chat-send" ${active.sending ? "disabled" : ""}>Send</button>
       </div>
     `;
 }
@@ -718,17 +731,20 @@ function allQueuedMessages(tab) {
 function renderQueuedChatMessages(messages) {
   if (!messages.length) return "";
   return `
-    <div class="chat-queue" id="chat-queue">
-      <div class="chat-queue-header">
+    <div class="chat-queue" id="chat-queue" data-testid="chat-queue">
+      <div class="chat-queue-header" data-testid="chat-queue-header">
         <span>Queued messages</span>
-        <span class="muted small">${messages.length}</span>
+        <span class="muted small" data-testid="chat-queue-count">${messages.length}</span>
       </div>
       ${messages.map((message) => `
-        <div class="chat-queue-item" data-queued-message-id="${htmlEscape(message.id)}" data-queued-message-local="${message.local ? "1" : "0"}">
-          <textarea class="chat-queue-edit" rows="2" data-queued-message-text>${htmlEscape(message.text)}</textarea>
+        <div class="chat-queue-item"
+             data-testid="chat-queue-item"
+             data-queued-message-id="${htmlEscape(message.id)}"
+             data-queued-message-local="${message.local ? "1" : "0"}">
+          <textarea class="chat-queue-edit" rows="2" data-queued-message-text data-testid="chat-queue-text">${htmlEscape(message.text)}</textarea>
           <div class="chat-queue-actions">
-            <button class="secondary small" data-queued-message-save="${htmlEscape(message.id)}">Save</button>
-            <button class="danger small" data-queued-message-remove="${htmlEscape(message.id)}">Remove</button>
+            <button class="secondary small" data-queued-message-save="${htmlEscape(message.id)}" data-testid="chat-queue-save">Save</button>
+            <button class="danger small" data-queued-message-remove="${htmlEscape(message.id)}" data-testid="chat-queue-remove">Remove</button>
           </div>
         </div>`).join("")}
     </div>`;
@@ -794,16 +810,17 @@ function renderSystemPanel() {
     ? `${messages.length} / ${SYSTEM_OPERATION_LOG_LIMIT}`
     : `${visibleMessages.length} of ${messages.length}`;
   return `
-    <div class="system-panel">
-      <div class="system-panel-header">
+    <div class="system-panel" data-testid="toolbar-system-panel">
+      <div class="system-panel-header" data-testid="toolbar-system-header">
         <span>System operations</span>
         ${renderSystemLogFilters(messages, activeFilters)}
-        <span class="muted small">${countLabel}</span>
+        <span class="muted small" data-testid="system-log-count">${countLabel}</span>
       </div>
-      <div class="system-log" role="log" aria-live="polite" aria-label="Recent system operations">
+      <div class="system-log" role="log" aria-live="polite" aria-label="Recent system operations"
+           data-testid="system-log">
         ${visibleMessages.length
           ? visibleMessages.map(renderSystemLogLine).join("")
-          : `<div class="system-log-empty">${messages.length ? "No system activity matches this filter." : "Waiting for system activity."}</div>`}
+          : `<div class="system-log-empty" data-testid="system-log-empty">${messages.length ? "No system activity matches this filter." : "Waiting for system activity."}</div>`}
       </div>
     </div>`;
 }
@@ -815,6 +832,7 @@ function renderSystemLogFilters(messages, activeFilters) {
       <label class="system-log-filter${!activeFilters.size ? " active" : ""}">
         <input type="checkbox"
                data-system-log-filter="all"
+               data-testid="system-log-filter-all"
                ${!activeFilters.size ? "checked" : ""}
                aria-label="Show all system operations">
         <span>All</span>
@@ -823,6 +841,7 @@ function renderSystemLogFilters(messages, activeFilters) {
         <label class="system-log-filter system-log-filter-${option.status}${activeFilters.has(option.status) ? " active" : ""}">
           <input type="checkbox"
                  data-system-log-filter="${htmlEscape(option.status)}"
+                 data-testid="system-log-filter-${htmlEscape(option.status)}"
                  ${activeFilters.has(option.status) ? "checked" : ""}
                  aria-label="Show ${htmlEscape(option.label.toLowerCase())} system operations">
           <span>${htmlEscape(option.label)}</span>
@@ -873,7 +892,7 @@ function systemLogStatusLabel(status) {
 function renderSystemLogLine(item) {
   const time = formatSystemLogTime(item.timestamp);
   return `
-    <div class="system-log-line system-log-${item.status}">
+    <div class="system-log-line system-log-${item.status}" data-testid="system-log-line">
       <span class="system-log-time">${htmlEscape(time)}</span>
       <span class="system-log-message">${htmlEscape(item.message)}</span>
     </div>`;
@@ -912,66 +931,71 @@ function renderFilesPanel() {
         ? filesState.file.path
         : "Select a file.";
   return `
-    <div class="files-panel">
-      <div class="files-pathbar">
+    <div class="files-panel" data-testid="toolbar-files-panel">
+      <div class="files-pathbar" data-testid="files-pathbar">
         <label for="files-path-input" class="files-path-label">Path</label>
         <input type="text" id="files-path-input"
+               data-testid="files-path-input"
                autocomplete="off" spellcheck="false"
                placeholder="Repo-relative path"
                value="${htmlEscape(inputPath)}">
         <button type="button" class="secondary files-icon-btn"
-                data-files-copy title="Copy path" aria-label="Copy path">
+                data-files-copy data-testid="files-copy-path" title="Copy path" aria-label="Copy path">
           ${toolbarIcon("copy")}
         </button>
         <button type="button" class="secondary files-icon-btn"
-                data-files-clear title="Clear path" aria-label="Clear path">
+                data-files-clear data-testid="files-clear-path" title="Clear path" aria-label="Clear path">
           ${toolbarIcon("clear")}
         </button>
         <button type="button" class="secondary files-icon-btn"
-                data-files-go title="Go to path" aria-label="Go to path">
+                data-files-go data-testid="files-go-path" title="Go to path" aria-label="Go to path">
           ${toolbarIcon("go")}
         </button>
         <button type="button" class="secondary files-icon-btn"
-                data-files-refresh title="Refresh" aria-label="Refresh">
+                data-files-refresh data-testid="files-refresh" title="Refresh" aria-label="Refresh">
           ${toolbarIcon("refresh")}
         </button>
       </div>
-      <div class="files-browser">
-        <div class="files-tree-panel">
+      <div class="files-browser" data-testid="files-browser">
+        <div class="files-tree-panel" data-testid="files-tree-panel">
           <div class="files-tree-header">
             <span>Files</span>
             <div class="files-tree-actions">
               <button type="button" class="secondary files-icon-btn"
-                      data-files-expand-all title="Expand all" aria-label="Expand all">
+                      data-files-expand-all data-testid="files-expand-all" title="Expand all" aria-label="Expand all">
                 ${toolbarIcon("expand")}
               </button>
               <button type="button" class="secondary files-icon-btn"
-                      data-files-clear-tree title="Clear tree" aria-label="Clear tree">
+                      data-files-clear-tree data-testid="files-clear-tree" title="Clear tree" aria-label="Clear tree">
                 ${toolbarIcon("clear")}
               </button>
               <button type="button" class="secondary files-icon-btn"
-                      data-files-collapse-all title="Collapse all" aria-label="Collapse all">
+                      data-files-collapse-all data-testid="files-collapse-all" title="Collapse all" aria-label="Collapse all">
                 ${toolbarIcon("collapse")}
               </button>
             </div>
           </div>
-          <div class="files-tree-search">
+          <div class="files-tree-search" data-testid="files-search">
             <span class="files-tree-search-icon">${toolbarIcon("search")}</span>
             <input type="search" id="files-search-input"
+                   data-testid="files-search-input"
+                   data-files-selected-path="${htmlEscape(filesState.searchUserSelectedPath || filesState.searchSelectedPath || "")}"
                    autocomplete="off" spellcheck="false"
                    placeholder="Search files"
                    value="${htmlEscape(filesState.searchQuery || "")}">
           </div>
-          <div class="files-tree" role="tree" aria-label="Directories and files">
+          <div class="files-tree" role="tree" aria-label="Directories and files"
+               data-testid="files-tree">
             ${renderFilesTreePanel()}
           </div>
         </div>
-        <div class="files-content">
-          <div class="files-content-header">
-            <span class="muted small">${htmlEscape(status)}</span>
+        <div class="files-content" data-testid="files-content">
+          <div class="files-content-header" data-testid="files-content-header">
+            <span class="muted small" data-testid="files-status">${htmlEscape(status)}</span>
             ${filesState.file?.previewable ? `
               <button type="button" class="secondary files-icon-btn"
                       data-files-copy-content
+                      data-testid="files-copy-content"
                       title="Copy file contents"
                       aria-label="Copy file contents">
                 ${toolbarIcon("copy")}
@@ -1010,6 +1034,7 @@ function renderFilesSearchResults() {
     return `
     <div class="files-tree-item files-search-result ${selected ? "selected" : ""}"
          role="treeitem"
+         data-testid="files-search-result"
          aria-selected="${selected ? "true" : "false"}"
          style="--depth:0"
          data-files-path="${htmlEscape(entry.path)}"
@@ -1052,6 +1077,7 @@ function renderFilesTree(path = "", depth = 0) {
     return `
       <div class="files-tree-item ${selected ? "selected" : ""}"
            role="treeitem"
+           data-testid="files-tree-row"
            aria-expanded="${expandable ? expanded ? "true" : "false" : ""}"
            style="--depth:${depth}"
            data-files-path="${htmlEscape(entry.path)}"
@@ -1074,25 +1100,25 @@ function renderFilesTree(path = "", depth = 0) {
 function renderFilesContent() {
   const file = filesState.file;
   if (filesState.loading && !file) {
-    return `<div class="files-message">Loading...</div>`;
+    return `<div class="files-message" data-testid="files-message">Loading...</div>`;
   }
   if (filesState.error && !file) {
-    return `<div class="files-message">${htmlEscape(filesState.error)}</div>`;
+    return `<div class="files-message" data-testid="files-message">${htmlEscape(filesState.error)}</div>`;
   }
   if (!file) {
-    return `<div class="files-message">Choose a file from the tree or enter a path.</div>`;
+    return `<div class="files-message" data-testid="files-message">Choose a file from the tree or enter a path.</div>`;
   }
   if (!file.previewable) {
-    return `<div class="files-message">${htmlEscape(file.reason || "Preview is not available.")}</div>`;
+    return `<div class="files-message" data-testid="files-message">${htmlEscape(file.reason || "Preview is not available.")}</div>`;
   }
   if (file.kind === "image") {
     return `
-      <div class="files-image-preview">
+      <div class="files-image-preview" data-testid="files-image-preview">
         <img src="${htmlEscape(file.data_url || "")}" alt="${htmlEscape(file.name || file.path || "Image preview")}">
       </div>`;
   }
   return `
-    <div class="files-source" data-language="${htmlEscape(languageForPath(file.path))}">
+    <div class="files-source" data-testid="files-source" data-language="${htmlEscape(languageForPath(file.path))}">
       ${renderSourceLines(file.content || "", file.path, file.start_line || 1)}
       ${file.has_more ? `
         <div class="files-load-more" data-files-load-more>
@@ -1107,7 +1133,7 @@ function renderSourceLines(content, path, startLine = 1) {
   if (lines.length && lines[lines.length - 1] === "") lines.pop();
   const shown = lines.length ? lines : [""];
   return shown.map((line, idx) => `
-    <div class="files-source-line">
+    <div class="files-source-line" data-testid="files-source-line">
       <span class="files-line-number">${startLine + idx}</span>
       <code class="files-line-code">${highlightFileLine(line, lang)}</code>
     </div>`).join("");
@@ -1182,6 +1208,8 @@ function bindFilesPanel(root) {
   });
   root.querySelector("#files-search-input")?.addEventListener("input", (e) => {
     filesState.searchSelectedIndex = -1;
+    filesState.searchSelectedPath = "";
+    filesState.searchUserSelectedPath = "";
     scheduleFilesSearch(e.target.value);
   });
   root.querySelector("#files-search-input")?.addEventListener("keydown", (e) => {
@@ -1197,8 +1225,10 @@ function bindFilesPanel(root) {
     }
     if (e.key !== "Enter") return;
     e.preventDefault();
-    const currentQuery = String(e.target.value || "").trim();
-    if (!filesState.searchLoading && filesState.searchResults?.query === currentQuery && openSelectedFilesSearchResult()) return;
+    const selectedPath = e.currentTarget?.dataset?.filesSelectedPath || "";
+    if (selectedPath && openFilesSearchPath(selectedPath)) return;
+    if (filesState.searchResults && openSelectedFilesSearchResult()) return;
+    if (filesState.searchLoading) return;
     runFilesSearch(e.target.value, { refocus: true, openSelectedFile: true });
   });
   root.querySelector("[data-files-go]")?.addEventListener("click", () => {
@@ -1238,12 +1268,16 @@ function bindFilesPanel(root) {
       const depth = Number.parseInt(row.dataset.filesDepth || "0", 10);
       if (row.dataset.filesSearchResult === "1") {
         filesState.searchSelectedIndex = Number.parseInt(row.dataset.filesSearchIndex || "-1", 10);
+        filesState.searchSelectedPath = path;
+        filesState.searchUserSelectedPath = path;
       }
       if (type === "directory") {
         if (row.dataset.filesSearchResult === "1") {
           filesState.searchQuery = "";
           filesState.searchResults = null;
           filesState.searchSelectedIndex = -1;
+          filesState.searchSelectedPath = "";
+          filesState.searchUserSelectedPath = "";
           filesState.searchError = "";
           loadFilesDirectory(path, { expand: true, redraw: true });
           return;
@@ -1281,6 +1315,8 @@ function scheduleFilesSearch(query) {
     filesState.searchLoading = false;
     filesState.searchResults = null;
     filesState.searchSelectedIndex = -1;
+    filesState.searchSelectedPath = "";
+    filesState.searchUserSelectedPath = "";
     drawToolbar();
     focusFilesSearchInput();
     return;
@@ -1313,16 +1349,55 @@ function filesSearchFileIndexes(results = filesState.searchResults) {
 }
 
 function normalizedFilesSearchSelectedIndex(results = filesState.searchResults) {
+  const entries = results?.entries || [];
   const fileIndexes = filesSearchFileIndexes(results);
-  if (!fileIndexes.length) return -1;
+  if (!fileIndexes.length) {
+    filesState.searchSelectedIndex = -1;
+    filesState.searchSelectedPath = "";
+    filesState.searchUserSelectedPath = "";
+    return -1;
+  }
+  if (filesState.searchSelectedPath) {
+    const selectedPathIndex = entries.findIndex((entry) =>
+      entry.type === "file" && entry.path === filesState.searchSelectedPath
+    );
+    if (selectedPathIndex >= 0) {
+      filesState.searchSelectedIndex = selectedPathIndex;
+      return selectedPathIndex;
+    }
+  }
   if (fileIndexes.includes(filesState.searchSelectedIndex)) {
+    filesState.searchSelectedPath = entries[filesState.searchSelectedIndex]?.path || "";
     return filesState.searchSelectedIndex;
   }
   filesState.searchSelectedIndex = fileIndexes[0];
+  filesState.searchSelectedPath = entries[filesState.searchSelectedIndex]?.path || "";
   return filesState.searchSelectedIndex;
 }
 
 function selectedFilesSearchEntry() {
+  if (filesState.searchUserSelectedPath) {
+    const userSelected = filesState.searchResults?.entries?.find((entry) =>
+      entry.type === "file" && entry.path === filesState.searchUserSelectedPath
+    );
+    if (userSelected) return userSelected;
+  }
+  const selectedRow = document.querySelector('.files-search-result[aria-selected="true"]');
+  const selectedPath = selectedRow?.dataset.filesPath || "";
+  if (selectedPath) {
+    const selectedType = selectedRow?.dataset.filesType || "";
+    filesState.searchSelectedPath = selectedPath;
+    return filesState.searchResults?.entries?.find((entry) => entry.path === selectedPath) || {
+      path: selectedPath,
+      type: selectedType || "file",
+    };
+  }
+  if (filesState.searchSelectedPath) {
+    const selectedByPath = filesState.searchResults?.entries?.find((entry) =>
+      entry.type === "file" && entry.path === filesState.searchSelectedPath
+    );
+    if (selectedByPath) return selectedByPath;
+  }
   const selectedIndex = normalizedFilesSearchSelectedIndex();
   if (selectedIndex < 0) return null;
   return filesState.searchResults?.entries?.[selectedIndex] || null;
@@ -1335,6 +1410,8 @@ function moveFilesSearchSelection(delta) {
   const current = Math.max(0, fileIndexes.indexOf(selectedIndex));
   const next = Math.min(fileIndexes.length - 1, Math.max(0, current + delta));
   filesState.searchSelectedIndex = fileIndexes[next];
+  filesState.searchSelectedPath = filesState.searchResults?.entries?.[filesState.searchSelectedIndex]?.path || "";
+  filesState.searchUserSelectedPath = filesState.searchSelectedPath;
   drawToolbar();
   focusFilesSearchInput();
   scrollSelectedFilesSearchResultIntoView();
@@ -1347,9 +1424,20 @@ function openSelectedFilesSearchResult() {
   return true;
 }
 
+function openFilesSearchPath(path) {
+  const entry = filesState.searchResults?.entries?.find((candidate) =>
+    candidate.type === "file" && candidate.path === path
+  );
+  if (!entry) return false;
+  filesState.searchSelectedPath = entry.path;
+  filesState.searchUserSelectedPath = entry.path;
+  loadFile(entry.path);
+  return true;
+}
+
 function scrollSelectedFilesSearchResultIntoView() {
   requestAnimationFrame(() => {
-    const row = document.querySelector(".files-search-result.selected");
+    const row = document.querySelector('.files-search-result[aria-selected="true"]');
     row?.scrollIntoView({ block: "nearest" });
   });
 }
@@ -1365,6 +1453,8 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
     filesState.searchLoading = false;
     filesState.searchResults = null;
     filesState.searchSelectedIndex = -1;
+    filesState.searchSelectedPath = "";
+    filesState.searchUserSelectedPath = "";
     drawToolbar();
     if (refocus) focusFilesSearchInput();
     return;
@@ -1398,6 +1488,8 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
     filesState.searchLoading = false;
     filesState.searchResults = null;
     filesState.searchSelectedIndex = -1;
+    filesState.searchSelectedPath = "";
+    filesState.searchUserSelectedPath = "";
     filesState.searchError = e.message || String(e);
     drawToolbar();
     if (refocus) focusFilesSearchInput();
@@ -1411,6 +1503,7 @@ async function runFilesSearch(query, { refocus = false, openSelectedFile = false
 function focusFilesSearchInput() {
   const input = $("#files-search-input");
   if (!input) return;
+  input.dataset.filesSelectedPath = filesState.searchUserSelectedPath || filesState.searchSelectedPath || "";
   input.focus();
   const end = input.value.length;
   try { input.setSelectionRange(end, end); } catch {}
@@ -1458,6 +1551,8 @@ async function clearFilesTreeView() {
   filesState.searchQuery = "";
   filesState.searchResults = null;
   filesState.searchSelectedIndex = -1;
+  filesState.searchSelectedPath = "";
+  filesState.searchUserSelectedPath = "";
   filesState.searchLoading = false;
   filesState.searchError = "";
   filesState.path = treeRoot;
@@ -1484,6 +1579,8 @@ async function openFilesToolbar(options = {}) {
     filesState.searchQuery = search;
     filesState.searchResults = null;
     filesState.searchSelectedIndex = -1;
+    filesState.searchSelectedPath = "";
+    filesState.searchUserSelectedPath = "";
     filesState.searchError = "";
   }
   if (path.trim()) {
@@ -1853,7 +1950,7 @@ function toggleChatProgress() {
 function planTranscriptText(tab) {
   return (tab?.output || "")
     .split(/\r?\n/)
-    .filter((line) => !line.startsWith("[refine]"))
+    .filter((line) => !line.startsWith("[refine]") && !line.trim().startsWith(">"))
     .join("\n")
     .trim();
 }
@@ -1946,17 +2043,18 @@ function openGapRoundExtractModal(gapId, transcript) {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
+         data-testid="gap-round-extract-modal"
          aria-labelledby="gap-round-extract-title">
       <div class="modal-title" id="gap-round-extract-title">Extract round</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
           Review the extracted round before adding it to this Gap.
         </div>
-        <div id="gap-round-extract-body"></div>
+        <div id="gap-round-extract-body" data-testid="gap-round-extract-body"></div>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button id="btn-add-extracted-round" disabled>Add round</button>
+        <button class="secondary" data-cancel data-testid="gap-round-extract-cancel">Cancel</button>
+        <button id="btn-add-extracted-round" data-testid="gap-round-extract-submit" disabled>Add round</button>
       </div>
     </div>
   `;
@@ -2000,9 +2098,11 @@ function openGapRoundExtractModal(gapId, transcript) {
 }
 
 async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addButton, close, signal }) {
-  const drafts = await extractImportDrafts(transcript, bodyRoot, signal);
+  const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "round" });
   if (signal.aborted) return;
   const draft = (drafts || []).find((item) => {
+    return String(item?.actual || "").trim() && String(item?.target || "").trim();
+  }) || (drafts || []).find((item) => {
     return String(item?.actual || item?.target || "").trim();
   });
   if (!draft) {
@@ -2018,11 +2118,11 @@ async function loadExtractedRoundDraft({ gapId, transcript, root, bodyRoot, addB
     <form id="gap-round-extract-form" class="round-form">
       <div class="form-row">
         <label>Actual (current behavior)</label>
-        <textarea name="actual">${htmlEscape(draft.actual || "")}</textarea>
+        <textarea name="actual" data-testid="gap-round-extract-actual">${htmlEscape(draft.actual || "")}</textarea>
       </div>
       <div class="form-row">
         <label>Target (desired behavior)</label>
-        <textarea name="target">${htmlEscape(draft.target || "")}</textarea>
+        <textarea name="target" data-testid="gap-round-extract-target">${htmlEscape(draft.target || "")}</textarea>
       </div>
     </form>
   `;

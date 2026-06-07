@@ -11,38 +11,38 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         <button class="secondary" id="s-runtime-copy-node">Copy from node</button>
       </div>
       <div class="form-row"><label>${renderSettingsGuideLabel("Parallel-run cap", "runtime-parallel-run-cap")}</label>
-        <input type="number" id="s-cap" value="${s.parallel_run_cap || 5}"></div>
+        <input type="number" id="s-cap" data-testid="runtime-parallel-run-cap" value="${s.parallel_run_cap || 5}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel("Branch name pattern", "runtime-branch-name-pattern")}</label>
-        <input type="text" id="s-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
+        <input type="text" id="s-pattern" data-testid="runtime-branch-name-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{gap_id}")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel("Agent idle timeout (seconds)", "runtime-agent-idle-timeout")}</label>
-        <input type="number" id="s-idle" value="${s.agent_idle_timeout_seconds || 900}"></div>
+        <input type="number" id="s-idle" data-testid="runtime-agent-idle-timeout" value="${s.agent_idle_timeout_seconds || 900}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel("Agent hard cap (seconds)", "runtime-agent-hard-cap")}</label>
-        <input type="number" id="s-hard" value="${s.agent_hard_cap_seconds || 86400}"></div>
+        <input type="number" id="s-hard" data-testid="runtime-agent-hard-cap" value="${s.agent_hard_cap_seconds || 86400}"></div>
       <div class="form-grid two">
         <div class="form-row"><label>${renderSettingsGuideLabel(
           "Worker memory limit (MB)",
           "runtime-worker-memory-limit",
           "0 disables the per-process limit",
         )}</label>
-          <input type="number" id="s-worker-memory" min="0" value="${s.worker_memory_limit_mb ?? 2000}"></div>
+          <input type="number" id="s-worker-memory" data-testid="runtime-worker-memory-limit" min="0" value="${s.worker_memory_limit_mb ?? 2000}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel(
           "UI memory limit (MB)",
           "runtime-ui-memory-limit",
           "0 disables the supervised UI process limit",
         )}</label>
-          <input type="number" id="s-ui-memory" min="0" value="${s.ui_memory_limit_mb ?? 2000}"></div>
+          <input type="number" id="s-ui-memory" data-testid="runtime-ui-memory-limit" min="0" value="${s.ui_memory_limit_mb ?? 2000}"></div>
       </div>
       <div class="form-grid two">
         <div class="form-row"><label>${renderSettingsGuideLabel("Worker CPU priority", "runtime-worker-cpu-priority")}</label>
-          <select id="s-worker-cpu-priority">
+          <select id="s-worker-cpu-priority" data-testid="runtime-worker-cpu-priority">
             ${[
               ["normal", "Normal"],
               ["low", "Low"],
               ["very_low", "Very low"],
             ].map(([v, lbl]) => `<option value="${v}" ${String(s.worker_cpu_priority ?? "low") === v ? "selected" : ""}>${lbl}</option>`).join("")}
-          </select></div>
+        </select></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Resource isolation mode", "runtime-resource-isolation")}</label>
-          <select id="s-resource-isolation">
+          <select id="s-resource-isolation" data-testid="runtime-resource-isolation">
             ${[
               ["auto", "Auto"],
               ["enforced", "Enforced"],
@@ -55,7 +55,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         "runtime-agent-limit-pause",
         "how long agents wait before continuing after provider rate-limit or token-limit errors.",
       )}</label>
-        <select id="s-agent-limit-pause">
+        <select id="s-agent-limit-pause" data-testid="runtime-agent-limit-pause">
           ${[
             ["30",    "30 seconds"],
             ["60",    "1 minute"],
@@ -68,13 +68,13 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         "runtime-chat-idle-timeout",
         "set to 0 to disable auto-close",
       )}</label>
-        <input type="number" id="s-chat-idle" value="${s.chat_idle_timeout_seconds || 300}"></div>
+        <input type="number" id="s-chat-idle" data-testid="runtime-chat-idle-timeout" value="${s.chat_idle_timeout_seconds || 300}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Auto-promote backlog → todo",
         "runtime-backlog-promote",
         "how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.",
       )}</label>
-        <select id="s-backlog-promote">
+        <select id="s-backlog-promote" data-testid="runtime-backlog-promote">
           ${[
             ["-1",    "Never"],
             ["0",     "Instant"],
@@ -91,7 +91,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         "runtime-project-update-pulse",
         "checks for local commits or upstream commits and refreshes this node's projected state.",
       )}</label>
-        <select id="s-project-update-pulse">
+        <select id="s-project-update-pulse" data-testid="runtime-project-update-pulse">
           ${[
             ["-1",   "Never"],
             ["30",   "30 seconds"],
@@ -108,6 +108,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         "comma-delimited file or directory patterns hidden during normal browsing.",
       )}</label>
         <input type="text" id="s-file-browser-ignore"
+               data-testid="runtime-file-browser-ignore"
                value="${htmlEscape(s.file_browser_ignore_patterns || "node_modules, .git, .refine, run")}"></div>
     </section>
 
@@ -118,7 +119,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         "runtime-ai-provider",
         "used for Gap agent runs, conflict resolution, chat, import extraction, target-app actions, and pre-flight.",
       )}</label>
-        <select id="s-cli">
+        <select id="s-cli" data-testid="runtime-provider-select">
           ${cliOption("claude", "Claude Code (default)")}
           ${cliOption("codex", "OpenAI Codex")}
           ${cliOption("gemini", "Gemini")}
@@ -132,7 +133,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         events; Gemini falls back to plain stdout passthrough.
       </p>
       <p class="muted" style="margin-top:14px">The selected provider's auth lives on the host. Use Re-check to re-run the pre-flight after running the relevant login command (<code>claude login</code> / <code>codex login</code> / <code>gemini auth login</code> / <code>copilot login</code>), or after setting <code>REFINE_SMOKE_AI_PATH</code> for Smoke AI.</p>
-      <button id="s-recheck">Re-check auth</button>
+      <button id="s-recheck" data-testid="runtime-recheck-auth">Re-check auth</button>
     </section>`;
 }
 
@@ -143,11 +144,12 @@ function renderRuntimeUpgradeBanner(upgrade) {
   if (upgrade.upgrade_available) {
     const command = "./r update";
     return `
-      <div class="runtime-version-status runtime-version-status-upgrade">
-        <span>Upgrade available ${htmlEscape(latest || current)}</span>
+      <div class="runtime-version-status runtime-version-status-upgrade" data-testid="runtime-upgrade-status">
+        <span data-testid="runtime-upgrade-message">Upgrade available ${htmlEscape(latest || current)}</span>
         <button
           class="secondary runtime-copy-upgrade-command"
           type="button"
+          data-testid="runtime-copy-upgrade"
           title="Copy ./r update"
           aria-label="Copy ./r update"
           data-runtime-copy-upgrade="${htmlEscape(command)}">
@@ -160,14 +162,14 @@ function renderRuntimeUpgradeBanner(upgrade) {
   }
   if (upgrade.local_development) {
     return latest ? `
-      <div class="runtime-version-status">
-        <span>Running latest ${htmlEscape(latest)}</span>
+      <div class="runtime-version-status" data-testid="runtime-upgrade-status">
+        <span data-testid="runtime-upgrade-message">Running latest ${htmlEscape(latest)}</span>
       </div>` : "";
   }
   if (current && latest && current === latest) {
     return `
-      <div class="runtime-version-status">
-        <span>Running latest ${htmlEscape(current)}</span>
+      <div class="runtime-version-status" data-testid="runtime-upgrade-status">
+        <span data-testid="runtime-upgrade-message">Running latest ${htmlEscape(current)}</span>
       </div>`;
   }
   return "";

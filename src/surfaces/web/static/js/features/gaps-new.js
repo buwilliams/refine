@@ -22,7 +22,7 @@ function openNewGapModal(options = {}) {
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-gap-title" style="max-width:560px">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="new-gap-title" data-testid="new-gap-modal" style="max-width:560px">
       <div class="modal-title" id="new-gap-title">${options.featureId ? "New Feature Gap" : "New Gap"}</div>
       <div class="modal-body">
         <div class="muted small" style="margin-bottom:8px">
@@ -32,15 +32,15 @@ function openNewGapModal(options = {}) {
         <form id="new-gap-form">
           <div class="form-row">
             <label>Actual (current behavior)</label>
-            <textarea name="actual" placeholder="What's happening today?"></textarea>
+            <textarea name="actual" data-testid="new-gap-actual" placeholder="What's happening today?"></textarea>
           </div>
           <div class="form-row">
             <label>Target (desired behavior)</label>
-            <textarea name="target" placeholder="What should be happening?"></textarea>
+            <textarea name="target" data-testid="new-gap-target" placeholder="What should be happening?"></textarea>
           </div>
           <div class="form-row">
             <label>Priority</label>
-            <select name="priority">
+            <select name="priority" data-testid="new-gap-priority">
               <option value="low" selected>Low (default)</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>
@@ -54,8 +54,8 @@ function openNewGapModal(options = {}) {
         </form>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button data-ok>Create Gap</button>
+        <button class="secondary" data-cancel data-testid="new-gap-cancel">Cancel</button>
+        <button data-ok data-testid="new-gap-submit">Create Gap</button>
       </div>
     </div>
   `;
@@ -218,7 +218,7 @@ function drawNewGapDuplicatePrompt(root, match, {
 
 function renderGapDuplicatePrompt(match) {
   return `
-    <div class="import-duplicate">
+    <div class="import-duplicate" data-testid="new-gap-duplicate">
       <div class="small" style="font-weight:600">Possible duplicate</div>
       <p class="muted small" style="margin:4px 0">
         ${htmlEscape(match.name || match.id)} · ${htmlEscape(match.node_display_name || match.node_id || "Default")}
@@ -235,9 +235,9 @@ function renderGapDuplicatePrompt(match) {
         </div>
       </div>
       <div class="actions import-duplicate-actions">
-        <button type="button" data-duplicate-decision="move_original_to_backlog" class="selected">Yes, move original to backlog</button>
-        <button type="button" class="secondary" data-duplicate-decision="duplicate">Yes, ignore</button>
-        <button type="button" class="secondary" data-duplicate-decision="original">No, import</button>
+        <button type="button" data-duplicate-decision="move_original_to_backlog" data-testid="new-gap-duplicate-move" class="selected">Yes, move original to backlog</button>
+        <button type="button" class="secondary" data-duplicate-decision="duplicate" data-testid="new-gap-duplicate-ignore">Yes, ignore</button>
+        <button type="button" class="secondary" data-duplicate-decision="original" data-testid="new-gap-duplicate-import">No, import</button>
       </div>
     </div>`;
 }

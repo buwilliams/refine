@@ -102,6 +102,22 @@ impl IntegrationFixture {
         self.json_stdout(&output)["gap"][field].clone()
     }
 
+    pub fn api_json(&self, method: &str, path: &str, body: serde_json::Value) -> serde_json::Value {
+        let response = http_json(self.port, method, path, Some(body))
+            .unwrap_or_else(|error| panic!("{method} {path} failed: {error}"));
+        serde_json::from_slice(&response)
+            .unwrap_or_else(|error| panic!("{method} {path} returned invalid JSON: {error}"))
+    }
+
+    pub fn create_git_app(&self, name: &str) -> PathBuf {
+        let app_root = self
+            .repo_root
+            .join("target/refine-integration/apps")
+            .join(name);
+        ensure_git_app_at(&app_root, name);
+        app_root
+    }
+
     fn reset_paths(&self) {
         let _ = fs::remove_dir_all(&self.artifact_root);
         fs::create_dir_all(&self.artifact_root).expect("failed to create artifact root");
@@ -111,34 +127,7 @@ impl IntegrationFixture {
     }
 
     fn ensure_test_app(&self) {
-        fs::create_dir_all(&self.app_root).expect("failed to create test app");
-        fs::write(
-            self.app_root.join("README.md"),
-            "# Refine rust smoke target app\n\nDisposable target app for the Rust integration suite.\n",
-        )
-        .unwrap();
-        fs::write(
-            self.app_root.join("app.py"),
-            "def health() -> str:\n    return \"ok\"\n",
-        )
-        .unwrap();
-        fs::write(self.app_root.join(".gitignore"), "__pycache__/\n*.py[cod]\n").unwrap();
-        if !self.app_root.join(".git").is_dir() {
-            self.git(&["init", "-q"]);
-        }
-        self.git(&["config", "user.email", "refine-smoke@example.invalid"]);
-        self.git(&["config", "user.name", "Refine Rust Smoke"]);
-        self.git(&["add", "README.md", "app.py", ".gitignore"]);
-        let diff = self.git_output(&["diff", "--cached", "--quiet", "--exit-code"]);
-        if diff.status.code() == Some(1) {
-            self.git(&["commit", "-q", "-m", "Initialize refine rust smoke target app"]);
-        } else if !diff.status.success() {
-            panic!(
-                "git diff --cached failed\nstdout:\n{}\nstderr:\n{}",
-                String::from_utf8_lossy(&diff.stdout),
-                String::from_utf8_lossy(&diff.stderr)
-            );
-        }
+        ensure_git_app_at(&self.app_root, "rust-test-app");
     }
 
     fn start_daemon(&mut self, static_root: &Path) {
@@ -284,25 +273,6 @@ impl IntegrationFixture {
             let _ = copy_dir_all(&source, &dest);
         }
     }
-
-    fn git(&self, args: &[&str]) {
-        let output = self.git_output(args);
-        assert!(
-            output.status.success(),
-            "git {} failed\nstdout:\n{}\nstderr:\n{}",
-            args.join(" "),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-
-    fn git_output(&self, args: &[&str]) -> Output {
-        Command::new("git")
-            .args(args)
-            .current_dir(&self.app_root)
-            .output()
-            .expect("failed to run git")
-    }
 }
 
 impl Drop for IntegrationFixture {
@@ -325,6 +295,67 @@ fn repo_root() -> PathBuf {
     }
 }
 
+fn ensure_git_app_at(app_root: &Path, name: &str) {
+    fs::create_dir_all(app_root).expect("failed to create test app");
+    fs::write(
+        app_root.join("README.md"),
+        format!("# Refine rust smoke target app\n\nDisposable target app `{name}` for the Rust integration suite.\n"),
+    )
+    .unwrap();
+    fs::write(
+        app_root.join("app.py"),
+        "def health() -> str:\n    return \"ok\"\n",
+    )
+    .unwrap();
+    fs::write(app_root.join(".gitignore"), "__pycache__/\n*.py[cod]\n").unwrap();
+    if !app_root.join(".git").is_dir() {
+        git(app_root, &["init", "-q"]);
+    }
+    git(
+        app_root,
+        &["config", "user.email", "refine-smoke@example.invalid"],
+    );
+    git(app_root, &["config", "user.name", "Refine Rust Smoke"]);
+    git(app_root, &["add", "README.md", "app.py", ".gitignore"]);
+    let diff = git_output(app_root, &["diff", "--cached", "--quiet", "--exit-code"]);
+    if diff.status.code() == Some(1) {
+        git(
+            app_root,
+            &[
+                "commit",
+                "-q",
+                "-m",
+                "Initialize refine rust smoke target app",
+            ],
+        );
+    } else if !diff.status.success() {
+        panic!(
+            "git diff --cached failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&diff.stdout),
+            String::from_utf8_lossy(&diff.stderr)
+        );
+    }
+}
+
+fn git(app_root: &Path, args: &[&str]) {
+    let output = git_output(app_root, args);
+    assert!(
+        output.status.success(),
+        "git {} failed\nstdout:\n{}\nstderr:\n{}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+fn git_output(app_root: &Path, args: &[&str]) -> Output {
+    Command::new("git")
+        .args(args)
+        .current_dir(app_root)
+        .output()
+        .expect("failed to run git")
+}
+
 fn test_port() -> u16 {
     std::env::var("REFINE_TEST_PORT")
         .ok()
@@ -342,13 +373,31 @@ fn env_path(name: &str) -> Option<PathBuf> {
 }
 
 fn http_get(port: u16, path: &str) -> Result<Vec<u8>, String> {
+    http_json(port, "GET", path, None)
+}
+
+fn http_json(
+    port: u16,
+    method: &str,
+    path: &str,
+    body: Option<serde_json::Value>,
+) -> Result<Vec<u8>, String> {
+    let body = body
+        .map(|value| serde_json::to_vec(&value).map_err(|error| error.to_string()))
+        .transpose()?
+        .unwrap_or_default();
     let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| error.to_string())?;
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .map_err(|error| error.to_string())?;
-    let request = format!("GET {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: test-{}\r\n\r\n",
+        body.len(),
+        timestamp_millis()
+    );
     stream
         .write_all(request.as_bytes())
+        .and_then(|_| stream.write_all(&body))
         .map_err(|error| error.to_string())?;
     let mut response = Vec::new();
     stream

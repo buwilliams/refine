@@ -19,6 +19,7 @@ function logsFiltersFromHash() {
     actor: hashQs.get("actor") || "",
     gap_id: hashQs.get("gap_id") || "",
     q: hashQs.get("q") || "",
+    period: ["day", "week", "month"].includes(hashQs.get("period")) ? hashQs.get("period") : "day",
     limit: parseInt(hashQs.get("limit") || String(LOGS_DEFAULT_LIMIT), 10)
            || LOGS_DEFAULT_LIMIT,
     page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
@@ -34,6 +35,7 @@ function logsHashFromFilters(f) {
   if (f.actor) next.set("actor", f.actor);
   if (f.gap_id) next.set("gap_id", f.gap_id);
   if (f.q) next.set("q", f.q);
+  if (f.period && f.period !== "day") next.set("period", f.period);
   if (f.limit && f.limit !== LOGS_DEFAULT_LIMIT) {
     next.set("limit", String(f.limit));
   }
@@ -52,45 +54,53 @@ async function renderLogs() {
   const logsFilterShellOpen = logsFilterShell ? logsFilterShell.open : false;
   $("#main").innerHTML = `
     <h2>Logs</h2>
-    <details class="filter-shell" id="logs-filter-shell"${logsFilterShellOpen ? " open" : ""}>
-      <summary>
+    <details class="filter-shell" id="logs-filter-shell" data-testid="logs-filter-shell"${logsFilterShellOpen ? " open" : ""}>
+      <summary data-testid="logs-filter-summary">
         <span class="filter-shell-title">Filters</span>
         <span class="spacer"></span>
-        <span class="muted small"><span id="logs-count"></span></span>
-        <span id="logs-filtered" class="filter-pill" hidden>Filtered</span>
+        <span class="muted small"><span id="logs-count" data-testid="logs-count"></span></span>
+        <span id="logs-filtered" class="filter-pill" data-testid="logs-filtered-pill" hidden>Filtered</span>
       </summary>
       <div class="filter-shell-body">
     <div class="filter-bar">
       <div class="filter-row filter-row-primary">
         <input type="text" id="logs-q"
                class="filter-grow"
+               data-testid="logs-search"
                placeholder="Search message or details…"
                value="${htmlEscape(f.q)}">
         <input type="text" id="logs-gap-id"
                class="filter-gap-id"
+               data-testid="logs-gap-filter"
                placeholder="Gap ID"
                value="${htmlEscape(f.gap_id)}">
       </div>
       <div class="filter-row filter-row-filters">
-        <select id="logs-severity">
+        <select id="logs-severity" data-testid="logs-severity-filter">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
           <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
           <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
           <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
         </select>
-        <select id="logs-category"><option value="">all categories</option></select>
-        <select id="logs-actor"><option value="">all actors</option></select>
-        <select id="logs-limit">
+        <select id="logs-category" data-testid="logs-category-filter"><option value="">all categories</option></select>
+        <select id="logs-actor" data-testid="logs-actor-filter"><option value="">all actors</option></select>
+        <select id="logs-limit" data-testid="logs-limit-filter">
           ${LOGS_LIMIT_OPTIONS.map((n) =>
             `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
         </select>
         <span class="spacer"></span>
-        <button class="secondary" id="logs-clear">Clear filters</button>
+        <button class="secondary" id="logs-clear" data-testid="logs-clear-filters">Clear filters</button>
       </div>
     </div>
       </div>
     </details>
-    <div id="logs-list"><p class="muted">Loading…</p></div>
+    <div class="segmented-control logs-period-control" role="group" aria-label="Log visualization period" data-testid="logs-period-control">
+      <button type="button" data-logs-period="day" data-testid="logs-period-day" ${f.period === "day" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Day</button>
+      <button type="button" data-logs-period="week" data-testid="logs-period-week" ${f.period === "week" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Week</button>
+      <button type="button" data-logs-period="month" data-testid="logs-period-month" ${f.period === "month" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Month</button>
+    </div>
+    <div id="logs-visualization" data-testid="logs-visualization"><p class="muted">Loading…</p></div>
+    <div id="logs-list" data-testid="logs-list"><p class="muted">Loading…</p></div>
   `;
 
   $("#logs-q").addEventListener("input", debounce(() => {
@@ -110,6 +120,9 @@ async function renderLogs() {
       limit: parseInt(e.target.value, 10) || LOGS_DEFAULT_LIMIT,
       page: 1,
     }));
+  $$("[data-logs-period]").forEach((btn) => {
+    btn.addEventListener("click", () => updateLogsFilter({ period: btn.dataset.logsPeriod, page: 1 }));
+  });
   $("#logs-clear").addEventListener("click", () => {
     history.replaceState(null, "", "#/logs");
     renderLogs();
@@ -126,6 +139,7 @@ function updateLogsFilter(patch) {
     actor: "actor" in patch ? patch.actor : current.actor,
     gap_id: "gap_id" in patch ? patch.gap_id : current.gap_id,
     q: "q" in patch ? patch.q : current.q,
+    period: "period" in patch ? patch.period : current.period,
     limit: "limit" in patch ? patch.limit : current.limit,
     page: "page" in patch ? patch.page : current.page,
     sort: "sort" in patch ? patch.sort : current.sort,
@@ -189,6 +203,8 @@ function drawLogsList(data, f) {
     countEl.textContent = `${entries.length} ${entries.length === 1 ? "entry" : "entries"}`;
   }
   applyLogsFilterIndicator(f);
+  syncLogsPeriodControls(f.period);
+  drawLogsVisualization(entries, f.period);
   const root = $("#logs-list");
   if (!entries.length) {
     root.innerHTML = `
@@ -210,16 +226,17 @@ function drawLogsList(data, f) {
       ? (f.effectiveDir === "asc" ? "↑" : "↓")
       : `<span class="sort-arrow-placeholder">↕</span>`;
     return `<th class="sortable ${isActive ? "active" : ""}"
-                data-sort-key="${c.key}">
+            data-sort-key="${c.key}"
+            data-testid="logs-sort-${c.key}">
               ${c.label} <span class="sort-arrow">${arrow}</span>
             </th>`;
   }).join("");
   root.innerHTML = `
-    <table class="table logs-table mobile-card-table">
+    <table class="table logs-table mobile-card-table" data-testid="logs-table">
       <thead><tr>${sortHeads}</tr></thead>
       <tbody>
         ${entries.map((e) => `
-          <tr class="logs-entry-row">
+          <tr class="logs-entry-row" data-testid="logs-row">
             <td class="logs-entry-cell" colspan="5">
               <div class="logs-entry-meta">
                 <div class="logs-entry-meta-item">
@@ -249,7 +266,7 @@ function drawLogsList(data, f) {
                 <span class="logs-entry-meta-label">Message</span>
                 <div class="logs-message-body">
                   <div class="logs-message-text">${htmlEscape(e.message)}</div>
-                  ${e.details ? `<details><summary class="diff-show-details">Show details</summary><pre>${htmlEscape(e.details)}</pre></details>` : ""}
+                  ${e.details ? `<details data-testid="logs-details"><summary class="diff-show-details" data-testid="logs-show-details">Show details</summary><pre>${htmlEscape(logDetailsText(e.details))}</pre></details>` : ""}
                 </div>
               </div>
             </td>
@@ -268,6 +285,90 @@ function drawLogsList(data, f) {
       updateLogsFilter({ sort: key, dir: nextDir, page: 1 });
     });
   });
+}
+
+function syncLogsPeriodControls(period = "day") {
+  $$("[data-logs-period]").forEach((btn) => {
+    const active = btn.dataset.logsPeriod === period;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function logDetailsText(details) {
+  if (details == null) return "";
+  if (typeof details === "string") return details;
+  try {
+    return JSON.stringify(details, null, 2);
+  } catch (_) {
+    return String(details);
+  }
+}
+
+function logBucketLabel(datetime, period) {
+  const date = new Date(datetime);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  if (period === "month") return `${year}-${month}`;
+  if (period === "week") {
+    const copy = new Date(Date.UTC(year, date.getUTCMonth(), date.getUTCDate()));
+    const dayNo = copy.getUTCDay() || 7;
+    copy.setUTCDate(copy.getUTCDate() + 4 - dayNo);
+    const weekYear = copy.getUTCFullYear();
+    const yearStart = new Date(Date.UTC(weekYear, 0, 1));
+    const weekNo = Math.ceil((((copy - yearStart) / 86400000) + 1) / 7);
+    return `${weekYear}-W${String(weekNo).padStart(2, "0")}`;
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function drawLogsVisualization(entries, period = "day") {
+  const root = $("#logs-visualization");
+  if (!root) return;
+  const severities = ["error", "warn", "info"];
+  const buckets = new Map();
+  for (const entry of entries) {
+    const label = logBucketLabel(entry.datetime, period);
+    if (!buckets.has(label)) {
+      buckets.set(label, { label, total: 0, counts: { error: 0, warn: 0, info: 0 } });
+    }
+    const bucket = buckets.get(label);
+    const severity = severities.includes(entry.severity) ? entry.severity : "info";
+    bucket.total += 1;
+    bucket.counts[severity] += 1;
+  }
+  const rows = Array.from(buckets.values()).sort((a, b) => b.label.localeCompare(a.label));
+  if (!rows.length) {
+    root.innerHTML = `<p class="muted">No log activity to visualize.</p>`;
+    return;
+  }
+  const maxTotal = Math.max(...rows.map((row) => row.total), 1);
+  root.innerHTML = `
+    <section class="logs-visualization-grid">
+      ${rows.map((row) => `
+        <div class="card logs-visualization-bucket" data-testid="logs-bucket">
+          <div class="row">
+            <strong data-testid="logs-bucket-label">${htmlEscape(row.label)}</strong>
+            <span class="spacer"></span>
+            <span class="muted small" data-testid="logs-bucket-total">${fmtCount(row.total)}</span>
+          </div>
+          <div class="logs-visualization-bar" aria-hidden="true">
+            ${severities.map((severity) => {
+              const count = row.counts[severity] || 0;
+              const width = count ? Math.max(8, Math.round((count / maxTotal) * 100)) : 0;
+              return `<span class="${severity}" style="width:${width}%"></span>`;
+            }).join("")}
+          </div>
+          <div class="logs-visualization-counts">
+            ${severities.map((severity) => `
+              <span data-testid="logs-severity-${severity}">
+                ${htmlEscape(severity)} ${fmtCount(row.counts[severity] || 0)}
+              </span>`).join("")}
+          </div>
+        </div>`).join("")}
+    </section>`;
 }
 
 // Mirror of applyGapsFilterIndicator for the Logs screen.

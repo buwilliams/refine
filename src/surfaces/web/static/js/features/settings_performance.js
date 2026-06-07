@@ -42,18 +42,20 @@ function performanceApiPath(f = performanceFiltersFromHash()) {
 
 function renderPerformanceSummary(perf = {}) {
   const summary = perf.summary || [];
-  if (!summary.length) return `<p class="muted">No performance metrics recorded yet.</p>`;
+  if (!summary.length) {
+    return `<p class="muted" data-testid="performance-summary-empty">No performance metrics recorded yet.</p>`;
+  }
   return `
-    <table class="table performance-summary-table mobile-card-table">
+    <table class="table performance-summary-table mobile-card-table" data-testid="performance-summary-table">
       <thead><tr>
         <th>Operation</th><th>Count</th><th>Failures</th>
         <th>Avg</th><th>P95</th><th>Max</th><th>Last seen</th>
       </tr></thead>
       <tbody>
         ${summary.map((row) => `
-          <tr>
-            <td data-label="Operation"><code>${htmlEscape(row.operation || "")}</code></td>
-            <td data-label="Count">${fmtCount(row.count || 0)}</td>
+          <tr data-testid="performance-summary-row">
+            <td data-label="Operation" data-testid="performance-summary-operation"><code>${htmlEscape(row.operation || "")}</code></td>
+            <td data-label="Count" data-testid="performance-summary-count">${fmtCount(row.count || 0)}</td>
             <td data-label="Failures">${fmtCount(row.failures || 0)}</td>
             <td data-label="Avg">${fmtPerfMs(row.avg_ms)}</td>
             <td data-label="P95">${fmtPerfMs(row.p95_ms)}</td>
@@ -76,18 +78,18 @@ function renderPerformanceEvents(perf = {}) {
   };
   const filterShellOpen = !!document.getElementById("performance-filter-shell")?.open;
   return `
-    <details class="filter-shell" id="performance-filter-shell"${filterShellOpen ? " open" : ""}>
+    <details class="filter-shell" id="performance-filter-shell" data-testid="performance-filter-shell"${filterShellOpen ? " open" : ""}>
       <summary>
         <span class="filter-shell-title">Filters</span>
         <span class="spacer"></span>
-        <span class="muted small"><span id="performance-count">${events.length} ${events.length === 1 ? "event" : "events"}</span></span>
-        <span id="performance-filtered" class="filter-pill" hidden>Filtered</span>
+        <span class="muted small"><span id="performance-count" data-testid="performance-count">${events.length} ${events.length === 1 ? "event" : "events"}</span></span>
+        <span id="performance-filtered" class="filter-pill" data-testid="performance-filtered-pill" hidden>Filtered</span>
       </summary>
       <div class="filter-shell-body">
         <div class="filter-bar">
           <div class="filter-row filter-row-filters">
             <label class="filter-field">${renderSettingsGuideLabel("Operation", "performance-operation-filter")}
-              <select id="performance-operation-filter">
+              <select id="performance-operation-filter" data-testid="performance-operation-filter">
                 <option value="">all operations</option>
                 ${operations.map((op) => `
                   <option value="${htmlEscape(op)}" ${op === f.operation ? "selected" : ""}>${htmlEscape(op)}</option>`).join("")}
@@ -96,37 +98,37 @@ function renderPerformanceEvents(perf = {}) {
               </select>
             </label>
             <label class="filter-field">${renderSettingsGuideLabel("Outcome", "performance-outcome-filter")}
-              <select id="performance-success-filter">
+              <select id="performance-success-filter" data-testid="performance-success-filter">
                 <option value="" ${f.success === "" ? "selected" : ""}>all outcomes</option>
                 <option value="1" ${f.success === "1" ? "selected" : ""}>success</option>
                 <option value="0" ${f.success === "0" ? "selected" : ""}>failure</option>
               </select>
             </label>
             <label class="filter-field">${renderSettingsGuideLabel("Limit", "performance-limit")}
-              <select id="performance-limit">
+              <select id="performance-limit" data-testid="performance-limit-filter">
                 ${PERFORMANCE_LIMIT_OPTIONS.map((n) =>
                   `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} events</option>`).join("")}
               </select>
             </label>
             <span class="spacer"></span>
-            <button class="secondary" id="performance-filter-clear">Clear filters</button>
+            <button class="secondary" id="performance-filter-clear" data-testid="performance-clear-filters">Clear filters</button>
           </div>
         </div>
       </div>
     </details>
     ${events.length ? `
-      <table class="table performance-events-table mobile-card-table">
+      <table class="table performance-events-table mobile-card-table" data-testid="performance-events-table">
         <thead><tr>
           <th>When</th><th>Operation</th><th>Elapsed</th><th>Outcome</th>
           <th>Gap</th><th>Provider</th><th>Mode</th><th>Resource</th><th>Rows</th>
         </tr></thead>
         <tbody>
           ${events.map((event) => `
-            <tr>
+            <tr data-testid="performance-event-row">
               <td class="muted small" data-label="When">${fmtTime(event.occurred_at)}</td>
-              <td data-label="Operation"><code>${htmlEscape(event.operation || "")}</code></td>
+              <td data-label="Operation" data-testid="performance-event-operation"><code>${htmlEscape(event.operation || "")}</code></td>
               <td data-label="Elapsed">${fmtPerfMs(event.elapsed_ms)}</td>
-              <td data-label="Outcome"><span class="status-pill ${event.success ? "done" : "failed"}">${event.success ? "success" : "failed"}</span></td>
+              <td data-label="Outcome" data-testid="performance-event-outcome"><span class="status-pill ${event.success ? "done" : "failed"}">${event.success ? "success" : "failed"}</span></td>
               <td data-label="Gap">${event.gap_id ? `<a href="#/gaps/${htmlEscape(event.gap_id)}">${htmlEscape(event.gap_id.slice(0, 10))}...</a>` : ""}</td>
               <td data-label="Provider">${htmlEscape(event.provider || "")}</td>
               <td data-label="Mode">${htmlEscape(event.query_mode || "")}</td>
@@ -134,7 +136,7 @@ function renderPerformanceEvents(perf = {}) {
               <td class="muted small" data-label="Rows">${event.rows_returned ?? ""}${event.rows_scanned != null ? ` / ${event.rows_scanned}` : ""}</td>
             </tr>`).join("")}
         </tbody>
-      </table>` : `<p class="muted">No recent events match the current filters.</p>`}
+      </table>` : `<p class="muted" data-testid="performance-events-empty">No recent events match the current filters.</p>`}
     ${renderPaginationControls("performance", pageMeta, events.length, "event")}`;
 }
 
@@ -159,13 +161,13 @@ function renderSettingsPerformanceTab(performance, performanceBackend) {
       <dl class="kv">
         <dt>Process model</dt><dd>${htmlEscape(backendProcessLabel(performanceBackend))}</dd>
         <dt>Metric store</dt><dd>${htmlEscape(performanceMetricStoreLabel(performanceBackend))}</dd>
-        <dt>Events retained</dt><dd>${fmtCount(performance.event_count || 0)}</dd>
-        <dt>Total stored</dt><dd>${fmtCount(performance.total_event_count || 0)}</dd>
+        <dt>Events retained</dt><dd data-testid="performance-events-retained">${fmtCount(performance.event_count || 0)}</dd>
+        <dt>Total stored</dt><dd data-testid="performance-total-stored">${fmtCount(performance.total_event_count || 0)}</dd>
       </dl>
       <div class="actions" style="margin-top:10px">
-        <button class="secondary" id="performance-refresh">Refresh</button>
-        <button class="secondary" id="performance-prune">Prune old metrics</button>
-        <button class="danger" id="performance-clear">Clear metrics</button>
+        <button class="secondary" id="performance-refresh" data-testid="performance-refresh">Refresh</button>
+        <button class="secondary" id="performance-prune" data-testid="performance-prune">Prune old metrics</button>
+        <button class="danger" id="performance-clear" data-testid="performance-clear">Clear metrics</button>
       </div>
     </section>
     <section class="settings-section">

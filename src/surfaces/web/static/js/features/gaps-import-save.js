@@ -17,9 +17,9 @@ function drawImportSaving(root, session, close, saveSession = null) {
     </p>
   `;
   actions.innerHTML = `
-    <button class="secondary" data-cancel>Cancel</button>
-    <button class="secondary" data-hide>Hide</button>
-    <button id="btn-persist" disabled>Saving…</button>
+    <button class="secondary" data-cancel data-testid="import-save-cancel">Cancel</button>
+    <button class="secondary" data-hide data-testid="import-save-hide">Hide</button>
+    <button id="btn-persist" data-testid="import-save-progress" disabled>Saving…</button>
   `;
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {
     const ok = await modalConfirm(

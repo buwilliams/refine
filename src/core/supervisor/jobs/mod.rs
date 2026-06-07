@@ -6,7 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::model::log::LogEntry;
@@ -41,6 +41,12 @@ pub struct JobHandle {
     pub id: String,
     pub owner: String,
     pub state: JobState,
+    #[serde(default = "empty_object")]
+    pub progress: Value,
+    #[serde(default = "empty_object")]
+    pub result: Value,
+    #[serde(default)]
+    pub error: Option<Value>,
 }
 
 pub trait JobRegistry {
@@ -230,6 +236,48 @@ impl FileJobRegistry {
         )?;
         Ok(handle)
     }
+
+    pub fn update_progress(&self, job_id: &str, progress: Value) -> RefineResult<JobHandle> {
+        let mut handle = self.status(job_id)?;
+        handle.progress = progress;
+        self.write(&handle)?;
+        Ok(handle)
+    }
+
+    pub fn finish_with_result(
+        &self,
+        job_id: &str,
+        state: JobState,
+        result: Value,
+    ) -> RefineResult<JobHandle> {
+        if !matches!(state, JobState::Succeeded | JobState::Failed) {
+            return Err(RefineError::InvalidInput(
+                "result jobs must finish as succeeded or failed".to_string(),
+            ));
+        }
+        let mut handle = self.status(job_id)?;
+        handle.state = state;
+        handle.result = result;
+        handle.error = None;
+        self.write(&handle)?;
+        self.append_log(
+            &handle.id,
+            job_log_entry(&handle, "info", "Job finished", None),
+        )?;
+        Ok(handle)
+    }
+
+    pub fn fail_with_error(&self, job_id: &str, error: Value) -> RefineResult<JobHandle> {
+        let mut handle = self.status(job_id)?;
+        handle.state = JobState::Failed;
+        handle.error = Some(error);
+        self.write(&handle)?;
+        self.append_log(
+            &handle.id,
+            job_log_entry(&handle, "error", "Job failed", None),
+        )?;
+        Ok(handle)
+    }
 }
 
 impl JobRegistry for FileJobRegistry {
@@ -238,6 +286,9 @@ impl JobRegistry for FileJobRegistry {
             id: new_job_id(),
             owner: owner.to_string(),
             state: JobState::Running,
+            progress: empty_object(),
+            result: empty_object(),
+            error: None,
         };
         self.write(&handle)?;
         self.append_log(
@@ -319,6 +370,10 @@ fn new_job_id() -> String {
         std::process::id(),
         COUNTER.fetch_add(1, Ordering::Relaxed)
     )
+}
+
+fn empty_object() -> Value {
+    json!({})
 }
 
 fn job_log_entry(

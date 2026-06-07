@@ -291,7 +291,12 @@ impl InProcessWebServer {
 
     pub(super) fn handle_quality_regression_run(&self) -> ApiResponse {
         let durable_root = require_durable_root!(self, "run quality regressions");
-        match FileQualityService::new(durable_root).run_regressions(true) {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("run quality regressions");
+        };
+        match FileQualityService::with_runtime_root(durable_root, runtime_root)
+            .run_regressions(true)
+        {
             Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }

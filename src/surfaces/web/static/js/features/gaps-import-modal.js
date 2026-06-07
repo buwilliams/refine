@@ -7,13 +7,15 @@ function openImportModal() {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
+         data-testid="import-modal"
          aria-labelledby="import-title">
       <div class="modal-title" id="import-title">Import gaps</div>
-      <div class="modal-body" style="max-height:72vh;overflow:auto">
-        <nav class="settings-tabs" id="import-tabs" role="tablist">
+      <div class="modal-body" data-testid="import-modal-body" style="max-height:72vh;overflow:auto">
+        <nav class="settings-tabs" id="import-tabs" role="tablist" data-testid="import-tabs">
           ${Object.entries(IMPORT_MODES).map(([mode, meta]) => `
             <button type="button" class="settings-tab ${mode === "ai" ? "active" : ""}"
                     data-import-mode="${mode}" role="tab"
+                    data-testid="import-tab-${htmlEscape(mode)}"
                     aria-selected="${mode === "ai" ? "true" : "false"}">
               ${htmlEscape(meta.label)}
             </button>`).join("")}
@@ -29,7 +31,7 @@ function openImportModal() {
             </div>
             <div class="form-row">
               <label>Source text</label>
-              <textarea id="import-text" rows="8" placeholder="Paste here…"></textarea>
+              <textarea id="import-text" data-testid="import-text" rows="8" placeholder="Paste here…"></textarea>
             </div>
           </section>
           <section class="settings-pane import-panel" data-import-panel="csv">
@@ -37,10 +39,10 @@ function openImportModal() {
               <label>CSV text
                 <span class="muted small">— required fields: ${IMPORT_CSV_REQUIRED_FIELDS.map(htmlEscape).join(", ")}</span>
               </label>
-              <textarea id="import-csv-text" rows="8" placeholder="actual,target,reporter,priority&#10;Current behavior,Desired behavior,Alice,medium"></textarea>
+              <textarea id="import-csv-text" data-testid="import-csv-text" rows="8" placeholder="actual,target,reporter,priority&#10;Current behavior,Desired behavior,Alice,medium"></textarea>
             </div>
             <label class="checkbox-row">
-              <input type="checkbox" id="import-csv-distribute">
+              <input type="checkbox" id="import-csv-distribute" data-testid="import-csv-distribute">
               <span>Distribute across cluster nodes</span>
             </label>
           </section>
@@ -52,22 +54,22 @@ function openImportModal() {
             <div class="form-row">
               <label>CSV file</label>
               <div class="import-file-control">
-                <button type="button" class="secondary" id="import-csv-file-button">Choose CSV</button>
-                <span class="import-file-name muted" id="import-csv-file-name" aria-live="polite">No file selected</span>
+                <button type="button" class="secondary" id="import-csv-file-button" data-testid="import-csv-file-button">Choose CSV</button>
+                <span class="import-file-name muted" id="import-csv-file-name" data-testid="import-csv-file-name" aria-live="polite">No file selected</span>
               </div>
-              <input type="file" id="import-csv-file" class="visually-hidden" accept=".csv,text/csv">
+              <input type="file" id="import-csv-file" data-testid="import-csv-file" class="visually-hidden" accept=".csv,text/csv">
             </div>
             <label class="checkbox-row">
-              <input type="checkbox" id="import-upload-distribute">
+              <input type="checkbox" id="import-upload-distribute" data-testid="import-upload-distribute">
               <span>Distribute across cluster nodes</span>
             </label>
           </section>
-          <div id="import-drafts" class="import-drafts" style="margin-top:14px"></div>
+          <div id="import-drafts" class="import-drafts" data-testid="import-drafts" style="margin-top:14px"></div>
         </div>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button id="btn-extract" data-ok>${IMPORT_MODES.ai.action}</button>
+        <button class="secondary" data-cancel data-testid="import-cancel">Cancel</button>
+        <button id="btn-extract" data-ok data-testid="import-extract">${IMPORT_MODES.ai.action}</button>
       </div>
     </div>
   `;
@@ -255,8 +257,8 @@ function openImportModal() {
           ? !!root.querySelector("#import-csv-distribute")?.checked
           : !!root.querySelector("#import-upload-distribute")?.checked;
         const drafts = await parseImportCsvBackend(csvText, draftsRoot, saveSession, { distribute });
-        if (saveSession) saveSession({ phase: "review", drafts, prepareJobId: "", error: "" });
-        drawImportDrafts(root, drafts, close, { saveSession });
+        if (saveSession) saveSession({ prepareJobId: "", error: "" });
+        await reviewImportDrafts(root, drafts, close, saveSession);
       } catch (e) {
         saveSession({ phase: "editing", prepareJobId: "", error: e.message });
         if (draftsRoot) {

@@ -45,39 +45,40 @@ async function renderGapsList() {
 
   $("#main").innerHTML = `
     <h2>Gaps</h2>
-    <div id="gaps-workflow" class="gaps-workflow">
+    <div id="gaps-workflow" class="gaps-workflow" data-testid="gaps-workflow">
       ${renderWorkflowVisualization({
         counts: {},
         hrefForStatus: (status) => gapsWorkflowStatusHash(status, f),
         className: "gaps-workflow-grid",
       })}
     </div>
-    <details class="filter-shell" id="gaps-filter-shell"${filterShellOpen ? " open" : ""}>
-      <summary>
+    <details class="filter-shell" id="gaps-filter-shell" data-testid="gaps-filter-shell"${filterShellOpen ? " open" : ""}>
+      <summary data-testid="gaps-filter-summary">
         <span class="filter-shell-title">Filters &amp; bulk actions</span>
         <span class="spacer"></span>
-        <span class="muted small"><span id="gaps-count"></span></span>
-        <span id="gaps-filtered" class="filter-pill" hidden>Filtered</span>
+        <span class="muted small"><span id="gaps-count" data-testid="gaps-count"></span></span>
+        <span id="gaps-filtered" class="filter-pill" data-testid="gaps-filtered-pill" hidden>Filtered</span>
       </summary>
       <div class="filter-shell-body">
     <div class="filter-bar">
       <div class="filter-row filter-row-primary">
         <input type="text" id="search" class="filter-grow"
+               data-testid="gaps-search"
                placeholder="Search gaps…" value="${htmlEscape(f.q)}">
       </div>
       <div class="filter-row filter-row-activity">
-        <select id="filter-status">
+        <select id="filter-status" data-testid="gaps-status-filter">
           ${STATUS_FILTER_OPTIONS
             .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s ? workflowStatusLabel(s) : "all statuses"}</option>`).join("")}
         </select>
-        <select id="filter-reporter">
+        <select id="filter-reporter" data-testid="gaps-reporter-filter">
           <option value="" ${f.reporter === "" ? "selected" : ""}>all reporters</option>
           ${(state.reporters || []).map((r) =>
             `<option value="${htmlEscape(r.name)}" ${r.name === f.reporter ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
           ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
-        <select id="filter-node">
+        <select id="filter-node" data-testid="gaps-node-filter">
           <option value="" ${f.node === "" ? "selected" : ""}>all nodes</option>
           <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
           <option value="unknown" ${f.node === "unknown" ? "selected" : ""}>unknown node</option>
@@ -87,42 +88,45 @@ async function renderGapsList() {
             ? `<option value="${htmlEscape(f.node)}" selected>${htmlEscape(f.node)}</option>` : ""}
         </select>
         <input type="text" id="filter-feature" class="filter-feature"
+               data-testid="gaps-feature-filter"
                placeholder="Feature ID or standalone" value="${htmlEscape(f.feature)}">
         <input type="number" id="filter-rounds-gte" class="filter-number"
+               data-testid="gaps-rounds-gte-filter"
                min="0" step="1" inputmode="numeric"
                placeholder="Rounds ≥" value="${htmlEscape(f.rounds_gte)}">
         <input type="number" id="filter-rounds-lte" class="filter-number"
+               data-testid="gaps-rounds-lte-filter"
                min="0" step="1" inputmode="numeric"
                placeholder="Rounds ≤" value="${htmlEscape(f.rounds_lte)}">
-        <select id="gaps-severity">
+        <select id="gaps-severity" data-testid="gaps-severity-filter">
           <option value="" ${f.severity === "" ? "selected" : ""}>all severities</option>
           <option value="info"  ${f.severity === "info"  ? "selected" : ""}>info</option>
           <option value="warn"  ${f.severity === "warn"  ? "selected" : ""}>warn</option>
           <option value="error" ${f.severity === "error" ? "selected" : ""}>error</option>
         </select>
-        <select id="gaps-category"><option value="">all categories</option></select>
-        <select id="gaps-actor"><option value="">all actors</option></select>
-        <select id="gaps-limit">
+        <select id="gaps-category" data-testid="gaps-category-filter"><option value="">all categories</option></select>
+        <select id="gaps-actor" data-testid="gaps-actor-filter"><option value="">all actors</option></select>
+        <select id="gaps-limit" data-testid="gaps-limit-filter">
           ${GAPS_LIMIT_OPTIONS.map((n) =>
             `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
         </select>
         <span class="spacer"></span>
-        <button class="secondary" id="gaps-clear">Clear filters</button>
+        <button class="secondary" id="gaps-clear" data-testid="gaps-clear-filters">Clear filters</button>
       </div>
       <div class="filter-row filter-row-bulk">
         <span class="muted small">Bulk update selected:</span>
-        <button class="secondary small" id="gap-select-page">Select page</button>
-        <button class="secondary small" id="bulk-set-status">Status…</button>
-        <button class="secondary small" id="bulk-set-priority">Priority…</button>
-        <button class="secondary small" id="bulk-set-reporter">Reporter…</button>
-        <button class="secondary small" id="bulk-assign-feature">Feature…</button>
-        <button class="secondary small" id="bulk-transfer-node">Node…</button>
-        <button class="secondary small" id="bulk-delete">Delete…</button>
+        <button class="secondary small" id="gap-select-page" data-testid="gaps-select-page">Select page</button>
+        <button class="secondary small" id="bulk-set-status" data-testid="gaps-bulk-status">Status…</button>
+        <button class="secondary small" id="bulk-set-priority" data-testid="gaps-bulk-priority">Priority…</button>
+        <button class="secondary small" id="bulk-set-reporter" data-testid="gaps-bulk-reporter">Reporter…</button>
+        <button class="secondary small" id="bulk-assign-feature" data-testid="gaps-bulk-feature">Feature…</button>
+        <button class="secondary small" id="bulk-transfer-node" data-testid="gaps-bulk-transfer-node">Node…</button>
+        <button class="secondary small" id="bulk-delete" data-testid="gaps-bulk-delete">Delete…</button>
       </div>
     </div>
       </div>
     </details>
-    <div id="gaps-table"><p class="muted">Loading…</p></div>
+    <div id="gaps-table" data-testid="gaps-table"><p class="muted">Loading…</p></div>
   `;
   // In-view filter changes update the URL via replaceState (which does NOT
   // fire `hashchange`) and refresh only the table. Going through
@@ -418,13 +422,15 @@ function drawGapsTable(gaps, state) {
       ? (state.dir === "asc" ? "↑" : "↓")
       : `<span class="sort-arrow-placeholder">↕</span>`;
     return `<th class="sortable ${isActive ? "active" : ""}"
-                data-sort-key="${c.key}">
+                data-sort-key="${c.key}"
+                data-testid="gaps-sort-${c.key}">
               ${c.label} <span class="sort-arrow">${arrow}</span>
             </th>`;
   }).join("");
   const selectionHead = showSelection
     ? `<th class="gap-select-col">
          <input type="checkbox" id="gap-select-all"
+                data-testid="gaps-select-all"
                 aria-label="Select all matching Gaps">
        </th>`
     : "";
@@ -447,12 +453,13 @@ function drawGapsTable(gaps, state) {
           const cell = showSelection
             ? `<td class="gap-select-col" data-label="Select">
                  <input type="checkbox" class="gap-select"
+                        data-testid="gaps-row-select"
                         data-id="${g.id}"
                         ${selected ? "checked" : ""}
                         aria-label="Select gap ${htmlEscape(g.name)}">
                </td>`
             : "";
-          return `<tr data-id="${g.id}">
+          return `<tr data-id="${g.id}" data-testid="gaps-row">
             ${cell}
             <td class="gaps-name-cell" data-label="Name">${htmlEscape(g.name)}</td>
             <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>

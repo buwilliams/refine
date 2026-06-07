@@ -19,20 +19,20 @@
       <img class="brand-logo" src="/static/images/refine_logo_transparent.png" alt="refine">
       <div class="brand-node" id="active-node-label">-</div>
     </a>
-    <nav class="nav">
-      <a href="#/" data-route="dashboard">Dashboard</a>
-      <a href="#/features" data-route="features">Features</a>
-      <a href="#/gaps" data-route="gaps">Gaps</a>
-      <a href="#/changes" data-route="changes">Changes</a>
-      <a href="#/logs" data-route="logs">Logs</a>
+    <nav class="nav" data-testid="primary-nav">
+      <a href="#/" data-route="dashboard" data-testid="nav-dashboard">Dashboard</a>
+      <a href="#/features" data-route="features" data-testid="nav-features">Features</a>
+      <a href="#/gaps" data-route="gaps" data-testid="nav-gaps">Gaps</a>
+      <a href="#/changes" data-route="changes" data-testid="nav-changes">Changes</a>
+      <a href="#/logs" data-route="logs" data-testid="nav-logs">Logs</a>
     </nav>
     <div class="topbar-actions">
       <details class="nav-menu nav-context-menu" id="nav-context-menu">
-        <summary class="nav-context-summary" aria-label="Current context">
+        <summary class="nav-context-summary" aria-label="Current context" data-testid="context-menu-toggle">
           <span class="target-app-dot nav-context-summary-dot" aria-hidden="true"></span>
-          <span class="nav-context-app" id="nav-context-app-summary">Application</span>
+          <span class="nav-context-app" id="nav-context-app-summary" data-testid="context-app-name">Application</span>
           <span class="nav-context-separator" aria-hidden="true">/</span>
-          <span class="nav-context-reporter" id="nav-context-reporter-summary">No reporter</span>
+          <span class="nav-context-reporter" id="nav-context-reporter-summary" data-testid="context-reporter-name">No reporter</span>
         </summary>
         <div class="nav-menu-panel nav-context-panel">
           <div class="nav-menu-label">Application</div>
@@ -40,14 +40,15 @@
              href="#/node/processes"
              aria-label="Target application status (click to manage)"
              title="Target application status"
+             data-testid="context-target-app-status"
              data-state="unknown">
             <span class="target-app-dot" aria-hidden="true"></span>
             <span class="target-app-label">Application</span>
           </a>
           <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
-          <select id="global-reporter" aria-label="Reporter"></select>
+          <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
           <div class="nav-menu-label nav-context-section-label">Management</div>
-          <a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide">
+          <a class="nav-menu-item nav-management-item" href="#/guide" id="nav-guide-open" data-route="guide" data-testid="nav-guide-open">
             <svg class="nav-menu-icon" aria-hidden="true" viewBox="0 0 24 24" focusable="false">
               <path d="M12 7v14"></path>
               <path d="M3 5a2 2 0 0 1 2-2h4a3 3 0 0 1 3 3v15a3 3 0 0 0-3-3H5a2 2 0 0 1-2-2V5Z"></path>
@@ -82,25 +83,27 @@
         <span class="agent-status-label">0</span>
       </a>
       <button class="secondary nav-command-button" id="btn-command-palette"
+              data-testid="command-palette-button"
               aria-label="Open command palette">
         <span class="nav-command-icon" aria-hidden="true"></span>
         <span class="nav-command-shortcut" data-command-shortcut>Ctrl+K</span>
       </button>
       <button class="secondary nav-issue-button" id="btn-refine-issue"
+              data-testid="nav-refine-issue"
               aria-label="Request refine feature or bugfix"
               title="Request refine feature or bugfix">
         <span class="nav-bug-icon" aria-hidden="true"></span>
       </button>
       <div class="nav-create-group">
-        <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap">+ New Gap</a>
+        <a class="btn nav-action nav-create-primary" href="#/gaps/new" id="btn-new-gap" data-testid="nav-new-gap">+ New Gap</a>
         <details class="nav-menu nav-create-menu" id="nav-create-menu">
-          <summary class="btn nav-action nav-create-more" aria-label="More create actions"></summary>
+          <summary class="btn nav-action nav-create-more" aria-label="More create actions" data-testid="create-menu-toggle"></summary>
           <div class="nav-menu-panel nav-create-panel">
-            <a class="nav-menu-item" href="#/features/new" id="btn-new-feature">New Feature</a>
-            <a class="nav-menu-item" href="#/gaps/plan" id="btn-plan">Plan Mode</a>
-            <a class="nav-menu-item" href="#/gaps/import" id="btn-import">Import gaps</a>
+            <a class="nav-menu-item" href="#/features/new" id="btn-new-feature" data-testid="nav-new-feature">New Feature</a>
+            <a class="nav-menu-item" href="#/gaps/plan" id="btn-plan" data-testid="nav-plan-mode">Plan Mode</a>
+            <a class="nav-menu-item" href="#/gaps/import" id="btn-import" data-testid="nav-import-gaps">Import gaps</a>
             <a class="nav-menu-item" href="https://github.com/buwilliams/refine/issues/new"
-               id="btn-refine-issue-menu">Request refine feature/bugfix</a>
+               id="btn-refine-issue-menu" data-testid="nav-refine-issue-menu">Request refine feature/bugfix</a>
           </div>
         </details>
       </div>
@@ -111,8 +114,8 @@
 
   <main id="main"></main>
 
-  <aside id="toolbar-dock" class="toolbar-dock" aria-label="Toolbar"></aside>
-  <aside id="guide-panel" class="guide-panel" aria-label="Guide" aria-hidden="true"></aside>
+  <aside id="toolbar-dock" class="toolbar-dock" aria-label="Toolbar" data-testid="toolbar-dock"></aside>
+  <aside id="guide-panel" class="guide-panel" aria-label="Guide" aria-hidden="true" data-testid="guide-panel"></aside>
 
   <template id="t-banner">
     <div class="banner">

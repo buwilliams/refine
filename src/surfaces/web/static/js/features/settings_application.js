@@ -21,14 +21,14 @@ function renderProjectApplicationsSection({
         "project-known-apps",
         "add an existing repo or a new directory, then switch between apps here.",
       )}</label>
-        <select id="s-project-select" ${projectApps.length ? "" : "disabled"}>
+        <select id="s-project-select" data-testid="project-app-select" ${projectApps.length ? "" : "disabled"}>
           ${appOptions || `<option value="">No apps yet</option>`}
         </select></div>
       <div class="actions settings-section-actions">
-        <button class="secondary" id="s-project-add" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
-        <button class="secondary" id="s-project-template" ${currentProject ? "" : "disabled"}>Select app template</button>
-        <button id="s-project-switch" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
-        <button class="danger" id="s-project-remove" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
+        <button class="secondary" id="s-project-add" data-testid="project-add-app" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
+        <button class="secondary" id="s-project-template" data-testid="project-template" ${currentProject ? "" : "disabled"}>Select app template</button>
+        <button id="s-project-switch" data-testid="project-switch-app" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
+        <button class="danger" id="s-project-remove" data-testid="project-remove-app" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
     </section>`;
 }
@@ -52,8 +52,8 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
       <h3>Application</h3>
       <p class="scope-label muted small">Node: ${htmlEscape(activeNodeLabel)}</p>
       <div class="actions">
-        <button class="secondary" id="s-application-copy-node">Copy from node</button>
-        <button class="secondary" id="s-target-generate-ai">Generate with AI</button>
+        <button class="secondary" id="s-application-copy-node" data-testid="target-app-copy-node">Copy from node</button>
+        <button class="secondary" id="s-target-generate-ai" data-testid="target-app-generate-ai">Generate with AI</button>
       </div>
     </section>
 
@@ -104,6 +104,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "opened from the status indicator when the app is running.",
       )}</label>
         <input type="url" id="s-target-app-url"
+               data-testid="target-app-url"
                placeholder="http://localhost:3000"
                value="${htmlEscape(s.target_app_url || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -112,6 +113,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "one-line shell command that starts the app and returns promptly.",
       )}</label>
         <input type="text" id="s-target-start-command"
+               data-testid="target-app-start-command"
                placeholder="./.refine/manage-app.sh start"
                value="${htmlEscape(s.target_app_start_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -120,6 +122,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "one-line shell command that stops the app; should be idempotent when practical.",
       )}</label>
         <input type="text" id="s-target-stop-command"
+               data-testid="target-app-stop-command"
                placeholder="./.refine/manage-app.sh stop"
                value="${htmlEscape(s.target_app_stop_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -128,6 +131,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "one-line shell command that prepares generated artifacts for review.",
       )}</label>
         <input type="text" id="s-target-rebuild-command"
+               data-testid="target-app-rebuild-command"
                placeholder="./.refine/manage-app.sh rebuild"
                value="${htmlEscape(s.target_app_rebuild_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -162,6 +166,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "exit 0 only when the app is healthy or running.",
       )}</label>
         <input type="text" id="s-target-status-command"
+               data-testid="target-app-status-command"
                placeholder="./.refine/manage-app.sh status"
                value="${htmlEscape(s.target_app_status_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -170,6 +175,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "repo-relative path, or blank for repo root.",
       )}</label>
         <input type="text" id="s-target-cwd"
+               data-testid="target-app-cwd"
                placeholder="."
                value="${htmlEscape(s.target_app_cwd || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -177,18 +183,18 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "application-environment",
         "JSON object merged into the host environment.",
       )}</label>
-        <textarea id="s-target-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea></div>
+        <textarea id="s-target-env" data-testid="target-app-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea></div>
       <div class="form-grid two">
         <div class="form-row"><label>${renderSettingsGuideLabel("Start timeout (s)", "application-start-timeout")}</label>
-          <input type="number" id="s-target-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
+          <input type="number" id="s-target-start-timeout" data-testid="target-app-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Stop timeout (s)", "application-stop-timeout")}</label>
-          <input type="number" id="s-target-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
+          <input type="number" id="s-target-stop-timeout" data-testid="target-app-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Rebuild timeout (s)", "application-rebuild-timeout")}</label>
-          <input type="number" id="s-target-rebuild-timeout" value="${htmlEscape(s.target_app_rebuild_timeout_seconds || "300")}"></div>
+          <input type="number" id="s-target-rebuild-timeout" data-testid="target-app-rebuild-timeout" value="${htmlEscape(s.target_app_rebuild_timeout_seconds || "300")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Status timeout (s)", "application-status-timeout")}</label>
-          <input type="number" id="s-target-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
+          <input type="number" id="s-target-status-timeout" data-testid="target-app-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Log path", "application-log-path")}</label>
-          <input type="text" id="s-target-log-path" value="${htmlEscape(s.target_app_log_path || "")}"></div>
+          <input type="text" id="s-target-log-path" data-testid="target-app-log-path" value="${htmlEscape(s.target_app_log_path || "")}"></div>
       </div>
       <h4 style="margin:16px 0 8px">Optional checks</h4>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -197,13 +203,14 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "optional; 2xx means healthy. Runs on the host.",
       )}</label>
         <input type="text" id="s-target-http-url"
+               data-testid="target-app-http-url"
                placeholder="http://localhost:3000/health"
                value="${htmlEscape(s.target_app_http_check_url || s.target_app_health_url || "")}"></div>
       <div class="form-grid two">
         <div class="form-row"><label>${renderSettingsGuideLabel("TCP host", "application-tcp-host")}</label>
-          <input type="text" id="s-target-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}"></div>
+          <input type="text" id="s-target-tcp-host" data-testid="target-app-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("TCP port", "application-tcp-port")}</label>
-          <input type="number" id="s-target-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}"></div>
+          <input type="number" id="s-target-tcp-port" data-testid="target-app-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}"></div>
       </div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Process check command",
@@ -211,9 +218,10 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         "optional one-line command; exit 0 when the expected process exists.",
       )}</label>
         <input type="text" id="s-target-process-command"
+               data-testid="target-app-process-command"
                value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
-        <p class="muted small" id="s-target-notes"></p></div>
+        <p class="muted small" id="s-target-notes" data-testid="target-app-notes"></p></div>
     </section>`;
 }
 

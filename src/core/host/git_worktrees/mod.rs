@@ -378,11 +378,37 @@ impl GitWorktreeService for FileGitWorktreeService {
     }
 
     fn hard_reset(&self) -> RefineResult<MergeResult> {
-        let output = self.git_raw(&["reset", "--hard", "HEAD"])?;
+        let reset = self.git_raw(&["reset", "--hard", "HEAD"])?;
+        let mut clean_args = vec![
+            "clean".to_string(),
+            "-fd".to_string(),
+            "-e".to_string(),
+            ".refine".to_string(),
+            "-e".to_string(),
+            ".refine/**".to_string(),
+        ];
+        if let Some(runtime_root) = &self.runtime_root
+            && let Some(relative_runtime) = relative_child_path(&self.root, runtime_root)
+        {
+            clean_args.extend([
+                "-e".to_string(),
+                relative_runtime.clone(),
+                "-e".to_string(),
+                format!("{relative_runtime}/**"),
+            ]);
+        }
+        let clean_refs = clean_args.iter().map(String::as_str).collect::<Vec<_>>();
+        let clean = self.git_raw(&clean_refs)?;
         let result = MergeResult {
-            ok: output.success,
+            ok: reset.success && clean.success,
             conflicts: self.conflicts().unwrap_or_default(),
-            message: Some(trimmed_command_text(&output)),
+            message: Some(
+                [trimmed_command_text(&reset), trimmed_command_text(&clean)]
+                    .into_iter()
+                    .filter(|text| !text.trim().is_empty())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+            ),
         };
         if result.ok {
             self.audit("hard_reset", "ok", json!({"result": &result}))?;
@@ -411,6 +437,16 @@ impl GitWorktreeService for FileGitWorktreeService {
         }
         Ok(result)
     }
+}
+
+fn relative_child_path(root: &Path, child: &Path) -> Option<String> {
+    let root = fs::canonicalize(root).ok()?;
+    let child = fs::canonicalize(child).ok()?;
+    let relative = child.strip_prefix(root).ok()?;
+    if relative.as_os_str().is_empty() {
+        return None;
+    }
+    Some(relative.to_string_lossy().replace('\\', "/"))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -558,6 +594,8 @@ mod tests {
         git(&repo, &["commit", "-m", "initial"]).unwrap();
         fs::write(repo.join("app.txt"), "dirty\n").unwrap();
         fs::write(repo.join("untracked.txt"), "keep\n").unwrap();
+        fs::create_dir_all(repo.join(".refine")).unwrap();
+        fs::write(repo.join(".refine/state.json"), "{}\n").unwrap();
 
         let service = FileGitWorktreeService::new(&repo);
         let reset = service.hard_reset().unwrap();
@@ -566,10 +604,8 @@ mod tests {
             fs::read_to_string(repo.join("app.txt")).unwrap(),
             "committed\n"
         );
-        assert_eq!(
-            fs::read_to_string(repo.join("untracked.txt")).unwrap(),
-            "keep\n"
-        );
+        assert!(!repo.join("untracked.txt").exists());
+        assert!(repo.join(".refine/state.json").exists());
         let audit = fs::read_to_string(service.audit_path().unwrap()).unwrap();
         assert!(audit.contains("\"action\":\"hard_reset\""));
         assert!(audit.contains("\"status\":\"ok\""));

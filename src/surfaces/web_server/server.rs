@@ -165,6 +165,10 @@ impl InProcessWebServer {
             return self.handle_diagnostics();
         }
 
+        if request.method == "POST" && request.path == "/diagnostics/support-bundle" {
+            return self.handle_support_bundle(request);
+        }
+
         if request.method == "GET" && request.path == "/dashboard" {
             return self.handle_dashboard(&raw_path);
         }

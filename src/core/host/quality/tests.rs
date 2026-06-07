@@ -55,7 +55,7 @@ fn quality_regressions_create_update_delete_and_run() {
     assert_eq!(created.id, "dashboard-smoke");
     assert!(
         durable_root
-            .join("regressions/specs/dashboard-smoke.js")
+            .join("regressions/specs/dashboard-smoke.spec.cjs")
             .exists()
     );
 
@@ -83,7 +83,7 @@ fn quality_regressions_create_update_delete_and_run() {
     assert!(service.list_regressions(true).unwrap().is_empty());
     assert!(
         !durable_root
-            .join("regressions/specs/dashboard-smoke.js")
+            .join("regressions/specs/dashboard-smoke.spec.cjs")
             .exists()
     );
 

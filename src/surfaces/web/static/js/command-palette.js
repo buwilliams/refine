@@ -37,6 +37,7 @@ function openCommandPalette() {
   root.className = "modal-backdrop command-palette-backdrop";
   root.innerHTML = `
     <div class="modal command-palette" role="dialog" aria-modal="true"
+         data-testid="command-palette"
          aria-labelledby="command-palette-title">
       <div class="command-palette-head">
         <div class="modal-title" id="command-palette-title">Command palette</div>
@@ -44,10 +45,11 @@ function openCommandPalette() {
       </div>
       <input type="text" id="command-palette-input"
              class="command-palette-input"
+             data-testid="command-palette-input"
              autocomplete="off" spellcheck="false"
              placeholder="Type a command or parameters...">
       <div class="command-palette-results" id="command-palette-results"
-           role="listbox" aria-label="Commands"></div>
+           role="listbox" aria-label="Commands" data-testid="command-palette-results"></div>
     </div>`;
   document.body.appendChild(root);
 
@@ -71,6 +73,8 @@ function openCommandPalette() {
         <button type="button"
                 class="command-palette-row ${idx === commandPaletteSelected ? "selected" : ""}"
                 data-command-index="${idx}"
+                data-command-id="${htmlEscape(command.id || "")}"
+                data-testid="command-palette-row"
                 role="option"
                 aria-selected="${idx === commandPaletteSelected ? "true" : "false"}"
                 ${disabled ? "disabled" : ""}>
@@ -80,7 +84,7 @@ function openCommandPalette() {
           </span>
           <span class="command-palette-row-group">${htmlEscape(command.group || "")}</span>
         </button>`;
-    }).join("") : `<div class="command-palette-empty">No commands found.</div>`;
+    }).join("") : `<div class="command-palette-empty" data-testid="command-palette-empty">No commands found.</div>`;
     results.querySelectorAll("[data-command-index]").forEach((row) => {
       row.addEventListener("click", () => {
         const idx = Number(row.dataset.commandIndex) || 0;

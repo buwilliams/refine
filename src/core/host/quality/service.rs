@@ -118,9 +118,9 @@ impl FileQualityService {
                 description.trim().to_string()
             },
             enabled: true,
-            spec_path: format!("specs/{id}.js"),
+            spec_path: format!("specs/{id}.spec.cjs"),
             viewport: default_viewport(),
-            wait_until: "networkidle".to_string(),
+            wait_until: "domcontentloaded".to_string(),
             timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
             created_at: now.clone(),
             updated_at: now,
@@ -170,7 +170,7 @@ impl FileQualityService {
         if let Some(wait_until) = updates.get("wait_until").and_then(|value| value.as_str()) {
             regression.wait_until = wait_until.trim().to_string();
             if regression.wait_until.is_empty() {
-                regression.wait_until = "networkidle".to_string();
+                regression.wait_until = "domcontentloaded".to_string();
             }
         }
         if let Some(timeout) = updates
@@ -203,6 +203,15 @@ impl FileQualityService {
 
     pub fn delete_regression(&self, regression_id: &str) -> RefineResult<()> {
         let mut manifest = self.load_manifest()?;
+        let spec_path = manifest
+            .regressions
+            .iter()
+            .find(|regression| regression.id == regression_id)
+            .map(|regression| {
+                self.durable_root
+                    .join("regressions")
+                    .join(&regression.spec_path)
+            });
         let original_len = manifest.regressions.len();
         manifest
             .regressions
@@ -211,17 +220,16 @@ impl FileQualityService {
             return Err(RefineError::NotFound("Regression not found".to_string()));
         }
         self.save_manifest(&manifest)?;
-        let spec_path = self
-            .regression_specs_dir()
-            .join(format!("{regression_id}.js"));
-        match fs::remove_file(&spec_path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(RefineError::Io(format!(
-                    "failed to delete regression spec {}: {error}",
-                    spec_path.display()
-                )));
+        if let Some(spec_path) = spec_path {
+            match fs::remove_file(&spec_path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to delete regression spec {}: {error}",
+                        spec_path.display()
+                    )));
+                }
             }
         }
         Ok(())
@@ -1003,7 +1011,13 @@ pub(super) fn validate_regression(regression: &RegressionCheck) -> RefineResult<
             "regression id must match [a-z0-9][a-z0-9_-]{1,63}".to_string(),
         ));
     }
-    if regression.spec_path != format!("specs/{}.js", regression.id) {
+    let expected = format!("specs/{}.spec.cjs", regression.id);
+    let js_expected = format!("specs/{}.spec.js", regression.id);
+    let legacy_expected = format!("specs/{}.js", regression.id);
+    if regression.spec_path != expected
+        && regression.spec_path != js_expected
+        && regression.spec_path != legacy_expected
+    {
         return Err(RefineError::InvalidInput(
             "regression spec_path must stay inside regressions/specs".to_string(),
         ));

@@ -8,6 +8,8 @@
 
 const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const CHANGES_DEFAULT_LIMIT = 50;
+const CHANGES_DEFAULT_SORT = "committed";
+const CHANGES_DEFAULT_DIR = "desc";
 
 function changesFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
@@ -18,6 +20,8 @@ function changesFiltersFromHash() {
     limit: parseInt(hashQs.get("limit") || String(CHANGES_DEFAULT_LIMIT), 10)
            || CHANGES_DEFAULT_LIMIT,
     page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
+    sort: hashQs.get("sort") || CHANGES_DEFAULT_SORT,
+    dir: hashQs.get("dir") || CHANGES_DEFAULT_DIR,
   };
 }
 
@@ -30,6 +34,8 @@ function changesHashFromFilters(f) {
     next.set("limit", String(f.limit));
   }
   if (f.page && f.page > 1) next.set("page", String(f.page));
+  if (f.sort && f.sort !== CHANGES_DEFAULT_SORT) next.set("sort", f.sort);
+  if (f.dir && f.dir !== CHANGES_DEFAULT_DIR) next.set("dir", f.dir);
   return "#/changes" + (next.toString() ? "?" + next : "");
 }
 
@@ -41,43 +47,44 @@ async function renderChanges() {
   const filterShellOpen = filterShell ? filterShell.open : false;
   $("#main").innerHTML = `
     <h2>Changes</h2>
-    <details class="filter-shell" id="changes-filter-shell"${filterShellOpen ? " open" : ""}>
+    <details class="filter-shell" id="changes-filter-shell" data-testid="changes-filter-shell"${filterShellOpen ? " open" : ""}>
       <summary>
         <span class="filter-shell-title">Filters</span>
         <span class="spacer"></span>
-        <span class="muted small"><span id="changes-count"></span></span>
-        <span id="changes-filtered" class="filter-pill" hidden>Filtered</span>
+        <span class="muted small"><span id="changes-count" data-testid="changes-count"></span></span>
+        <span id="changes-filtered" class="filter-pill" data-testid="changes-filtered-pill" hidden>Filtered</span>
       </summary>
       <div class="filter-shell-body">
         <div class="filter-bar">
           <div class="filter-row filter-row-primary">
             <input type="text" id="changes-q"
                    class="filter-grow"
+                   data-testid="changes-search"
                    placeholder="Search gap, commit, or status..."
                    value="${htmlEscape(f.q)}">
           </div>
           <div class="filter-row filter-row-filters">
-            <select id="changes-status">
+            <select id="changes-status" data-testid="changes-status-filter">
               ${STATUS_FILTER_OPTIONS
                 .map((s) => `<option value="${s}" ${s === f.status ? "selected" : ""}>${s ? workflowStatusLabel(s) : "all statuses"}</option>`).join("")}
             </select>
-            <select id="changes-priority">
+            <select id="changes-priority" data-testid="changes-priority-filter">
               <option value="" ${f.priority === "" ? "selected" : ""}>all priorities</option>
               <option value="high" ${f.priority === "high" ? "selected" : ""}>high</option>
               <option value="medium" ${f.priority === "medium" ? "selected" : ""}>medium</option>
               <option value="low" ${f.priority === "low" ? "selected" : ""}>low</option>
             </select>
-            <select id="changes-limit">
+            <select id="changes-limit" data-testid="changes-limit-filter">
               ${CHANGES_LIMIT_OPTIONS.map((n) =>
                 `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
             </select>
             <span class="spacer"></span>
-            <button class="secondary" id="changes-clear">Clear filters</button>
+            <button class="secondary" id="changes-clear" data-testid="changes-clear-filters">Clear filters</button>
           </div>
         </div>
       </div>
     </details>
-    <div id="changes-body"><p class="muted">Loading...</p></div>`;
+    <div id="changes-body" data-testid="changes-body"><p class="muted">Loading...</p></div>`;
   $("#changes-q").addEventListener("input", debounce(() => {
     updateChangesFilter({ q: $("#changes-q").value, page: 1 });
   }, 250));
@@ -105,9 +112,17 @@ function updateChangesFilter(patch) {
     priority: "priority" in patch ? patch.priority : current.priority,
     limit: "limit" in patch ? patch.limit : current.limit,
     page: "page" in patch ? patch.page : current.page,
+    sort: "sort" in patch ? patch.sort : current.sort,
+    dir: "dir" in patch ? patch.dir : current.dir,
   };
   history.replaceState(null, "", changesHashFromFilters(next));
   loadChanges();
+}
+
+function updateChangesSort(key) {
+  const current = changesFiltersFromHash();
+  const dir = current.sort === key && current.dir === "asc" ? "desc" : "asc";
+  updateChangesFilter({ sort: key, dir, page: 1 });
 }
 
 async function loadChanges() {
@@ -118,6 +133,8 @@ async function loadChanges() {
   if (f.q) params.set("q", f.q);
   if (f.status) params.set("status", f.status);
   if (f.priority) params.set("priority", f.priority);
+  if (f.sort) params.set("sort", f.sort);
+  if (f.dir) params.set("dir", f.dir);
   params.set("limit", String(f.limit));
   params.set("offset", String((f.page - 1) * f.limit));
   try {
@@ -167,32 +184,44 @@ function drawChanges(data, f) {
       updateChangesFilter({ page }));
     return;
   }
+  const columns = [
+    { key: "committed", label: "When" },
+    { key: "gap", label: "Gap" },
+    { key: "status", label: "Status" },
+    { key: "priority", label: "Priority" },
+    { key: "commit", label: "Merge commit" },
+  ];
+  const sortHeads = columns.map((c) => {
+    const isActive = c.key === f.sort;
+    const arrow = isActive
+      ? (f.dir === "asc" ? "↑" : "↓")
+      : `<span class="sort-arrow-placeholder">↕</span>`;
+    return `<th class="sortable ${isActive ? "active" : ""}"
+            data-sort-key="${c.key}"
+            data-testid="changes-sort-${c.key}">
+              ${c.label} <span class="sort-arrow">${arrow}</span>
+            </th>`;
+  }).join("");
   root.innerHTML = `
     <p class="muted small" style="margin-bottom:10px">
       Merges on <code>${htmlEscape(branch)}</code> (newest first).
       Each row maps to a Gap via the <code>Refine Gap:</code> trailer in
       the commit message.
     </p>
-    <table class="table changes-table mobile-card-table">
-      <thead><tr>
-        <th>When</th>
-        <th>Gap</th>
-        <th>Status</th>
-        <th>Priority</th>
-        <th>Merge commit</th>
-        <th></th>
-      </tr></thead>
+    <table class="table changes-table mobile-card-table" data-testid="changes-table">
+      <thead><tr>${sortHeads}<th></th></tr></thead>
       <tbody>
         ${changes.map((c) => `
-          <tr data-commit="${htmlEscape(c.commit)}" data-gap-id="${htmlEscape(c.gap_id)}">
+          <tr data-commit="${htmlEscape(c.commit)}" data-gap-id="${htmlEscape(c.gap_id)}" data-testid="changes-row">
             <td class="muted small" data-label="When">${fmtTime(c.committed)}</td>
-            <td data-label="Gap">${renderChangeGapCell(c)}</td>
-            <td data-label="Status">${c.status ? `<span class="status-pill ${c.status}">${c.status}</span>` : `<span class="muted small">-</span>`}</td>
-            <td data-label="Priority">${c.priority
+            <td data-label="Gap" data-testid="changes-gap-cell">${renderChangeGapCell(c)}</td>
+            <td data-label="Status" data-testid="changes-status-cell">${c.status ? `<span class="status-pill ${c.status}">${c.status}</span>` : `<span class="muted small">-</span>`}</td>
+            <td data-label="Priority" data-testid="changes-priority-cell">${c.priority
               ? `<span class="priority-pill priority-${c.priority}">${c.priority}</span>`
               : `<span class="muted small">-</span>`}</td>
-            <td class="muted small" data-label="Merge commit"><code>${c.commit.slice(0, 10)}...</code></td>
+            <td class="muted small" data-label="Merge commit" data-testid="changes-commit-cell"><code>${c.commit.slice(0, 10)}...</code></td>
             <td data-label="Actions"><button class="secondary" data-undo-commit="${htmlEscape(c.commit)}"
+                       data-testid="changes-undo"
                        ${c.status === "cancelled" ? "disabled" : ""}>
               Undo
             </button></td>
@@ -203,6 +232,9 @@ function drawChanges(data, f) {
   `;
   bindPaginationControls(root, "changes", (page) =>
     updateChangesFilter({ page }));
+  $$("[data-sort-key]", root).forEach((head) => {
+    head.addEventListener("click", () => updateChangesSort(head.dataset.sortKey));
+  });
   $$("[data-undo-commit]", root).forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();

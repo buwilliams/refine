@@ -1,8 +1,12 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
+use std::thread;
 
 use serde_json::{Value, json};
 
+use crate::core::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::logs::FileLogService;
@@ -13,8 +17,10 @@ use crate::core::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
-use crate::core::product::work_items::BulkGapSelection;
+use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
+use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::RefineError;
+use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
 
@@ -28,9 +34,138 @@ fn derive_gap_name(actual: &str, target: &str) -> Option<String> {
     let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
     let mut name = collapsed.chars().take(80).collect::<String>();
     if collapsed.chars().count() > 80 {
-        name = name.trim_end_matches(|ch: char| !ch.is_alphanumeric()).to_string();
+        name = name
+            .trim_end_matches(|ch: char| !ch.is_alphanumeric())
+            .to_string();
     }
     (!name.trim().is_empty()).then(|| name.trim().to_string())
+}
+
+fn latest_round_duplicate_match(
+    service: &FileWorkItemService,
+    actual: &str,
+    target: &str,
+) -> Result<Option<Value>, RefineError> {
+    if actual.is_empty() || target.is_empty() {
+        return Ok(None);
+    }
+    for gap in service.list_gap_summaries()? {
+        if gap.gap.round_count == 0 {
+            continue;
+        }
+        let detail = service.show_gap_detail(&gap.gap.id)?;
+        let Some(round) = detail
+            .get("rounds")
+            .and_then(Value::as_array)
+            .and_then(|rounds| rounds.last())
+        else {
+            continue;
+        };
+        let round_actual = round
+            .get("actual")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        let round_target = round
+            .get("target")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if round_actual == actual && round_target == target {
+            return Ok(Some(json!({
+                "id": gap.gap.id,
+                "name": gap.gap.name,
+                "status": gap.gap.status,
+                "node_id": gap.gap.node_id,
+                "node_display_name": gap.node_display_name,
+                "actual": round_actual,
+                "target": round_target
+            })));
+        }
+    }
+    Ok(None)
+}
+
+fn import_extraction_prompt(text: &str, purpose: &str) -> String {
+    let instruction = match purpose {
+        "plan" => {
+            "Draft Feature Gap drafts from this Plan chat transcript. Return only draft data, \
+             one draft per line, using actual => target text."
+        }
+        "round" => {
+            "Draft Round data from this Gap chat transcript. Return only one actual => target line."
+        }
+        _ => {
+            "Import these notes into Refine Gap drafts. Return only draft data, one draft per line, \
+             using actual => target text or JSON objects with name, actual, target, reporter, and priority."
+        }
+    };
+    format!("{instruction}\n\n{text}")
+}
+
+fn import_provider_from_settings(durable_root: &std::path::Path, body: &Value) -> String {
+    body.get("provider")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|provider| !provider.is_empty())
+        .map(str::to_string)
+        .or_else(|| {
+            FileSettingsService::new(durable_root)
+                .load()
+                .ok()
+                .and_then(|settings| {
+                    settings
+                        .get("agent_cli")
+                        .and_then(Value::as_str)
+                        .map(str::trim)
+                        .filter(|provider| !provider.is_empty())
+                        .map(str::to_string)
+                })
+        })
+        .or_else(|| {
+            provider_status_value().ok().and_then(|status| {
+                status
+                    .get("selected_provider")
+                    .and_then(Value::as_str)
+                    .map(str::trim)
+                    .filter(|provider| !provider.is_empty())
+                    .map(str::to_string)
+            })
+        })
+        .unwrap_or_else(|| "claude".to_string())
+}
+
+fn parse_provider_import_output(
+    output: &str,
+    reporter: Option<&str>,
+) -> crate::core::supervisor::errors::RefineResult<Vec<crate::core::product::imports::ImportDraft>>
+{
+    if let Ok(value) = serde_json::from_str::<Value>(output) {
+        let body = match value {
+            Value::Array(items) => json!({ "drafts": items, "reporter": reporter.unwrap_or("") }),
+            other => other,
+        };
+        if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
+            return Ok(drafts);
+        }
+    }
+
+    let json_lines = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(serde_json::from_str::<Value>)
+        .collect::<Result<Vec<_>, _>>();
+    if let Ok(items) = json_lines
+        && !items.is_empty()
+    {
+        let body = json!({ "drafts": items, "reporter": reporter.unwrap_or("") });
+        if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
+            return Ok(drafts);
+        }
+    }
+
+    FileImportService::new(PathBuf::new()).parse_text(output, reporter)
 }
 
 fn feature_detail_response(
@@ -47,13 +182,22 @@ fn feature_detail_response(
         object.insert("status".to_string(), json!(feature.rollup.status));
         object.insert("gap_count".to_string(), json!(feature.rollup.gap_count));
         object.insert("done_count".to_string(), json!(feature.rollup.done_count));
-        object.insert("active_count".to_string(), json!(feature.rollup.active_count));
-        object.insert("failed_count".to_string(), json!(feature.rollup.failed_count));
+        object.insert(
+            "active_count".to_string(),
+            json!(feature.rollup.active_count),
+        );
+        object.insert(
+            "failed_count".to_string(),
+            json!(feature.rollup.failed_count),
+        );
         object.insert(
             "cancelled_count".to_string(),
             json!(feature.rollup.cancelled_count),
         );
-        object.insert("blocked_count".to_string(), json!(feature.rollup.blocked_count));
+        object.insert(
+            "blocked_count".to_string(),
+            json!(feature.rollup.blocked_count),
+        );
         object.insert("next_gap".to_string(), json!(feature.rollup.next_gap));
         object.insert("gap_ids".to_string(), json!(feature.gap_ids));
         object.insert("gaps".to_string(), json!(gaps));
@@ -236,6 +380,11 @@ impl InProcessWebServer {
             .and_then(|feature_id| feature_id.as_str())
             .map(str::trim)
             .filter(|feature_id| !feature_id.is_empty());
+        let duplicate_decision = body
+            .and_then(|body| body.get("duplicate_decision"))
+            .and_then(|decision| decision.as_str())
+            .unwrap_or("")
+            .trim();
         if !matches!(priority, "low" | "medium" | "high") {
             return error_response(RefineError::InvalidInput(
                 "priority must be one of low, medium, or high".to_string(),
@@ -243,6 +392,98 @@ impl InProcessWebServer {
         }
 
         let service = self.work_item_service(durable_root);
+        let duplicate = if id.is_none() {
+            match latest_round_duplicate_match(&service, actual, target) {
+                Ok(duplicate) => duplicate,
+                Err(error) => return error_response(error),
+            }
+        } else {
+            None
+        };
+        if let Some(duplicate) = duplicate {
+            let duplicate_id = duplicate
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            match duplicate_decision {
+                "" => {
+                    return ApiResponse::json(
+                        409,
+                        json!({
+                            "error": {
+                                "code": "duplicate_gap",
+                                "message": "Possible duplicate Gap",
+                                "duplicate": {
+                                    "match": duplicate
+                                }
+                            }
+                        }),
+                    );
+                }
+                "duplicate" => {
+                    return ApiResponse::json(
+                        200,
+                        json!({
+                            "created": false,
+                            "duplicate_action": "duplicate",
+                            "duplicate": {
+                                "match": duplicate
+                            }
+                        }),
+                    );
+                }
+                "move_original_to_backlog" => {
+                    let from = duplicate
+                        .get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("backlog")
+                        .to_string();
+                    let mut move_result = json!({
+                        "moved": false,
+                        "from": from,
+                        "to": "backlog",
+                        "reason": "already_backlog"
+                    });
+                    if from != "backlog" && !duplicate_id.is_empty() {
+                        match service.transition_gap_status(&duplicate_id, GapStatus::Backlog) {
+                            Ok(_) => {
+                                move_result = json!({
+                                    "moved": true,
+                                    "from": from,
+                                    "to": "backlog"
+                                });
+                            }
+                            Err(_) => {
+                                move_result = json!({
+                                    "moved": false,
+                                    "from": from,
+                                    "to": "backlog",
+                                    "reason": "protected_status"
+                                });
+                            }
+                        }
+                    }
+                    return ApiResponse::json(
+                        200,
+                        json!({
+                            "created": false,
+                            "duplicate_action": "move_original_to_backlog",
+                            "duplicate": {
+                                "match": duplicate
+                            },
+                            "move": move_result
+                        }),
+                    );
+                }
+                "original" => {}
+                other => {
+                    return error_response(RefineError::InvalidInput(format!(
+                        "unknown duplicate_decision: {other}"
+                    )));
+                }
+            }
+        }
         let mut gap = match service.create_gap_summary(&name, id) {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
@@ -1075,6 +1316,11 @@ impl InProcessWebServer {
         facet_query.page.limit = 0;
         let facet_status_counts =
             include_facets.then(|| projection.list_gaps(facet_query).filtered_status_counts);
+        let activity_facets = include_facets.then(|| {
+            projection
+                .list_activity(ActivityProjectionQuery::default())
+                .facets
+        });
         let result = projection.list_gaps(query);
         let node_names = self.node_display_names_for_routes();
         let gaps = result
@@ -1111,7 +1357,19 @@ impl InProcessWebServer {
         });
         if let Some(status_counts) = facet_status_counts {
             body["facets"] = json!({
-                "status_counts": status_counts
+                "status_counts": status_counts,
+                "categories": activity_facets
+                    .as_ref()
+                    .map(|facets| facets.categories.clone())
+                    .unwrap_or_default(),
+                "severities": activity_facets
+                    .as_ref()
+                    .map(|facets| facets.severities.clone())
+                    .unwrap_or_default(),
+                "actors": activity_facets
+                    .as_ref()
+                    .map(|facets| facets.actors.clone())
+                    .unwrap_or_default()
             });
         }
         ApiResponse::json(200, body)
@@ -1349,25 +1607,52 @@ impl InProcessWebServer {
                 }),
             );
         }
+        let durable_root = require_durable_root!(self, "undo Git changes");
         let Some(source_root) = self.source_root() else {
             return durable_root_unavailable("undo Git changes");
         };
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("undo Git changes");
         };
+        let linked_gap_id = self.current_projection().ok().and_then(|projection| {
+            projection
+                .changes
+                .values()
+                .find(|change| change.commit == commit)
+                .and_then(|change| change.gap_id.clone())
+        });
         match FileGitWorktreeService::with_runtime_root(source_root, runtime_root)
             .revert_commit(commit)
         {
-            Ok(result) => ApiResponse::json(
-                200,
-                json!({
-                    "ok": result.ok,
-                    "pushed": false,
-                    "commit": commit,
-                    "conflicts": result.conflicts,
-                    "message": result.message.unwrap_or_default()
-                }),
-            ),
+            Ok(result) => {
+                let cancelled_gap = if result.ok {
+                    match linked_gap_id.as_deref() {
+                        Some(gap_id) => match self
+                            .work_item_service(durable_root)
+                            .cancel_gap_summary(gap_id)
+                        {
+                            Ok(gap) => Some(gap.gap.id),
+                            Err(error) => return error_response(error),
+                        },
+                        None => None,
+                    }
+                } else {
+                    None
+                };
+                let _ = self.rebuild_current_projection_cache();
+                ApiResponse::json(
+                    200,
+                    json!({
+                        "ok": result.ok,
+                        "pushed": false,
+                        "commit": commit,
+                        "conflicts": result.conflicts,
+                        "message": result.message.unwrap_or_default(),
+                        "gap_id": linked_gap_id,
+                        "cancelled_gap": cancelled_gap
+                    }),
+                )
+            }
             Err(error) => error_response(error),
         }
     }
@@ -1440,16 +1725,27 @@ impl InProcessWebServer {
             .unwrap_or(false);
         let service = FileMetricsService::new(runtime_root);
         match service.cleanup(clear) {
-            Ok(result) => ApiResponse::json(
-                200,
-                json!({
+            Ok(result) => {
+                let _ = performance_report_value(runtime_root, PerformanceQuery::default())
+                    .and_then(|value| {
+                        if let Some(performance) = value.as_object().cloned() {
+                            self.persist_runtime_projection_override(|runtime| {
+                                runtime.performance = Some(performance);
+                            })?;
+                        }
+                        Ok(())
+                    });
+                ApiResponse::json(
+                    200,
+                    json!({
                     "ok": result.ok,
                     "deleted": result.deleted,
                     "retained": result.retained,
                     "cleared": result.cleared,
                     "retention_days": service.retention_days
-                }),
-            ),
+                    }),
+                )
+            }
             Err(error) => error_response(error),
         }
     }
@@ -1530,12 +1826,38 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "extract imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
         let text = body_text(&body);
-        match FileImportService::new(PathBuf::new())
-            .parse_text(text, body.get("reporter").and_then(|value| value.as_str()))
-        {
-            Ok(drafts) => ApiResponse::json(200, json!({"drafts": drafts})),
+        let purpose = body
+            .get("purpose")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .unwrap_or("import");
+        let provider = import_provider_from_settings(&durable_root, &body);
+        let cwd = self.source_root().map(|path| path.display().to_string());
+        let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
+            provider: provider.clone(),
+            prompt: import_extraction_prompt(text, purpose),
+            session_id: None,
+            cwd,
+        }) {
+            Ok(output) => output,
+            Err(error) => return error_response(error),
+        };
+        match parse_provider_import_output(
+            &output,
+            body.get("reporter").and_then(|value| value.as_str()),
+        ) {
+            Ok(drafts) => ApiResponse::json(
+                200,
+                json!({
+                    "drafts": drafts,
+                    "provider": provider,
+                    "purpose": purpose,
+                    "source": "provider"
+                }),
+            ),
             Err(error) => error_response(error),
         }
     }
@@ -1609,6 +1931,74 @@ impl InProcessWebServer {
     pub(super) fn handle_import_persist(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "persist imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
+        if body
+            .get("background")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            let Some(runtime_root) = &self.runtime_root else {
+                return runtime_root_unavailable("persist imported Gaps in the background");
+            };
+            let registry = FileJobRegistry::new(runtime_root);
+            let job = match registry.register("import:persist") {
+                Ok(job) => job,
+                Err(error) => return error_response(error),
+            };
+            let draft_total = body
+                .get("drafts")
+                .and_then(Value::as_array)
+                .map(Vec::len)
+                .unwrap_or(0);
+            let _ = registry.update_progress(
+                &job.id,
+                json!({
+                    "message": "Saving import",
+                    "completed": 0,
+                    "total": draft_total
+                }),
+            );
+            let job = registry.status(&job.id).unwrap_or(job);
+            let server = self.clone();
+            let job_id = job.id.clone();
+            let runtime_root = runtime_root.clone();
+            thread::spawn(move || {
+                let registry = FileJobRegistry::new(&runtime_root);
+                let response = server.import_persist_response(durable_root, body);
+                let mut result = response.body.clone();
+                match result.as_object_mut() {
+                    Some(object) => {
+                        object.insert("http_status".to_string(), json!(response.status));
+                    }
+                    None => {
+                        result = json!({
+                            "http_status": response.status,
+                            "body": result
+                        });
+                    }
+                }
+                let count = result.get("count").and_then(Value::as_u64).unwrap_or(0);
+                let _ = registry.update_progress(
+                    &job_id,
+                    json!({
+                        "message": "Import saved",
+                        "completed": count,
+                        "total": draft_total
+                    }),
+                );
+                let state = if response.status >= 400 {
+                    JobState::Failed
+                } else {
+                    JobState::Succeeded
+                };
+                let _ = registry.finish_with_result(&job_id, state, result);
+                let _ = server.refresh_projection_cache_after_mutation();
+            });
+            return ApiResponse::json(202, json!({ "job": job_response(job) }));
+        }
+        self.import_persist_response(durable_root, body)
+    }
+
+    fn import_persist_response(&self, durable_root: PathBuf, body: Value) -> ApiResponse {
         let drafts = match import_drafts_from_value(&body, None) {
             Ok(drafts) => drafts,
             Err(error) => return error_response(error),

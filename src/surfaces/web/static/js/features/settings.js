@@ -288,13 +288,13 @@ async function copySettingsFromNode(section, {
     <div class="modal-title">${htmlEscape(title)}</div>
     <div class="modal-body">
       <label>${renderSettingsGuideLabel("Source node", "node-copy-settings-source")}</label>
-      <select class="modal-input" style="width:100%">
+      <select class="modal-input" data-testid="copy-settings-source-node" style="width:100%">
         ${opts}
       </select>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>Copy</button>
+      <button class="secondary" data-cancel data-testid="copy-settings-cancel">Cancel</button>
+      <button data-ok data-testid="copy-settings-submit">Copy</button>
     </div>`;
   const source = await _openModal(
     body, { cancel: null, ok: choices[0].id }, ".modal-input",
@@ -493,6 +493,7 @@ function renderSettingsMarkdownField({
                 aria-label="Edit ${htmlEscape(title)}"
                 data-settings-markdown-title="${htmlEscape(title)}"
                 data-settings-markdown-empty="${emptyPreview}"
+                data-testid="${htmlEscape(id)}-edit"
                 data-settings-markdown-edit>
           ${settingsMarkdownIcon("edit")}
         </button>
@@ -503,6 +504,7 @@ function renderSettingsMarkdownField({
         ${trimmed ? mdToHtml(value) : `<p class="muted small">${emptyPreview}</p>`}
       </div>
       <textarea id="${htmlId}" rows="${rows}" data-settings-markdown-editor
+                data-testid="${htmlId}"
                 ${description ? `aria-describedby="${describedById}"` : ""}
                 hidden>${htmlEscape(value)}</textarea>
     </section>`;
@@ -521,6 +523,7 @@ function renderSettingsGuideIcon(itemId = "", title = "setting") {
     <button type="button"
             class="settings-guide-icon"
             data-guide-label-item="${htmlEscape(itemId)}"
+            data-testid="settings-guide-${htmlEscape(itemId)}"
             tabindex="-1"
             title="Open Guide: ${htmlEscape(title)}"
             aria-label="Open Guide for ${htmlEscape(title)}">
@@ -718,7 +721,7 @@ function setSettingsTab(slug) {
 
 
 function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute()) {
-  const releaseStatus = surface === SETTINGS_SURFACES.settings
+  const releaseStatus = (surface === SETTINGS_SURFACES.settings || surface === SETTINGS_SURFACES.node)
     ? '<div id="runtime-upgrade-banner" class="settings-release-status" aria-live="polite"></div>'
     : "";
   return `
@@ -727,6 +730,7 @@ function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute())
         ${surface.tabs.map((t) => `
           <a class="settings-tab ${t.slug === activeSlug ? "active" : ""}"
              href="${surface.basePath}/${t.slug}"
+             data-testid="settings-tab-${htmlEscape(t.slug)}"
              data-tab-target="${t.slug}">${htmlEscape(t.label)}</a>`).join("")}
       </nav>
       ${releaseStatus}
@@ -736,7 +740,8 @@ function renderSettingsTabStrip(activeSlug, surface = settingsSurfaceForRoute())
 function renderSettingsPane(slug, body, activeSlug) {
   return `
     <section class="settings-pane ${slug === activeSlug ? "active" : ""}"
-             data-tab-pane="${slug}">
+             data-tab-pane="${slug}"
+             data-testid="settings-pane-${htmlEscape(slug)}">
       <div class="card settings-tab-card">${body}</div>
     </section>`;
 }
@@ -883,22 +888,22 @@ function renderSettingsTabBody(surface, slug, data) {
 
 function renderSettingsNoProjectTab(title = "Settings") {
   return `
-    <section class="settings-section">
+    <section class="settings-section" data-testid="settings-no-project">
       <h3>No app configured.</h3>
       <p class="muted">Open the Guide to configure Refine and attach an app before using ${htmlEscape(title)} settings.</p>
-      <button type="button" class="secondary" data-settings-open-guide>Open Guide</button>
+      <button type="button" class="secondary" data-settings-open-guide data-testid="settings-open-guide">Open Guide</button>
     </section>`;
 }
 
 function renderDetachedNodeConfig(body) {
   return `
-    <section class="settings-section">
+    <section class="settings-section" data-testid="settings-detached-config">
       <h3>No app attached.</h3>
       <p class="muted">
         Node configuration is shown for reference. Attach an app before saving
         application or runtime settings.
       </p>
-      <button type="button" class="secondary" data-settings-open-guide>Open Guide</button>
+      <button type="button" class="secondary" data-settings-open-guide data-testid="settings-open-guide">Open Guide</button>
     </section>
     ${disableSettingsControls(body)}`;
 }

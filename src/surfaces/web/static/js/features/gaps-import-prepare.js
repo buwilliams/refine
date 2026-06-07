@@ -2,7 +2,7 @@ function countImportLines(text) {
   return text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).length;
 }
 
-async function extractImportDrafts(text, draftsRoot, signal = null) {
+async function extractImportDrafts(text, draftsRoot, signal = null, options = {}) {
   const lineCount = countImportLines(text);
   if (draftsRoot) {
     drawImportProgress(draftsRoot, {
@@ -12,7 +12,7 @@ async function extractImportDrafts(text, draftsRoot, signal = null) {
   }
   let r = null;
   try {
-    r = await api("POST", "/api/import/extract", { text }, { signal });
+    r = await api("POST", "/api/import/extract", { text, ...options }, { signal });
   } catch (e) {
     if (e.name === "AbortError") throw e;
     throw new Error(`AI extraction failed: ${e.message}`);
@@ -58,16 +58,17 @@ async function openPlanDraftModalFromText(text) {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal import-modal" role="dialog" aria-modal="true"
+         data-testid="plan-drafts-modal"
          aria-labelledby="plan-drafts-title">
       <div class="modal-title" id="plan-drafts-title">Plan drafts</div>
-      <div class="modal-body" style="max-height:72vh;overflow:auto">
+      <div class="modal-body" data-testid="plan-drafts-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
           Review and edit drafted Gaps before saving.
         </div>
-        <div id="import-drafts" class="import-drafts"></div>
+        <div id="import-drafts" class="import-drafts" data-testid="import-drafts"></div>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
+        <button class="secondary" data-cancel data-testid="plan-drafts-cancel">Cancel</button>
       </div>
     </div>
   `;
@@ -94,7 +95,7 @@ async function openPlanDraftModalFromText(text) {
   root.querySelector("[data-cancel]").addEventListener("click", () => close(false));
   const draftsRoot = root.querySelector("#import-drafts");
   try {
-    const drafts = await extractImportDrafts(text, draftsRoot, abort.signal);
+    const drafts = await extractImportDrafts(text, draftsRoot, abort.signal, { purpose: "plan" });
     drafts.forEach((draft) => {
       draft.reporter = draft.reporter || state.lastReporter || "";
       draft.priority = draft.priority || "low";

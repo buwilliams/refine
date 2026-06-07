@@ -16,43 +16,43 @@ function renderImportDraftActionBar({
 }) {
   const pageInfo = renderImportDraftRange(start, end, visibleCount, totalCount, filtered);
   return `
-    <details class="filter-shell import-review-shell" open>
+    <details class="filter-shell import-review-shell" data-testid="import-review-shell" open>
       <summary>
         <span class="filter-shell-title">Filters &amp; bulk actions</span>
-        <span class="filter-pill">${selectedCount} selected</span>
+        <span class="filter-pill" data-testid="import-selected-count">${selectedCount} selected</span>
         ${filtered ? `<span class="filter-pill">Needs resolution</span>` : ""}
       </summary>
       <div class="filter-shell-body">
         <div class="filter-bar">
           <div class="filter-row filter-row-primary">
             <label class="import-resolution-filter small">
-              <input type="checkbox" data-import-unresolved-filter ${filtered ? "checked" : ""}>
+              <input type="checkbox" data-import-unresolved-filter data-testid="import-unresolved-filter" ${filtered ? "checked" : ""}>
               Needs resolution (${unresolvedCount})
             </label>
-            <span class="muted small">${htmlEscape(pageInfo)}</span>
+            <span class="muted small" data-testid="import-review-range">${htmlEscape(pageInfo)}</span>
             <span class="muted small">${selectedCount} selected</span>
-            ${duplicateCount ? `<span class="muted small">${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}</span>` : ""}
+            ${duplicateCount ? `<span class="muted small" data-testid="import-duplicate-count">${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"}</span>` : ""}
           </div>
           <div class="filter-row filter-row-bulk">
             <span class="muted small">Bulk update selected:</span>
-            <button type="button" class="secondary small" data-import-toggle-page ${visibleCount ? "" : "disabled"}>
+            <button type="button" class="secondary small" data-import-toggle-page data-testid="import-select-page" ${visibleCount ? "" : "disabled"}>
               ${pageAllSelected ? "Deselect page" : "Select page"}
             </button>
-            <button type="button" class="secondary small" data-import-toggle-all ${visibleCount ? "" : "disabled"}>
+            <button type="button" class="secondary small" data-import-toggle-all data-testid="import-select-all" ${visibleCount ? "" : "disabled"}>
               ${allFilteredSelected ? "Deselect all" : "Select all"}
             </button>
-            <button type="button" class="secondary small" data-import-select-duplicates ${duplicateCount ? "" : "disabled"}>Select duplicates</button>
-            <button type="button" class="secondary small" data-import-dismiss-duplicates ${duplicateCount ? "" : "disabled"}>Dismiss duplicates</button>
-            <button type="button" class="secondary small" data-import-originals>Import selected</button>
-            <button type="button" class="secondary small" data-import-backlog-originals>Move originals to backlog</button>
-            <select data-import-update-field aria-label="Original Gap field">
+            <button type="button" class="secondary small" data-import-select-duplicates data-testid="import-select-duplicates" ${duplicateCount ? "" : "disabled"}>Select duplicates</button>
+            <button type="button" class="secondary small" data-import-dismiss-duplicates data-testid="import-dismiss-duplicates" ${duplicateCount ? "" : "disabled"}>Dismiss duplicates</button>
+            <button type="button" class="secondary small" data-import-originals data-testid="import-import-selected">Import selected</button>
+            <button type="button" class="secondary small" data-import-backlog-originals data-testid="import-move-originals">Move originals to backlog</button>
+            <select data-import-update-field data-testid="import-update-field" aria-label="Original Gap field">
               ${["actual", "target", "reporter", "priority"].map((field) => `
                 <option value="${field}" ${field === updateField ? "selected" : ""}>${field}</option>`).join("")}
             </select>
-            <button type="button" class="secondary small" data-import-update-originals>Update originals</button>
+            <button type="button" class="secondary small" data-import-update-originals data-testid="import-update-originals">Update originals</button>
           </div>
         </div>
-        ${totalPages > 1 ? `<span class="muted small">Page ${page} of ${totalPages}</span>` : ""}
+        ${totalPages > 1 ? `<span class="muted small" data-testid="import-review-page-label">Page ${page} of ${totalPages}</span>` : ""}
       </div>
     </details>`;
 }
@@ -79,15 +79,15 @@ function renderImportDraftPager(page, totalPages) {
   if (totalPages <= 1) return "";
   return `
     <div class="pagination import-draft-pagination">
-      <button type="button" class="secondary small" data-import-page="prev" ${page <= 1 ? "disabled" : ""}>Previous</button>
-      <span class="muted small">Page ${page} of ${totalPages}</span>
-      <button type="button" class="secondary small" data-import-page="next" ${page >= totalPages ? "disabled" : ""}>Next</button>
+      <button type="button" class="secondary small" data-import-page="prev" data-testid="import-page-prev" ${page <= 1 ? "disabled" : ""}>Previous</button>
+      <span class="muted small" data-testid="import-page-label">Page ${page} of ${totalPages}</span>
+      <button type="button" class="secondary small" data-import-page="next" data-testid="import-page-next" ${page >= totalPages ? "disabled" : ""}>Next</button>
     </div>`;
 }
 
 function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected, draftCount }) {
   return `
-    <table class="table import-drafts-table">
+    <table class="table import-drafts-table" data-testid="import-drafts-table">
       <colgroup>
         <col class="import-col-select">
         <col class="import-col-order">
@@ -124,36 +124,37 @@ function renderImportDraftTable(pageDrafts, { pageAllSelected, pageSomeSelected,
 function renderImportDraftRow(d, index, draftCount) {
   return `
     <tr class="draft ${importDraftNeedsResolution(d) ? "needs-resolution" : ""}"
+        data-testid="import-draft-row"
         data-idx="${index}" data-duplicate-decision="${htmlEscape(d.duplicateDecision || "")}">
       <td class="gap-select-col">
-        <input type="checkbox" data-import-draft-select ${d.selected ? "checked" : ""}
+        <input type="checkbox" data-import-draft-select data-testid="import-draft-select" ${d.selected ? "checked" : ""}
                aria-label="Select draft ${index + 1}">
       </td>
       <td>
         <div class="actions compact-actions">
-          <button type="button" class="secondary small" data-import-draft-move="up" data-idx="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
-          <button type="button" class="secondary small" data-import-draft-move="down" data-idx="${index}" ${index >= draftCount - 1 ? "disabled" : ""}>Down</button>
+          <button type="button" class="secondary small" data-import-draft-move="up" data-testid="import-draft-move-up" data-idx="${index}" ${index === 0 ? "disabled" : ""}>Up</button>
+          <button type="button" class="secondary small" data-import-draft-move="down" data-testid="import-draft-move-down" data-idx="${index}" ${index >= draftCount - 1 ? "disabled" : ""}>Down</button>
         </div>
       </td>
       <td>
-        <input type="text" class="d-name" value="${htmlEscape(d.name)}" placeholder="Name">
+        <input type="text" class="d-name" data-testid="import-draft-name" value="${htmlEscape(d.name)}" placeholder="Name">
         ${d.error ? `<p class="small draft-error">${htmlEscape(d.error)}</p>` : ""}
-        ${d.duplicate ? `<p class="muted small import-decision-label">${htmlEscape(importDuplicateDecisionLabel(d.duplicateDecision))}</p>` : ""}
+        ${d.duplicate ? `<p class="muted small import-decision-label" data-testid="import-duplicate-decision">${htmlEscape(importDuplicateDecisionLabel(d.duplicateDecision))}</p>` : ""}
       </td>
-      <td><input type="text" class="d-reporter" value="${htmlEscape(d.reporter)}" placeholder="Reporter"></td>
+      <td><input type="text" class="d-reporter" data-testid="import-draft-reporter" value="${htmlEscape(d.reporter)}" placeholder="Reporter"></td>
       <td>
-        <select class="d-priority">
+        <select class="d-priority" data-testid="import-draft-priority">
           ${["low", "medium", "high"].map((priority) => `
             <option value="${priority}" ${d.priority === priority ? "selected" : ""}>${priority}</option>`).join("")}
         </select>
       </td>
-      <td><input type="text" class="d-node" value="${htmlEscape(d.node_id || "")}" placeholder="current"></td>
+      <td><input type="text" class="d-node" data-testid="import-draft-node" value="${htmlEscape(d.node_id || "")}" placeholder="current"></td>
       <td>
-        <textarea class="d-actual" rows="3">${htmlEscape(d.actual)}</textarea>
+        <textarea class="d-actual" data-testid="import-draft-actual" rows="3">${htmlEscape(d.actual)}</textarea>
         ${d.duplicate ? renderImportDuplicateActual(d.duplicate) : ""}
       </td>
       <td>
-        <textarea class="d-target" rows="3">${htmlEscape(d.target)}</textarea>
+        <textarea class="d-target" data-testid="import-draft-target" rows="3">${htmlEscape(d.target)}</textarea>
         ${d.duplicate ? renderImportDuplicateTarget(d.duplicate) : ""}
       </td>
     </tr>`;

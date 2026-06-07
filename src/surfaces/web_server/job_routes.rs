@@ -8,6 +8,7 @@ use crate::core::host::agent_providers::{AgentProviderService, HostAgentProvider
 use crate::core::host::installation::{FileInstallationService, InstallationService};
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::core::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
@@ -445,6 +446,27 @@ impl InProcessWebServer {
         }
         match self.diagnostics_value(false) {
             Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_support_bundle(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "export support bundle");
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("export support bundle");
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let redact_secrets = body
+            .get("redact_secrets")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        let repo_root = self
+            .source_root()
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        match FileSupportBundleService::new(durable_root, runtime_root.clone(), repo_root)
+            .export(redact_secrets)
+        {
+            Ok(bundle) => ApiResponse::json(200, json!(bundle)),
             Err(error) => error_response(error),
         }
     }

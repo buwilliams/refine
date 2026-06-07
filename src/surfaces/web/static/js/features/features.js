@@ -55,48 +55,49 @@ async function renderFeaturesList() {
     <div class="page-title-row">
       <h2>Features</h2>
     </div>
-    <details class="filter-shell" id="features-filter-shell">
-      <summary>
+    <details class="filter-shell" id="features-filter-shell" data-testid="features-filter-shell">
+      <summary data-testid="features-filter-summary">
         <span class="filter-shell-title">Filters</span>
         <span class="spacer"></span>
-        <span class="muted small"><span id="features-count"></span></span>
-        <span id="features-filtered" class="filter-pill" hidden>Filtered</span>
+        <span class="muted small"><span id="features-count" data-testid="features-count"></span></span>
+        <span id="features-filtered" class="filter-pill" data-testid="features-filtered-pill" hidden>Filtered</span>
       </summary>
       <div class="filter-shell-body">
         <div class="filter-bar">
           <div class="filter-row filter-row-primary">
             <input type="text" id="features-search" class="filter-grow"
+                   data-testid="features-search"
                    placeholder="Search features..." value="${htmlEscape(f.q)}">
           </div>
           <div class="filter-row">
-            <select id="features-status">
+            <select id="features-status" data-testid="features-status-filter">
               ${FEATURES_STATUS_OPTIONS.map((s) =>
                 `<option value="${s}" ${s === f.status ? "selected" : ""}>${s ? workflowStatusLabel(s) : "all statuses"}</option>`).join("")}
             </select>
-            <select id="features-reporter">
+            <select id="features-reporter" data-testid="features-reporter-filter">
               <option value="" ${f.reporter === "" ? "selected" : ""}>all reporters</option>
               ${(state.reporters || []).map((r) =>
                 `<option value="${htmlEscape(r.name)}" ${r.name === f.reporter ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
               ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
                 ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
             </select>
-            <select id="features-node">
+            <select id="features-node" data-testid="features-node-filter">
               <option value="" ${f.node === "" ? "selected" : ""}>all nodes</option>
               <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
               ${(state.project?.nodes || []).map((node) =>
                 `<option value="${htmlEscape(node.id)}" ${node.id === f.node ? "selected" : ""}>${htmlEscape(node.display_name || node.id)}</option>`).join("")}
             </select>
-            <select id="features-limit">
+            <select id="features-limit" data-testid="features-limit-filter">
               ${FEATURES_LIMIT_OPTIONS.map((n) =>
                 `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
             </select>
             <span class="spacer"></span>
-            <button class="secondary" id="features-clear">Clear filters</button>
+            <button class="secondary" id="features-clear" data-testid="features-clear-filters">Clear filters</button>
           </div>
         </div>
       </div>
     </details>
-    <div id="features-table"><p class="muted">Loading...</p></div>
+    <div id="features-table" data-testid="features-table"><p class="muted">Loading...</p></div>
   `;
   $("#features-search")?.addEventListener("input", debounce((e) =>
     updateFeaturesFilter({ q: e.target.value, page: 1 }), 250));
@@ -165,7 +166,7 @@ function drawFeaturesTable(features, stateForRender) {
   const rows = features.length ? features.map((entry) => {
     const feature = normalizeFeatureEntry(entry);
     return `
-    <tr data-feature-id="${htmlEscape(feature.id)}">
+    <tr data-feature-id="${htmlEscape(feature.id)}" data-testid="features-row">
       <td class="features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
       <td class="features-status-cell" data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
       <td data-label="Progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</td>
@@ -241,7 +242,7 @@ function featureSortHeader(key, label, stateForRender) {
   const arrow = active
     ? (dir === "asc" ? "↑" : "↓")
     : `<span class="sort-arrow-placeholder">↕</span>`;
-  return `<th class="sortable ${active ? "active" : ""}" data-sort="${key}">
+  return `<th class="sortable ${active ? "active" : ""}" data-sort="${key}" data-testid="features-sort-${htmlEscape(key)}">
     ${htmlEscape(label)} <span class="sort-arrow">${arrow}</span>
   </th>`;
 }
@@ -405,8 +406,8 @@ function openFeatureModal(feature = null, options = {}) {
     ? `Node owner: ${nodeDisplayName} (${feature.node_id})`
     : `Node owner: ${nodeDisplayName}`;
   root.innerHTML = `
-    <div class="modal feature-modal ${feature ? "feature-detail-modal" : "feature-create-modal"}" role="dialog" aria-modal="true" aria-labelledby="feature-modal-title">
-      <button class="modal-close" type="button" aria-label="Close">×</button>
+    <div class="modal feature-modal ${feature ? "feature-detail-modal" : "feature-create-modal"}" role="dialog" aria-modal="true" aria-labelledby="feature-modal-title" data-testid="${feature ? "feature-detail-modal" : "feature-create-modal"}">
+      <button class="modal-close" type="button" aria-label="Close" data-testid="feature-modal-close">×</button>
       ${feature ? `
       <div class="feature-modal-head">
         <div class="feature-modal-title-block">
@@ -433,14 +434,14 @@ function openFeatureModal(feature = null, options = {}) {
       <div class="modal-title" id="feature-modal-title">New Feature</div>`}
       <div class="modal-body">
         <label>Name</label>
-        <input type="text" id="feature-name" class="modal-input" value="${htmlEscape(feature?.name || "")}">
+        <input type="text" id="feature-name" class="modal-input" data-testid="feature-name" value="${htmlEscape(feature?.name || "")}">
         <label>Description</label>
-        <textarea id="feature-description">${htmlEscape(feature?.description || "")}</textarea>
+        <textarea id="feature-description" data-testid="feature-description">${htmlEscape(feature?.description || "")}</textarea>
         ${feature ? `<div class="feature-modal-gap-heading">
           <div class="modal-title compact">Ordered Gaps</div>
           <div class="actions feature-gap-heading-actions">
             <button type="button" class="secondary small feature-gap-add-btn"
-                    data-feature-new-gap aria-label="New Gap" title="New Gap">+</button>
+                    data-feature-new-gap data-testid="feature-new-gap" aria-label="New Gap" title="New Gap">+</button>
           </div>
         </div>
         ${renderFeatureGapTable(gaps, {
@@ -450,8 +451,8 @@ function openFeatureModal(feature = null, options = {}) {
         })}` : ""}
       </div>
       ${feature ? "" : `<div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button data-ok>Create</button>
+        <button class="secondary" data-cancel data-testid="feature-create-cancel">Cancel</button>
+        <button data-ok data-testid="feature-create-submit">Create</button>
       </div>`}
     </div>`;
   document.body.appendChild(root);

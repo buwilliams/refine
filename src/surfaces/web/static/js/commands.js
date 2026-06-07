@@ -119,7 +119,8 @@ function openRefineIssueRequestModal() {
   root.className = "modal-backdrop";
   root.innerHTML = `
     <div class="modal refine-issue-modal" role="dialog" aria-modal="true"
-         aria-labelledby="refine-issue-title">
+         aria-labelledby="refine-issue-title"
+         data-testid="refine-issue-modal">
       <div class="modal-title" id="refine-issue-title">Request refine feature/bugfix</div>
       <div class="modal-body">
         <p class="muted small" style="margin-top:0">
@@ -130,18 +131,20 @@ function openRefineIssueRequestModal() {
           <div class="form-row">
             <label>Title</label>
             <input type="text" id="refine-issue-input-title"
+                   data-testid="refine-issue-title"
                    placeholder="Short summary">
           </div>
           <div class="form-row">
             <label>Description</label>
             <textarea id="refine-issue-input-description"
+                      data-testid="refine-issue-description"
                       placeholder="What should change? Include what happened, what you expected, and any relevant context."></textarea>
           </div>
         </form>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button data-ok>Open GitHub</button>
+        <button class="secondary" data-cancel data-testid="refine-issue-cancel">Cancel</button>
+        <button data-ok data-testid="refine-issue-submit">Open GitHub</button>
       </div>
     </div>`;
   document.body.appendChild(root);
@@ -211,6 +214,7 @@ function registerNavigationCommand(id, title, hash, keywords = []) {
 }
 
 registerNavigationCommand("nav.dashboard", "Dashboard", "#/", ["home"]);
+registerNavigationCommand("nav.features", "Features", "#/features", ["feature", "planning"]);
 registerNavigationCommand("nav.gaps", "Gaps", "#/gaps", ["issues", "work"]);
 registerNavigationCommand("nav.changes", "Changes", "#/changes", ["merges"]);
 registerNavigationCommand("nav.logs", "Logs", "#/logs", ["activity"]);
@@ -462,8 +466,9 @@ registerCommand({
   group: "System",
   aliases: ["pause-agents", "unpause-agents", "resume-agents"],
   run: async ({ button, settings } = {}) => {
-    const s = settings || (await api("GET", "/api/settings")).settings || {};
-    const agentsPaused = s.agents_paused === "1";
+    const settingsPayload = settings || (await api("GET", "/api/settings"));
+    const agentsPaused = !!settingsPayload.runtime?.agents_paused ||
+      settingsPayload.settings?.agents_paused === "1";
     await withButtonBusy(button, agentsPaused ? "Unpausing..." : "Pausing...", async () => {
       await api("POST", "/api/processes/agents", { paused: !agentsPaused });
       if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
@@ -541,11 +546,29 @@ registerCommand({
       const r = await api("POST", "/api/target-app/health");
       const ok = "last_check_ok" in r ? r.last_check_ok : r.last_health_ok;
       toast(ok ? "Status check OK" : (r.probe_message || "Unhealthy"), ok ? "info" : "error");
+      applyTargetAppSnapshot(r);
       drawTargetAppStatusBlock(r);
       if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
     });
   },
 });
+
+async function ensureTargetAppSettingsPane() {
+  if (state.currentRoute !== "node") {
+    location.hash = "#/node/target-app";
+  }
+  for (let i = 0; i < 40; i += 1) {
+    if (
+      state.currentRoute === "node" &&
+      document.querySelector('[data-tab-pane="target-app"]')
+    ) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  setSettingsTab("target-app");
+  await refreshSettingsTab("target-app", { force: true });
+}
 
 registerCommand({
   id: "target_app.generate",
@@ -557,16 +580,11 @@ registerCommand({
     { title: "Generate target-app config", okLabel: "Generate" },
   ),
   run: async ({ button } = {}) => {
-    if (state.currentRoute !== "node") {
-      location.hash = "#/node/target-app";
-    } else {
-      setSettingsTab("target-app");
-      await refreshSettingsTab("target-app", { force: true });
-    }
+    await ensureTargetAppSettingsPane();
     await withButtonBusy(button, "Generating...", async () => {
       const r = await api("POST", "/api/target-app/generate-instructions", { kind: "all" });
       if (r.ok && r.config) {
-        setSettingsTab("target-app");
+        await ensureTargetAppSettingsPane();
         applyGeneratedTargetAppConfig(r.config);
         toast("Generated target-app config saved", "info");
       } else {

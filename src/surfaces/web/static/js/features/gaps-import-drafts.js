@@ -197,8 +197,8 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   // Swap the primary action from "Extract drafts" to "Save N gap(s)".
   const actions = root.querySelector(".modal-actions");
   actions.innerHTML = `
-    <button class="secondary" data-cancel>Cancel</button>
-    <button id="btn-persist"></button>
+    <button class="secondary" data-cancel data-testid="import-cancel">Cancel</button>
+    <button id="btn-persist" data-testid="import-persist"></button>
   `;
   updateImportPersistButton(root, draftState, featureDestination);
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {

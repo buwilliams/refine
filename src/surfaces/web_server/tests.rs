@@ -442,8 +442,86 @@ fn web_server_creates_gap_from_new_gap_modal_payload() {
         body: None,
     });
     assert_eq!(detail.status, 200);
-    assert_eq!(detail.body["gap"]["rounds"][0]["actual"], "The game does not pause when the pause key is pressed.");
-    assert_eq!(detail.body["gap"]["rounds"][0]["target"], "Pressing pause should freeze the board and show a paused state.");
+    assert_eq!(
+        detail.body["gap"]["rounds"][0]["actual"],
+        "The game does not pause when the pause key is pressed."
+    );
+    assert_eq!(
+        detail.body["gap"]["rounds"][0]["target"],
+        "Pressing pause should freeze the board and show a paused state."
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_handles_new_gap_duplicate_decisions() {
+    let temp_root = unique_temp_dir("http-gap-duplicate-modal");
+    let durable_root = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+
+    let body = json!({
+        "reporter": "Alice",
+        "actual": "Duplicate actual state",
+        "target": "Duplicate target state",
+        "priority": "low"
+    });
+    let original = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(body.clone()),
+    });
+    assert_eq!(original.status, 201);
+    let original_id = original.body["gap"]["id"].as_str().unwrap().to_string();
+
+    let duplicate = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(body.clone()),
+    });
+    assert_eq!(duplicate.status, 409);
+    assert_eq!(duplicate.body["error"]["code"], "duplicate_gap");
+    assert_eq!(
+        duplicate.body["error"]["duplicate"]["match"]["id"],
+        original_id
+    );
+
+    let ignored = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({
+            "reporter": "Alice",
+            "actual": "Duplicate actual state",
+            "target": "Duplicate target state",
+            "duplicate_decision": "duplicate"
+        })),
+    });
+    assert_eq!(ignored.status, 200);
+    assert_eq!(ignored.body["created"], false);
+    assert_eq!(ignored.body["duplicate_action"], "duplicate");
+
+    let imported = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({
+            "reporter": "Alice",
+            "actual": "Duplicate actual state",
+            "target": "Duplicate target state",
+            "duplicate_decision": "original"
+        })),
+    });
+    assert_eq!(imported.status, 201);
+    let imported_id = imported.body["gap"]["id"].as_str().unwrap();
+    assert_ne!(imported_id, original_id);
+
+    let list = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps?q=Duplicate%20actual%20state".to_string(),
+        body: None,
+    });
+    assert_eq!(list.status, 200);
+    assert_eq!(list.body["page"]["total"], 2);
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1682,6 +1760,13 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     metrics
         .record_operation("old", 10.0, true, json!({}))
         .unwrap();
+    let performance_before_cleanup = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/performance".to_string(),
+        body: None,
+    });
+    assert_eq!(performance_before_cleanup.status, 200);
+    assert_eq!(performance_before_cleanup.body["total_event_count"], 1);
     let performance_cleanup = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/performance/cleanup".to_string(),
@@ -1690,6 +1775,13 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     assert_eq!(performance_cleanup.status, 200);
     assert_eq!(performance_cleanup.body["deleted"], 1);
     assert!(!metrics.path().exists());
+    let performance_after_cleanup = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/performance".to_string(),
+        body: None,
+    });
+    assert_eq!(performance_after_cleanup.status, 200);
+    assert_eq!(performance_after_cleanup.body["total_event_count"], 0);
 
     let undo = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1872,6 +1964,14 @@ fn web_server_serves_source_file_tree_read_and_search() {
     fs::create_dir_all(&durable_root).unwrap();
     fs::write(temp_root.join("README.md"), "hello\nworld\n").unwrap();
     fs::write(temp_root.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs::write(
+        temp_root.join("pixel.png"),
+        [
+            0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n', 0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .unwrap();
+    fs::write(temp_root.join("artifact.bin"), [0x00, 0x01, 0x02]).unwrap();
     fs::write(durable_root.join("settings.json"), "{}").unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
@@ -1917,6 +2017,31 @@ fn web_server_serves_source_file_tree_read_and_search() {
     assert_eq!(read.body["content"], "hello\n");
     assert_eq!(read.body["has_more"], true);
     assert_eq!(read.body["next_offset"], 6);
+
+    let image = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/files/read?path=pixel.png".to_string(),
+        body: None,
+    });
+    assert_eq!(image.status, 200);
+    assert_eq!(image.body["previewable"], true);
+    assert_eq!(image.body["kind"], "image");
+    assert_eq!(image.body["mime_type"], "image/png");
+    assert!(
+        image.body["data_url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,")
+    );
+
+    let binary = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/files/read?path=artifact.bin".to_string(),
+        body: None,
+    });
+    assert_eq!(binary.status, 200);
+    assert_eq!(binary.body["previewable"], false);
+    assert_eq!(binary.body["kind"], "binary");
 
     let search = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -2481,7 +2606,7 @@ fn web_server_manages_quality_settings_and_regressions() {
     assert_eq!(created.body["regression"]["id"], "dashboard-smoke");
     assert!(
         durable_root
-            .join("regressions/specs/dashboard-smoke.js")
+            .join("regressions/specs/dashboard-smoke.spec.cjs")
             .exists()
     );
 

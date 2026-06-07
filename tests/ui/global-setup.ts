@@ -66,7 +66,8 @@ function refineEnv(): NodeJS.ProcessEnv {
     REFINE_DAEMON_PORT: String(port),
     REFINE_TEST_BASE_URL: baseURL,
     REFINE_TEST_RUNTIME_ROOT: runtimeRoot,
-    REFINE_TEST_APP_ROOT: appRoot
+    REFINE_TEST_APP_ROOT: appRoot,
+    REFINE_TEST_UPGRADE_LATEST_VERSION: "999.0.0-test"
   };
 }
 

@@ -208,9 +208,9 @@ pub(in crate::surfaces::web_server) fn job_response(job: JobHandle) -> serde_jso
         "owner": job.owner,
         "status": job.state.as_api_status(),
         "state": job.state,
-        "progress": {},
-        "result": {},
-        "error": null
+        "progress": job.progress,
+        "result": job.result,
+        "error": job.error
     })
 }
 

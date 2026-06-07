@@ -483,8 +483,32 @@ impl FileTargetAppService {
         let encoded = serde_json::to_vec_pretty(snapshot).map_err(|error| {
             RefineError::Serialization(format!("failed to encode target-app state: {error}"))
         })?;
-        fs::write(self.state_path(), encoded)
-            .map_err(|error| RefineError::Io(format!("failed to write target-app state: {error}")))
+        let state_path = self.state_path();
+        let temp_path = self.snapshot_temp_path();
+        fs::write(&temp_path, encoded).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to write target-app state temp file {}: {error}",
+                temp_path.display()
+            ))
+        })?;
+        fs::rename(&temp_path, &state_path).map_err(|error| {
+            let _ = fs::remove_file(&temp_path);
+            RefineError::Io(format!(
+                "failed to replace target-app state {}: {error}",
+                state_path.display()
+            ))
+        })
+    }
+
+    fn snapshot_temp_path(&self) -> PathBuf {
+        let nanos = Utc::now()
+            .timestamp_nanos_opt()
+            .unwrap_or_else(|| Utc::now().timestamp_micros() * 1000);
+        self.runtime_root.join(format!(
+            ".{TARGET_APP_STATE_FILE}.{}.{}.tmp",
+            std::process::id(),
+            nanos
+        ))
     }
 
     fn command_cwd(&self, settings: &JsonObject) -> PathBuf {
@@ -813,6 +837,51 @@ mod tests {
                 .contains("target-started")
         );
         service.stop().unwrap();
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn target_app_snapshot_write_replaces_longer_state() {
+        let temp_root = unique_temp_dir("target-app-state");
+        let durable_root = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let source_root = temp_root.join("app");
+        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&source_root).unwrap();
+        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let mut long_snapshot = TargetAppSnapshot {
+            state: "running".to_string(),
+            message: "Target application started.".to_string(),
+            last_operation_id: "target-start-1".to_string(),
+            last_operation: Some(TargetAppOperation {
+                id: "target-start-1".to_string(),
+                kind: "start".to_string(),
+                state: "running".to_string(),
+                started_at: now_timestamp(),
+                finished_at: String::new(),
+                exit_code: None,
+                stdout: "long target app stdout".repeat(8),
+                stderr: String::new(),
+            }),
+            process_id: Some("proc-target-app-state".to_string()),
+            pid: Some(12345),
+            ..TargetAppSnapshot::default()
+        };
+        service.save_snapshot(&long_snapshot).unwrap();
+        long_snapshot.last_operation = None;
+        long_snapshot.last_operation_id = String::new();
+        long_snapshot.process_id = None;
+        long_snapshot.pid = None;
+        long_snapshot.message = "short".to_string();
+        service.save_snapshot(&long_snapshot).unwrap();
+
+        let raw = fs::read_to_string(service.state_path()).unwrap();
+        assert!(!raw.contains("long target app stdout"));
+        assert!(!raw.contains("proc-target-app-state"));
+        let loaded = service.load_snapshot().unwrap();
+        assert_eq!(loaded.message, "short");
+        assert!(loaded.last_operation.is_none());
 
         fs::remove_dir_all(temp_root).unwrap();
     }

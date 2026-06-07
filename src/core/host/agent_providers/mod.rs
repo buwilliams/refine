@@ -229,7 +229,7 @@ impl HostAgentProviderService {
                         .map(|code| code.to_string())
                         .unwrap_or_else(|| "unknown".to_string());
                     format!("provider command exited {exit}")
-            });
+                });
             return Err(RefineError::Degraded(message));
         }
         if let Some(message) = provider_error_message(&stdout, &stderr) {

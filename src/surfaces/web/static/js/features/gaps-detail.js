@@ -271,13 +271,13 @@ function drawGapDetail(gap) {
     <button id="btn-state-back">${htmlEscape(workflow.back.label)}</button>
   ` : "";
   const forwardBtn = workflow.forward ? `
-    <button id="btn-state-forward">${htmlEscape(workflow.forward.label)}</button>
+    <button id="btn-state-forward" data-testid="gap-state-forward">${htmlEscape(workflow.forward.label)}</button>
   ` : "";
 
   const container = gapDetailContainer();
   if (!container) return;
   container.innerHTML = `
-    <div class="gap-detail">
+    <div class="gap-detail" data-testid="gap-detail">
       <div class="row" style="align-items:center;margin-bottom:8px">
         <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
         <span class="status-pill ${gap.status}">${workflowStatusLabel(gap.status)}</span>
@@ -287,9 +287,9 @@ function drawGapDetail(gap) {
         ${backBtn}
         ${forwardBtn}
         <div class="gap-action-group">
-          <button class="gap-action-primary" id="btn-chat">Open Chat</button>
+          <button class="gap-action-primary" id="btn-chat" data-testid="gap-open-chat">Open Chat</button>
           <details class="nav-menu gap-action-menu" id="gap-action-menu">
-            <summary class="btn gap-action-more" aria-label="More Gap actions"></summary>
+            <summary class="btn gap-action-more" aria-label="More Gap actions" data-testid="gap-action-menu-toggle"></summary>
             <div class="nav-menu-panel gap-action-panel">
               <button class="nav-menu-item" type="button" id="btn-view-logs">View Logs</button>
               <button class="nav-menu-item" type="button" id="btn-reporter">Reporter</button>
@@ -298,7 +298,7 @@ function drawGapDetail(gap) {
               <button class="nav-menu-item" type="button" id="btn-gap-feature-assign">Move to Feature</button>
               <button class="nav-menu-item" type="button" id="btn-gap-feature-remove" ${gap.feature_id ? "" : "disabled"}>Remove from Feature</button>
               <button class="nav-menu-item" type="button" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel</button>
-              <button class="nav-menu-item danger" type="button" id="btn-delete">Delete</button>
+              <button class="nav-menu-item danger" type="button" id="btn-delete" data-testid="gap-delete">Delete</button>
             </div>
           </details>
         </div>
@@ -346,8 +346,8 @@ function drawGapDetail(gap) {
           ${renderRoundForm("submit", null)}
         </div>` : ""}
 
-      <details class="card notes-card" data-gap-id="${gap.id}" style="margin-top:14px" ${notesOpen ? "open" : ""}>
-        <summary class="notes-card-summary">
+      <details class="card notes-card" data-gap-id="${gap.id}" data-testid="gap-notes" style="margin-top:14px" ${notesOpen ? "open" : ""}>
+        <summary class="notes-card-summary" data-testid="gap-notes-toggle">
           <span><strong>Notes (${(gap.notes || []).length})</strong></span>
           <span class="muted small">Saved to gap.json and included in attached
             Chat context.</span>
@@ -360,14 +360,14 @@ function drawGapDetail(gap) {
               ? `<p class="muted small">No notes yet.</p>`
               : (gap.notes || []).map(renderNote).join("")}
           </div>
-          <details class="note-composer" style="margin-top:10px">
-            <summary>+ Add a note</summary>
+          <details class="note-composer" data-testid="gap-note-composer" style="margin-top:10px">
+            <summary data-testid="gap-note-composer-toggle">+ Add a note</summary>
             <div class="form-row" style="margin-top:8px">
-              <textarea id="new-note-body" rows="3"
+              <textarea id="new-note-body" data-testid="gap-note-body" rows="3"
                         placeholder="Anything the agent or team should know — links to specs, prior decisions, constraints, related code paths."></textarea>
             </div>
             <div class="actions">
-              <button id="btn-add-note">Save note</button>
+              <button id="btn-add-note" data-testid="gap-note-submit">Save note</button>
             </div>
           </details>
         </div>

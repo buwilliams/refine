@@ -28,7 +28,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Process management", "process-management")}</h3>
       ${rows ? `
-        <table class="table process-table managed-process-table mobile-card-table">
+        <table class="table process-table managed-process-table mobile-card-table" data-testid="managed-process-table">
           <colgroup>
             <col class="process-col">
             <col class="status-col">
@@ -49,7 +49,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Subprocesses", "process-runner-processes")}</h3>
       ${subprocessBody ? `
-        <table class="table process-table runner-workers-table mobile-card-table">
+        <table class="table process-table runner-workers-table mobile-card-table" data-testid="subprocess-table">
           <colgroup>
             <col class="worker-col">
             <col class="status-col">
@@ -251,13 +251,13 @@ function renderManagedProcessRow(proc) {
   const supervisorChildAttr = proc.supervisor_child ? ` data-supervisor-child="1"` : "";
   const hiddenAttr = proc.supervisor_child_hidden ? " hidden" : "";
   return `
-    <tr${rowClassAttr} data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}"${supervisorChildAttr}${hiddenAttr}>
+    <tr${rowClassAttr} data-testid="managed-process-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}"${supervisorChildAttr}${hiddenAttr}>
       <td data-label="Process">${label}</td>
-      <td data-label="Status" data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+      <td data-label="Status" data-testid="managed-process-status" data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td data-label="PID">${pid}</td>
       <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
       <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
-      <td data-label="Details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td data-label="Details" data-testid="managed-process-details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
       <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
     </tr>`;
 }
@@ -308,7 +308,7 @@ function renderAgentProcessRow(proc, anchorMs) {
     ? String(Number(proc.round_idx) + 1)
     : "";
   return `
-    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+    <tr data-testid="subprocess-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
       <td data-label="Agent">${label}</td>
       <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td data-label="PID">${pid}</td>
@@ -432,20 +432,20 @@ function renderProcessActions(proc) {
     const stopped = !!proc.background_processes_stopped;
     const agentsPaused = !!proc.agents_paused;
     return `
-      <button class="${agentsPaused ? "" : "secondary"}" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}">${agentsPaused ? "Unpause" : "Pause"} agents</button>
-      <button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
+      <button class="${agentsPaused ? "" : "secondary"}" data-testid="process-agent-toggle" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}">${agentsPaused ? "Unpause" : "Pause"} agents</button>
+      <button class="${stopped ? "" : "danger"}" data-testid="process-background-toggle" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
   }
   if (proc.kind === "agent_scheduler") {
     const agentsPaused = !!proc.agents_paused;
     return `
-      <button class="${agentsPaused ? "" : "secondary"}" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}" ${proc.runner_reachable ? "" : "disabled"}>${agentsPaused ? "Unpause" : "Pause"} agents</button>`;
+      <button class="${agentsPaused ? "" : "secondary"}" data-testid="process-agent-toggle" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}" ${proc.runner_reachable ? "" : "disabled"}>${agentsPaused ? "Unpause" : "Pause"} agents</button>`;
   }
   if (proc.kind === "background_processes") {
     const paused = proc.status === "paused";
     const stopped = !!proc.background_processes_stopped;
     return `
-      <button class="${stopped ? "" : "danger"}" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>
-      <button class="danger" data-hard-reset-worktree ${proc.runner_reachable && !paused ? "" : "disabled"}>Hard reset worktree</button>`;
+      <button class="${stopped ? "" : "danger"}" data-testid="process-background-toggle" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>
+      <button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${proc.runner_reachable && !paused ? "" : "disabled"}>Hard reset worktree</button>`;
   }
   if (proc.kind === "agent" && proc.gap_id) {
     return `<button class="danger" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
@@ -461,12 +461,12 @@ function renderProcessActions(proc) {
     const showStop = targetAppShowsStopAction(snap.state);
     return `
       <span class="target-app-action-slot">
-        <button id="s-target-run-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !snap.has_start_command ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
-        <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
+        <button id="s-target-run-start" data-testid="process-target-app-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !snap.has_start_command ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
+        <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
       </span>
-      <button class="secondary" id="s-target-run-rebuild" ${inFlight ? "disabled" : ""}>Rebuild</button>
-      <button class="secondary" id="s-target-sync-now">Sync</button>
-      <button class="secondary" id="s-target-health-now">Check</button>`;
+      <button class="secondary" id="s-target-run-rebuild" data-testid="process-target-app-rebuild" ${inFlight ? "disabled" : ""}>Rebuild</button>
+      <button class="secondary" id="s-target-sync-now" data-testid="process-target-app-sync">Sync</button>
+      <button class="secondary" id="s-target-health-now" data-testid="process-target-app-health">Check</button>`;
   }
   return `<span class="muted small">-</span>`;
 }
