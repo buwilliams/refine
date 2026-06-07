@@ -255,7 +255,7 @@ Modals
 
 Implementation Internals (for e2e testing)
 	Purpose: contract details a test needs to drive the UI, wait correctly, and assert outcomes. Frontend is a hash-routed SPA served from one index.html; all data via JSON over /api; live updates via SSE.
-	Testing contract (read first; full integration-test plan in docs/spec/3.x.x/rust-integration-spec.md)
+	Testing contract (read first; full integration-test plan in docs/spec/rust-integration-spec.md)
 		Determinism — tag every flow before testing it
 			[crud] deterministic, assert directly: create/edit gaps·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Verify, done↔review); reporter/node/cluster mgmt; settings edits; Undo (git revert)
 			[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/gap/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the dispatcher-driven chain todo→in-progress→qa→ready-merge→awaiting-rebuild→review (incl. auto-promote backlog→todo)

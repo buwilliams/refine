@@ -15,7 +15,7 @@ The recommended shape is layered:
 
 The goal is not to re-create the Python `refine-test` runner inside Rust. The goal is to port the best ideas into a native test harness that is close to the Rust tree, cheap to run locally, stable in CI, and explicit about which product surface failed.
 
-This document is the single source for integration testing: it carries both the harness/layering plan and the **UI testing contract** (determinism, preconditions, oracles, selectors, timing — see [UI Surface Tests](#ui-surface-tests)) that a Playwright author needs. The companion `docs/spec/3.x.x/rust-integration-feature-index.md` is the UI **surface inventory** — every screen, modal, route, `#id`, endpoint, storage key, and the Gap workflow state machine. Use the feature index to learn *what exists and how to address it*; use this document to learn *how to test it*.
+This document is the single source for integration testing: it carries both the harness/layering plan and the **UI testing contract** (determinism, preconditions, oracles, selectors, timing — see [UI Surface Tests](#ui-surface-tests)) that a Playwright author needs. The companion `docs/spec/rust-integration-feature-index.md` is the UI **surface inventory** — every screen, modal, route, `#id`, endpoint, storage key, and the Gap workflow state machine. Use the feature index to learn *what exists and how to address it*; use this document to learn *how to test it*.
 
 ## Goals
 
@@ -78,7 +78,7 @@ These tests can inspect internal types because they are not the surface suite. T
 
 ### CLI Surface Tests
 
-CLI surface tests should be Cargo integration tests under `tests/`, using the compiled binary via `env!("CARGO_BIN_EXE_refine")` or a small shared helper.
+CLI surface tests should be Cargo integration tests under `tests/`, using the compiled binary via `env!("CARGO_BIN_EXE_refine")` or a small shared helper. Daemon-backed surface tests should be explicitly ignored or otherwise gated so plain `cargo test` stays fast; `xtask test-cli` is the public command that opts into starting the daemon and running them.
 
 The tests should:
 
@@ -97,7 +97,8 @@ Initial coverage should port the existing `refine-test` Rust CLI cases:
 - `project doctor` runs.
 - `gap create/list/show/edit/note/round/delete`.
 - `workflow allowed` and user-driven transitions.
-- `feature create/list/add-gap/remove-gap/rollup/delete`.
+- `feature create/list/add-gap/remove-gap/delete`, with rollup assertions read
+  from `list` or `show` output.
 - `node list/create/activate/archive`.
 - The production CLI rejects internal durable-root escape hatches.
 
@@ -143,7 +144,7 @@ journey, with CLI and route/unit tests covering lower-level permutations.
 Every UI spec is written against these five rules. The surface inventory they
 reference (screens, modals, routes, `#id`s, endpoints, the Gap workflow state
 machine, SSE channels, storage keys, timing constants) lives in
-`docs/spec/3.x.x/rust-integration-feature-index.md`; this contract is how to use it.
+`docs/spec/rust-integration-feature-index.md`; this contract is how to use it.
 
 1. **Determinism — classify the flow first.**
    - `[crud]` flows are deterministic; drive them and assert synchronously on
@@ -261,12 +262,15 @@ REFINE_TEST_PORT
 REFINE_TEST_BASE_URL
 REFINE_TEST_RUNTIME_ROOT
 REFINE_TEST_APP_ROOT
+REFINE_DAEMON_PORT
 REFINE_SMOKE_AI_PATH
 ```
 
 All CLI invocations in the integration suite must target this daemon. If a
-command can infer a daemon port from environment, the fixture should set it. If
-a command accepts an explicit `--port`, the tests should pass it.
+command infers a daemon port from environment, the fixture must set
+`REFINE_DAEMON_PORT` to the same value as `REFINE_TEST_PORT`; this is the live
+CLI routing contract for daemon-backed model commands. If a command accepts an
+explicit `--port`, the tests should pass it.
 
 ### Public Commands
 
@@ -409,7 +413,7 @@ Acceptance:
 - Should Playwright dependencies live at repo root or under a dedicated   `tests/ui` package directory? -> repo root
 - Should the Smoke AI fixture be a separate tiny Rust binary, an `xtask`   subcommand, or an executable script during the first migration? -> separate tiny binary
 - Should CLI integration tests allocate a random port by default, or use a stable default with an environment override? -> Use a stable default port, 18080
-- Should `cargo test` include the CLI surface tests by default, or should those be gated behind an ignored test or `xtask` command because they start a daemon? -> Include CLI surface tests by default
+- Should `cargo test` include the CLI surface tests by default, or should those be gated behind an ignored test or `xtask` command because they start a daemon? -> Gate daemon-backed CLI surface tests behind `xtask test-cli`; keep any `cargo test` integration tests fast, in-process, or explicitly ignored.
 - Which CI job should own Playwright browser installation and cache priming?
 
 ## Recommendation
