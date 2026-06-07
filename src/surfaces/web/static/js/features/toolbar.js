@@ -706,7 +706,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
             ${toolbarIcon(showProgress ? "collapse" : "expand")}
           </span>
         </button>
-        <div id="chat-progress-panel" class="chat-progress-panel" ${showActivityPanel ? "" : "hidden"}>
+        <div id="chat-progress-panel" class="chat-progress-panel" data-testid="chat-progress-panel" ${showActivityPanel ? "" : "hidden"}>
           <div id="chat-progress" class="chat-progress" data-testid="chat-progress">${renderChatProgress(progressText)}</div>
         </div>
       </div>

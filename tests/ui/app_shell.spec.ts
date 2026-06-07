@@ -1,5 +1,16 @@
+import fs from "node:fs";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { ensureAttachedProject, jsonObject } from "./helpers";
+
+function testRuntimeRoot(): string {
+  return process.env.REFINE_TEST_RUNTIME_ROOT ||
+    path.join(process.cwd(), "target/refine-integration/run");
+}
+
+function testPortRuntimeRoot(): string {
+  return path.join(testRuntimeRoot(), process.env.REFINE_TEST_PORT || "18080");
+}
 
 test("loads the app shell with primary navigation", async ({ page }) => {
   await page.goto("/");
@@ -89,6 +100,43 @@ test("switches dashboard node scope between current and all", async ({ page, req
   expect(currentPayload.node_filter).toBe("current");
   await expect(page).toHaveURL(/#\/$/);
   await expect(page.getByTestId("dashboard-scope-current")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("shows runtime unreachable banner and re-checks auth from Dashboard", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const healthPath = path.join(testPortRuntimeRoot(), "runner-health.json");
+  fs.mkdirSync(path.dirname(healthPath), { recursive: true });
+
+  try {
+    fs.writeFileSync(healthPath, JSON.stringify({ runner_reachable: false }, null, 2));
+    await expect.poll(async () => {
+      const dashboard = await jsonObject(await request.get("/api/dashboard?node=current"));
+      return {
+        reachable: dashboard.runner_reachable,
+        banners: (dashboard.needs_attention as Array<{ kind?: string }> | undefined ?? [])
+          .filter((item) => item.kind === "banner")
+          .length,
+      };
+    }).toEqual({ reachable: false, banners: 1 });
+
+    await page.goto("/");
+    const banner = page.getByTestId("global-banner").filter({ hasText: "Refine cannot reach the runtime worker" });
+    await expect(banner).toBeVisible();
+    await expect(banner.getByTestId("global-banner-message")).toContainText("Refine cannot reach the runtime worker");
+    await expect(banner.getByTestId("global-banner-action")).toHaveText("Re-check auth");
+
+    const rechecked = page.waitForResponse((response) =>
+      response.url().includes("/api/settings/recheck-auth") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await banner.getByTestId("global-banner-action").click();
+    const payload = await (await rechecked).json();
+    expect(payload.ok).toBe(true);
+    await expect(page.getByTestId("toast").filter({ hasText: "Pre-flight re-run requested" })).toBeVisible();
+  } finally {
+    fs.rmSync(healthPath, { force: true });
+  }
 });
 
 test("renders dashboard workflow status cards for every Gap state", async ({ page, request }) => {

@@ -124,6 +124,11 @@ impl ManagedProcess {
                     object.insert(key.to_string(), field.clone());
                 }
             }
+            if let Some(kind) = details.get("kind").and_then(|kind| kind.as_str())
+                && matches!(kind, "ui" | "runner")
+            {
+                object.insert("kind".to_string(), json!(kind));
+            }
             if details.get("session_id").is_some() {
                 object.insert("kind".to_string(), json!("chat"));
             }

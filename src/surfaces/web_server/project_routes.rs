@@ -54,6 +54,27 @@ fn configured_provider_from_settings(durable_root: &std::path::Path, body: &Valu
         .unwrap_or_else(|| "claude".to_string())
 }
 
+fn dashboard_attention_items(indicators: &[String], runner_reachable: bool) -> Vec<Value> {
+    let mut items = indicators
+        .iter()
+        .map(|message| {
+            json!({
+                "kind": "filter",
+                "severity": "warn",
+                "message": message
+            })
+        })
+        .collect::<Vec<_>>();
+    if !runner_reachable {
+        items.push(json!({
+            "kind": "banner",
+            "severity": "error",
+            "message": "Refine cannot reach the runtime worker. Re-check auth after restoring provider access."
+        }));
+    }
+    items
+}
+
 fn governance_generation_prompt(product: &str, constitution: &str) -> String {
     format!(
         "Generate governance rules for this project. Return only concise rules, one per line, \
@@ -214,6 +235,10 @@ impl InProcessWebServer {
         } else {
             projection.dashboard.current_node_status_counts.clone()
         };
+        let runner_reachable = process
+            .get("runner_reachable")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
         ApiResponse::json(
             200,
             json!({
@@ -224,14 +249,17 @@ impl InProcessWebServer {
                 "governance": null,
                 "preflight": preflight,
                 "activity": activity,
-                "runner_reachable": process.get("runner_reachable").and_then(|value| value.as_bool()).unwrap_or(false),
+                "runner_reachable": runner_reachable,
                 "reporter_stats": reporter_stats_rows(&projection.dashboard.reporter_stats),
                 "node_scope": node_filter,
                 "node_filter": node_filter,
                 "quality_timing": self.quality_timing_setting(),
                 "active_node_id": "default",
                 "active_node_display_name": "Default",
-                "needs_attention": projection.dashboard.attention_indicators,
+                "needs_attention": dashboard_attention_items(
+                    &projection.dashboard.attention_indicators,
+                    runner_reachable
+                ),
                 "attached": attached
             }),
         )

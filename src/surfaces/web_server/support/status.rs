@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -233,17 +234,68 @@ pub(in crate::surfaces::web_server) fn process_summary_value(
         .into_iter()
         .map(|process| process.api_json())
         .collect();
+    let runner_reachable = runner_reachable_value(runtime_root);
     Ok(json!({
-        "runner_reachable": true,
+        "runner_reachable": runner_reachable,
         "paused": pause_state.background_processes_stopped || pause_state.agents_paused,
         "background_processes_stopped": pause_state.background_processes_stopped,
         "agents_paused": pause_state.agents_paused,
         "processes": process_values,
-        "runner_work": [],
+        "runner_work": runner_work_summary(pause_state.background_processes_stopped),
         "backend": {
             "process_model": "supervisor"
         }
     }))
+}
+
+fn runner_reachable_value(runtime_root: &Path) -> bool {
+    let path = runtime_root.join("runner-health.json");
+    let Ok(bytes) = fs::read(&path) else {
+        return true;
+    };
+    let Ok(value) = serde_json::from_slice::<Value>(&bytes) else {
+        return true;
+    };
+    value
+        .get("runner_reachable")
+        .or_else(|| value.get("reachable"))
+        .and_then(Value::as_bool)
+        .unwrap_or(true)
+}
+
+fn runner_work_summary(background_stopped: bool) -> Value {
+    let status = if background_stopped { "paused" } else { "idle" };
+    Value::Array(
+        [
+            (
+                "target_app_rebuilder",
+                "target-app rebuild worker is ready for manual rebuild requests",
+            ),
+            (
+                "target_app_config_generator",
+                "target-app config generation is ready for Smoke AI-backed requests",
+            ),
+            (
+                "sqlite_cache_rebuild",
+                "projection cache rebuild worker is ready for manual rebuild requests",
+            ),
+            (
+                "activity_log_cleanup",
+                "activity log cleanup worker is ready for retention cleanup requests",
+            ),
+        ]
+        .into_iter()
+        .map(|(kind, details)| {
+            json!({
+                "kind": kind,
+                "status": status,
+                "elapsed_seconds": 0,
+                "queued": 0,
+                "details": details
+            })
+        })
+        .collect(),
+    )
 }
 
 pub(in crate::surfaces::web_server) fn provider_status_response() -> ApiResponse {

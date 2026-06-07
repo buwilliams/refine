@@ -151,6 +151,15 @@ test("opens Gap chat and drafts a round from a Smoke AI turn", async ({ page, re
     await page.getByTestId("chat-input").fill("Run a Gap chat draft round conversation for this deterministic defect.");
     await page.getByTestId("chat-send").click();
     await expect(page.getByTestId("chat-output")).toContainText("smoke-ai round actual behavior", { timeout: 45_000 });
+    await expect(page.getByTestId("chat-activity-toggle")).toBeVisible();
+    await expect(page.getByTestId("chat-activity-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("chat-progress-panel")).toBeVisible();
+    await page.getByTestId("chat-activity-toggle").click();
+    await expect(page.getByTestId("chat-activity-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByTestId("chat-progress-panel")).toBeHidden();
+    await page.getByTestId("chat-activity-toggle").click();
+    await expect(page.getByTestId("chat-activity-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(page.getByTestId("chat-progress-panel")).toBeVisible();
     await expect(page.getByTestId("gap-draft-round")).toBeEnabled();
 
     await page.getByTestId("gap-draft-round").click();

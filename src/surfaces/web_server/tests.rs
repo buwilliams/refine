@@ -134,6 +134,39 @@ fn web_server_routes_work_gap_queries_through_projection() {
 }
 
 #[test]
+fn web_server_structures_dashboard_attention_and_runtime_banner() {
+    let mut server = server_with_projection();
+    server
+        .projection
+        .dashboard
+        .attention_indicators
+        .push("1 failed Gap(s) need recovery".to_string());
+    server.projection.runtime.supervisor = json!({"runner_reachable": false}).as_object().cloned();
+
+    let response = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard".to_string(),
+        body: None,
+    });
+    assert_eq!(response.status, 200);
+    assert_eq!(response.body["runner_reachable"], json!(false));
+    let attention = response.body["needs_attention"].as_array().unwrap();
+    assert!(attention.iter().any(|item| {
+        item["kind"] == "filter"
+            && item["message"] == "1 failed Gap(s) need recovery"
+            && item["severity"] == "warn"
+    }));
+    assert!(attention.iter().any(|item| {
+        item["kind"] == "banner"
+            && item["severity"] == "error"
+            && item["message"]
+                .as_str()
+                .unwrap()
+                .contains("Refine cannot reach the runtime worker")
+    }));
+}
+
+#[test]
 fn web_server_route_groups_cover_static_web_surface() {
     let groups = API_GROUPS
         .iter()
@@ -2572,6 +2605,22 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             exit_code: None,
         })
         .unwrap();
+    supervisor
+        .register(ManagedProcess {
+            id: "ui-context".to_string(),
+            owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
+            pid: None,
+            state: "running".to_string(),
+            label: Some("UI context".to_string()),
+            details: Some(json!({"kind": "ui"}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -2584,6 +2633,27 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(listed.status, 200);
     assert_eq!(listed.body["processes"][0]["kind"], "agent");
     assert_eq!(listed.body["runner_reachable"], true);
+    assert_eq!(
+        listed.body["runner_work"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|work| work["kind"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        vec![
+            "target_app_rebuilder",
+            "target_app_config_generator",
+            "sqlite_cache_rebuild",
+            "activity_log_cleanup"
+        ]
+    );
+    assert!(
+        listed.body["runner_work"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|work| work["status"] == "idle")
+    );
     let listed_processes = listed.body["processes"].as_array().unwrap();
     let agent_context = listed_processes
         .iter()
@@ -2598,6 +2668,11 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(chat_context["kind"], "chat");
     assert_eq!(chat_context["session_id"], "chat-context-session");
     assert_eq!(chat_context["mode"], "standalone");
+    let ui_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == "ui-context")
+        .unwrap();
+    assert_eq!(ui_context["kind"], "ui");
     let summary = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/processes?summary=1".to_string(),
@@ -2605,7 +2680,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(summary.status, 200);
     assert_eq!(summary.body["agent_count"], 2);
-    assert_eq!(summary.body["process_count"], 3);
+    assert_eq!(summary.body["process_count"], 4);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -2670,6 +2745,13 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(background.status, 200);
     assert_eq!(background.body["background_processes_stopped"], true);
+    assert!(
+        background.body["runner_work"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|work| work["status"] == "paused")
+    );
 
     let agents = server.handle(ApiRequest {
         method: "POST".to_string(),

@@ -268,6 +268,7 @@ function renderManagedProcessLabel(proc, rawLabel) {
     return `
       <span class="process-tree-label">
         <button type="button" class="process-tree-toggle" data-supervisor-toggle
+                data-testid="process-supervisor-toggle"
                 aria-expanded="${expanded ? "true" : "false"}"
                 aria-label="${expanded ? "Collapse supervisor processes" : "Expand supervisor processes"}"
                 title="${expanded ? "Collapse supervisor processes" : "Expand supervisor processes"}">
@@ -527,7 +528,7 @@ function renderRunnerWorkRow(work, anchorMs) {
     ? ` class="runner-work-details process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Runner worker details" title="${htmlEscape(details)}"`
     : ` class="runner-work-details"`;
   return `
-    <tr>
+    <tr data-testid="runner-work-row" data-runner-work-kind="${htmlEscape(work.kind || "")}">
       <td data-label="Worker">${htmlEscape(runnerWorkKindLabel(work.kind))}</td>
       <td data-label="Status">${htmlEscape(processStatusLabel(work.status || ""))}</td>
       <td data-label="PID"><span class="muted small">-</span></td>
@@ -542,24 +543,24 @@ function renderRunnerWorkRow(work, anchorMs) {
 function renderRunnerWorkActions(work) {
   if (work.kind === "target_app_rebuilder") {
     const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="secondary" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
+    return `<button class="secondary" data-testid="runner-target-app-rebuild" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
   }
   if (work.kind === "target_app_config_generator") {
     const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="secondary" data-runner-target-app-generate ${busy ? "disabled" : ""}>Generate</button>`;
+    return `<button class="secondary" data-testid="runner-target-app-generate" data-runner-target-app-generate ${busy ? "disabled" : ""}>Generate</button>`;
   }
   if (work.kind === "sqlite_cache_rebuild") {
     const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="danger" data-runner-cache-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
+    return `<button class="danger" data-testid="runner-cache-rebuild" data-runner-cache-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
   }
   if (work.kind === "activity_log_cleanup") {
     const paused = work.status === "paused";
     return `
-      <select data-runner-log-cleanup-days aria-label="Activity log retention" ${paused ? "disabled" : ""}>
+      <select data-testid="runner-log-cleanup-days" data-runner-log-cleanup-days aria-label="Activity log retention" ${paused ? "disabled" : ""}>
         ${[0, 7, 30, 60, 90, 365].map((n) =>
           `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 days" : `${n} days`}</option>`).join("")}
       </select>
-      <button class="danger" data-runner-log-cleanup ${paused ? "disabled" : ""}>Clean up</button>`;
+      <button class="danger" data-testid="runner-log-cleanup" data-runner-log-cleanup ${paused ? "disabled" : ""}>Clean up</button>`;
   }
   return `<span class="muted small">-</span>`;
 }

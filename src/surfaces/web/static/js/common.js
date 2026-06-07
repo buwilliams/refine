@@ -1235,6 +1235,7 @@ function _openModal(buildBody, onResolveDefault, focusSel) {
   return new Promise((resolve) => {
     const root = document.createElement("div");
     root.className = "modal-backdrop";
+    root.dataset.testid = "modal-backdrop";
     const body = buildBody();
     root.innerHTML = `<div class="modal" role="dialog" aria-modal="true" data-testid="modal-dialog">${body}</div>`;
     document.body.appendChild(root);
@@ -1725,6 +1726,7 @@ function renderBanners(items) {
     if (item.action) {
       const btn = document.createElement("button");
       btn.textContent = item.action.label;
+      btn.dataset.testid = "global-banner-action";
       btn.onclick = item.action.onClick;
       tpl.querySelector(".banner-actions").appendChild(btn);
     }

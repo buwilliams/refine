@@ -87,6 +87,120 @@ fn latest_round_duplicate_match(
     Ok(None)
 }
 
+#[derive(Default)]
+struct ImportDuplicateActions {
+    moved_to_backlog: usize,
+    move_noop: usize,
+    updated_original: usize,
+}
+
+impl ImportDuplicateActions {
+    fn to_json(&self) -> Value {
+        json!({
+            "moved_to_backlog": self.moved_to_backlog,
+            "move_noop": self.move_noop,
+            "updated_original": self.updated_original
+        })
+    }
+}
+
+fn persist_import_draft_with_duplicate_decision(
+    service: &FileWorkItemService,
+    draft: &ImportDraft,
+    feature_id: Option<&str>,
+    actions: &mut ImportDuplicateActions,
+) -> Result<Option<String>, RefineError> {
+    let decision = draft.duplicate_decision.trim();
+    if !decision.is_empty() && decision != "original" {
+        if let Some(duplicate) =
+            latest_round_duplicate_match(service, draft.actual.trim(), draft.target.trim())?
+        {
+            let duplicate_id = duplicate
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
+            match decision {
+                "duplicate" => return Ok(None),
+                "move_original_to_backlog" => {
+                    let from = duplicate
+                        .get("status")
+                        .and_then(Value::as_str)
+                        .unwrap_or("backlog");
+                    if from == "backlog" || duplicate_id.is_empty() {
+                        actions.move_noop += 1;
+                    } else if service
+                        .transition_gap_status(&duplicate_id, GapStatus::Backlog)
+                        .is_ok()
+                    {
+                        actions.moved_to_backlog += 1;
+                    } else {
+                        actions.move_noop += 1;
+                    }
+                    return Ok(None);
+                }
+                "update_original_actual"
+                | "update_original_target"
+                | "update_original_reporter"
+                | "update_original_priority" => {
+                    if !duplicate_id.is_empty() {
+                        if decision == "update_original_priority" {
+                            service.update_gap_metadata_summary(
+                                &duplicate_id,
+                                None,
+                                Some(&draft.priority),
+                            )?;
+                        } else {
+                            let actual = (decision == "update_original_actual")
+                                .then_some(draft.actual.as_str());
+                            let target = (decision == "update_original_target")
+                                .then_some(draft.target.as_str());
+                            let reporter = (decision == "update_original_reporter")
+                                .then(|| nonempty_import_option(&draft.reporter))
+                                .flatten();
+                            service.edit_latest_gap_round_summary(
+                                &duplicate_id,
+                                reporter,
+                                actual,
+                                target,
+                            )?;
+                        }
+                        actions.updated_original += 1;
+                    }
+                    return Ok(None);
+                }
+                other => {
+                    return Err(RefineError::InvalidInput(format!(
+                        "unknown duplicate_decision: {other}"
+                    )));
+                }
+            }
+        }
+    }
+
+    let gap = service.create_gap_summary(&draft.name, None)?;
+    if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
+        service.append_gap_round_summary(
+            &gap.gap.id,
+            nonempty_or_import_value(&draft.reporter, "Imported"),
+            &draft.actual,
+            &draft.target,
+        )?;
+    }
+    if gap.gap.priority.as_str() != draft.priority {
+        service.update_gap_metadata_summary(&gap.gap.id, None, Some(&draft.priority))?;
+    }
+    if let Some(feature_id) = feature_id {
+        service.assign_gap_to_feature(feature_id, &gap.gap.id)?;
+    }
+    Ok(Some(gap.gap.id))
+}
+
+fn nonempty_import_option(value: &str) -> Option<&str> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then_some(trimmed)
+}
+
 fn import_extraction_prompt(text: &str, purpose: &str) -> String {
     let instruction = match purpose {
         "plan" => {
@@ -2194,6 +2308,7 @@ impl InProcessWebServer {
             }
         };
         let mut created_gap_ids = Vec::new();
+        let mut duplicate_actions = ImportDuplicateActions::default();
         if failures.is_empty() {
             match self.persist_import_drafts_incrementally(
                 &service,
@@ -2202,6 +2317,7 @@ impl InProcessWebServer {
                 registry,
                 job_id,
                 &mut created_gap_ids,
+                &mut duplicate_actions,
             ) {
                 Ok(()) => {}
                 Err(ImportPersistWorkerError::Cancelled) => {
@@ -2243,7 +2359,7 @@ impl InProcessWebServer {
                 "created": created,
                 "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
                 "failures": failures,
-                "duplicate_actions": {},
+                "duplicate_actions": duplicate_actions.to_json(),
                 "feature": feature_response
             }),
         )
@@ -2257,6 +2373,7 @@ impl InProcessWebServer {
         registry: &FileJobRegistry,
         job_id: &str,
         created_gap_ids: &mut Vec<String>,
+        duplicate_actions: &mut ImportDuplicateActions,
     ) -> Result<(), ImportPersistWorkerError> {
         if let Some(feature_id) = feature_id {
             service
@@ -2268,29 +2385,15 @@ impl InProcessWebServer {
             if import_job_cancelled(registry, job_id) {
                 return Err(ImportPersistWorkerError::Cancelled);
             }
-            let gap = service
-                .create_gap_summary(&draft.name, None)
-                .map_err(ImportPersistWorkerError::Failed)?;
-            created_gap_ids.push(gap.gap.id.clone());
-            if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
-                service
-                    .append_gap_round_summary(
-                        &gap.gap.id,
-                        nonempty_or_import_value(&draft.reporter, "Imported"),
-                        &draft.actual,
-                        &draft.target,
-                    )
-                    .map_err(ImportPersistWorkerError::Failed)?;
-            }
-            if gap.gap.priority.as_str() != draft.priority {
-                service
-                    .update_gap_metadata_summary(&gap.gap.id, None, Some(&draft.priority))
-                    .map_err(ImportPersistWorkerError::Failed)?;
-            }
-            if let Some(feature_id) = feature_id {
-                service
-                    .assign_gap_to_feature(feature_id, &gap.gap.id)
-                    .map_err(ImportPersistWorkerError::Failed)?;
+            if let Some(gap_id) = persist_import_draft_with_duplicate_decision(
+                service,
+                &draft,
+                feature_id,
+                duplicate_actions,
+            )
+            .map_err(ImportPersistWorkerError::Failed)?
+            {
+                created_gap_ids.push(gap_id);
             }
             let _ = registry.update_progress(
                 job_id,
@@ -2334,8 +2437,31 @@ impl InProcessWebServer {
             }
         };
         let import_result = if failures.is_empty() {
-            match FileImportService::new(durable_root).persist(drafts, feature_id.as_deref()) {
-                Ok(result) => Some(result),
+            let mut gap_ids = Vec::new();
+            let mut duplicate_actions = ImportDuplicateActions::default();
+            let result: Result<crate::core::product::imports::ImportPersistResult, RefineError> =
+                (|| {
+                    if let Some(feature_id) = feature_id.as_deref() {
+                        service.show_feature_summary(feature_id)?;
+                    }
+                    for draft in drafts {
+                        if let Some(gap_id) = persist_import_draft_with_duplicate_decision(
+                            &service,
+                            &draft,
+                            feature_id.as_deref(),
+                            &mut duplicate_actions,
+                        )? {
+                            gap_ids.push(gap_id);
+                        }
+                    }
+                    Ok(crate::core::product::imports::ImportPersistResult {
+                        created: gap_ids.len(),
+                        gap_ids,
+                        feature_id: feature_id.clone(),
+                    })
+                })();
+            match result {
+                Ok(result) => Some((result, duplicate_actions)),
                 Err(error) => {
                     failures.push(json!({
                         "index": 0,
@@ -2350,7 +2476,7 @@ impl InProcessWebServer {
         };
         let created = import_result
             .as_ref()
-            .map(|result| {
+            .map(|(result, _)| {
                 result
                     .gap_ids
                     .iter()
@@ -2372,7 +2498,10 @@ impl InProcessWebServer {
                 "created": created,
                 "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
                 "failures": failures,
-                "duplicate_actions": {},
+                "duplicate_actions": import_result
+                    .as_ref()
+                    .map(|(_, actions)| actions.to_json())
+                    .unwrap_or_else(|| ImportDuplicateActions::default().to_json()),
                 "feature": feature_response
             }),
         )

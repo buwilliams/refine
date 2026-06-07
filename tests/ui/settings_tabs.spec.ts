@@ -263,6 +263,82 @@ test("manages application nodes from the Application tab", async ({ page, reques
   }
 });
 
+test("honors shared modal keyboard, focus, backdrop, and danger contracts", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const suffix = Date.now();
+  const cancelledName = `Modal Cancelled Node ${suffix}`;
+  const nodeName = `Modal Contract Node ${suffix}`;
+  const originalNodes = await jsonObject(await request.get("/api/nodes"));
+  const originalActiveNodeId = String(originalNodes.active_node_id ?? "default");
+  let createdNodeId = "";
+
+  try {
+    await page.goto("/#/node/application");
+    await page.getByTestId("node-add").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Create node");
+    await expect(page.getByTestId("modal-input")).toBeFocused();
+    await page.getByTestId("modal-input").fill(cancelledName);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("modal-dialog")).toHaveCount(0);
+    await expect(page.getByTestId("node-settings-table")).not.toContainText(cancelledName);
+
+    const created = page.waitForResponse((response) =>
+      response.url().includes("/api/nodes") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("node-add").click();
+    await page.getByTestId("modal-input").fill(nodeName);
+    await page.keyboard.press("Enter");
+    const createdPayload = await (await created).json() as Record<string, unknown>;
+    const createdNode = nodesFromPayload(createdPayload)
+      .find((node) => node.display_name === nodeName);
+    createdNodeId = String(createdNode?.id ?? "");
+    expect(createdNodeId).toBeTruthy();
+
+    const row = page.locator(`[data-testid="node-settings-row"][data-node-id="${createdNodeId}"]`);
+    await expect(row).toBeVisible();
+    await expect(row.getByTestId("node-settings-name")).toContainText(nodeName);
+
+    await row.getByTestId("node-archive").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Archive node");
+    await expect(page.getByTestId("modal-ok")).toHaveClass(/danger/);
+    await page.getByTestId("modal-backdrop").click({ position: { x: 4, y: 4 } });
+    await expect(page.getByTestId("modal-dialog")).toHaveCount(0);
+    await expect(row.getByTestId("node-settings-name")).not.toContainText("archived");
+
+    await row.getByTestId("node-archive").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Archive node");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("modal-dialog")).toHaveCount(0);
+    await expect(row.getByTestId("node-settings-name")).not.toContainText("archived");
+
+    const archived = page.waitForResponse((response) =>
+      response.url().includes(`/api/nodes/${createdNodeId}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await row.getByTestId("node-archive").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Archive node");
+    await page.keyboard.press("Enter");
+    const archivedPayload = await (await archived).json() as Record<string, unknown>;
+    expect(nodesFromPayload(archivedPayload)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: createdNodeId,
+        archived: true,
+      }),
+    ]));
+    await expect(row.getByTestId("node-settings-name")).toContainText("archived");
+  } finally {
+    await request.post("/api/nodes/activate", { data: { node_id: originalActiveNodeId } }).catch(() => undefined);
+    if (createdNodeId) {
+      await request.patch(`/api/nodes/${encodeURIComponent(createdNodeId)}`, {
+        data: { archived: true },
+      }).catch(() => undefined);
+    }
+  }
+});
+
 test("manages cluster nodes from the Application tab", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const suffix = Date.now();
@@ -360,6 +436,92 @@ test("manages cluster nodes from the Application tab", async ({ page, request })
   }
 });
 
+test("expands supervisor child processes from the Processes tab", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const processDirs = testRuntimeProcessDirs();
+  const supervisorId = "000-supervisor-tree";
+  const uiId = "001-ui-child";
+  const runnerId = "002-runner-child";
+  const processPaths = processDirs.flatMap((processDir) => [
+    path.join(processDir, `${supervisorId}.json`),
+    path.join(processDir, `${uiId}.json`),
+    path.join(processDir, `${runnerId}.json`),
+  ]);
+
+  try {
+    for (const processDir of processDirs) fs.mkdirSync(processDir, { recursive: true });
+    for (const processDir of processDirs) {
+      fs.writeFileSync(path.join(processDir, `${supervisorId}.json`), JSON.stringify({
+        id: supervisorId,
+        owner: "daemon",
+        pid: null,
+        state: "running",
+        label: "Supervisor tree",
+        details: "",
+        started_at: new Date().toISOString(),
+      }, null, 2));
+      fs.writeFileSync(path.join(processDir, `${uiId}.json`), JSON.stringify({
+        id: uiId,
+        owner: "user_helper",
+        pid: null,
+        state: "running",
+        label: "UI child",
+        details: JSON.stringify({ kind: "ui" }),
+        started_at: new Date().toISOString(),
+      }, null, 2));
+      fs.writeFileSync(path.join(processDir, `${runnerId}.json`), JSON.stringify({
+        id: runnerId,
+        owner: "maintenance",
+        pid: null,
+        state: "running",
+        label: "Runner child",
+        details: JSON.stringify({ kind: "runner" }),
+        started_at: new Date().toISOString(),
+      }, null, 2));
+    }
+
+    await expect.poll(async () => {
+      const summary = await jsonObject(await request.get("/api/processes"));
+      return (summary.processes as Array<{ id?: string; kind?: string }> | undefined ?? [])
+        .map((process) => `${process.id}:${process.kind}`);
+    }).toEqual(expect.arrayContaining([
+      `${supervisorId}:daemon`,
+      `${uiId}:ui`,
+      `${runnerId}:runner`,
+    ]));
+
+    await page.goto("/#/node/processes");
+    const supervisorRow = page.locator(
+      `[data-testid="managed-process-row"][data-process-id="${supervisorId}"]`,
+    );
+    const uiRow = page.locator(
+      `[data-testid="managed-process-row"][data-process-id="${uiId}"]`,
+    );
+    const runnerRow = page.locator(
+      `[data-testid="managed-process-row"][data-process-id="${runnerId}"]`,
+    );
+    await expect(supervisorRow).toBeVisible();
+    await expect(supervisorRow).toHaveAttribute("data-process-kind", "supervisor");
+    await expect(supervisorRow.getByTestId("process-supervisor-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(uiRow).toBeHidden();
+    await expect(runnerRow).toBeHidden();
+
+    await supervisorRow.getByTestId("process-supervisor-toggle").click();
+    await expect(supervisorRow.getByTestId("process-supervisor-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(uiRow).toBeVisible();
+    await expect(uiRow).toHaveAttribute("data-supervisor-child", "1");
+    await expect(runnerRow).toBeVisible();
+    await expect(runnerRow).toHaveAttribute("data-supervisor-child", "1");
+
+    await supervisorRow.getByTestId("process-supervisor-toggle").click();
+    await expect(supervisorRow.getByTestId("process-supervisor-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(uiRow).toBeHidden();
+    await expect(runnerRow).toBeHidden();
+  } finally {
+    for (const processPath of processPaths) fs.rmSync(processPath, { force: true });
+  }
+});
+
 test("controls background and agent processes from the Processes tab", async ({ page, request }) => {
   await ensureAttachedProject(request);
   await jsonObject(await request.post("/api/processes/background", { data: { stopped: false } }));
@@ -431,6 +593,135 @@ test("controls background and agent processes from the Processes tab", async ({ 
   } finally {
     await request.post("/api/processes/background", { data: { stopped: false } }).catch(() => undefined);
     await request.post("/api/processes/agents", { data: { paused: false } }).catch(() => undefined);
+  }
+});
+
+test("runs subprocess worker actions from the Processes tab", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  await ensureAttachedProject(request);
+  await jsonObject(await request.post("/api/processes/background", { data: { stopped: false } }));
+  const original = await jsonObject(await request.get("/api/settings"));
+  const originalSettings = (original.settings as Record<string, unknown> | undefined) ?? {};
+  const restoreKeys = [
+    "agent_cli",
+    "target_app_start_command",
+    "target_app_stop_command",
+    "target_app_rebuild_command",
+    "target_app_status_command",
+    "target_app_cwd",
+    "target_app_env_json",
+    "target_app_start_timeout_seconds",
+    "target_app_stop_timeout_seconds",
+    "target_app_rebuild_timeout_seconds",
+    "target_app_status_timeout_seconds",
+    "target_app_log_path",
+    "target_app_http_check_url",
+    "target_app_tcp_check_host",
+    "target_app_tcp_check_port",
+    "target_app_process_check_command",
+  ];
+  const restore = Object.fromEntries(
+    restoreKeys.map((key) => [key, String(originalSettings[key] ?? "")]),
+  );
+  const prefix = `Processes worker cleanup ${Date.now()}`;
+
+  try {
+    await request.patch("/api/settings", {
+      data: {
+        agent_cli: "smoke-ai",
+        target_app_start_command: "",
+        target_app_stop_command: "",
+        target_app_rebuild_command: "printf processes-worker-rebuild",
+        target_app_status_command: "",
+        target_app_cwd: "",
+        target_app_env_json: "{}",
+        target_app_rebuild_timeout_seconds: "5",
+        target_app_http_check_url: "",
+        target_app_tcp_check_host: "",
+        target_app_tcp_check_port: "",
+        target_app_process_check_command: "",
+      },
+    });
+    await jsonObject(await request.post("/api/activity/ui-error", {
+      data: {
+        message: `${prefix} seeded activity`,
+        marker: prefix,
+        source: "settings-tabs-processes.spec",
+      },
+    }));
+
+    await page.goto("/#/node/processes");
+    await expect(page.getByTestId("settings-pane-processes")).toHaveClass(/active/);
+    await expect(page.getByTestId("subprocess-table")).toBeVisible();
+    const row = (kind: string) => page.locator(
+      `[data-testid="runner-work-row"][data-runner-work-kind="${kind}"]`,
+    );
+    for (const kind of [
+      "target_app_rebuilder",
+      "target_app_config_generator",
+      "sqlite_cache_rebuild",
+      "activity_log_cleanup",
+    ]) {
+      await expect(row(kind)).toBeVisible();
+      await expect(row(kind).locator("td").nth(1)).toHaveText("idle");
+    }
+
+    const rebuiltTargetApp = page.waitForResponse((response) =>
+      response.url().includes("/api/runner-workers/target-app-rebuilder/rebuild") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await row("target_app_rebuilder").getByTestId("runner-target-app-rebuild").click();
+    const rebuildPayload = await (await rebuiltTargetApp).json();
+    expect(rebuildPayload.ok).toBe(true);
+    expect(rebuildPayload.queued).toBe(true);
+    expect(String(rebuildPayload.last_operation?.stdout ?? "")).toBe("processes-worker-rebuild");
+
+    const generated = page.waitForResponse((response) =>
+      response.url().includes("/api/target-app/generate-instructions") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await row("target_app_config_generator").getByTestId("runner-target-app-generate").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Generate target-app config");
+    await page.getByTestId("modal-ok").click();
+    const generatedPayload = await (await generated).json();
+    expect(generatedPayload.provider).toBe("smoke-ai");
+    expect(generatedPayload.source).toBe("provider");
+    expect(generatedPayload.config.start_command).toBe("printf smoke-ai-target-start");
+    await expect(page.getByTestId("target-app-start-command")).toHaveValue("printf smoke-ai-target-start");
+
+    await page.getByTestId("settings-tab-processes").click();
+    await expect(page.getByTestId("settings-pane-processes")).toHaveClass(/active/);
+    const rebuiltCache = page.waitForResponse((response) =>
+      response.url().includes("/api/cache/rebuild") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await row("sqlite_cache_rebuild").getByTestId("runner-cache-rebuild").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Rebuild projection cache");
+    await page.getByTestId("modal-ok").click();
+    const cachePayload = await (await rebuiltCache).json();
+    expect(cachePayload.ok).toBe(true);
+    expect(String(cachePayload.cache ?? "")).toContain("target/refine-integration/run");
+
+    const cleaned = page.waitForResponse((response) =>
+      response.url().includes("/api/activity/cleanup") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await row("activity_log_cleanup").getByTestId("runner-log-cleanup").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Clean up old logs");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Delete activity log entries older than 7 days");
+    await page.getByTestId("modal-ok").click();
+    const cleanupPayload = await (await cleaned).json();
+    expect(cleanupPayload.ok).toBe(true);
+    expect(cleanupPayload.cleared).toBe(false);
+    expect(cleanupPayload.retention_days).toBe(7);
+    expect(Number(cleanupPayload.deleted ?? 0)).toBeGreaterThanOrEqual(0);
+  } finally {
+    await request.patch("/api/settings", { data: restore }).catch(() => undefined);
+    await request.post("/api/processes/background", { data: { stopped: false } }).catch(() => undefined);
   }
 });
 

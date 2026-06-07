@@ -385,6 +385,7 @@ fn runtime_projection_fingerprint(
         runtime_root.join("process-control.json"),
         runtime_root.join("jobs"),
         runtime_root.join("target-app-state.json"),
+        runtime_root.join("runner-health.json"),
         runtime_root.join("metrics/performance.jsonl"),
     ] {
         collect_runtime_path_fingerprint(runtime_root, &path, &mut fingerprint.entries)?;

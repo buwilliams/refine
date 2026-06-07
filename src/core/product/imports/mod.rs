@@ -13,6 +13,8 @@ pub struct ImportDraft {
     pub target: String,
     pub reporter: String,
     pub priority: String,
+    #[serde(default)]
+    pub duplicate_decision: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
@@ -47,6 +49,7 @@ impl FileImportService {
                     target: target.to_string(),
                     reporter: reporter.unwrap_or("").trim().to_string(),
                     priority: "low".to_string(),
+                    duplicate_decision: String::new(),
                 }
             })
             .collect::<Vec<_>>();
@@ -93,6 +96,7 @@ impl FileImportService {
                 target: target.to_string(),
                 reporter: nonempty_or(value("reporter"), reporter.unwrap_or("")).to_string(),
                 priority,
+                duplicate_decision: String::new(),
             });
         }
         Ok(drafts)
@@ -235,6 +239,7 @@ fn import_draft_from_value(
         target,
         reporter: nonempty_or(field("reporter"), default_reporter).to_string(),
         priority,
+        duplicate_decision: field("duplicate_decision").to_string(),
     })
 }
 
