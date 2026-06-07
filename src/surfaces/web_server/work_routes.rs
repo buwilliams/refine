@@ -2172,6 +2172,7 @@ impl InProcessWebServer {
             Ok(drafts) => drafts,
             Err(error) => return error_response(error),
         };
+        let draft_total = drafts.len();
         let service = self.work_item_service(&durable_root);
         let mut failures = Vec::new();
         let mut feature_response = serde_json::Value::Null;
@@ -2210,7 +2211,7 @@ impl InProcessWebServer {
                         json!({
                             "message": "Import cancelled",
                             "completed": 0,
-                            "total": created_gap_ids.len()
+                            "total": draft_total
                         }),
                     );
                     return ApiResponse::json(499, json!({"cancelled": true}));
@@ -2300,6 +2301,9 @@ impl InProcessWebServer {
                 }),
             );
             thread::sleep(Duration::from_millis(5));
+        }
+        if import_job_cancelled(registry, job_id) {
+            return Err(ImportPersistWorkerError::Cancelled);
         }
         Ok(())
     }

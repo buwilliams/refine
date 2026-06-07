@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
@@ -12,6 +12,7 @@ use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
 };
+use crate::core::product::work_items::FileWorkItemService;
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
@@ -333,6 +334,39 @@ impl FileSchedulingService {
                 && matches!(other.gap.status, GapStatus::InProgress | GapStatus::Qa)
         })
     }
+
+    fn promote_backlog_to_todo(&self, durable_root: &Path) -> RefineResult<usize> {
+        let settings = FileSettingsService::new(durable_root).load()?;
+        let threshold = setting_i64(&settings, "backlog_promote_after_seconds", 3600);
+        if threshold < 0 {
+            return Ok(0);
+        }
+        let snapshot = self.projection_snapshot(durable_root)?;
+        let service = FileWorkItemService::new(durable_root);
+        let now = Utc::now();
+        let mut promoted = 0;
+        let mut candidates = snapshot
+            .gaps
+            .values()
+            .filter(|projection| projection.gap.status == GapStatus::Backlog)
+            .filter(|projection| Self::feature_dispatch_eligible(&snapshot, projection))
+            .filter(|projection| backlog_gap_age_seconds(projection, now) >= Some(threshold))
+            .cloned()
+            .collect::<Vec<_>>();
+        candidates.sort_by(|a, b| {
+            a.gap
+                .feature_order
+                .unwrap_or(i64::MAX)
+                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+                .then_with(|| a.gap.updated.cmp(&b.gap.updated))
+                .then_with(|| a.gap.id.cmp(&b.gap.id))
+        });
+        for gap in candidates {
+            service.transition_gap_status(&gap.gap.id, GapStatus::Todo)?;
+            promoted += 1;
+        }
+        Ok(promoted)
+    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -375,6 +409,7 @@ impl SchedulingService for FileSchedulingService {
                 .filter(|reservation| reservation.state == ReservationState::Reserved)
                 .count());
         };
+        self.promote_backlog_to_todo(durable_root)?;
         let snapshot = self.projection_snapshot(durable_root)?;
         let mut eligible = snapshot
             .gaps
@@ -663,6 +698,14 @@ fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -> usize {
         .unwrap_or(fallback)
 }
 
+fn setting_i64(settings: &JsonObject, key: &str, fallback: i64) -> i64 {
+    settings
+        .get(key)
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(fallback)
+}
+
 fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
     settings
         .get(key)
@@ -671,6 +714,15 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
         .unwrap_or_else(|| fallback.to_string())
+}
+
+fn backlog_gap_age_seconds(gap: &GapSummaryProjection, now: DateTime<Utc>) -> Option<i64> {
+    DateTime::parse_from_rfc3339(&gap.gap.updated)
+        .ok()
+        .map(|timestamp| {
+            now.signed_duration_since(timestamp.with_timezone(&Utc))
+                .num_seconds()
+        })
 }
 
 fn default_node_id() -> String {
@@ -731,6 +783,49 @@ mod tests {
             scheduler.job_registry.status(&job_id).unwrap().owner,
             "gap:GAP1"
         );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_auto_promotes_backlog_gaps_when_configured() {
+        let temp_root = unique_temp_dir("scheduler-backlog-promote");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_gap_summary("Instant Backlog", Some("GAP1"))
+            .unwrap();
+        work_items
+            .create_gap_summary("Never Backlog", Some("GAP2"))
+            .unwrap();
+        let settings = FileSettingsService::new(&durable_root);
+        settings
+            .update(&json!({"backlog_promote_after_seconds": "-1"}))
+            .unwrap();
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.promote().unwrap(), 0);
+        assert_eq!(
+            work_items.show_gap_summary("GAP1").unwrap().gap.status,
+            GapStatus::Backlog
+        );
+
+        settings
+            .update(&json!({"backlog_promote_after_seconds": "0"}))
+            .unwrap();
+        assert_eq!(scheduler.promote().unwrap(), 1);
+        assert_eq!(
+            work_items.show_gap_summary("GAP1").unwrap().gap.status,
+            GapStatus::Todo
+        );
+        assert_eq!(
+            work_items.show_gap_summary("GAP2").unwrap().gap.status,
+            GapStatus::Todo
+        );
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.reservations.len(), 1);
+        assert_eq!(state.reservations[0].gap_id, "GAP1");
 
         fs::remove_dir_all(temp_root).unwrap();
     }

@@ -99,7 +99,7 @@ impl ManagedProcessOutput {
 
 impl ManagedProcess {
     pub fn api_json(&self) -> serde_json::Value {
-        json!({
+        let mut value = json!({
             "id": self.id,
             "kind": self.owner.as_kind(),
             "label": self.label.as_deref().unwrap_or(self.owner.as_kind()),
@@ -111,7 +111,24 @@ impl ManagedProcess {
             "max_memory": {"label": self.limits.as_ref().and_then(|limits| limits.max_memory_bytes.map(|bytes| bytes.to_string())).unwrap_or_else(|| "-".to_string())},
             "isolation": process_isolation_label(self.limits.as_ref()),
             "actions": process_actions(&self.state)
-        })
+        });
+        if let Some(object) = value.as_object_mut()
+            && let Some(details) = self
+                .details
+                .as_deref()
+                .and_then(|details| serde_json::from_str::<serde_json::Value>(details).ok())
+                .and_then(|details| details.as_object().cloned())
+        {
+            for key in ["gap_id", "session_id", "mode", "round_idx"] {
+                if let Some(field) = details.get(key) {
+                    object.insert(key.to_string(), field.clone());
+                }
+            }
+            if details.get("session_id").is_some() {
+                object.insert("kind".to_string(), json!("chat"));
+            }
+        }
+        value
     }
 }
 

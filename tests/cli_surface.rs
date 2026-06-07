@@ -690,6 +690,42 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
         "gap delete bulk second",
         &fixture.run_refine(&["gap", "delete", &second]),
     );
+
+    let settings = fixture.api_json(
+        "PATCH",
+        "/api/settings",
+        serde_json::json!({
+            "backlog_promote_after_seconds": "0",
+            "parallel_run_cap": "4",
+            "parallel_per_node_cap": "4",
+        }),
+    );
+    assert_eq!(
+        settings["settings"]["backlog_promote_after_seconds"], "0",
+        "{settings:#}"
+    );
+    let backlog = fixture.create_gap("workflow schedule auto-promote backlog");
+    assert_eq!(fixture.gap_field(&backlog, "status"), "backlog");
+    let auto_schedule = fixture.run_refine(&["workflow", "schedule"]);
+    fixture.assert_success("workflow schedule auto-promote backlog", &auto_schedule);
+    let auto_payload = fixture.json_stdout(&auto_schedule);
+    assert_eq!(auto_payload["promoted"], 1, "{auto_payload:#}");
+    assert!(
+        auto_payload["reservations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |reservation| reservation["gap_id"].as_str() == Some(backlog.as_str())
+                    && reservation["state"].as_str() == Some("reserved")
+            ),
+        "{auto_payload:#}"
+    );
+    assert_eq!(fixture.gap_field(&backlog, "status"), "todo");
+    fixture.assert_success(
+        "gap delete auto-promoted backlog",
+        &fixture.run_refine(&["gap", "delete", &backlog]),
+    );
 }
 
 fn feature_create_membership_rollup_and_delete(fixture: &IntegrationFixture) {

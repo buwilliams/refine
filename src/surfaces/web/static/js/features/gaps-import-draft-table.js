@@ -138,7 +138,7 @@ function renderImportDraftRow(d, index, draftCount) {
       </td>
       <td>
         <input type="text" class="d-name" data-testid="import-draft-name" value="${htmlEscape(d.name)}" placeholder="Name">
-        ${d.error ? `<p class="small draft-error">${htmlEscape(d.error)}</p>` : ""}
+        ${d.error ? `<p class="small draft-error" data-testid="import-draft-error">${htmlEscape(d.error)}</p>` : ""}
         ${d.duplicate ? `<p class="muted small import-decision-label" data-testid="import-duplicate-decision">${htmlEscape(importDuplicateDecisionLabel(d.duplicateDecision))}</p>` : ""}
       </td>
       <td><input type="text" class="d-reporter" data-testid="import-draft-reporter" value="${htmlEscape(d.reporter)}" placeholder="Reporter"></td>
@@ -198,7 +198,7 @@ function bindImportDraftPage(root, draftState, saveSession = null, options = {})
       ? options.featureDestination()
       : options.featureDestination;
     saveSession({
-      phase: "review",
+      phase: typeof options.phase === "function" ? options.phase() : "review",
       drafts: draftState,
       ...(destination ? { featureDestination: destination } : {}),
     });

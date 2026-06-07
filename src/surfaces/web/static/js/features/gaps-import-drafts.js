@@ -13,6 +13,11 @@ function drawImportDrafts(root, drafts, close, options = {}) {
   let page = 1;
   let showNeedsResolutionOnly = false;
   let originalUpdateField = "actual";
+  const currentSessionPhase = () => (
+    options.retry && draftState.some((draft) => draft.error)
+      ? "failed"
+      : "review"
+  );
 
   function renderPage() {
     const reviewDrafts = draftState
@@ -69,16 +74,17 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     updateImportPersistButton(root, draftState, featureDestination);
     bindImportFeatureDestination(drafts_root, (next) => {
       featureDestination = next;
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       updateImportPersistButton(root, draftState, featureDestination);
     });
     bindImportDraftPage(drafts_root, draftState, saveSession, {
       featureDestination: () => featureDestination,
+      phase: currentSessionPhase,
       onSelectionChange: renderPage,
     });
     const persistReviewState = () => {
       syncImportDraftPage(drafts_root, draftState);
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
     };
     $("[data-import-unresolved-filter]", drafts_root)?.addEventListener("change", (e) => {
       persistReviewState();
@@ -91,7 +97,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       for (const { draft } of visibleDrafts.slice(start, start + IMPORT_DRAFT_PAGE_SIZE)) {
         draft.selected = !pageAllSelected;
       }
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       renderPage();
     });
     $("[data-import-toggle-all]", drafts_root)?.addEventListener("click", () => {
@@ -99,7 +105,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       visibleDrafts.forEach(({ draft }) => {
         draft.selected = !allFilteredSelected;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       renderPage();
     });
     $("[data-import-select-duplicates]", drafts_root)?.addEventListener("click", () => {
@@ -107,7 +113,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       reviewDrafts.forEach(({ draft }) => {
         draft.selected = !!draft.duplicate;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       renderPage();
     });
     $("[data-import-dismiss-duplicates]", drafts_root)?.addEventListener("click", () => {
@@ -119,7 +125,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = "duplicate";
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       toast(`Dismissed ${targets.length} duplicate${targets.length === 1 ? "" : "s"}`, "info");
       renderPage();
     });
@@ -134,7 +140,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = "original";
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       toast(`Marked ${targets.length} duplicate draft${targets.length === 1 ? "" : "s"} to import`, "info");
       renderPage();
     });
@@ -149,7 +155,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = "move_original_to_backlog";
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for backlog`, "info");
       renderPage();
     });
@@ -168,7 +174,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         draft.duplicateDecision = `update_original_${field}`;
         draft.selected = false;
       });
-      if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+      if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
       toast(`Marked ${targets.length} original Gap${targets.length === 1 ? "" : "s"} for ${field} update`, "info");
       renderPage();
     });
@@ -180,7 +186,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
         const swapIdx = direction === "up" ? idx - 1 : idx + 1;
         if (idx < 0 || swapIdx < 0 || swapIdx >= draftState.length) return;
         [draftState[idx], draftState[swapIdx]] = [draftState[swapIdx], draftState[idx]];
-        if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+        if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
         renderPage();
       });
     });
@@ -214,7 +220,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
     const btn = actions.querySelector("#btn-persist");
     if (btn.disabled) return;
     syncImportDraftPage(drafts_root, draftState);
-    if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+    if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
     const unresolved = draftState.filter(importDraftNeedsResolution);
     if (unresolved.length) {
       showNeedsResolutionOnly = true;
@@ -237,7 +243,7 @@ function drawImportDrafts(root, drafts, close, options = {}) {
       return;
     }
     featureDestination = readImportFeatureDestination(drafts_root);
-    if (saveSession) saveSession({ phase: "review", drafts: draftState, featureDestination });
+    if (saveSession) saveSession({ phase: currentSessionPhase(), drafts: draftState, featureDestination });
     let destinationPayload = {};
     try {
       destinationPayload = importFeatureDestinationPayload(featureDestination);

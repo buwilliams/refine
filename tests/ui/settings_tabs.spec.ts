@@ -8,6 +8,20 @@ function testAppRoot(): string {
     path.join(process.cwd(), "target/refine-integration/apps/rust-test-app");
 }
 
+function testRuntimeRoot(): string {
+  return process.env.REFINE_TEST_RUNTIME_ROOT ||
+    path.join(process.cwd(), "target/refine-integration/run");
+}
+
+function testRuntimeProcessDirs(): string[] {
+  const runtimeRoot = testRuntimeRoot();
+  const port = process.env.REFINE_TEST_PORT || "18080";
+  return [
+    path.join(runtimeRoot, "processes"),
+    path.join(runtimeRoot, port, "processes"),
+  ];
+}
+
 async function answerModalPrompt(page: Page, title: string, value: string): Promise<void> {
   await expect(page.getByTestId("modal-dialog")).toContainText(title);
   await page.getByTestId("modal-input").fill(value);
@@ -417,6 +431,107 @@ test("controls background and agent processes from the Processes tab", async ({ 
   } finally {
     await request.post("/api/processes/background", { data: { stopped: false } }).catch(() => undefined);
     await request.post("/api/processes/agents", { data: { paused: false } }).catch(() => undefined);
+  }
+});
+
+test("cancels agent and stops chat subprocesses from the Processes tab", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const processDirs = testRuntimeProcessDirs();
+  const processPaths = processDirs.flatMap((processDir) => [
+    path.join(processDir, "ui-agent-process.json"),
+    path.join(processDir, "ui-chat-process.json"),
+  ]);
+  let gapId = "";
+  let sessionId = "";
+
+  try {
+    const gapPayload = await jsonObject(await request.post("/api/gaps", {
+      data: {
+        name: `process action gap ${Date.now()}`,
+        reporter: "refine-smoke",
+      },
+    }));
+    gapId = String((gapPayload.gap as { id?: string } | undefined)?.id ?? "");
+    expect(gapId).toBeTruthy();
+    const chatPayload = await jsonObject(await request.post("/api/chat/start", {
+      data: {
+        provider: "smoke-ai",
+        mode: "standalone",
+      },
+    }));
+    sessionId = String(chatPayload.session_id ?? "");
+    expect(sessionId).toBeTruthy();
+
+    for (const processDir of processDirs) fs.mkdirSync(processDir, { recursive: true });
+    for (const processDir of processDirs) {
+      fs.writeFileSync(path.join(processDir, "ui-agent-process.json"), JSON.stringify({
+      id: "ui-agent-process",
+      owner: "agent",
+      pid: null,
+      state: "running",
+      label: "UI test agent",
+      details: JSON.stringify({ gap_id: gapId, round_idx: 0 }),
+      started_at: new Date().toISOString(),
+      }, null, 2));
+      fs.writeFileSync(path.join(processDir, "ui-chat-process.json"), JSON.stringify({
+      id: "ui-chat-process",
+      owner: "user_helper",
+      pid: null,
+      state: "running",
+      label: "UI test chat",
+      details: JSON.stringify({ session_id: sessionId, mode: "standalone" }),
+      started_at: new Date().toISOString(),
+      }, null, 2));
+    }
+
+    await expect.poll(async () => {
+      const summary = await jsonObject(await request.get("/api/processes"));
+      return (summary.processes as Array<{ id?: string }> | undefined ?? []).map((process) => process.id);
+    }).toEqual(expect.arrayContaining(["ui-agent-process", "ui-chat-process"]));
+
+    await page.goto("/#/node/processes");
+    const agentRow = page.locator(
+      '[data-testid="subprocess-row"][data-process-id="ui-agent-process"]',
+    );
+    const chatRow = page.locator(
+      '[data-testid="subprocess-row"][data-process-id="ui-chat-process"]',
+    );
+    await expect(agentRow).toBeVisible();
+    await expect(agentRow.getByTestId("process-cancel-agent")).toBeVisible();
+    await expect(chatRow).toBeVisible();
+    await expect(chatRow.getByTestId("process-stop-chat")).toBeVisible();
+
+    const cancelled = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(gapId)}/cancel`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await agentRow.getByTestId("process-cancel-agent").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Cancel this Gap's running subprocess?");
+    await page.getByTestId("modal-ok").click();
+    const cancelledPayload = await (await cancelled).json();
+    expect(cancelledPayload.gap.status).toBe("cancelled");
+    const cancelledGap = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(gapId)}`));
+    expect((cancelledGap.gap as { status?: string } | undefined)?.status).toBe("cancelled");
+
+    const stopped = page.waitForResponse((response) =>
+      response.url().includes(`/api/chat/${encodeURIComponent(sessionId)}/stop`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await chatRow.getByTestId("process-stop-chat").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Stop this chat session?");
+    await page.getByTestId("modal-ok").click();
+    const stoppedPayload = await (await stopped).json();
+    expect(stoppedPayload.alive).toBe(false);
+  } finally {
+    for (const processPath of processPaths) fs.rmSync(processPath, { force: true });
+    if (sessionId) {
+      await request.post(`/api/chat/${encodeURIComponent(sessionId)}/stop`).catch(() => undefined);
+    }
+    if (gapId) {
+      await request.delete(`/api/gaps/${encodeURIComponent(gapId)}`).catch(() => undefined);
+    }
   }
 });
 

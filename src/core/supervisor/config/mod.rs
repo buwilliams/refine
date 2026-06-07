@@ -387,7 +387,7 @@ fn default_settings() -> JsonObject {
         ("worker_cpu_priority", "normal"),
         ("resource_isolation_mode", "process_group"),
         ("chat_idle_timeout_seconds", "300"),
-        ("backlog_promote_after_seconds", "0"),
+        ("backlog_promote_after_seconds", "3600"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
         ("agent_subpath", ""),

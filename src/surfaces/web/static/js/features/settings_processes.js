@@ -341,7 +341,7 @@ function renderSubprocessProcessRow(proc, anchorMs) {
     ? ` class="process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Subprocess details" title="${htmlEscape(details)}"`
     : "";
   return `
-    <tr data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+    <tr data-testid="subprocess-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
       <td data-label="Subprocess">${label}</td>
       <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td data-label="PID">${pid}</td>
@@ -448,10 +448,10 @@ function renderProcessActions(proc) {
       <button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${proc.runner_reachable && !paused ? "" : "disabled"}>Hard reset worktree</button>`;
   }
   if (proc.kind === "agent" && proc.gap_id) {
-    return `<button class="danger" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
+    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
   }
   if (proc.kind === "chat" && proc.session_id) {
-    return `<button class="danger" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
+    return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
   }
   if (proc.kind === "target_app") {
     const snap = proc.target_app || {};

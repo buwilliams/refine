@@ -117,7 +117,7 @@ async function handleImportPersistResult(root, r, payload, skipped, close, saveS
         ...original,
         ...(failure.draft || {}),
         duplicate,
-        error: failure.error || "Could not save this Gap.",
+        error: failure.error || failure.message || "Could not save this Gap.",
       };
     });
     if (saveSession) saveSession({ phase: "failed", drafts: failedDrafts, jobId: "", result: r });

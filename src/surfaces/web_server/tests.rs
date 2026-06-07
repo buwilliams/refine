@@ -1655,6 +1655,97 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
 }
 
 #[test]
+fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
+    let temp_root = unique_temp_dir("http-import-cancel");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let prefix = format!(
+        "cancel-import-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis()
+    );
+    let drafts = (1..=240)
+        .map(|index| {
+            json!({
+                "name": format!("{prefix}-{index:03}"),
+                "actual": format!("{prefix} actual {index:03}"),
+                "target": format!("{prefix} target {index:03}"),
+                "reporter": "QA",
+                "priority": "medium"
+            })
+        })
+        .collect::<Vec<_>>();
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/import/persist".to_string(),
+        body: Some(json!({
+            "background": true,
+            "drafts": drafts
+        })),
+    });
+    assert_eq!(started.status, 202);
+    let job_id = started.body["job"]["id"].as_str().unwrap().to_string();
+
+    let cancel = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/jobs/{job_id}/cancel"),
+        body: None,
+    });
+    assert_eq!(cancel.status, 200);
+    assert_eq!(cancel.body["job"]["status"], "cancelled");
+
+    let registry = FileJobRegistry::new(&runtime_root);
+    let worker_deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let job = registry.status(&job_id).unwrap();
+        if job.progress["message"] == "Import cancelled" {
+            assert_eq!(job.state, JobState::Cancelled);
+            assert_eq!(job.progress["completed"], 0);
+            assert_eq!(job.progress["total"], 240);
+            break;
+        }
+        assert!(
+            !matches!(job.state, JobState::Succeeded | JobState::Failed),
+            "background import finished instead of observing cancellation: {:?}",
+            job
+        );
+        assert!(
+            Instant::now() < worker_deadline,
+            "timed out waiting for background import worker to observe cancellation: {:?}",
+            job
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    let projection_deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let gaps = server.handle(ApiRequest {
+            method: "GET".to_string(),
+            path: format!("/api/gaps?limit=1000&node=current&q={prefix}"),
+            body: None,
+        });
+        assert_eq!(gaps.status, 200);
+        let total = gaps.body["page"]["total"].as_u64().unwrap();
+        if total == 0 {
+            break;
+        }
+        assert!(
+            Instant::now() < projection_deadline,
+            "cancelled import left {total} matching Gap records"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() {
     let temp_root = unique_temp_dir("http-cache-changes-performance");
     let durable_root = temp_root.join(".refine");
@@ -2447,6 +2538,40 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             sensitive: false,
         })
         .unwrap();
+    supervisor
+        .register(ManagedProcess {
+            id: "agent-context".to_string(),
+            owner: crate::core::host::process_supervision::ProcessOwner::Agent,
+            pid: None,
+            state: "running".to_string(),
+            label: Some("Agent context".to_string()),
+            details: Some(json!({"gap_id": "GAPCTX", "round_idx": 1}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    supervisor
+        .register(ManagedProcess {
+            id: "chat-context".to_string(),
+            owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
+            pid: None,
+            state: "running".to_string(),
+            label: Some("Chat context".to_string()),
+            details: Some(
+                json!({"session_id": "chat-context-session", "mode": "standalone"}).to_string(),
+            ),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -2459,20 +2584,40 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(listed.status, 200);
     assert_eq!(listed.body["processes"][0]["kind"], "agent");
     assert_eq!(listed.body["runner_reachable"], true);
+    let listed_processes = listed.body["processes"].as_array().unwrap();
+    let agent_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == "agent-context")
+        .unwrap();
+    assert_eq!(agent_context["gap_id"], "GAPCTX");
+    assert_eq!(agent_context["round_idx"], 1);
+    let chat_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == "chat-context")
+        .unwrap();
+    assert_eq!(chat_context["kind"], "chat");
+    assert_eq!(chat_context["session_id"], "chat-context-session");
+    assert_eq!(chat_context["mode"], "standalone");
     let summary = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/processes?summary=1".to_string(),
         body: None,
     });
     assert_eq!(summary.status, 200);
-    assert_eq!(summary.body["agent_count"], 1);
-    assert_eq!(summary.body["process_count"], 1);
+    assert_eq!(summary.body["agent_count"], 2);
+    assert_eq!(summary.body["process_count"], 3);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert_eq!(cached.runtime.processes[0]["kind"], "agent");
+    assert!(
+        cached
+            .runtime
+            .processes
+            .iter()
+            .any(|process| process["gap_id"] == "GAPCTX")
+    );
     assert_eq!(
         cached.runtime.supervisor.unwrap()["runner_reachable"],
         json!(true)

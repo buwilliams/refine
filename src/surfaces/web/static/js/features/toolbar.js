@@ -241,7 +241,9 @@ function resetChatForProjectSwitch() {
   chatState.tabs = {};
   chatState.activeTabId = "standalone";
   chatState.open = false;
+  chatState.bodyHeight = null;
   chatState.fullscreen = false;
+  systemOperationState.filters.clear();
   ensureStandaloneTab();
   resetFilesState();
   saveChatStateToStorage();

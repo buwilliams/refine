@@ -303,6 +303,243 @@ test("hides and recovers a background CSV import save", async ({ page, request }
   }
 });
 
+test("cancels a background CSV import save and rolls back created gaps", async ({ page, request }) => {
+  test.setTimeout(120_000);
+  await ensureAttachedProject(request);
+  const createdGapIds = new Set<string>();
+  const suffix = Date.now();
+  const prefix = `import-cancel-${suffix}`;
+  const rows = [csvLine(["name", "actual", "target", "reporter", "priority"])];
+  for (let i = 1; i <= 240; i += 1) {
+    const padded = String(i).padStart(3, "0");
+    rows.push(csvLine([
+      `${prefix} imported ${padded}`,
+      `${prefix} actual ${padded}`,
+      `${prefix} target ${padded}`,
+      "refine-smoke",
+      i % 2 === 0 ? "medium" : "low",
+    ]));
+  }
+
+  const cleanupMatchingGaps = async () => {
+    try {
+      const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
+      for (const gap of (gaps.gaps as Array<{ id?: string }> | undefined) ?? []) {
+        if (gap.id) createdGapIds.add(String(gap.id));
+      }
+    } catch {
+      // Best-effort cleanup; individual deletes below still run for known ids.
+    }
+  };
+
+  try {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("refine_import_session_v1"));
+    await selectReporter(page);
+    await page.getByTestId("create-menu-toggle").click();
+    await page.getByTestId("nav-import-gaps").click();
+
+    await expect(page.getByTestId("import-modal")).toBeVisible();
+    await page.getByTestId("import-tab-csv").click();
+    await page.getByTestId("import-csv-text").fill(rows.join("\n"));
+
+    const parsed = page.waitForResponse((response) =>
+      response.url().includes("/api/import/csv/parse") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    const deduped = page.waitForResponse((response) =>
+      response.url().includes("/api/import/dedup") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("import-extract").click();
+    await parsed;
+    await deduped;
+    await expect(page.getByTestId("import-persist")).toHaveText("Save (240) gaps");
+
+    const persisted = page.waitForResponse((response) =>
+      response.url().includes("/api/import/persist") &&
+      response.request().method() === "POST" &&
+      response.status() === 202
+    );
+    await page.getByTestId("import-persist").click();
+    const startPayload = await (await persisted).json();
+    const jobId = String(startPayload.job?.id ?? "");
+    expect(jobId).toBeTruthy();
+
+    const cancelled = page.waitForResponse((response) =>
+      response.url().includes(`/api/jobs/${jobId}/cancel`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await expect(page.getByTestId("import-save-cancel")).toBeVisible();
+    await page.getByTestId("import-save-cancel").click();
+    await page.getByTestId("modal-ok").click();
+    const cancelPayload = await (await cancelled).json();
+    expect(cancelPayload.job?.status).toBe("cancelled");
+
+    await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
+    await expect.poll(async () => page.evaluate(() => localStorage.getItem("refine_import_session_v1"))).toBeNull();
+    await expect.poll(async () => {
+      const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
+      const job = payload.job as { status?: string; progress?: { message?: string; completed?: number; total?: number } };
+      return {
+        status: job.status,
+        message: job.progress?.message,
+        completed: job.progress?.completed,
+        total: job.progress?.total,
+      };
+    }, { timeout: 30_000 }).toMatchObject({
+      status: "cancelled",
+      message: "Import cancelled",
+      completed: 0,
+      total: 240,
+    });
+    await expect.poll(async () => {
+      const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
+      return (gaps.page as { total?: number } | undefined)?.total ?? -1;
+    }, { timeout: 30_000 }).toBe(0);
+  } finally {
+    await cleanupMatchingGaps();
+    for (const gapId of createdGapIds) {
+      await request.delete(`/api/gaps/${gapId}`);
+    }
+  }
+});
+
+test("recovers failed import drafts and retries after correcting the review", async ({ page, request }) => {
+  test.setTimeout(120_000);
+  await ensureAttachedProject(request);
+  const createdGapIds = new Set<string>();
+  let featureId = "";
+  const suffix = Date.now();
+  const prefix = `import-retry-${suffix}`;
+  const rows = [
+    csvLine(["name", "actual", "target", "reporter", "priority"]),
+    csvLine([`${prefix} stale feature`, `${prefix} actual`, `${prefix} target`, "refine-smoke", "medium"]),
+  ];
+
+  const cleanupMatchingGaps = async () => {
+    try {
+      const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
+      for (const gap of (gaps.gaps as Array<{ id?: string }> | undefined) ?? []) {
+        if (gap.id) createdGapIds.add(String(gap.id));
+      }
+    } catch {
+      // Best-effort cleanup; individual deletes below still run for known ids.
+    }
+  };
+
+  try {
+    const featurePayload = await jsonObject(await request.post("/api/features", {
+      data: {
+        name: `${prefix} destination`,
+        description: `${prefix} stale destination`,
+        reporter: "refine-smoke",
+      },
+    }));
+    featureId = String((featurePayload.feature as { id?: string } | undefined)?.id ?? "");
+    expect(featureId).toBeTruthy();
+
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("refine_import_session_v1"));
+    await selectReporter(page);
+    await page.getByTestId("create-menu-toggle").click();
+    await page.getByTestId("nav-import-gaps").click();
+
+    await expect(page.getByTestId("import-modal")).toBeVisible();
+    await page.getByTestId("import-tab-csv").click();
+    await page.getByTestId("import-csv-text").fill(rows.join("\n"));
+
+    const parsed = page.waitForResponse((response) =>
+      response.url().includes("/api/import/csv/parse") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    const deduped = page.waitForResponse((response) =>
+      response.url().includes("/api/import/dedup") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("import-extract").click();
+    await parsed;
+    await deduped;
+    await expect(page.getByTestId("import-persist")).toHaveText("Save (1) gap");
+
+    await page.getByTestId("import-feature-mode-existing").check();
+    await expect(page.getByTestId("import-feature-existing").locator(`option[value="${featureId}"]`)).toHaveCount(1);
+    await page.getByTestId("import-feature-existing").selectOption(featureId);
+    await expect(page.getByTestId("import-persist")).toHaveText("Save (1) gap to Feature");
+
+    const deletedFeature = await request.delete(`/api/features/${encodeURIComponent(featureId)}`);
+    expect(deletedFeature.status()).toBe(200);
+    await expect.poll(async () => (
+      await request.get(`/api/features/${encodeURIComponent(featureId)}`)
+    ).status()).toBe(404);
+    featureId = "";
+
+    const failedPersist = page.waitForResponse((response) =>
+      response.url().includes("/api/import/persist") &&
+      response.request().method() === "POST" &&
+      response.status() === 202
+    );
+    await page.getByTestId("import-persist").click();
+    const failedPersistPayload = await (await failedPersist).json();
+    const failedJobId = String(failedPersistPayload.job?.id ?? "");
+    expect(failedJobId).toBeTruthy();
+    await expect(page.getByText("Failed drafts (1)", { exact: false })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("import-draft-error")).toContainText("was not found");
+    await expect.poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem("refine_import_session_v1") || "{}").phase)).toBe("failed");
+
+    await page.reload();
+    await expect(page.getByTestId("import-modal")).toBeVisible();
+    await expect(page.getByText("Failed drafts (1)", { exact: false })).toBeVisible();
+    await expect(page.getByTestId("import-draft-error")).toContainText("was not found");
+
+    await page.getByTestId("import-feature-mode-standalone").check();
+    await page.getByTestId("import-draft-name").fill(`${prefix} retried standalone`);
+    await expect(page.getByTestId("import-draft-error")).toHaveCount(0);
+    await expect(page.getByTestId("import-persist")).toHaveText("Save (1) gap");
+
+    const retried = page.waitForResponse((response) =>
+      response.url().includes("/api/import/persist") &&
+      response.request().method() === "POST" &&
+      response.status() === 202
+    );
+    await page.getByTestId("import-persist").click();
+    const retryPayload = await (await retried).json();
+    const retryJobId = String(retryPayload.job?.id ?? "");
+    expect(retryJobId).toBeTruthy();
+    await expect.poll(async () => {
+      const payload = await jsonObject(await request.get(`/api/jobs/${retryJobId}`));
+      const job = payload.job as { status?: string; result?: { count?: number; gaps?: Array<{ id?: string }> } };
+      for (const gap of job.result?.gaps ?? []) {
+        if (gap.id) createdGapIds.add(String(gap.id));
+      }
+      return {
+        status: job.status,
+        count: job.result?.count,
+      };
+    }, { timeout: 30_000 }).toMatchObject({
+      status: "complete",
+      count: 1,
+    });
+    await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
+    await expect.poll(async () => page.evaluate(() => localStorage.getItem("refine_import_session_v1"))).toBeNull();
+    const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
+    expect((gaps.page as { total?: number } | undefined)?.total).toBe(1);
+  } finally {
+    await cleanupMatchingGaps();
+    for (const gapId of createdGapIds) {
+      await request.delete(`/api/gaps/${gapId}`);
+    }
+    if (featureId) {
+      await request.delete(`/api/features/${encodeURIComponent(featureId)}`);
+    }
+  }
+});
+
 test("uploads and persists CSV import drafts", async ({ page, request }) => {
   test.setTimeout(120_000);
   await ensureAttachedProject(request);

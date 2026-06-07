@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { ensureAttachedProject } from "./helpers";
+import { attachProject, ensureAttachedProject, projectStatus } from "./helpers";
 
 function testAppRoot(): string {
   return process.env.REFINE_TEST_APP_ROOT ||
@@ -237,4 +237,76 @@ test("filters system operations in the toolbar", async ({ page, request }) => {
   await expect(page.getByTestId("system-log-line")).toHaveCount(250);
   await expect(page.getByTestId("system-log-line").filter({ hasText: "toolbar limit operation 0" })).toHaveCount(0);
   await expect(page.getByTestId("system-log-line").filter({ hasText: "toolbar limit operation 259" })).toBeVisible();
+});
+
+test("resets project-scoped toolbar state when switching apps", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const original = await projectStatus(request);
+  const originalPath = String(original.client_repo ?? testAppRoot());
+  const disposablePath = path.join(
+    process.cwd(),
+    `target/refine-integration/apps/toolbar-reset-app-${Date.now()}`,
+  );
+  await request.delete("/api/apps", { data: { path: disposablePath } }).catch(() => undefined);
+  fs.rmSync(disposablePath, { recursive: true, force: true });
+
+  try {
+    await page.goto("/");
+    await page.evaluate(() => {
+      localStorage.setItem("refine_chat_tabs", JSON.stringify({
+        tabs: {
+          system: { label: "System", mode: "system" },
+          files: { label: "Files", mode: "files" },
+          standalone: { label: "Standalone", mode: "standalone" },
+          "GAP-OLD": { label: "Old Gap", mode: "gap", gapId: "GAP-OLD", sessionId: "stale-session" },
+        },
+        activeTabId: "GAP-OLD",
+        open: true,
+        fullscreen: true,
+        bodyHeight: 444,
+        systemFilters: ["error"],
+      }));
+    });
+    await page.reload();
+    await expect(page.getByTestId("toolbar-dock")).toHaveClass(/open/);
+    await expect(page.getByTestId("toolbar-dock")).toHaveClass(/fullscreen/);
+    await expect(page.getByTestId("toolbar-tab-GAP-OLD")).toHaveCount(1);
+
+    const attachedPath = await page.evaluate(async (targetPath) => {
+      const result = await (window as any).api("POST", "/api/project/attach", { path: targetPath });
+      await (window as any).applyProjectAttachResult(result);
+      return result.client_repo || "";
+    }, disposablePath);
+    expect(attachedPath).toBe(disposablePath);
+    await expect.poll(async () =>
+      String((await projectStatus(request)).client_repo ?? "")
+    ).toBe(disposablePath);
+
+    await expect(page.getByTestId("toolbar-dock")).not.toHaveClass(/open/);
+    await expect(page.getByTestId("toolbar-dock")).not.toHaveClass(/fullscreen/);
+    await expect(page.getByTestId("toolbar-tab-GAP-OLD")).toHaveCount(0);
+    await expect(page.getByTestId("toolbar-tab-standalone")).toHaveCount(1);
+    await expect.poll(async () => page.evaluate(() => {
+      const stored = JSON.parse(localStorage.getItem("refine_chat_tabs") || "{}");
+      return {
+        activeTabId: stored.activeTabId,
+        open: stored.open,
+        fullscreen: stored.fullscreen,
+        bodyHeight: stored.bodyHeight ?? null,
+        systemFilters: stored.systemFilters || [],
+        tabIds: Object.keys(stored.tabs || {}),
+      };
+    })).toEqual({
+      activeTabId: "standalone",
+      open: false,
+      fullscreen: false,
+      bodyHeight: null,
+      systemFilters: [],
+      tabIds: ["system", "files", "standalone"],
+    });
+  } finally {
+    await attachProject(request, originalPath);
+    await request.delete("/api/apps", { data: { path: disposablePath } }).catch(() => undefined);
+    fs.rmSync(disposablePath, { recursive: true, force: true });
+  }
 });
