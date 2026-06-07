@@ -162,7 +162,9 @@ function drawFeaturesTable(features, stateForRender) {
       updateFeaturesFilter({ page: pageNo }));
     return;
   }
-  const rows = features.length ? features.map((feature) => `
+  const rows = features.length ? features.map((entry) => {
+    const feature = normalizeFeatureEntry(entry);
+    return `
     <tr data-feature-id="${htmlEscape(feature.id)}">
       <td class="features-name-cell" data-label="Name">${htmlEscape(feature.name || "Untitled Feature")}</td>
       <td class="features-status-cell" data-label="Status"><span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span></td>
@@ -171,7 +173,8 @@ function drawFeaturesTable(features, stateForRender) {
       <td class="muted small" data-label="Reporter">${htmlEscape(feature.reporter || "-")}</td>
       <td class="muted small" data-label="Node">${htmlEscape(feature.node_display_name || feature.node_id || "-")}</td>
       <td class="muted small" data-label="Updated">${fmtTime(feature.updated)}</td>
-    </tr>`).join("") : `
+    </tr>`;
+  }).join("") : `
     <tr><td colspan="7" class="muted">No Features match the current filters.</td></tr>`;
   root.innerHTML = `
     <div class="table-scroll">
@@ -214,6 +217,22 @@ function drawFeaturesTable(features, stateForRender) {
   });
   bindPaginationControls($("#features-table"), "features", (pageNo) =>
     updateFeaturesFilter({ page: pageNo }));
+}
+
+function normalizeFeatureEntry(entry) {
+  const feature = { ...(entry?.feature || entry || {}) };
+  const rollup = entry?.rollup || feature.rollup || {};
+  feature.status = feature.status || rollup.status || "backlog";
+  feature.gap_count = feature.gap_count ?? rollup.gap_count ?? (entry?.gap_ids || feature.gap_ids || []).length;
+  feature.done_count = feature.done_count ?? rollup.done_count ?? 0;
+  feature.active_count = feature.active_count ?? rollup.active_count ?? 0;
+  feature.failed_count = feature.failed_count ?? rollup.failed_count ?? 0;
+  feature.cancelled_count = feature.cancelled_count ?? rollup.cancelled_count ?? 0;
+  feature.blocked_count = feature.blocked_count ?? rollup.blocked_count ?? 0;
+  feature.next_gap = feature.next_gap || rollup.next_gap || null;
+  feature.gap_ids = feature.gap_ids || entry?.gap_ids || [];
+  feature.rollup = feature.rollup || rollup;
+  return feature;
 }
 
 function featureSortHeader(key, label, stateForRender) {

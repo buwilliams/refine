@@ -794,6 +794,15 @@ fn web_server_transitions_gap_and_durable_root() {
             .unwrap()
             .contains("\"status\": \"todo\"")
     );
+
+    let patch_response = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/gaps/GAP1".to_string(),
+        body: Some(json!({"status": "backlog"})),
+    });
+    assert_eq!(patch_response.status, 200);
+    assert_eq!(patch_response.body["gap"]["status"], "backlog");
+
     fs::remove_dir_all(temp_root).unwrap();
 }
 
@@ -998,6 +1007,9 @@ fn web_server_creates_features_and_updates_membership() {
     });
     assert_eq!(show.status, 200);
     assert_eq!(show.body["gap_ids"], json!(["GAP1"]));
+    assert_eq!(show.body["feature"]["gap_ids"], json!(["GAP1"]));
+    assert_eq!(show.body["feature"]["gap_count"], 1);
+    assert_eq!(show.body["feature"]["gaps"][0]["id"], "GAP1");
 
     let remove_gap = server.handle(ApiRequest {
         method: "DELETE".to_string(),

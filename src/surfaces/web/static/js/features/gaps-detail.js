@@ -444,10 +444,9 @@ function drawGapDetail(gap) {
     const body = (ta.value || "").trim();
     if (!body) return toast("Note can't be empty", "error");
     const author = state.lastReporter || "";
-    const nextNotes = [...(gap.notes || []), { author, body }];
     await withButtonBusy(btn, "Saving…", async () => {
       try {
-        await api("PATCH", "/api/gaps/" + gap.id, { notes: nextNotes });
+        await api("POST", `/api/gaps/${gap.id}/notes`, { author, body });
         toast("Note added", "info");
         await loadGapDetail(gap.id);
       } catch (e) { await showActionError(e); }

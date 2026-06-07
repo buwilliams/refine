@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::core::observability::activity::{ActivityService, FileActivityService};
@@ -31,6 +31,35 @@ fn derive_gap_name(actual: &str, target: &str) -> Option<String> {
         name = name.trim_end_matches(|ch: char| !ch.is_alphanumeric()).to_string();
     }
     (!name.trim().is_empty()).then(|| name.trim().to_string())
+}
+
+fn feature_detail_response(
+    projection: &crate::core::product::project_state::ProjectionSnapshot,
+    feature: &crate::core::product::project_state::FeatureSummaryProjection,
+) -> Value {
+    let gaps = feature
+        .gap_ids
+        .iter()
+        .filter_map(|gap_id| projection.gaps.get(gap_id).map(|gap| gap.gap.clone()))
+        .collect::<Vec<_>>();
+    let mut value = serde_json::to_value(&feature.feature).unwrap_or_else(|_| json!({}));
+    if let Some(object) = value.as_object_mut() {
+        object.insert("status".to_string(), json!(feature.rollup.status));
+        object.insert("gap_count".to_string(), json!(feature.rollup.gap_count));
+        object.insert("done_count".to_string(), json!(feature.rollup.done_count));
+        object.insert("active_count".to_string(), json!(feature.rollup.active_count));
+        object.insert("failed_count".to_string(), json!(feature.rollup.failed_count));
+        object.insert(
+            "cancelled_count".to_string(),
+            json!(feature.rollup.cancelled_count),
+        );
+        object.insert("blocked_count".to_string(), json!(feature.rollup.blocked_count));
+        object.insert("next_gap".to_string(), json!(feature.rollup.next_gap));
+        object.insert("gap_ids".to_string(), json!(feature.gap_ids));
+        object.insert("gaps".to_string(), json!(gaps));
+        object.insert("rollup".to_string(), json!(feature.rollup));
+    }
+    value
 }
 
 impl InProcessWebServer {
@@ -404,13 +433,46 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("priority"))
             .and_then(|priority| priority.as_str());
-        match self
-            .work_item_service(durable_root)
-            .update_gap_metadata_summary(gap_id, name, priority)
+        let status = match request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("status"))
+            .and_then(|status| status.as_str())
         {
-            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
-            Err(error) => error_response(error),
+            Some(status) => match GapStatus::parse_wire(status) {
+                Some(status) => Some(status),
+                None => {
+                    return ApiResponse::json(
+                        400,
+                        json!({
+                            "error": {
+                                "code": "invalid_status",
+                                "message": "body.status must be a valid Gap status"
+                            }
+                        }),
+                    );
+                }
+            },
+            None => None,
+        };
+        let service = self.work_item_service(durable_root);
+        let mut gap = match status {
+            Some(status) => match service.transition_gap_status(gap_id, status) {
+                Ok(gap) => gap,
+                Err(error) => return error_response(error),
+            },
+            None => match service.show_gap_summary(gap_id) {
+                Ok(gap) => gap,
+                Err(error) => return error_response(error),
+            },
+        };
+        if name.is_some() || priority.is_some() {
+            match service.update_gap_metadata_summary(gap_id, name, priority) {
+                Ok(updated) => gap = updated,
+                Err(error) => return error_response(error),
+            }
         }
+        ApiResponse::json(200, json!({"gap": gap.gap}))
     }
 
     pub(super) fn handle_gap_note(&self, request: ApiRequest) -> ApiResponse {
@@ -702,10 +764,17 @@ impl InProcessWebServer {
         };
         match self.current_projection() {
             Ok(projection) => match projection.features.get(feature_id) {
-                Some(feature) => ApiResponse::json(
-                    200,
-                    json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
-                ),
+                Some(feature) => {
+                    let feature_detail = feature_detail_response(&projection, feature);
+                    ApiResponse::json(
+                        200,
+                        json!({
+                            "feature": feature_detail,
+                            "gap_ids": feature.gap_ids,
+                            "rollup": feature.rollup
+                        }),
+                    )
+                }
                 None => ApiResponse::json(
                     404,
                     json!({

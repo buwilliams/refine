@@ -13,6 +13,11 @@ dist/
 /target/
 /desktop/src-tauri/target/
 /xtask/target/
+/tests/fixtures/smoke-ai/target/
+
+# JavaScript test dependencies
+/node_modules/
+/test-results/
 
 # Per-checkout refine binding (links this refine source dir to a target app).
 # Created by `refine init`; host-specific; do not commit.
