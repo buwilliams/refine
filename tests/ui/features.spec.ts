@@ -191,3 +191,157 @@ test("paginates Features and preserves URL-backed filter state", async ({ page, 
     }
   }
 });
+
+test("manages Feature detail actions and ordered Gaps through the browser", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  const suffix = Date.now();
+  let featureId = "";
+  let featureDeleted = false;
+  const gapIds: string[] = [];
+  const gapNames: string[] = [];
+
+  const featurePayload = await jsonObject(await request.post("/api/features", {
+    data: {
+      name: `Feature detail actions ${suffix}`,
+      description: "Seeded for browser Feature detail actions.",
+      reporter: "refine-smoke",
+    },
+  }));
+  featureId = String((featurePayload.feature as { id?: string } | undefined)?.id ?? "");
+  expect(featureId).toBeTruthy();
+
+  for (let i = 0; i < 26; i++) {
+    const created = await jsonObject(await request.post("/api/gaps", {
+      data: {
+        reporter: "refine-smoke",
+        actual: `Feature detail gap ${suffix} ${String(i).padStart(2, "0")} actual`,
+        target: `Feature detail gap ${suffix} ${String(i).padStart(2, "0")} target`,
+        priority: i % 3 === 0 ? "high" : i % 3 === 1 ? "medium" : "low",
+      },
+    }));
+    const gapId = String((created.gap as { id?: string } | undefined)?.id ?? "");
+    const gapName = String((created.gap as { name?: string } | undefined)?.name ?? "");
+    expect(gapId).toBeTruthy();
+    expect(gapName).toBeTruthy();
+    gapIds.push(gapId);
+    gapNames.push(gapName);
+    await jsonObject(await request.post(
+      `/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`,
+    ));
+  }
+
+  try {
+    await page.goto(`/#/features/${encodeURIComponent(featureId)}`);
+    await expect(page.getByTestId("feature-detail-modal")).toBeVisible();
+    await expect(page.getByTestId("feature-status-pill")).toHaveText("Backlog");
+    await expect(page.getByTestId("feature-progress")).toHaveText("0 / 26 done");
+    await expect(page.getByTestId("feature-metadata")).toContainText(featureId);
+    await expect(page.getByTestId("feature-gap-row")).toHaveCount(25);
+    await expect(page.getByTestId("feature-modal-gaps-pagination")).toContainText("1-25 gaps");
+
+    await page.getByTestId("feature-modal-gaps-page-next").click();
+    await expect(page.getByTestId("feature-modal-gaps-page-current")).toHaveText("Page 2");
+    await expect(page.getByTestId("feature-gap-row")).toHaveCount(1);
+    await expect(page.getByTestId("feature-gap-link")).toContainText([gapNames[25]]);
+    await page.getByTestId("feature-modal-gaps-page-prev").click();
+    await expect(page.getByTestId("feature-modal-gaps-page-current")).toHaveText("Page 1");
+    await expect(page.getByTestId("feature-gap-link").first()).toHaveText(gapNames[0]);
+
+    await page.getByTestId("feature-name").fill("");
+    await expect(page.locator(".toast.error", { hasText: "Feature name is required" })).toBeVisible();
+    await expect(page.getByTestId("feature-name")).toHaveValue(`Feature detail actions ${suffix}`);
+
+    const renamedName = `Feature detail renamed ${suffix}`;
+    const renamedDescription = "Autosaved from Feature detail Playwright coverage.";
+    const renamed = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("feature-name").fill(renamedName);
+    await page.getByTestId("feature-description").fill(renamedDescription);
+    await renamed;
+    await expect.poll(async () => {
+      const detail = await jsonObject(await request.get(`/api/features/${encodeURIComponent(featureId)}`));
+      return [
+        String((detail.feature as { name?: string } | undefined)?.name ?? ""),
+        String((detail.feature as { description?: string } | undefined)?.description ?? ""),
+      ].join("\n");
+    }).toBe(`${renamedName}\n${renamedDescription}`);
+
+    const movedTodo = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}/workflow`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("feature-workflow-todo").click();
+    await movedTodo;
+    await expect(page.getByTestId("feature-gap-status").first()).toHaveText("To do");
+    await expect(page.getByTestId("feature-workflow-todo")).toBeDisabled();
+
+    const movedBacklog = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}/workflow`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("feature-workflow-backlog").click();
+    await movedBacklog;
+    await expect(page.getByTestId("feature-gap-status").first()).toHaveText("Backlog");
+
+    await page.getByTestId("feature-gap-row").nth(1).getByTestId("feature-gap-move-up").click();
+    await expect(page.getByTestId("feature-gap-link").first()).toHaveText(gapNames[1]);
+    await expect(page.getByTestId("feature-gap-order").first()).toHaveText("1");
+
+    const deletedGap = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(gapIds[1])}`) &&
+      response.request().method() === "DELETE" &&
+      response.status() === 200
+    );
+    await page.getByTestId("feature-gap-row").first().getByTestId("feature-gap-delete").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Delete Gap");
+    await page.getByTestId("modal-ok").click();
+    await deletedGap;
+    await expect(page.getByTestId("feature-progress")).toHaveText("0 / 25 done");
+    await expect(page.getByTestId("feature-gap-link").first()).toHaveText(gapNames[0]);
+    await expect(await request.get(`/api/gaps/${encodeURIComponent(gapIds[1])}`)).not.toBeOK();
+
+    const cancelled = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}/cancel`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("feature-cancel").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Cancel Feature");
+    await page.getByTestId("modal-ok").click();
+    await cancelled;
+    await expect(page.getByTestId("feature-status-pill")).toHaveText("Cancelled");
+
+    const deletedFeature = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}`) &&
+      response.request().method() === "DELETE" &&
+      response.status() === 200
+    );
+    await page.getByTestId("feature-delete").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Delete Feature");
+    await page.getByTestId("modal-ok").click();
+    await deletedFeature;
+    featureDeleted = true;
+    await expect(page).toHaveURL(/#\/features$/);
+    await expect(page.getByTestId("feature-detail-modal")).toHaveCount(0);
+    await expect.poll(async () => {
+      const response = await request.get(`/api/features/${encodeURIComponent(featureId)}`);
+      return response.ok();
+    }).toBe(false);
+  } finally {
+    let cleanedByFeatureDelete = featureDeleted;
+    if (!featureDeleted && featureId) {
+      const cleanup = await request.delete(`/api/features/${encodeURIComponent(featureId)}`);
+      cleanedByFeatureDelete = cleanup.ok();
+    }
+    if (!cleanedByFeatureDelete) {
+      for (const gapId of gapIds.reverse()) {
+        await request.delete(`/api/gaps/${encodeURIComponent(gapId)}`);
+      }
+    }
+  }
+});

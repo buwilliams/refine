@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::thread;
+use std::time::Duration;
 
 use serde_json::{Value, json};
 
@@ -11,7 +12,7 @@ use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServic
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::logs::FileLogService;
 use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::core::product::imports::{FileImportService, import_drafts_from_value};
+use crate::core::product::imports::{FileImportService, ImportDraft, import_drafts_from_value};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
@@ -204,6 +205,113 @@ fn feature_detail_response(
         object.insert("rollup".to_string(), json!(feature.rollup));
     }
     value
+}
+
+fn feature_reorder_order_from_body(
+    body: Option<&Value>,
+    projection: &crate::core::product::project_state::ProjectionSnapshot,
+    feature_id: &str,
+    gap_id: &str,
+) -> Result<i64, ApiResponse> {
+    let Some(body) = body else {
+        return Err(ApiResponse::json(
+            400,
+            json!({
+                "error": {
+                    "code": "invalid_order",
+                    "message": "body.order, body.before, or body.after is required"
+                }
+            }),
+        ));
+    };
+    if let Some(order) = body.get("order").and_then(|order| order.as_i64()) {
+        return Ok(order);
+    }
+    let before = body.get("before").and_then(|target| target.as_str());
+    let after = body.get("after").and_then(|target| target.as_str());
+    let Some((target_id, insert_after)) = (match (before, after) {
+        (Some(_), Some(_)) => None,
+        (Some(target_id), None) => Some((target_id, false)),
+        (None, Some(target_id)) => Some((target_id, true)),
+        (None, None) => None,
+    }) else {
+        return Err(ApiResponse::json(
+            400,
+            json!({
+                "error": {
+                    "code": "invalid_order",
+                    "message": "body.order, body.before, or body.after is required"
+                }
+            }),
+        ));
+    };
+    let Some(feature) = projection.features.get(feature_id) else {
+        return Err(ApiResponse::json(
+            404,
+            json!({
+                "error": {
+                    "code": "not_found",
+                    "message": format!("Feature {feature_id} was not found")
+                }
+            }),
+        ));
+    };
+    let mut ordered_gap_ids = feature.gap_ids.clone();
+    let Some(source_index) = ordered_gap_ids.iter().position(|id| id == gap_id) else {
+        return Err(ApiResponse::json(
+            404,
+            json!({
+                "error": {
+                    "code": "not_found",
+                    "message": format!("Gap {gap_id} was not found in Feature {feature_id}")
+                }
+            }),
+        ));
+    };
+    if target_id == gap_id {
+        return Ok(source_index as i64 + 1);
+    }
+    ordered_gap_ids.remove(source_index);
+    let Some(target_index) = ordered_gap_ids.iter().position(|id| id == target_id) else {
+        return Err(ApiResponse::json(
+            400,
+            json!({
+                "error": {
+                    "code": "invalid_order",
+                    "message": format!("target Gap {target_id} is not assigned to Feature {feature_id}")
+                }
+            }),
+        ));
+    };
+    let insert_index = if insert_after {
+        target_index + 1
+    } else {
+        target_index
+    };
+    Ok(insert_index as i64 + 1)
+}
+
+enum ImportPersistWorkerError {
+    Cancelled,
+    Failed(RefineError),
+}
+
+fn import_job_cancelled(registry: &FileJobRegistry, job_id: &str) -> bool {
+    registry
+        .status(job_id)
+        .map(|job| matches!(job.state, JobState::Cancelled))
+        .unwrap_or(false)
+}
+
+fn rollback_import_gaps(service: &FileWorkItemService, gap_ids: &[String]) {
+    for gap_id in gap_ids.iter().rev() {
+        let _ = service.delete_gap_record(gap_id);
+    }
+}
+
+fn nonempty_or_import_value<'a>(value: &'a str, fallback: &'a str) -> &'a str {
+    let value = value.trim();
+    if value.is_empty() { fallback } else { value }
 }
 
 impl InProcessWebServer {
@@ -855,6 +963,26 @@ impl InProcessWebServer {
         }
     }
 
+    pub(super) fn handle_gap_round_evaluation_update(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "update latest Gap round evaluation");
+        let Some(gap_id) = request
+            .path
+            .strip_prefix("/work/gaps/")
+            .and_then(|path| path.strip_suffix("/rounds/latest/evaluation"))
+            .filter(|gap_id| !gap_id.is_empty())
+        else {
+            return gap_id_required();
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        match self
+            .work_item_service(durable_root)
+            .update_latest_gap_round_evaluation_summary(gap_id, &body)
+        {
+            Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(super) fn handle_gap_round_log_append(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "append Gap round logs");
         let Some(rest) = request.path.strip_prefix("/work/gaps/") else {
@@ -1148,21 +1276,19 @@ impl InProcessWebServer {
         let Some(gap_id) = gap_part.strip_suffix("/reorder") else {
             return gap_id_required();
         };
-        let Some(order) = request
-            .body
-            .as_ref()
-            .and_then(|body| body.get("order"))
-            .and_then(|order| order.as_i64())
-        else {
-            return ApiResponse::json(
-                400,
-                json!({
-                    "error": {
-                        "code": "invalid_order",
-                        "message": "body.order is required"
-                    }
-                }),
-            );
+        let order = match self
+            .current_projection()
+            .map_err(error_response)
+            .and_then(|projection| {
+                feature_reorder_order_from_body(
+                    request.body.as_ref(),
+                    &projection,
+                    feature_id,
+                    gap_id,
+                )
+            }) {
+            Ok(order) => order,
+            Err(response) => return response,
         };
         match self
             .work_item_service(durable_root)
@@ -1991,7 +2117,16 @@ impl InProcessWebServer {
             let runtime_root = runtime_root.clone();
             thread::spawn(move || {
                 let registry = FileJobRegistry::new(&runtime_root);
-                let response = server.import_persist_response(durable_root, body);
+                let response = server.import_persist_background_response(
+                    durable_root,
+                    body,
+                    &registry,
+                    &job_id,
+                );
+                if response.status == 499 {
+                    let _ = server.refresh_projection_cache_after_mutation();
+                    return;
+                }
                 let mut result = response.body.clone();
                 match result.as_object_mut() {
                     Some(object) => {
@@ -2024,6 +2159,149 @@ impl InProcessWebServer {
             return ApiResponse::json(202, json!({ "job": job_response(job) }));
         }
         self.import_persist_response(durable_root, body)
+    }
+
+    fn import_persist_background_response(
+        &self,
+        durable_root: PathBuf,
+        body: Value,
+        registry: &FileJobRegistry,
+        job_id: &str,
+    ) -> ApiResponse {
+        let drafts = match import_drafts_from_value(&body, None) {
+            Ok(drafts) => drafts,
+            Err(error) => return error_response(error),
+        };
+        let service = self.work_item_service(&durable_root);
+        let mut failures = Vec::new();
+        let mut feature_response = serde_json::Value::Null;
+        let feature_id = match import_destination_feature_id(&service, &body) {
+            Ok(feature) => {
+                feature_response = feature
+                    .as_ref()
+                    .map(feature_import_response)
+                    .unwrap_or(serde_json::Value::Null);
+                feature.map(|feature| feature.feature.id)
+            }
+            Err(error) => {
+                failures.push(json!({
+                    "index": 0,
+                    "name": "feature",
+                    "message": error.to_string()
+                }));
+                None
+            }
+        };
+        let mut created_gap_ids = Vec::new();
+        if failures.is_empty() {
+            match self.persist_import_drafts_incrementally(
+                &service,
+                drafts,
+                feature_id.as_deref(),
+                registry,
+                job_id,
+                &mut created_gap_ids,
+            ) {
+                Ok(()) => {}
+                Err(ImportPersistWorkerError::Cancelled) => {
+                    rollback_import_gaps(&service, &created_gap_ids);
+                    let _ = registry.update_progress(
+                        job_id,
+                        json!({
+                            "message": "Import cancelled",
+                            "completed": 0,
+                            "total": created_gap_ids.len()
+                        }),
+                    );
+                    return ApiResponse::json(499, json!({"cancelled": true}));
+                }
+                Err(ImportPersistWorkerError::Failed(error)) => {
+                    failures.push(json!({
+                        "index": 0,
+                        "name": "import",
+                        "message": error.to_string()
+                    }));
+                }
+            }
+        }
+        let created = created_gap_ids
+            .iter()
+            .filter_map(|gap_id| service.show_gap_summary(gap_id).ok())
+            .collect::<Vec<_>>();
+        if let Some(feature_id) = feature_id.as_deref() {
+            if let Ok(feature) = service.show_feature_summary(feature_id) {
+                feature_response = feature_import_response(&feature);
+            }
+        }
+
+        ApiResponse::json(
+            if failures.is_empty() { 201 } else { 207 },
+            json!({
+                "ok": failures.is_empty(),
+                "count": created.len(),
+                "created": created,
+                "gaps": created.iter().map(|gap| &gap.gap).collect::<Vec<_>>(),
+                "failures": failures,
+                "duplicate_actions": {},
+                "feature": feature_response
+            }),
+        )
+    }
+
+    fn persist_import_drafts_incrementally(
+        &self,
+        service: &FileWorkItemService,
+        drafts: Vec<ImportDraft>,
+        feature_id: Option<&str>,
+        registry: &FileJobRegistry,
+        job_id: &str,
+        created_gap_ids: &mut Vec<String>,
+    ) -> Result<(), ImportPersistWorkerError> {
+        if let Some(feature_id) = feature_id {
+            service
+                .show_feature_summary(feature_id)
+                .map_err(ImportPersistWorkerError::Failed)?;
+        }
+        let total = drafts.len();
+        for draft in drafts {
+            if import_job_cancelled(registry, job_id) {
+                return Err(ImportPersistWorkerError::Cancelled);
+            }
+            let gap = service
+                .create_gap_summary(&draft.name, None)
+                .map_err(ImportPersistWorkerError::Failed)?;
+            created_gap_ids.push(gap.gap.id.clone());
+            if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
+                service
+                    .append_gap_round_summary(
+                        &gap.gap.id,
+                        nonempty_or_import_value(&draft.reporter, "Imported"),
+                        &draft.actual,
+                        &draft.target,
+                    )
+                    .map_err(ImportPersistWorkerError::Failed)?;
+            }
+            if gap.gap.priority.as_str() != draft.priority {
+                service
+                    .update_gap_metadata_summary(&gap.gap.id, None, Some(&draft.priority))
+                    .map_err(ImportPersistWorkerError::Failed)?;
+            }
+            if let Some(feature_id) = feature_id {
+                service
+                    .assign_gap_to_feature(feature_id, &gap.gap.id)
+                    .map_err(ImportPersistWorkerError::Failed)?;
+            }
+            let _ = registry.update_progress(
+                job_id,
+                json!({
+                    "message": "Saving import",
+                    "completed": created_gap_ids.len(),
+                    "total": total
+                }),
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        Ok(())
     }
 
     fn import_persist_response(&self, durable_root: PathBuf, body: Value) -> ApiResponse {

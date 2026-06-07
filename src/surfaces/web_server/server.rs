@@ -597,6 +597,13 @@ impl InProcessWebServer {
             return self.handle_gap_round_edit_latest(request);
         }
 
+        if request.method == "PATCH"
+            && request.path.starts_with("/work/gaps/")
+            && request.path.ends_with("/rounds/latest/evaluation")
+        {
+            return self.handle_gap_round_evaluation_update(request);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/work/gaps/")
             && request.path.contains("/rounds/")

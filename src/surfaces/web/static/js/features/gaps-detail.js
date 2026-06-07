@@ -177,14 +177,24 @@ function renderGapFeatureAssociation(gap) {
     ? `<a href="#/features/${encodeURIComponent(gap.feature_id)}">${htmlEscape(gap.feature_id)}</a>${gap.feature_order ? ` · order ${gap.feature_order}` : ""}`
     : `<span class="muted">Standalone</span>`;
   return `
-    <div class="gap-feature-row muted small" style="margin-bottom:14px">
+    <div class="gap-feature-row muted small" style="margin-bottom:14px" data-testid="gap-feature-association">
       Feature ${feature}
     </div>`;
 }
 
 async function openGapFeatureAssignModal(gap) {
   const data = await api("GET", "/api/features?limit=100&node=current");
-  const features = data.features || [];
+  const features = (data.features || []).map((entry) => {
+    if (typeof normalizeFeatureEntry === "function") {
+      return normalizeFeatureEntry(entry);
+    }
+    const feature = { ...(entry?.feature || entry || {}) };
+    const rollup = entry?.rollup || feature.rollup || {};
+    feature.status = feature.status || rollup.status || "backlog";
+    feature.gap_count = feature.gap_count ?? rollup.gap_count ?? (entry?.gap_ids || feature.gap_ids || []).length;
+    feature.done_count = feature.done_count ?? rollup.done_count ?? 0;
+    return feature;
+  });
   if (!features.length) {
     await modalAlert("Create a Feature before assigning this Gap.", {
       title: "Assign Feature",
@@ -195,7 +205,7 @@ async function openGapFeatureAssignModal(gap) {
     <div class="modal-title">${gap.feature_id ? "Move to Feature" : "Assign to Feature"}</div>
     <div class="modal-body">
       <label>Feature</label>
-      <select class="modal-input">
+      <select class="modal-input" data-testid="gap-feature-select">
         ${features.map((feature) => `
           <option value="${htmlEscape(feature.id)}" ${feature.id === gap.feature_id ? "selected" : ""}>
             ${htmlEscape(feature.name || feature.id)} · ${htmlEscape(feature.status || "backlog")} · ${feature.done_count || 0}/${feature.gap_count || 0} done
@@ -203,8 +213,8 @@ async function openGapFeatureAssignModal(gap) {
       </select>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>${gap.feature_id ? "Move" : "Assign"}</button>
+      <button class="secondary" data-cancel data-testid="modal-cancel">Cancel</button>
+      <button data-ok data-testid="modal-ok">${gap.feature_id ? "Move" : "Assign"}</button>
     </div>`;
   const featureId = await _openModal(body, { cancel: null, ok: "" }, ".modal-input");
   if (!featureId || featureId === gap.feature_id) return;
@@ -268,7 +278,7 @@ function drawGapDetail(gap) {
   // update via PATCH /api/gaps/<id>.
   const workflow = workflowForGap(gap, latest);
   const backBtn = workflow.back ? `
-    <button id="btn-state-back">${htmlEscape(workflow.back.label)}</button>
+    <button id="btn-state-back" data-testid="gap-state-back">${htmlEscape(workflow.back.label)}</button>
   ` : "";
   const forwardBtn = workflow.forward ? `
     <button id="btn-state-forward" data-testid="gap-state-forward">${htmlEscape(workflow.forward.label)}</button>
@@ -279,11 +289,11 @@ function drawGapDetail(gap) {
   container.innerHTML = `
     <div class="gap-detail" data-testid="gap-detail">
       <div class="row" style="align-items:center;margin-bottom:8px">
-        <h2 style="margin:0">${htmlEscape(gap.name)}</h2>
-        <span class="status-pill ${gap.status}">${workflowStatusLabel(gap.status)}</span>
-        <span class="priority-pill priority-${gap.priority || "low"}">priority: ${gap.priority || "low"}</span>
+        <h2 style="margin:0" data-testid="gap-title">${htmlEscape(gap.name)}</h2>
+        <span class="status-pill ${gap.status}" data-testid="gap-status-pill">${workflowStatusLabel(gap.status)}</span>
+        <span class="priority-pill priority-${gap.priority || "low"}" data-testid="gap-priority-pill">priority: ${gap.priority || "low"}</span>
       </div>
-      <div class="actions" style="margin-bottom:10px">
+      <div class="actions" style="margin-bottom:10px" data-testid="gap-workflow-actions">
         ${backBtn}
         ${forwardBtn}
         <div class="gap-action-group">
@@ -291,32 +301,32 @@ function drawGapDetail(gap) {
           <details class="nav-menu gap-action-menu" id="gap-action-menu">
             <summary class="btn gap-action-more" aria-label="More Gap actions" data-testid="gap-action-menu-toggle"></summary>
             <div class="nav-menu-panel gap-action-panel">
-              <button class="nav-menu-item" type="button" id="btn-view-logs">View Logs</button>
-              <button class="nav-menu-item" type="button" id="btn-reporter">Reporter</button>
-              <button class="nav-menu-item" type="button" id="btn-rename">Rename</button>
-              <button class="nav-menu-item" type="button" id="btn-priority">Change Priority</button>
-              <button class="nav-menu-item" type="button" id="btn-gap-feature-assign">Move to Feature</button>
-              <button class="nav-menu-item" type="button" id="btn-gap-feature-remove" ${gap.feature_id ? "" : "disabled"}>Remove from Feature</button>
-              <button class="nav-menu-item" type="button" id="btn-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel</button>
+              <button class="nav-menu-item" type="button" id="btn-view-logs" data-testid="gap-action-view-logs">View Logs</button>
+              <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="gap-action-reporter">Reporter</button>
+              <button class="nav-menu-item" type="button" id="btn-rename" data-testid="gap-action-rename">Rename</button>
+              <button class="nav-menu-item" type="button" id="btn-priority" data-testid="gap-action-priority">Change Priority</button>
+              <button class="nav-menu-item" type="button" id="btn-gap-feature-assign" data-testid="gap-action-assign-feature">Move to Feature</button>
+              <button class="nav-menu-item" type="button" id="btn-gap-feature-remove" data-testid="gap-action-remove-feature" ${gap.feature_id ? "" : "disabled"}>Remove from Feature</button>
+              <button class="nav-menu-item" type="button" id="btn-cancel" data-testid="gap-action-cancel" ${cancelEnabled ? "" : "disabled"}>Cancel</button>
               <button class="nav-menu-item danger" type="button" id="btn-delete" data-testid="gap-delete">Delete</button>
             </div>
           </details>
         </div>
       </div>
-      <div class="muted small" style="margin-bottom:14px">
+      <div class="muted small" style="margin-bottom:14px" data-testid="gap-metadata">
         ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
         ${gap.branch_name ? ` · branch <code>${gap.branch_name}</code>` : ""}
       </div>
       ${renderGapFeatureAssociation(gap)}
 
       ${failureBanner ? `
-        <div class="banner ${failureBanner.severity}">
-          <span class="banner-msg">${htmlEscape(failureBanner.message)}</span>
+        <div class="banner ${failureBanner.severity}" data-testid="gap-failure-banner">
+          <span class="banner-msg" data-testid="gap-failure-banner-message">${htmlEscape(failureBanner.message)}</span>
           <span class="banner-actions">${failureBanner.actionsHtml}</span>
         </div>` : ""}
       ${governanceBanner ? `
-        <div class="banner ${governanceBanner.severity}">
-          <span class="banner-msg">${htmlEscape(governanceBanner.message)}</span>
+        <div class="banner ${governanceBanner.severity}" data-testid="gap-governance-banner">
+          <span class="banner-msg" data-testid="gap-governance-banner-message">${htmlEscape(governanceBanner.message)}</span>
         </div>` : ""}
 
       ${latest ? renderGovernanceSummary(latest) : ""}
@@ -495,15 +505,15 @@ function drawGapDetail(gap) {
       <div class="modal-title">Change priority</div>
       <div class="modal-body">
         <label for="modal-priority-select">Priority</label>
-        <select class="modal-input" id="modal-priority-select" style="width:100%">
+        <select class="modal-input" id="modal-priority-select" data-testid="gap-priority-select" style="width:100%">
           ${["low", "medium", "high"].map((p) =>
             `<option value="${p}" ${p === current ? "selected" : ""}>${p}</option>`,
           ).join("")}
         </select>
       </div>
       <div class="modal-actions">
-        <button class="secondary" data-cancel>Cancel</button>
-        <button data-ok>Save</button>
+        <button class="secondary" data-cancel data-testid="modal-cancel">Cancel</button>
+        <button data-ok data-testid="modal-ok">Save</button>
       </div>`;
     const next = await _openModal(
       body, { cancel: null, ok: current }, ".modal-input",
@@ -599,7 +609,7 @@ async function openGapReporterModal(gap) {
     <div class="modal-title">Change reporter</div>
     <div class="modal-body">
       <label for="modal-reporter-select">Reporter</label>
-      <select class="modal-input" id="modal-reporter-select" style="width:100%">
+      <select class="modal-input" id="modal-reporter-select" data-testid="gap-reporter-select" style="width:100%">
         <option value="">— pick reporter —</option>
         ${missingCurrent}
         ${options}
@@ -610,8 +620,8 @@ async function openGapReporterModal(gap) {
       </p>
     </div>
     <div class="modal-actions">
-      <button class="secondary" data-cancel>Cancel</button>
-      <button data-ok>Save</button>
+      <button class="secondary" data-cancel data-testid="modal-cancel">Cancel</button>
+      <button data-ok data-testid="modal-ok">Save</button>
     </div>`;
   let next = await _openModal(body, { cancel: null, ok: current }, ".modal-input");
   if (next === null) return;
@@ -721,21 +731,21 @@ function renderGovernanceSummary(round) {
   }
   const actions = round.governance_rule_actions || [];
   return `
-    <div class="card" style="margin:0 0 14px">
+    <div class="card" style="margin:0 0 14px" data-testid="gap-governance-summary">
       <h3>Governance</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <span class="status-pill ${round.rule_state === "passed" ? "done" : "failed"}">rules: ${htmlEscape(round.rule_state)}</span>
-        <span class="status-pill ${round.product_state === "pass" ? "done" : "failed"}">product: ${htmlEscape(round.product_state || "unclassified")}</span>
-        <span class="status-pill ${round.constitution_state === "pass" ? "done" : "failed"}">constitution: ${htmlEscape(round.constitution_state || "unclassified")}</span>
-        <span class="status-pill todo">meta: ${htmlEscape(round.meta_rule_state || "none")}</span>
+        <span class="status-pill ${round.rule_state === "passed" ? "done" : "failed"}" data-testid="gap-governance-rules">rules: ${htmlEscape(round.rule_state)}</span>
+        <span class="status-pill ${round.product_state === "pass" ? "done" : "failed"}" data-testid="gap-governance-product">product: ${htmlEscape(round.product_state || "unclassified")}</span>
+        <span class="status-pill ${round.constitution_state === "pass" ? "done" : "failed"}" data-testid="gap-governance-constitution">constitution: ${htmlEscape(round.constitution_state || "unclassified")}</span>
+        <span class="status-pill todo" data-testid="gap-governance-meta">meta: ${htmlEscape(round.meta_rule_state || "none")}</span>
       </div>
-      ${round.governance_message ? `<p style="margin-bottom:6px">${htmlEscape(round.governance_message)}</p>` : ""}
-      ${round.governance_details ? `<details><summary>Details</summary><pre>${htmlEscape(round.governance_details)}</pre></details>` : ""}
+      ${round.governance_message ? `<p style="margin-bottom:6px" data-testid="gap-governance-message">${htmlEscape(round.governance_message)}</p>` : ""}
+      ${round.governance_details ? `<details data-testid="gap-governance-details"><summary>Details</summary><pre>${htmlEscape(round.governance_details)}</pre></details>` : ""}
       ${actions.length ? `
-        <details style="margin-top:8px">
+        <details style="margin-top:8px" data-testid="gap-governance-actions">
           <summary>Rule actions (${actions.length})</summary>
           ${actions.map((a) => `
-            <div class="log-entry info">
+            <div class="log-entry info" data-testid="gap-governance-action">
               <div>${htmlEscape(a.action || "")}${a.text ? `: ${htmlEscape(a.text)}` : ""}</div>
               ${a.reason ? `<div class="meta">${htmlEscape(a.reason)}</div>` : ""}
             </div>`).join("")}
@@ -748,14 +758,14 @@ function renderQualitySummary(round) {
     return "";
   }
   return `
-    <div class="card" style="margin:0 0 14px">
+    <div class="card" style="margin:0 0 14px" data-testid="gap-quality-summary">
       <h3>Quality</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <span class="status-pill ${round.quality_state === "passed" ? "qa" : "failed"}">quality: ${htmlEscape(round.quality_state)}</span>
-        ${round.quality_checked_at ? `<span class="muted small">${fmtTime(round.quality_checked_at)}</span>` : ""}
+        <span class="status-pill ${round.quality_state === "passed" ? "qa" : "failed"}" data-testid="gap-quality-state">quality: ${htmlEscape(round.quality_state)}</span>
+        ${round.quality_checked_at ? `<span class="muted small" data-testid="gap-quality-checked-at">${fmtTime(round.quality_checked_at)}</span>` : ""}
       </div>
-      ${round.quality_message ? `<p style="margin-bottom:6px">${htmlEscape(round.quality_message)}</p>` : ""}
-      ${round.quality_details ? `<details><summary>Details</summary><pre>${htmlEscape(round.quality_details)}</pre></details>` : ""}
+      ${round.quality_message ? `<p style="margin-bottom:6px" data-testid="gap-quality-message">${htmlEscape(round.quality_message)}</p>` : ""}
+      ${round.quality_details ? `<details data-testid="gap-quality-details"><summary>Details</summary><pre>${htmlEscape(round.quality_details)}</pre></details>` : ""}
     </div>`;
 }
 

@@ -1085,6 +1085,41 @@ fn web_server_appends_and_reads_gap_round_logs() {
         "Workflow status changed: backlog -> todo"
     );
 
+    let evaluation = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/gaps/GAP1/rounds/latest/evaluation".to_string(),
+        body: Some(json!({
+            "rule_state": "failed",
+            "product_state": "fail",
+            "constitution_state": "pass",
+            "meta_rule_state": "needs-review",
+            "governance_message": "Governance found a product concern.",
+            "governance_details": "Product requirement mismatch",
+            "governance_rule_actions": [{"action": "flag", "text": "Update policy"}],
+            "quality_state": "failed",
+            "quality_message": "Quality check failed.",
+            "quality_details": "Screenshot mismatch",
+            "quality_checked_at": "2026-06-07T22:00:00Z"
+        })),
+    });
+    assert_eq!(evaluation.status, 200);
+    let detail = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps/GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(detail.status, 200);
+    assert_eq!(detail.body["gap"]["rounds"][0]["rule_state"], "failed");
+    assert_eq!(
+        detail.body["gap"]["rounds"][0]["governance_message"],
+        "Governance found a product concern."
+    );
+    assert_eq!(detail.body["gap"]["rounds"][0]["quality_state"], "failed");
+    assert_eq!(
+        detail.body["gap"]["rounds"][0]["quality_message"],
+        "Quality check failed."
+    );
+
     fs::remove_dir_all(temp_root).unwrap();
 }
 
@@ -1171,6 +1206,22 @@ fn web_server_reorders_and_moves_feature_workflow() {
     });
     assert_eq!(reorder.status, 200);
     assert_eq!(reorder.body["gap_ids"], json!(["GAP2", "GAP1"]));
+
+    let reorder_before = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/work/features/FEA1/gaps/GAP1/reorder".to_string(),
+        body: Some(json!({"before": "GAP2"})),
+    });
+    assert_eq!(reorder_before.status, 200);
+    assert_eq!(reorder_before.body["gap_ids"], json!(["GAP1", "GAP2"]));
+
+    let reorder_after = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/work/features/FEA1/gaps/GAP1/reorder".to_string(),
+        body: Some(json!({"after": "GAP2"})),
+    });
+    assert_eq!(reorder_after.status, 200);
+    assert_eq!(reorder_after.body["gap_ids"], json!(["GAP2", "GAP1"]));
 
     let move_feature = server.handle(ApiRequest {
         method: "POST".to_string(),

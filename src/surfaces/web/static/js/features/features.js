@@ -267,10 +267,11 @@ function renderFeatureGapTable(gaps, options = {}) {
   const rows = visible.length ? visible.map((gap, idx) => {
     const globalIdx = start + idx;
     return `
-    <tr data-feature-gap-row="${htmlEscape(gap.id)}">
+    <tr data-feature-gap-row="${htmlEscape(gap.id)}" data-testid="feature-gap-row">
       ${actions ? `<td class="feature-gap-drag-cell" data-label="Move">
         <button type="button" class="feature-gap-drag-handle" draggable="true"
                 data-feature-drag-gap="${htmlEscape(gap.id)}"
+                data-testid="feature-gap-drag"
                 aria-label="Drag to reorder ${htmlEscape(gap.name || gap.id)}"
                 title="Drag to reorder">
           <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
@@ -283,27 +284,30 @@ function renderFeatureGapTable(gaps, options = {}) {
           </svg>
         </button>
       </td>` : ""}
-      <td data-label="Order">${gap.feature_order || ""}</td>
-      <td data-label="Gap"><a href="#/gaps/${encodeURIComponent(gap.id)}">${htmlEscape(gap.name || gap.id)}</a></td>
-      <td data-label="Status"><span class="status-pill ${htmlEscape(gap.status || "backlog")}">${workflowStatusLabel(gap.status || "backlog")}</span></td>
-      <td data-label="Priority">${htmlEscape(gap.priority || "low")}</td>
-      <td data-label="Reporter">${htmlEscape(gap.reporter || "-")}</td>
-      <td data-label="Updated">${fmtTime(gap.updated)}</td>
+      <td data-label="Order" data-testid="feature-gap-order">${gap.feature_order || ""}</td>
+      <td data-label="Gap"><a href="#/gaps/${encodeURIComponent(gap.id)}" data-testid="feature-gap-link">${htmlEscape(gap.name || gap.id)}</a></td>
+      <td data-label="Status"><span class="status-pill ${htmlEscape(gap.status || "backlog")}" data-testid="feature-gap-status">${workflowStatusLabel(gap.status || "backlog")}</span></td>
+      <td data-label="Priority" data-testid="feature-gap-priority">${htmlEscape(gap.priority || "low")}</td>
+      <td data-label="Reporter" data-testid="feature-gap-reporter">${htmlEscape(gap.reporter || "-")}</td>
+      <td data-label="Updated" data-testid="feature-gap-updated">${fmtTime(gap.updated)}</td>
       ${actions ? `<td data-label="Actions">
         <div class="actions compact-actions">
           <button class="secondary small feature-gap-icon-btn" data-feature-move="up"
                   data-gap-id="${htmlEscape(gap.id)}"
                   data-neighbor-id="${htmlEscape(gaps[globalIdx - 1]?.id || "")}"
+                  data-testid="feature-gap-move-up"
                   aria-label="Move ${htmlEscape(gap.name || gap.id)} up"
                   title="Move up"
                   ${globalIdx === 0 ? "disabled" : ""}>${featureGapActionIcon("chevron-up")}</button>
           <button class="secondary small feature-gap-icon-btn" data-feature-move="down"
                   data-gap-id="${htmlEscape(gap.id)}"
                   data-neighbor-id="${htmlEscape(gaps[globalIdx + 1]?.id || "")}"
+                  data-testid="feature-gap-move-down"
                   aria-label="Move ${htmlEscape(gap.name || gap.id)} down"
                   title="Move down"
                   ${globalIdx === gaps.length - 1 ? "disabled" : ""}>${featureGapActionIcon("chevron-down")}</button>
           <button class="secondary small feature-gap-icon-btn" data-feature-delete-gap="${htmlEscape(gap.id)}"
+                  data-testid="feature-gap-delete"
                   aria-label="Delete ${htmlEscape(gap.name || gap.id)}"
                   title="Delete Gap">${featureGapActionIcon("trash")}</button>
         </div>
@@ -413,22 +417,24 @@ function openFeatureModal(feature = null, options = {}) {
         <div class="feature-modal-title-block">
           <div class="feature-modal-title-row">
             <div class="modal-title" id="feature-modal-title">Feature</div>
-            <span class="status-pill ${htmlEscape(feature.status || "backlog")}">${workflowStatusLabel(feature.status || "backlog")}</span>
-            <span class="muted small">${feature.done_count || 0} / ${feature.gap_count || 0} done</span>
+            <span class="status-pill ${htmlEscape(feature.status || "backlog")}" data-testid="feature-status-pill">${workflowStatusLabel(feature.status || "backlog")}</span>
+            <span class="muted small" data-testid="feature-progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</span>
           </div>
-          <div class="feature-modal-meta muted small">
+          <div class="feature-modal-meta muted small" data-testid="feature-metadata">
             ID <code>${htmlEscape(feature.id)}</code> · created ${fmtTime(feature.created)} · updated ${fmtTime(feature.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
           </div>
         </div>
         <div class="actions feature-modal-top-actions">
           <button type="button" class="small"
                   data-feature-workflow="backlog"
+                  data-testid="feature-workflow-backlog"
                   ${featureWorkflowEligibleCount(feature, "backlog") ? "" : "disabled"}>&lt;- Backlog</button>
           <button type="button" class="small"
                   data-feature-workflow="todo"
+                  data-testid="feature-workflow-todo"
                   ${featureWorkflowEligibleCount(feature, "todo") ? "" : "disabled"}>Todo -&gt;</button>
-          <button type="button" class="secondary small" data-feature-cancel>Cancel Feature</button>
-          <button type="button" class="danger small" data-feature-delete>Delete Feature</button>
+          <button type="button" class="secondary small" data-feature-cancel data-testid="feature-cancel">Cancel Feature</button>
+          <button type="button" class="danger small" data-feature-delete data-testid="feature-delete">Delete Feature</button>
         </div>
       </div>` : `
       <div class="modal-title" id="feature-modal-title">New Feature</div>`}

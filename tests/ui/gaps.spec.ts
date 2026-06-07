@@ -93,6 +93,428 @@ test("creates, updates, notes, and deletes a Gap through the browser", async ({ 
   await expect(page.getByText(gapName)).toHaveCount(0);
 });
 
+test("runs Gap More actions through the browser", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  const suffix = Date.now();
+  let gapId = "";
+  let gapDeleted = false;
+  let featureId = "";
+  let reporterId = "";
+  const reporterName = `gap-more-reporter-${suffix}`;
+  const renamedGap = `Gap more renamed ${suffix}`;
+
+  const created = await jsonObject(await request.post("/api/gaps", {
+    data: {
+      reporter: "refine-smoke",
+      actual: `Gap more actions actual ${suffix}`,
+      target: `Gap more actions target ${suffix}`,
+      priority: "low",
+    },
+  }));
+  gapId = String((created.gap as { id?: string } | undefined)?.id ?? "");
+  expect(gapId).toBeTruthy();
+
+  const featurePayload = await jsonObject(await request.post("/api/features", {
+    data: {
+      name: `Gap more feature ${suffix}`,
+      description: "Feature for Gap More actions coverage.",
+      reporter: "refine-smoke",
+    },
+  }));
+  featureId = String((featurePayload.feature as { id?: string } | undefined)?.id ?? "");
+  expect(featureId).toBeTruthy();
+
+  const reporterPayload = await jsonObject(await request.post("/api/reporters", {
+    data: { name: reporterName },
+  }));
+  reporterId = String((reporterPayload.reporter as { id?: string | number } | undefined)?.id ?? "");
+  expect(reporterId).toBeTruthy();
+
+  const openMoreAction = async (testId: string) => {
+    await page.getByTestId("gap-action-menu-toggle").click();
+    await page.getByTestId(testId).click();
+  };
+  const currentGap = async () => {
+    const payload = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(gapId)}`));
+    return payload.gap as Record<string, unknown>;
+  };
+
+  try {
+    await page.goto(`/#/gaps/${encodeURIComponent(gapId)}`);
+    await expect(page.getByTestId("gap-detail")).toBeVisible();
+    await expect(page.getByTestId("gap-feature-association")).toContainText("Standalone");
+
+    await openMoreAction("gap-action-view-logs");
+    await expect(page).toHaveURL(new RegExp(`#\\/logs\\?gap_id=${gapId}$`));
+    await page.goto(`/#/gaps/${encodeURIComponent(gapId)}`);
+    await expect(page.getByTestId("gap-detail")).toBeVisible();
+
+    await openMoreAction("gap-action-reporter");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Change reporter");
+    await page.getByTestId("gap-reporter-select").selectOption(reporterName);
+    const reporterUpdated = page.waitForResponse((response) =>
+      response.url().includes("/api/gaps/bulk") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await reporterUpdated;
+    await expect.poll(async () => String((await currentGap()).reporter ?? "")).toBe(reporterName);
+
+    await openMoreAction("gap-action-rename");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Rename Gap");
+    await page.getByTestId("modal-input").fill(renamedGap);
+    const renamed = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(gapId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await renamed;
+    await expect(page.getByRole("heading", { name: renamedGap })).toBeVisible();
+    await expect.poll(async () => String((await currentGap()).name ?? "")).toBe(renamedGap);
+
+    await openMoreAction("gap-action-priority");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Change priority");
+    await page.getByTestId("gap-priority-select").selectOption("high");
+    const priorityUpdated = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(gapId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await priorityUpdated;
+    await expect(page.locator(".priority-pill")).toContainText("high");
+    await expect.poll(async () => String((await currentGap()).priority ?? "")).toBe("high");
+
+    await openMoreAction("gap-action-assign-feature");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Assign to Feature");
+    await page.getByTestId("gap-feature-select").selectOption(featureId);
+    const assigned = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await assigned;
+    await expect(page.getByTestId("gap-feature-association")).toContainText(featureId);
+    await expect.poll(async () => String((await currentGap()).feature_id ?? "")).toBe(featureId);
+
+    await openMoreAction("gap-action-remove-feature");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Remove from Feature");
+    const removed = page.waitForResponse((response) =>
+      response.url().includes(`/api/features/${encodeURIComponent(featureId)}/gaps/${encodeURIComponent(gapId)}`) &&
+      response.request().method() === "DELETE" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await removed;
+    await expect(page.getByTestId("gap-feature-association")).toContainText("Standalone");
+    await expect.poll(async () => (await currentGap()).feature_id ?? null).toBeNull();
+
+    await openMoreAction("gap-action-cancel");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Cancel Gap");
+    const cancelled = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(gapId)}/cancel`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await cancelled;
+    await expect(page.locator(".gap-detail > .row .status-pill")).toHaveText("Cancelled");
+    await expect.poll(async () => String((await currentGap()).status ?? "")).toBe("cancelled");
+
+    await openMoreAction("gap-delete");
+    await expect(page.getByTestId("modal-dialog")).toContainText(`Delete Gap "${renamedGap}"?`);
+    const deleted = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(gapId)}`) &&
+      response.request().method() === "DELETE" &&
+      response.status() === 200
+    );
+    await page.getByTestId("modal-ok").click();
+    await deleted;
+    gapDeleted = true;
+    await expect(page).toHaveURL(/#\/gaps$/);
+    await expect(await request.get(`/api/gaps/${encodeURIComponent(gapId)}`)).not.toBeOK();
+  } finally {
+    if (!gapDeleted && gapId) await request.delete(`/api/gaps/${encodeURIComponent(gapId)}`);
+    if (featureId) await request.delete(`/api/features/${encodeURIComponent(featureId)}`);
+    if (reporterId) await request.delete(`/api/reporters/${encodeURIComponent(reporterId)}`);
+  }
+});
+
+test("drives Gap detail workflow buttons for user-visible statuses", async ({ page, request }) => {
+  const suffix = Date.now();
+  const createdIds: string[] = [];
+  const createGap = async (label: string) => {
+    const payload = await jsonObject(await request.post("/api/gaps", {
+      data: {
+        reporter: "refine-smoke",
+        actual: `Gap workflow ${label} actual ${suffix}`,
+        target: `Gap workflow ${label} target ${suffix}`,
+        priority: "medium",
+      },
+    }));
+    const id = String((payload.gap as { id?: string } | undefined)?.id ?? "");
+    expect(id).toBeTruthy();
+    createdIds.push(id);
+    return id;
+  };
+  const setStatus = async (id: string, status: string) => {
+    await jsonObject(await request.post("/api/gaps/bulk", {
+      data: {
+        selected_ids: [id],
+        update: { status },
+      },
+    }));
+  };
+  const action = async (id: string, name: string) => {
+    await jsonObject(await request.post(`/api/gaps/${encodeURIComponent(id)}/${name}`, { data: {} }));
+  };
+  const appendWorkflowLog = async (id: string, message: string) => {
+    await jsonObject(await request.post(`/api/gaps/${encodeURIComponent(id)}/rounds/0/logs`, {
+      data: {
+        category: "workflow",
+        severity: "info",
+        message,
+        actor: "refine-smoke",
+      },
+    }));
+  };
+  const gapStatus = async (id: string) => {
+    const payload = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(id)}`));
+    return String((payload.gap as { status?: string } | undefined)?.status ?? "");
+  };
+  const openGap = async (id: string) => {
+    await page.goto(`/#/gaps/${encodeURIComponent(id)}`);
+    await expect(page.getByTestId("gap-detail")).toBeVisible();
+    await expect(page.getByTestId("gap-metadata")).toContainText(id);
+    await expect(page.getByTestId("gap-priority-pill")).toContainText("medium");
+  };
+
+  try {
+    const backlogId = await createGap("backlog");
+    await openGap(backlogId);
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("Backlog");
+    await expect(page.getByTestId("gap-state-forward")).toHaveText("Todo \u2192");
+    await expect(page.getByTestId("gap-state-back")).toHaveCount(0);
+    const movedTodo = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(backlogId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-forward").click();
+    await movedTodo;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("To do");
+    await expect.poll(async () => gapStatus(backlogId)).toBe("todo");
+
+    const todoId = await createGap("todo");
+    await setStatus(todoId, "todo");
+    await openGap(todoId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 Backlog");
+    await expect(page.getByTestId("gap-state-forward")).toHaveCount(0);
+    const movedBacklog = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(todoId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-back").click();
+    await movedBacklog;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("Backlog");
+    await expect.poll(async () => gapStatus(todoId)).toBe("backlog");
+
+    const reviewId = await createGap("review");
+    await setStatus(reviewId, "review");
+    await openGap(reviewId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 Todo");
+    await expect(page.getByTestId("gap-state-forward")).toHaveText("Verify \u2192");
+    const verified = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(reviewId)}/verify`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-forward").click();
+    await verified;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("Done");
+    await expect.poll(async () => gapStatus(reviewId)).toBe("done");
+
+    const doneId = await createGap("done");
+    await setStatus(doneId, "done");
+    await openGap(doneId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 Review");
+    await expect(page.getByTestId("gap-state-forward")).toHaveCount(0);
+    const movedReview = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(doneId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-back").click();
+    await movedReview;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("Review");
+    await expect.poll(async () => gapStatus(doneId)).toBe("review");
+
+    const failedId = await createGap("failed");
+    await setStatus(failedId, "failed");
+    await openGap(failedId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 Todo");
+    const failedToTodo = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(failedId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-back").click();
+    await failedToTodo;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("To do");
+    await expect.poll(async () => gapStatus(failedId)).toBe("todo");
+
+    const cancelledId = await createGap("cancelled");
+    await action(cancelledId, "cancel");
+    await openGap(cancelledId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 Todo");
+    const cancelledToTodo = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(cancelledId)}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-back").click();
+    await cancelledToTodo;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("To do");
+    await expect.poll(async () => gapStatus(cancelledId)).toBe("todo");
+
+    const qaRetryId = await createGap("retry-quality");
+    await setStatus(qaRetryId, "failed");
+    await appendWorkflowLog(qaRetryId, "Workflow status changed: qa -> failed");
+    await openGap(qaRetryId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 QA");
+    const retryQuality = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(qaRetryId)}/retry-quality`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-back").click();
+    await retryQuality;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("QA");
+    await expect.poll(async () => gapStatus(qaRetryId)).toBe("qa");
+
+    const mergeRetryId = await createGap("retry-merge");
+    await setStatus(mergeRetryId, "failed");
+    await appendWorkflowLog(mergeRetryId, "Workflow status changed: ready-merge -> failed");
+    await openGap(mergeRetryId);
+    await expect(page.getByTestId("gap-state-back")).toHaveText("\u2190 Merge");
+    const retryMerge = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${encodeURIComponent(mergeRetryId)}/retry-merge`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-state-back").click();
+    await retryMerge;
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("Ready to merge");
+    await expect.poll(async () => gapStatus(mergeRetryId)).toBe("ready-merge");
+  } finally {
+    for (const id of createdIds.reverse()) {
+      await request.delete(`/api/gaps/${encodeURIComponent(id)}`);
+    }
+  }
+});
+
+test("shows Gap metadata, feature association, banners, governance, and quality summaries", async ({ page, request }) => {
+  const suffix = Date.now();
+  let gapId = "";
+  let featureId = "";
+
+  const featurePayload = await jsonObject(await request.post("/api/features", {
+    data: {
+      name: `Gap metadata feature ${suffix}`,
+      description: "Feature for Gap metadata and summary coverage.",
+      reporter: "refine-smoke",
+    },
+  }));
+  featureId = String((featurePayload.feature as { id?: string } | undefined)?.id ?? "");
+  expect(featureId).toBeTruthy();
+
+  const created = await jsonObject(await request.post("/api/gaps", {
+    data: {
+      reporter: "refine-smoke",
+      actual: `Gap summary actual ${suffix}`,
+      target: `Gap summary target ${suffix}`,
+      priority: "high",
+      feature_id: featureId,
+    },
+  }));
+  gapId = String((created.gap as { id?: string } | undefined)?.id ?? "");
+  expect(gapId).toBeTruthy();
+
+  try {
+    await jsonObject(await request.post("/api/gaps/bulk", {
+      data: {
+        selected_ids: [gapId],
+        update: { status: "failed" },
+      },
+    }));
+    await jsonObject(await request.patch(`/api/gaps/${encodeURIComponent(gapId)}/rounds/latest/evaluation`, {
+      data: {
+        rule_state: "failed",
+        product_state: "fail",
+        constitution_state: "pass",
+        meta_rule_state: "needs-review",
+        governance_message: "Governance summary requires product changes.",
+        governance_details: "Product expectation is not met.",
+        governance_checked_at: "2026-06-07T22:00:00Z",
+        governance_rule_actions: [
+          { action: "flag", text: "Update product policy", reason: "Missing expectation" },
+        ],
+        quality_state: "failed",
+        quality_message: "Quality summary found a regression.",
+        quality_details: "Screenshot diff exceeded tolerance.",
+        quality_checked_at: "2026-06-07T22:01:00Z",
+      },
+    }));
+    await jsonObject(await request.post(`/api/gaps/${encodeURIComponent(gapId)}/rounds/0/logs`, {
+      data: {
+        severity: "error",
+        category: "quality",
+        actor: "refine-smoke",
+        message: "Quality failure banner message",
+      },
+    }));
+
+    await page.goto(`/#/gaps/${encodeURIComponent(gapId)}`);
+    await expect(page.getByTestId("gap-detail")).toBeVisible();
+    await expect(page.getByTestId("gap-title")).toContainText(`Gap summary target ${suffix}`);
+    await expect(page.getByTestId("gap-status-pill")).toHaveText("Failed");
+    await expect(page.getByTestId("gap-priority-pill")).toContainText("high");
+    await expect(page.getByTestId("gap-metadata")).toContainText(gapId);
+    await expect(page.getByTestId("gap-metadata")).toContainText("node");
+    await expect(page.getByTestId("gap-feature-association")).toContainText(featureId);
+    await expect(page.getByTestId("gap-feature-association")).toContainText("order 1");
+
+    await expect(page.getByTestId("gap-failure-banner-message")).toHaveText("Quality failure banner message");
+    await expect(page.getByTestId("gap-governance-banner-message")).toHaveText("Governance summary requires product changes.");
+
+    await expect(page.getByTestId("gap-governance-summary")).toBeVisible();
+    await expect(page.getByTestId("gap-governance-rules")).toHaveText("rules: failed");
+    await expect(page.getByTestId("gap-governance-product")).toHaveText("product: fail");
+    await expect(page.getByTestId("gap-governance-constitution")).toHaveText("constitution: pass");
+    await expect(page.getByTestId("gap-governance-meta")).toHaveText("meta: needs-review");
+    await expect(page.getByTestId("gap-governance-message")).toHaveText("Governance summary requires product changes.");
+    await page.getByTestId("gap-governance-details").click();
+    await expect(page.getByTestId("gap-governance-details")).toContainText("Product expectation is not met.");
+    await page.getByTestId("gap-governance-actions").click();
+    await expect(page.getByTestId("gap-governance-action")).toContainText("flag: Update product policy");
+    await expect(page.getByTestId("gap-governance-action")).toContainText("Missing expectation");
+
+    await expect(page.getByTestId("gap-quality-summary")).toBeVisible();
+    await expect(page.getByTestId("gap-quality-state")).toHaveText("quality: failed");
+    await expect(page.getByTestId("gap-quality-checked-at")).toContainText("2026");
+    await expect(page.getByTestId("gap-quality-message")).toHaveText("Quality summary found a regression.");
+    await page.getByTestId("gap-quality-details").click();
+    await expect(page.getByTestId("gap-quality-details")).toContainText("Screenshot diff exceeded tolerance.");
+  } finally {
+    if (gapId) await request.delete(`/api/gaps/${encodeURIComponent(gapId)}`);
+    if (featureId) await request.delete(`/api/features/${encodeURIComponent(featureId)}`);
+  }
+});
+
 test("validates New Gap modal focus, priority, and dismissal behavior", async ({ page, request }) => {
   let gapId = "";
   await page.goto("/");

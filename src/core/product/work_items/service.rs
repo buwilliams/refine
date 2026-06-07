@@ -1066,6 +1066,60 @@ impl FileWorkItemService {
         self.show_gap_summary(gap_id)
     }
 
+    pub fn update_latest_gap_round_evaluation_summary(
+        &self,
+        gap_id: &str,
+        evaluation: &Value,
+    ) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current)?;
+        let fields = evaluation.as_object().ok_or_else(|| {
+            RefineError::InvalidInput("round evaluation body must be a JSON object".to_string())
+        })?;
+
+        let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+        })?;
+        let rounds = object
+            .get_mut("rounds")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+        let latest = rounds
+            .iter_mut()
+            .rev()
+            .find(|round| round.is_object())
+            .ok_or_else(|| RefineError::NotFound(format!("Gap {gap_id} has no rounds")))?;
+        let latest = latest.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "latest round for Gap {gap_id} is not a JSON object"
+            ))
+        })?;
+        for key in [
+            "rule_state",
+            "meta_rule_state",
+            "product_state",
+            "constitution_state",
+            "governance_message",
+            "governance_details",
+            "governance_checked_at",
+            "governance_rule_actions",
+            "quality_state",
+            "quality_message",
+            "quality_details",
+            "quality_checked_at",
+        ] {
+            if let Some(value) = fields.get(key) {
+                latest.insert(key.to_string(), value.clone());
+            }
+        }
+        let now = now_timestamp();
+        latest.insert("updated".to_string(), Value::String(now.clone()));
+        object.insert("updated".to_string(), Value::String(now));
+        write_json_atomically(&gap_path, &value)?;
+        self.show_gap_summary(gap_id)
+    }
+
     pub fn delete_gap_record(&self, gap_id: &str) -> RefineResult<()> {
         let current = self.show_gap_summary(gap_id)?;
         self.ensure_gap_owned(&current)?;
