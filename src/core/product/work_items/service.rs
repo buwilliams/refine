@@ -906,6 +906,79 @@ impl FileWorkItemService {
         self.show_gap_summary(gap_id)
     }
 
+    pub fn replace_gap_notes_summary(
+        &self,
+        gap_id: &str,
+        notes: &[Value],
+    ) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        validate_gap_operation(&current.gap.status, &GapOperation::EditNotes)?;
+
+        let now = now_timestamp();
+        let mut next_notes = Vec::new();
+        for note in notes {
+            let object = note.as_object().ok_or_else(|| {
+                RefineError::InvalidInput("notes must be an array of objects".to_string())
+            })?;
+            let body = object
+                .get("body")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim();
+            if body.is_empty() {
+                return Err(RefineError::InvalidInput(
+                    "note body cannot be empty".to_string(),
+                ));
+            }
+            let mut cleaned = Map::new();
+            cleaned.insert(
+                "id".to_string(),
+                Value::String(
+                    object
+                        .get("id")
+                        .and_then(|value| value.as_str())
+                        .filter(|value| !value.trim().is_empty())
+                        .map(str::to_string)
+                        .unwrap_or_else(new_ulid_like),
+                ),
+            );
+            cleaned.insert(
+                "author".to_string(),
+                Value::String(
+                    object
+                        .get("author")
+                        .and_then(|value| value.as_str())
+                        .unwrap_or("")
+                        .trim()
+                        .to_string(),
+                ),
+            );
+            cleaned.insert("body".to_string(), Value::String(body.to_string()));
+            cleaned.insert(
+                "created".to_string(),
+                Value::String(
+                    object
+                        .get("created")
+                        .and_then(|value| value.as_str())
+                        .filter(|value| !value.trim().is_empty())
+                        .map(str::to_string)
+                        .unwrap_or_else(|| now.clone()),
+                ),
+            );
+            cleaned.insert("updated".to_string(), Value::String(now.clone()));
+            next_notes.push(Value::Object(cleaned));
+        }
+
+        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+        })?;
+        object.insert("notes".to_string(), Value::Array(next_notes));
+        object.insert("updated".to_string(), Value::String(now));
+        write_json_atomically(&gap_path, &value)?;
+        self.show_gap_summary(gap_id)
+    }
+
     pub fn append_gap_round_summary(
         &self,
         gap_id: &str,

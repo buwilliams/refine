@@ -9,11 +9,23 @@ function testAppRoot(): string {
     path.join(process.cwd(), "target/refine-integration/apps/rust-test-app");
 }
 
-function git(args: string[]) {
+function git(args: string[], env: Record<string, string> = {}) {
+  const result = spawnSync("git", args, {
+    cwd: testAppRoot(),
+    encoding: "utf-8",
+    env: { ...process.env, ...env },
+  });
+  if (result.status !== 0) {
+    throw new Error(`git ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
+  }
+}
+
+function gitOutput(args: string[]): string {
   const result = spawnSync("git", args, { cwd: testAppRoot(), encoding: "utf-8" });
   if (result.status !== 0) {
     throw new Error(`git ${args.join(" ")} failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`);
   }
+  return result.stdout;
 }
 
 async function syncProject(request: APIRequestContext) {
@@ -69,6 +81,9 @@ test("filters, sorts, and paginates Changes through URL-backed controls", async 
 
   await page.goto(`/#/changes?q=${encodeURIComponent(prefix)}&status=backlog&priority=high&limit=50`);
   await expect(page.getByRole("heading", { name: "Changes", level: 2 })).toBeVisible();
+  await expect(page.getByTestId("changes-branch-info")).toContainText(
+    gitOutput(["branch", "--show-current"]).trim(),
+  );
   await expect(page.getByTestId("changes-filter-shell")).toBeVisible();
   await expect(page.getByTestId("changes-search")).toHaveValue(prefix);
   await expect(page.getByTestId("changes-status-filter")).toHaveValue("backlog");
@@ -112,6 +127,82 @@ test("filters, sorts, and paginates Changes through URL-backed controls", async 
   });
   await page.getByTestId("changes-clear-filters").click();
   await expect(page).toHaveURL(/#\/changes$/);
+});
+
+test("visualizes Git changes by day, week, month, and year", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const suffix = Date.now();
+  const prefix = `changes-viz-${suffix}`;
+  const created = await jsonObject(await request.post("/api/gaps", {
+    data: {
+      reporter: "refine-smoke",
+      actual: `Changes visualization actual ${suffix}`,
+      target: `Changes visualization target ${suffix}`,
+      priority: "high",
+    },
+  }));
+  const gapId = String((created.gap as { id?: string } | undefined)?.id ?? "");
+  expect(gapId).toBeTruthy();
+
+  const vizPath = path.join(testAppRoot(), `changes-viz-${suffix}.txt`);
+  const commits = [
+    ["2024-01-03T12:00:00Z", "day-one"],
+    ["2024-01-10T12:00:00Z", "day-two"],
+    ["2024-02-05T12:00:00Z", "day-three"],
+    ["2025-03-06T12:00:00Z", "day-four"],
+  ];
+  for (const [date, label] of commits) {
+    fs.appendFileSync(vizPath, `${prefix}-${label}\n`);
+    git(["add", path.basename(vizPath)]);
+    git(["commit", "-q", "-m", `${prefix} ${label} ${gapId}`], {
+      GIT_AUTHOR_DATE: date,
+      GIT_COMMITTER_DATE: date,
+    });
+  }
+  await syncProject(request);
+  const seeded = await waitForChangeTotal(request, prefix, 4);
+  expect(Number((seeded.page as { total?: number } | undefined)?.total ?? 0)).toBeGreaterThanOrEqual(4);
+
+  await page.goto(`/#/changes?q=${encodeURIComponent(prefix)}&status=backlog&priority=high&limit=50`);
+  await expect(page.getByRole("heading", { name: "Changes", level: 2 })).toBeVisible();
+  await expect(page.getByTestId("changes-period-day")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("changes-bucket")).toHaveCount(4);
+  await expect(page.getByTestId("changes-bucket-label")).toContainText([
+    "2025-03-06",
+    "2024-02-05",
+    "2024-01-10",
+    "2024-01-03",
+  ]);
+
+  await page.getByTestId("changes-period-week").click();
+  await expect(page).toHaveURL(/#\/changes\?.*period=week/);
+  await expect(page.getByTestId("changes-period-week")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("changes-bucket-label")).toContainText([
+    "2025-03-02",
+    "2024-02-04",
+    "2024-01-07",
+    "2023-12-31",
+  ]);
+
+  await page.getByTestId("changes-period-month").click();
+  await expect(page).toHaveURL(/#\/changes\?.*period=month/);
+  await expect(page.getByTestId("changes-period-month")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("changes-bucket")).toHaveCount(3);
+  const januaryBucket = page.getByTestId("changes-bucket").filter({
+    has: page.getByTestId("changes-bucket-label").filter({ hasText: "2024-01" }),
+  });
+  await expect(januaryBucket.getByTestId("changes-bucket-total")).toHaveText("2 changes");
+  await expect(januaryBucket.getByTestId("changes-bucket-linked")).toHaveText("2 linked Gaps");
+
+  await page.getByTestId("changes-period-year").click();
+  await expect(page).toHaveURL(/#\/changes\?.*period=year/);
+  await expect(page.getByTestId("changes-period-year")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("changes-bucket")).toHaveCount(2);
+  const yearBucket = page.getByTestId("changes-bucket").filter({
+    has: page.getByTestId("changes-bucket-label").filter({ hasText: "2024" }),
+  });
+  await expect(yearBucket.getByTestId("changes-bucket-total")).toHaveText("3 changes");
+  await expect(yearBucket.getByTestId("changes-bucket-linked")).toHaveText("3 linked Gaps");
 });
 
 test("confirms Changes undo, reverts git, and cancels the linked Gap", async ({ page, request }) => {
@@ -169,4 +260,24 @@ test("confirms Changes undo, reverts git, and cancels the linked Gap", async ({ 
   expect(fs.existsSync(undoPath)).toBe(false);
   const gap = await jsonObject(await request.get(`/api/gaps/${gapId}`));
   expect((gap.gap as { status?: string } | undefined)?.status).toBe("cancelled");
+});
+
+test("shows Changes branch empty states for resolved and detached repositories", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const originalBranch = gitOutput(["branch", "--show-current"]).trim();
+  expect(originalBranch).toBeTruthy();
+
+  await page.goto(`/#/changes?q=${encodeURIComponent(`branch-empty-${Date.now()}`)}&limit=50`);
+  await expect(page.getByRole("heading", { name: "Changes", level: 2 })).toBeVisible();
+  await expect(page.getByTestId("changes-empty-state")).toContainText(`No changes match the current filters on ${originalBranch}.`);
+
+  try {
+    git(["checkout", "--detach", "HEAD"]);
+    await syncProject(request);
+    await page.goto(`/#/changes?q=${encodeURIComponent(`branch-detached-${Date.now()}`)}&limit=50`);
+    await expect(page.getByTestId("changes-branch-unresolved")).toContainText("No merge target branch resolved");
+  } finally {
+    git(["switch", originalBranch]);
+    await syncProject(request);
+  }
 });

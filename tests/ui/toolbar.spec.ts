@@ -205,11 +205,36 @@ test("filters system operations in the toolbar", async ({ page, request }) => {
   await page.getByTestId("system-log-filter-error").check({ force: true });
   await expect(page.getByTestId("system-log-line").filter({ hasText: "missing-toolbar-file.txt" }).first()).toBeVisible();
   await expect(page.getByTestId("system-log-count")).toContainText("of");
+  await expect.poll(() => page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem("refine_chat_tabs") || "{}");
+    return stored.systemFilters || [];
+  })).toEqual(["error"]);
+
+  await page.reload();
+  await expect(page.getByTestId("toolbar-system-panel")).toBeVisible();
+  await expect(page.getByTestId("system-log-filter-error")).toBeChecked();
+  await expect(page.getByTestId("system-log-empty")).toContainText("No system activity matches this filter.");
 
   await page.getByTestId("system-log-filter-all").check({ force: true });
   await page.getByTestId("system-log-filter-queued").check({ force: true });
   await expect(page.getByTestId("system-log-empty")).toContainText("No system activity matches this filter.");
 
   await page.getByTestId("system-log-filter-all").check({ force: true });
-  await expect(page.getByTestId("system-log-line").filter({ hasText: "missing-toolbar-file.txt" }).first()).toBeVisible();
+  await expect.poll(() => page.evaluate(() => {
+    const stored = JSON.parse(localStorage.getItem("refine_chat_tabs") || "{}");
+    return stored.systemFilters || [];
+  })).toEqual([]);
+
+  await page.evaluate(() => {
+    for (let index = 0; index < 260; index += 1) {
+      (window as any).recordUiNotice(`toolbar limit operation ${index}`, {
+        kind: "info",
+        source: "toolbar-test",
+      });
+    }
+  });
+  await expect(page.getByTestId("system-log-count")).toHaveText("250 / 250");
+  await expect(page.getByTestId("system-log-line")).toHaveCount(250);
+  await expect(page.getByTestId("system-log-line").filter({ hasText: "toolbar limit operation 0" })).toHaveCount(0);
+  await expect(page.getByTestId("system-log-line").filter({ hasText: "toolbar limit operation 259" })).toBeVisible();
 });

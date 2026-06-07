@@ -180,6 +180,21 @@ pub enum GapAction {
         #[arg(long, default_value = "")]
         author: String,
     },
+    NoteEdit {
+        id: String,
+        note_id: String,
+        body: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        durable_root: Option<PathBuf>,
+    },
+    NoteDelete {
+        id: String,
+        note_id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        durable_root: Option<PathBuf>,
+    },
     Round {
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]

@@ -38,12 +38,52 @@ test("creates, updates, notes, and deletes a Gap through the browser", async ({ 
   expect(transitionedPayload.gap?.status).toBe("todo");
   await page.goto(`/#/gaps/${gapId}`);
   await expect(page.locator(".gap-detail > .row .status-pill")).toHaveText("To do");
+  await page.getByTestId("gap-round-actual").fill("Browser smoke actual behavior edited");
+  await page.getByTestId("gap-round-target").fill("Browser smoke target behavior edited");
+  const roundEdited = page.waitForResponse((response) =>
+    response.url().includes(`/api/gaps/${gapId}/rounds/latest`) &&
+    response.request().method() === "PATCH" &&
+    response.status() === 200
+  );
+  await page.getByTestId("gap-round-submit").click();
+  await roundEdited;
+  await expect(page.getByTestId("gap-round-detail-actual").last()).toContainText("Browser smoke actual behavior edited");
+  await expect(page.getByTestId("gap-round-detail-target").last()).toContainText("Browser smoke target behavior edited");
 
   await page.getByTestId("gap-notes-toggle").click();
   await page.getByTestId("gap-note-composer-toggle").click();
   await page.getByTestId("gap-note-body").fill("Browser smoke note");
   await page.getByTestId("gap-note-submit").click();
-  await expect(page.locator(".note-preview", { hasText: "Browser smoke note" })).toBeVisible();
+  await expect(page.getByTestId("gap-note-preview").filter({ hasText: "Browser smoke note" })).toBeVisible();
+
+  await page.getByTestId("gap-note-summary").click();
+  await expect(page.getByTestId("gap-note-detail")).toContainText("Browser smoke note");
+  await page.getByTestId("gap-note-edit").click();
+  await expect(page.getByTestId("modal-dialog")).toContainText("Edit note");
+  await page.getByTestId("modal-input").fill("Browser smoke note edited");
+  const noteEdited = page.waitForResponse((response) =>
+    response.url().includes(`/api/gaps/${gapId}`) &&
+    response.request().method() === "PATCH" &&
+    (response.request().postData() || "").includes("Browser smoke note edited") &&
+    response.status() === 200
+  );
+  await page.getByTestId("modal-ok").click();
+  await noteEdited;
+  await expect(page.getByTestId("gap-note-preview").filter({ hasText: "Browser smoke note edited" })).toBeVisible();
+
+  await page.getByTestId("gap-note-summary").click();
+  await page.getByTestId("gap-note-delete").click();
+  await expect(page.getByTestId("modal-dialog")).toContainText("Delete note");
+  const noteDeleted = page.waitForResponse((response) =>
+    response.url().includes(`/api/gaps/${gapId}`) &&
+    response.request().method() === "PATCH" &&
+    (response.request().postData() || "").includes('"notes":[]') &&
+    response.status() === 200
+  );
+  await page.getByTestId("modal-ok").click();
+  await noteDeleted;
+  await expect(page.getByTestId("gap-note")).toHaveCount(0);
+  await expect(page.getByTestId("gap-notes")).toContainText("No notes yet.");
 
   await page.getByTestId("gap-action-menu-toggle").click();
   await page.getByTestId("gap-delete").click();
@@ -154,6 +194,83 @@ test("handles New Gap duplicate decisions through the browser", async ({ page, r
     await expect(page.getByTestId("new-gap-modal")).toHaveCount(0);
     const afterImport = await jsonObject(await request.get(`/api/gaps?q=${encodeURIComponent(actual)}`));
     expect(afterImport.page.total).toBe(2);
+  } finally {
+    for (const id of createdIds.reverse()) {
+      await request.delete(`/api/gaps/${encodeURIComponent(id)}`);
+    }
+  }
+});
+
+test("submits follow-up and recovery rounds from Gap detail", async ({ page, request }) => {
+  const createdIds: string[] = [];
+  const createGapInStatus = async (label: string, status: string) => {
+    const payload = await jsonObject(await request.post("/api/gaps", {
+      data: {
+        reporter: "refine-smoke",
+        actual: `${label} initial actual`,
+        target: `${label} initial target`,
+        priority: "low",
+      },
+    }));
+    const id = String((payload.gap as { id?: string } | undefined)?.id ?? "");
+    expect(id).toBeTruthy();
+    createdIds.push(id);
+    await jsonObject(await request.post("/api/gaps/bulk", {
+      data: {
+        selected_ids: [id],
+        update: { status },
+      },
+    }));
+    return id;
+  };
+
+  const submitRound = async (
+    gapId: string,
+    heading: string,
+    actual: string,
+    target: string,
+  ) => {
+    await page.goto(`/#/gaps/${encodeURIComponent(gapId)}`);
+    await expect(page.getByTestId("gap-detail")).toBeVisible();
+    await expect(page.getByRole("heading", { name: heading, level: 3 })).toBeVisible();
+    await expect(page.getByTestId("gap-round-submit")).toHaveText("Submit new round");
+    await page.getByTestId("gap-round-actual").fill(actual);
+    await page.getByTestId("gap-round-target").fill(target);
+    const submitted = page.waitForResponse((response) =>
+      response.url().includes(`/api/gaps/${gapId}/rounds`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("gap-round-submit").click();
+    await submitted;
+    await expect(page.getByTestId("gap-round")).toHaveCount(2);
+    await expect(page.getByTestId("gap-round-detail-actual").last()).toContainText(actual);
+    await expect(page.getByTestId("gap-round-detail-target").last()).toContainText(target);
+    const detail = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(gapId)}`));
+    expect((detail.gap as { round_count?: number } | undefined)?.round_count).toBe(2);
+  };
+
+  try {
+    await page.goto("/");
+    await page.getByTestId("context-menu-toggle").click();
+    await expect(page.getByTestId("global-reporter").locator("option", { hasText: "refine-smoke" })).toHaveCount(1);
+    await page.getByTestId("global-reporter").selectOption("refine-smoke");
+
+    const reviewId = await createGapInStatus("Follow-up round", "review");
+    await submitRound(
+      reviewId,
+      "Submit follow-up round",
+      "Follow-up round actual",
+      "Follow-up round target",
+    );
+
+    const failedId = await createGapInStatus("Recovery round", "failed");
+    await submitRound(
+      failedId,
+      "Submit recovery round",
+      "Recovery round actual",
+      "Recovery round target",
+    );
   } finally {
     for (const id of createdIds.reverse()) {
       await request.delete(`/api/gaps/${encodeURIComponent(id)}`);

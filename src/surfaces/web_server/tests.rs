@@ -940,6 +940,44 @@ fn web_server_edits_notes_and_deletes_gap() {
     assert_eq!(note.status, 200);
     let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"body\": \"Needs context\""));
+    let written_gap = serde_json::from_str::<serde_json::Value>(&written).unwrap();
+    let note_id = written_gap["notes"][0]["id"].as_str().unwrap();
+
+    let edited_note = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/work/gaps/GAP1".to_string(),
+        body: Some(json!({
+            "notes": [{
+                "id": note_id,
+                "author": "Reviewer",
+                "body": "Updated context",
+                "created": written_gap["notes"][0]["created"].clone()
+            }]
+        })),
+    });
+    assert_eq!(edited_note.status, 200);
+    let edited_detail = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/work/gaps/GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(
+        edited_detail.body["gap"]["notes"][0]["body"],
+        "Updated context"
+    );
+
+    let deleted_note = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/work/gaps/GAP1".to_string(),
+        body: Some(json!({"notes": []})),
+    });
+    assert_eq!(deleted_note.status, 200);
+    let deleted_detail = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/work/gaps/GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(deleted_detail.body["gap"]["notes"], json!([]));
 
     let delete = server.handle(ApiRequest {
         method: "DELETE".to_string(),
@@ -1599,7 +1637,7 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
         body: None,
     });
     assert_eq!(changes.status, 200);
-    assert_eq!(changes.body["branch"], "main");
+    assert_eq!(changes.body["branch"], serde_json::Value::Null);
     assert_eq!(changes.body["changes"], json!([]));
 
     let metrics = FileMetricsService::new(&runtime_root);

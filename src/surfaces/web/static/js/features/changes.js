@@ -10,6 +10,8 @@ const CHANGES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const CHANGES_DEFAULT_LIMIT = 50;
 const CHANGES_DEFAULT_SORT = "committed";
 const CHANGES_DEFAULT_DIR = "desc";
+const CHANGES_DEFAULT_PERIOD = "day";
+const CHANGES_PERIODS = ["day", "week", "month", "year"];
 
 function changesFiltersFromHash() {
   const hashQs = new URLSearchParams(location.hash.split("?")[1] || "");
@@ -22,6 +24,7 @@ function changesFiltersFromHash() {
     page: Math.max(1, parseInt(hashQs.get("page") || "1", 10) || 1),
     sort: hashQs.get("sort") || CHANGES_DEFAULT_SORT,
     dir: hashQs.get("dir") || CHANGES_DEFAULT_DIR,
+    period: CHANGES_PERIODS.includes(hashQs.get("period")) ? hashQs.get("period") : CHANGES_DEFAULT_PERIOD,
   };
 }
 
@@ -36,6 +39,7 @@ function changesHashFromFilters(f) {
   if (f.page && f.page > 1) next.set("page", String(f.page));
   if (f.sort && f.sort !== CHANGES_DEFAULT_SORT) next.set("sort", f.sort);
   if (f.dir && f.dir !== CHANGES_DEFAULT_DIR) next.set("dir", f.dir);
+  if (f.period && f.period !== CHANGES_DEFAULT_PERIOD) next.set("period", f.period);
   return "#/changes" + (next.toString() ? "?" + next : "");
 }
 
@@ -84,6 +88,16 @@ async function renderChanges() {
         </div>
       </div>
     </details>
+    <div class="segmented-control changes-period-control" role="group" aria-label="Git visualization period" data-testid="changes-period-control">
+      ${CHANGES_PERIODS.map((period) => `
+        <button type="button"
+                data-changes-period="${period}"
+                data-testid="changes-period-${period}"
+                ${f.period === period ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>
+          ${period.charAt(0).toUpperCase() + period.slice(1)}
+        </button>`).join("")}
+    </div>
+    <div id="changes-visualization" data-testid="changes-visualization"><p class="muted">Loading...</p></div>
     <div id="changes-body" data-testid="changes-body"><p class="muted">Loading...</p></div>`;
   $("#changes-q").addEventListener("input", debounce(() => {
     updateChangesFilter({ q: $("#changes-q").value, page: 1 });
@@ -101,6 +115,9 @@ async function renderChanges() {
     history.replaceState(null, "", "#/changes");
     renderChanges();
   });
+  $$("[data-changes-period]").forEach((btn) => {
+    btn.addEventListener("click", () => updateChangesFilter({ period: btn.dataset.changesPeriod, page: 1 }));
+  });
   await loadChanges();
 }
 
@@ -114,6 +131,7 @@ function updateChangesFilter(patch) {
     page: "page" in patch ? patch.page : current.page,
     sort: "sort" in patch ? patch.sort : current.sort,
     dir: "dir" in patch ? patch.dir : current.dir,
+    period: "period" in patch ? patch.period : current.period,
   };
   history.replaceState(null, "", changesHashFromFilters(next));
   loadChanges();
@@ -163,9 +181,11 @@ function drawChanges(data, f) {
     countEl.textContent = `${changes.length} ${changes.length === 1 ? "change" : "changes"}`;
   }
   applyChangesFilterIndicator(f);
+  syncChangesPeriodControls(f.period);
+  drawChangesVisualization(changes, f.period);
   if (!branch || branch === "(unknown)") {
     root.innerHTML = `
-      <p class="muted">
+      <p class="muted" data-testid="changes-branch-unresolved">
         No merge target branch resolved. Set <code>merge_target_branch</code>
         in <a href="#/node/target-app">Node → Target App Config</a>, or check that the host
         repo has a branch checked out.
@@ -174,7 +194,7 @@ function drawChanges(data, f) {
   }
   if (!changes.length) {
     root.innerHTML = `
-      <p class="muted">
+      <p class="muted" data-testid="changes-empty-state">
         ${f.q || f.status || f.priority
           ? `No changes match the current filters on <code>${htmlEscape(branch)}</code>.`
           : `No refine merges on <code>${htmlEscape(branch)}</code> yet. When the Merge agent lands a Gap, its merge commit shows up here.`}
@@ -203,7 +223,7 @@ function drawChanges(data, f) {
             </th>`;
   }).join("");
   root.innerHTML = `
-    <p class="muted small" style="margin-bottom:10px">
+    <p class="muted small" style="margin-bottom:10px" data-testid="changes-branch-info">
       Merges on <code>${htmlEscape(branch)}</code> (newest first).
       Each row maps to a Gap via the <code>Refine Gap:</code> trailer in
       the commit message.
@@ -270,6 +290,73 @@ function drawChanges(data, f) {
       });
     });
   });
+}
+
+function syncChangesPeriodControls(period = CHANGES_DEFAULT_PERIOD) {
+  $$("[data-changes-period]").forEach((btn) => {
+    const active = btn.dataset.changesPeriod === period;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
+function changeBucketLabel(datetime, period) {
+  const date = new Date(datetime);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  if (period === "year") return String(year);
+  if (period === "month") return `${year}-${month}`;
+  if (period === "week") {
+    const weekStart = new Date(Date.UTC(year, date.getUTCMonth(), date.getUTCDate()));
+    weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+    const weekYear = weekStart.getUTCFullYear();
+    const weekMonth = String(weekStart.getUTCMonth() + 1).padStart(2, "0");
+    const weekDay = String(weekStart.getUTCDate()).padStart(2, "0");
+    return `${weekYear}-${weekMonth}-${weekDay}`;
+  }
+  return `${year}-${month}-${day}`;
+}
+
+function drawChangesVisualization(changes, period = CHANGES_DEFAULT_PERIOD) {
+  const root = $("#changes-visualization");
+  if (!root) return;
+  const buckets = new Map();
+  (changes || []).forEach((change) => {
+    const label = changeBucketLabel(change.committed, period);
+    if (!buckets.has(label)) {
+      buckets.set(label, { label, total: 0, linked: 0 });
+    }
+    const bucket = buckets.get(label);
+    bucket.total += 1;
+    if (change.gap_id) bucket.linked += 1;
+  });
+  const rows = Array.from(buckets.values()).sort((a, b) => b.label.localeCompare(a.label));
+  if (!rows.length) {
+    root.innerHTML = `<p class="muted" data-testid="changes-visualization-empty">No Git changes to visualize.</p>`;
+    return;
+  }
+  const maxTotal = Math.max(1, ...rows.map((row) => row.total));
+  root.innerHTML = `
+    <section class="logs-visualization-grid changes-visualization-grid" data-testid="changes-visualization-grid">
+      ${rows.map((row) => {
+        const width = Math.max(8, Math.round((row.total / maxTotal) * 100));
+        return `
+          <div class="card logs-visualization-bucket changes-visualization-bucket" data-testid="changes-bucket">
+            <div class="logs-visualization-bucket-head">
+              <strong data-testid="changes-bucket-label">${htmlEscape(row.label)}</strong>
+              <span class="muted small" data-testid="changes-bucket-total">${row.total} ${row.total === 1 ? "change" : "changes"}</span>
+            </div>
+            <div class="logs-visualization-bar" aria-hidden="true">
+              <span class="info" style="width:${width}%"></span>
+            </div>
+            <div class="logs-visualization-counts">
+              <span data-testid="changes-bucket-linked">${row.linked} linked ${row.linked === 1 ? "Gap" : "Gaps"}</span>
+            </div>
+          </div>`;
+      }).join("")}
+    </section>`;
 }
 
 function renderChangeGapCell(change = {}) {

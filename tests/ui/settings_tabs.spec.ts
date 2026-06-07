@@ -14,6 +14,10 @@ async function answerModalPrompt(page: Page, title: string, value: string): Prom
   await page.getByTestId("modal-ok").click();
 }
 
+function nodesFromPayload(payload: Record<string, unknown>): Array<Record<string, unknown>> {
+  return (payload.nodes as Array<Record<string, unknown>> | undefined) ?? [];
+}
+
 test("navigates Node settings tabs from the tab strip", async ({ page, request }) => {
   await ensureAttachedProject(request);
   await page.goto("/#/node/application");
@@ -140,6 +144,108 @@ test("manages known apps from the Application tab", async ({ page, request }) =>
     await attachProject(request, originalPath);
     await request.delete("/api/apps", { data: { path: disposablePath } }).catch(() => undefined);
     fs.rmSync(disposablePath, { recursive: true, force: true });
+  }
+});
+
+test("manages application nodes from the Application tab", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const originalNodes = await jsonObject(await request.get("/api/nodes"));
+  const originalActiveNodeId = String(originalNodes.active_node_id ?? "default");
+  const suffix = Date.now();
+  const nodeName = `Application UI Node ${suffix}`;
+  const renamedNodeName = `Application UI Node Renamed ${suffix}`;
+  let createdNodeId = "";
+
+  try {
+    await page.goto("/#/node/application");
+    await expect(page.getByTestId("node-settings-table")).toBeVisible();
+    await expect(page.getByTestId("node-add")).toBeVisible();
+
+    const created = page.waitForResponse((response) =>
+      response.url().includes("/api/nodes") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("node-add").click();
+    await answerModalPrompt(page, "Create node", nodeName);
+    const createdPayload = await (await created).json() as Record<string, unknown>;
+    const createdNode = nodesFromPayload(createdPayload)
+      .find((node) => node.display_name === nodeName);
+    expect(createdNode).toBeTruthy();
+    createdNodeId = String(createdNode?.id ?? "");
+    expect(createdNodeId).toBeTruthy();
+
+    const row = page.locator(`[data-testid="node-settings-row"][data-node-id="${createdNodeId}"]`);
+    await expect(row).toBeVisible();
+    await expect(row.getByTestId("node-settings-name")).toContainText(nodeName);
+    await expect(row.getByTestId("node-settings-id")).toContainText(createdNodeId);
+    await expect(row.getByTestId("node-activate")).toBeEnabled();
+    await expect(row.getByTestId("node-archive")).toBeEnabled();
+
+    const activated = page.waitForResponse((response) =>
+      response.url().includes("/api/nodes/activate") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await row.getByTestId("node-activate").click();
+    const activatedPayload = await (await activated).json() as Record<string, unknown>;
+    expect(activatedPayload.active_node_id).toBe(createdNodeId);
+    await expect(row.getByTestId("node-settings-name")).toContainText("active");
+    await expect(row.getByTestId("node-activate")).toBeDisabled();
+    await expect(row.getByTestId("node-archive")).toBeDisabled();
+
+    const renamed = page.waitForResponse((response) =>
+      response.url().includes(`/api/nodes/${createdNodeId}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await row.getByTestId("node-rename").click();
+    await answerModalPrompt(page, "Rename node", renamedNodeName);
+    const renamedPayload = await (await renamed).json() as Record<string, unknown>;
+    expect(nodesFromPayload(renamedPayload)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: createdNodeId,
+        display_name: renamedNodeName,
+      }),
+    ]));
+    await expect(row.getByTestId("node-settings-name")).toContainText(renamedNodeName);
+
+    const restored = page.waitForResponse((response) =>
+      response.url().includes("/api/nodes/activate") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    const originalRow = page.locator(`[data-testid="node-settings-row"][data-node-id="${originalActiveNodeId}"]`);
+    await originalRow.getByTestId("node-activate").click();
+    const restoredPayload = await (await restored).json() as Record<string, unknown>;
+    expect(restoredPayload.active_node_id).toBe(originalActiveNodeId);
+    await expect(originalRow.getByTestId("node-settings-name")).toContainText("active");
+    await expect(row.getByTestId("node-archive")).toBeEnabled();
+
+    const archived = page.waitForResponse((response) =>
+      response.url().includes(`/api/nodes/${createdNodeId}`) &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
+    await row.getByTestId("node-archive").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Archive node");
+    await page.getByTestId("modal-ok").click();
+    const archivedPayload = await (await archived).json() as Record<string, unknown>;
+    expect(nodesFromPayload(archivedPayload)).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: createdNodeId,
+        archived: true,
+      }),
+    ]));
+    await expect(row.getByTestId("node-settings-name")).toContainText("archived");
+    await expect(row.getByTestId("node-activate")).toBeDisabled();
+  } finally {
+    if (createdNodeId) {
+      await request.post("/api/nodes/activate", { data: { node_id: originalActiveNodeId } }).catch(() => undefined);
+      await request.patch(`/api/nodes/${encodeURIComponent(createdNodeId)}`, {
+        data: { archived: true },
+      }).catch(() => undefined);
+    }
   }
 });
 
@@ -711,6 +817,7 @@ test("shows and clears the Quality requirements warning", async ({ page, request
     const requirementsSaved = page.waitForResponse((response) =>
       response.url().includes("/api/quality") &&
       response.request().method() === "PATCH" &&
+      (response.request().postData() || "").includes(requirements) &&
       response.status() === 200
     );
     await page.getByTestId("s-quality-business-requirements-edit").click();
@@ -721,6 +828,7 @@ test("shows and clears the Quality requirements warning", async ({ page, request
     const instructionsSaved = page.waitForResponse((response) =>
       response.url().includes("/api/quality") &&
       response.request().method() === "PATCH" &&
+      (response.request().postData() || "").includes(instructions) &&
       response.status() === 200
     );
     await page.getByTestId("s-quality-instructions-edit").click();

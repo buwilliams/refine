@@ -245,6 +245,37 @@ fn gap_create_list_show_edit_note_round_delete(fixture: &IntegrationFixture) {
     ]);
     fixture.assert_success("gap note", &note);
     assert_eq!(fixture.json_stdout(&note)["gap"]["id"], gap_id);
+    let shown_after_note = fixture.run_refine(&["gap", "show", &gap_id]);
+    fixture.assert_success("gap show after note", &shown_after_note);
+    let note_id = fixture.json_stdout(&shown_after_note)["gap"]["notes"][0]["id"]
+        .as_str()
+        .expect("gap show should expose note id")
+        .to_string();
+    let note_edit = fixture.run_refine(&[
+        "gap",
+        "note-edit",
+        &gap_id,
+        &note_id,
+        "needs a closer look after edit",
+    ]);
+    fixture.assert_success("gap note-edit", &note_edit);
+    let shown_after_note_edit = fixture.run_refine(&["gap", "show", &gap_id]);
+    fixture.assert_success("gap show after note edit", &shown_after_note_edit);
+    assert_eq!(
+        fixture.json_stdout(&shown_after_note_edit)["gap"]["notes"][0]["body"],
+        "needs a closer look after edit"
+    );
+    let note_delete = fixture.run_refine(&["gap", "note-delete", &gap_id, &note_id]);
+    fixture.assert_success("gap note-delete", &note_delete);
+    let shown_after_note_delete = fixture.run_refine(&["gap", "show", &gap_id]);
+    fixture.assert_success("gap show after note delete", &shown_after_note_delete);
+    assert_eq!(
+        fixture.json_stdout(&shown_after_note_delete)["gap"]["notes"]
+            .as_array()
+            .unwrap()
+            .len(),
+        0
+    );
 
     assert_eq!(fixture.gap_field(&gap_id, "round_count"), 0);
     let round = fixture.run_refine(&[

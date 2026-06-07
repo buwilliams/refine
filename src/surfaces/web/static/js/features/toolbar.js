@@ -167,6 +167,11 @@ function loadChatStateFromStorage() {
       if (typeof parsed.fullscreen === "boolean") {
         chatState.fullscreen = parsed.fullscreen;
       }
+      if (Array.isArray(parsed.systemFilters)) {
+        systemOperationState.filters = new Set(
+          parsed.systemFilters.map((item) => String(item || "").trim()).filter(Boolean),
+        );
+      }
     }
   } catch {}
   ensureStandaloneTab();
@@ -198,6 +203,7 @@ function saveChatStateToStorage() {
       tabs, activeTabId: chatState.activeTabId,
       open: chatState.open, bodyHeight: chatState.bodyHeight,
       fullscreen: chatState.fullscreen,
+      systemFilters: [...systemOperationState.filters],
     }));
   } catch {}
 }
@@ -820,7 +826,7 @@ function renderSystemPanel() {
            data-testid="system-log">
         ${visibleMessages.length
           ? visibleMessages.map(renderSystemLogLine).join("")
-          : `<div class="system-log-empty" data-testid="system-log-empty">${messages.length ? "No system activity matches this filter." : "Waiting for system activity."}</div>`}
+          : `<div class="system-log-empty" data-testid="system-log-empty">${activeFilters.size || messages.length ? "No system activity matches this filter." : "Waiting for system activity."}</div>`}
       </div>
     </div>`;
 }
@@ -876,6 +882,7 @@ function bindSystemPanel(root) {
       } else {
         systemOperationState.filters.add(filter);
       }
+      saveChatStateToStorage();
       drawToolbar();
     });
   });

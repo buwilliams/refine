@@ -692,8 +692,8 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
   const key = String(idx);
   const roundOpen = key in prevRoundOpen ? prevRoundOpen[key] : isLatest;
   return `
-    <details class="round" data-round-idx="${idx}" ${roundOpen ? "open" : ""}>
-      <summary class="round-head">
+    <details class="round" data-round-idx="${idx}" data-testid="gap-round" ${roundOpen ? "open" : ""}>
+      <summary class="round-head" data-testid="gap-round-summary">
         <strong>Round ${idx + 1}</strong>
         ${isLatest ? `<span class="status-pill review">latest</span>` : ""}
         ${isLatest && rnd.rule_state && rnd.rule_state !== "unclassified"
@@ -707,8 +707,8 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
       </summary>
       <div class="round-body">
         <dl class="pair">
-          <dt>actual</dt><dd>${htmlEscape(rnd.actual || "").replace(/\n/g, "<br>")}</dd>
-          <dt>target</dt><dd>${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
+          <dt>actual</dt><dd data-testid="gap-round-detail-actual">${htmlEscape(rnd.actual || "").replace(/\n/g, "<br>")}</dd>
+          <dt>target</dt><dd data-testid="gap-round-detail-target">${htmlEscape(rnd.target || "").replace(/\n/g, "<br>")}</dd>
         </dl>
       </div>
     </details>
@@ -766,15 +766,15 @@ function renderNote(n) {
     : firstLine;
   const meta = [n.author, n.created ? fmtTime(n.created) : ""].filter(Boolean).join(" · ");
   return `
-    <details class="note">
-      <summary>
-        <span class="note-preview">${htmlEscape(preview || "(empty)")}</span>
+    <details class="note" data-testid="gap-note">
+      <summary data-testid="gap-note-summary">
+        <span class="note-preview" data-testid="gap-note-preview">${htmlEscape(preview || "(empty)")}</span>
         ${meta ? `<span class="muted small note-meta">${htmlEscape(meta)}</span>` : ""}
       </summary>
-      <div class="note-body">${htmlEscape(n.body || "").replace(/\n/g, "<br>")}</div>
+      <div class="note-body" data-testid="gap-note-detail">${htmlEscape(n.body || "").replace(/\n/g, "<br>")}</div>
       <div class="actions" style="margin-top:6px">
-        <button class="secondary" data-note-edit="${htmlEscape(n.id)}">Edit</button>
-        <button class="danger" data-note-delete="${htmlEscape(n.id)}">Delete</button>
+        <button class="secondary" data-note-edit="${htmlEscape(n.id)}" data-testid="gap-note-edit">Edit</button>
+        <button class="danger" data-note-delete="${htmlEscape(n.id)}" data-testid="gap-note-delete">Delete</button>
       </div>
     </details>`;
 }
@@ -792,7 +792,7 @@ function renderRoundForm(
   const readonly = disabled ? "readonly" : "";
   const buttonDisabled = disabled ? "disabled" : "";
   return `
-    <form id="${htmlEscape(formId)}" data-kind="${kind}">
+    <form id="${htmlEscape(formId)}" data-kind="${kind}" data-testid="gap-round-form">
       <div class="muted small" style="margin-bottom:8px">
         Submitting as <strong class="js-reporter-name">${htmlEscape(reporter)}</strong>
         — change in the top-right reporter selector.
@@ -803,14 +803,14 @@ function renderRoundForm(
         </p>` : ""}
       <div class="form-row">
         <label>Actual (current behavior)</label>
-        <textarea name="actual" placeholder="What's happening today?" ${readonly}>${htmlEscape(actual)}</textarea>
+        <textarea name="actual" data-testid="gap-round-actual" placeholder="What's happening today?" ${readonly}>${htmlEscape(actual)}</textarea>
       </div>
       <div class="form-row">
         <label>Target (desired behavior)</label>
-        <textarea name="target" placeholder="What should be happening?" ${readonly}>${htmlEscape(target)}</textarea>
+        <textarea name="target" data-testid="gap-round-target" placeholder="What should be happening?" ${readonly}>${htmlEscape(target)}</textarea>
       </div>
       <div class="actions">
-        <button type="submit" ${buttonDisabled}>${submitLabel}</button>
+        <button type="submit" data-testid="gap-round-submit" ${buttonDisabled}>${submitLabel}</button>
       </div>
     </form>
   `;

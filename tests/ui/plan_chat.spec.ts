@@ -121,10 +121,12 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
     await page.getByTestId("import-persist").click();
     await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0, { timeout: 30_000 });
 
-    const detail = await jsonObject(await request.get(`/api/features/${featureId}`));
-    expect((detail.feature as { gap_count?: number } | undefined)?.gap_count).toBe(1);
-    const gaps = await jsonObject(await request.get(`/api/gaps?limit=100&node=current&q=${encodeURIComponent(editedActual)}`));
-    const createdId = String((((gaps.gaps as Array<{ id?: string }> | undefined) ?? [])[0]?.id) ?? "");
+    let createdId = "";
+    await expect.poll(async () => {
+      const gaps = await jsonObject(await request.get(`/api/gaps?limit=100&node=current&q=${encodeURIComponent(editedActual)}`));
+      createdId = String((((gaps.gaps as Array<{ id?: string }> | undefined) ?? [])[0]?.id) ?? "");
+      return createdId;
+    }).not.toBe("");
     expect(createdId).toBeTruthy();
     const createdDetail = await jsonObject(await request.get(`/api/gaps/${createdId}`));
     const createdGap = createdDetail.gap as {

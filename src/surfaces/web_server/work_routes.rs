@@ -674,6 +674,21 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("priority"))
             .and_then(|priority| priority.as_str());
+        let notes = match request.body.as_ref().and_then(|body| body.get("notes")) {
+            Some(Value::Array(notes)) => Some(notes.clone()),
+            Some(_) => {
+                return ApiResponse::json(
+                    400,
+                    json!({
+                        "error": {
+                            "code": "invalid_notes",
+                            "message": "body.notes must be an array"
+                        }
+                    }),
+                );
+            }
+            None => None,
+        };
         let status = match request
             .body
             .as_ref()
@@ -709,6 +724,12 @@ impl InProcessWebServer {
         };
         if name.is_some() || priority.is_some() {
             match service.update_gap_metadata_summary(gap_id, name, priority) {
+                Ok(updated) => gap = updated,
+                Err(error) => return error_response(error),
+            }
+        }
+        if let Some(notes) = notes {
+            match service.replace_gap_notes_summary(gap_id, &notes) {
                 Ok(updated) => gap = updated,
                 Err(error) => return error_response(error),
             }
@@ -1554,7 +1575,14 @@ impl InProcessWebServer {
             .changes
             .iter()
             .find_map(|change| change.branch.clone())
-            .unwrap_or_else(|| "main".to_string());
+            .or_else(|| {
+                self.source_root().and_then(|source_root| {
+                    FileGitWorktreeService::new(source_root)
+                        .inspect("")
+                        .ok()
+                        .and_then(|status| status.branch)
+                })
+            });
         let changes = result
             .changes
             .iter()

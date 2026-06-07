@@ -4,7 +4,7 @@ use std::net::TcpStream;
 use std::path::PathBuf;
 
 use clap::Parser;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -1086,6 +1086,43 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Gap {
             action:
+                GapAction::NoteEdit {
+                    id,
+                    note_id,
+                    body,
+                    durable_root: Some(durable_root),
+                },
+        } => {
+            let service = FileWorkItemService::new(durable_root);
+            let detail = service.show_gap_detail(&id)?;
+            let notes = edit_gap_note_values(gap_notes_from_detail(&detail), &note_id, &body)?;
+            let gap = service.replace_gap_notes_summary(&id, &notes)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Gap {
+            action:
+                GapAction::NoteDelete {
+                    id,
+                    note_id,
+                    durable_root: Some(durable_root),
+                },
+        } => {
+            let service = FileWorkItemService::new(durable_root);
+            let detail = service.show_gap_detail(&id)?;
+            let notes = delete_gap_note_values(gap_notes_from_detail(&detail), &note_id)?;
+            let gap = service.replace_gap_notes_summary(&id, &notes)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Gap {
+            action:
                 GapAction::Round {
                     id,
                     durable_root: Some(durable_root),
@@ -1765,6 +1802,34 @@ fn dispatch_gap_daemon(action: GapAction) -> RefineResult<()> {
                 "author": author
             })),
         )?,
+        GapAction::NoteEdit {
+            id,
+            note_id,
+            body,
+            durable_root: None,
+        } => {
+            let detail = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
+            let notes =
+                edit_gap_note_values(gap_notes_from_detail(&detail["gap"]), &note_id, &body)?;
+            daemon_json(
+                "PATCH",
+                &format!("/work/gaps/{}", path_segment(&id)),
+                Some(json!({ "notes": notes })),
+            )?
+        }
+        GapAction::NoteDelete {
+            id,
+            note_id,
+            durable_root: None,
+        } => {
+            let detail = daemon_json("GET", &format!("/work/gaps/{}", path_segment(&id)), None)?;
+            let notes = delete_gap_note_values(gap_notes_from_detail(&detail["gap"]), &note_id)?;
+            daemon_json(
+                "PATCH",
+                &format!("/work/gaps/{}", path_segment(&id)),
+                Some(json!({ "notes": notes })),
+            )?
+        }
         GapAction::Round {
             id,
             durable_root: None,
@@ -2414,6 +2479,58 @@ fn query_component(value: &str) -> String {
     path_segment(value)
 }
 
+fn gap_notes_from_detail(detail: &Value) -> Vec<Value> {
+    detail
+        .get("notes")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default()
+}
+
+fn edit_gap_note_values(
+    mut notes: Vec<Value>,
+    note_id: &str,
+    body: &str,
+) -> RefineResult<Vec<Value>> {
+    let trimmed = body.trim();
+    if trimmed.is_empty() {
+        return Err(RefineError::InvalidInput(
+            "note body cannot be empty".to_string(),
+        ));
+    }
+    let mut found = false;
+    for note in &mut notes {
+        if note.get("id").and_then(Value::as_str) == Some(note_id) {
+            let object = note.as_object_mut().ok_or_else(|| {
+                RefineError::InvalidInput("notes must be an array of objects".to_string())
+            })?;
+            object.insert("body".to_string(), Value::String(trimmed.to_string()));
+            found = true;
+            break;
+        }
+    }
+    if !found {
+        return Err(RefineError::NotFound(format!(
+            "note {note_id} was not found"
+        )));
+    }
+    Ok(notes)
+}
+
+fn delete_gap_note_values(notes: Vec<Value>, note_id: &str) -> RefineResult<Vec<Value>> {
+    let original_len = notes.len();
+    let next = notes
+        .into_iter()
+        .filter(|note| note.get("id").and_then(Value::as_str) != Some(note_id))
+        .collect::<Vec<_>>();
+    if next.len() == original_len {
+        return Err(RefineError::NotFound(format!(
+            "note {note_id} was not found"
+        )));
+    }
+    Ok(next)
+}
+
 fn skipped_durable_root(path: &PathBuf) -> bool {
     path.as_os_str().is_empty()
 }
@@ -2438,6 +2555,8 @@ pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf>
             | GapAction::Show { durable_root, .. }
             | GapAction::Edit { durable_root, .. }
             | GapAction::Note { durable_root, .. }
+            | GapAction::NoteEdit { durable_root, .. }
+            | GapAction::NoteDelete { durable_root, .. }
             | GapAction::Round { durable_root, .. }
             | GapAction::Start { durable_root, .. }
             | GapAction::Cancel { durable_root, .. }
