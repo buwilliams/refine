@@ -486,6 +486,8 @@ fn rebuild_projection_scans_git_changes_and_joins_gap_display_fields() {
             }"#,
     )
     .unwrap();
+    fs::write(temp_root.join("app.txt"), "unrelated\n").unwrap();
+    git(&temp_root, &["commit", "-am", "maintenance update"]).unwrap();
     fs::write(temp_root.join("app.txt"), "two\n").unwrap();
     git(&temp_root, &["commit", "-am", "GAP1 update app"]).unwrap();
 
@@ -493,6 +495,13 @@ fn rebuild_projection_scans_git_changes_and_joins_gap_display_fields() {
         .rebuild_projection()
         .unwrap();
     assert!(snapshot.source_fingerprints.contains_key("git:HEAD"));
+    let all_changes = snapshot.list_changes(ChangeProjectionQuery {
+        page: PageRequest::default(),
+        ..ChangeProjectionQuery::default()
+    });
+    assert_eq!(all_changes.total, 1);
+    assert_eq!(all_changes.changes[0].subject, "GAP1 update app");
+    assert_eq!(all_changes.changes[0].gap_id.as_deref(), Some("GAP1"));
     let changes = snapshot.list_changes(ChangeProjectionQuery {
         q: Some("GAP1 update".to_string()),
         gap_id: Some("GAP1".to_string()),

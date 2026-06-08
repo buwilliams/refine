@@ -1974,15 +1974,32 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     let temp_root = unique_temp_dir("http-git-changes");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let gap_dir = durable_root.join("gaps").join("GA").join("P1");
     fs::create_dir_all(&durable_root).unwrap();
+    fs::create_dir_all(&gap_dir).unwrap();
     git(&temp_root, &["init"]).unwrap();
     git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
     git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
     fs::write(temp_root.join("app.txt"), "one\n").unwrap();
     git(&temp_root, &["add", "app.txt"]).unwrap();
     git(&temp_root, &["commit", "-m", "initial"]).unwrap();
+    fs::write(
+        gap_dir.join("gap.json"),
+        r#"{
+              "id": "GAP1",
+              "name": "Change-linked Gap",
+              "status": "todo",
+              "priority": "high",
+              "created": "2026-01-01T00:00:00Z",
+              "updated": "2026-01-02T00:00:00Z",
+              "rounds": []
+            }"#,
+    )
+    .unwrap();
+    fs::write(temp_root.join("app.txt"), "unrelated\n").unwrap();
+    git(&temp_root, &["commit", "-am", "maintenance update"]).unwrap();
     fs::write(temp_root.join("app.txt"), "two\n").unwrap();
-    git(&temp_root, &["commit", "-am", "update app"]).unwrap();
+    git(&temp_root, &["commit", "-am", "GAP1 update app"]).unwrap();
 
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root);
@@ -1994,7 +2011,9 @@ fn web_server_lists_git_changes_and_reverts_commits() {
         body: None,
     });
     assert_eq!(changes.status, 200);
-    assert_eq!(changes.body["changes"][0]["subject"], "update app");
+    assert_eq!(changes.body["page"]["total"], 1);
+    assert_eq!(changes.body["changes"][0]["subject"], "GAP1 update app");
+    assert_eq!(changes.body["changes"][0]["gap_id"], "GAP1");
     let commit = changes.body["changes"][0]["commit"].as_str().unwrap();
 
     let undo = server.handle(ApiRequest {
@@ -2006,7 +2025,7 @@ fn web_server_lists_git_changes_and_reverts_commits() {
     assert_eq!(undo.body["ok"], true);
     assert_eq!(
         fs::read_to_string(temp_root.join("app.txt")).unwrap(),
-        "one\n"
+        "unrelated\n"
     );
     assert!(
         FileProcessSupervisor::new(&runtime_root)

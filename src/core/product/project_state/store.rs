@@ -331,24 +331,24 @@ impl FileProjectStateStore {
         changes
             .into_iter()
             .enumerate()
-            .map(|(order, change)| {
+            .filter_map(|(order, change)| {
                 let branch = change.branch.or_else(|| branch.clone());
-                let joined_gap = matching_change_gap(gaps, branch.as_deref(), &change.subject);
+                let joined_gap = matching_change_gap(gaps, branch.as_deref(), &change.subject)?;
                 let projection = ChangeSummaryProjection {
                     commit: change.commit,
                     committed_time: change.committed_time,
                     subject: change.subject,
-                    gap_id: joined_gap.map(|gap| gap.gap.id.clone()),
+                    gap_id: Some(joined_gap.gap.id.clone()),
                     branch,
-                    gap_name: joined_gap.map(|gap| gap.gap.name.clone()),
-                    gap_status: joined_gap.map(|gap| gap.gap.status.clone()),
-                    gap_priority: joined_gap.map(|gap| gap.gap.priority.as_str().to_string()),
+                    gap_name: Some(joined_gap.gap.name.clone()),
+                    gap_status: Some(joined_gap.gap.status.clone()),
+                    gap_priority: Some(joined_gap.gap.priority.as_str().to_string()),
                     searchable_text: String::new(),
                     order,
                 };
                 let mut projection = projection;
                 projection.searchable_text = change_searchable_text(&projection);
-                (change_projection_key(&projection), projection)
+                Some((change_projection_key(&projection), projection))
             })
             .collect()
     }

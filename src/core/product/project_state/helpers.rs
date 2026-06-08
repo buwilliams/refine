@@ -61,9 +61,7 @@ pub(super) fn matching_change_gap<'a>(
     subject: &str,
 ) -> Option<&'a GapSummaryProjection> {
     gaps.values().find(|gap| {
-        branch.is_some_and(|branch| gap.gap.branch_name.as_deref() == Some(branch))
-            || subject.contains(&gap.gap.id)
-            || branch.is_some_and(|branch| branch.contains(&gap.gap.id))
+        subject.contains(&gap.gap.id) || branch.is_some_and(|branch| branch.contains(&gap.gap.id))
     })
 }
 
