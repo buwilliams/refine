@@ -17,6 +17,7 @@ services:
         apt-get update
         apt-get install -y --no-install-recommends \
           bash \
+          build-essential \
           ca-certificates \
           curl \
           git \
@@ -32,5 +33,3 @@ services:
         chmod 0440 /etc/sudoers.d/refine
         exec sleep infinity
     working_dir: /home/refine
-    tmpfs:
-      - /tmp

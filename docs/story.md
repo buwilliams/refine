@@ -179,3 +179,35 @@ Effort: Very High (19 commits, 5 milestones)
 Milestones started: Feature workflow execution; Guide tabs and help polish; update/status visibility; chat and toolbar ergonomics; runtime cache/merger diagnostics.
 
 Feature and planning work moved forward: Feature workflow actions landed, Plan became Plan Mode in the create menu, Plan drafts now open as Feature drafts, and Gaps got the same workflow visualization as the Dashboard without dashboard label wrapping. Guide tabs, field-help affordances, active-node page titles, global version/status output, and Processes/System responsiveness were tightened. Chat also became more useful with multiline input, richer Gap preambles, recovery-round support, UI notices in the System toolbar, and auto-minimizing draft actions, while the runtime gained stronger worker startup diagnostics and SQLite cache readiness checks that prevent legacy projections from surprising the Merger.
+
+## Day 24: 2026-06-05 (Friday)
+
+Effort: Very High (31 commits, 4 milestones)
+
+Milestones started: Rust architecture implementation; repo layout migration; Rust conformance hardening; runtime process scoping.
+
+Refine crossed from architecture plan into native implementation: Rust module boundaries, core workflow services, web and CLI surfaces, projection-cache design, and conformance reports all moved into the repo. The Python implementation was preserved under `python/`, the native crate became the root package at version 3.0.0, durable-root bypasses were guarded, supervisor-routed process lifecycle work advanced, web endpoints were aligned with runtime architecture, and dashboard/runtime polling was reduced.
+
+## Day 25: 2026-06-06 (Saturday)
+
+Effort: High (13 commits, 4 milestones)
+
+Milestones started: Axum web server migration; Rust web UI regression fixes; provider/chat reliability; Guide and runtime navigation polish.
+
+The Rust web surface stabilized around Axum and sharper runtime behavior: startup performance improved, management navigation and Guide field targets were corrected, system status learned to show running ports, and web Gap creation kept compatibility with the browser payload. Chat and provider paths were hardened through queued input, CLI auth for agent launches, provider success parsing, first-message focus preservation, and duplicate-send prevention across toolbar chat surfaces.
+
+## Day 26: 2026-06-07 (Sunday)
+
+Effort: Medium (8 commits, 2 milestones)
+
+Milestones started: Rust integration-test specification; deterministic surface harness.
+
+The integration-test strategy became executable: the obsolete 2.x spec was removed, the new Rust integration spec landed, and the harness grew from design into real coverage. Smoke AI, native Rust CLI tests, Playwright UI tests, support fixtures, and workflow-focused integration cases established a deterministic public-surface test path for the Rust implementation.
+
+## Day 27: 2026-06-08 (Monday)
+
+Effort: Extreme (42 commits, 7 milestones)
+
+Milestones started: full Rust release gate; multi-instance and cluster coverage; target-app and chat workflow fixes; installer/release hardening; UI regression cleanup; manual Docker release testing; 3.0 patch releases.
+
+The Rust stack was pushed through release-grade hardening: `cargo test` now drives the full suite, Smoke AI stdin handling and fixture isolation were fixed, true multi-instance sync and Docker-backed cluster/install tests landed, and daemon-backed workflow coverage exercises real Git worktrees. Product fixes kept pace with target-app AI generation, wrapper generation, stale process cleanup, all-node filtering, Changes/Logs visualization polish, chat-session process visibility, standalone chat-to-Gap drafting, duplicate transcript prevention, and mutation-cache race fixes. Installer and release behavior tightened around deployed release binaries, port-scoped install services, automated migrations, system update routing, and the 3.0.1 patch release, while manual Docker tooling created an ephemeral Linux install environment with host-visible Refine ports.
