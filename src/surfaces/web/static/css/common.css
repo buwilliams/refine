@@ -1014,7 +1014,6 @@ select {
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
-  overflow: hidden;
 }
 .changes-visualization-head {
   min-height: 44px;

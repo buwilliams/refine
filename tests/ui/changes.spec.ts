@@ -180,6 +180,7 @@ test("visualizes Git changes by day, week, month, and year", async ({ page, requ
   await expect(page.getByRole("heading", { name: "Changes", level: 2 })).toBeVisible();
   await expect(page.getByTestId("changes-period-day")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("changes-visualization-panel").getByTestId("changes-period-control")).toBeVisible();
+  await expect(page.getByTestId("changes-visualization-panel")).toHaveCSS("overflow", "visible");
   await expect(page.getByTestId("changes-visualization-grid")).toHaveCSS("display", "grid");
   await expect(page.getByTestId("changes-visualization-grid")).toHaveCSS("overflow-x", "hidden");
   await expect(page.getByTestId("changes-bucket").first()).not.toHaveCSS("white-space", "nowrap");
