@@ -4,7 +4,9 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
-use crate::core::host::agent_providers::{AgentProviderService, HostAgentProviderService};
+use crate::core::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 use crate::core::host::installation::{FileInstallationService, InstallationService};
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
@@ -350,6 +352,49 @@ impl InProcessWebServer {
                     "configured": true
                 }),
             ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_agent_invoke(&self, request: ApiRequest) -> ApiResponse {
+        let Some(provider) = agent_provider_from_path(&request.path, "invoke") else {
+            return provider_id_required();
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let Some(prompt) = body.get("prompt").and_then(Value::as_str) else {
+            return error_response(RefineError::InvalidInput(
+                "agent invoke requires prompt".to_string(),
+            ));
+        };
+        let cwd = body
+            .get("cwd")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string);
+        match HostAgentProviderService::new().invoke(ProviderInvocation {
+            provider: provider.to_string(),
+            prompt: prompt.to_string(),
+            session_id: None,
+            cwd,
+        }) {
+            Ok(output) => ApiResponse::json(200, json!({"ok": true, "output": output})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_agent_resume(&self, request: ApiRequest) -> ApiResponse {
+        let Some(provider) = agent_provider_from_path(&request.path, "resume") else {
+            return provider_id_required();
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let Some(session_id) = body.get("session_id").and_then(Value::as_str) else {
+            return error_response(RefineError::InvalidInput(
+                "agent resume requires session_id".to_string(),
+            ));
+        };
+        match HostAgentProviderService::new().resume(provider, session_id) {
+            Ok(output) => ApiResponse::json(200, json!({"ok": true, "output": output})),
             Err(error) => error_response(error),
         }
     }

@@ -56,11 +56,24 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     }
 
     #[cfg(not(test))]
-    if matches!(&cli.command, Commands::Project { .. }) {
-        if let Commands::Project { action } = cli.command {
-            return dispatch_project_daemon(action);
+    let cli = match cli.command {
+        Commands::Project { action } => return dispatch_project_daemon(action),
+        Commands::Gap { action } => return dispatch_gap_daemon(action),
+        Commands::Feature { action } => return dispatch_feature_daemon(action),
+        Commands::Workflow { action } => return dispatch_workflow_daemon(action),
+        Commands::Node { action } => return dispatch_node_daemon(action),
+        Commands::Cluster { action } => return dispatch_cluster_daemon(action),
+        Commands::Log { action } => return dispatch_log_daemon(action),
+        Commands::Agent { action } => return dispatch_agent_daemon(action),
+        Commands::System {
+            action: SystemAction::Doctor { .. },
+        } => {
+            let response = daemon_json("GET", "/diagnostics", None)?;
+            print_json(&response);
+            return Ok(());
         }
-    }
+        other => Cli { command: other },
+    };
 
     match cli.command {
         Commands::Workflow {
@@ -2071,6 +2084,59 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
             &format!("/work/features/{}", path_segment(&id)),
             None,
         )?,
+        FeatureAction::Import {
+            durable_root,
+            text,
+            file,
+            csv,
+            reporter,
+            feature_id,
+        } if skipped_durable_root(&durable_root) => {
+            let source = if let Some(file) = file {
+                fs::read_to_string(&file).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to read import file {}: {error}",
+                        file.display()
+                    ))
+                })?
+            } else {
+                text.ok_or_else(|| {
+                    RefineError::InvalidInput(
+                        "feature import requires --text or --file".to_string(),
+                    )
+                })?
+            };
+            let parsed = if csv {
+                daemon_json(
+                    "POST",
+                    "/import/csv/parse",
+                    Some(json!({
+                        "text": source,
+                        "reporter": reporter
+                    })),
+                )?
+            } else {
+                daemon_json(
+                    "POST",
+                    "/import/extract",
+                    Some(json!({
+                        "text": source,
+                        "reporter": reporter,
+                        "purpose": "feature import"
+                    })),
+                )?
+            };
+            let drafts = parsed.get("drafts").cloned().unwrap_or_else(|| json!([]));
+            daemon_json(
+                "POST",
+                "/import/persist",
+                Some(json!({
+                    "drafts": drafts,
+                    "reporter": reporter,
+                    "feature_id": feature_id
+                })),
+            )?
+        }
         other => {
             return Err(RefineError::InvalidInput(format!(
                 "Feature command cannot be routed to the daemon in this mode: {other:?}"
@@ -2083,6 +2149,18 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
 
 fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
     let response = match action {
+        WorkflowAction::Allowed { from, to } => {
+            let from: GapStatus = from.into();
+            let to: GapStatus = to.into();
+            daemon_json(
+                "POST",
+                "/workflow/allowed",
+                Some(json!({
+                    "from": from.as_str(),
+                    "to": to.as_str()
+                })),
+            )?
+        }
         WorkflowAction::Transition {
             id,
             target,
@@ -2119,11 +2197,183 @@ fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
                 })),
             )?
         }
+        WorkflowAction::Schedule { durable_root, .. } if skipped_durable_root(&durable_root) => {
+            daemon_json("POST", "/workflow/schedule", None)?
+        }
+        WorkflowAction::Pause { .. } => {
+            daemon_json(
+                "POST",
+                "/processes/background",
+                Some(json!({ "stopped": true })),
+            )?;
+            daemon_json("POST", "/processes/agents", Some(json!({ "paused": true })))?
+        }
+        WorkflowAction::Resume { .. } => {
+            daemon_json(
+                "POST",
+                "/processes/background",
+                Some(json!({ "stopped": false })),
+            )?;
+            daemon_json(
+                "POST",
+                "/processes/agents",
+                Some(json!({ "paused": false })),
+            )?
+        }
+        WorkflowAction::Restore { durable_root } if skipped_durable_root(&durable_root) => {
+            daemon_json("POST", "/workflow/restore", None)?
+        }
+        WorkflowAction::Enforce { durable_root } if skipped_durable_root(&durable_root) => {
+            daemon_json("POST", "/workflow/enforce", None)?
+        }
         other => {
             return Err(RefineError::InvalidInput(format!(
                 "Workflow command cannot be routed to the daemon in this mode: {other:?}"
             )));
         }
+    };
+    print_json(&response);
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn dispatch_log_daemon(action: LogAction) -> RefineResult<()> {
+    let response = match action {
+        LogAction::List {
+            durable_root,
+            limit,
+        } if skipped_durable_root(&durable_root) => {
+            let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
+            json!({
+                "entries": response.get("activity").cloned().unwrap_or_default()
+            })
+        }
+        LogAction::Tail {
+            durable_root,
+            limit,
+        } if skipped_durable_root(&durable_root) => {
+            let response = daemon_json("GET", &format!("/activity?limit={limit}"), None)?;
+            json!({
+                "entries": response.get("activity").cloned().unwrap_or_default(),
+                "tail": true
+            })
+        }
+        LogAction::Show { id, durable_root } if skipped_durable_root(&durable_root) => {
+            let response = daemon_json("GET", "/activity?limit=1000", None)?;
+            let Some(entry) = response
+                .get("activity")
+                .and_then(|value| value.as_array())
+                .and_then(|entries| {
+                    entries.iter().find(|entry| {
+                        entry.get("id").and_then(|value| value.as_str()) == Some(id.as_str())
+                    })
+                })
+                .cloned()
+            else {
+                return Err(RefineError::NotFound(format!(
+                    "Log entry {id} was not found"
+                )));
+            };
+            json!({ "entry": entry })
+        }
+        LogAction::Query {
+            q,
+            durable_root,
+            limit,
+            offset,
+            gap_id,
+            severity,
+            category,
+            actor,
+        } if skipped_durable_root(&durable_root) => {
+            let mut query = vec![
+                format!("limit={limit}"),
+                format!("offset={offset}"),
+                format!("q={}", query_component(&q)),
+            ];
+            if let Some(value) = gap_id {
+                query.push(format!("gap_id={}", query_component(&value)));
+            }
+            if let Some(value) = severity {
+                query.push(format!("severity={}", query_component(&value)));
+            }
+            if let Some(value) = category {
+                query.push(format!("category={}", query_component(&value)));
+            }
+            if let Some(value) = actor {
+                query.push(format!("actor={}", query_component(&value)));
+            }
+            let response = daemon_json("GET", &format!("/activity?{}", query.join("&")), None)?;
+            json!({
+                "entries": response.get("activity").cloned().unwrap_or_default()
+            })
+        }
+        LogAction::Export { durable_root: None } => {
+            let response = daemon_json("GET", "/activity?limit=1000", None)?;
+            let entries = response.get("activity").cloned().unwrap_or_default();
+            let exported = entries.as_array().map(Vec::len).unwrap_or_default();
+            json!({"entries": entries, "exported": exported})
+        }
+        LogAction::Bundle {
+            durable_root,
+            redact_secrets,
+            ..
+        } if skipped_durable_root(&durable_root) => daemon_json(
+            "POST",
+            "/diagnostics/support-bundle",
+            Some(json!({ "redact_secrets": redact_secrets })),
+        )?,
+        other => {
+            return Err(RefineError::InvalidInput(format!(
+                "Log command cannot be routed to the daemon in this mode: {other:?}"
+            )));
+        }
+    };
+    print_json(&response);
+    Ok(())
+}
+
+#[cfg(not(test))]
+fn dispatch_agent_daemon(action: AgentAction) -> RefineResult<()> {
+    let response = match action {
+        AgentAction::Detect => daemon_json("GET", "/agents", None)?,
+        AgentAction::Configure { provider } => daemon_json(
+            "POST",
+            &format!("/agents/{}/configure", path_segment(&provider)),
+            None,
+        )?,
+        AgentAction::Auth { provider } => daemon_json(
+            "POST",
+            &format!("/agents/{}/auth", path_segment(&provider)),
+            None,
+        )?,
+        AgentAction::Diagnose { provider } => daemon_json(
+            "GET",
+            &format!("/agents/{}/diagnostics", path_segment(&provider)),
+            None,
+        )?,
+        AgentAction::Invoke {
+            prompt,
+            provider,
+            cwd,
+        } => daemon_json(
+            "POST",
+            &format!("/agents/{}/invoke", path_segment(&provider)),
+            Some(json!({
+                "prompt": prompt,
+                "cwd": cwd.map(|path| path.display().to_string())
+            })),
+        )?,
+        AgentAction::Resume {
+            session_id,
+            provider,
+        } => daemon_json(
+            "POST",
+            &format!("/agents/{}/resume", path_segment(&provider)),
+            Some(json!({
+                "session_id": session_id
+            })),
+        )?,
     };
     print_json(&response);
     Ok(())
@@ -2427,7 +2677,7 @@ fn daemon_json(
     let port = daemon_port();
     let mut stream = TcpStream::connect(("127.0.0.1", port)).map_err(|error| {
         RefineError::Degraded(format!(
-            "Refine daemon is not reachable at http://127.0.0.1:{port}: {error}"
+            "Refine daemon is required for this CLI command but is not reachable at http://127.0.0.1:{port}: {error}. Start it with `refine system start`."
         ))
     })?;
     let request = format!(

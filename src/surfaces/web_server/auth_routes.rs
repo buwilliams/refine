@@ -2,11 +2,40 @@ use serde_json::json;
 
 use crate::core::product::scheduling::FileSchedulingService;
 use crate::core::product::work_items::{BulkGapFilter, BulkGapSelection, BulkGapUpdate};
+use crate::core::supervisor::errors::RefineError;
+use crate::model::workflow::{GapStatus, user_status_transition};
 
 use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
+    pub(super) fn handle_workflow_allowed(&self, request: ApiRequest) -> ApiResponse {
+        let Some(body) = request.body else {
+            return error_response(RefineError::InvalidInput(
+                "workflow allowed requires a JSON body".to_string(),
+            ));
+        };
+        let Some(from) = body
+            .get("from")
+            .and_then(|value| value.as_str())
+            .and_then(GapStatus::parse_wire)
+        else {
+            return error_response(RefineError::InvalidInput(
+                "workflow allowed requires from".to_string(),
+            ));
+        };
+        let Some(to) = body
+            .get("to")
+            .and_then(|value| value.as_str())
+            .and_then(GapStatus::parse_wire)
+        else {
+            return error_response(RefineError::InvalidInput(
+                "workflow allowed requires to".to_string(),
+            ));
+        };
+        ApiResponse::json(200, json!(user_status_transition(&from, &to)))
+    }
+
     pub(super) fn handle_workflow_schedule(&self) -> ApiResponse {
         let durable_root = require_durable_root!(self, "schedule work items");
         let Some(runtime_root) = &self.runtime_root else {

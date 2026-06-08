@@ -40,6 +40,10 @@ impl InProcessWebServer {
             return self.handle_workflow_schedule();
         }
 
+        if request.method == "POST" && request.path == "/workflow/allowed" {
+            return self.handle_workflow_allowed(request);
+        }
+
         if request.method == "POST" && request.path == "/workflow/restore" {
             return self.handle_workflow_restore();
         }
@@ -152,6 +156,20 @@ impl InProcessWebServer {
             && request.path.ends_with("/configure")
         {
             return self.handle_agent_configure(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/agents/")
+            && request.path.ends_with("/invoke")
+        {
+            return self.handle_agent_invoke(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/agents/")
+            && request.path.ends_with("/resume")
+        {
+            return self.handle_agent_resume(request);
         }
 
         if request.method == "POST"
