@@ -546,16 +546,21 @@ function bindFeatureAutosave(root, feature) {
     if (name) name.value = saved.name;
     if (description) description.value = saved.description;
   };
+  const currentBody = () => ({
+    name: root.querySelector("#feature-name")?.value.trim() || "",
+    description: root.querySelector("#feature-description")?.value.trim() || "",
+    reporter: feature.reporter || "",
+  });
+  const currentDiffersFromSaved = () => {
+    const body = currentBody();
+    return body.name !== saved.name || body.description !== saved.description;
+  };
   const save = async () => {
     if (inFlight) {
       pending = true;
       return;
     }
-    const body = {
-      name: root.querySelector("#feature-name")?.value.trim() || "",
-      description: root.querySelector("#feature-description")?.value.trim() || "",
-      reporter: feature.reporter || "",
-    };
+    const body = currentBody();
     if (!body.name) {
       toast("Feature name is required", "error");
       restoreSaved();
@@ -574,15 +579,20 @@ function bindFeatureAutosave(root, feature) {
       showActionError(e, "Feature autosave failed");
     } finally {
       inFlight = false;
-      if (pending) {
-        pending = false;
+      const shouldSaveAgain = pending || currentDiffersFromSaved();
+      pending = false;
+      if (shouldSaveAgain) {
         await save();
       }
     }
   };
   const autosave = debounce(save, 450);
+  const scheduleAutosave = () => {
+    if (inFlight) pending = true;
+    autosave();
+  };
   controls.forEach((control) => {
-    control.addEventListener("input", autosave);
+    control.addEventListener("input", scheduleAutosave);
     control.addEventListener("change", save);
   });
 }

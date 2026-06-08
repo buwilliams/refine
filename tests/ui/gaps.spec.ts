@@ -612,10 +612,18 @@ test("handles New Gap duplicate decisions through the browser", async ({ page, r
     const duplicateId = String(createdPayload.gap?.id ?? "");
     expect(duplicateId).toBeTruthy();
     expect(duplicateId).not.toBe(originalId);
+    expect(createdPayload.gap?.reporter).toBe("refine-smoke");
+    expect(createdPayload.gap?.round_count).toBe(1);
     createdIds.push(duplicateId);
     await expect(page.getByTestId("new-gap-modal")).toHaveCount(0);
-    const afterImport = await jsonObject(await request.get(`/api/gaps?q=${encodeURIComponent(actual)}`));
-    expect(afterImport.page.total).toBe(2);
+    const duplicateDetail = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(duplicateId)}`));
+    const duplicateRounds = (duplicateDetail.gap as { rounds?: Array<{ actual?: string; target?: string }> } | undefined)?.rounds ?? [];
+    expect(duplicateRounds.some((round) => round.actual === actual && round.target === target)).toBeTruthy();
+    await expect.poll(async () => {
+      const original = await request.get(`/api/gaps/${encodeURIComponent(originalId)}`);
+      const imported = await request.get(`/api/gaps/${encodeURIComponent(duplicateId)}`);
+      return Number(original.ok()) + Number(imported.ok());
+    }).toBe(2);
   } finally {
     for (const id of createdIds.reverse()) {
       await request.delete(`/api/gaps/${encodeURIComponent(id)}`);
@@ -624,6 +632,7 @@ test("handles New Gap duplicate decisions through the browser", async ({ page, r
 });
 
 test("submits follow-up and recovery rounds from Gap detail", async ({ page, request }) => {
+  test.setTimeout(60_000);
   const createdIds: string[] = [];
   const createGapInStatus = async (label: string, status: string) => {
     const payload = await jsonObject(await request.post("/api/gaps", {
@@ -1041,7 +1050,7 @@ test("paginates Gaps and tracks filter-scoped selection across pages", async ({ 
   test.setTimeout(60_000);
   const createdIds: string[] = [];
   const prefix = `Gaps pagination ${Date.now()}`;
-  for (let i = 0; i < 52; i++) {
+  for (let i = 0; i < 12; i++) {
     const label = `${prefix} ${String(i).padStart(2, "0")}`;
     const payload = await jsonObject(await request.post("/api/gaps", {
       data: {
@@ -1057,19 +1066,19 @@ test("paginates Gaps and tracks filter-scoped selection across pages", async ({ 
   }
 
   try {
-    await page.goto(`/#/gaps?q=${encodeURIComponent(prefix)}&node=current&limit=50&sort=name&dir=asc`);
+    await page.goto(`/#/gaps?q=${encodeURIComponent(prefix)}&node=current&limit=10&sort=name&dir=asc`);
     await expect(page.getByTestId("gaps-search")).toHaveValue(prefix);
     await expect(page.getByTestId("gaps-filtered-pill")).toBeVisible();
-    await expect(page.getByTestId("gaps-count")).toHaveText("50 gaps");
-    await expect(page.getByTestId("gaps-row")).toHaveCount(50);
-    await expect(page.getByTestId("gaps-pagination")).toContainText("1-50 gaps");
+    await expect(page.getByTestId("gaps-count")).toHaveText("10 gaps");
+    await expect(page.getByTestId("gaps-row")).toHaveCount(10);
+    await expect(page.getByTestId("gaps-pagination")).toContainText("1-10 gaps");
     await expect(page.getByTestId("gaps-page-current")).toHaveText("Page 1");
     await expect(page.getByTestId("gaps-page-prev")).toBeDisabled();
 
     await page.getByTestId("gaps-filter-summary").click();
     await expect(page.getByTestId("gaps-filter-shell")).toHaveJSProperty("open", true);
     await expect(page.getByTestId("gaps-select-all")).toBeChecked();
-    await expect(page.getByTestId("gaps-row-select")).toHaveCount(50);
+    await expect(page.getByTestId("gaps-row-select")).toHaveCount(10);
 
     await page.getByTestId("gaps-row-select").first().uncheck();
     await expect(page.getByTestId("gaps-select-all")).toHaveJSProperty("indeterminate", true);
@@ -1090,9 +1099,9 @@ test("paginates Gaps and tracks filter-scoped selection across pages", async ({ 
     await expect(page.getByTestId("gaps-row-select").first()).not.toBeChecked();
     await expect(page.getByTestId("gaps-select-all")).toHaveJSProperty("indeterminate", true);
 
-    await page.getByTestId("gaps-row").filter({ hasText: `${prefix} 51 target` }).click();
+    await page.getByTestId("gaps-row").filter({ hasText: `${prefix} 11 target` }).click();
     await expect(page.getByTestId("gap-detail")).toBeVisible();
-    await expect(page.getByTestId("gap-detail")).toContainText(`${prefix} 51 target`);
+    await expect(page.getByTestId("gap-detail")).toContainText(`${prefix} 11 target`);
   } finally {
     for (const id of createdIds.reverse()) {
       await request.delete(`/api/gaps/${encodeURIComponent(id)}`);

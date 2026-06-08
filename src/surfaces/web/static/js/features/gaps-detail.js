@@ -90,8 +90,10 @@ function ensureGapModalUnderlay() {
 async function loadGapDetail(gapId) {
   try {
     const { gap } = await api("GET", "/api/gaps/" + gapId);
+    if (state.currentGap !== gapId || gap?.id !== gapId) return;
     drawGapDetail(gap);
   } catch (e) {
+    if (state.currentGap !== gapId) return;
     const container = gapDetailContainer();
     if (container) {
       container.innerHTML = `<p class="muted">Could not load gap: ${htmlEscape(e.message)}</p>`;

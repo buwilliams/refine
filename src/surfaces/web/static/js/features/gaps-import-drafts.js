@@ -270,7 +270,12 @@ function drawImportDrafts(root, drafts, close, options = {}) {
           clearSession: clearSessionOnClose,
         });
       } catch (e) {
-        if (e.code === "job_cancelled" || e.name === "AbortError") return;
+        if (e.code === "job_cancelled") {
+          if (clearSessionOnClose) clearImportSession();
+          close(true, { force: true });
+          return;
+        }
+        if (e.name === "AbortError") return;
         await showActionError(e, "Import failed");
       }
     });

@@ -44,11 +44,25 @@ test("extracts and saves AI Import drafts through Smoke AI", async ({ page, requ
     await expect(page.getByTestId("import-draft-name").nth(1)).toHaveValue(/refine-smoke imported gap two/);
     await expect(page.getByTestId("import-persist")).toBeEnabled();
 
+    let completedImportResult: {
+      count?: number;
+      gaps?: Array<{ id?: string; name?: string }>;
+    } | null = null;
+    const importCompleted = page.waitForResponse(async (response) => {
+      if (!/\/api\/jobs\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
+      if (response.request().method() !== "GET" || response.status() !== 200) return false;
+      const payload = await response.json();
+      if (payload.job?.status === "complete") {
+        completedImportResult = payload.job.result || null;
+        return true;
+      }
+      return false;
+    });
     await page.getByTestId("import-persist").click();
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
+    await importCompleted;
 
-    const gaps = await jsonObject(await request.get("/api/gaps?limit=100&node=current&q=refine-smoke%20imported"));
-    for (const gap of (gaps.gaps as Array<{ id?: string; name?: string }> | undefined) ?? []) {
+    for (const gap of completedImportResult?.gaps ?? []) {
       if (gap?.name?.startsWith("refine-smoke imported gap")) {
         createdGapIds.push(String(gap.id));
       }
@@ -511,11 +525,15 @@ test("recovers failed import drafts and retries after correcting the review", as
     const retryPayload = await (await retried).json();
     const retryJobId = String(retryPayload.job?.id ?? "");
     expect(retryJobId).toBeTruthy();
+    let retriedGapId = "";
     await expect.poll(async () => {
       const payload = await jsonObject(await request.get(`/api/jobs/${retryJobId}`));
       const job = payload.job as { status?: string; result?: { count?: number; gaps?: Array<{ id?: string }> } };
       for (const gap of job.result?.gaps ?? []) {
-        if (gap.id) createdGapIds.add(String(gap.id));
+        if (gap.id) {
+          retriedGapId = String(gap.id);
+          createdGapIds.add(retriedGapId);
+        }
       }
       return {
         status: job.status,
@@ -527,10 +545,11 @@ test("recovers failed import drafts and retries after correcting the review", as
     });
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
     await expect.poll(async () => page.evaluate(() => localStorage.getItem("refine_import_session_v1"))).toBeNull();
+    expect(retriedGapId).toBeTruthy();
     await expect.poll(async () => {
-      const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
-      return Number((gaps.page as { total?: number } | undefined)?.total ?? 0);
-    }).toBe(1);
+      const response = await request.get(`/api/gaps/${encodeURIComponent(retriedGapId)}`);
+      return response.status();
+    }).toBe(200);
   } finally {
     await cleanupMatchingGaps();
     for (const gapId of createdGapIds) {

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -206,19 +206,18 @@ impl FileProcessSupervisor {
             if entry.path().extension().and_then(|ext| ext.to_str()) != Some("json") {
                 continue;
             }
-            let bytes = fs::read(entry.path()).map_err(|error| {
+            let path = entry.path();
+            let bytes = fs::read(&path).map_err(|error| {
                 RefineError::Io(format!(
                     "failed to read process {}: {error}",
-                    entry.path().display()
+                    path.display()
                 ))
             })?;
-            let process = serde_json::from_slice::<ManagedProcess>(&bytes).map_err(|error| {
-                RefineError::Serialization(format!(
-                    "failed to parse process {}: {error}",
-                    entry.path().display()
-                ))
-            })?;
-            processes.push(process);
+            match serde_json::from_slice::<ManagedProcess>(&bytes) {
+                Ok(process) => processes.push(process),
+                Err(_) if bytes.is_empty() => continue,
+                Err(_) => continue,
+            }
         }
         processes.sort_by(|a, b| a.id.cmp(&b.id));
         Ok(processes)
@@ -282,12 +281,7 @@ impl FileProcessSupervisor {
             RefineError::Serialization(format!("failed to encode process control: {error}"))
         })?;
         let path = self.pause_state_path();
-        fs::write(&path, encoded).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to write process control {}: {error}",
-                path.display()
-            ))
-        })
+        write_json_atomically(&path, &encoded, "process control")
     }
 
     fn write_process(&self, process: &ManagedProcess) -> RefineResult<()> {
@@ -301,12 +295,7 @@ impl FileProcessSupervisor {
         let encoded = serde_json::to_vec_pretty(process).map_err(|error| {
             RefineError::Serialization(format!("failed to encode process: {error}"))
         })?;
-        fs::write(&path, encoded).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to write process {}: {error}",
-                path.display()
-            ))
-        })
+        write_json_atomically(&path, &encoded, "process")
     }
 
     pub fn register(&self, process: ManagedProcess) -> RefineResult<ManagedProcess> {
@@ -736,6 +725,47 @@ fn now_millis_string() -> String {
         .unwrap_or_default()
         .as_millis()
         .to_string()
+}
+
+fn write_json_atomically(path: &Path, encoded: &[u8], label: &str) -> RefineResult<()> {
+    let Some(parent) = path.parent() else {
+        return Err(RefineError::Io(format!(
+            "failed to write {label} {}: path has no parent",
+            path.display()
+        )));
+    };
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("state");
+    let tmp_path = parent.join(format!(".{file_name}.{}.tmp", new_process_id()));
+    {
+        let mut tmp = fs::File::create(&tmp_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create {label} temp file {}: {error}",
+                tmp_path.display()
+            ))
+        })?;
+        tmp.write_all(encoded).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to write {label} temp file {}: {error}",
+                tmp_path.display()
+            ))
+        })?;
+        tmp.sync_all().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to sync {label} temp file {}: {error}",
+                tmp_path.display()
+            ))
+        })?;
+    }
+    fs::rename(&tmp_path, path).map_err(|error| {
+        let _ = fs::remove_file(&tmp_path);
+        RefineError::Io(format!(
+            "failed to write {label} {}: {error}",
+            path.display()
+        ))
+    })
 }
 
 fn new_process_id() -> String {

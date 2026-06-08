@@ -3084,6 +3084,12 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             exit_code: Some(0),
         })
         .unwrap();
+    fs::write(runtime_root.join("processes/empty-process.json"), "").unwrap();
+    fs::write(
+        runtime_root.join("processes/malformed-process.json"),
+        "{not json",
+    )
+    .unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -3162,6 +3168,16 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .find(|process| process["id"] == "ui-context")
         .unwrap();
     assert_eq!(ui_context["kind"], "ui");
+    assert!(
+        !listed_processes
+            .iter()
+            .any(|process| process["id"] == "empty-process")
+    );
+    assert!(
+        !listed_processes
+            .iter()
+            .any(|process| process["id"] == "malformed-process")
+    );
 
     supervisor
         .register(ManagedProcess {

@@ -44,8 +44,6 @@ async function waitForImportPersistJob(jobId, root, close, saveSession = null) {
   while (true) {
     const snap = await api("GET", `/api/jobs/${jobId}`);
     const job = snap.job || {};
-    if (saveSession) saveSession({ phase: "saving", jobId, progress: job.progress || {} });
-    drawImportSaving(root, readImportSession(), close, saveSession);
     if (job.status === "complete") {
       const result = job.result || {};
       if (result.http_status && result.http_status >= 400) {
@@ -68,6 +66,8 @@ async function waitForImportPersistJob(jobId, root, close, saveSession = null) {
       err.code = job.error?.code;
       throw err;
     }
+    if (saveSession) saveSession({ phase: "saving", jobId, progress: job.progress || {} });
+    drawImportSaving(root, readImportSession(), close, saveSession);
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
 }
@@ -76,14 +76,6 @@ async function waitForImportJobCancellation(jobId, root, close, saveSession = nu
   while (true) {
     const snap = await api("GET", `/api/jobs/${jobId}`);
     const job = snap.job || {};
-    if (saveSession) {
-      saveSession({
-        phase: "saving",
-        jobId,
-        progress: { ...(job.progress || {}), message: "Cancelling" },
-      });
-    }
-    drawImportSaving(root, readImportSession(), close, saveSession);
     if (job.status === "cancelled") return job;
     if (job.status === "complete") return job;
     if (job.status === "failed") {
@@ -92,6 +84,14 @@ async function waitForImportJobCancellation(jobId, root, close, saveSession = nu
       err.code = job.error?.code;
       throw err;
     }
+    if (saveSession) {
+      saveSession({
+        phase: "saving",
+        jobId,
+        progress: { ...(job.progress || {}), message: "Cancelling" },
+      });
+    }
+    drawImportSaving(root, readImportSession(), close, saveSession);
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 }

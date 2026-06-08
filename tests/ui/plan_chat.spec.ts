@@ -118,15 +118,36 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
     await expect(page.getByTestId("import-persist")).toHaveText("Save (2) gaps to Feature");
     await expect(page.getByTestId("import-persist")).toBeEnabled();
 
+    let completedImportResult: {
+      count?: number;
+      gaps?: Array<{ id?: string }>;
+    } | null = null;
+    const importCompleted = page.waitForResponse(async (response) => {
+      if (!/\/api\/jobs\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
+      if (response.request().method() !== "GET" || response.status() !== 200) return false;
+      const payload = await response.json();
+      if (payload.job?.status === "complete") {
+        completedImportResult = payload.job.result || null;
+        return true;
+      }
+      return false;
+    });
     await page.getByTestId("import-persist").click();
     await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0, { timeout: 30_000 });
+    await importCompleted;
+    expect(completedImportResult?.count).toBe(2);
 
     let createdId = "";
-    await expect.poll(async () => {
-      const gaps = await jsonObject(await request.get(`/api/gaps?limit=100&node=current&q=${encodeURIComponent(editedActual)}`));
-      createdId = String((((gaps.gaps as Array<{ id?: string }> | undefined) ?? [])[0]?.id) ?? "");
-      return createdId;
-    }).not.toBe("");
+    for (const gap of completedImportResult?.gaps ?? []) {
+      const id = String(gap.id ?? "");
+      if (!id) continue;
+      const detail = await jsonObject(await request.get(`/api/gaps/${id}`));
+      const rounds = (detail.gap as { rounds?: Array<{ actual?: string; target?: string }> } | undefined)?.rounds ?? [];
+      if (rounds.some((round) => round.actual === editedActual && round.target === editedTarget)) {
+        createdId = id;
+        break;
+      }
+    }
     expect(createdId).toBeTruthy();
     const createdDetail = await jsonObject(await request.get(`/api/gaps/${createdId}`));
     const createdGap = createdDetail.gap as {
@@ -138,21 +159,17 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
     createdGapIds.add(createdId);
 
     let importedDuplicateId = "";
-    await expect.poll(async () => {
-      const gaps = await jsonObject(await request.get(`/api/gaps?limit=100&node=current&q=${encodeURIComponent(duplicateActual)}`));
-      const candidates = ((gaps.gaps as Array<{ id?: string }> | undefined) ?? [])
-        .map((gap) => String(gap.id ?? ""))
-        .filter((id) => id && id !== duplicateGapId);
-      for (const id of candidates) {
-        const detail = await jsonObject(await request.get(`/api/gaps/${id}`));
-        const rounds = (detail.gap as { rounds?: Array<{ actual?: string; target?: string }> } | undefined)?.rounds ?? [];
-        if (rounds.some((round) => round.actual === duplicateActual && round.target === duplicateTarget)) {
-          importedDuplicateId = id;
-          return importedDuplicateId;
-        }
+    for (const gap of completedImportResult?.gaps ?? []) {
+      const id = String(gap.id ?? "");
+      if (!id || id === duplicateGapId) continue;
+      const detail = await jsonObject(await request.get(`/api/gaps/${id}`));
+      const rounds = (detail.gap as { rounds?: Array<{ actual?: string; target?: string }> } | undefined)?.rounds ?? [];
+      if (rounds.some((round) => round.actual === duplicateActual && round.target === duplicateTarget)) {
+        importedDuplicateId = id;
+        break;
       }
-      return "";
-    }).not.toBe("");
+    }
+    expect(importedDuplicateId).toBeTruthy();
     createdGapIds.add(importedDuplicateId);
   } finally {
     await closePlanTabIfPresent(page);
@@ -224,20 +241,37 @@ test("updates an original Gap from a Plan draft duplicate decision", async ({ pa
     await expect(page.getByTestId("import-duplicate-decision")).toHaveText("Will update original priority");
     await expect(page.getByTestId("import-persist")).toHaveText("Save (1) gap to new Feature");
 
+    let completedImportResult: {
+      duplicate_actions?: { updated_original?: number };
+      gaps?: Array<{ id?: string }>;
+    } | null = null;
+    const importCompleted = page.waitForResponse(async (response) => {
+      if (!/\/api\/jobs\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
+      if (response.request().method() !== "GET" || response.status() !== 200) return false;
+      const payload = await response.json();
+      const job = payload.job || {};
+      if (job.status !== "complete") return false;
+      completedImportResult = job.result || {};
+      return true;
+    });
     await page.getByTestId("import-persist").click();
     await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0, { timeout: 30_000 });
+    await importCompleted;
 
     await expect.poll(async () => {
       const detail = await jsonObject(await request.get(`/api/gaps/${duplicateGapId}`));
       return String((detail.gap as { priority?: string } | undefined)?.priority ?? "");
     }).toBe("high");
 
-    let createdId = "";
-    await expect.poll(async () => {
-      const gaps = await jsonObject(await request.get("/api/gaps?limit=100&node=current&q=smoke-ai%20plan%20actual%20behavior%20two"));
-      createdId = String((((gaps.gaps as Array<{ id?: string }> | undefined) ?? [])[0]?.id) ?? "");
-      return createdId;
-    }).not.toBe("");
+    expect(completedImportResult?.duplicate_actions?.updated_original).toBe(1);
+    const createdId = String((completedImportResult?.gaps ?? [])[0]?.id ?? "");
+    expect(createdId).toBeTruthy();
+    const createdDetail = await jsonObject(await request.get(`/api/gaps/${createdId}`));
+    const createdRounds = (createdDetail.gap as { rounds?: Array<{ actual?: string; target?: string }> } | undefined)?.rounds ?? [];
+    expect(createdRounds.some((round) =>
+      round.actual === "smoke-ai plan actual behavior two" &&
+      round.target === "smoke-ai plan target behavior two"
+    )).toBeTruthy();
     createdGapIds.add(createdId);
   } finally {
     await closePlanTabIfPresent(page);

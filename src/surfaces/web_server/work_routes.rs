@@ -109,6 +109,7 @@ fn persist_import_draft_with_duplicate_decision(
     draft: &ImportDraft,
     feature_id: Option<&str>,
     actions: &mut ImportDuplicateActions,
+    created_gap_ids: &mut Vec<String>,
 ) -> Result<Option<String>, RefineError> {
     let decision = draft.duplicate_decision.trim();
     if !decision.is_empty() && decision != "original" {
@@ -179,6 +180,7 @@ fn persist_import_draft_with_duplicate_decision(
     }
 
     let gap = service.create_gap_summary(&draft.name, None)?;
+    created_gap_ids.push(gap.gap.id.clone());
     if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
         service.append_gap_round_summary(
             &gap.gap.id,
@@ -287,15 +289,10 @@ fn parse_provider_import_output(
     FileImportService::new(PathBuf::new()).parse_text(output, reporter)
 }
 
-fn feature_detail_response(
-    projection: &crate::core::product::project_state::ProjectionSnapshot,
+fn feature_detail_response_from_gaps(
     feature: &crate::core::product::project_state::FeatureSummaryProjection,
+    gaps: Vec<crate::model::gap::GapIndexProjection>,
 ) -> Value {
-    let gaps = feature
-        .gap_ids
-        .iter()
-        .filter_map(|gap_id| projection.gaps.get(gap_id).map(|gap| gap.gap.clone()))
-        .collect::<Vec<_>>();
     let mut value = serde_json::to_value(&feature.feature).unwrap_or_else(|_| json!({}));
     if let Some(object) = value.as_object_mut() {
         object.insert("status".to_string(), json!(feature.rollup.status));
@@ -736,7 +733,10 @@ impl InProcessWebServer {
             }
         }
 
-        ApiResponse::json(201, json!({"gap": gap.gap}))
+        match self.refresh_projection_cache_after_mutation() {
+            Ok(()) => ApiResponse::json(201, json!({"gap": gap.gap})),
+            Err(error) => error_response(error),
+        }
     }
 
     pub(super) fn handle_gap_bulk_update(&self, request: ApiRequest) -> ApiResponse {
@@ -1238,7 +1238,10 @@ impl InProcessWebServer {
             .work_item_service(durable_root)
             .delete_gap_record(gap_id)
         {
-            Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": gap_id})),
+            Ok(()) => match self.refresh_projection_cache_after_mutation() {
+                Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": gap_id})),
+                Err(error) => error_response(error),
+            },
             Err(error) => error_response(error),
         }
     }
@@ -1263,6 +1266,7 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_feature_show(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "read Features");
         let Some(feature_id) = request
             .path
             .strip_prefix("/work/features/")
@@ -1270,29 +1274,24 @@ impl InProcessWebServer {
         else {
             return feature_id_required();
         };
-        match self.current_projection() {
-            Ok(projection) => match projection.features.get(feature_id) {
-                Some(feature) => {
-                    let feature_detail = feature_detail_response(&projection, feature);
-                    ApiResponse::json(
-                        200,
-                        json!({
-                            "feature": feature_detail,
-                            "gap_ids": feature.gap_ids,
-                            "rollup": feature.rollup
-                        }),
-                    )
-                }
-                None => ApiResponse::json(
-                    404,
+        let service = FileWorkItemService::new(durable_root);
+        match service.show_feature_summary(feature_id) {
+            Ok(feature) => {
+                let gaps = feature
+                    .gap_ids
+                    .iter()
+                    .filter_map(|gap_id| service.show_gap_summary(gap_id).ok().map(|gap| gap.gap))
+                    .collect::<Vec<_>>();
+                let feature_detail = feature_detail_response_from_gaps(&feature, gaps);
+                ApiResponse::json(
+                    200,
                     json!({
-                        "error": {
-                            "code": "not_found",
-                            "message": format!("Feature {feature_id} was not found")
-                        }
+                        "feature": feature_detail,
+                        "gap_ids": feature.gap_ids,
+                        "rollup": feature.rollup
                     }),
-                ),
-            },
+                )
+            }
             Err(error) => error_response(error),
         }
     }
@@ -1327,10 +1326,13 @@ impl InProcessWebServer {
             .work_item_service(durable_root)
             .assign_gap_to_feature(feature_id, gap_id)
         {
-            Ok(feature) => ApiResponse::json(
-                200,
-                json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
-            ),
+            Ok(feature) => match self.refresh_projection_cache_after_mutation() {
+                Ok(()) => ApiResponse::json(
+                    200,
+                    json!({"feature": feature.feature, "gap_ids": feature.gap_ids, "rollup": feature.rollup}),
+                ),
+                Err(error) => error_response(error),
+            },
             Err(error) => error_response(error),
         }
     }
@@ -1514,7 +1516,10 @@ impl InProcessWebServer {
             .work_item_service(durable_root)
             .delete_feature_record(feature_id)
         {
-            Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": feature_id})),
+            Ok(()) => match self.refresh_projection_cache_after_mutation() {
+                Ok(()) => ApiResponse::json(200, json!({"deleted": true, "id": feature_id})),
+                Err(error) => error_response(error),
+            },
             Err(error) => error_response(error),
         }
     }
@@ -2242,7 +2247,6 @@ impl InProcessWebServer {
                     &job_id,
                 );
                 if response.status == 499 {
-                    let _ = server.refresh_projection_cache_after_mutation();
                     return;
                 }
                 let mut result = response.body.clone();
@@ -2266,13 +2270,23 @@ impl InProcessWebServer {
                         "total": draft_total
                     }),
                 );
+                let refresh_result = server.refresh_projection_cache_after_mutation();
                 let state = if response.status >= 400 {
                     JobState::Failed
                 } else {
                     JobState::Succeeded
                 };
-                let _ = registry.finish_with_result(&job_id, state, result);
-                let _ = server.refresh_projection_cache_after_mutation();
+                if let Err(error) = refresh_result {
+                    let _ = registry.fail_with_error(
+                        &job_id,
+                        json!({
+                            "code": "projection_refresh_failed",
+                            "message": error.to_string()
+                        }),
+                    );
+                } else {
+                    let _ = registry.finish_with_result(&job_id, state, result);
+                }
             });
             return ApiResponse::json(202, json!({ "job": job_response(job) }));
         }
@@ -2326,6 +2340,16 @@ impl InProcessWebServer {
                 Ok(()) => {}
                 Err(ImportPersistWorkerError::Cancelled) => {
                     rollback_import_gaps(&service, &created_gap_ids);
+                    if let Err(error) = self.refresh_projection_cache_after_mutation() {
+                        let _ = registry.fail_with_error(
+                            job_id,
+                            json!({
+                                "code": "projection_refresh_failed",
+                                "message": error.to_string()
+                            }),
+                        );
+                        return error_response(error);
+                    }
                     let _ = registry.update_progress(
                         job_id,
                         json!({
@@ -2394,10 +2418,11 @@ impl InProcessWebServer {
                 &draft,
                 feature_id,
                 duplicate_actions,
+                created_gap_ids,
             )
             .map_err(ImportPersistWorkerError::Failed)?
             {
-                created_gap_ids.push(gap_id);
+                let _ = gap_id;
             }
             let _ = registry.update_progress(
                 job_id,
@@ -2454,8 +2479,9 @@ impl InProcessWebServer {
                             &draft,
                             feature_id.as_deref(),
                             &mut duplicate_actions,
+                            &mut gap_ids,
                         )? {
-                            gap_ids.push(gap_id);
+                            let _ = gap_id;
                         }
                     }
                     Ok(crate::core::product::imports::ImportPersistResult {

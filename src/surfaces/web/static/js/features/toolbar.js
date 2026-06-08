@@ -70,7 +70,7 @@ function ensureStandaloneTab() {
     chatState.tabs.standalone = {
       gapId: null, label: "Standalone", mode: "standalone",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false, progress: "", showProgress: true,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
   }
   ensureChatTabQueueState(chatState.tabs.standalone);
@@ -84,7 +84,7 @@ function ensureFilesTab() {
     chatState.tabs[FILES_TAB_ID] = {
       gapId: null, label: "Files", mode: "files",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false, progress: "", showProgress: true,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
   }
   ensureChatTabQueueState(chatState.tabs[FILES_TAB_ID]);
@@ -95,7 +95,7 @@ function ensureSystemTab() {
     chatState.tabs[SYSTEM_TAB_ID] = {
       gapId: null, label: "System", mode: "system",
       sessionId: null, output: "", closedReason: null,
-      agentResponded: false, progress: "", showProgress: true,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
     };
   }
   ensureChatTabQueueState(chatState.tabs[SYSTEM_TAB_ID]);
@@ -136,6 +136,7 @@ function ensureChatTabQueueState(tab) {
   tab.localQueuedMessages = normalizeQueuedMessages(tab.localQueuedMessages);
   tab.starting = !!tab.starting;
   tab.sending = !!tab.sending;
+  tab.sentUserInput = !!tab.sentUserInput;
   return tab;
 }
 
@@ -195,6 +196,7 @@ function saveChatStateToStorage() {
         showProgress: t.showProgress !== false,
         closedReason: t.closedReason,
         agentResponded: !!t.agentResponded,
+        sentUserInput: !!t.sentUserInput,
         queuedMessages: normalizeQueuedMessages(t.queuedMessages),
         localQueuedMessages: normalizeQueuedMessages(t.localQueuedMessages),
         starting: !!t.starting,
@@ -330,7 +332,7 @@ function openChatDock({ gapId = null, gapStatus = null } = {}) {
         mode: "gap",
         gapStatus: gapStatus || "",
         sessionId: null, output: "", progress: "", showProgress: true,
-        closedReason: null, agentResponded: false,
+        closedReason: null, agentResponded: false, sentUserInput: false,
         queuedMessages: [], localQueuedMessages: [], starting: false,
       };
     } else if (gapStatus) {
@@ -365,6 +367,7 @@ function ensurePlanTab() {
       showProgress: true,
       closedReason: null,
       agentResponded: false,
+      sentUserInput: false,
       queuedMessages: [],
       localQueuedMessages: [],
       starting: false,
@@ -1954,6 +1957,7 @@ async function clearActiveChat() {
     t.localQueuedMessages = [];
     t.starting = false;
     t.agentResponded = false;
+    t.sentUserInput = false;
     saveChatStateToStorage();
     drawChat();
   });
@@ -2012,6 +2016,7 @@ function chatLinesIncludeAgentResponse(lines) {
 
 function planHasAgentResponse(tab) {
   if (!tab) return false;
+  if (tab.mode === "plan" && !tab.sentUserInput) return false;
   if (tab.agentResponded) return true;
   return (tab.output || "")
     .split(/\r?\n/)
@@ -2671,6 +2676,7 @@ async function queueChatTextOnServer(tab, text) {
     const r = await api("POST", `/api/chat/${tab.sessionId}/input`, { text });
     tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
     tab.closedReason = null;
+    tab.sentUserInput = true;
     saveChatStateToStorage();
     refreshProcessesTabForChatChange();
     drawToolbar();

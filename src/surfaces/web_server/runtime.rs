@@ -237,17 +237,14 @@ impl InProcessWebServer {
     }
 
     pub(super) fn refresh_projection_cache_after_mutation(&self) -> RefineResult<()> {
-        let Some(runtime_root) = &self.runtime_root else {
+        if self.runtime_root.is_none() {
             return Ok(());
-        };
-        let Some(durable_root) = self.current_durable_root()? else {
+        }
+        if self.current_durable_root()?.is_none() {
             return Ok(());
-        };
-        let snapshot = FileProjectStateStore::new(&durable_root)
-            .load_or_refresh_projection(&runtime_root.join("cache"))?;
-        store_hot_projection(projection_cache_key(&durable_root, runtime_root), snapshot)?;
-        let _ = self.refresh_runtime_projection_cache()?;
-        Ok(())
+        }
+        self.rebuild_current_projection_cache()?;
+        self.current_projection_with_runtime().map(|_| ())
     }
 
     pub(super) fn warm_current_projection_cache(&self) -> RefineResult<Option<ProjectionSnapshot>> {

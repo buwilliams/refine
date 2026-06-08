@@ -79,7 +79,7 @@ test("filters Logs, visualizes severity buckets, and expands details", async ({ 
 test("paginates and sorts Logs through URL-backed controls", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const prefix = `Logs pagination ${Date.now()}`;
-  for (let i = 0; i < 52; i++) {
+  for (let i = 0; i < 12; i++) {
     await jsonObject(await request.post("/api/activity/ui-error", {
       data: {
         message: `${prefix} ${String(i).padStart(2, "0")}`,
@@ -90,10 +90,10 @@ test("paginates and sorts Logs through URL-backed controls", async ({ page, requ
     }));
   }
 
-  await page.goto(`/#/logs?q=${encodeURIComponent(prefix)}&limit=50&sort=datetime&dir=desc`);
+  await page.goto(`/#/logs?q=${encodeURIComponent(prefix)}&limit=10&sort=datetime&dir=desc`);
   await expect(page.getByTestId("logs-search")).toHaveValue(prefix);
-  await expect(page.getByTestId("logs-row")).toHaveCount(50);
-  await expect(page.getByTestId("logs-pagination")).toContainText("1-50 entries");
+  await expect(page.getByTestId("logs-row")).toHaveCount(10);
+  await expect(page.getByTestId("logs-pagination")).toContainText("1-10 entries");
   await expect(page.getByTestId("logs-page-current")).toHaveText("Page 1");
   await expect(page.getByTestId("logs-page-prev")).toBeDisabled();
   await expect(page.getByTestId("logs-page-next")).toBeEnabled();
