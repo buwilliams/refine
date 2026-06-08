@@ -26,6 +26,10 @@ refine has a robust CLI:
 ./r --help
 ```
 
+## Agent Install
+
+If you want OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine for you, point it at [docs/agent-install.md](docs/agent-install.md). That runbook gives the agent exact install, verification, and reporting steps.
+
 For testing Refine, there is a black-box testing app for Refine surfaces (UI and CLI) at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
 
 ### Windows Users
