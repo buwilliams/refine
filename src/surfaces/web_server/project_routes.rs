@@ -84,11 +84,13 @@ fn governance_generation_prompt(product: &str, constitution: &str) -> String {
 
 fn target_app_generation_prompt(source_root: &std::path::Path) -> String {
     format!(
-        "Generate target app config for this project. Return only JSON with kind=target-app and \
-         fields start_command, stop_command, rebuild_command, status_command, cwd, env, \
+        "Analyze this target app codebase and generate lifecycle commands for Refine to wrap. \
+         Return only JSON with kind=target-app and fields start_command, stop_command, \
+         rebuild_command, status_command, cwd, env, \
          start_timeout_seconds, stop_timeout_seconds, rebuild_timeout_seconds, \
          status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
-         process_check_command, and notes.\n\nProject root: {}",
+         process_check_command, and notes. Do not write files; Refine will write \
+         .refine/manage-app.sh from your analysis.\n\nProject root: {}",
         source_root.display()
     )
 }
@@ -658,7 +660,10 @@ impl InProcessWebServer {
             Err(error) => Err(error),
         };
         match config {
-            Ok(config) => {
+            Ok(mut config) => {
+                if let Err(error) = service.write_manage_app_wrapper(&mut config) {
+                    return error_response(error);
+                }
                 let settings = json!({
                     "target_app_start_command": config.start_command.clone(),
                     "target_app_stop_command": config.stop_command.clone(),

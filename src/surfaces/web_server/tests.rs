@@ -3886,12 +3886,18 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         body: Some(json!({"kind": "all"})),
     });
     assert_eq!(generated.status, 200);
-    assert_eq!(generated.body["config"]["start_command"], "npm run dev");
+    assert_eq!(
+        generated.body["config"]["start_command"],
+        "./.refine/manage-app.sh start"
+    );
     assert_eq!(
         generated.body["settings"]["target_app_rebuild_command"],
-        "npm run build"
+        "./.refine/manage-app.sh rebuild"
     );
     assert_eq!(generated.body["config"]["tcp_check_port"], "3000");
+    let wrapper = fs::read_to_string(temp_root.join(".refine/manage-app.sh")).unwrap();
+    assert!(wrapper.contains("START_COMMAND='npm run dev'"));
+    assert!(wrapper.contains("REBUILD_COMMAND='npm run build'"));
 
     let rebuild = server.handle(ApiRequest {
         method: "POST".to_string(),

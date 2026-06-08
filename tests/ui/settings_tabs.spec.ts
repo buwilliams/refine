@@ -722,8 +722,8 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
     const generatedPayload = await (await generated).json();
     expect(generatedPayload.provider).toBe("smoke-ai");
     expect(generatedPayload.source).toBe("provider");
-    expect(generatedPayload.config.start_command).toBe("printf smoke-ai-target-start");
-    await expect(page.getByTestId("target-app-start-command")).toHaveValue("printf smoke-ai-target-start");
+    expect(generatedPayload.config.start_command).toBe("./.refine/manage-app.sh start");
+    await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
 
     await page.getByTestId("settings-tab-processes").click();
     await expect(page.getByTestId("settings-pane-processes")).toHaveClass(/active/);

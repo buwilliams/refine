@@ -50,12 +50,12 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
     expect(payload.provider).toBe("smoke-ai");
     expect(payload.source).toBe("provider");
     expect(String(payload.raw ?? "")).toContain("refine-smoke target app check passed");
-    expect(payload.config.start_command).toBe("printf smoke-ai-target-start");
+    expect(payload.config.start_command).toBe("./.refine/manage-app.sh start");
 
-    await expect(page.getByTestId("target-app-start-command")).toHaveValue("printf smoke-ai-target-start");
-    await expect(page.getByTestId("target-app-stop-command")).toHaveValue("printf smoke-ai-target-stop");
-    await expect(page.getByTestId("target-app-rebuild-command")).toHaveValue("printf smoke-ai-target-rebuild");
-    await expect(page.getByTestId("target-app-status-command")).toHaveValue("printf smoke-ai-target-status");
+    await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
+    await expect(page.getByTestId("target-app-stop-command")).toHaveValue("./.refine/manage-app.sh stop");
+    await expect(page.getByTestId("target-app-rebuild-command")).toHaveValue("./.refine/manage-app.sh rebuild");
+    await expect(page.getByTestId("target-app-status-command")).toHaveValue("./.refine/manage-app.sh status");
     await expect(page.getByTestId("target-app-env")).toHaveValue(/REFINE_SMOKE_TARGET/);
     await expect(page.getByTestId("target-app-http-url")).toHaveValue("http://127.0.0.1:3456/health");
     await expect(page.getByTestId("target-app-process-command")).toHaveValue("printf smoke-ai-target-process");
@@ -64,7 +64,7 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
       const saved = await jsonObject(await request.get("/api/settings"));
       const settings = (saved.settings as Record<string, unknown> | undefined) ?? {};
       return String(settings.target_app_start_command ?? "");
-    }).toBe("printf smoke-ai-target-start");
+    }).toBe("./.refine/manage-app.sh start");
   } finally {
     await resetTargetAppSettings(request);
   }

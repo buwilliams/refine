@@ -708,8 +708,8 @@ test("runs AI plan, draft, and target-app generation from the command palette", 
     const generatePayload = await (await generated).json();
     expect(generatePayload.provider).toBe("smoke-ai");
     expect(generatePayload.source).toBe("provider");
-    expect(generatePayload.config.start_command).toBe("printf smoke-ai-target-start");
-    await expect(page.getByTestId("target-app-start-command")).toHaveValue("printf smoke-ai-target-start");
+    expect(generatePayload.config.start_command).toBe("./.refine/manage-app.sh start");
+    await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
   } finally {
     const planTab = page.getByTestId("toolbar-tab-plan");
     if (await planTab.count()) {
