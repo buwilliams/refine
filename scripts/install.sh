@@ -11,6 +11,7 @@ REFINE_RAW_INSTALL_URL="${REFINE_RAW_INSTALL_URL:-https://raw.githubusercontent.
 REFINE_INSTALL_CHECKOUT_DEFAULT="${REFINE_INSTALL_CHECKOUT_DEFAULT:-${REFINE_INSTALL_BASE_DEFAULT:-$HOME/refine}}"
 REFINE_DEFAULT_PORT="${REFINE_DEFAULT_PORT:-8080}"
 REFINE_INSTALL_PORT="${REFINE_INSTALL_PORT:-}"
+REFINE_BIND_ADDRESS="${REFINE_BIND_ADDRESS:-}"
 REFINE_UPDATE_TARGET_APP="${REFINE_UPDATE_TARGET_APP:-1}"
 REFINE_INSTALL_PROVIDER="${REFINE_INSTALL_PROVIDER:-}"
 REFINE_INSTALL_TARGET_APP="${REFINE_INSTALL_TARGET_APP:-}"
@@ -375,6 +376,22 @@ resolve_refine_port() {
   fi
   [ -n "$port" ] || port="$REFINE_DEFAULT_PORT"
   printf '%s\n' "$port"
+}
+
+running_in_container() {
+  [ -f /.dockerenv ] && return 0
+  [ -f /run/.containerenv ] && return 0
+  grep -qaE '/(docker|containerd|kubepods|libpod)(/|[-:])' /proc/1/cgroup 2>/dev/null
+}
+
+resolve_bind_address() {
+  if [ -n "$REFINE_BIND_ADDRESS" ]; then
+    printf '%s\n' "$REFINE_BIND_ADDRESS"
+  elif running_in_container; then
+    printf '0.0.0.0\n'
+  else
+    printf '127.0.0.1\n'
+  fi
 }
 
 terminal_available() {
@@ -1568,8 +1585,10 @@ target_refine() {
 start_refine() {
   section "Start Refine"
   local port
+  local bind_address
   local refine_started="1"
   port="$(prompt "Refine port" "$(resolve_refine_port)")"
+  bind_address="$(resolve_bind_address)"
   if has_systemd && confirm "Prepare Refine as a persistent service with: ./r system install --target linux-cli-web --port $port" "y"; then
     if run ./r system install --target linux-cli-web --port "$port" --runtime-root run; then
       ok "Refine installed as a persistent service"
@@ -1579,25 +1598,25 @@ start_refine() {
         "The persistent service keeps Refine running after terminal close and host restarts." \
         "Run manually: $(refine_manual_prefix) system install --target linux-cli-web --port $port --runtime-root run" \
         "Persistent install failed. Trying non-installed background start."
-      if ! run ./r system start --port "$port" --runtime-root run; then
+      if ! run ./r system start --port "$port" --bind-address "$bind_address" --runtime-root run; then
         warn_issue \
           "Refine background start" \
           "Refine must be running for the browser UI." \
-          "Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run" \
-          "Could not start Refine. Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run"
+          "Run manually: $(refine_manual_prefix) system start --port $port --bind-address $bind_address --runtime-root run" \
+          "Could not start Refine. Run manually: $(refine_manual_prefix) system start --port $port --bind-address $bind_address --runtime-root run"
         refine_started="0"
       fi
     fi
   else
     if ! has_systemd; then
-      info "Persistent service install requires systemd. Starting with: ./r system start --port $port --runtime-root run"
+      info "Persistent service install requires systemd. Starting with: ./r system start --port $port --bind-address $bind_address --runtime-root run"
     fi
-    if ! run ./r system start --port "$port" --runtime-root run; then
+    if ! run ./r system start --port "$port" --bind-address "$bind_address" --runtime-root run; then
       warn_issue \
         "Refine background start" \
         "Refine must be running for the browser UI." \
-        "Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run" \
-        "Could not start Refine. Run manually: $(refine_manual_prefix) system start --port $port --runtime-root run"
+        "Run manually: $(refine_manual_prefix) system start --port $port --bind-address $bind_address --runtime-root run" \
+        "Could not start Refine. Run manually: $(refine_manual_prefix) system start --port $port --bind-address $bind_address --runtime-root run"
       refine_started="0"
     fi
   fi

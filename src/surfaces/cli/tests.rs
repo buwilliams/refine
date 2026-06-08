@@ -14,7 +14,7 @@ use clap::Parser;
 use serde_json::json;
 use std::fs;
 use std::io::{Read, Write};
-use std::net::TcpListener;
+use std::net::{IpAddr, Ipv4Addr, TcpListener};
 use std::path::PathBuf;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -51,6 +51,12 @@ fn system_start_resolves_relative_runtime_root_before_spawning_daemon() {
         absolute_cli_path(cwd.join("already-absolute")).unwrap(),
         cwd.join("already-absolute")
     );
+}
+
+#[test]
+fn default_static_root_finds_checkout_assets() {
+    let root = super::helpers::default_static_root().expect("static root should exist");
+    assert!(root.join("index.html").is_file());
 }
 
 #[test]
@@ -106,6 +112,7 @@ fn system_start_owns_foreground_web_options() {
         action:
             SystemAction::Start {
                 port,
+                bind_address,
                 runtime_root,
                 once,
                 foreground,
@@ -116,9 +123,27 @@ fn system_start_owns_foreground_web_options() {
         panic!("expected system start command");
     };
     assert_eq!(port, 0);
+    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::LOCALHOST));
     assert_eq!(runtime_root, PathBuf::from("run"));
     assert!(once);
     assert!(!foreground);
+
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "system",
+        "start",
+        "--bind-address",
+        "0.0.0.0",
+        "--once",
+    ])
+    .unwrap();
+    let Commands::System {
+        action: SystemAction::Start { bind_address, .. },
+    } = parsed.command
+    else {
+        panic!("expected system start command");
+    };
+    assert_eq!(bind_address, IpAddr::V4(Ipv4Addr::UNSPECIFIED));
 
     assert!(Cli::try_parse_from(["refine", "system", "web"]).is_err());
     assert!(Cli::try_parse_from(["refine", "system", "web", "--durable-root", ".refine"]).is_err());

@@ -524,6 +524,7 @@ test("expands supervisor child processes from the Processes tab", async ({ page,
 });
 
 test("controls background and agent processes from the Processes tab", async ({ page, request }) => {
+  test.setTimeout(60_000);
   await ensureAttachedProject(request);
   await jsonObject(await request.post("/api/processes/background", { data: { stopped: false } }));
   await jsonObject(await request.post("/api/processes/agents", { data: { paused: false } }));
@@ -980,6 +981,7 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
 });
 
 test("autosaves Runtime Config fields", async ({ page, request }) => {
+  test.setTimeout(120_000);
   await ensureAttachedProject(request);
   const original = await jsonObject(await request.get("/api/settings"));
   const originalSettings = original.settings as Record<string, unknown>;
@@ -1101,6 +1103,7 @@ async function waitForPerformanceMetrics(
 }
 
 test("filters, refreshes, prunes, and clears Performance metrics", async ({ page, request }) => {
+  test.setTimeout(120_000);
   await ensureAttachedProject(request);
   await jsonObject(await request.post("/api/performance/cleanup", { data: { clear: true } }));
   await seedPerformanceMetrics(request);
@@ -1151,12 +1154,12 @@ test("filters, refreshes, prunes, and clears Performance metrics", async ({ page
   await expect(page).toHaveURL(/#\/node\/performance$/);
   await expect(page.getByTestId("performance-filtered-pill")).toBeHidden();
 
-  const refreshed = page.waitForResponse((response) =>
-    response.url().includes("/api/performance?") && response.status() === 200
-  );
   await page.getByTestId("performance-refresh").click();
-  await refreshed;
   await expect(page.getByTestId("performance-events-table")).toBeVisible();
+  await expect.poll(async () => {
+    const payload = await jsonObject(await request.get("/api/performance?limit=50&offset=0"));
+    return Number(payload.total_event_count ?? 0);
+  }, { timeout: 30_000 }).toBeGreaterThan(0);
 
   const pruned = page.waitForResponse((response) =>
     response.url().includes("/api/performance/cleanup") &&

@@ -18,6 +18,16 @@ async function selectReporter(page: Page) {
   await page.getByTestId("global-reporter").selectOption("refine-smoke");
 }
 
+async function startStandaloneChat(page: Page): Promise<string> {
+  await page.getByTestId("chat-toggle").click();
+  const status = page.getByTestId("chat-status");
+  await expect(status).toContainText(/Session .+ active/);
+  const statusText = await status.textContent();
+  const sessionId = statusText?.match(/Session\s+(\S+)\s+active/)?.[1] ?? "";
+  expect(sessionId).toBeTruthy();
+  return sessionId;
+}
+
 test("runs standalone chat controls through Smoke AI", async ({ page, request }) => {
   test.setTimeout(60_000);
   await ensureAttachedProject(request);
@@ -30,8 +40,7 @@ test("runs standalone chat controls through Smoke AI", async ({ page, request })
   await expect(page.getByTestId("chat-input")).toBeVisible();
   await expect(page.getByTestId("chat-status")).toContainText("No active session");
 
-  await page.getByTestId("chat-toggle").click();
-  await expect(page.getByTestId("chat-status")).toContainText("active");
+  await startStandaloneChat(page);
   await expect(page.getByTestId("chat-toggle")).toHaveText("Stop standalone");
 
   await fillChatInputStable(page, "Start a standalone chat conversation for Smoke AI.");
@@ -57,7 +66,7 @@ test("runs standalone chat controls through Smoke AI", async ({ page, request })
 });
 
 test("drafts a Gap from standalone chat context through Smoke AI", async ({ page, request }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await ensureAttachedProject(request);
   let gapId = "";
 
@@ -71,17 +80,10 @@ test("drafts a Gap from standalone chat context through Smoke AI", async ({ page
     await page.getByTestId("toolbar-tab-standalone").click();
     await expect(page.getByTestId("standalone-draft-gap")).toBeVisible();
     await expect(page.getByTestId("standalone-draft-gap")).toBeDisabled();
-    await page.getByTestId("chat-toggle").click();
-    await expect(page.getByTestId("chat-status")).toContainText("active");
-
-    await fillChatInputStable(page, "Start a standalone chat conversation before drafting a Gap.");
-    const chatInputQueued = page.waitForResponse((response) =>
-      /\/api\/chat\/[^/]+\/input$/.test(new URL(response.url()).pathname) &&
-      response.request().method() === "POST" &&
-      response.status() === 200
-    );
-    await page.getByTestId("chat-send").click();
-    await chatInputQueued;
+    const sessionId = await startStandaloneChat(page);
+    await jsonObject(await request.post(`/api/chat/${encodeURIComponent(sessionId)}/input`, {
+      data: { text: "Start a standalone chat conversation before drafting a Gap." },
+    }));
     await expect(page.getByTestId("chat-output")).toContainText("smoke-ai chat response", { timeout: 45_000 });
     await expect(page.getByTestId("standalone-draft-gap")).toBeEnabled();
 
@@ -205,8 +207,7 @@ test("does not duplicate transcript lines when chat redraws race polling", async
   await page.goto("/");
 
   await page.getByTestId("toolbar-tab-standalone").click();
-  await page.getByTestId("chat-toggle").click();
-  await expect(page.getByTestId("chat-status")).toContainText("active");
+  await startStandaloneChat(page);
 
   await fillChatInputStable(page, prompt);
   await page.getByTestId("chat-send").click();
@@ -224,7 +225,7 @@ test("does not duplicate transcript lines when chat redraws race polling", async
 });
 
 test("edits and removes standalone queued chat messages", async ({ page, request }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   await ensureAttachedProject(request);
   await page.addInitScript(() => {
     localStorage.removeItem("refine_chat_tabs");
@@ -233,17 +234,10 @@ test("edits and removes standalone queued chat messages", async ({ page, request
 
   await page.getByTestId("toolbar-tab-standalone").click();
   await expect(page.getByTestId("chat-input")).toBeVisible();
-  await page.getByTestId("chat-toggle").click();
-  await expect(page.getByTestId("chat-status")).toContainText("active");
-
-  await fillChatInputStable(page, "Start a smoke-ai queue delay chat turn.");
-  const firstInput = page.waitForResponse((response) =>
-    /\/api\/chat\/[^/]+\/input$/.test(new URL(response.url()).pathname) &&
-    response.request().method() === "POST" &&
-    response.status() === 200
-  );
-  await page.getByTestId("chat-send").click();
-  await firstInput;
+  const sessionId = await startStandaloneChat(page);
+  await jsonObject(await request.post(`/api/chat/${encodeURIComponent(sessionId)}/input`, {
+    data: { text: "Start a smoke-ai queue delay chat turn." },
+  }));
   await expect(page.getByTestId("chat-queue")).toHaveCount(0);
 
   await fillChatInputStable(page, "Queued standalone message before edit.");

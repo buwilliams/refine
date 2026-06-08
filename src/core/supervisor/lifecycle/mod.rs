@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{IpAddr, Ipv4Addr, TcpStream};
 use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
@@ -31,11 +31,23 @@ pub struct DaemonStatus {
     pub degraded_integrations: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct BackgroundDaemonConfig {
     pub port: u16,
+    pub bind_address: IpAddr,
     pub cache_dir: Option<PathBuf>,
     pub static_root: Option<PathBuf>,
+}
+
+impl Default for BackgroundDaemonConfig {
+    fn default() -> Self {
+        Self {
+            port: 0,
+            bind_address: IpAddr::V4(Ipv4Addr::LOCALHOST),
+            cache_dir: None,
+            static_root: None,
+        }
+    }
 }
 
 pub trait DaemonLifecycleService {
@@ -142,6 +154,8 @@ impl FileDaemonLifecycleService {
             "--foreground".to_string(),
             "--port".to_string(),
             port.to_string(),
+            "--bind-address".to_string(),
+            config.bind_address.to_string(),
             "--runtime-root".to_string(),
             runtime_root.display().to_string(),
         ]);
@@ -473,6 +487,7 @@ mod tests {
 
         let result = service.start_background_daemon(BackgroundDaemonConfig {
             port: 4555,
+            bind_address: IpAddr::V4(Ipv4Addr::LOCALHOST),
             cache_dir: None,
             static_root: None,
         });

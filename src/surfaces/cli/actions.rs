@@ -1,3 +1,4 @@
+use std::net::{IpAddr, Ipv4Addr};
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -724,6 +725,8 @@ pub enum SystemAction {
     Start {
         #[arg(long, default_value_t = 8080)]
         port: u16,
+        #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
+        bind_address: IpAddr,
         #[arg(long)]
         cache_dir: Option<PathBuf>,
         #[arg(long)]

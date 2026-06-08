@@ -826,13 +826,22 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             action:
                 SystemAction::Start {
                     port,
+                    bind_address,
                     cache_dir,
                     static_root,
                     runtime_root,
                     once,
                     foreground,
                 },
-        } => run_system_start(port, cache_dir, static_root, runtime_root, once, foreground),
+        } => run_system_start(
+            port,
+            bind_address,
+            cache_dir,
+            static_root,
+            runtime_root,
+            once,
+            foreground,
+        ),
         Commands::System {
             action: SystemAction::Stop { port, runtime_root },
         } => {
@@ -1638,6 +1647,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
 
 fn run_system_start(
     port: u16,
+    bind_address: std::net::IpAddr,
     cache_dir: Option<PathBuf>,
     static_root: Option<PathBuf>,
     runtime_root: PathBuf,
@@ -1653,6 +1663,7 @@ fn run_system_start(
         })
         .start_background_daemon(BackgroundDaemonConfig {
             port,
+            bind_address,
             cache_dir,
             static_root,
         })?;
@@ -1662,7 +1673,7 @@ fn run_system_start(
         );
         return Ok(());
     }
-    let listener = LocalHttpDaemon::bind_loopback(port)?;
+    let listener = LocalHttpDaemon::bind_address(bind_address, port)?;
     let addr = LocalHttpDaemon::local_addr(&listener)?;
     let actual_port = addr.port();
     let port_runtime_root = RuntimeRoot {

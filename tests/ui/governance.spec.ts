@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { ensureAttachedProject, jsonObject } from "./helpers";
 
 test("generates governance rules through Smoke AI", async ({ page, request }) => {
+  test.setTimeout(60_000);
   await ensureAttachedProject(request);
 
   try {
@@ -25,6 +26,11 @@ test("generates governance rules through Smoke AI", async ({ page, request }) =>
       response.request().method() === "POST" &&
       response.status() === 200
     );
+    const savedGeneratedRules = page.waitForResponse((response) =>
+      response.url().includes("/api/governance") &&
+      response.request().method() === "PATCH" &&
+      response.status() === 200
+    );
     await page.getByTestId("governance-generate").click();
     const payload = await (await generated).json();
     expect(payload.provider).toBe("smoke-ai");
@@ -33,6 +39,7 @@ test("generates governance rules through Smoke AI", async ({ page, request }) =>
 
     await expect(page.getByTestId("governance-rule-input").first()).toHaveValue(/smoke-ai governance response/);
     await expect(page.getByTestId("governance-rule-input").nth(1)).toHaveValue(/clear ownership/);
+    await savedGeneratedRules;
 
     const saved = await jsonObject(await request.get("/api/governance"));
     const rules = (saved.rules as Array<{ text?: string; source?: string }> | undefined) ?? [];

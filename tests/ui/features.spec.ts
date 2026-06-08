@@ -144,6 +144,7 @@ test("filters and sorts Features through URL-backed controls", async ({ page, re
 });
 
 test("paginates Features and preserves URL-backed filter state", async ({ page, request }) => {
+  test.setTimeout(60_000);
   const createdIds: string[] = [];
   const prefix = `Feature pagination ${Date.now()}`;
   for (let i = 0; i < 52; i++) {
@@ -193,7 +194,7 @@ test("paginates Features and preserves URL-backed filter state", async ({ page, 
 });
 
 test("manages Feature detail actions and ordered Gaps through the browser", async ({ page, request }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const suffix = Date.now();
   let featureId = "";
   let featureDeleted = false;

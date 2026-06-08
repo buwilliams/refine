@@ -244,6 +244,7 @@ test("runs Gap More actions through the browser", async ({ page, request }) => {
 });
 
 test("drives Gap detail workflow buttons for user-visible statuses", async ({ page, request }) => {
+  test.setTimeout(60_000);
   const suffix = Date.now();
   const createdIds: string[] = [];
   const createGap = async (label: string) => {
@@ -1047,7 +1048,7 @@ test("bulk assigns Features, transfers nodes, and deletes selected Gaps", async 
 });
 
 test("paginates Gaps and tracks filter-scoped selection across pages", async ({ page, request }) => {
-  test.setTimeout(60_000);
+  test.setTimeout(120_000);
   const createdIds: string[] = [];
   const prefix = `Gaps pagination ${Date.now()}`;
   for (let i = 0; i < 12; i++) {

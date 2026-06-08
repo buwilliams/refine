@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
 use std::env;
 use std::fs;
-use std::net::{SocketAddr, TcpListener};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -181,9 +181,13 @@ impl LocalHttpDaemon {
     }
 
     pub fn bind_loopback(port: u16) -> RefineResult<TcpListener> {
-        TcpListener::bind(("127.0.0.1", port)).map_err(|error| {
+        Self::bind_address(IpAddr::V4(Ipv4Addr::LOCALHOST), port)
+    }
+
+    pub fn bind_address(bind_address: IpAddr, port: u16) -> RefineResult<TcpListener> {
+        TcpListener::bind((bind_address, port)).map_err(|error| {
             RefineError::Io(format!(
-                "failed to bind local daemon web server on 127.0.0.1:{port}: {error}"
+                "failed to bind local daemon web server on {bind_address}:{port}: {error}"
             ))
         })
     }

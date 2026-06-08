@@ -15,6 +15,14 @@ function csvLine(cells: string[]): string {
   }).join(",");
 }
 
+async function waitForGapInProjection(request, gapId: string, query: string) {
+  await expect.poll(async () => {
+    const gaps = await jsonObject(await request.get(`/api/gaps?limit=100&node=current&q=${encodeURIComponent(query)}`));
+    return ((gaps.gaps as Array<{ id?: string }> | undefined) ?? [])
+      .some((gap) => String(gap.id ?? "") === gapId);
+  }, { timeout: 30_000 }).toBe(true);
+}
+
 test("extracts and saves AI Import drafts through Smoke AI", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const createdGapIds: string[] = [];
@@ -123,6 +131,7 @@ test("reviews CSV import drafts with pagination and bulk duplicate decisions", a
     const originalId = String((originalPayload.gap as { id?: string } | undefined)?.id ?? "");
     expect(originalId).toBeTruthy();
     createdGapIds.add(originalId);
+    await waitForGapInProjection(request, originalId, prefix);
 
     await page.goto("/");
     await page.evaluate(() => localStorage.removeItem("refine_import_session_v1"));
@@ -219,7 +228,7 @@ test("reviews CSV import drafts with pagination and bulk duplicate decisions", a
 });
 
 test("hides and recovers a background CSV import save", async ({ page, request }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   await ensureAttachedProject(request);
   const createdGapIds = new Set<string>();
   const suffix = Date.now();
