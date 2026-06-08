@@ -258,6 +258,7 @@ test("persists dashboard review panels and completes review actions", async ({ p
   };
   const firstId = await createReviewGap("Dashboard review first");
   const secondId = await createReviewGap("Dashboard review second");
+  const thirdId = await createReviewGap("Dashboard review third");
 
   await page.addInitScript((selectedReporter) => {
     if (!sessionStorage.getItem("dashboard_review_test_initialized")) {
@@ -274,8 +275,8 @@ test("persists dashboard review panels and completes review actions", async ({ p
 
     const reviewPanel = page.getByTestId("dashboard-review-panel");
     await expect(reviewPanel).toHaveJSProperty("open", true);
-    await expect(page.getByTestId("dashboard-review-count")).toHaveText("2");
-    await expect(page.getByTestId("dashboard-review-row")).toHaveCount(2);
+    await expect(page.getByTestId("dashboard-review-count")).toHaveText("3");
+    await expect(page.getByTestId("dashboard-review-row")).toHaveCount(3);
 
     await page.getByTestId("dashboard-review-summary").click();
     await expect(reviewPanel).toHaveJSProperty("open", false);
@@ -293,16 +294,17 @@ test("persists dashboard review panels and completes review actions", async ({ p
 
     const firstRow = page.getByTestId("dashboard-review-row").filter({ hasText: "Dashboard review first target" });
     const secondRow = page.getByTestId("dashboard-review-row").filter({ hasText: "Dashboard review second target" });
+    const thirdRow = page.getByTestId("dashboard-review-row").filter({ hasText: "Dashboard review third target" });
     await firstRow.getByTestId("dashboard-review-check").check();
     await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (1)");
     await expect(page.getByTestId("dashboard-review-select-all")).toHaveJSProperty("indeterminate", true);
 
     await page.getByTestId("dashboard-review-select-all").check();
-    await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (2)");
+    await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (3)");
     await expect(page.getByTestId("dashboard-review-select-all")).toBeChecked();
 
     await firstRow.getByTestId("dashboard-review-check").uncheck();
-    await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (1)");
+    await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (2)");
     await expect(page.getByTestId("dashboard-review-select-all")).toHaveJSProperty("indeterminate", true);
 
     await firstRow.getByTestId("dashboard-review-add-round").click();
@@ -319,22 +321,26 @@ test("persists dashboard review panels and completes review actions", async ({ p
     await expect(page.getByTestId("dashboard-add-round-modal")).toHaveCount(0);
     const firstGap = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(firstId)}`));
     expect((firstGap.gap as { round_count?: number } | undefined)?.round_count).toBe(2);
+    expect((firstGap.gap as { status?: string } | undefined)?.status).toBe("todo");
+    await expect(page.getByTestId("dashboard-review-row")).toHaveCount(2);
+    await expect(firstRow).toHaveCount(0);
+    await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (2)");
 
     const verifiedFirst = page.waitForResponse((response) =>
-      response.url().includes(`/api/gaps/${encodeURIComponent(firstId)}/verify`) &&
+      response.url().includes(`/api/gaps/${encodeURIComponent(secondId)}/verify`) &&
       response.request().method() === "POST" &&
       response.status() === 200
     );
-    await firstRow.getByTestId("dashboard-review-verify").click();
+    await secondRow.getByTestId("dashboard-review-verify").click();
     await verifiedFirst;
     await expect(page.getByTestId("dashboard-review-row")).toHaveCount(1);
-    await expect(secondRow).toBeVisible();
+    await expect(thirdRow).toBeVisible();
     await expect(page.getByTestId("dashboard-review-bulk-verify")).toHaveText("Verify selected (1)");
 
     await page.getByTestId("dashboard-review-bulk-verify").click();
     await expect(page.getByRole("dialog")).toContainText("Verify 1 gap?");
     const verifiedSecond = page.waitForResponse((response) =>
-      response.url().includes(`/api/gaps/${encodeURIComponent(secondId)}/verify`) &&
+      response.url().includes(`/api/gaps/${encodeURIComponent(thirdId)}/verify`) &&
       response.request().method() === "POST" &&
       response.status() === 200
     );
@@ -342,7 +348,7 @@ test("persists dashboard review panels and completes review actions", async ({ p
     await verifiedSecond;
     await expect(page.getByTestId("dashboard-review-count")).toHaveText("0");
     await expect(page.getByText("You're clear.")).toBeVisible();
-    await expect(statsRow).toContainText("100.0%");
+    await expect(statsRow).toContainText("66.7%");
 
     await statsRow.click();
     await expect(page).toHaveURL(new RegExp(`#/gaps\\?.*reporter=${reporter}.*node=current`));
