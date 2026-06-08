@@ -350,6 +350,10 @@ impl InProcessWebServer {
             return self.handle_project_attach(request);
         }
 
+        if request.method == "POST" && request.path == "/project/migrate" {
+            return self.handle_project_migrate();
+        }
+
         if request.method == "POST" && request.path == "/apps/register" {
             return self.handle_project_register(request);
         }

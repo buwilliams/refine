@@ -3903,6 +3903,105 @@ fn web_server_reports_project_registry_and_updates_settings() {
 }
 
 #[test]
+fn web_server_migrates_legacy_project_state_automatically() {
+    let temp_root = unique_temp_dir("http-project-migration");
+    let runtime_root = temp_root.join("run/8080");
+    let app_root = temp_root.join("legacy-app");
+    let durable_root = app_root.join(".refine");
+    fs::create_dir_all(durable_root.join("gaps/GA")).unwrap();
+    fs::write(durable_root.join("gaps/GA/gap.json"), "{}").unwrap();
+
+    let mut server = server_with_projection();
+    server.runtime_root = Some(runtime_root.clone());
+
+    let migrated_attach = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/attach".to_string(),
+        body: Some(json!({"path": app_root.display().to_string()})),
+    });
+    assert_eq!(migrated_attach.status, 200);
+    assert_eq!(migrated_attach.body["schema"]["compatible"], true);
+    assert_eq!(migrated_attach.body["schema"]["schema_version"], 1);
+    assert!(durable_root.join("refine.json").exists());
+    assert!(durable_root.join("backups/migrations").exists());
+
+    let migrate_again = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/migrate".to_string(),
+        body: None,
+    });
+    assert_eq!(migrate_again.status, 200);
+    assert_eq!(migrate_again.body["ok"], true);
+    assert_eq!(migrate_again.body["migrated"], false);
+    assert_eq!(migrate_again.body["schema"]["compatible"], true);
+
+    let status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/status".to_string(),
+        body: None,
+    });
+    assert_eq!(status.status, 200);
+    assert_eq!(status.body["schema"]["migration_required"], false);
+
+    let second_app = temp_root.join("second-legacy-app");
+    let second_durable_root = second_app.join(".refine");
+    fs::create_dir_all(second_durable_root.join("features")).unwrap();
+    let registered = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/apps/register".to_string(),
+        body: Some(json!({
+            "name": "second",
+            "path": second_app.display().to_string()
+        })),
+    });
+    assert_eq!(registered.status, 201);
+
+    let migrated_switch = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/apps/switch".to_string(),
+        body: Some(json!({"name": "second"})),
+    });
+    assert_eq!(migrated_switch.status, 200);
+    assert_eq!(
+        migrated_switch.body["client_repo"],
+        second_app.display().to_string()
+    );
+    assert!(second_durable_root.join("refine.json").exists());
+
+    let newer_app = temp_root.join("newer-app");
+    let newer_durable_root = newer_app.join(".refine");
+    fs::create_dir_all(&newer_durable_root).unwrap();
+    fs::write(
+        newer_durable_root.join("refine.json"),
+        r#"{"schema_version":999,"refine":{"version":"future"},"created_at":"now","updated_at":"now","settings":{}}"#,
+    )
+    .unwrap();
+    let registered_newer = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/apps/register".to_string(),
+        body: Some(json!({
+            "name": "newer",
+            "path": newer_app.display().to_string()
+        })),
+    });
+    assert_eq!(registered_newer.status, 201);
+    let blocked_newer = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/apps/switch".to_string(),
+        body: Some(json!({"name": "newer"})),
+    });
+    assert_eq!(blocked_newer.status, 409);
+    assert!(
+        blocked_newer.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("newer than this Refine supports")
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_resolves_app_scoped_routes_from_active_runtime_app() {
     let temp_root = unique_temp_dir("http-detached-active-app");
     let app_root = temp_root.join("app");

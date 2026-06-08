@@ -322,6 +322,49 @@ fn project_and_system_doctor_and_migrate_use_observability_services() {
 }
 
 #[test]
+fn project_attach_runs_legacy_refine_migration() {
+    let temp_root = unique_temp_dir("cli-project-migration");
+    let runtime_root = temp_root.join("run");
+    let app_root = temp_root.join("legacy-app");
+    let durable_root = app_root.join(".refine");
+    fs::create_dir_all(durable_root.join("gaps/GA")).unwrap();
+    fs::write(durable_root.join("gaps/GA/gap.json"), "{}").unwrap();
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "attach",
+            app_root.to_str().unwrap(),
+            "--runtime-root",
+            runtime_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    let config: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(durable_root.join("refine.json")).unwrap())
+            .unwrap();
+    assert_eq!(config["schema_version"], 1);
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "migrate",
+            "--durable-root",
+            durable_root.to_str().unwrap(),
+            "--runtime-root",
+            runtime_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn system_install_repair_and_uninstall_use_installation_service() {
     let temp_root = unique_temp_dir("cli-installation");
     let runtime_root = temp_root.join("run");

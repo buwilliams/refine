@@ -993,8 +993,18 @@ impl InProcessWebServer {
             );
         };
         self.stop_target_app_for_project_change();
-        match service.attach(path) {
+        match service.attach_with_migration(path) {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_project_migrate(&self) -> ApiResponse {
+        let Some(service) = self.project_registry_service() else {
+            return runtime_root_unavailable("migrate project");
+        };
+        match service.migrate_current() {
+            Ok(report) => ApiResponse::json(200, serde_json::to_value(report).unwrap()),
             Err(error) => error_response(error),
         }
     }
@@ -1081,7 +1091,7 @@ impl InProcessWebServer {
             ));
         };
         self.stop_target_app_for_project_change();
-        match service.switch(name) {
+        match service.switch_with_migration(name) {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
         }

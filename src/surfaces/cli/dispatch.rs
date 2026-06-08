@@ -871,8 +871,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     durable_root,
                 },
         } => {
-            let status =
-                FileProjectRegistryService::new(runtime_root, durable_root).attach(&path)?;
+            let status = FileProjectRegistryService::new(runtime_root, durable_root)
+                .attach_with_migration(&path)?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -884,8 +884,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     durable_root,
                 },
         } => {
-            let status =
-                FileProjectRegistryService::new(runtime_root, durable_root).switch(&name)?;
+            let status = FileProjectRegistryService::new(runtime_root, durable_root)
+                .switch_with_migration(&name)?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -954,16 +954,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     runtime_root,
                 },
         } => {
-            let status = FileProjectRegistryService::new(runtime_root, durable_root).status()?;
+            let report =
+                FileProjectRegistryService::new(runtime_root, durable_root).migrate_current()?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&json!({
-                    "ok": true,
-                    "migrated": false,
-                    "schema": status.schema,
-                    "message": "project schema is already compatible"
-                }))
-                .unwrap()
+                serde_json::to_string_pretty(&serde_json::to_value(report).unwrap()).unwrap()
             );
             Ok(())
         }
@@ -1755,15 +1750,7 @@ fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()> {
         ProjectAction::Remove { name, .. } => {
             daemon_json("DELETE", "/apps", Some(json!({ "name": name })))?
         }
-        ProjectAction::Migrate { .. } => {
-            let status = daemon_json("GET", "/project/status", None)?;
-            json!({
-                "ok": true,
-                "migrated": false,
-                "schema": status.get("schema").cloned().unwrap_or(serde_json::Value::Null),
-                "message": "project schema is already compatible"
-            })
-        }
+        ProjectAction::Migrate { .. } => daemon_json("POST", "/project/migrate", None)?,
         ProjectAction::Sync { .. } => daemon_json("POST", "/project/sync", None)?,
         ProjectAction::Doctor { .. } => daemon_json("GET", "/diagnostics", None)?,
     };

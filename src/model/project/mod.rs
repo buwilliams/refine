@@ -48,6 +48,19 @@ pub struct ProjectSchemaStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct ProjectMigrationReport {
+    pub ok: bool,
+    pub migrated: bool,
+    pub from_version: Option<u64>,
+    pub to_version: u64,
+    pub applied: Vec<String>,
+    pub skipped: Vec<String>,
+    pub warnings: Vec<String>,
+    pub backup_path: Option<String>,
+    pub schema: ProjectSchemaStatus,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct ProjectMaintenance {
     pub active: bool,
     pub created_at: Timestamp,

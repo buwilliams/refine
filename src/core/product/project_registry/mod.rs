@@ -7,8 +7,11 @@ use chrono::Utc;
 use crate::core::host::process_supervision::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
 };
+use crate::core::product::project_migration::FileProjectMigrationService;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::model::project::{AppRegistry, ProjectStatus, RegisteredApp};
+use crate::model::project::{
+    AppRegistry, ProjectMigrationReport, ProjectSchemaStatus, ProjectStatus, RegisteredApp,
+};
 
 pub const APP_REGISTRY_FILE: &str = "apps.json";
 
@@ -121,42 +124,11 @@ impl FileProjectRegistryService {
             upsert_app(&mut registry, app, false);
             self.save(&registry)?;
         }
+        if let Some(current) = &current {
+            self.migrate_schema_if_safe(Path::new(current))?;
+        }
         let attached = current.is_some();
-        let active_refine_root = current
-            .as_ref()
-            .map(|path| PathBuf::from(path).join(".refine"));
-        Ok(ProjectStatus {
-            attached,
-            registry_enabled: true,
-            client_repo: current.clone(),
-            volume_root: active_refine_root
-                .as_ref()
-                .map(|path| path.display().to_string()),
-            config_path: active_refine_root
-                .as_ref()
-                .map(|path| path.join("refine.json").display().to_string()),
-            schema: crate::model::project::ProjectSchemaStatus {
-                compatible: true,
-                migration_required: false,
-                schema_version: Some(1),
-                current_schema_version: 1,
-                reason: None,
-                migration_id: None,
-                migration_description: None,
-                safe_auto: true,
-                requires_cluster_quiescence: false,
-                operator_instructions: None,
-            },
-            maintenance: None,
-            apps: registry,
-            active_node_id: Some("default".to_string()),
-            active_node: Some("Default".to_string()),
-            message: if attached {
-                None
-            } else {
-                Some("No refine project is attached.".to_string())
-            },
-        })
+        project_status_for(registry, current, attached)
     }
 
     pub fn register_path(
@@ -189,6 +161,9 @@ impl FileProjectRegistryService {
             },
             make_current,
         );
+        if make_current {
+            self.ensure_schema_ready(&app_path)?;
+        }
         self.save(&registry)?;
         Ok(registry)
     }
@@ -244,6 +219,112 @@ impl FileProjectRegistryService {
         }
         Ok(())
     }
+
+    pub fn attach_with_migration(&self, path: &str) -> RefineResult<ProjectStatus> {
+        let app_path = normalize_app_path(path)?;
+        let display_path = app_path.display().to_string();
+        self.ensure_schema_ready(&app_path)?;
+        let mut registry = self.load()?;
+        upsert_app(
+            &mut registry,
+            RegisteredApp {
+                name: app_path
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| display_path.clone()),
+                path: display_path.clone(),
+                added_at: now_timestamp(),
+                last_used_at: Some(now_timestamp()),
+            },
+            true,
+        );
+        self.save(&registry)?;
+        project_status_for(registry, Some(display_path), true)
+    }
+
+    pub fn switch_with_migration(&self, name: &str) -> RefineResult<ProjectStatus> {
+        let mut registry = self.load()?;
+        let Some(path) = registry
+            .apps
+            .values()
+            .find(|app| app.name == name || app.path == name)
+            .map(|app| app.path.clone())
+        else {
+            return Err(RefineError::NotFound(format!("App {name} was not found")));
+        };
+        self.ensure_schema_ready(&PathBuf::from(&path))?;
+        registry.active_app = Some(path.clone());
+        if let Some(app) = registry.apps.get_mut(&path) {
+            app.last_used_at = Some(now_timestamp());
+        }
+        self.save(&registry)?;
+        project_status_for(registry, Some(path), true)
+    }
+
+    pub fn migrate_current(&self) -> RefineResult<ProjectMigrationReport> {
+        let durable_root = self.current_durable_project_root()?;
+        FileProjectMigrationService::with_runtime_root(durable_root, self.runtime_root.clone())
+            .migrate()
+    }
+
+    fn ensure_schema_ready(&self, app_path: &Path) -> RefineResult<()> {
+        let migrated = self.migrate_schema_if_safe(app_path)?;
+        if migrated {
+            return Ok(());
+        }
+        let durable_root = app_path.join(".refine");
+        let service = FileProjectMigrationService::with_runtime_root(
+            &durable_root,
+            self.runtime_root.clone(),
+        );
+        let schema = service.status()?;
+        if schema.compatible && !schema.migration_required {
+            return Ok(());
+        }
+        if schema.migration_required {
+            if schema.safe_auto && !schema.requires_cluster_quiescence {
+                service.migrate()?;
+                return Ok(());
+            }
+            return Err(RefineError::Conflict(
+                schema
+                    .operator_instructions
+                    .clone()
+                    .unwrap_or_else(|| "project migration required".to_string()),
+            ));
+        }
+        Err(RefineError::Conflict(schema.reason.unwrap_or_else(|| {
+            "project schema is not compatible".to_string()
+        })))
+    }
+
+    fn migrate_schema_if_safe(&self, app_path: &Path) -> RefineResult<bool> {
+        let durable_root = app_path.join(".refine");
+        let service = FileProjectMigrationService::with_runtime_root(
+            &durable_root,
+            self.runtime_root.clone(),
+        );
+        let schema = service.status()?;
+        if schema.migration_required && schema.safe_auto && !schema.requires_cluster_quiescence {
+            service.migrate()?;
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn current_durable_project_root(&self) -> RefineResult<PathBuf> {
+        if let Some(root) = &self.current_durable_root {
+            return Ok(root.clone());
+        }
+        let registry = self.load()?;
+        let Some(app) = registry.active_app else {
+            return Err(RefineError::NotFound(
+                "no active project is attached".to_string(),
+            ));
+        };
+        Ok(PathBuf::from(app).join(".refine"))
+    }
 }
 
 impl ProjectRegistryService for FileProjectRegistryService {
@@ -255,72 +336,18 @@ impl ProjectRegistryService for FileProjectRegistryService {
     }
 
     fn attach(&self, path: &str) -> RefineResult<ProjectStatus> {
-        let app_path = normalize_app_path(path)?;
-        let mut registry = self.load()?;
-        upsert_app(
-            &mut registry,
-            RegisteredApp {
-                name: app_path
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .map(str::to_string)
-                    .unwrap_or_else(|| app_path.display().to_string()),
-                path: app_path.display().to_string(),
-                added_at: now_timestamp(),
-                last_used_at: Some(now_timestamp()),
-            },
-            true,
-        );
-        self.save(&registry)?;
-        self.inspect(&app_path.display().to_string())
+        self.attach_with_migration(path)
     }
 
     fn switch(&self, name: &str) -> RefineResult<ProjectStatus> {
-        let mut registry = self.load()?;
-        let Some(path) = registry
-            .apps
-            .values()
-            .find(|app| app.name == name || app.path == name)
-            .map(|app| app.path.clone())
-        else {
-            return Err(RefineError::NotFound(format!("App {name} was not found")));
-        };
-        registry.active_app = Some(path.clone());
-        if let Some(app) = registry.apps.get_mut(&path) {
-            app.last_used_at = Some(now_timestamp());
-        }
-        self.save(&registry)?;
-        self.inspect(&path)
+        self.switch_with_migration(name)
     }
 
     fn detach(&self) -> RefineResult<ProjectStatus> {
         let mut registry = self.load()?;
         registry.active_app = None;
         self.save(&registry)?;
-        Ok(ProjectStatus {
-            attached: false,
-            registry_enabled: true,
-            client_repo: None,
-            volume_root: None,
-            config_path: None,
-            schema: crate::model::project::ProjectSchemaStatus {
-                compatible: true,
-                migration_required: false,
-                schema_version: Some(1),
-                current_schema_version: 1,
-                reason: None,
-                migration_id: None,
-                migration_description: None,
-                safe_auto: true,
-                requires_cluster_quiescence: false,
-                operator_instructions: None,
-            },
-            maintenance: None,
-            apps: registry,
-            active_node_id: None,
-            active_node: None,
-            message: Some("No refine project is attached.".to_string()),
-        })
+        project_status_for(registry, None, false)
     }
 
     fn clone_app(
@@ -355,16 +382,71 @@ impl ProjectRegistryService for FileProjectRegistryService {
     }
 
     fn inspect(&self, path: &str) -> RefineResult<ProjectStatus> {
-        let mut status = self.status()?;
+        let registry = self.load()?;
         if !path.trim().is_empty() {
             let app_path = normalize_app_path(path)?;
-            status.attached = true;
-            status.client_repo = Some(app_path.display().to_string());
-            status.volume_root = Some(app_path.join(".refine").display().to_string());
-            status.config_path = Some(app_path.join(".refine/refine.json").display().to_string());
-            status.message = None;
+            return project_status_for(registry, Some(app_path.display().to_string()), true);
         }
-        Ok(status)
+        project_status_for(registry, None, false)
+    }
+}
+
+fn project_status_for(
+    registry: AppRegistry,
+    current: Option<String>,
+    attached: bool,
+) -> RefineResult<ProjectStatus> {
+    let active_refine_root = current
+        .as_ref()
+        .map(|path| PathBuf::from(path).join(".refine"));
+    let schema = match &active_refine_root {
+        Some(root) => FileProjectMigrationService::new(root).status()?,
+        None => detached_schema_status(),
+    };
+    Ok(ProjectStatus {
+        attached,
+        registry_enabled: true,
+        client_repo: current.clone(),
+        volume_root: active_refine_root
+            .as_ref()
+            .map(|path| path.display().to_string()),
+        config_path: active_refine_root
+            .as_ref()
+            .map(|path| path.join("refine.json").display().to_string()),
+        schema,
+        maintenance: None,
+        apps: registry,
+        active_node_id: if attached {
+            Some("default".to_string())
+        } else {
+            None
+        },
+        active_node: if attached {
+            Some("Default".to_string())
+        } else {
+            None
+        },
+        message: if attached {
+            None
+        } else {
+            Some("No refine project is attached.".to_string())
+        },
+    })
+}
+
+fn detached_schema_status() -> ProjectSchemaStatus {
+    ProjectSchemaStatus {
+        compatible: true,
+        migration_required: false,
+        schema_version: None,
+        current_schema_version:
+            crate::core::product::project_migration::CURRENT_PROJECT_SCHEMA_VERSION,
+        reason: None,
+        migration_id: None,
+        migration_description: None,
+        safe_auto: true,
+        requires_cluster_quiescence: false,
+        operator_instructions: None,
     }
 }
 
