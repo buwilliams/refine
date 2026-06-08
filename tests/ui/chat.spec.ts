@@ -123,6 +123,106 @@ test("drafts a Gap from standalone chat context through Smoke AI", async ({ page
   }
 });
 
+test("does not duplicate transcript lines when chat redraws race polling", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const sessionId = "ui-poll-race";
+  const prompt = "Unique duplicate guard prompt.";
+  const response = "Unique duplicate guard response.";
+  let inputPosts = 0;
+  let readDelivered = false;
+
+  await page.route("**/api/chat/start", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        session_id: sessionId,
+        mode: "standalone",
+        provider: "mock",
+      }),
+    });
+  });
+  await page.route(`**/api/chat/${sessionId}/input`, async (route) => {
+    inputPosts += 1;
+    const body = route.request().postDataJSON() as { text?: string };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        alive: true,
+        session_id: sessionId,
+        queued_messages: [{
+          id: "queued-one",
+          text: body.text ?? "",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }],
+        importable_artifacts: [],
+        in_flight: true,
+        provider_session_id: null,
+      }),
+    });
+  });
+  await page.route(`**/api/chat/${sessionId}/read`, async (route) => {
+    if (!inputPosts || readDelivered) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          alive: true,
+          session_id: sessionId,
+          lines: [],
+          progress_lines: [],
+          queued_messages: [],
+          importable_artifacts: [],
+          in_flight: false,
+          provider_session_id: null,
+        }),
+      });
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    readDelivered = true;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        alive: true,
+        session_id: sessionId,
+        lines: [`> ${prompt}`, response],
+        progress_lines: [],
+        queued_messages: [],
+        importable_artifacts: [],
+        in_flight: false,
+        provider_session_id: null,
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.removeItem("refine_chat_tabs");
+  });
+  await page.goto("/");
+
+  await page.getByTestId("toolbar-tab-standalone").click();
+  await page.getByTestId("chat-toggle").click();
+  await expect(page.getByTestId("chat-status")).toContainText("active");
+
+  await fillChatInputStable(page, prompt);
+  await page.getByTestId("chat-send").click();
+  await page.evaluate(() => {
+    (window as any).drawToolbar?.();
+    (window as any).drawToolbar?.();
+  });
+
+  await expect(page.getByTestId("chat-output")).toContainText(response);
+  await page.waitForTimeout(250);
+  const transcript = await page.getByTestId("chat-output").textContent();
+  expect(transcript?.match(/Unique duplicate guard prompt\./g) ?? []).toHaveLength(1);
+  expect(transcript?.match(/Unique duplicate guard response\./g) ?? []).toHaveLength(1);
+  expect(inputPosts).toBe(1);
+});
+
 test("edits and removes standalone queued chat messages", async ({ page, request }) => {
   test.setTimeout(60_000);
   await ensureAttachedProject(request);
