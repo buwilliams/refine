@@ -1,0 +1,36 @@
+services:
+  linux:
+    image: ubuntu:24.04
+    init: true
+    stdin_open: true
+    tty: true
+    ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:18080:18080"
+      - "127.0.0.1:19080:19080"
+    environment:
+      DEBIAN_FRONTEND: noninteractive
+    command:
+      - /bin/bash
+      - -lc
+      - |
+        apt-get update
+        apt-get install -y --no-install-recommends \
+          bash \
+          ca-certificates \
+          curl \
+          git \
+          procps \
+          sudo \
+          unzip \
+          xz-utils
+        rm -rf /var/lib/apt/lists/*
+        id -u refine >/dev/null 2>&1 || useradd -m -s /bin/bash refine
+        mkdir -p /home/refine
+        chown -R refine:refine /home/refine
+        echo "refine ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/refine
+        chmod 0440 /etc/sudoers.d/refine
+        exec sleep infinity
+    working_dir: /home/refine
+    tmpfs:
+      - /tmp
