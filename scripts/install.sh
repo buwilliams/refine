@@ -1181,33 +1181,63 @@ build_refine_release() {
   ok "Optimized Refine binary ready: $release_bin"
 }
 
-install_state_path() {
+install_state_paths() {
   local runtime="$REFINE_INSTALL_RUNTIME_ROOT"
+  local found="0"
   case "$runtime" in
     /*) ;;
     *) runtime="$REFINE_CHECKOUT/$runtime" ;;
   esac
-  printf '%s/install-state.json\n' "$runtime"
+  if [ -d "$runtime" ]; then
+    for state in "$runtime"/*/install-state.json; do
+      [ -f "$state" ] || continue
+      found="1"
+      printf '%s\n' "$state"
+    done
+  fi
+  if [ -f "$runtime/install-state.json" ]; then
+    found="1"
+    printf '%s\n' "$runtime/install-state.json"
+  fi
+  [ "$found" = "1" ]
 }
 
 repair_existing_refine_install() {
   section "Repair installed service"
-  local install_state
-  install_state="$(install_state_path)"
+  local install_state port repaired="0"
   run cd "$REFINE_CHECKOUT" || die_issue \
     "Refine checkout access" \
     "The installer needs to enter the Refine checkout before refreshing service metadata." \
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not enter $REFINE_CHECKOUT"
-  if [ ! -f "$install_state" ]; then
-    info "No install-state.json found at $install_state; skipping persistent service repair."
+  if ! install_state_paths >/tmp/refine-install-states-$$; then
+    info "No install-state.json files found under $REFINE_INSTALL_RUNTIME_ROOT; skipping persistent service repair."
     return 0
   fi
-  run ./r system repair --runtime-root "$REFINE_INSTALL_RUNTIME_ROOT" || die_issue \
-    "Refine service repair" \
-    "Persistent services must be refreshed so they point at the deployed Refine binary." \
-    "Run manually: $(refine_manual_prefix) system repair --runtime-root $REFINE_INSTALL_RUNTIME_ROOT" \
-    "Could not refresh Refine service metadata."
+  while IFS= read -r install_state || [ -n "$install_state" ]; do
+    case "$(dirname "$install_state")" in
+      "$REFINE_CHECKOUT/$REFINE_INSTALL_RUNTIME_ROOT"|"$REFINE_INSTALL_RUNTIME_ROOT")
+        port="$(resolve_refine_port)"
+        ;;
+      *)
+        port="$(basename "$(dirname "$install_state")")"
+        ;;
+    esac
+    case "$port" in
+      ''|*[!0-9]*)
+        warn "Skipping install state with non-port directory: $install_state"
+        continue
+        ;;
+    esac
+    repaired="1"
+    run ./r system repair --port "$port" --runtime-root "$REFINE_INSTALL_RUNTIME_ROOT" || die_issue \
+      "Refine service repair" \
+      "Persistent services must be refreshed so they point at the deployed Refine binary." \
+      "Run manually: $(refine_manual_prefix) system repair --port $port --runtime-root $REFINE_INSTALL_RUNTIME_ROOT" \
+      "Could not refresh Refine service metadata for port $port."
+  done </tmp/refine-install-states-$$
+  rm -f /tmp/refine-install-states-$$
+  [ "$repaired" = "1" ] || info "No port-scoped install states were repairable."
 }
 
 finish_update_only() {
@@ -1354,14 +1384,14 @@ start_refine() {
   local port
   local refine_started="1"
   port="$(prompt "Refine port" "$(resolve_refine_port)")"
-  if has_systemd && confirm "Prepare Refine as a persistent service with: ./r system install --target linux-cli-web" "y"; then
-    if run ./r system install --target linux-cli-web --runtime-root run; then
+  if has_systemd && confirm "Prepare Refine as a persistent service with: ./r system install --target linux-cli-web --port $port" "y"; then
+    if run ./r system install --target linux-cli-web --port "$port" --runtime-root run; then
       ok "Refine installed as a persistent service"
     else
       warn_issue \
         "Persistent Refine service install" \
         "The persistent service keeps Refine running after terminal close and host restarts." \
-        "Run manually: $(refine_manual_prefix) system install --target linux-cli-web --runtime-root run" \
+        "Run manually: $(refine_manual_prefix) system install --target linux-cli-web --port $port --runtime-root run" \
         "Persistent install failed. Trying non-installed background start."
       if ! run ./r system start --port "$port" --runtime-root run; then
         warn_issue \

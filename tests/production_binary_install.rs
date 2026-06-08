@@ -98,7 +98,9 @@ fn install_dry_run_builds_and_installs_release_binary_before_start_commands() {
         "write deployed marker {}/.refine-deployed",
         checkout.display()
     )));
-    assert!(log.contains("./r system"));
+    assert!(
+        log.contains("./r system install --target linux-cli-web --port 8080 --runtime-root run")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -109,8 +111,8 @@ fn install_update_only_dry_run_builds_repairs_and_skips_start_commands() {
     let temp_root = unique_temp_dir("install-update-only-dry-run");
     let runtime_root = temp_root.join("run");
     let log = temp_root.join("install.log");
-    fs::create_dir_all(&runtime_root).unwrap();
-    fs::write(runtime_root.join("install-state.json"), "{}").unwrap();
+    fs::create_dir_all(runtime_root.join("19080")).unwrap();
+    fs::write(runtime_root.join("19080").join("install-state.json"), "{}").unwrap();
 
     let output = Command::new("bash")
         .arg(format!("{repo}/scripts/install.sh"))
@@ -140,7 +142,7 @@ fn install_update_only_dry_run_builds_repairs_and_skips_start_commands() {
         "install -m 755 {repo}/target/release/refine {repo}/bin/refine"
     )));
     assert!(log.contains(&format!("write deployed marker {repo}/.refine-deployed")));
-    assert!(log.contains("./r system repair --runtime-root"));
+    assert!(log.contains("./r system repair --port 19080 --runtime-root"));
     assert!(!log.contains("./r system start"));
 
     fs::remove_dir_all(temp_root).unwrap();

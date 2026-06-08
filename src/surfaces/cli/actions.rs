@@ -684,6 +684,8 @@ pub enum AgentAction {
 #[derive(Debug, Subcommand)]
 pub enum SystemAction {
     Install {
+        #[arg(long)]
+        port: u16,
         #[arg(long, value_enum, default_value_t = CliInstallTarget::Auto)]
         target: CliInstallTarget,
         #[arg(long, default_value = "run")]
@@ -692,6 +694,8 @@ pub enum SystemAction {
         version: String,
     },
     Repair {
+        #[arg(long)]
+        port: u16,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
@@ -702,12 +706,16 @@ pub enum SystemAction {
         runtime_root: PathBuf,
     },
     Rollback {
+        #[arg(long)]
+        port: u16,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
         version: String,
     },
     Uninstall {
+        #[arg(long)]
+        port: u16,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]

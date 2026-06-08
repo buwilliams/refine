@@ -370,10 +370,21 @@ fn system_install_repair_and_uninstall_use_installation_service() {
     let runtime_root = temp_root.join("run");
 
     for argv in [
+        ["refine", "system", "install"],
+        ["refine", "system", "repair"],
+        ["refine", "system", "rollback"],
+        ["refine", "system", "uninstall"],
+    ] {
+        assert!(Cli::try_parse_from(argv).is_err());
+    }
+
+    for argv in [
         vec![
             "refine",
             "system",
             "install",
+            "--port",
+            "4557",
             "--target",
             "linux-cli-web",
             "--runtime-root",
@@ -385,6 +396,8 @@ fn system_install_repair_and_uninstall_use_installation_service() {
             "refine",
             "system",
             "repair",
+            "--port",
+            "4557",
             "--runtime-root",
             runtime_root.to_str().unwrap(),
             "--version",
@@ -394,6 +407,8 @@ fn system_install_repair_and_uninstall_use_installation_service() {
             "refine",
             "system",
             "uninstall",
+            "--port",
+            "4557",
             "--runtime-root",
             runtime_root.to_str().unwrap(),
             "--version",
@@ -403,10 +418,12 @@ fn system_install_repair_and_uninstall_use_installation_service() {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
     }
 
-    let state: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(runtime_root.join("install-state.json")).unwrap())
-            .unwrap();
+    let state: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(runtime_root.join("4557").join("install-state.json")).unwrap(),
+    )
+    .unwrap();
     assert_eq!(state["status"]["installed"], false);
+    assert_eq!(state["status"]["port"], 4557);
     assert_eq!(state["status"]["version"], "1.0.0");
 
     fs::remove_dir_all(temp_root).unwrap();

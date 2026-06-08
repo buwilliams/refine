@@ -208,12 +208,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action:
                 SystemAction::Install {
+                    port,
                     target,
                     runtime_root,
                     version,
                 },
         } => {
-            let status = FileInstallationService::new(runtime_root, version)
+            let status = FileInstallationService::for_port(runtime_root, version, port)
                 .install(target.into_target())?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
@@ -221,11 +222,12 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action:
                 SystemAction::Repair {
+                    port,
                     runtime_root,
                     version,
                 },
         } => {
-            let status = FileInstallationService::new(runtime_root, version).repair()?;
+            let status = FileInstallationService::for_port(runtime_root, version, port).repair()?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
@@ -250,22 +252,25 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         Commands::System {
             action:
                 SystemAction::Rollback {
+                    port,
                     runtime_root,
                     version,
                 },
         } => {
-            let status = FileInstallationService::new(runtime_root, version).rollback()?;
+            let status =
+                FileInstallationService::for_port(runtime_root, version, port).rollback()?;
             println!("{}", serde_json::to_string_pretty(&status).unwrap());
             Ok(())
         }
         Commands::System {
             action:
                 SystemAction::Uninstall {
+                    port,
                     runtime_root,
                     version,
                 },
         } => {
-            FileInstallationService::new(runtime_root, version).uninstall()?;
+            FileInstallationService::for_port(runtime_root, version, port).uninstall()?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"uninstalled": true})).unwrap()

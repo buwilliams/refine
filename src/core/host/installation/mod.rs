@@ -28,6 +28,8 @@ pub enum InstallTarget {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct InstallStatus {
     pub installed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
     pub target: InstallTarget,
     pub version: Option<String>,
     pub stale: bool,
@@ -39,6 +41,8 @@ pub struct InstallStatus {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct InstallBackendRegistration {
     pub target: InstallTarget,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
     pub service_manager: String,
     pub service_metadata_path: Option<String>,
     pub app_support_dir: Option<String>,
@@ -81,6 +85,7 @@ struct InstallStateDocument {
 pub struct FileInstallationService {
     pub runtime_root: PathBuf,
     pub current_version: String,
+    pub port: Option<u16>,
     pub path_inputs: RuntimePathInputs,
 }
 
@@ -89,6 +94,20 @@ impl FileInstallationService {
         Self {
             runtime_root: runtime_root.into(),
             current_version: current_version.into(),
+            port: None,
+            path_inputs: RuntimePathInputs::from_env(),
+        }
+    }
+
+    pub fn for_port(
+        runtime_root: impl Into<PathBuf>,
+        current_version: impl Into<String>,
+        port: u16,
+    ) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            current_version: current_version.into(),
+            port: Some(port),
             path_inputs: RuntimePathInputs::from_env(),
         }
     }
@@ -101,22 +120,64 @@ impl FileInstallationService {
         Self {
             runtime_root: runtime_root.into(),
             current_version: current_version.into(),
+            port: None,
             path_inputs,
         }
     }
 
+    pub fn with_path_inputs_for_port(
+        runtime_root: impl Into<PathBuf>,
+        current_version: impl Into<String>,
+        port: u16,
+        path_inputs: RuntimePathInputs,
+    ) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            current_version: current_version.into(),
+            port: Some(port),
+            path_inputs,
+        }
+    }
+
+    fn state_root(&self) -> PathBuf {
+        match self.port {
+            Some(port) => self.runtime_root.join(port.to_string()),
+            None => self.runtime_root.clone(),
+        }
+    }
+
     pub fn path(&self) -> PathBuf {
-        self.runtime_root.join(INSTALL_STATE_FILE)
+        self.state_root().join(INSTALL_STATE_FILE)
     }
 
     pub fn backend_path(&self) -> PathBuf {
-        self.runtime_root.join(INSTALL_BACKEND_FILE)
+        self.state_root().join(INSTALL_BACKEND_FILE)
+    }
+
+    fn legacy_path(&self) -> Option<PathBuf> {
+        self.port
+            .map(|_| self.runtime_root.join(INSTALL_STATE_FILE))
+    }
+
+    fn legacy_backend_path(&self) -> Option<PathBuf> {
+        self.port
+            .map(|_| self.runtime_root.join(INSTALL_BACKEND_FILE))
     }
 
     fn load(&self) -> RefineResult<InstallStateDocument> {
-        let path = self.path();
+        let mut path = self.path();
+        if !path.exists()
+            && let Some(legacy_path) = self.legacy_path()
+            && legacy_path.exists()
+        {
+            path = legacy_path;
+        }
         if !path.exists() {
-            return Ok(default_state(self.default_target(), &self.current_version));
+            return Ok(default_state(
+                self.default_target(),
+                &self.current_version,
+                self.port,
+            ));
         }
         let bytes = fs::read(&path).map_err(|error| {
             RefineError::Io(format!(
@@ -133,10 +194,11 @@ impl FileInstallationService {
     }
 
     fn save(&self, state: &InstallStateDocument) -> RefineResult<()> {
-        fs::create_dir_all(&self.runtime_root).map_err(|error| {
+        let state_root = self.state_root();
+        fs::create_dir_all(&state_root).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create runtime root {}: {error}",
-                self.runtime_root.display()
+                state_root.display()
             ))
         })?;
         let encoded = serde_json::to_vec_pretty(state).map_err(|error| {
@@ -147,11 +209,28 @@ impl FileInstallationService {
                 "failed to write install state {}: {error}",
                 self.path().display()
             ))
-        })
+        })?;
+        if let Some(legacy_path) = self.legacy_path()
+            && legacy_path.exists()
+        {
+            fs::remove_file(&legacy_path).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to remove legacy install state {}: {error}",
+                    legacy_path.display()
+                ))
+            })?;
+        }
+        Ok(())
     }
 
     fn load_backend(&self) -> RefineResult<Option<InstallBackendRegistration>> {
-        let path = self.backend_path();
+        let mut path = self.backend_path();
+        if !path.exists()
+            && let Some(legacy_path) = self.legacy_backend_path()
+            && legacy_path.exists()
+        {
+            path = legacy_path;
+        }
         if !path.exists() {
             return Ok(None);
         }
@@ -172,10 +251,11 @@ impl FileInstallationService {
     }
 
     fn save_backend(&self, backend: &InstallBackendRegistration) -> RefineResult<()> {
-        fs::create_dir_all(&self.runtime_root).map_err(|error| {
+        let state_root = self.state_root();
+        fs::create_dir_all(&state_root).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create runtime root {}: {error}",
-                self.runtime_root.display()
+                state_root.display()
             ))
         })?;
         let encoded = serde_json::to_vec_pretty(backend).map_err(|error| {
@@ -186,12 +266,23 @@ impl FileInstallationService {
                 "failed to write install backend {}: {error}",
                 self.backend_path().display()
             ))
-        })
+        })?;
+        if let Some(legacy_backend_path) = self.legacy_backend_path()
+            && legacy_backend_path.exists()
+        {
+            fs::remove_file(&legacy_backend_path).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to remove legacy install backend {}: {error}",
+                    legacy_backend_path.display()
+                ))
+            })?;
+        }
+        Ok(())
     }
 
     fn register_backend(&self, target: InstallTarget) -> RefineResult<InstallBackendRegistration> {
         let now = now_timestamp();
-        let mut backend = backend_for_target(target, &now, self.path_inputs.clone());
+        let mut backend = backend_for_target(target, &now, self.path_inputs.clone(), self.port);
         if let Some(existing) = self.load_backend()? {
             backend.created_at = existing.created_at;
         }
@@ -221,6 +312,16 @@ impl FileInstallationService {
                 RefineError::Io(format!(
                     "failed to remove install backend {}: {error}",
                     self.backend_path().display()
+                ))
+            })?;
+        }
+        if let Some(legacy_backend_path) = self.legacy_backend_path()
+            && legacy_backend_path.exists()
+        {
+            fs::remove_file(&legacy_backend_path).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to remove legacy install backend {}: {error}",
+                    legacy_backend_path.display()
                 ))
             })?;
         }
@@ -339,9 +440,14 @@ impl FileInstallationService {
     fn systemd_user_unit(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
         let exe = daemon_executable_string()?;
         let logs_dir = backend.logs_dir.as_deref().unwrap_or(".");
+        let port_args = backend
+            .port
+            .map(|port| format!(" --port {}", systemd_escape_arg(&port.to_string())))
+            .unwrap_or_default();
         Ok(format!(
-            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system start --foreground --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
+            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system start --foreground{} --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
             systemd_escape_arg(&exe),
+            port_args,
             systemd_escape_arg(&self.runtime_root.display().to_string()),
             systemd_escape_arg(backend.app_support_dir.as_deref().unwrap_or(".")),
             logs_dir,
@@ -457,6 +563,7 @@ impl InstallationService for FileInstallationService {
         let state = InstallStateDocument {
             status: InstallStatus {
                 installed: true,
+                port: self.port,
                 target,
                 version: Some(self.current_version.clone()),
                 stale: false,
@@ -475,6 +582,7 @@ impl InstallationService for FileInstallationService {
     fn repair(&self) -> RefineResult<InstallStatus> {
         let mut state = self.load()?;
         state.status.installed = true;
+        state.status.port = self.port;
         let backend = self.register_backend(state.status.target.clone())?;
         state.status.partial = !backend_complete(&backend);
         state.status.conflicting = false;
@@ -499,6 +607,7 @@ impl InstallationService for FileInstallationService {
         let backend = self.register_backend(state.status.target.clone())?;
         state.previous_version = state.status.version.clone();
         state.status.installed = true;
+        state.status.port = self.port;
         state.status.version = Some(version.to_string());
         state.status.stale = false;
         state.status.partial = !backend_complete(&backend);
@@ -521,6 +630,7 @@ impl InstallationService for FileInstallationService {
         };
         let current = state.status.version.clone();
         state.status.installed = true;
+        state.status.port = self.port;
         state.status.version = Some(previous);
         state.status.stale = false;
         let backend = self.register_backend(state.status.target.clone())?;
@@ -536,6 +646,7 @@ impl InstallationService for FileInstallationService {
     fn uninstall(&self) -> RefineResult<()> {
         let mut state = self.load()?;
         state.status.installed = false;
+        state.status.port = self.port;
         state.status.stale = false;
         state.status.partial = false;
         state.status.conflicting = false;
@@ -547,6 +658,7 @@ impl InstallationService for FileInstallationService {
 
     fn status(&self) -> RefineResult<InstallStatus> {
         let mut state = self.load()?;
+        state.status.port = self.port;
         if state.status.installed
             && state.status.version.as_deref() != Some(self.current_version.as_str())
         {
@@ -568,10 +680,15 @@ impl InstallationService for FileInstallationService {
     }
 }
 
-fn default_state(target: InstallTarget, current_version: &str) -> InstallStateDocument {
+fn default_state(
+    target: InstallTarget,
+    current_version: &str,
+    port: Option<u16>,
+) -> InstallStateDocument {
     InstallStateDocument {
         status: InstallStatus {
             installed: false,
+            port,
             target,
             version: Some(current_version.to_string()),
             stale: false,
@@ -589,8 +706,9 @@ fn backend_for_target(
     target: InstallTarget,
     timestamp: &str,
     path_inputs: RuntimePathInputs,
+    port: Option<u16>,
 ) -> InstallBackendRegistration {
-    let (os, service_manager, credential_store, desktop_bundle, notes) = match target {
+    let (os, service_manager, credential_store, desktop_bundle, notes) = match &target {
         InstallTarget::MacOsAppBundle => (
             RuntimeOs::Macos,
             "launchd_login_item",
@@ -626,13 +744,16 @@ fn backend_for_target(
         ),
     };
     let layout = RuntimePathLayout::for_os(os, DEFAULT_APP_ID, path_inputs);
+    let service_metadata_path = layout
+        .service_metadata_path
+        .as_ref()
+        .map(|path| port_scoped_service_metadata_path(path, &target, port))
+        .map(|path| path.display().to_string());
     InstallBackendRegistration {
         target,
+        port,
         service_manager: service_manager.to_string(),
-        service_metadata_path: layout
-            .service_metadata_path
-            .as_ref()
-            .map(|path| path.display().to_string()),
+        service_metadata_path,
         app_support_dir: Some(layout.app_support_dir.display().to_string()),
         cache_dir: Some(layout.cache_dir.display().to_string()),
         logs_dir: Some(layout.logs_dir.display().to_string()),
@@ -647,6 +768,22 @@ fn backend_for_target(
         updated_at: timestamp.to_string(),
         notes,
     }
+}
+
+fn port_scoped_service_metadata_path(
+    path: &std::path::Path,
+    target: &InstallTarget,
+    port: Option<u16>,
+) -> PathBuf {
+    let Some(port) = port else {
+        return path.to_path_buf();
+    };
+    let file_name = match target {
+        InstallTarget::LinuxCliWeb => format!("refine-{port}.service"),
+        InstallTarget::MacOsAppBundle => format!("com.refine.daemon-{port}.plist"),
+        InstallTarget::WindowsInstaller => format!("service-{port}.json"),
+    };
+    path.with_file_name(file_name)
 }
 
 fn backend_complete(backend: &InstallBackendRegistration) -> bool {
@@ -816,13 +953,15 @@ mod tests {
     fn file_installation_service_persists_update_and_rollback_state() {
         let temp_root = unique_temp_dir("installation");
         let runtime_root = temp_root.join("run");
-        let service = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+        let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
 
         let initial = service.status().unwrap();
         assert!(!initial.installed);
+        assert_eq!(initial.port, Some(4557));
 
         let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
         assert!(installed.installed);
+        assert_eq!(installed.port, Some(4557));
         assert!(!installed.partial);
         assert_eq!(installed.version.as_deref(), Some("1.0.0"));
         assert_eq!(
@@ -849,12 +988,25 @@ mod tests {
                 .as_ref()
                 .unwrap(),
         );
+        assert_eq!(
+            service_metadata_path.file_name().unwrap().to_str().unwrap(),
+            "refine-4557.service"
+        );
         assert!(service_metadata_path.exists());
         let unit = fs::read_to_string(&service_metadata_path).unwrap();
         assert!(unit.contains("ExecStart="));
         assert!(unit.contains("system start --foreground"));
+        assert!(unit.contains("--port 4557 --runtime-root"));
         assert!(service.path().exists());
         assert!(service.backend_path().exists());
+        assert_eq!(
+            service.path(),
+            runtime_root.join("4557").join(INSTALL_STATE_FILE)
+        );
+        assert_eq!(
+            service.backend_path(),
+            runtime_root.join("4557").join(INSTALL_BACKEND_FILE)
+        );
 
         let updated = service.record_metadata_update("1.1.0").unwrap();
         assert_eq!(updated.version.as_deref(), Some("1.1.0"));
@@ -862,7 +1014,7 @@ mod tests {
             updated.backend.as_ref().unwrap().target,
             InstallTarget::LinuxCliWeb
         );
-        let stale = test_installation_service(&runtime_root, "1.2.0", &temp_root)
+        let stale = test_installation_service_for_port(&runtime_root, "1.2.0", 4557, &temp_root)
             .status()
             .unwrap();
         assert!(stale.stale);
@@ -890,7 +1042,7 @@ mod tests {
 
         let temp_root = unique_temp_dir("installation-release-bin");
         let runtime_root = temp_root.join("run");
-        let service = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+        let service = test_installation_service_for_port(&runtime_root, "1.0.0", 8082, &temp_root);
 
         let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
         let service_metadata_path = PathBuf::from(
@@ -903,7 +1055,9 @@ mod tests {
                 .unwrap(),
         );
         let unit = fs::read_to_string(&service_metadata_path).unwrap();
-        assert!(unit.contains("ExecStart=/opt/refine/bin/refine system start --foreground"));
+        assert!(unit.contains(
+            "ExecStart=/opt/refine/bin/refine system start --foreground --port 8082 --runtime-root"
+        ));
 
         restore_env("REFINE_LAUNCH_MODE", old_mode);
         restore_env("REFINE_LAUNCH_EXECUTABLE", old_executable);
@@ -911,10 +1065,86 @@ mod tests {
     }
 
     #[test]
+    fn uninstall_is_scoped_to_selected_port() {
+        let temp_root = unique_temp_dir("installation-port-scope");
+        let runtime_root = temp_root.join("run");
+        let first = test_installation_service_for_port(&runtime_root, "1.0.0", 8081, &temp_root);
+        let second = test_installation_service_for_port(&runtime_root, "1.0.0", 8082, &temp_root);
+
+        let first_metadata = PathBuf::from(
+            first
+                .install(InstallTarget::LinuxCliWeb)
+                .unwrap()
+                .backend
+                .as_ref()
+                .unwrap()
+                .service_metadata_path
+                .as_ref()
+                .unwrap(),
+        );
+        let second_metadata = PathBuf::from(
+            second
+                .install(InstallTarget::LinuxCliWeb)
+                .unwrap()
+                .backend
+                .as_ref()
+                .unwrap()
+                .service_metadata_path
+                .as_ref()
+                .unwrap(),
+        );
+
+        first.uninstall().unwrap();
+
+        assert!(!first.backend_path().exists());
+        assert!(!first_metadata.exists());
+        assert!(second.path().exists());
+        assert!(second.backend_path().exists());
+        assert!(second_metadata.exists());
+        assert!(second.status().unwrap().installed);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn port_scoped_repair_can_migrate_legacy_root_install_state() {
+        let temp_root = unique_temp_dir("installation-legacy-port-migration");
+        let runtime_root = temp_root.join("run");
+        let legacy = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+        let scoped = test_installation_service_for_port(&runtime_root, "1.1.0", 8080, &temp_root);
+
+        legacy.install(InstallTarget::LinuxCliWeb).unwrap();
+        assert!(runtime_root.join(INSTALL_STATE_FILE).exists());
+        assert!(!scoped.path().exists());
+
+        let repaired = scoped.repair().unwrap();
+
+        assert_eq!(repaired.port, Some(8080));
+        assert_eq!(repaired.version.as_deref(), Some("1.0.0"));
+        assert!(scoped.path().exists());
+        assert!(scoped.backend_path().exists());
+        assert!(!runtime_root.join(INSTALL_STATE_FILE).exists());
+        assert!(!runtime_root.join(INSTALL_BACKEND_FILE).exists());
+        let unit = fs::read_to_string(
+            repaired
+                .backend
+                .as_ref()
+                .unwrap()
+                .service_metadata_path
+                .as_ref()
+                .unwrap(),
+        )
+        .unwrap();
+        assert!(unit.contains("--port 8080 --runtime-root"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_installation_service_detects_partial_and_conflicting_backend_state() {
         let temp_root = unique_temp_dir("installation-backend");
         let runtime_root = temp_root.join("run");
-        let service = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+        let service = test_installation_service_for_port(&runtime_root, "1.0.0", 4558, &temp_root);
 
         service.install(InstallTarget::LinuxCliWeb).unwrap();
         fs::remove_file(service.backend_path()).unwrap();
@@ -930,6 +1160,28 @@ mod tests {
         assert!(conflicting.conflicting);
 
         fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn test_installation_service_for_port(
+        runtime_root: &PathBuf,
+        version: &str,
+        port: u16,
+        temp_root: &Path,
+    ) -> FileInstallationService {
+        FileInstallationService::with_path_inputs_for_port(
+            runtime_root,
+            version,
+            port,
+            RuntimePathInputs {
+                home: Some(temp_root.join("home")),
+                local_app_data: Some(temp_root.join("local-app-data")),
+                app_data: Some(temp_root.join("app-data")),
+                program_data: Some(temp_root.join("program-data")),
+                xdg_cache_home: Some(temp_root.join("cache")),
+                xdg_state_home: Some(temp_root.join("state")),
+                xdg_config_home: Some(temp_root.join("config")),
+            },
+        )
     }
 
     fn test_installation_service(

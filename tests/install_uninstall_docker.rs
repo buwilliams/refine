@@ -47,15 +47,17 @@ set -eu
 cd /home/refine/refine
 metadata_path="$(
   ./r system install --target linux-cli-web --runtime-root run --version 3.0.0 \
+    --port 19080 \
     | tee /tmp/refine-system-install.json \
     | sed -n 's/.*"service_metadata_path": "\([^"]*\)".*/\1/p' \
     | head -n 1
 )"
 test -n "$metadata_path"
 test -f "$metadata_path"
-test -f run/install-state.json
-test -f run/install-backend.json
-grep -q '"installed": true' run/install-state.json
+test -f run/19080/install-state.json
+test -f run/19080/install-backend.json
+grep -q '"installed": true' run/19080/install-state.json
+grep -q '"port": 19080' run/19080/install-state.json
 printf '%s\n' "$metadata_path" >/tmp/refine-service-metadata-path
 "#,
     );
@@ -66,11 +68,11 @@ printf '%s\n' "$metadata_path" >/tmp/refine-service-metadata-path
 set -eu
 cd /home/refine/refine
 metadata_path="$(cat /tmp/refine-service-metadata-path)"
-./r system uninstall --runtime-root run --version 3.0.0
-test -f run/install-state.json
-test ! -f run/install-backend.json
+./r system uninstall --port 19080 --runtime-root run --version 3.0.0
+test -f run/19080/install-state.json
+test ! -f run/19080/install-backend.json
 test ! -e "$metadata_path"
-grep -q '"installed": false' run/install-state.json
+grep -q '"installed": false' run/19080/install-state.json
 ./r system stop --port 19080 --runtime-root run || true
 "#,
     );
