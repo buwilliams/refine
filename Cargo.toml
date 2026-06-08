@@ -47,6 +47,10 @@ path = "tests/install_uninstall_docker.rs"
 test = false
 
 [[test]]
+name = "full_workflow"
+path = "tests/full_workflow.rs"
+
+[[test]]
 name = "multi_instance_sync"
 path = "tests/multi_instance_sync.rs"
 test = false

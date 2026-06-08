@@ -17,6 +17,7 @@ fn main() {
         Some("test-cli") => test_cli(),
         Some("test-cluster-ssh") => test_cluster_ssh(),
         Some("test-install-uninstall") => test_install_uninstall(),
+        Some("test-full-workflow") => test_full_workflow(),
         Some("test-multi-instance-sync") => test_multi_instance_sync(),
         Some("test-ui") => test_ui(),
         Some("test-surface") => test_surface(),
@@ -50,6 +51,7 @@ fn test_all() -> Result<(), String> {
     test_cli()?;
     test_cluster_ssh()?;
     test_install_uninstall()?;
+    test_full_workflow()?;
     test_multi_instance_sync()?;
     test_ui()?;
     check_git_diff()
@@ -166,6 +168,27 @@ fn test_install_uninstall() -> Result<(), String> {
         ])
         .current_dir(&repo_root);
     run(&mut command, "run Docker-backed install/uninstall tests")
+}
+
+fn test_full_workflow() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    let smoke_ai = ensure_smoke_ai_built(&repo_root)?;
+    let mut command = Command::new("cargo");
+    command
+        .args([
+            "test",
+            "--test",
+            "full_workflow",
+            "--",
+            "--ignored",
+            "--test-threads=1",
+            "--nocapture",
+        ])
+        .current_dir(&repo_root)
+        .env("REFINE_TEST_PORT", test_port())
+        .env("REFINE_DAEMON_PORT", test_port())
+        .env("REFINE_SMOKE_AI_PATH", smoke_ai);
+    run(&mut command, "run full workflow integration test")
 }
 
 fn test_multi_instance_sync() -> Result<(), String> {

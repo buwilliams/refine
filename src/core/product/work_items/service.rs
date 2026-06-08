@@ -1067,6 +1067,12 @@ impl FileWorkItemService {
                 object.insert("rounds".to_string(), Value::Array(vec![round]));
             }
         }
+        if current.gap.status == GapStatus::Review {
+            object.insert(
+                "status".to_string(),
+                Value::String(GapStatus::Todo.as_str().to_string()),
+            );
+        }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&gap_path, &value)?;
         self.show_gap_summary(gap_id)
@@ -1121,6 +1127,30 @@ impl FileWorkItemService {
         let now = now_timestamp();
         latest.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
+        write_json_atomically(&gap_path, &value)?;
+        self.show_gap_summary(gap_id)
+    }
+
+    pub fn update_gap_branch_name(
+        &self,
+        gap_id: &str,
+        branch_name: Option<&str>,
+    ) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        self.ensure_gap_owned(&current)?;
+        let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+        })?;
+        match branch_name.map(str::trim).filter(|value| !value.is_empty()) {
+            Some(branch) => {
+                object.insert("branch_name".to_string(), Value::String(branch.to_string()));
+            }
+            None => {
+                object.insert("branch_name".to_string(), Value::Null);
+            }
+        }
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&gap_path, &value)?;
         self.show_gap_summary(gap_id)
     }

@@ -1454,15 +1454,19 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
-    git(&temp_root, &["init", "-b", "main"]).unwrap();
-    git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
-    git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
-    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
-    git(&temp_root, &["add", "app.txt"]).unwrap();
-    git(&temp_root, &["commit", "-m", "initial"]).unwrap();
+    fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+    git(&temp_root, &["init", "-q"]).unwrap();
+    git(
+        &temp_root,
+        &["config", "user.email", "refine-test@example.invalid"],
+    )
+    .unwrap();
+    git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+    git(&temp_root, &["add", "app.py"]).unwrap();
+    git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
+        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai\\n' >> app.py\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
     )
     .unwrap();
     {
@@ -1504,12 +1508,8 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     assert_eq!(schedule.body["reservations"][0]["gap_id"], "GAP1");
     assert_eq!(schedule.body["reservations"][0]["state"], "completed");
     assert_eq!(schedule.body["dispatched"][0]["gap_id"], "GAP1");
-    assert_eq!(
-        schedule.body["dispatched"][0]["final_status"],
-        "ready-merge"
-    );
-    assert_eq!(schedule.body["merged"]["gap_id"], "GAP1");
-    assert_eq!(schedule.body["merged"]["status"], "review");
+    assert_eq!(schedule.body["dispatched"][0]["final_status"], "review");
+    assert_eq!(schedule.body["merged"], serde_json::Value::Null);
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1".to_string(),
@@ -1818,15 +1818,19 @@ fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_requ
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
-    git(&temp_root, &["init", "-b", "main"]).unwrap();
-    git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
-    git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
-    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
-    git(&temp_root, &["add", "app.txt"]).unwrap();
-    git(&temp_root, &["commit", "-m", "initial"]).unwrap();
+    fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+    git(&temp_root, &["init", "-q"]).unwrap();
+    git(
+        &temp_root,
+        &["config", "user.email", "refine-test@example.invalid"],
+    )
+    .unwrap();
+    git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+    git(&temp_root, &["add", "app.py"]).unwrap();
+    git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai loop response'\n",
+        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai loop\\n' >> app.py\nprintf '%s\\n' 'smoke-ai loop response'\n",
     )
     .unwrap();
     {
@@ -4414,7 +4418,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         path: "/api/target-app/generate-instructions".to_string(),
         body: Some(json!({"kind": "all", "provider": "__local__", "background": true})),
     });
-    assert_eq!(generated_job.status, 202);
+    assert_eq!(generated_job.status, 202, "{:?}", generated_job.body);
     let generated_job_id = generated_job.body["job"]["id"].as_str().unwrap();
     let registry = FileJobRegistry::new(&runtime_root);
     let generated_job = wait_for_job_status(&registry, generated_job_id, JobState::Succeeded);

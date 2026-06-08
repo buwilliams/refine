@@ -16,10 +16,21 @@ pub struct IntegrationFixture {
     pub artifact_root: PathBuf,
     binary: PathBuf,
     daemon: Option<Child>,
+    agent_scheduler_enabled: bool,
 }
 
 impl IntegrationFixture {
+    #[allow(dead_code)]
     pub fn start(suite: &str) -> Self {
+        Self::start_with_scheduler(suite, false)
+    }
+
+    #[allow(dead_code)]
+    pub fn start_with_agent_scheduler(suite: &str) -> Self {
+        Self::start_with_scheduler(suite, true)
+    }
+
+    fn start_with_scheduler(suite: &str, agent_scheduler_enabled: bool) -> Self {
         let repo_root = repo_root();
         let port = test_port();
         let runtime_root = env_path("REFINE_TEST_RUNTIME_ROOT")
@@ -40,6 +51,7 @@ impl IntegrationFixture {
             artifact_root,
             binary,
             daemon: None,
+            agent_scheduler_enabled,
         };
         fixture.reset_paths();
         fixture.ensure_test_app();
@@ -96,6 +108,7 @@ impl IntegrationFixture {
             .to_string()
     }
 
+    #[allow(dead_code)]
     pub fn gap_field(&self, id: &str, field: &str) -> serde_json::Value {
         let output = self.run_refine(&["gap", "show", id]);
         self.assert_success("gap show", &output);
@@ -109,6 +122,7 @@ impl IntegrationFixture {
             .unwrap_or_else(|error| panic!("{method} {path} returned invalid JSON: {error}"))
     }
 
+    #[allow(dead_code)]
     pub fn create_git_app(&self, name: &str) -> PathBuf {
         let app_root = self
             .repo_root
@@ -123,6 +137,7 @@ impl IntegrationFixture {
         fs::create_dir_all(&self.artifact_root).expect("failed to create artifact root");
         self.copy_runtime_diagnostics("before-reset");
         let _ = fs::remove_dir_all(&self.runtime_root);
+        self.cleanup_test_app_worktrees();
         let _ = fs::remove_dir_all(&self.app_root);
     }
 
@@ -170,7 +185,7 @@ impl IntegrationFixture {
             {
                 panic!("daemon exited before readiness with status {status}");
             }
-            if http_get(self.port, "/system/version").is_ok() {
+            if http_get(self.port, "/system/version").is_ok() && self.daemon_status_ready() {
                 return;
             }
             thread::sleep(Duration::from_millis(100));
@@ -180,6 +195,21 @@ impl IntegrationFixture {
             self.port,
             self.artifact_root.display()
         );
+    }
+
+    fn daemon_status_ready(&self) -> bool {
+        let path = self
+            .runtime_root
+            .join(self.port.to_string())
+            .join("daemon-status.json");
+        let Ok(bytes) = fs::read(path) else {
+            return false;
+        };
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&bytes) else {
+            return false;
+        };
+        value["port"].as_u64() == Some(self.port.into())
+            && value["daemon_healthy"].as_bool() == Some(true)
     }
 
     fn wait_for_attached_project(&self) {
@@ -232,6 +262,32 @@ impl IntegrationFixture {
         }
     }
 
+    fn cleanup_test_app_worktrees(&self) {
+        let Some(parent) = self.app_root.parent() else {
+            return;
+        };
+        let Some(name) = self.app_root.file_name().and_then(|value| value.to_str()) else {
+            return;
+        };
+        let prefix = format!("{name}-");
+        let Ok(entries) = fs::read_dir(parent) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path == self.app_root {
+                continue;
+            }
+            let matches_prefix = path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .is_some_and(|value| value.starts_with(&prefix));
+            if matches_prefix && path.is_dir() {
+                let _ = fs::remove_dir_all(path);
+            }
+        }
+    }
+
     fn env(&self) -> Vec<(String, String)> {
         let mut env = vec![
             ("REFINE_TEST_PORT".to_string(), self.port.to_string()),
@@ -244,14 +300,17 @@ impl IntegrationFixture {
                 "REFINE_TEST_APP_ROOT".to_string(),
                 self.app_root.display().to_string(),
             ),
-            (
+        ];
+        if !self.agent_scheduler_enabled {
+            env.push((
                 "REFINE_AGENT_SCHEDULER_DISABLED".to_string(),
                 "1".to_string(),
-            ),
-        ];
+            ));
+        }
         if let Ok(path) = std::env::var("REFINE_SMOKE_AI_PATH") {
             env.push(("REFINE_SMOKE_AI_PATH".to_string(), path));
         }
+        env.push(("SMOKE_AI_EDIT_APP".to_string(), "1".to_string()));
         env
     }
 
@@ -285,6 +344,7 @@ impl Drop for IntegrationFixture {
         self.stop_daemon();
         self.copy_runtime_diagnostics("after-stop");
         let _ = fs::remove_dir_all(&self.runtime_root);
+        self.cleanup_test_app_worktrees();
         let _ = fs::remove_dir_all(&self.app_root);
     }
 }

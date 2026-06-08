@@ -714,40 +714,10 @@ fn workflow_schedule_uses_file_scheduler_service() {
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
-    for args in [
-        vec!["init", "-b", "main"],
-        vec!["config", "user.email", "test@example.com"],
-        vec!["config", "user.name", "Test User"],
-    ] {
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&temp_root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
-    for args in [vec!["add", "app.txt"], vec!["commit", "-m", "initial"]] {
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&temp_root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    init_test_git_repo(&temp_root);
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
+        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai\\n' >> app.py\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
     )
     .unwrap();
     {
@@ -1357,40 +1327,10 @@ fn workflow_control_commands_use_core_state() {
     let runtime_root = temp_root.join("run");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
-    for args in [
-        vec!["init", "-b", "main"],
-        vec!["config", "user.email", "test@example.com"],
-        vec!["config", "user.name", "Test User"],
-    ] {
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&temp_root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
-    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
-    for args in [vec!["add", "app.txt"], vec!["commit", "-m", "initial"]] {
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(&temp_root)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
+    init_test_git_repo(&temp_root);
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
+        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai control\\n' >> app.py\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
     )
     .unwrap();
     {
@@ -1874,6 +1814,30 @@ fn agent_configure_and_diagnose_use_provider_service() {
         Cli::try_parse_from(["refine", "agent", "configure", "--provider", "nope"]).unwrap(),
     );
     assert!(invalid.is_err());
+}
+
+fn init_test_git_repo(repo: &std::path::Path) {
+    fs::write(repo.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+    for args in [
+        vec!["init", "-q"],
+        vec!["config", "user.email", "refine-test@example.invalid"],
+        vec!["config", "user.name", "Refine Test"],
+        vec!["add", "app.py"],
+        vec!["commit", "-q", "-m", "Initialize test app"],
+    ] {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git command failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {

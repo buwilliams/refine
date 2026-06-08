@@ -1,4 +1,5 @@
 use std::env;
+use std::fs::OpenOptions;
 use std::io::{self, Read, Write};
 use std::thread;
 use std::time::Duration;
@@ -100,6 +101,11 @@ fn main() {
             io::stderr(),
             "smoke-ai matcher={selected_name} template={selected_template}"
         );
+    }
+    if selected_name == "gap-agent" && env::var("SMOKE_AI_EDIT_APP").as_deref() == Ok("1") {
+        if let Ok(mut file) = OpenOptions::new().append(true).open("app.py") {
+            let _ = writeln!(file, "\n# edited by smoke-ai gap-agent");
+        }
     }
     if haystack.contains("smoke-ai queue delay") {
         thread::sleep(Duration::from_millis(4_000));

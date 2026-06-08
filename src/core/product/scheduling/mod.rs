@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::thread;
+use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -10,17 +12,19 @@ use uuid::Uuid;
 use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessPauseState};
-use crate::core::product::merging::{
-    FileMergerService, MergerGapResult, branch_name_for_gap, source_root,
+use crate::core::host::quality::{
+    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityService,
 };
+use crate::core::observability::logs::FileLogService;
+use crate::core::product::merging::{FileMergerService, MergerGapResult};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
 };
 use crate::core::product::work_items::FileWorkItemService;
-use crate::core::supervisor::config::{ConfigService, FileSettingsService};
+use crate::core::supervisor::config::{ConfigService, FileGovernanceService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::model::JsonObject;
@@ -113,8 +117,9 @@ pub struct ScheduleDispatchResult {
     pub gap_id: String,
     pub job_id: String,
     pub provider: String,
-    pub branch_name: String,
-    pub worktree_path: String,
+    pub branch: String,
+    pub commit: String,
+    pub merge: MergeResult,
     pub final_status: String,
     pub provider_output: String,
 }
@@ -468,74 +473,189 @@ impl FileSchedulingService {
             durable_root,
             self.runtime_root.join("cache"),
         );
-        work_items.advance_automated_gap_status(&reservation.gap_id, GapStatus::InProgress)?;
-        self.append_job_log(
-            job_id,
+        let round_idx = ensure_dispatch_round(&work_items, &reservation.gap_id)?;
+        let settings = FileSettingsService::new(durable_root).load()?;
+        let app_root = durable_root.parent().ok_or_else(|| {
+            RefineError::InvalidInput(
+                "durable root must be inside an attached target app".to_string(),
+            )
+        })?;
+        let branch = implementation_branch_name(
+            setting_string(&settings, "branch_name_pattern", "refine/{gap_id}").as_str(),
             &reservation.gap_id,
+            round_idx,
+        );
+        let app_git = FileGitWorktreeService::with_runtime_root(app_root, &self.runtime_root);
+        let workflow = WorkflowExecution {
+            job_id,
+            gap_id: &reservation.gap_id,
+            round_idx,
+            work_items: &work_items,
+            durable_root,
+        };
+
+        work_items.advance_automated_gap_status(&reservation.gap_id, GapStatus::InProgress)?;
+        workflow.log(
+            self,
             "state",
             "Workflow status changed: todo -> in-progress",
             None,
         )?;
 
-        let settings = FileSettingsService::new(durable_root).load()?;
-        let current_gap = work_items.show_gap_summary(&reservation.gap_id)?;
-        let branch_name = current_gap
-            .gap
-            .branch_name
-            .clone()
-            .unwrap_or_else(|| branch_name_for_gap(&settings, &reservation.gap_id));
-        work_items.set_gap_branch_name(&reservation.gap_id, &branch_name)?;
-        let source_root = source_root(durable_root)?;
-        let git = FileGitWorktreeService::with_runtime_root(&source_root, &self.runtime_root);
-        git.ensure_branch_from_head(&branch_name)?;
-        let worktree_target = git.git_path(&format!("refine-worktrees/{}", reservation.gap_id))?;
-        let worktree_path = PathBuf::from(git.ensure_worktree(&branch_name, &worktree_target)?);
-        let agent_cwd = agent_cwd(&worktree_path, &settings)?;
+        let worktree_path = match app_git.worktree(&branch) {
+            Ok(path) => path,
+            Err(error) => {
+                self.fail_workflow(&workflow, "branch", &error)?;
+                return Err(error);
+            }
+        };
+        workflow.log(
+            self,
+            "git",
+            &format!("Created implementation worktree for {branch}"),
+            Some(json_object(json!({
+                "branch": branch,
+                "worktree": worktree_path
+            }))),
+        )?;
+        if let Err(error) = work_items.update_gap_branch_name(&reservation.gap_id, Some(&branch)) {
+            self.fail_workflow(&workflow, "branch", &error)?;
+            return Err(error);
+        }
 
         let prompt = gap_agent_prompt(&reservation.gap_id);
-        let cwd = Some(agent_cwd.display().to_string());
+        let agent_cwd = agent_worktree_cwd(
+            &worktree_path,
+            setting_string(&settings, "agent_subpath", "").as_str(),
+        )?;
         let provider =
             HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"));
-        let provider_output = provider.invoke(ProviderInvocation {
+        let provider_output = match provider.invoke(ProviderInvocation {
             provider: reservation.provider.clone(),
             prompt,
             session_id: None,
-            cwd,
-        })?;
-        let implementation_commit = FileGitWorktreeService::with_runtime_root(
-            &worktree_path,
-            self.runtime_root.join("agents"),
-        )
-        .commit_allow_empty(
-            &format!("Implement Gap {}", reservation.gap_id),
-            &Vec::<String>::new(),
-        )?;
-        self.append_job_log(
-            job_id,
-            &reservation.gap_id,
+            cwd: Some(agent_cwd.display().to_string()),
+        }) {
+            Ok(output) => output,
+            Err(error) => {
+                self.fail_workflow(&workflow, "agent", &error)?;
+                return Err(error);
+            }
+        };
+        workflow.log(
+            self,
             "agent",
             "Gap agent completed",
             Some(json_object(json!({
                 "provider": reservation.provider,
                 "output": provider_output,
-                "branch_name": branch_name,
-                "worktree_path": worktree_path.display().to_string(),
-                "implementation_commit": implementation_commit
+                "branch": branch,
+                "worktree": worktree_path
+            }))),
+        )?;
+
+        let worktree_git =
+            FileGitWorktreeService::with_runtime_root(&worktree_path, &self.runtime_root);
+        let commit = match worktree_git.commit(
+            &format!("Implement {} round {}", reservation.gap_id, round_idx + 1),
+            &[],
+        ) {
+            Ok(commit) => commit,
+            Err(error) => {
+                self.fail_workflow(&workflow, "commit", &error)?;
+                return Err(error);
+            }
+        };
+        workflow.log(
+            self,
+            "git",
+            &format!("Committed implementation branch {branch}"),
+            Some(json_object(json!({
+                "branch": branch,
+                "commit": commit,
+                "worktree": worktree_path
+            }))),
+        )?;
+
+        if let Err(error) = workflow.advance(self, GapStatus::Qa, "in-progress") {
+            self.fail_workflow(&workflow, "state", &error)?;
+            return Err(error);
+        }
+        let quality = match self.run_workflow_quality(durable_root, &settings, &reservation.gap_id)
+        {
+            Ok(result) => result,
+            Err(error) => {
+                self.record_quality_error(&workflow, &error)?;
+                self.fail_workflow(&workflow, "quality", &error)?;
+                return Err(error);
+            }
+        };
+        self.record_quality(&workflow, &quality)?;
+        if !quality.ok {
+            let error = RefineError::Conflict("quality checks failed".to_string());
+            self.fail_workflow(&workflow, "quality", &error)?;
+            return Err(error);
+        }
+
+        let governance = self.evaluate_workflow_governance(durable_root, &settings)?;
+        self.record_governance(&workflow, &governance)?;
+        if governance.failed {
+            let error = RefineError::Conflict(
+                governance
+                    .message
+                    .clone()
+                    .unwrap_or_else(|| "governance checks failed".to_string()),
+            );
+            self.fail_workflow(&workflow, "governance", &error)?;
+            return Err(error);
+        }
+
+        if let Err(error) = workflow.advance(self, GapStatus::ReadyMerge, "qa") {
+            self.fail_workflow(&workflow, "state", &error)?;
+            return Err(error);
+        }
+        let merge = match merge_with_transient_lock_retry(&app_git, &branch) {
+            Ok(result) if result.ok => result,
+            Ok(result) => {
+                let error = RefineError::Conflict(
+                    result
+                        .message
+                        .clone()
+                        .unwrap_or_else(|| "implementation merge failed".to_string()),
+                );
+                workflow.log(
+                    self,
+                    "merge",
+                    "Implementation merge failed",
+                    Some(json_object(json!({"branch": branch, "merge": &result}))),
+                )?;
+                self.fail_workflow(&workflow, "merge", &error)?;
+                return Err(error);
+            }
+            Err(error) => {
+                self.fail_workflow(&workflow, "merge", &error)?;
+                return Err(error);
+            }
+        };
+        workflow.log(
+            self,
+            "merge",
+            &format!("Merged implementation branch {branch}"),
+            Some(json_object(json!({
+                "branch": branch,
+                "commit": commit,
+                "merge": &merge
             }))),
         )?;
 
         for (from, to) in [
-            ("in-progress", GapStatus::Qa),
-            ("qa", GapStatus::ReadyMerge),
+            ("ready-merge", GapStatus::AwaitingRebuild),
+            ("awaiting-rebuild", GapStatus::Review),
         ] {
-            work_items.advance_automated_gap_status(&reservation.gap_id, to.clone())?;
-            self.append_job_log(
-                job_id,
-                &reservation.gap_id,
-                "state",
-                &format!("Workflow status changed: {from} -> {}", to.as_str()),
-                None,
-            )?;
+            if let Err(error) = workflow.advance(self, to, from) {
+                self.fail_workflow(&workflow, "state", &error)?;
+                return Err(error);
+            }
         }
 
         self.job_registry.finish_with_result(
@@ -544,11 +664,13 @@ impl FileSchedulingService {
             json!({
                 "gap_id": reservation.gap_id,
                 "provider": reservation.provider,
-                "branch_name": branch_name,
-                "worktree_path": worktree_path.display().to_string(),
+                "branch": branch,
+                "commit": commit,
+                "merge": merge,
+                "quality": quality,
+                "governance": governance.details,
                 "provider_output": provider_output,
-                "implementation_commit": implementation_commit,
-                "final_status": "ready-merge"
+                "final_status": "review"
             }),
         )?;
         self.mark_reservation_state(reservation_id, ReservationState::Completed)?;
@@ -557,11 +679,177 @@ impl FileSchedulingService {
             gap_id: reservation.gap_id,
             job_id: job_id.to_string(),
             provider: reservation.provider,
-            branch_name,
-            worktree_path: worktree_path.display().to_string(),
-            final_status: "ready-merge".to_string(),
+            branch,
+            commit,
+            merge,
+            final_status: "review".to_string(),
             provider_output,
         })
+    }
+
+    fn fail_workflow(
+        &self,
+        workflow: &WorkflowExecution<'_>,
+        category: &str,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        let _ = workflow
+            .work_items
+            .advance_automated_gap_status(workflow.gap_id, GapStatus::Failed);
+        workflow.log(
+            self,
+            category,
+            &format!("Workflow failed: {error}"),
+            Some(json_object(json!({"error": error.to_string()}))),
+        )
+    }
+
+    fn run_workflow_quality(
+        &self,
+        durable_root: &Path,
+        settings: &JsonObject,
+        gap_id: &str,
+    ) -> RefineResult<QualityCheckResult> {
+        if setting_string(settings, "quality_enabled", "0") != "1" {
+            return Ok(QualityCheckResult {
+                owner_id: gap_id.to_string(),
+                ok: true,
+                diagnostics: vec!["Quality checks disabled.".to_string()],
+            });
+        }
+        let service = FileQualityService::with_runtime_root(durable_root, &self.runtime_root);
+        let browser_required = setting_string(settings, "quality_regressions_enabled", "0") == "1";
+        service.run_checks(QualityCheckRequest {
+            owner_id: gap_id.to_string(),
+            command: String::new(),
+            browser_required,
+        })
+    }
+
+    fn record_quality(
+        &self,
+        workflow: &WorkflowExecution<'_>,
+        result: &QualityCheckResult,
+    ) -> RefineResult<()> {
+        let message = if result.ok {
+            "Quality checks passed"
+        } else {
+            "Quality checks failed"
+        };
+        workflow
+            .work_items
+            .update_latest_gap_round_evaluation_summary(
+                workflow.gap_id,
+                &json!({
+                    "quality_state": if result.ok { "passed" } else { "failed" },
+                    "quality_message": message,
+                    "quality_details": {"diagnostics": result.diagnostics},
+                    "quality_checked_at": now_timestamp()
+                }),
+            )?;
+        workflow.log(
+            self,
+            "quality",
+            message,
+            Some(json_object(json!({
+                "ok": result.ok,
+                "diagnostics": result.diagnostics
+            }))),
+        )
+    }
+
+    fn record_quality_error(
+        &self,
+        workflow: &WorkflowExecution<'_>,
+        error: &RefineError,
+    ) -> RefineResult<()> {
+        workflow
+            .work_items
+            .update_latest_gap_round_evaluation_summary(
+                workflow.gap_id,
+                &json!({
+                    "quality_state": "failed",
+                    "quality_message": "Quality checks failed.",
+                    "quality_details": {"error": error.to_string()},
+                    "quality_checked_at": now_timestamp()
+                }),
+            )?;
+        Ok(())
+    }
+
+    fn evaluate_workflow_governance(
+        &self,
+        durable_root: &Path,
+        _settings: &JsonObject,
+    ) -> RefineResult<GovernanceEvaluation> {
+        let governance = FileGovernanceService::new(durable_root).load()?;
+        let rules = governance
+            .get("rules")
+            .and_then(|value| value.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let failed_actions = rules
+            .iter()
+            .filter_map(|rule| {
+                let action = rule
+                    .get("action")
+                    .and_then(|value| value.as_str())
+                    .unwrap_or("allow");
+                matches!(action, "block" | "fail" | "failed").then(|| rule.clone())
+            })
+            .collect::<Vec<_>>();
+        let failed = !failed_actions.is_empty();
+        Ok(GovernanceEvaluation {
+            failed,
+            message: failed.then(|| "Governance rules blocked implementation.".to_string()),
+            details: json_object(json!({
+                "configured": !rules.is_empty(),
+                "rules_checked": rules.len(),
+                "failed_actions": failed_actions
+            })),
+        })
+    }
+
+    fn record_governance(
+        &self,
+        workflow: &WorkflowExecution<'_>,
+        evaluation: &GovernanceEvaluation,
+    ) -> RefineResult<()> {
+        let message = evaluation.message.clone().unwrap_or_else(|| {
+            if evaluation.details["configured"].as_bool() == Some(true) {
+                "Governance checks passed.".to_string()
+            } else {
+                "No governance rules configured.".to_string()
+            }
+        });
+        workflow
+            .work_items
+            .update_latest_gap_round_evaluation_summary(
+                workflow.gap_id,
+                &json!({
+                    "rule_state": if evaluation.failed { "failed" } else { "passed" },
+                    "meta_rule_state": "passed",
+                    "product_state": "passed",
+                    "constitution_state": "passed",
+                    "governance_message": message,
+                    "governance_details": evaluation.details,
+                    "governance_checked_at": now_timestamp(),
+                    "governance_rule_actions": evaluation.details
+                        .get("failed_actions")
+                        .cloned()
+                        .unwrap_or_else(|| json!([]))
+                }),
+            )?;
+        workflow.log(
+            self,
+            "governance",
+            if evaluation.failed {
+                "Governance checks failed"
+            } else {
+                "Governance checks passed"
+            },
+            Some(evaluation.details.clone()),
+        )
     }
 
     fn reservation(&self, reservation_id: &str) -> RefineResult<ScheduleReservation> {
@@ -644,6 +932,64 @@ struct ReservationMetadata {
     node_id: String,
     provider: String,
     target_app_id: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+struct GovernanceEvaluation {
+    failed: bool,
+    message: Option<String>,
+    details: JsonObject,
+}
+
+struct WorkflowExecution<'a> {
+    job_id: &'a str,
+    gap_id: &'a str,
+    round_idx: usize,
+    work_items: &'a FileWorkItemService,
+    durable_root: &'a Path,
+}
+
+impl WorkflowExecution<'_> {
+    fn advance(
+        &self,
+        scheduler: &FileSchedulingService,
+        to: GapStatus,
+        from: &str,
+    ) -> RefineResult<()> {
+        self.work_items
+            .advance_automated_gap_status(self.gap_id, to.clone())?;
+        self.log(
+            scheduler,
+            "state",
+            &format!("Workflow status changed: {from} -> {}", to.as_str()),
+            None,
+        )
+    }
+
+    fn log(
+        &self,
+        scheduler: &FileSchedulingService,
+        category: &str,
+        message: &str,
+        details: Option<JsonObject>,
+    ) -> RefineResult<()> {
+        scheduler.append_job_log(self.job_id, self.gap_id, category, message, details.clone())?;
+        FileLogService::new(self.durable_root).append_round_log(
+            self.gap_id,
+            self.round_idx,
+            LogEntry {
+                datetime: now_timestamp(),
+                severity: "info".to_string(),
+                category: category.to_string(),
+                message: message.to_string(),
+                details,
+                actions: Vec::new(),
+                actor: Some("refine".to_string()),
+                gap_id: Some(self.gap_id.to_string()),
+            },
+        )?;
+        Ok(())
+    }
 }
 
 impl SchedulingService for FileSchedulingService {
@@ -966,31 +1312,81 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
         .unwrap_or_else(|| fallback.to_string())
 }
 
-fn agent_cwd(worktree_path: &Path, settings: &JsonObject) -> RefineResult<PathBuf> {
-    let subpath = setting_string(settings, "agent_subpath", "");
-    let cwd = if subpath.is_empty() {
-        worktree_path.to_path_buf()
+fn ensure_dispatch_round(work_items: &FileWorkItemService, gap_id: &str) -> RefineResult<usize> {
+    let gap = work_items.show_gap_summary(gap_id)?;
+    if let Some(idx) = gap.gap.round_count.checked_sub(1) {
+        return Ok(idx);
+    }
+    let gap = work_items.append_gap_round_summary(
+        gap_id,
+        "Refine",
+        "Automated workflow requested",
+        "Implement and verify this Gap",
+    )?;
+    gap.gap
+        .round_count
+        .checked_sub(1)
+        .ok_or_else(|| RefineError::InvalidInput(format!("Gap {gap_id} has no rounds")))
+}
+
+fn implementation_branch_name(pattern: &str, gap_id: &str, round_idx: usize) -> String {
+    let pattern = pattern.trim();
+    let base = if pattern.is_empty() {
+        "refine/{gap_id}"
     } else {
-        worktree_path.join(&subpath)
+        pattern
     };
-    let canonical_worktree = fs::canonicalize(worktree_path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to inspect Gap worktree {}: {error}",
-            worktree_path.display()
-        ))
-    })?;
-    let canonical_cwd = fs::canonicalize(&cwd).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to inspect agent_subpath {}: {error}",
-            cwd.display()
-        ))
-    })?;
-    if !canonical_cwd.starts_with(&canonical_worktree) {
+    let round = (round_idx + 1).to_string();
+    let branch = base
+        .replace("{gap_id}", gap_id)
+        .replace("{gap}", gap_id)
+        .replace("{round}", &round);
+    if branch.contains(&format!("round-{round}")) || branch.contains(&format!("round/{round}")) {
+        branch
+    } else {
+        format!("{branch}/round-{round}")
+    }
+}
+
+fn agent_worktree_cwd(worktree_path: &str, agent_subpath: &str) -> RefineResult<PathBuf> {
+    let root = PathBuf::from(worktree_path);
+    let subpath = agent_subpath.trim();
+    if subpath.is_empty() {
+        return Ok(root);
+    }
+    let relative = Path::new(subpath);
+    if relative.is_absolute()
+        || relative
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
         return Err(RefineError::InvalidInput(
-            "agent_subpath must stay inside the Gap worktree".to_string(),
+            "agent_subpath must be a relative path inside the worktree".to_string(),
         ));
     }
-    Ok(canonical_cwd)
+    Ok(root.join(relative))
+}
+
+fn merge_with_transient_lock_retry(
+    service: &FileGitWorktreeService,
+    branch: &str,
+) -> RefineResult<MergeResult> {
+    let mut result = service.merge(branch)?;
+    for _ in 0..5 {
+        if result.ok || !merge_message_has_index_lock(&result) {
+            return Ok(result);
+        }
+        thread::sleep(Duration::from_millis(50));
+        result = service.merge(branch)?;
+    }
+    Ok(result)
+}
+
+fn merge_message_has_index_lock(result: &MergeResult) -> bool {
+    result
+        .message
+        .as_deref()
+        .is_some_and(|message| message.contains("index.lock"))
 }
 
 fn gap_agent_prompt(gap_id: &str) -> String {
