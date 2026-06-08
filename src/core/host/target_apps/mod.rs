@@ -341,6 +341,7 @@ impl FileTargetAppService {
             );
             notes.push("Generated stop command targets the configured TCP port.".to_string());
         }
+        apply_static_web_server_defaults(&project_root, &mut config, &mut notes);
         config.notes = notes.join(" ");
         Ok(config)
     }
@@ -359,6 +360,12 @@ impl FileTargetAppService {
 
         if config.log_path.trim().is_empty() {
             config.log_path = ".refine/manage-app.log".to_string();
+        }
+        let mut notes = Vec::new();
+        let project_root = config_project_root(&self.source_root, &config.cwd);
+        apply_static_web_server_defaults(&project_root, config, &mut notes);
+        for note in notes {
+            append_note(&mut config.notes, &note);
         }
 
         let wrapper_path = wrapper_dir.join("manage-app.sh");
@@ -693,6 +700,136 @@ fn apply_makefile_defaults(path: &Path, config: &mut TargetAppGeneratedConfig) -
     Ok(())
 }
 
+fn apply_static_web_server_defaults(
+    root: &Path,
+    config: &mut TargetAppGeneratedConfig,
+    notes: &mut Vec<String>,
+) {
+    if !config.start_command.trim().is_empty() {
+        return;
+    }
+    let Some(serve_dir) = static_web_serve_dir(root) else {
+        return;
+    };
+    let port = static_web_port(config);
+    if config.http_check_url.trim().is_empty() {
+        config.http_check_url = format!("http://127.0.0.1:{port}/");
+    }
+    if config.tcp_check_host.trim().is_empty() {
+        config.tcp_check_host = "127.0.0.1".to_string();
+    }
+    if config.tcp_check_port.trim().is_empty() {
+        config.tcp_check_port = port.to_string();
+    }
+    config.start_command = static_web_start_command(port, serve_dir, &config.http_check_url);
+    config.stop_command = static_web_stop_command();
+    if config.rebuild_command.trim().is_empty() {
+        config.rebuild_command =
+            "printf 'No build step configured; static server uses current files.\\n'".to_string();
+    }
+    config.status_command = format!(
+        "curl -fsS {} >/dev/null",
+        shell_quote(&config.http_check_url)
+    );
+    notes.push(format!(
+        "Detected static web content and generated a managed local web server on port {port}."
+    ));
+}
+
+fn config_project_root(source_root: &Path, cwd: &str) -> PathBuf {
+    let cwd = cwd.trim();
+    if cwd.is_empty() || cwd == "." {
+        return source_root.to_path_buf();
+    }
+    let path = PathBuf::from(cwd);
+    if path.is_absolute() {
+        path
+    } else {
+        source_root.join(path)
+    }
+}
+
+fn static_web_serve_dir(root: &Path) -> Option<&'static str> {
+    for (dir, entry) in [
+        (".", "index.html"),
+        ("public", "public/index.html"),
+        ("dist", "dist/index.html"),
+        ("build", "build/index.html"),
+    ] {
+        if root.join(entry).is_file() {
+            return Some(dir);
+        }
+    }
+    let has_root_html = fs::read_dir(root)
+        .ok()?
+        .filter_map(Result::ok)
+        .any(|entry| {
+            entry
+                .path()
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(|extension| extension.eq_ignore_ascii_case("html"))
+                .unwrap_or(false)
+        });
+    has_root_html.then_some(".")
+}
+
+fn static_web_port(config: &TargetAppGeneratedConfig) -> u16 {
+    port_from_url(&config.http_check_url)
+        .or_else(|| config.tcp_check_port.trim().parse::<u16>().ok())
+        .unwrap_or(3000)
+}
+
+fn static_web_start_command(port: u16, serve_dir: &str, url: &str) -> String {
+    [
+        format!("PORT={port};"),
+        format!("URL={};", shell_quote(url)),
+        format!("SERVE_DIR={};", shell_quote(serve_dir)),
+        "PID_FILE=.refine/run/target-app.pid;".to_string(),
+        "SERVER_LOG=.refine/logs/target-app-server.log;".to_string(),
+        "mkdir -p .refine/run .refine/logs;".to_string(),
+        "if curl -fsS \"$URL\" >/dev/null 2>&1; then exit 0; fi;".to_string(),
+        "if [ -s \"$PID_FILE\" ] && kill -0 \"$(cat \"$PID_FILE\")\" 2>/dev/null; then :; else"
+            .to_string(),
+        "rm -f \"$PID_FILE\";".to_string(),
+        "if command -v python3 >/dev/null 2>&1; then".to_string(),
+        "sh -c \"cd \\\"$SERVE_DIR\\\" && exec python3 -m http.server \\\"$PORT\\\" --bind 127.0.0.1\" > \"$SERVER_LOG\" 2>&1 & echo $! > \"$PID_FILE\";"
+            .to_string(),
+        "elif command -v npx >/dev/null 2>&1; then".to_string(),
+        "sh -c \"exec npx --yes serve \\\"$SERVE_DIR\\\" -l tcp://127.0.0.1:\\\"$PORT\\\" --no-clipboard --no-port-switching\" > \"$SERVER_LOG\" 2>&1 & echo $! > \"$PID_FILE\";"
+            .to_string(),
+        "else echo \"No static web server runner found (need python3 or npx)\" >&2; exit 1; fi; fi;"
+            .to_string(),
+        "i=0;".to_string(),
+        "while [ \"$i\" -lt 90 ]; do".to_string(),
+        "if curl -fsS \"$URL\" >/dev/null 2>&1; then exit 0; fi;".to_string(),
+        "i=$((i + 1)); sleep 1; done;".to_string(),
+        "echo \"Target app did not become reachable at $URL\" >&2; exit 1".to_string(),
+    ]
+    .join(" ")
+}
+
+fn static_web_stop_command() -> String {
+    [
+        "PID_FILE=.refine/run/target-app.pid;",
+        "if [ -s \"$PID_FILE\" ]; then",
+        "PID=$(cat \"$PID_FILE\");",
+        "if kill -0 \"$PID\" 2>/dev/null; then",
+        "kill \"$PID\" 2>/dev/null || true;",
+        "i=0;",
+        "while [ \"$i\" -lt 30 ]; do",
+        "kill -0 \"$PID\" 2>/dev/null || break;",
+        "i=$((i + 1)); sleep 1;",
+        "done;",
+        "kill -0 \"$PID\" 2>/dev/null && kill -9 \"$PID\" 2>/dev/null || true;",
+        "fi;",
+        "rm -f \"$PID_FILE\";",
+        "fi;",
+        "exit 0",
+    ]
+    .join(" ")
+}
+
 fn package_manager(root: &Path) -> &'static str {
     if root.join("pnpm-lock.yaml").exists() {
         "pnpm"
@@ -960,6 +1097,7 @@ fn new_operation_id(prefix: &str) -> String {
 mod tests {
     use super::*;
     use serde_json::json;
+    use std::net::TcpListener;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -1110,6 +1248,48 @@ mod tests {
     }
 
     #[test]
+    fn target_app_service_generates_static_web_server_for_package_without_start_script() {
+        let temp_root = unique_temp_dir("target-app-static-package");
+        let durable_root = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let source_root = temp_root.join("app");
+        let port = free_test_port();
+        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&source_root).unwrap();
+        fs::write(
+            source_root.join("package.json"),
+            r#"{"scripts":{"test":"node --test"}}"#,
+        )
+        .unwrap();
+        fs::write(source_root.join("index.html"), "<h1>Static app</h1>").unwrap();
+        FileSettingsService::new(&durable_root)
+            .update(&json!({
+                "target_app_url": format!("http://127.0.0.1:{port}/"),
+                "target_app_cwd": source_root.to_str().unwrap()
+            }))
+            .unwrap();
+
+        let generated = FileTargetAppService::new(&durable_root, &runtime_root, &source_root)
+            .generate_config()
+            .unwrap();
+        assert!(generated.start_command.contains("python3 -m http.server"));
+        assert!(generated.stop_command.contains("target-app.pid"));
+        assert_eq!(
+            generated.rebuild_command,
+            "printf 'No build step configured; static server uses current files.\\n'"
+        );
+        assert_eq!(
+            generated.status_command,
+            format!("curl -fsS 'http://127.0.0.1:{port}/' >/dev/null")
+        );
+        assert_eq!(generated.tcp_check_host, "127.0.0.1");
+        assert_eq!(generated.tcp_check_port, port.to_string());
+        assert!(generated.notes.contains("static web content"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn target_app_service_writes_manage_app_wrapper() {
         let temp_root = unique_temp_dir("target-app-wrapper");
         let source_root = temp_root.join("app");
@@ -1175,11 +1355,104 @@ mod tests {
         fs::remove_dir_all(temp_root).unwrap();
     }
 
+    #[test]
+    fn target_app_wrapper_turns_partial_ai_web_config_into_managed_server() {
+        let temp_root = unique_temp_dir("target-app-wrapper-static");
+        let source_root = temp_root.join("app");
+        let durable_root = source_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let port = free_test_port();
+        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&source_root).unwrap();
+        fs::write(source_root.join("index.html"), "<h1>AI static app</h1>").unwrap();
+
+        let mut config = TargetAppGeneratedConfig {
+            start_command: String::new(),
+            stop_command: String::new(),
+            rebuild_command: String::new(),
+            status_command: "npm test -- --help >/dev/null 2>&1 || true".to_string(),
+            cwd: ".".to_string(),
+            env: serde_json::Map::new(),
+            start_timeout_seconds: 120,
+            stop_timeout_seconds: 60,
+            rebuild_timeout_seconds: 300,
+            status_timeout_seconds: 10,
+            log_path: String::new(),
+            http_check_url: format!("http://127.0.0.1:{port}/"),
+            tcp_check_host: String::new(),
+            tcp_check_port: String::new(),
+            process_check_command: String::new(),
+            notes: "provider returned only a test status command".to_string(),
+        };
+        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+
+        service.write_manage_app_wrapper(&mut config).unwrap();
+
+        assert_eq!(config.start_command, "./.refine/manage-app.sh start");
+        assert_eq!(config.stop_command, "./.refine/manage-app.sh stop");
+        assert_eq!(config.rebuild_command, "./.refine/manage-app.sh rebuild");
+        assert_eq!(config.status_command, "./.refine/manage-app.sh status");
+        assert!(config.notes.contains("static web content"));
+
+        let wrapper_path = source_root.join(".refine/manage-app.sh");
+        let script = fs::read_to_string(&wrapper_path).unwrap();
+        assert!(!script.contains("START_COMMAND=''"));
+        assert!(!script.contains("STOP_COMMAND=''"));
+        assert!(script.contains(&format!("PORT={port};")));
+        assert!(script.contains(&format!("http://127.0.0.1:{port}/")));
+        assert!(script.contains("python3 -m http.server"));
+        assert!(script.contains("STATUS_COMMAND='curl -fsS"));
+
+        let start = std::process::Command::new(&wrapper_path)
+            .arg("start")
+            .current_dir(&source_root)
+            .output()
+            .unwrap();
+        assert!(
+            start.status.success(),
+            "start failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&start.stdout),
+            String::from_utf8_lossy(&start.stderr)
+        );
+        let status = std::process::Command::new(&wrapper_path)
+            .arg("status")
+            .current_dir(&source_root)
+            .output()
+            .unwrap();
+        let stop = std::process::Command::new(&wrapper_path)
+            .arg("stop")
+            .current_dir(&source_root)
+            .output()
+            .unwrap();
+        assert!(
+            status.status.success(),
+            "status failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&status.stdout),
+            String::from_utf8_lossy(&status.stderr)
+        );
+        assert!(
+            stop.status.success(),
+            "stop failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&stop.stdout),
+            String::from_utf8_lossy(&stop.stderr)
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
     fn unique_temp_dir(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn free_test_port() -> u16 {
+        TcpListener::bind(("127.0.0.1", 0))
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port()
     }
 }
