@@ -12,12 +12,14 @@ fn main() {
         Some("api-contract") => print_api_contract(),
         Some("check-static-assets") => check_static_assets(),
         Some("runtime-layout") => print_runtime_layout(),
+        Some("test-rust") => test_rust(),
         Some("test-smoke-ai") => test_smoke_ai(),
         Some("test-cli") => test_cli(),
         Some("test-cluster-ssh") => test_cluster_ssh(),
         Some("test-multi-instance-sync") => test_multi_instance_sync(),
         Some("test-ui") => test_ui(),
         Some("test-surface") => test_surface(),
+        Some("test-all") => test_all(),
         Some("check") | None => check_all(),
         Some(command) => Err(format!("unknown xtask command: {command}")),
     };
@@ -38,6 +40,43 @@ fn test_surface() -> Result<(), String> {
     test_cli()?;
     test_multi_instance_sync()?;
     test_ui()
+}
+
+fn test_all() -> Result<(), String> {
+    test_rust()?;
+    check_all()?;
+    test_smoke_ai()?;
+    test_cli()?;
+    test_cluster_ssh()?;
+    test_multi_instance_sync()?;
+    test_ui()?;
+    check_git_diff()
+}
+
+fn test_rust() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    run(
+        Command::new("cargo")
+            .args([
+                "test",
+                "--lib",
+                "--bins",
+                "--test",
+                "smoke_ai_contract",
+                "--test",
+                "cli_durable_root",
+                "--",
+                "--test-threads=1",
+            ])
+            .current_dir(&repo_root),
+        "run Rust subset tests",
+    )?;
+    run(
+        Command::new("cargo")
+            .args(["test", "--doc"])
+            .current_dir(&repo_root),
+        "run Rust doc tests",
+    )
 }
 
 fn test_smoke_ai() -> Result<(), String> {
@@ -274,6 +313,16 @@ fn ensure_playwright_package(repo_root: &Path) -> Result<(), String> {
     run(
         Command::new("npm").args(["install"]).current_dir(repo_root),
         "install Playwright npm dependencies",
+    )
+}
+
+fn check_git_diff() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    run(
+        Command::new("git")
+            .args(["diff", "--check"])
+            .current_dir(&repo_root),
+        "check git diff whitespace",
     )
 }
 

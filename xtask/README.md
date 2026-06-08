@@ -9,6 +9,8 @@ Commands:
 - `cargo run --manifest-path xtask/Cargo.toml -- api-contract`
 - `cargo run --manifest-path xtask/Cargo.toml -- check-static-assets`
 - `cargo run --manifest-path xtask/Cargo.toml -- runtime-layout`
+- `cargo run --manifest-path xtask/Cargo.toml -- test-rust`
+- `cargo run --manifest-path xtask/Cargo.toml -- test-all`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-cluster-ssh`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync`
 - `cargo run --manifest-path xtask/Cargo.toml -- check`

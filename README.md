@@ -40,16 +40,20 @@ After Ubuntu opens, use the Quick Start one-liner above.
 
 ## Test Suite
 
-The full verification set:
+Run the full verification set with Cargo:
 
 ```bash
 cargo test
-cargo run --manifest-path xtask/Cargo.toml -- check
-cargo run --manifest-path xtask/Cargo.toml -- test-smoke-ai
-cargo run --manifest-path xtask/Cargo.toml -- test-cli
-cargo run --manifest-path xtask/Cargo.toml -- test-ui
+```
+
+`cargo test` runs `xtask test-all`, which runs the Rust subset, xtask checks, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, multi-instance sync tests, Playwright UI tests, and `git diff --check`.
+
+Focused suites:
+
+```bash
+cargo run --manifest-path xtask/Cargo.toml -- test-rust
 cargo run --manifest-path xtask/Cargo.toml -- test-surface
-git diff --check
+cargo run --manifest-path xtask/Cargo.toml -- test-cluster-ssh
 ```
 
 ## License

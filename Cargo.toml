@@ -2,6 +2,45 @@
 name = "refine"
 version = "3.0.0"
 edition = "2024"
+autotests = false
+
+[lib]
+test = false
+doctest = false
+
+[[bin]]
+name = "refine"
+path = "src/main.rs"
+test = false
+
+[[test]]
+name = "test_all"
+path = "tests/test_all.rs"
+
+[[test]]
+name = "smoke_ai_contract"
+path = "tests/smoke_ai_contract.rs"
+test = false
+
+[[test]]
+name = "cli_durable_root"
+path = "tests/cli_durable_root.rs"
+test = false
+
+[[test]]
+name = "cli_surface"
+path = "tests/cli_surface.rs"
+test = false
+
+[[test]]
+name = "cluster_ssh_cli"
+path = "tests/cluster_ssh_cli.rs"
+test = false
+
+[[test]]
+name = "multi_instance_sync"
+path = "tests/multi_instance_sync.rs"
+test = false
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
