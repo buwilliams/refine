@@ -86,9 +86,7 @@ fn project_registry_lifecycle_commands(fixture: &IntegrationFixture) {
     let registered_app = fixture.create_git_app("rust-registered-app");
     let registered_app_path = registered_app.display().to_string();
     let clone_source = fixture.create_git_app("rust-clone-source");
-    let clone_destination = fixture
-        .repo_root
-        .join("target/refine-integration/apps/rust-cloned-app");
+    let clone_destination = fixture.app_workspace_root().join("rust-cloned-app");
     let _ = fs::remove_dir_all(&clone_destination);
     let clone_destination_path = clone_destination.display().to_string();
 

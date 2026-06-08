@@ -36,7 +36,7 @@ impl IntegrationFixture {
         let runtime_root = env_path("REFINE_TEST_RUNTIME_ROOT")
             .unwrap_or_else(|| repo_root.join("target/refine-integration/run"));
         let app_root = env_path("REFINE_TEST_APP_ROOT")
-            .unwrap_or_else(|| repo_root.join("target/refine-integration/apps/rust-test-app"));
+            .unwrap_or_else(|| default_app_root(&repo_root, suite, port));
         let artifact_root = repo_root
             .join("target/refine-integration/artifacts")
             .join(format!("{suite}-{port}"));
@@ -124,12 +124,16 @@ impl IntegrationFixture {
 
     #[allow(dead_code)]
     pub fn create_git_app(&self, name: &str) -> PathBuf {
-        let app_root = self
-            .repo_root
-            .join("target/refine-integration/apps")
-            .join(name);
+        let app_root = self.app_workspace_root().join(name);
         ensure_git_app_at(&app_root, name);
         app_root
+    }
+
+    pub fn app_workspace_root(&self) -> PathBuf {
+        self.app_root
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.repo_root.join("target/refine-integration/apps"))
     }
 
     fn reset_paths(&self) {
@@ -357,6 +361,13 @@ fn repo_root() -> PathBuf {
         }
         assert!(current.pop(), "failed to locate repository root");
     }
+}
+
+fn default_app_root(repo_root: &Path, suite: &str, port: u16) -> PathBuf {
+    repo_root
+        .join("target/refine-integration/apps")
+        .join(format!("{suite}-{port}"))
+        .join("rust-test-app")
 }
 
 fn ensure_git_app_at(app_root: &Path, name: &str) {
