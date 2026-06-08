@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { attachProject, ensureAttachedProject, jsonObject, projectStatus } from "./helpers";
+import { attachProject, ensureAttachedProject, jsonObject, projectStatus, waitForJobResult } from "./helpers";
 
 function testAppRoot(): string {
   return process.env.REFINE_TEST_APP_ROOT ||
@@ -714,15 +714,20 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
     const generated = page.waitForResponse((response) =>
       response.url().includes("/api/target-app/generate-instructions") &&
       response.request().method() === "POST" &&
-      response.status() === 200
+      response.status() === 202
     );
     await row("target_app_config_generator").getByTestId("runner-target-app-generate").click();
     await expect(page.getByTestId("modal-dialog")).toContainText("Generate target-app config");
     await page.getByTestId("modal-ok").click();
     const generatedPayload = await (await generated).json();
-    expect(generatedPayload.provider).toBe("smoke-ai");
-    expect(generatedPayload.source).toBe("provider");
-    expect(generatedPayload.config.start_command).toBe("./.refine/manage-app.sh start");
+    const generatedJobId = String(generatedPayload.job?.id ?? "");
+    expect(generatedPayload.job?.owner).toBe("target-app:generate");
+    expect(generatedJobId).toBeTruthy();
+    const generatedResult = await waitForJobResult(request, generatedJobId);
+    expect(generatedResult.provider).toBe("smoke-ai");
+    expect(generatedResult.source).toBe("provider");
+    const generatedConfig = (generatedResult.config as Record<string, unknown> | undefined) ?? {};
+    expect(generatedConfig.start_command).toBe("./.refine/manage-app.sh start");
     await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
 
     await page.getByTestId("settings-tab-processes").click();

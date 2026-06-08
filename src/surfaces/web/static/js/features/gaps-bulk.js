@@ -374,10 +374,26 @@ async function withButtonBusy(btn, busyLabel, fn) {
   if (!btn) return await fn();
   const wasDisabled = btn.disabled;
   const orig = btn.textContent;
+  const operationLabel = String(orig || busyLabel || "Operation").trim() || "Operation";
   btn.disabled = true;
   btn.textContent = busyLabel;
+  recordUiNotice(`${operationLabel} started`, {
+    kind: "start",
+    source: "ui-operation",
+  });
   try {
-    return await fn();
+    const result = await fn();
+    recordUiNotice(`${operationLabel} completed`, {
+      kind: "complete",
+      source: "ui-operation",
+    });
+    return result;
+  } catch (error) {
+    recordUiError(`${operationLabel} failed`, {
+      source: "ui-operation",
+      details: error?.message || String(error || "Request failed"),
+    });
+    throw error;
   } finally {
     // The button may have been re-rendered by the awaited work (e.g., a
     // reload of the view); setting properties on a detached node is a no-op.

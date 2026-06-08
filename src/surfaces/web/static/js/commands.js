@@ -570,6 +570,131 @@ async function ensureTargetAppSettingsPane() {
   await refreshSettingsTab("target-app", { force: true });
 }
 
+const TARGET_APP_GENERATE_JOB_KEY = "refine_target_app_generate_job";
+let targetAppGeneratePollJobId = "";
+let targetAppGeneratePollPromise = null;
+
+function readTargetAppGenerateJob() {
+  try {
+    const raw = localStorage.getItem(TARGET_APP_GENERATE_JOB_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const jobId = String(parsed?.jobId || "").trim();
+    if (!jobId) return null;
+    const startedAt = Number(parsed?.startedAt || 0);
+    if (startedAt && Date.now() - startedAt > 12 * 60 * 60 * 1000) {
+      localStorage.removeItem(TARGET_APP_GENERATE_JOB_KEY);
+      return null;
+    }
+    return { jobId, startedAt };
+  } catch {
+    localStorage.removeItem(TARGET_APP_GENERATE_JOB_KEY);
+    return null;
+  }
+}
+
+function writeTargetAppGenerateJob(jobId) {
+  if (!jobId) {
+    localStorage.removeItem(TARGET_APP_GENERATE_JOB_KEY);
+    return;
+  }
+  localStorage.setItem(TARGET_APP_GENERATE_JOB_KEY, JSON.stringify({
+    jobId,
+    startedAt: Date.now(),
+  }));
+}
+
+function setTargetAppGenerateButtonLoading(active) {
+  const button = document.querySelector("#s-target-generate-ai");
+  if (!button) return;
+  button.disabled = !!active;
+  button.textContent = active ? "Generating..." : "Generate with AI";
+}
+
+async function handleTargetAppGenerateResult(result) {
+  if (result?.http_status && result.http_status >= 400) {
+    const raw = result.error || {};
+    const err = new Error(raw.message || "Target-app config generation failed");
+    err.details = raw.details;
+    err.code = raw.code;
+    throw err;
+  }
+  if (result?.ok && result.config) {
+    await ensureTargetAppSettingsPane();
+    applyGeneratedTargetAppConfig(result.config);
+    return result;
+  }
+  throw new Error("Generation produced no configuration");
+}
+
+async function waitForTargetAppGenerateJob(jobId) {
+  if (targetAppGeneratePollJobId === jobId && targetAppGeneratePollPromise) {
+    return await targetAppGeneratePollPromise;
+  }
+  targetAppGeneratePollJobId = jobId;
+  targetAppGeneratePollPromise = waitForBackgroundJob(jobId, {
+    onProgress: (progress) => {
+      const message = String(progress?.message || "").trim();
+      if (message) recordUiNotice(message, { kind: "info", source: "background-job" });
+    },
+  });
+  try {
+    return await targetAppGeneratePollPromise;
+  } finally {
+    targetAppGeneratePollJobId = "";
+    targetAppGeneratePollPromise = null;
+  }
+}
+
+async function resumeTargetAppGenerateJob() {
+  const active = readTargetAppGenerateJob();
+  if (!active) {
+    setTargetAppGenerateButtonLoading(false);
+    return null;
+  }
+  setTargetAppGenerateButtonLoading(true);
+  try {
+    const result = await waitForTargetAppGenerateJob(active.jobId);
+    writeTargetAppGenerateJob("");
+    setTargetAppGenerateButtonLoading(false);
+    return await handleTargetAppGenerateResult(result);
+  } catch (error) {
+    writeTargetAppGenerateJob("");
+    setTargetAppGenerateButtonLoading(false);
+    throw error;
+  }
+}
+
+function syncTargetAppGenerateButtonState() {
+  if (!readTargetAppGenerateJob()) {
+    setTargetAppGenerateButtonLoading(false);
+    return;
+  }
+  resumeTargetAppGenerateJob().catch((error) => {
+    showActionError(error, "Target-app config generation failed");
+  });
+}
+
+async function runTargetAppGenerateJob() {
+  const response = await api("POST", "/api/target-app/generate-instructions", {
+    kind: "all",
+    background: true,
+  });
+  if (!response?.job?.id) {
+    return await handleTargetAppGenerateResult(response);
+  }
+  writeTargetAppGenerateJob(response.job.id);
+  setTargetAppGenerateButtonLoading(true);
+  recordUiNotice("Target-app config generation queued", {
+    kind: "queued",
+    source: "background-job",
+  });
+  const result = await waitForTargetAppGenerateJob(response.job.id);
+  writeTargetAppGenerateJob("");
+  setTargetAppGenerateButtonLoading(false);
+  return await handleTargetAppGenerateResult(result);
+}
+
 registerCommand({
   id: "target_app.generate",
   title: "Generate target-app config with AI",
@@ -582,14 +707,7 @@ registerCommand({
   run: async ({ button } = {}) => {
     await ensureTargetAppSettingsPane();
     await withButtonBusy(button, "Generating...", async () => {
-      const r = await api("POST", "/api/target-app/generate-instructions", { kind: "all" });
-      if (r.ok && r.config) {
-        await ensureTargetAppSettingsPane();
-        applyGeneratedTargetAppConfig(r.config);
-        toast("Generated target-app config saved", "info");
-      } else {
-        toast("Generation produced no configuration", "error");
-      }
+      await runTargetAppGenerateJob();
     });
   },
 });

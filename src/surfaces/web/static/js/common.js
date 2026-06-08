@@ -479,7 +479,7 @@ function normalizeUiNoticeStatus(kind) {
   const normalized = String(kind || "info").toLowerCase();
   if (normalized === "success") return "complete";
   if (normalized === "warning") return "warn";
-  if (["info", "warn", "error", "complete"].includes(normalized)) return normalized;
+  if (["info", "start", "queued", "warn", "error", "complete"].includes(normalized)) return normalized;
   return "info";
 }
 

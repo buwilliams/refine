@@ -2,8 +2,8 @@ use crate::core::observability::activity::{ActivityService, FileActivityService}
 use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::product::chat::{ChatAttachment, ChatService, FileChatService};
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
-use crate::core::supervisor::config::FileSettingsService;
-use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::core::supervisor::config::{ConfigService, FileSettingsService};
+use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::model::log::LogEntry;
 use serde_json::json;
 
@@ -3894,7 +3894,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let generated = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/target-app/generate-instructions".to_string(),
-        body: Some(json!({"kind": "all"})),
+        body: Some(json!({"kind": "all", "provider": "__local__"})),
     });
     assert_eq!(generated.status, 200);
     assert_eq!(
@@ -3909,6 +3909,25 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     let wrapper = fs::read_to_string(temp_root.join(".refine/manage-app.sh")).unwrap();
     assert!(wrapper.contains("START_COMMAND='npm run dev'"));
     assert!(wrapper.contains("REBUILD_COMMAND='npm run build'"));
+
+    let generated_job = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/target-app/generate-instructions".to_string(),
+        body: Some(json!({"kind": "all", "provider": "__local__", "background": true})),
+    });
+    assert_eq!(generated_job.status, 202);
+    let generated_job_id = generated_job.body["job"]["id"].as_str().unwrap();
+    let registry = FileJobRegistry::new(&runtime_root);
+    let generated_job = wait_for_job_status(&registry, generated_job_id, JobState::Succeeded);
+    assert_eq!(
+        generated_job.result["config"]["start_command"],
+        "./.refine/manage-app.sh start"
+    );
+    let settings = FileSettingsService::new(&durable_root).load().unwrap();
+    assert_eq!(
+        settings["target_app_start_command"],
+        "./.refine/manage-app.sh start"
+    );
 
     let rebuild = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4027,6 +4046,22 @@ fn wait_for_http_request_metrics(
         thread::sleep(Duration::from_millis(25));
     }
     Vec::new()
+}
+
+fn wait_for_job_status(registry: &FileJobRegistry, job_id: &str, expected: JobState) -> JobHandle {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Ok(job) = registry.status(job_id)
+            && job.state == expected
+        {
+            return job;
+        }
+        if Instant::now() >= deadline {
+            let latest = registry.status(job_id).ok();
+            panic!("timed out waiting for job {job_id} to reach {expected:?}: {latest:?}");
+        }
+        thread::sleep(Duration::from_millis(25));
+    }
 }
 
 fn wait_for_chat_read_line(

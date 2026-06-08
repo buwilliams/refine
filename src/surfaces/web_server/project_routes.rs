@@ -3,6 +3,7 @@ use crate::core::supervisor::config::{
     FileSettingsService,
 };
 use std::collections::BTreeMap;
+use std::thread;
 
 use chrono::Utc;
 use serde_json::{Value, json};
@@ -17,6 +18,7 @@ use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_
 use crate::core::product::project_registry::{ProjectRegistryService, registry_apps_array};
 use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::model::workflow::GapStatus;
 
 use super::support::*;
@@ -148,6 +150,26 @@ fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedC
         tcp_check_port: target_config_string(cfg, "tcp_check_port", ""),
         process_check_command: target_config_string(cfg, "process_check_command", ""),
         notes: target_config_string(cfg, "notes", ""),
+    })
+}
+
+fn target_app_generated_settings(config: &TargetAppGeneratedConfig) -> Value {
+    json!({
+        "target_app_start_command": config.start_command.clone(),
+        "target_app_stop_command": config.stop_command.clone(),
+        "target_app_rebuild_command": config.rebuild_command.clone(),
+        "target_app_status_command": config.status_command.clone(),
+        "target_app_cwd": config.cwd.clone(),
+        "target_app_env_json": serde_json::to_string_pretty(&config.env).unwrap_or_else(|_| "{}".to_string()),
+        "target_app_start_timeout_seconds": config.start_timeout_seconds.to_string(),
+        "target_app_stop_timeout_seconds": config.stop_timeout_seconds.to_string(),
+        "target_app_rebuild_timeout_seconds": config.rebuild_timeout_seconds.to_string(),
+        "target_app_status_timeout_seconds": config.status_timeout_seconds.to_string(),
+        "target_app_log_path": config.log_path.clone(),
+        "target_app_http_check_url": config.http_check_url.clone(),
+        "target_app_tcp_check_host": config.tcp_check_host.clone(),
+        "target_app_tcp_check_port": config.tcp_check_port.clone(),
+        "target_app_process_check_command": config.process_check_command.clone()
     })
 }
 
@@ -639,7 +661,74 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_target_app_generate_instructions(&self) -> ApiResponse {
+    pub(super) fn handle_target_app_generate_instructions(
+        &self,
+        request: ApiRequest,
+    ) -> ApiResponse {
+        let body = request.body.unwrap_or_else(|| json!({}));
+        if body
+            .get("background")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            let Some(runtime_root) = &self.runtime_root else {
+                return runtime_root_unavailable("generate target-app config in the background");
+            };
+            let registry = FileJobRegistry::new(runtime_root);
+            let job = match registry.register("target-app:generate") {
+                Ok(job) => job,
+                Err(error) => return error_response(error),
+            };
+            let _ = registry.update_progress(
+                &job.id,
+                json!({
+                    "message": "Generating target-app config with AI"
+                }),
+            );
+            let job = registry.status(&job.id).unwrap_or(job);
+            let server = self.clone();
+            let runtime_root = runtime_root.clone();
+            let job_id = job.id.clone();
+            thread::spawn(move || {
+                let registry = FileJobRegistry::new(&runtime_root);
+                let response = server.target_app_generate_response(&body, true);
+                let mut result = response.body.clone();
+                match result.as_object_mut() {
+                    Some(object) => {
+                        object.insert("http_status".to_string(), json!(response.status));
+                    }
+                    None => {
+                        result = json!({
+                            "http_status": response.status,
+                            "body": result
+                        });
+                    }
+                }
+                if response.status >= 400 {
+                    let error = result.get("error").cloned().unwrap_or_else(|| {
+                        json!({
+                            "message": "Target-app config generation failed",
+                            "details": result
+                        })
+                    });
+                    let _ = registry.fail_with_error(&job_id, error);
+                } else {
+                    let _ = registry.update_progress(
+                        &job_id,
+                        json!({
+                            "message": "Generated target-app config"
+                        }),
+                    );
+                    let _ = registry.finish_with_result(&job_id, JobState::Succeeded, result);
+                }
+                let _ = server.refresh_projection_cache_after_mutation();
+            });
+            return ApiResponse::json(202, json!({"job": job_response(job)}));
+        }
+        self.target_app_generate_response(&body, false)
+    }
+
+    fn target_app_generate_response(&self, body: &Value, persist_settings: bool) -> ApiResponse {
         let service = match self.target_app_service() {
             Ok(service) => service,
             Err(error) => return error_response(error),
@@ -649,7 +738,7 @@ impl InProcessWebServer {
         let mut raw = String::new();
         let config = match self.current_durable_root() {
             Ok(Some(durable_root)) => {
-                provider = configured_provider_from_settings(&durable_root, &json!({}));
+                provider = configured_provider_from_settings(&durable_root, body);
                 match HostAgentProviderService::new().invoke(ProviderInvocation {
                     provider: provider.clone(),
                     prompt: target_app_generation_prompt(&service.source_root),
@@ -676,23 +765,20 @@ impl InProcessWebServer {
                 if let Err(error) = service.write_manage_app_wrapper(&mut config) {
                     return error_response(error);
                 }
-                let settings = json!({
-                    "target_app_start_command": config.start_command.clone(),
-                    "target_app_stop_command": config.stop_command.clone(),
-                    "target_app_rebuild_command": config.rebuild_command.clone(),
-                    "target_app_status_command": config.status_command.clone(),
-                    "target_app_cwd": config.cwd.clone(),
-                    "target_app_env_json": serde_json::to_string_pretty(&config.env).unwrap_or_else(|_| "{}".to_string()),
-                    "target_app_start_timeout_seconds": config.start_timeout_seconds.to_string(),
-                    "target_app_stop_timeout_seconds": config.stop_timeout_seconds.to_string(),
-                    "target_app_rebuild_timeout_seconds": config.rebuild_timeout_seconds.to_string(),
-                    "target_app_status_timeout_seconds": config.status_timeout_seconds.to_string(),
-                    "target_app_log_path": config.log_path.clone(),
-                    "target_app_http_check_url": config.http_check_url.clone(),
-                    "target_app_tcp_check_host": config.tcp_check_host.clone(),
-                    "target_app_tcp_check_port": config.tcp_check_port.clone(),
-                    "target_app_process_check_command": config.process_check_command.clone()
-                });
+                let settings = target_app_generated_settings(&config);
+                if persist_settings {
+                    match self.current_durable_root() {
+                        Ok(Some(durable_root)) => {
+                            if let Err(error) =
+                                FileSettingsService::new(&durable_root).update(&settings)
+                            {
+                                return error_response(error);
+                            }
+                        }
+                        Ok(None) => {}
+                        Err(error) => return error_response(error),
+                    }
+                }
                 ApiResponse::json(
                     200,
                     json!({

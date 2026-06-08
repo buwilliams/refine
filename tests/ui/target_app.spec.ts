@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { ensureAttachedProject, jsonObject } from "./helpers";
+import { ensureAttachedProject, jsonObject, waitForJobResult } from "./helpers";
 
 const EMPTY_TARGET_APP_SETTINGS = {
   target_app_url: "",
@@ -41,16 +41,21 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
     const generated = page.waitForResponse((response) =>
       response.url().includes("/api/target-app/generate-instructions") &&
       response.request().method() === "POST" &&
-      response.status() === 200
+      response.status() === 202
     );
     await page.getByTestId("target-app-generate-ai").click();
     await page.getByRole("button", { name: "Generate", exact: true }).click();
     const payload = await (await generated).json();
+    const jobId = String(payload.job?.id ?? "");
+    expect(payload.job?.owner).toBe("target-app:generate");
+    expect(jobId).toBeTruthy();
+    const result = await waitForJobResult(request, jobId);
 
-    expect(payload.provider).toBe("smoke-ai");
-    expect(payload.source).toBe("provider");
-    expect(String(payload.raw ?? "")).toContain("refine-smoke target app check passed");
-    expect(payload.config.start_command).toBe("./.refine/manage-app.sh start");
+    expect(result.provider).toBe("smoke-ai");
+    expect(result.source).toBe("provider");
+    expect(String(result.raw ?? "")).toContain("refine-smoke target app check passed");
+    const config = (result.config as Record<string, unknown> | undefined) ?? {};
+    expect(config.start_command).toBe("./.refine/manage-app.sh start");
 
     await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
     await expect(page.getByTestId("target-app-stop-command")).toHaveValue("./.refine/manage-app.sh stop");
@@ -65,7 +70,85 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
       const settings = (saved.settings as Record<string, unknown> | undefined) ?? {};
       return String(settings.target_app_start_command ?? "");
     }).toBe("./.refine/manage-app.sh start");
+
+    await page.getByTestId("toolbar-tab-system").click();
+    await expect(page.getByTestId("system-log-line").filter({ hasText: "Generate with AI started" }).first()).toBeVisible();
+    await expect(page.getByTestId("system-log-line").filter({ hasText: "Generate with AI completed" }).first()).toBeVisible();
   } finally {
+    await resetTargetAppSettings(request);
+  }
+});
+
+test("keeps Generate with AI loading state after reload until the background job finishes", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  await resetTargetAppSettings(request);
+
+  let complete = false;
+  await page.route("**/api/jobs/job-target-reload", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        job: complete
+          ? {
+              id: "job-target-reload",
+              owner: "target-app:generate",
+              status: "complete",
+              result: {
+                http_status: 200,
+                ok: true,
+                config: {
+                  start_command: "./.refine/manage-app.sh start",
+                  stop_command: "./.refine/manage-app.sh stop",
+                  rebuild_command: "./.refine/manage-app.sh rebuild",
+                  status_command: "./.refine/manage-app.sh status",
+                  cwd: ".",
+                  env: {},
+                  start_timeout_seconds: 120,
+                  stop_timeout_seconds: 60,
+                  rebuild_timeout_seconds: 300,
+                  status_timeout_seconds: 10,
+                  log_path: ".refine/manage-app.log",
+                  http_check_url: "",
+                  tcp_check_host: "",
+                  tcp_check_port: "",
+                  process_check_command: "",
+                  notes: "reload result",
+                },
+              },
+            }
+          : {
+              id: "job-target-reload",
+              owner: "target-app:generate",
+              status: "running",
+              progress: { message: "Generating target-app config with AI" },
+              result: {},
+            },
+      }),
+    });
+  });
+
+  try {
+    await page.goto("/#/node/target-app");
+    await page.evaluate(() => {
+      localStorage.setItem("refine_target_app_generate_job", JSON.stringify({
+        jobId: "job-target-reload",
+        startedAt: Date.now(),
+      }));
+    });
+    await page.reload();
+
+    await expect(page.getByTestId("target-app-generate-ai")).toBeDisabled();
+    await expect(page.getByTestId("target-app-generate-ai")).toHaveText("Generating...");
+    await page.getByTestId("toolbar-tab-system").click();
+    await expect(page.getByTestId("system-log-line").filter({ hasText: "Generating target-app config with AI" }).first()).toBeVisible();
+
+    complete = true;
+    await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
+    await expect(page.getByTestId("target-app-generate-ai")).toBeEnabled();
+    await expect(page.getByTestId("target-app-generate-ai")).toHaveText("Generate with AI");
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("refine_target_app_generate_job"))).toBeNull();
+  } finally {
+    await page.unroute("**/api/jobs/job-target-reload");
     await resetTargetAppSettings(request);
   }
 });

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import { ensureAttachedProject, jsonObject } from "./helpers";
+import { ensureAttachedProject, jsonObject, waitForJobResult } from "./helpers";
 
 function testAppRoot(): string {
   return process.env.REFINE_TEST_APP_ROOT ||
@@ -701,14 +701,19 @@ test("runs AI plan, draft, and target-app generation from the command palette", 
     const generated = page.waitForResponse((response) =>
       response.url().includes("/api/target-app/generate-instructions") &&
       response.request().method() === "POST" &&
-      response.status() === 200
+      response.status() === 202
     );
     await runPaletteCommand(page, "target-generate");
     await page.getByRole("button", { name: "Generate", exact: true }).click();
     const generatePayload = await (await generated).json();
-    expect(generatePayload.provider).toBe("smoke-ai");
-    expect(generatePayload.source).toBe("provider");
-    expect(generatePayload.config.start_command).toBe("./.refine/manage-app.sh start");
+    const generateJobId = String(generatePayload.job?.id ?? "");
+    expect(generatePayload.job?.owner).toBe("target-app:generate");
+    expect(generateJobId).toBeTruthy();
+    const generateResult = await waitForJobResult(request, generateJobId);
+    expect(generateResult.provider).toBe("smoke-ai");
+    expect(generateResult.source).toBe("provider");
+    const generateConfig = (generateResult.config as Record<string, unknown> | undefined) ?? {};
+    expect(generateConfig.start_command).toBe("./.refine/manage-app.sh start");
     await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
   } finally {
     const planTab = page.getByTestId("toolbar-tab-plan");

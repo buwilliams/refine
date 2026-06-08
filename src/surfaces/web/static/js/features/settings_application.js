@@ -407,6 +407,9 @@ function refreshProjectApplicationsSectionOnly(project) {
 function bindNodeApplicationConfigControls() {
   bindCommand("#s-application-copy-node", "settings.application.copy_node");
   bindCommand("#s-target-generate-ai", "target_app.generate");
+  if (typeof syncTargetAppGenerateButtonState === "function") {
+    syncTargetAppGenerateButtonState();
+  }
   const root = document.querySelector('[data-tab-pane="target-app"]');
   const autoRebuild = $("#s-target-auto-rebuild");
   const autoRebuildHour = $("#s-target-auto-rebuild-hour-utc");

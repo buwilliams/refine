@@ -256,7 +256,7 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST" && request.path == "/target-app/generate-instructions" {
-            return self.handle_target_app_generate_instructions();
+            return self.handle_target_app_generate_instructions(request);
         }
 
         if request.method == "POST"
