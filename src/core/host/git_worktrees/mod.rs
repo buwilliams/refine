@@ -41,11 +41,16 @@ pub struct MergeResult {
 pub trait GitWorktreeService {
     fn inspect(&self, path: &str) -> RefineResult<GitStatus>;
     fn branch(&self, name: &str) -> RefineResult<String>;
+    fn switch(&self, branch: &str) -> RefineResult<String>;
     fn worktree(&self, branch: &str) -> RefineResult<String>;
+    fn ensure_branch_from_head(&self, name: &str) -> RefineResult<String>;
+    fn ensure_worktree(&self, branch: &str, target: &Path) -> RefineResult<String>;
     fn diff(&self, pathspecs: &[String]) -> RefineResult<String>;
     fn merge(&self, branch: &str) -> RefineResult<MergeResult>;
+    fn merge_no_ff(&self, branch: &str) -> RefineResult<MergeResult>;
     fn rebase(&self, branch: &str) -> RefineResult<MergeResult>;
     fn commit(&self, message: &str, pathspecs: &[String]) -> RefineResult<String>;
+    fn commit_allow_empty(&self, message: &str, pathspecs: &[String]) -> RefineResult<String>;
     fn push(&self, remote: &str, branch: &str) -> RefineResult<()>;
     fn hard_reset(&self) -> RefineResult<MergeResult>;
     fn recover(&self) -> RefineResult<MergeResult>;
@@ -96,6 +101,22 @@ impl FileGitWorktreeService {
             .split('\x1e')
             .filter_map(parse_git_change)
             .collect::<Vec<_>>())
+    }
+
+    pub fn git_path(&self, path: &str) -> RefineResult<PathBuf> {
+        let resolved = stdout(self.git_output(&["rev-parse", "--git-path", path])?)?;
+        let resolved = PathBuf::from(resolved.trim());
+        let path = if resolved.is_absolute() {
+            resolved
+        } else {
+            self.root.join(resolved)
+        };
+        self.audit(
+            "git_path",
+            "ok",
+            json!({"path": path.display().to_string()}),
+        )?;
+        Ok(path)
     }
 
     pub fn revert_commit(&self, commit: &str) -> RefineResult<MergeResult> {
@@ -179,6 +200,66 @@ impl FileGitWorktreeService {
             .filter(|line| !line.is_empty())
             .map(str::to_string)
             .collect())
+    }
+
+    fn branch_exists(&self, branch: &str) -> RefineResult<bool> {
+        validate_branch_name(branch)?;
+        Ok(self
+            .git_raw(&["rev-parse", "--verify", &format!("refs/heads/{branch}")])?
+            .success)
+    }
+
+    fn worktree_for_branch(&self, branch: &str) -> RefineResult<Option<PathBuf>> {
+        validate_branch_name(branch)?;
+        let output = stdout(self.git_output(&["worktree", "list", "--porcelain"])?)?;
+        let mut current_path: Option<PathBuf> = None;
+        for line in output.lines() {
+            if let Some(path) = line.strip_prefix("worktree ") {
+                current_path = Some(PathBuf::from(path));
+            } else if let Some(head_branch) = line.strip_prefix("branch refs/heads/")
+                && head_branch == branch
+            {
+                return Ok(current_path);
+            }
+        }
+        Ok(None)
+    }
+
+    fn commit_inner(
+        &self,
+        message: &str,
+        pathspecs: &[String],
+        allow_empty: bool,
+    ) -> RefineResult<String> {
+        if message.trim().is_empty() {
+            return Err(RefineError::InvalidInput(
+                "commit message is required".to_string(),
+            ));
+        }
+        if pathspecs.is_empty() {
+            self.git_output(&["add", "-A"])?;
+        } else {
+            let mut add_args = vec!["add", "--"];
+            for pathspec in pathspecs {
+                add_args.push(pathspec.as_str());
+            }
+            self.git_output(&add_args)?;
+        }
+        let mut commit_args = vec!["commit"];
+        if allow_empty {
+            commit_args.push("--allow-empty");
+        }
+        commit_args.extend(["-m", message]);
+        self.git_output(&commit_args)?;
+        let commit = stdout(self.git_output(&["rev-parse", "HEAD"])?)?
+            .trim()
+            .to_string();
+        self.audit(
+            "commit",
+            "ok",
+            json!({"commit": &commit, "message": message, "pathspecs": pathspecs, "allow_empty": allow_empty}),
+        )?;
+        Ok(commit)
     }
 
     fn audit(&self, action: &str, status: &str, details: serde_json::Value) -> RefineResult<()> {
@@ -265,6 +346,13 @@ impl GitWorktreeService for FileGitWorktreeService {
         Ok(name.to_string())
     }
 
+    fn switch(&self, branch: &str) -> RefineResult<String> {
+        validate_branch_name(branch)?;
+        self.git_output(&["switch", branch])?;
+        self.audit("switch", "ok", json!({"branch": branch}))?;
+        Ok(branch.to_string())
+    }
+
     fn worktree(&self, branch: &str) -> RefineResult<String> {
         validate_branch_name(branch)?;
         let parent = self.root.parent().unwrap_or_else(|| Path::new("."));
@@ -287,6 +375,51 @@ impl GitWorktreeService for FileGitWorktreeService {
             "worktree",
             "ok",
             json!({"branch": branch, "target": target.display().to_string()}),
+        )?;
+        Ok(target.display().to_string())
+    }
+
+    fn ensure_branch_from_head(&self, name: &str) -> RefineResult<String> {
+        validate_branch_name(name)?;
+        if !self.branch_exists(name)? {
+            self.git_output(&["branch", name])?;
+            self.audit("branch", "ok", json!({"name": name, "reused": false}))?;
+        } else {
+            self.audit("branch", "ok", json!({"name": name, "reused": true}))?;
+        }
+        Ok(name.to_string())
+    }
+
+    fn ensure_worktree(&self, branch: &str, target: &Path) -> RefineResult<String> {
+        validate_branch_name(branch)?;
+        if let Some(existing) = self.worktree_for_branch(branch)? {
+            self.audit(
+                "worktree",
+                "ok",
+                json!({"branch": branch, "target": existing.display().to_string(), "reused": true}),
+            )?;
+            return Ok(existing.display().to_string());
+        }
+        let target = if target.is_absolute() {
+            target.to_path_buf()
+        } else {
+            self.root.join(target)
+        };
+        if !self.branch_exists(branch)? {
+            self.git_output(&[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                target.to_str().unwrap_or(""),
+            ])?;
+        } else {
+            self.git_output(&["worktree", "add", target.to_str().unwrap_or(""), branch])?;
+        }
+        self.audit(
+            "worktree",
+            "ok",
+            json!({"branch": branch, "target": target.display().to_string(), "reused": false}),
         )?;
         Ok(target.display().to_string())
     }
@@ -321,6 +454,30 @@ impl GitWorktreeService for FileGitWorktreeService {
         Ok(result)
     }
 
+    fn merge_no_ff(&self, branch: &str) -> RefineResult<MergeResult> {
+        validate_branch_name(branch)?;
+        let output = self.git_raw(&["merge", "--no-ff", "--no-edit", branch])?;
+        let result = MergeResult {
+            ok: output.success,
+            conflicts: self.conflicts().unwrap_or_default(),
+            message: Some(trimmed_command_text(&output)),
+        };
+        if result.ok {
+            self.audit(
+                "merge_no_ff",
+                "ok",
+                json!({"branch": branch, "result": &result}),
+            )?;
+        } else {
+            let _ = self.audit(
+                "merge_no_ff",
+                "conflict",
+                json!({"branch": branch, "result": &result}),
+            );
+        }
+        Ok(result)
+    }
+
     fn rebase(&self, branch: &str) -> RefineResult<MergeResult> {
         validate_branch_name(branch)?;
         let output = self.git_raw(&["rebase", branch])?;
@@ -342,30 +499,11 @@ impl GitWorktreeService for FileGitWorktreeService {
     }
 
     fn commit(&self, message: &str, pathspecs: &[String]) -> RefineResult<String> {
-        if message.trim().is_empty() {
-            return Err(RefineError::InvalidInput(
-                "commit message is required".to_string(),
-            ));
-        }
-        if pathspecs.is_empty() {
-            self.git_output(&["add", "-A"])?;
-        } else {
-            let mut add_args = vec!["add", "--"];
-            for pathspec in pathspecs {
-                add_args.push(pathspec.as_str());
-            }
-            self.git_output(&add_args)?;
-        }
-        self.git_output(&["commit", "-m", message])?;
-        let commit = stdout(self.git_output(&["rev-parse", "HEAD"])?)?
-            .trim()
-            .to_string();
-        self.audit(
-            "commit",
-            "ok",
-            json!({"commit": &commit, "message": message, "pathspecs": pathspecs}),
-        )?;
-        Ok(commit)
+        self.commit_inner(message, pathspecs, false)
+    }
+
+    fn commit_allow_empty(&self, message: &str, pathspecs: &[String]) -> RefineResult<String> {
+        self.commit_inner(message, pathspecs, true)
     }
 
     fn push(&self, remote: &str, branch: &str) -> RefineResult<()> {

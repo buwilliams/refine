@@ -10,7 +10,11 @@ use uuid::Uuid;
 use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessPauseState};
+use crate::core::product::merging::{
+    FileMergerService, MergerGapResult, branch_name_for_gap, source_root,
+};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
     FileProjectStateStore, GapSummaryProjection, ProjectionSnapshot,
@@ -100,6 +104,7 @@ pub struct WorkflowScheduleRun {
     pub promoted: usize,
     pub reservations: Vec<ScheduleReservation>,
     pub dispatched: Vec<ScheduleDispatchResult>,
+    pub merged: Option<MergerGapResult>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -108,6 +113,8 @@ pub struct ScheduleDispatchResult {
     pub gap_id: String,
     pub job_id: String,
     pub provider: String,
+    pub branch_name: String,
+    pub worktree_path: String,
     pub final_status: String,
     pub provider_output: String,
 }
@@ -399,11 +406,20 @@ impl FileSchedulingService {
     pub fn schedule_and_dispatch(&self) -> RefineResult<WorkflowScheduleRun> {
         let promoted = self.promote()?;
         let dispatched = self.dispatch_reserved()?;
+        let merged = match &self.durable_root {
+            Some(durable_root) => {
+                FileMergerService::new(&self.runtime_root, durable_root)
+                    .tick()?
+                    .processed
+            }
+            None => None,
+        };
         let state = self.load_state()?;
         Ok(WorkflowScheduleRun {
             promoted,
             reservations: state.reservations,
             dispatched,
+            merged,
         })
     }
 
@@ -461,8 +477,23 @@ impl FileSchedulingService {
             None,
         )?;
 
+        let settings = FileSettingsService::new(durable_root).load()?;
+        let current_gap = work_items.show_gap_summary(&reservation.gap_id)?;
+        let branch_name = current_gap
+            .gap
+            .branch_name
+            .clone()
+            .unwrap_or_else(|| branch_name_for_gap(&settings, &reservation.gap_id));
+        work_items.set_gap_branch_name(&reservation.gap_id, &branch_name)?;
+        let source_root = source_root(durable_root)?;
+        let git = FileGitWorktreeService::with_runtime_root(&source_root, &self.runtime_root);
+        git.ensure_branch_from_head(&branch_name)?;
+        let worktree_target = git.git_path(&format!("refine-worktrees/{}", reservation.gap_id))?;
+        let worktree_path = PathBuf::from(git.ensure_worktree(&branch_name, &worktree_target)?);
+        let agent_cwd = agent_cwd(&worktree_path, &settings)?;
+
         let prompt = gap_agent_prompt(&reservation.gap_id);
-        let cwd = durable_root.parent().map(|path| path.display().to_string());
+        let cwd = Some(agent_cwd.display().to_string());
         let provider =
             HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"));
         let provider_output = provider.invoke(ProviderInvocation {
@@ -471,6 +502,14 @@ impl FileSchedulingService {
             session_id: None,
             cwd,
         })?;
+        let implementation_commit = FileGitWorktreeService::with_runtime_root(
+            &worktree_path,
+            self.runtime_root.join("agents"),
+        )
+        .commit_allow_empty(
+            &format!("Implement Gap {}", reservation.gap_id),
+            &Vec::<String>::new(),
+        )?;
         self.append_job_log(
             job_id,
             &reservation.gap_id,
@@ -478,15 +517,16 @@ impl FileSchedulingService {
             "Gap agent completed",
             Some(json_object(json!({
                 "provider": reservation.provider,
-                "output": provider_output
+                "output": provider_output,
+                "branch_name": branch_name,
+                "worktree_path": worktree_path.display().to_string(),
+                "implementation_commit": implementation_commit
             }))),
         )?;
 
         for (from, to) in [
             ("in-progress", GapStatus::Qa),
             ("qa", GapStatus::ReadyMerge),
-            ("ready-merge", GapStatus::AwaitingRebuild),
-            ("awaiting-rebuild", GapStatus::Review),
         ] {
             work_items.advance_automated_gap_status(&reservation.gap_id, to.clone())?;
             self.append_job_log(
@@ -504,8 +544,11 @@ impl FileSchedulingService {
             json!({
                 "gap_id": reservation.gap_id,
                 "provider": reservation.provider,
+                "branch_name": branch_name,
+                "worktree_path": worktree_path.display().to_string(),
                 "provider_output": provider_output,
-                "final_status": "review"
+                "implementation_commit": implementation_commit,
+                "final_status": "ready-merge"
             }),
         )?;
         self.mark_reservation_state(reservation_id, ReservationState::Completed)?;
@@ -514,7 +557,9 @@ impl FileSchedulingService {
             gap_id: reservation.gap_id,
             job_id: job_id.to_string(),
             provider: reservation.provider,
-            final_status: "review".to_string(),
+            branch_name,
+            worktree_path: worktree_path.display().to_string(),
+            final_status: "ready-merge".to_string(),
             provider_output,
         })
     }
@@ -919,6 +964,33 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
         .unwrap_or_else(|| fallback.to_string())
+}
+
+fn agent_cwd(worktree_path: &Path, settings: &JsonObject) -> RefineResult<PathBuf> {
+    let subpath = setting_string(settings, "agent_subpath", "");
+    let cwd = if subpath.is_empty() {
+        worktree_path.to_path_buf()
+    } else {
+        worktree_path.join(&subpath)
+    };
+    let canonical_worktree = fs::canonicalize(worktree_path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to inspect Gap worktree {}: {error}",
+            worktree_path.display()
+        ))
+    })?;
+    let canonical_cwd = fs::canonicalize(&cwd).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to inspect agent_subpath {}: {error}",
+            cwd.display()
+        ))
+    })?;
+    if !canonical_cwd.starts_with(&canonical_worktree) {
+        return Err(RefineError::InvalidInput(
+            "agent_subpath must stay inside the Gap worktree".to_string(),
+        ));
+    }
+    Ok(canonical_cwd)
 }
 
 fn gap_agent_prompt(gap_id: &str) -> String {

@@ -15,7 +15,7 @@ use crate::core::product::chat::{ChatAttachment, ChatSessionRecord, FileChatServ
 use crate::core::product::project_registry::registry_apps_array;
 use crate::core::product::project_state::RuntimeProjection;
 use crate::core::supervisor::errors::RefineResult;
-use crate::core::supervisor::jobs::JobHandle;
+use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry};
 use crate::model::JsonObject;
 
 use super::super::*;
@@ -261,7 +261,7 @@ pub(in crate::surfaces::web_server) fn process_summary_value_with_chat_sessions(
         "background_processes_stopped": pause_state.background_processes_stopped,
         "agents_paused": pause_state.agents_paused,
         "processes": process_values,
-        "runner_work": runner_work_summary(pause_state.background_processes_stopped),
+        "runner_work": runner_work_summary(runtime_root, pause_state.background_processes_stopped),
         "backend": {
             "process_model": "supervisor"
         }
@@ -381,29 +381,60 @@ fn runner_reachable_value(runtime_root: &Path) -> bool {
         .unwrap_or(true)
 }
 
-fn runner_work_summary(background_stopped: bool) -> Value {
+fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
     let status = if background_stopped { "paused" } else { "idle" };
-    Value::Array(
-        [
-            (
-                "target_app_rebuilder",
-                "target-app rebuild worker is ready for manual rebuild requests",
-            ),
-            (
-                "target_app_config_generator",
-                "target-app config generation is ready for Smoke AI-backed requests",
-            ),
-            (
-                "sqlite_cache_rebuild",
-                "projection cache rebuild worker is ready for manual rebuild requests",
-            ),
-            (
-                "activity_log_cleanup",
-                "activity log cleanup worker is ready for retention cleanup requests",
-            ),
-        ]
-        .into_iter()
-        .map(|(kind, details)| {
+    let merger_job = FileJobRegistry::new(runtime_root)
+        .recover()
+        .ok()
+        .and_then(|jobs| {
+            jobs.into_iter()
+                .rev()
+                .find(|job| job.owner.starts_with("merger:"))
+        });
+    let merger_status = if background_stopped {
+        "paused".to_string()
+    } else {
+        merger_job
+            .as_ref()
+            .map(|job| job.state.as_api_status().to_string())
+            .unwrap_or_else(|| "idle".to_string())
+    };
+    let merger_gap_id = merger_job
+        .as_ref()
+        .and_then(|job| job.owner.strip_prefix("merger:"))
+        .map(ToString::to_string);
+    let mut rows = [
+        ("merger", "serial Gap branch merger"),
+        (
+            "target_app_rebuilder",
+            "target-app rebuild worker is ready for manual rebuild requests",
+        ),
+        (
+            "target_app_config_generator",
+            "target-app config generation is ready for Smoke AI-backed requests",
+        ),
+        (
+            "sqlite_cache_rebuild",
+            "projection cache rebuild worker is ready for manual rebuild requests",
+        ),
+        (
+            "activity_log_cleanup",
+            "activity log cleanup worker is ready for retention cleanup requests",
+        ),
+    ]
+    .into_iter()
+    .map(|(kind, details)| {
+        if kind == "merger" {
+            json!({
+                "kind": kind,
+                "status": merger_status,
+                "elapsed_seconds": 0,
+                "queued": 0,
+                "details": details,
+                "job_id": merger_job.as_ref().map(|job| job.id.clone()),
+                "gap_id": merger_gap_id
+            })
+        } else {
             json!({
                 "kind": kind,
                 "status": status,
@@ -411,9 +442,10 @@ fn runner_work_summary(background_stopped: bool) -> Value {
                 "queued": 0,
                 "details": details
             })
-        })
-        .collect(),
-    )
+        }
+    })
+    .collect::<Vec<_>>();
+    Value::Array(std::mem::take(&mut rows))
 }
 
 pub(in crate::surfaces::web_server) fn provider_status_response() -> ApiResponse {

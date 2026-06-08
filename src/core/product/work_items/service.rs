@@ -792,6 +792,30 @@ impl FileWorkItemService {
         self.show_gap_summary(gap_id)
     }
 
+    pub fn set_gap_branch_name(
+        &self,
+        gap_id: &str,
+        branch_name: &str,
+    ) -> RefineResult<GapSummaryProjection> {
+        let branch_name = branch_name.trim();
+        if branch_name.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "branch name is required".to_string(),
+            ));
+        }
+        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+        })?;
+        object.insert(
+            "branch_name".to_string(),
+            Value::String(branch_name.to_string()),
+        );
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        write_json_atomically(&gap_path, &value)?;
+        self.show_gap_summary(gap_id)
+    }
+
     pub fn workflow_enforcement_summary(&self) -> RefineResult<WorkflowEnforcementSummary> {
         let snapshot = self.projection_snapshot()?;
         let automated = snapshot

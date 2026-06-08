@@ -1,5 +1,6 @@
 pub mod chat;
 pub mod imports;
+pub mod merging;
 pub mod nodes;
 pub mod project_migration;
 pub mod project_registry;

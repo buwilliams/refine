@@ -1454,6 +1454,12 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
+    git(&temp_root, &["init", "-b", "main"]).unwrap();
+    git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
+    git(&temp_root, &["add", "app.txt"]).unwrap();
+    git(&temp_root, &["commit", "-m", "initial"]).unwrap();
     fs::write(
         &smoke_ai,
         "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
@@ -1498,7 +1504,12 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     assert_eq!(schedule.body["reservations"][0]["gap_id"], "GAP1");
     assert_eq!(schedule.body["reservations"][0]["state"], "completed");
     assert_eq!(schedule.body["dispatched"][0]["gap_id"], "GAP1");
-    assert_eq!(schedule.body["dispatched"][0]["final_status"], "review");
+    assert_eq!(
+        schedule.body["dispatched"][0]["final_status"],
+        "ready-merge"
+    );
+    assert_eq!(schedule.body["merged"]["gap_id"], "GAP1");
+    assert_eq!(schedule.body["merged"]["status"], "review");
     let show = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1".to_string(),
@@ -1807,6 +1818,12 @@ fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_requ
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
+    git(&temp_root, &["init", "-b", "main"]).unwrap();
+    git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
+    git(&temp_root, &["add", "app.txt"]).unwrap();
+    git(&temp_root, &["commit", "-m", "initial"]).unwrap();
     fs::write(
         &smoke_ai,
         "#!/bin/sh\nprintf '%s\\n' 'smoke-ai loop response'\n",
@@ -3083,6 +3100,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .map(|work| work["kind"].as_str().unwrap())
             .collect::<Vec<_>>(),
         vec![
+            "merger",
             "target_app_rebuilder",
             "target_app_config_generator",
             "sqlite_cache_rebuild",

@@ -714,6 +714,37 @@ fn workflow_schedule_uses_file_scheduler_service() {
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
+    for args in [
+        vec!["init", "-b", "main"],
+        vec!["config", "user.email", "test@example.com"],
+        vec!["config", "user.name", "Test User"],
+    ] {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&temp_root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
+    for args in [vec!["add", "app.txt"], vec!["commit", "-m", "initial"]] {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&temp_root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
     fs::write(
         &smoke_ai,
         "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
@@ -1326,6 +1357,37 @@ fn workflow_control_commands_use_core_state() {
     let runtime_root = temp_root.join("run");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
+    for args in [
+        vec!["init", "-b", "main"],
+        vec!["config", "user.email", "test@example.com"],
+        vec!["config", "user.name", "Test User"],
+    ] {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&temp_root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    fs::write(temp_root.join("app.txt"), "base\n").unwrap();
+    for args in [vec!["add", "app.txt"], vec!["commit", "-m", "initial"]] {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&temp_root)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
     fs::write(
         &smoke_ai,
         "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
