@@ -1008,14 +1008,16 @@ select {
 }
 .filter-shell-body .filter-bar { margin-bottom: 0; }
 
-.changes-visualization-panel {
+.changes-visualization-panel,
+.logs-visualization-panel {
   margin-bottom: 14px;
   border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
 }
-.changes-visualization-head {
+.changes-visualization-head,
+.logs-visualization-head {
   min-height: 44px;
   padding: 6px 10px;
   display: flex;
@@ -1024,7 +1026,8 @@ select {
   border-bottom: 1px solid var(--color-border-subtle);
   background: linear-gradient(to bottom, #ffffff, #fbfcfe);
 }
-.changes-period-control {
+.changes-period-control,
+.logs-period-control {
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -1033,7 +1036,8 @@ select {
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
 }
-.changes-period-control button {
+.changes-period-control button,
+.logs-period-control button {
   height: 28px;
   padding: 0 10px;
   border: 0;
@@ -1045,26 +1049,32 @@ select {
   font-weight: 650;
 }
 .changes-period-control button.active,
-.changes-period-control button[aria-pressed="true"] {
+.changes-period-control button[aria-pressed="true"],
+.logs-period-control button.active,
+.logs-period-control button[aria-pressed="true"] {
   background: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-sm);
 }
-.changes-period-control button:hover:not(:disabled) {
+.changes-period-control button:hover:not(:disabled),
+.logs-period-control button:hover:not(:disabled) {
   background: var(--color-surface);
   border-color: transparent;
   color: var(--color-text);
 }
-#changes-visualization {
+#changes-visualization,
+#logs-visualization {
   padding: 12px;
 }
-.changes-visualization-grid {
+.changes-visualization-grid,
+.logs-visualization-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
   overflow-x: hidden;
 }
-.changes-visualization-bucket {
+.changes-visualization-bucket,
+.logs-visualization-bucket {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -1076,34 +1086,58 @@ select {
 }
 .changes-bucket-label,
 .changes-bucket-total,
-.changes-bucket-linked {
+.changes-bucket-linked,
+.logs-bucket-label,
+.logs-bucket-total,
+.logs-visualization-counts {
   min-width: 0;
   line-height: 1.2;
 }
-.changes-bucket-label {
+.changes-bucket-label,
+.logs-bucket-label {
   display: block;
   width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.changes-bucket-total {
+.changes-bucket-total,
+.logs-bucket-total {
   display: block;
   color: var(--color-text);
   font-size: 20px;
   font-weight: 750;
 }
-.changes-visualization-bar {
+.changes-visualization-bar,
+.logs-visualization-bar {
   height: 6px;
   width: 100%;
   border-radius: 999px;
   background: var(--color-surface-muted);
   overflow: hidden;
 }
-.changes-visualization-bar > span {
+.changes-visualization-bar > span,
+.logs-visualization-bar > span {
   display: block;
   height: 100%;
   border-radius: 999px;
+}
+.changes-visualization-bar > span {
+  background: var(--accent);
+}
+.logs-visualization-bar {
+  display: flex;
+}
+.logs-visualization-bar > span {
+  flex: 0 0 auto;
+}
+.logs-visualization-bar > span.error {
+  background: var(--color-danger);
+}
+.logs-visualization-bar > span.warn {
+  background: var(--color-warning);
+}
+.logs-visualization-bar > span.info {
   background: var(--accent);
 }
 .changes-bucket-linked {
@@ -1111,18 +1145,36 @@ select {
   font-size: 12px;
   white-space: nowrap;
 }
+.logs-visualization-counts {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.logs-visualization-counts span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @media (max-width: 720px) {
-  .changes-visualization-head {
+  .changes-visualization-head,
+  .logs-visualization-head {
     justify-content: flex-start;
     overflow-x: auto;
   }
-  .changes-period-control {
+  .changes-period-control,
+  .logs-period-control {
     flex: 0 0 auto;
   }
-  .changes-visualization-grid {
+  .changes-visualization-grid,
+  .logs-visualization-grid {
     grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   }
-  .changes-bucket-total {
+  .changes-bucket-total,
+  .logs-bucket-total {
     font-size: 18px;
   }
 }

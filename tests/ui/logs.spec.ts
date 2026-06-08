@@ -16,6 +16,21 @@ test("filters Logs, visualizes severity buckets, and expands details", async ({ 
   }
 
   await page.goto(`/#/logs?q=${encodeURIComponent(prefix)}&severity=error&category=ui&actor=browser&period=day`);
+  await expect(page.getByRole("heading", { name: "Logs", level: 2 })).toBeVisible();
+  await expect(page.getByTestId("logs-visualization-panel")).toBeVisible();
+  await expect(
+    page.getByTestId("logs-visualization-panel").getByTestId("logs-period-control"),
+  ).toBeVisible();
+  await expect(page.getByTestId("logs-filter-shell")).toBeVisible();
+  expect(await page.evaluate(() => {
+    const visualization = document.querySelector("[data-testid='logs-visualization-panel']");
+    const filters = document.querySelector("[data-testid='logs-filter-shell']");
+    return !!(
+      visualization &&
+      filters &&
+      (visualization.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING)
+    );
+  })).toBe(true);
   await expect(page.getByTestId("logs-search")).toHaveValue(prefix);
   await expect(page.getByTestId("logs-severity-filter")).toHaveValue("error");
   await expect(page.getByTestId("logs-category-filter")).toHaveValue("ui");
@@ -23,7 +38,19 @@ test("filters Logs, visualizes severity buckets, and expands details", async ({ 
   await expect(page.getByTestId("logs-filtered-pill")).toBeVisible();
   await expect(page.getByTestId("logs-count")).toHaveText("3 entries");
   await expect(page.getByTestId("logs-row")).toHaveCount(3);
+  await expect(page.getByTestId("logs-visualization-panel")).toHaveCSS("overflow", "visible");
+  await expect(page.getByTestId("logs-visualization-grid")).toHaveCSS("display", "grid");
+  await expect(page.getByTestId("logs-visualization-grid")).toHaveCSS("overflow-x", "hidden");
   await expect(page.getByTestId("logs-bucket")).toHaveCount(1);
+  await expect(page.getByTestId("logs-bucket").first()).not.toHaveCSS("white-space", "nowrap");
+  const gridOverflow = await page.getByTestId("logs-visualization-grid").evaluate((el) => ({
+    clientWidth: el.clientWidth,
+    scrollWidth: el.scrollWidth,
+  }));
+  expect(gridOverflow.scrollWidth).toBeLessThanOrEqual(gridOverflow.clientWidth + 1);
+  const firstBucketBox = await page.getByTestId("logs-bucket").first().boundingBox();
+  expect(firstBucketBox?.height ?? 0).toBeGreaterThanOrEqual(100);
+  expect(firstBucketBox?.width ?? 0).toBeGreaterThan(firstBucketBox?.height ?? 0);
   await expect(page.getByTestId("logs-severity-error")).toHaveText("error 3");
 
   const firstRow = page.getByTestId("logs-row").filter({ hasText: `${prefix} first` });

@@ -54,6 +54,16 @@ async function renderLogs() {
   const logsFilterShellOpen = logsFilterShell ? logsFilterShell.open : false;
   $("#main").innerHTML = `
     <h2>Logs</h2>
+    <section class="logs-visualization-panel" data-testid="logs-visualization-panel">
+      <div class="logs-visualization-head">
+        <div class="segmented-control logs-period-control" role="group" aria-label="Log visualization period" data-testid="logs-period-control">
+          <button type="button" data-logs-period="day" data-testid="logs-period-day" ${f.period === "day" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Day</button>
+          <button type="button" data-logs-period="week" data-testid="logs-period-week" ${f.period === "week" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Week</button>
+          <button type="button" data-logs-period="month" data-testid="logs-period-month" ${f.period === "month" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Month</button>
+        </div>
+      </div>
+      <div id="logs-visualization" data-testid="logs-visualization"><p class="muted">Loading…</p></div>
+    </section>
     <details class="filter-shell" id="logs-filter-shell" data-testid="logs-filter-shell"${logsFilterShellOpen ? " open" : ""}>
       <summary data-testid="logs-filter-summary">
         <span class="filter-shell-title">Filters</span>
@@ -94,12 +104,6 @@ async function renderLogs() {
     </div>
       </div>
     </details>
-    <div class="segmented-control logs-period-control" role="group" aria-label="Log visualization period" data-testid="logs-period-control">
-      <button type="button" data-logs-period="day" data-testid="logs-period-day" ${f.period === "day" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Day</button>
-      <button type="button" data-logs-period="week" data-testid="logs-period-week" ${f.period === "week" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Week</button>
-      <button type="button" data-logs-period="month" data-testid="logs-period-month" ${f.period === "month" ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>Month</button>
-    </div>
-    <div id="logs-visualization" data-testid="logs-visualization"><p class="muted">Loading…</p></div>
     <div id="logs-list" data-testid="logs-list"><p class="muted">Loading…</p></div>
   `;
 
@@ -346,14 +350,11 @@ function drawLogsVisualization(entries, period = "day") {
   }
   const maxTotal = Math.max(...rows.map((row) => row.total), 1);
   root.innerHTML = `
-    <section class="logs-visualization-grid">
+    <section class="logs-visualization-grid" data-testid="logs-visualization-grid">
       ${rows.map((row) => `
         <div class="card logs-visualization-bucket" data-testid="logs-bucket">
-          <div class="row">
-            <strong data-testid="logs-bucket-label">${htmlEscape(row.label)}</strong>
-            <span class="spacer"></span>
-            <span class="muted small" data-testid="logs-bucket-total">${fmtCount(row.total)}</span>
-          </div>
+          <strong class="logs-bucket-label" data-testid="logs-bucket-label">${htmlEscape(row.label)}</strong>
+          <span class="muted small logs-bucket-total" data-testid="logs-bucket-total">${fmtCount(row.total)} ${row.total === 1 ? "entry" : "entries"}</span>
           <div class="logs-visualization-bar" aria-hidden="true">
             ${severities.map((severity) => {
               const count = row.counts[severity] || 0;
@@ -361,7 +362,7 @@ function drawLogsVisualization(entries, period = "day") {
               return `<span class="${severity}" style="width:${width}%"></span>`;
             }).join("")}
           </div>
-          <div class="logs-visualization-counts">
+          <div class="logs-visualization-counts" data-testid="logs-bucket-counts">
             ${severities.map((severity) => `
               <span data-testid="logs-severity-${severity}">
                 ${htmlEscape(severity)} ${fmtCount(row.counts[severity] || 0)}
