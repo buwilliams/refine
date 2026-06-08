@@ -16,6 +16,7 @@ Commands:
   logs     Follow container logs.
   down     Stop and remove the container.
   restart  Recreate the container, then open a shell.
+  wait     Wait until the container is ready for manual testing.
   help     Show this help text.
 
 Options:
@@ -42,8 +43,28 @@ up() {
   compose up -d "$SERVICE"
 }
 
+wait_ready() {
+  ensure_compose_file
+  local deadline=$((SECONDS + 180))
+  printf 'Waiting for manual Linux container setup'
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if compose exec -T "$SERVICE" bash -lc 'id -u refine >/dev/null 2>&1 && command -v curl >/dev/null 2>&1'; then
+      printf '\n'
+      return 0
+    fi
+    printf '.'
+    sleep 2
+  done
+  printf '\n' >&2
+  echo "Timed out waiting for the manual Linux container to finish setup." >&2
+  echo "Recent logs:" >&2
+  compose logs --tail=80 "$SERVICE" >&2 || true
+  exit 1
+}
+
 shell() {
   up
+  wait_ready
   compose exec --user refine "$SERVICE" bash
 }
 
@@ -57,6 +78,9 @@ case "${1:-shell}" in
   status)
     ensure_compose_file
     compose ps
+    ;;
+  wait)
+    wait_ready
     ;;
   logs)
     ensure_compose_file
