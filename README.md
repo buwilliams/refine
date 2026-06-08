@@ -38,6 +38,20 @@ wsl --install
 
 After Ubuntu opens, use the Quick Start one-liner above.
 
+## Test Suite
+
+The full verification set:
+
+```bash
+cargo test
+cargo run --manifest-path xtask/Cargo.toml -- check
+cargo run --manifest-path xtask/Cargo.toml -- test-smoke-ai
+cargo run --manifest-path xtask/Cargo.toml -- test-cli
+cargo run --manifest-path xtask/Cargo.toml -- test-ui
+cargo run --manifest-path xtask/Cargo.toml -- test-surface
+git diff --check
+```
+
 ## License
 
 [MIT](LICENSE) — use it however you like, modify it, ship it, sell it. No warranty, no support obligations on my end. If you build something useful on top, a heads-up is appreciated but not required.
