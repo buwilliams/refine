@@ -28,6 +28,10 @@ path = "tests/cli_durable_root.rs"
 test = false
 
 [[test]]
+name = "production_binary_install"
+path = "tests/production_binary_install.rs"
+
+[[test]]
 name = "cli_surface"
 path = "tests/cli_surface.rs"
 test = false

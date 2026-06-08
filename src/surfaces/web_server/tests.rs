@@ -2490,16 +2490,24 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
         path: "/api/system/update".to_string(),
         body: Some(json!({"version": "1.1.0"})),
     });
-    assert_eq!(update.status, 200);
-    assert_eq!(update.body["install"]["version"], "1.1.0");
+    assert_eq!(update.status, 501);
+    assert!(
+        update.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("./r system update")
+    );
 
-    let rollback = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/system/rollback".to_string(),
-        body: Some(json!({})),
+    let install_status_after_update = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/system/install".to_string(),
+        body: None,
     });
-    assert_eq!(rollback.status, 200);
-    assert_eq!(rollback.body["install"]["version"], "1.0.0");
+    assert_eq!(install_status_after_update.status, 200);
+    assert_eq!(
+        install_status_after_update.body["install"]["version"],
+        "1.0.0"
+    );
 
     let uninstall = server.handle(ApiRequest {
         method: "POST".to_string(),

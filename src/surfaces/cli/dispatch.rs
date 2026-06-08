@@ -10,6 +10,9 @@ use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
+use crate::core::host::deployed_update::{
+    DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
+};
 use crate::core::host::installation::{FileInstallationService, InstallationService};
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
@@ -214,15 +217,21 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::System {
-            action:
-                SystemAction::Update {
-                    version,
-                    runtime_root,
-                },
+            action: SystemAction::Update { runtime_root },
         } => {
-            let status = FileInstallationService::new(runtime_root, env!("CARGO_PKG_VERSION"))
-                .update(&version)?;
-            println!("{}", serde_json::to_string_pretty(&status).unwrap());
+            let runtime_root = absolute_cli_path(runtime_root)?;
+            let checkout_path = discover_refine_checkout()?;
+            let mut host = FileDeployedUpdateHost::new(runtime_root.clone());
+            let summary = run_deployed_update(
+                &mut host,
+                DeployedUpdateOptions::new(checkout_path, runtime_root),
+            );
+            print_json(&serde_json::to_value(&summary).unwrap());
+            if !summary.ok {
+                return Err(RefineError::Degraded(
+                    "system update failed; see JSON summary above".to_string(),
+                ));
+            }
             Ok(())
         }
         Commands::System {

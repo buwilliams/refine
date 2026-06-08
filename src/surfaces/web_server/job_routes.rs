@@ -290,19 +290,10 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_install_update(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
-            return runtime_root_unavailable("update install state");
-        };
-        let body = request.body.unwrap_or_else(|| json!({}));
-        let Some(version) = body.get("version").and_then(|value| value.as_str()) else {
-            return error_response(RefineError::InvalidInput("version is required".to_string()));
-        };
-        match FileInstallationService::new(runtime_root, env!("CARGO_PKG_VERSION")).update(version)
-        {
-            Ok(status) => ApiResponse::json(200, json!({"install": status})),
-            Err(error) => error_response(error),
-        }
+    pub(super) fn handle_install_update(&self, _request: ApiRequest) -> ApiResponse {
+        error_response(RefineError::NotImplemented(
+            "HTTP system update is disabled; run `./r system update` from the Refine checkout so the installer can stop daemons, update the deployed binary, refresh service metadata, and restart ports.".to_string(),
+        ))
     }
 
     pub(super) fn handle_install_rollback(&self) -> ApiResponse {

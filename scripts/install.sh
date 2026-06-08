@@ -20,6 +20,8 @@ REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"
 REFINE_INSTALL_LOG="${REFINE_INSTALL_LOG:-}"
 REFINE_RELEASE_BIN_RELATIVE="${REFINE_RELEASE_BIN_RELATIVE:-bin/refine}"
 REFINE_DEPLOYED_MARKER_RELATIVE="${REFINE_DEPLOYED_MARKER_RELATIVE:-.refine-deployed}"
+REFINE_INSTALL_RUNTIME_ROOT="${REFINE_INSTALL_RUNTIME_ROOT:-run}"
+REFINE_INSTALL_UPDATE_ONLY="${REFINE_INSTALL_UPDATE_ONLY:-0}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -74,6 +76,8 @@ Environment:
   REFINE_INSTALL_UPGRADE=0          Same behavior as --no-upgrade.
   REFINE_INSTALL_LOG                Install log path. Defaults to /tmp/refine-install-<pid>.log.
   REFINE_RELEASE_BIN_RELATIVE       Installed binary path inside the checkout. Defaults to bin/refine.
+  REFINE_INSTALL_RUNTIME_ROOT       Runtime root used by Refine commands. Defaults to run.
+  REFINE_INSTALL_UPDATE_ONLY=1      Upgrade/build/repair only; do not start Refine.
 EOF
 }
 
@@ -305,6 +309,10 @@ is_any_refine_checkout() {
   is_refine_checkout "$1"
 }
 
+is_git_checkout() {
+  git -C "$1" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
 refine_manual_prefix() {
   printf 'cd %s && ./r' "$REFINE_CHECKOUT"
 }
@@ -346,9 +354,14 @@ bound_target_app() {
 
 recorded_primary_port() {
   local checkout="$1"
+  local runtime="$REFINE_INSTALL_RUNTIME_ROOT"
   [ -n "$checkout" ] || return 1
-  [ -f "$checkout/run/primary.json" ] || return 1
-  sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$checkout/run/primary.json" | head -n 1
+  case "$runtime" in
+    /*) ;;
+    *) runtime="$checkout/$runtime" ;;
+  esac
+  [ -f "$runtime/primary.json" ] || return 1
+  sed -n 's/.*"port"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' "$runtime/primary.json" | head -n 1
 }
 
 resolve_refine_port() {
@@ -1074,7 +1087,7 @@ upgrade_refine_checkout() {
 clone_or_update_refine() {
   local checkout="$1"
   REFINE_CHECKOUT="$checkout"
-  if [ -d "$checkout/.git" ]; then
+  if is_git_checkout "$checkout"; then
     if ! is_any_refine_checkout "$checkout"; then
       die_issue \
         "Refine checkout setup" \
@@ -1166,6 +1179,44 @@ build_refine_release() {
     "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
     "Could not write deployed marker $marker."
   ok "Optimized Refine binary ready: $release_bin"
+}
+
+install_state_path() {
+  local runtime="$REFINE_INSTALL_RUNTIME_ROOT"
+  case "$runtime" in
+    /*) ;;
+    *) runtime="$REFINE_CHECKOUT/$runtime" ;;
+  esac
+  printf '%s/install-state.json\n' "$runtime"
+}
+
+repair_existing_refine_install() {
+  section "Repair installed service"
+  local install_state
+  install_state="$(install_state_path)"
+  run cd "$REFINE_CHECKOUT" || die_issue \
+    "Refine checkout access" \
+    "The installer needs to enter the Refine checkout before refreshing service metadata." \
+    "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
+    "Could not enter $REFINE_CHECKOUT"
+  if [ ! -f "$install_state" ]; then
+    info "No install-state.json found at $install_state; skipping persistent service repair."
+    return 0
+  fi
+  run ./r system repair --runtime-root "$REFINE_INSTALL_RUNTIME_ROOT" || die_issue \
+    "Refine service repair" \
+    "Persistent services must be refreshed so they point at the deployed Refine binary." \
+    "Run manually: $(refine_manual_prefix) system repair --runtime-root $REFINE_INSTALL_RUNTIME_ROOT" \
+    "Could not refresh Refine service metadata."
+}
+
+finish_update_only() {
+  repair_existing_refine_install
+  section "Done"
+  say "Refine checkout: ${BOLD}$REFINE_CHECKOUT${RESET}"
+  say "Binary:          ${BOLD}$(release_binary_path)${RESET}"
+  print_install_issues
+  print_rerun_hint
 }
 
 target_from_remote() {
@@ -1440,6 +1491,10 @@ main() {
   fi
   clone_or_update_refine "$checkout"
   build_refine_release
+  if [ "$REFINE_INSTALL_UPDATE_ONLY" = "1" ]; then
+    finish_update_only
+    return 0
+  fi
 
   provider_flow
   ensure_playwright_headless

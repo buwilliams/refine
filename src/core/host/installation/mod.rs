@@ -63,7 +63,7 @@ pub struct InstallBackendRegistration {
 pub trait InstallationService {
     fn install(&self, target: InstallTarget) -> RefineResult<InstallStatus>;
     fn repair(&self) -> RefineResult<InstallStatus>;
-    fn update(&self, version: &str) -> RefineResult<InstallStatus>;
+    fn record_metadata_update(&self, version: &str) -> RefineResult<InstallStatus>;
     fn rollback(&self) -> RefineResult<InstallStatus>;
     fn uninstall(&self) -> RefineResult<()>;
     fn status(&self) -> RefineResult<InstallStatus>;
@@ -488,7 +488,7 @@ impl InstallationService for FileInstallationService {
         Ok(state.status)
     }
 
-    fn update(&self, version: &str) -> RefineResult<InstallStatus> {
+    fn record_metadata_update(&self, version: &str) -> RefineResult<InstallStatus> {
         let version = version.trim();
         if version.is_empty() {
             return Err(RefineError::InvalidInput(
@@ -856,7 +856,7 @@ mod tests {
         assert!(service.path().exists());
         assert!(service.backend_path().exists());
 
-        let updated = service.update("1.1.0").unwrap();
+        let updated = service.record_metadata_update("1.1.0").unwrap();
         assert_eq!(updated.version.as_deref(), Some("1.1.0"));
         assert_eq!(
             updated.backend.as_ref().unwrap().target,

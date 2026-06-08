@@ -698,7 +698,6 @@ pub enum SystemAction {
         version: String,
     },
     Update {
-        version: String,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },

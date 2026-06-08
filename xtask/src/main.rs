@@ -65,6 +65,8 @@ fn test_rust() -> Result<(), String> {
                 "smoke_ai_contract",
                 "--test",
                 "cli_durable_root",
+                "--test",
+                "production_binary_install",
                 "--",
                 "--test-threads=1",
             ])

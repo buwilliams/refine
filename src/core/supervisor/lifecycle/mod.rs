@@ -68,6 +68,14 @@ impl FileDaemonLifecycleService {
     }
 
     pub fn running_statuses(&self) -> RefineResult<Vec<DaemonStatus>> {
+        let mut statuses = self.known_statuses()?;
+        statuses.retain(|status| {
+            status.daemon_healthy && status.web_available && http_probe(status.port).is_ok()
+        });
+        Ok(statuses)
+    }
+
+    pub fn known_statuses(&self) -> RefineResult<Vec<DaemonStatus>> {
         let entries = match fs::read_dir(&self.runtime_root.root) {
             Ok(entries) => entries,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -102,9 +110,7 @@ impl FileDaemonLifecycleService {
                 continue;
             };
             let status = self.status(port)?;
-            if status.daemon_healthy && status.web_available && http_probe(port).is_ok() {
-                statuses.push(status);
-            }
+            statuses.push(status);
         }
         statuses.sort_by_key(|status| status.port);
         Ok(statuses)
