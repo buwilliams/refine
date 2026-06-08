@@ -14,7 +14,7 @@ refine is an agentic software delivery system that coordinates people and agents
 
 If you want OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine for you, point it at [docs/agent-install.md](docs/agent-install.md). That runbook gives the agent exact install, verification, and reporting steps.
 
-## Quick Start
+## Install yourself
 
 Linux, macOS, or Ubuntu/WSL:
 
@@ -38,7 +38,7 @@ Open PowerShell as Administrator:
 wsl --install
 ```
 
-After Ubuntu opens, use the Quick Start one-liner above.
+After Ubuntu opens, use the Install yourself one-liner above.
 
 ## Test Suite
 
