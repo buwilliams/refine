@@ -10,6 +10,10 @@ refine is an agentic software delivery system that coordinates people and agents
 - **Quality automation** - Guidance, Governance, and QA shape agent work from planning through merge, keeping automation aligned with product intent, local rules, and requirements.
 - **Human verification** - people review the result before merge, preserving ordinary human judgment where it matters.
 
+## Agent Install
+
+If you want OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine for you, point it at [docs/agent-install.md](docs/agent-install.md). That runbook gives the agent exact install, verification, and reporting steps.
+
 ## Quick Start
 
 Linux, macOS, or Ubuntu/WSL:
@@ -25,12 +29,6 @@ refine has a robust CLI:
 ```bash
 ./r --help
 ```
-
-## Agent Install
-
-If you want OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine for you, point it at [docs/agent-install.md](docs/agent-install.md). That runbook gives the agent exact install, verification, and reporting steps.
-
-For testing Refine, there is a black-box testing app for Refine surfaces (UI and CLI) at [buwilliams/refine-test](https://github.com/buwilliams/refine-test).
 
 ### Windows Users
 
