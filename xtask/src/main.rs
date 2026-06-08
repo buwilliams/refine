@@ -371,20 +371,14 @@ fn check_git_diff() -> Result<(), String> {
 }
 
 fn run(command: &mut Command, label: &str) -> Result<(), String> {
-    let output = command
-        .output()
+    eprintln!("==> {label}");
+    let status = command
+        .status()
         .map_err(|error| format!("{label}: failed to start command: {error}"))?;
-    if output.status.success() {
-        print!("{}", String::from_utf8_lossy(&output.stdout));
-        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+    if status.success() {
         Ok(())
     } else {
-        Err(format!(
-            "{label} failed with status {}\nstdout:\n{}\nstderr:\n{}",
-            output.status,
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        ))
+        Err(format!("{label} failed with status {status}"))
     }
 }
 

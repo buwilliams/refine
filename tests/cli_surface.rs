@@ -688,19 +688,13 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
             .iter()
             .any(
                 |dispatch| dispatch["gap_id"].as_str() == Some(first.as_str())
-                    && dispatch["final_status"].as_str() == Some("ready-merge")
+                    && dispatch["final_status"].as_str() == Some("review")
+                    && dispatch["merge"]["ok"].as_bool() == Some(true)
                     && dispatch["provider"].as_str() == Some("smoke-ai")
             ),
         "{schedule_payload:#}"
     );
-    assert_eq!(
-        schedule_payload["merged"]["gap_id"].as_str(),
-        Some(first.as_str())
-    );
-    assert_eq!(
-        schedule_payload["merged"]["status"].as_str(),
-        Some("review")
-    );
+    assert!(schedule_payload["merged"].is_null(), "{schedule_payload:#}");
     assert_eq!(fixture.gap_field(&first, "status"), "review");
 
     let runtime_root = fixture.runtime_root.display().to_string();
@@ -761,15 +755,12 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
             .iter()
             .any(
                 |dispatch| dispatch["gap_id"].as_str() == Some(backlog.as_str())
-                    && dispatch["final_status"].as_str() == Some("ready-merge")
+                    && dispatch["final_status"].as_str() == Some("review")
+                    && dispatch["merge"]["ok"].as_bool() == Some(true)
             ),
         "{auto_payload:#}"
     );
-    assert_eq!(
-        auto_payload["merged"]["gap_id"].as_str(),
-        Some(backlog.as_str())
-    );
-    assert_eq!(auto_payload["merged"]["status"].as_str(), Some("review"));
+    assert!(auto_payload["merged"].is_null(), "{auto_payload:#}");
     assert_eq!(fixture.gap_field(&backlog, "status"), "review");
     fixture.assert_success(
         "gap delete auto-promoted backlog",

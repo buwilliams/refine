@@ -1,10 +1,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-#[test]
-fn cargo_test_runs_full_suite() {
+fn main() {
     let repo_root = repo_root();
-    let output = Command::new("cargo")
+    let status = Command::new("cargo")
         .args([
             "run",
             "--manifest-path",
@@ -13,16 +12,13 @@ fn cargo_test_runs_full_suite() {
             "test-all",
         ])
         .current_dir(&repo_root)
-        .output()
+        .status()
         .expect("failed to start xtask test-all");
 
-    assert!(
-        output.status.success(),
-        "xtask test-all failed with status {}\nstdout:\n{}\nstderr:\n{}",
-        output.status,
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
+    if !status.success() {
+        eprintln!("xtask test-all failed with status {status}");
+        std::process::exit(status.code().unwrap_or(1));
+    }
 }
 
 fn repo_root() -> PathBuf {
