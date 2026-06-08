@@ -612,6 +612,20 @@ select {
 .runner-workers-table .gap-col { width: 120px; }
 .runner-workers-table .queue-col { width: 72px; }
 .runner-workers-table .worker-actions-col { width: 188px; }
+.runner-workers-table td:first-child {
+  overflow: hidden;
+}
+.runner-workers-table td:first-child a,
+.runner-workers-table td:first-child code {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+}
+.runner-workers-table td:first-child code {
+  white-space: nowrap;
+}
 .process-table td[data-process-details],
 .process-table .runner-work-details {
   overflow: hidden;
@@ -694,6 +708,16 @@ select {
   .process-table .process-actions .actions {
     justify-content: flex-start;
     flex-wrap: wrap;
+  }
+  .runner-workers-table td:first-child {
+    overflow: visible;
+  }
+  .runner-workers-table td:first-child a,
+  .runner-workers-table td:first-child code {
+    display: inline;
+    max-width: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 .target-app-action-slot {

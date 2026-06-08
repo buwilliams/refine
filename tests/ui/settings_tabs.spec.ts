@@ -759,6 +759,51 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
   }
 });
 
+test("keeps long subprocess labels inside the subprocess column", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const processDirs = testRuntimeProcessDirs();
+  const processId = "ui-long-subprocess-label";
+  const processPaths = processDirs.map((processDir) => path.join(processDir, `${processId}.json`));
+  const sessionId = `layout-${"session-".repeat(18)}${Date.now()}`;
+
+  try {
+    for (const processDir of processDirs) fs.mkdirSync(processDir, { recursive: true });
+    for (const processDir of processDirs) {
+      fs.writeFileSync(path.join(processDir, `${processId}.json`), JSON.stringify({
+        id: processId,
+        owner: "user_helper",
+        pid: null,
+        state: "running",
+        label: "Long subprocess layout fixture",
+        details: JSON.stringify({ session_id: sessionId, mode: "standalone" }),
+        started_at: new Date().toISOString(),
+      }, null, 2));
+    }
+
+    await expect.poll(async () => {
+      const summary = await jsonObject(await request.get("/api/processes"));
+      return (summary.processes as Array<{ id?: string }> | undefined ?? []).map((process) => process.id);
+    }).toContain(processId);
+
+    await page.setViewportSize({ width: 1040, height: 800 });
+    await page.goto("/#/node/processes");
+    const row = page.locator(`[data-testid="subprocess-row"][data-process-id="${processId}"]`);
+    const labelCode = row.locator('td[data-label="Subprocess"] code');
+    const statusCell = row.locator('td[data-label="Status"]');
+    await expect(row).toBeVisible();
+    await expect(labelCode).toBeVisible();
+    await expect(statusCell).toHaveText("running");
+
+    const codeBox = await labelCode.boundingBox();
+    const statusBox = await statusCell.boundingBox();
+    expect(codeBox).not.toBeNull();
+    expect(statusBox).not.toBeNull();
+    expect(codeBox!.x + codeBox!.width).toBeLessThanOrEqual(statusBox!.x + 1);
+  } finally {
+    for (const processPath of processPaths) fs.rmSync(processPath, { force: true });
+  }
+});
+
 test("cancels agent and stops chat subprocesses from the Processes tab", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const processDirs = testRuntimeProcessDirs();
