@@ -210,6 +210,10 @@ fn import_extraction_prompt(text: &str, purpose: &str) -> String {
         "round" => {
             "Draft Round data from this Gap chat transcript. Return only one actual => target line."
         }
+        "standalone_gap" => {
+            "Draft one standalone Gap from this Standalone chat transcript. Return only one \
+             JSON object with name, actual, target, reporter, and priority, or one actual => target line."
+        }
         _ => {
             "Import these notes into Refine Gap drafts. Return only draft data, one draft per line, \
              using actual => target text or JSON objects with name, actual, target, reporter, and priority."

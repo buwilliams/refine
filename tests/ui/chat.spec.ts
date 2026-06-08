@@ -12,6 +12,12 @@ async function fillChatInputStable(page: Page, text: string) {
   }).toBe(text);
 }
 
+async function selectReporter(page: Page) {
+  await page.getByTestId("context-menu-toggle").click();
+  await expect(page.getByTestId("global-reporter").locator("option", { hasText: "refine-smoke" })).toHaveCount(1);
+  await page.getByTestId("global-reporter").selectOption("refine-smoke");
+}
+
 test("runs standalone chat controls through Smoke AI", async ({ page, request }) => {
   test.setTimeout(60_000);
   await ensureAttachedProject(request);
@@ -48,6 +54,73 @@ test("runs standalone chat controls through Smoke AI", async ({ page, request })
   await page.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page.getByTestId("chat-output")).toHaveText("");
   await expect(page.getByTestId("chat-status")).toContainText("No active session");
+});
+
+test("drafts a Gap from standalone chat context through Smoke AI", async ({ page, request }) => {
+  test.setTimeout(60_000);
+  await ensureAttachedProject(request);
+  let gapId = "";
+
+  try {
+    await page.addInitScript(() => {
+      localStorage.removeItem("refine_chat_tabs");
+    });
+    await page.goto("/");
+    await selectReporter(page);
+
+    await page.getByTestId("toolbar-tab-standalone").click();
+    await expect(page.getByTestId("standalone-draft-gap")).toBeVisible();
+    await expect(page.getByTestId("standalone-draft-gap")).toBeDisabled();
+    await page.getByTestId("chat-toggle").click();
+    await expect(page.getByTestId("chat-status")).toContainText("active");
+
+    await fillChatInputStable(page, "Start a standalone chat conversation before drafting a Gap.");
+    const chatInputQueued = page.waitForResponse((response) =>
+      /\/api\/chat\/[^/]+\/input$/.test(new URL(response.url()).pathname) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("chat-send").click();
+    await chatInputQueued;
+    await expect(page.getByTestId("chat-output")).toContainText("smoke-ai chat response", { timeout: 45_000 });
+    await expect(page.getByTestId("standalone-draft-gap")).toBeEnabled();
+
+    const extractResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/import/extract") &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await page.getByTestId("standalone-draft-gap").click();
+    await expect(page.getByTestId("standalone-gap-draft-modal")).toBeVisible();
+    const extractPayload = await (await extractResponse).json();
+    expect(extractPayload.purpose).toBe("standalone_gap");
+    expect(extractPayload.provider).toBe("smoke-ai");
+    await expect(page.getByTestId("standalone-gap-draft-actual")).toHaveValue(/smoke-ai standalone actual behavior/);
+    await expect(page.getByTestId("standalone-gap-draft-target")).toHaveValue(/smoke-ai standalone target behavior/);
+    await expect(page.getByTestId("standalone-gap-draft-priority")).toHaveValue("low");
+
+    const createResponse = page.waitForResponse((response) =>
+      response.url().includes("/api/gaps") &&
+      response.request().method() === "POST" &&
+      response.status() === 201
+    );
+    await page.getByTestId("standalone-gap-draft-submit").click();
+    const createPayload = await (await createResponse).json();
+    gapId = String(createPayload.gap?.id ?? "");
+    expect(gapId).toBeTruthy();
+    await expect(page.getByTestId("standalone-gap-draft-modal")).toHaveCount(0);
+    await expect(page).toHaveURL(new RegExp(`#\\/gaps\\/${gapId}`));
+
+    const gap = await jsonObject(await request.get(`/api/gaps/${gapId}`));
+    const rounds = (gap.gap as { rounds?: Array<{ actual?: string; target?: string }> } | undefined)?.rounds ?? [];
+    expect(rounds.some((round) =>
+      (round.actual ?? "").includes("smoke-ai standalone actual behavior") &&
+      (round.target ?? "").includes("smoke-ai standalone target behavior")
+    )).toBeTruthy();
+    expect((gap.gap as { feature_id?: string | null } | undefined)?.feature_id ?? null).toBeNull();
+  } finally {
+    if (gapId) await request.delete(`/api/gaps/${gapId}`);
+  }
 });
 
 test("edits and removes standalone queued chat messages", async ({ page, request }) => {
