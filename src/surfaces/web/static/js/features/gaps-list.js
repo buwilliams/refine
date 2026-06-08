@@ -79,12 +79,11 @@ async function renderGapsList() {
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
         <select id="filter-node" data-testid="gaps-node-filter">
-          <option value="" ${f.node === "" ? "selected" : ""}>all nodes</option>
+          <option value="all" ${f.node === "" || f.node === "all" ? "selected" : ""}>all nodes</option>
           <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
-          <option value="unknown" ${f.node === "unknown" ? "selected" : ""}>unknown node</option>
           ${(state.project?.nodes || []).map((inst) =>
             `<option value="${htmlEscape(inst.id)}" ${inst.id === f.node ? "selected" : ""}>${htmlEscape(inst.display_name || inst.id)}</option>`).join("")}
-          ${f.node && !["current", "unknown"].includes(f.node) && !(state.project?.nodes || []).some((inst) => inst.id === f.node)
+          ${f.node && !["all", "current"].includes(f.node) && !(state.project?.nodes || []).some((inst) => inst.id === f.node)
             ? `<option value="${htmlEscape(f.node)}" selected>${htmlEscape(f.node)}</option>` : ""}
         </select>
         <input type="text" id="filter-feature" class="filter-feature"

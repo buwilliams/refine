@@ -2153,7 +2153,11 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
     let durable_root = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
-    for (id, name) in [("GAP1", "Transfer One"), ("GAP2", "Transfer Two")] {
+    for (id, name) in [
+        ("GAP1", "Transfer One"),
+        ("GAP2", "Transfer Two"),
+        ("GAP3", "Stay Default"),
+    ] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/gaps".to_string(),
@@ -2205,6 +2209,13 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
         current_node_gaps.body["gaps"][0]["node_display_name"],
         "Remote QA"
     );
+    let all_node_gaps = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps?node=all".to_string(),
+        body: None,
+    });
+    assert_eq!(all_node_gaps.status, 200);
+    assert_eq!(all_node_gaps.body["page"]["total"], 3);
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/gaps/GAP1".to_string(),

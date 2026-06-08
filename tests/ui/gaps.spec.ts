@@ -769,6 +769,12 @@ test("filters and sorts Gaps through URL-backed controls", async ({ page, reques
     await expect(page.getByTestId("gaps-search")).toHaveValue("");
     await expect(page.getByTestId("gaps-filtered-pill")).toBeHidden();
 
+    await page.goto(`/#/gaps?q=Beta&node=all`);
+    await expect(page.getByTestId("gaps-node-filter")).toHaveValue("all");
+    await expect(page.getByTestId("gaps-node-filter").locator("option", { hasText: "unknown node" })).toHaveCount(0);
+    await expect(page.getByTestId("gaps-row")).toContainText("Beta gaps filter");
+    await expect(page.getByTestId("gaps-filtered-pill")).toBeVisible();
+
     await page.goto(`/#/gaps/${encodeURIComponent(betaId)}`);
     await expect(page.getByTestId("gap-detail")).toBeVisible();
     await expect(page.getByTestId("gap-detail")).toContainText("Beta gaps filter actual");

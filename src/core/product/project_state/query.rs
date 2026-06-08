@@ -176,6 +176,7 @@ fn gap_matches(
         .filter(|value| !value.trim().is_empty())
     {
         match node {
+            "all" => {}
             "current" => {
                 if gap.node_id.as_deref() != query.current_node_id.as_deref().or(Some("default")) {
                     return false;
@@ -437,6 +438,7 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
         .filter(|value| !value.trim().is_empty())
     {
         match node {
+            "all" => {}
             "current" => {
                 if feature.node_id.as_deref()
                     != query.current_node_id.as_deref().or(Some("default"))
