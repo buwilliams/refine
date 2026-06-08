@@ -33,6 +33,8 @@ const chatState = {
   tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
   pollTimer: null,
+  pollTimerTabId: null,
+  pollTimerSessionId: null,
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
   fullscreen: false,       // when true, panel fills viewport below the topbar
@@ -237,6 +239,8 @@ function resetChatForProjectSwitch() {
   if (chatState.pollTimer) {
     clearInterval(chatState.pollTimer);
     chatState.pollTimer = null;
+    chatState.pollTimerTabId = null;
+    chatState.pollTimerSessionId = null;
   }
   chatState.tabs = {};
   chatState.activeTabId = "standalone";
@@ -1864,12 +1868,26 @@ function syncGapRoundExtractButton(tab) {
 }
 
 function restartPollForActiveTab() {
+  const activeTabId = chatState.activeTabId;
+  const t = chatState.tabs[activeTabId];
+  if (t && t.mode !== "files" && t.mode !== "system" && t.sessionId) {
+    if (
+      chatState.pollTimer &&
+      chatState.pollTimerTabId === activeTabId &&
+      chatState.pollTimerSessionId === t.sessionId
+    ) {
+      return;
+    }
+  }
   if (chatState.pollTimer) {
     clearInterval(chatState.pollTimer);
     chatState.pollTimer = null;
+    chatState.pollTimerTabId = null;
+    chatState.pollTimerSessionId = null;
   }
-  const t = chatState.tabs[chatState.activeTabId];
   if (!t || t.mode === "files" || t.mode === "system" || !t.sessionId) return;
+  chatState.pollTimerTabId = activeTabId;
+  chatState.pollTimerSessionId = t.sessionId;
   chatState.pollTimer = setInterval(pollChat, 800);
   // Fire an immediate poll so the user doesn't wait 800ms for the first read.
   pollChat();
@@ -2190,6 +2208,11 @@ async function refreshGapChatStatus(gapId, { redraw = true } = {}) {
 async function pollChat() {
   const t = chatState.tabs[chatState.activeTabId];
   if (!t || !t.sessionId) return;
+  if (t.polling) {
+    t.pollAgain = true;
+    return;
+  }
+  t.polling = true;
   const sid = t.sessionId;
   try {
     const r = await api("GET", `/api/chat/${sid}/read`);
@@ -2203,9 +2226,10 @@ async function pollChat() {
       if (chatLinesIncludeAgentResponse(r.lines)) {
         t.agentResponded = true;
       }
-      t.output = (t.output || "") + r.lines.join("\n") + "\n";
+      const outputChanged = appendChatOutputLines(t, r.lines);
       // Only update the DOM if this tab is still active.
-      if (chatState.activeTabId in chatState.tabs &&
+      if (outputChanged &&
+          chatState.activeTabId in chatState.tabs &&
           chatState.tabs[chatState.activeTabId].sessionId === sid) {
         const out = $("#chat-output");
         if (out) {
@@ -2258,7 +2282,45 @@ async function pollChat() {
     }
   } catch {
     // Tolerate transient errors; SSE/poller reconnects on its own.
+  } finally {
+    const pollAgain = !!t.pollAgain;
+    t.polling = false;
+    t.pollAgain = false;
+    if (
+      pollAgain &&
+      chatState.tabs[chatState.activeTabId] === t &&
+      t.sessionId === sid
+    ) {
+      setTimeout(pollChat, 0);
+    }
   }
+}
+
+function appendChatOutputLines(tab, lines) {
+  if (!tab || !Array.isArray(lines) || !lines.length) return false;
+  const now = Date.now();
+  const recent = Array.isArray(tab.recentOutputLines)
+    ? tab.recentOutputLines.filter((entry) => now - Number(entry?.at || 0) < 5000)
+    : [];
+  const existingOutputLines = new Set(
+    String(tab.output || "")
+      .split(/\n/)
+      .filter((line) => line.trim())
+      .slice(-100),
+  );
+  const next = [];
+  for (const line of lines) {
+    const text = String(line ?? "");
+    if (text.trim() && existingOutputLines.has(text)) continue;
+    if (recent.some((entry) => entry?.text === text)) continue;
+    next.push(text);
+    recent.push({ text, at: now });
+    if (text.trim()) existingOutputLines.add(text);
+  }
+  tab.recentOutputLines = recent.slice(-100);
+  if (!next.length) return false;
+  tab.output = (tab.output || "") + next.join("\n") + "\n";
+  return true;
 }
 
 async function sendChatLine() {
