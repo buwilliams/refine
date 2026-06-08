@@ -2,6 +2,7 @@ use crate::core::observability::activity::{ActivityService, FileActivityService}
 use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::product::chat::{ChatAttachment, ChatService, FileChatService};
 use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
+use crate::core::supervisor::config::FileSettingsService;
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::model::log::LogEntry;
 use serde_json::json;
@@ -17,6 +18,7 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
+use crate::core::host::agent_providers::smoke_ai_env_lock;
 use crate::core::host::process_supervision::{
     FileProcessSupervisor, ManagedProcess, ProcessSupervisor,
 };
@@ -1376,6 +1378,24 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     let temp_root = unique_temp_dir("http-workflow-schedule");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&smoke_ai, permissions).unwrap();
+    }
+    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+    }
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -1390,6 +1410,9 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
         path: "/api/gaps/GAP1/transition".to_string(),
         body: Some(json!({"status": "todo"})),
     });
+    FileSettingsService::new(&durable_root)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
 
     let schedule = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1399,7 +1422,23 @@ fn web_server_schedules_workflow_through_file_scheduler_service() {
     assert_eq!(schedule.status, 200);
     assert_eq!(schedule.body["promoted"], 1);
     assert_eq!(schedule.body["reservations"][0]["gap_id"], "GAP1");
+    assert_eq!(schedule.body["reservations"][0]["state"], "completed");
+    assert_eq!(schedule.body["dispatched"][0]["gap_id"], "GAP1");
+    assert_eq!(schedule.body["dispatched"][0]["final_status"], "review");
+    let show = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps/GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(show.body["gap"]["status"], "review");
     assert!(runtime_root.join("scheduler-state.json").exists());
+    unsafe {
+        if let Some(previous) = previous_smoke_ai {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
 
     fs::remove_dir_all(temp_root).unwrap();
 }

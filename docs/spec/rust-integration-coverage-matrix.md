@@ -60,7 +60,7 @@ Legend:
 | `REFINE_DAEMON_PORT = REFINE_TEST_PORT` for daemon-backed CLI tests | Harness | Baseline | Keep as invariant. |
 | Teardown on success/failure, retain diagnostics | Harness | Baseline | New tests must not bypass fixture teardown. |
 | Avoid private `.refine` inspection except teardown diagnostics | Harness | Baseline | New tests should assert CLI JSON, DOM, public HTTP, or Git state when Git is the product outcome. |
-| All default AI tests use Smoke AI only | AI/Harness | Baseline for existing AI tests | Missing coverage for most AI paths; first fix any path that cannot route through Smoke AI. |
+| All default AI tests use Smoke AI only | AI/Harness | Covered post-baseline | Chat, Plan, import extraction, Draft Feature/Round, governance generation, target-app config generation, provider preflight, agent CLI invoke, and dispatcher schedule coverage route through Smoke AI. Real external providers remain manual only. |
 | UI selectors use `data-testid` as primary locator | UI/Harness | Partial post-baseline | Existing smoke-tested controls have `data-testid` attributes and tests use them. New UI coverage must add test IDs before interacting with new controls. |
 | Wait on DOM/API state, not fixed sleeps | UI/Harness | Baseline mostly complies | Preserve. |
 
@@ -205,8 +205,8 @@ Legend:
 | Governance/rules generation | AI/UI | Covered post-baseline | `/api/governance/generate-rules` routes through the configured provider; Playwright verifies Smoke AI generation and persisted generated rules. Static fallback remains only for no-provider environments. |
 | Quality/regression AI | UI/Journey | Covered post-baseline | Managed regression coverage drives the Quality UI through command-palette actions and Rust `/api/quality/regressions/run`, executing a generated Playwright regression against a disposable target-app file URL. This path is browser-regression based, not an external provider call; no real provider is invoked. |
 | Target-app config generation | AI/UI/Journey | Covered post-baseline | Covered by Smoke AI-backed Target App Config Generate with AI test and provider-backed `/api/target-app/generate-instructions` route. |
-| Dispatcher/agent status chain todo -> review | AI/Journey | Missing | Add Smoke AI-backed daemon journey with disposable app and deterministic command outcomes. |
-| Auto-promote backlog -> todo | CLI/Journey | Covered post-baseline | `workflow schedule` now honors `backlog_promote_after_seconds`: `-1` keeps backlog manual, `0` promotes immediately, and positive values use the Gap's backlog age. Core scheduler regression covers instant/never behavior, and daemon-backed CLI coverage configures instant promotion through `/api/settings`, runs `refine workflow schedule`, asserts the backlog Gap becomes `todo`, and verifies the reserved scheduler entry. |
+| Dispatcher/agent status chain todo -> review | AI/Journey | Covered post-baseline | `workflow schedule` and `/api/workflow/schedule` now run reserved work through the configured provider under the scheduler runtime root, record job logs, complete reservations, and advance todo -> in-progress -> qa -> ready-merge -> awaiting-rebuild -> review. Unit HTTP/CLI coverage uses a temp Smoke AI executable; daemon-backed CLI coverage uses the Smoke AI fixture and asserts provider `smoke-ai`, completed reservation, dispatched job, and final review status. |
+| Auto-promote backlog -> todo | CLI/Journey | Covered post-baseline | `workflow schedule` now honors `backlog_promote_after_seconds`: `-1` keeps backlog manual, `0` promotes immediately, and positive values use the Gap's backlog age. Core scheduler regression covers instant/never behavior, and daemon-backed CLI coverage configures instant promotion through `/api/settings`, runs `refine workflow schedule`, asserts the backlog Gap is dispatched through Smoke AI to `review`, and verifies the completed scheduler entry. |
 | Real Claude/Codex/Gemini/Copilot/OpenAI/Anthropic provider calls | Manual | Not in default suite | Manual only; default tests must assert Smoke AI path when exercising AI behavior. |
 
 ## CLI Parity Matrix
@@ -250,8 +250,7 @@ The CLI audit below is from live help at `1a884e0`. Every command with a real mo
 
 ## Immediate Expansion Order
 
-1. Migrate existing UI tests and high-traffic controls to `data-testid` selectors.
-2. Add native CLI tests for existing daemon-backed model operations: feature show/edit/reorder/move/cancel/import, gap assign/remove feature, workflow bulk/pause/resume/schedule/enforce, node show/rename/settings/transfer, cluster local registry, logs, and Smoke AI-safe agent invoke.
-3. Add UI coverage for command palette, toolbar shell/files/system, filters/sort/pagination, settings tabs, Guide, and destructive confirmations.
-4. Add Smoke AI-backed UI journeys for quality/regression and dispatcher chain.
-5. Revisit blockers after root-cause fixes and move each item from `Missing` or `Blocked` to covered evidence.
+1. Keep new UI coverage on `data-testid` selectors and add IDs before interacting with newly covered controls.
+2. Preserve Smoke AI as the only default AI provider in CLI, HTTP, and Playwright coverage.
+3. Keep cluster SSH bootstrap/remote run and real external provider authentication in manual coverage unless a hermetic host fixture is added.
+4. Re-run the full verification suite after coverage changes: `cargo test`, `xtask check`, `xtask test-smoke-ai`, `xtask test-cli`, `xtask test-ui`, `xtask test-surface`, and `git diff --check`.

@@ -1,5 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
@@ -43,6 +45,12 @@ pub trait AgentProviderService {
     fn invoke(&self, invocation: ProviderInvocation) -> RefineResult<String>;
     fn resume(&self, provider: &str, session_id: &str) -> RefineResult<String>;
     fn diagnose(&self, provider: &str) -> RefineResult<Vec<String>>;
+}
+
+#[cfg(test)]
+pub fn smoke_ai_env_lock() -> &'static Mutex<()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
 }
 
 #[derive(Clone, Debug, Default)]

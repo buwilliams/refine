@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
+use crate::core::product::scheduling::FileSchedulingService;
 use crate::core::product::work_items::{BulkGapFilter, BulkGapSelection, BulkGapUpdate};
 
 use super::support::*;
@@ -13,12 +13,8 @@ impl InProcessWebServer {
             return runtime_root_unavailable("persist scheduler state");
         };
         let scheduler = FileSchedulingService::with_durable_root(runtime_root, durable_root);
-        match scheduler.promote().and_then(|promoted| {
-            scheduler
-                .load_state()
-                .map(|state| json!({"promoted": promoted, "reservations": state.reservations}))
-        }) {
-            Ok(body) => ApiResponse::json(200, body),
+        match scheduler.schedule_and_dispatch() {
+            Ok(body) => ApiResponse::json(200, json!(body)),
             Err(error) => error_response(error),
         }
     }

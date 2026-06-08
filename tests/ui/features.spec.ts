@@ -231,6 +231,17 @@ test("manages Feature detail actions and ordered Gaps through the browser", asyn
   }
 
   try {
+    const featureDetail = async () => jsonObject(await request.get(`/api/features/${encodeURIComponent(featureId)}`));
+    const featureGapStatus = async (index = 0) => {
+      const detail = await featureDetail();
+      const feature = detail.feature as { gaps?: Array<{ status?: string }> } | undefined;
+      return String((feature?.gaps ?? [])[index]?.status ?? "");
+    };
+    const refreshFeatureDetail = async () => {
+      await page.goto(`/#/features/${encodeURIComponent(featureId)}`);
+      await expect(page.getByTestId("feature-detail-modal")).toBeVisible();
+    };
+
     await page.goto(`/#/features/${encodeURIComponent(featureId)}`);
     await expect(page.getByTestId("feature-detail-modal")).toBeVisible();
     await expect(page.getByTestId("feature-status-pill")).toHaveText("Backlog");
@@ -276,6 +287,8 @@ test("manages Feature detail actions and ordered Gaps through the browser", asyn
     );
     await page.getByTestId("feature-workflow-todo").click();
     await movedTodo;
+    await expect.poll(async () => featureGapStatus()).toBe("todo");
+    await refreshFeatureDetail();
     await expect(page.getByTestId("feature-gap-status").first()).toHaveText("To do");
     await expect(page.getByTestId("feature-workflow-todo")).toBeDisabled();
 
@@ -286,6 +299,8 @@ test("manages Feature detail actions and ordered Gaps through the browser", asyn
     );
     await page.getByTestId("feature-workflow-backlog").click();
     await movedBacklog;
+    await expect.poll(async () => featureGapStatus()).toBe("backlog");
+    await refreshFeatureDetail();
     await expect(page.getByTestId("feature-gap-status").first()).toHaveText("Backlog");
 
     await page.getByTestId("feature-gap-row").nth(1).getByTestId("feature-gap-move-up").click();
@@ -301,6 +316,11 @@ test("manages Feature detail actions and ordered Gaps through the browser", asyn
     await expect(page.getByTestId("modal-dialog")).toContainText("Delete Gap");
     await page.getByTestId("modal-ok").click();
     await deletedGap;
+    await expect.poll(async () => {
+      const detail = await featureDetail();
+      return Number((detail.feature as { gap_count?: number } | undefined)?.gap_count ?? 0);
+    }).toBe(25);
+    await refreshFeatureDetail();
     await expect(page.getByTestId("feature-progress")).toHaveText("0 / 25 done");
     await expect(page.getByTestId("feature-gap-link").first()).toHaveText(gapNames[0]);
     await expect(await request.get(`/api/gaps/${encodeURIComponent(gapIds[1])}`)).not.toBeOK();
@@ -314,6 +334,11 @@ test("manages Feature detail actions and ordered Gaps through the browser", asyn
     await expect(page.getByTestId("modal-dialog")).toContainText("Cancel Feature");
     await page.getByTestId("modal-ok").click();
     await cancelled;
+    await expect.poll(async () => {
+      const detail = await featureDetail();
+      return String((detail.feature as { status?: string } | undefined)?.status ?? "");
+    }).toBe("cancelled");
+    await refreshFeatureDetail();
     await expect(page.getByTestId("feature-status-pill")).toHaveText("Cancelled");
 
     const deletedFeature = page.waitForResponse((response) =>

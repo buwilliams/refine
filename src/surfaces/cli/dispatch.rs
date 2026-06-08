@@ -20,7 +20,7 @@ use crate::core::product::project_registry::{FileProjectRegistryService, Project
 use crate::core::product::project_state::{
     FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
 };
-use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
+use crate::core::product::scheduling::FileSchedulingService;
 use crate::core::product::work_items::{
     BulkGapFilter, BulkGapSelection, BulkGapUpdate, FileWorkItemService,
 };
@@ -129,16 +129,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 return Ok(());
             }
             let scheduler = FileSchedulingService::with_durable_root(runtime_root, durable_root);
-            let promoted = scheduler.promote()?;
-            let state = scheduler.load_state()?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({
-                    "promoted": promoted,
-                    "reservations": state.reservations
-                }))
-                .unwrap()
-            );
+            let result = scheduler.schedule_and_dispatch()?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }
         Commands::Workflow {

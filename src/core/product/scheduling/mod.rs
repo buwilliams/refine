@@ -7,6 +7,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
+use crate::core::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
 use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessPauseState};
 use crate::core::product::nodes::FileNodeRegistryService;
 use crate::core::product::project_state::{
@@ -15,7 +18,7 @@ use crate::core::product::project_state::{
 use crate::core::product::work_items::FileWorkItemService;
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::model::JsonObject;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
@@ -36,6 +39,8 @@ pub enum SchedulerControl {
 pub enum ReservationState {
     Reserved,
     Dispatched,
+    Completed,
+    Failed,
     Cancelled,
     Interrupted,
 }
@@ -88,6 +93,23 @@ pub struct SchedulerState {
     pub policy: SchedulerPolicy,
     pub reservations: Vec<ScheduleReservation>,
     pub updated_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct WorkflowScheduleRun {
+    pub promoted: usize,
+    pub reservations: Vec<ScheduleReservation>,
+    pub dispatched: Vec<ScheduleDispatchResult>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ScheduleDispatchResult {
+    pub reservation_id: String,
+    pub gap_id: String,
+    pub job_id: String,
+    pub provider: String,
+    pub final_status: String,
+    pub provider_output: String,
 }
 
 pub trait SchedulingService {
@@ -366,6 +388,183 @@ impl FileSchedulingService {
             promoted += 1;
         }
         Ok(promoted)
+    }
+
+    pub fn schedule_and_dispatch(&self) -> RefineResult<WorkflowScheduleRun> {
+        let promoted = self.promote()?;
+        let dispatched = self.dispatch_reserved()?;
+        let state = self.load_state()?;
+        Ok(WorkflowScheduleRun {
+            promoted,
+            reservations: state.reservations,
+            dispatched,
+        })
+    }
+
+    pub fn dispatch_reserved(&self) -> RefineResult<Vec<ScheduleDispatchResult>> {
+        let state = self.load_state()?;
+        self.ensure_automation_running(&state)?;
+        let reservation_ids = state
+            .reservations
+            .iter()
+            .filter(|reservation| reservation.state == ReservationState::Reserved)
+            .map(|reservation| reservation.reservation_id.clone())
+            .collect::<Vec<_>>();
+        let mut results = Vec::new();
+        for reservation_id in reservation_ids {
+            let job_id = self.dispatch(&reservation_id)?;
+            match self.execute_dispatched_reservation(&reservation_id, &job_id) {
+                Ok(result) => results.push(result),
+                Err(error) => {
+                    let _ = self.mark_reservation_state(&reservation_id, ReservationState::Failed);
+                    let _ = self.job_registry.fail_with_error(
+                        &job_id,
+                        json!({
+                            "reservation_id": reservation_id,
+                            "error": error.to_string()
+                        }),
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(results)
+    }
+
+    fn execute_dispatched_reservation(
+        &self,
+        reservation_id: &str,
+        job_id: &str,
+    ) -> RefineResult<ScheduleDispatchResult> {
+        let reservation = self.reservation(reservation_id)?;
+        let durable_root = self.durable_root.as_ref().ok_or_else(|| {
+            RefineError::InvalidInput(
+                "durable root is required to dispatch scheduled work".to_string(),
+            )
+        })?;
+        let work_items = FileWorkItemService::with_projection_cache(
+            durable_root,
+            self.runtime_root.join("cache"),
+        );
+        work_items.advance_automated_gap_status(&reservation.gap_id, GapStatus::InProgress)?;
+        self.append_job_log(
+            job_id,
+            &reservation.gap_id,
+            "state",
+            "Workflow status changed: todo -> in-progress",
+            None,
+        )?;
+
+        let prompt = gap_agent_prompt(&reservation.gap_id);
+        let cwd = durable_root.parent().map(|path| path.display().to_string());
+        let provider =
+            HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"));
+        let provider_output = provider.invoke(ProviderInvocation {
+            provider: reservation.provider.clone(),
+            prompt,
+            session_id: None,
+            cwd,
+        })?;
+        self.append_job_log(
+            job_id,
+            &reservation.gap_id,
+            "agent",
+            "Gap agent completed",
+            Some(json_object(json!({
+                "provider": reservation.provider,
+                "output": provider_output
+            }))),
+        )?;
+
+        for (from, to) in [
+            ("in-progress", GapStatus::Qa),
+            ("qa", GapStatus::ReadyMerge),
+            ("ready-merge", GapStatus::AwaitingRebuild),
+            ("awaiting-rebuild", GapStatus::Review),
+        ] {
+            work_items.advance_automated_gap_status(&reservation.gap_id, to.clone())?;
+            self.append_job_log(
+                job_id,
+                &reservation.gap_id,
+                "state",
+                &format!("Workflow status changed: {from} -> {}", to.as_str()),
+                None,
+            )?;
+        }
+
+        self.job_registry.finish_with_result(
+            job_id,
+            JobState::Succeeded,
+            json!({
+                "gap_id": reservation.gap_id,
+                "provider": reservation.provider,
+                "provider_output": provider_output,
+                "final_status": "review"
+            }),
+        )?;
+        self.mark_reservation_state(reservation_id, ReservationState::Completed)?;
+        Ok(ScheduleDispatchResult {
+            reservation_id: reservation_id.to_string(),
+            gap_id: reservation.gap_id,
+            job_id: job_id.to_string(),
+            provider: reservation.provider,
+            final_status: "review".to_string(),
+            provider_output,
+        })
+    }
+
+    fn reservation(&self, reservation_id: &str) -> RefineResult<ScheduleReservation> {
+        self.load_state()?
+            .reservations
+            .into_iter()
+            .find(|reservation| reservation.reservation_id == reservation_id)
+            .ok_or_else(|| {
+                RefineError::NotFound(format!("reservation {reservation_id} was not found"))
+            })
+    }
+
+    fn mark_reservation_state(
+        &self,
+        reservation_id: &str,
+        reservation_state: ReservationState,
+    ) -> RefineResult<()> {
+        let mut state = self.load_state()?;
+        let Some(reservation) = state
+            .reservations
+            .iter_mut()
+            .find(|reservation| reservation.reservation_id == reservation_id)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "reservation {reservation_id} was not found"
+            )));
+        };
+        reservation.state = reservation_state;
+        reservation.updated_at = now_timestamp();
+        self.save_state(&mut state)
+    }
+
+    fn append_job_log(
+        &self,
+        job_id: &str,
+        gap_id: &str,
+        category: &str,
+        message: &str,
+        details: Option<JsonObject>,
+    ) -> RefineResult<()> {
+        self.job_registry.append_log(
+            job_id,
+            LogEntry {
+                datetime: now_timestamp(),
+                severity: "info".to_string(),
+                category: category.to_string(),
+                message: message.to_string(),
+                details,
+                actions: Vec::new(),
+                actor: Some("refine".to_string()),
+                gap_id: Some(gap_id.to_string()),
+            },
+        )?;
+        Ok(())
     }
 }
 
@@ -714,6 +913,16 @@ fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
         .unwrap_or_else(|| fallback.to_string())
+}
+
+fn gap_agent_prompt(gap_id: &str) -> String {
+    format!(
+        "Run the gap agent for ready Gap {gap_id}. Work on Gap {gap_id}, report deterministic command outcomes, and leave the Gap ready for review."
+    )
+}
+
+fn json_object(value: serde_json::Value) -> JsonObject {
+    value.as_object().cloned().unwrap_or_default()
 }
 
 fn backlog_gap_age_seconds(gap: &GapSummaryProjection, now: DateTime<Utc>) -> Option<i64> {

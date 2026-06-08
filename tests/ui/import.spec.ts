@@ -527,8 +527,10 @@ test("recovers failed import drafts and retries after correcting the review", as
     });
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
     await expect.poll(async () => page.evaluate(() => localStorage.getItem("refine_import_session_v1"))).toBeNull();
-    const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
-    expect((gaps.page as { total?: number } | undefined)?.total).toBe(1);
+    await expect.poll(async () => {
+      const gaps = await jsonObject(await request.get(`/api/gaps?limit=1000&node=current&q=${encodeURIComponent(prefix)}`));
+      return Number((gaps.page as { total?: number } | undefined)?.total ?? 0);
+    }).toBe(1);
   } finally {
     await cleanupMatchingGaps();
     for (const gapId of createdGapIds) {

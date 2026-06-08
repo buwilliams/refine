@@ -666,9 +666,34 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
     assert_eq!(fixture.gap_field(&first, "status"), "todo");
     assert_eq!(fixture.gap_field(&second, "status"), "todo");
 
+    let scheduler_settings = fixture.api_json(
+        "PATCH",
+        "/api/settings",
+        serde_json::json!({
+            "agent_cli": "smoke-ai"
+        }),
+    );
+    assert_eq!(
+        scheduler_settings["settings"]["agent_cli"], "smoke-ai",
+        "{scheduler_settings:#}"
+    );
     let schedule = fixture.run_refine(&["workflow", "schedule"]);
     fixture.assert_success("workflow schedule", &schedule);
-    assert!(fixture.json_stdout(&schedule).is_object());
+    let schedule_payload = fixture.json_stdout(&schedule);
+    assert_eq!(schedule_payload["promoted"], 1, "{schedule_payload:#}");
+    assert!(
+        schedule_payload["dispatched"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |dispatch| dispatch["gap_id"].as_str() == Some(first.as_str())
+                    && dispatch["final_status"].as_str() == Some("review")
+                    && dispatch["provider"].as_str() == Some("smoke-ai")
+            ),
+        "{schedule_payload:#}"
+    );
+    assert_eq!(fixture.gap_field(&first, "status"), "review");
 
     let runtime_root = fixture.runtime_root.display().to_string();
     let pause = fixture.run_refine(&["workflow", "pause", "--runtime-root", &runtime_root]);
@@ -717,11 +742,22 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
             .iter()
             .any(
                 |reservation| reservation["gap_id"].as_str() == Some(backlog.as_str())
-                    && reservation["state"].as_str() == Some("reserved")
+                    && reservation["state"].as_str() == Some("completed")
             ),
         "{auto_payload:#}"
     );
-    assert_eq!(fixture.gap_field(&backlog, "status"), "todo");
+    assert!(
+        auto_payload["dispatched"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |dispatch| dispatch["gap_id"].as_str() == Some(backlog.as_str())
+                    && dispatch["final_status"].as_str() == Some("review")
+            ),
+        "{auto_payload:#}"
+    );
+    assert_eq!(fixture.gap_field(&backlog, "status"), "review");
     fixture.assert_success(
         "gap delete auto-promoted backlog",
         &fixture.run_refine(&["gap", "delete", &backlog]),

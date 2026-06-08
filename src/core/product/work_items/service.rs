@@ -49,6 +49,30 @@ pub fn validate_manual_gap_transition(from: &GapStatus, to: &GapStatus) -> Refin
     }
 }
 
+fn validate_automated_gap_transition(from: &GapStatus, to: &GapStatus) -> RefineResult<()> {
+    let allowed = matches!(
+        (from, to),
+        (GapStatus::Todo, GapStatus::InProgress)
+            | (GapStatus::InProgress, GapStatus::Qa)
+            | (GapStatus::Qa, GapStatus::ReadyMerge)
+            | (GapStatus::ReadyMerge, GapStatus::AwaitingRebuild)
+            | (GapStatus::AwaitingRebuild, GapStatus::Review)
+            | (GapStatus::InProgress, GapStatus::Failed)
+            | (GapStatus::Qa, GapStatus::Failed)
+            | (GapStatus::ReadyMerge, GapStatus::Failed)
+            | (GapStatus::AwaitingRebuild, GapStatus::Failed)
+    );
+    if allowed {
+        Ok(())
+    } else {
+        Err(RefineError::InvalidInput(format!(
+            "automated transition {} -> {} is not allowed",
+            from.as_str(),
+            to.as_str()
+        )))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct FileWorkItemService {
     pub durable_root: PathBuf,
@@ -755,6 +779,17 @@ impl FileWorkItemService {
             self.transition_gap_status(gap_id, GapStatus::Todo)?;
         }
         self.start_gap_summary(gap_id)
+    }
+
+    pub fn advance_automated_gap_status(
+        &self,
+        gap_id: &str,
+        target: GapStatus,
+    ) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        validate_automated_gap_transition(&current.gap.status, &target)?;
+        self.set_gap_status_unchecked(gap_id, &target)?;
+        self.show_gap_summary(gap_id)
     }
 
     pub fn workflow_enforcement_summary(&self) -> RefineResult<WorkflowEnforcementSummary> {

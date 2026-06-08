@@ -2,13 +2,16 @@ use super::dispatch::{
     absolute_cli_path, dispatch, explicit_durable_root_path, system_status_response,
 };
 use super::*;
+use crate::core::host::agent_providers::smoke_ai_env_lock;
 use crate::core::observability::activity::ActivityService;
 use crate::core::observability::activity::FileActivityService;
 use crate::core::product::project_state::PROJECTION_SNAPSHOT_FILE;
 use crate::core::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::core::supervisor::config::FileSettingsService;
 use crate::core::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
 use crate::core::supervisor::runtime::RuntimeRoot;
 use clap::Parser;
+use serde_json::json;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
@@ -662,6 +665,24 @@ fn workflow_schedule_uses_file_scheduler_service() {
     let temp_root = unique_temp_dir("cli-workflow-schedule");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&smoke_ai, permissions).unwrap();
+    }
+    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+    }
     dispatch(
         Cli::try_parse_from([
             "refine",
@@ -676,6 +697,9 @@ fn workflow_schedule_uses_file_scheduler_service() {
         .unwrap(),
     )
     .unwrap();
+    FileSettingsService::new(&durable_root)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
     dispatch(
         Cli::try_parse_from([
             "refine",
@@ -705,7 +729,16 @@ fn workflow_schedule_uses_file_scheduler_service() {
 
     let scheduler_state = fs::read_to_string(runtime_root.join("scheduler-state.json")).unwrap();
     assert!(scheduler_state.contains("\"gap_id\": \"GAP1\""));
-    assert!(scheduler_state.contains("\"state\": \"reserved\""));
+    assert!(scheduler_state.contains("\"state\": \"completed\""));
+    let gap = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
+    assert!(gap.contains("\"status\": \"review\""));
+    unsafe {
+        if let Some(previous) = previous_smoke_ai {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1244,6 +1277,24 @@ fn workflow_control_commands_use_core_state() {
     let temp_root = unique_temp_dir("cli-workflow-control");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&smoke_ai, permissions).unwrap();
+    }
+    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+    }
     dispatch(
         Cli::try_parse_from([
             "refine",
@@ -1271,6 +1322,9 @@ fn workflow_control_commands_use_core_state() {
         .unwrap(),
     )
     .unwrap();
+    FileSettingsService::new(&durable_root)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
 
     for argv in [
         vec![
@@ -1305,6 +1359,13 @@ fn workflow_control_commands_use_core_state() {
         ],
     ] {
         dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
+    }
+    unsafe {
+        if let Some(previous) = previous_smoke_ai {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
     }
 
     let pause_state: serde_json::Value = serde_json::from_str(
