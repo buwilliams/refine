@@ -575,6 +575,54 @@ ensure_profile_path() {
   fi
 }
 
+prepend_env_path_now() {
+  local var="$1"
+  local dir="$2"
+  local current
+  eval "current=\${$var:-}"
+  case ":$current:" in
+    *":$dir:"*) ;;
+    *)
+      if [ -n "$current" ]; then
+        export "$var=$dir:$current"
+      else
+        export "$var=$dir"
+      fi
+      ;;
+  esac
+}
+
+ensure_profile_env_path() {
+  local var="$1"
+  local dir="$2"
+  local profile line
+  profile="$(profile_file)"
+  line="$(printf 'export %s="%s${%s:+:$%s}"' "$var" "$dir" "$var" "$var")"
+  prepend_env_path_now "$var" "$dir"
+  if dry_run; then
+    log_detail "${DIM}+ ensure '$dir' is in $var in $profile${RESET}"
+    return 0
+  fi
+  touch "$profile" 2>/dev/null || {
+    warn "Could not update $profile; add this manually: $line"
+    return 0
+  }
+  if ! grep -F "$line" "$profile" >/dev/null 2>&1; then
+    printf '\n%s\n' "$line" >>"$profile"
+    ok "Added $dir to $var in $profile"
+  fi
+}
+
+configure_brew_c_toolchain_env() {
+  local glibc_prefix
+  [ "$(package_manager)" = "brew" ] || return 0
+  have brew || return 0
+  glibc_prefix="$(brew --prefix glibc 2>/dev/null || true)"
+  [ -n "$glibc_prefix" ] || return 0
+  [ -d "$glibc_prefix/lib" ] && ensure_profile_env_path LIBRARY_PATH "$glibc_prefix/lib"
+  [ -d "$glibc_prefix/include" ] && ensure_profile_env_path C_INCLUDE_PATH "$glibc_prefix/include"
+}
+
 is_linux() {
   [ "$(uname -s)" = "Linux" ]
 }
@@ -682,6 +730,105 @@ install_packages() {
   esac
 }
 
+find_gcc_binary() {
+  local prefix path
+  if have gcc; then
+    command -v gcc
+    return 0
+  fi
+  if have brew; then
+    prefix="$(brew --prefix 2>/dev/null || true)"
+    if [ -n "$prefix" ]; then
+      for path in "$prefix"/bin/gcc-*; do
+        [ -x "$path" ] || continue
+        printf '%s\n' "$path"
+        return 0
+      done
+    fi
+  fi
+  return 1
+}
+
+find_ld_binary() {
+  local prefix path
+  if have ld; then
+    command -v ld
+    return 0
+  fi
+  if have brew; then
+    prefix="$(brew --prefix 2>/dev/null || true)"
+    if [ -n "$prefix" ]; then
+      for path in \
+        "$prefix"/opt/binutils/bin/ld \
+        "$prefix"/Cellar/binutils/*/bin/ld \
+        "$prefix"/Cellar/binutils/*/x86_64-*/bin/ld; do
+        [ -x "$path" ] || continue
+        printf '%s\n' "$path"
+        return 0
+      done
+    fi
+  fi
+  return 1
+}
+
+ensure_command_shim() {
+  local name="$1"
+  local target="$2"
+  local bin_dir="$HOME/bin"
+  local link="$bin_dir/$name"
+  [ -n "$target" ] || return 1
+  append_path_now "$bin_dir"
+  if have "$name"; then
+    return 0
+  fi
+  if dry_run; then
+    log_detail "${DIM}+ link $link -> $target so $name is available in this shell${RESET}"
+    return 0
+  fi
+  mkdir -p "$bin_dir" || return 1
+  ln -sf "$target" "$link" || return 1
+  ok "Made $name available at $link"
+  ensure_profile_path "$bin_dir"
+  have "$name"
+}
+
+ensure_c_linker() {
+  if have cc && have ld; then
+    ok "C compiler/linker found: $(command -v cc), $(command -v ld)"
+    return 0
+  fi
+  warn "C compiler/linker is not fully installed"
+  case "$(package_manager)" in
+    apt)
+      install_packages build-essential || true
+      ;;
+    dnf|yum)
+      install_packages gcc gcc-c++ make || true
+      ;;
+    pacman)
+      install_packages base-devel || true
+      ;;
+    brew)
+      install_packages gcc binutils glibc || true
+      configure_brew_c_toolchain_env
+      ;;
+    *)
+      ;;
+  esac
+  configure_brew_c_toolchain_env
+  ensure_command_shim cc "$(find_gcc_binary || true)" || true
+  ensure_command_shim ld "$(find_ld_binary || true)" || true
+  if have cc && have ld; then
+    ok "C compiler/linker ready: $(command -v cc), $(command -v ld)"
+    return 0
+  fi
+  die_issue \
+    "C compiler/linker install" \
+    "Rust crates with build scripts need a C compiler and linker during the optimized Refine build." \
+    "Install a C toolchain, then re-run install.sh." \
+    "Could not find a usable cc compiler/linker."
+}
+
 ensure_command() {
   local cmd="$1"
   shift
@@ -785,6 +932,14 @@ install_rust_toolchain() {
   append_path_now "$HOME/.cargo/bin"
 }
 
+install_cargo_toolchain() {
+  if [ "$(package_manager)" = "brew" ]; then
+    install_packages rust || true
+    return 0
+  fi
+  install_rust_toolchain
+}
+
 ensure_cargo() {
   append_path_now "$HOME/.cargo/bin"
   if have cargo; then
@@ -798,8 +953,12 @@ ensure_cargo() {
     return 0
   fi
   warn "Rust Cargo is not installed"
-  if confirm "Install Rust with rustup" "y"; then
-    install_rust_toolchain || true
+  if [ "$(package_manager)" = "brew" ]; then
+    if confirm "Install Rust with Homebrew" "y"; then
+      install_cargo_toolchain || true
+    fi
+  elif confirm "Install Rust with rustup" "y"; then
+    install_cargo_toolchain || true
   fi
   if have cargo; then
     local cargo_path_after
@@ -1498,6 +1657,7 @@ preflight() {
     "Refine uses git to clone, update, and manage the Refine and target app repositories." \
     "Install git with your OS package manager, then re-run install.sh." \
     "git is required"
+  ensure_c_linker
   ensure_cargo
 }
 

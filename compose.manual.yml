@@ -23,7 +23,6 @@ services:
         apt-get update
         apt-get install -y --no-install-recommends \
           bash \
-          build-essential \
           ca-certificates \
           curl \
           file \
@@ -41,7 +40,7 @@ services:
         if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
           sudo -H -u refine bash -lc 'NONINTERACTIVE=1 CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
         fi
-        grep -F 'brew shellenv' /home/refine/.bashrc >/dev/null 2>&1 || \
-          printf '%s\n' 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >>/home/refine/.bashrc
+        sudo -H -u refine bash -lc 'grep -F "brew shellenv" "$$HOME/.bashrc" >/dev/null 2>&1 || printf "%s\n" '\''eval "$$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'\'' >>"$$HOME/.bashrc"'
+        chown -R refine:refine /home/refine
         exec sleep infinity
     working_dir: /home/refine
