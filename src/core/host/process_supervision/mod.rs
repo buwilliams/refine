@@ -224,6 +224,17 @@ impl FileProcessSupervisor {
         Ok(processes)
     }
 
+    pub fn recover_owner(&self, owner: ProcessOwner) -> RefineResult<Vec<ManagedProcess>> {
+        let mut recovered = Vec::new();
+        for mut process in self.list()? {
+            if process.owner == owner && process.state == "running" {
+                self.recover_running_process(&mut process)?;
+            }
+            recovered.push(process);
+        }
+        Ok(recovered)
+    }
+
     pub fn pause_state(&self) -> RefineResult<ProcessPauseState> {
         let path = self.pause_state_path();
         if !path.exists() {
@@ -620,29 +631,36 @@ impl ProcessSupervisor for FileProcessSupervisor {
         let mut recovered = Vec::new();
         for mut process in self.list()? {
             if process.state == "running" {
-                match process.pid {
-                    Some(pid) if pid_alive(pid)? => {}
-                    Some(_) => {
-                        process.state = "exited".to_string();
-                        process.details = Some(append_detail(
-                            process.details.take(),
-                            "process was not alive during recovery",
-                        ));
-                        self.write_process(&process)?;
-                    }
-                    None => {
-                        process.state = "interrupted".to_string();
-                        process.details = Some(append_detail(
-                            process.details.take(),
-                            "running process had no pid during recovery",
-                        ));
-                        self.write_process(&process)?;
-                    }
-                }
+                self.recover_running_process(&mut process)?;
             }
             recovered.push(process);
         }
         Ok(recovered)
+    }
+}
+
+impl FileProcessSupervisor {
+    fn recover_running_process(&self, process: &mut ManagedProcess) -> RefineResult<()> {
+        match process.pid {
+            Some(pid) if pid_alive(pid)? => {}
+            Some(_) => {
+                process.state = "exited".to_string();
+                process.details = Some(append_detail(
+                    process.details.take(),
+                    "process was not alive during recovery",
+                ));
+                self.write_process(process)?;
+            }
+            None => {
+                process.state = "interrupted".to_string();
+                process.details = Some(append_detail(
+                    process.details.take(),
+                    "running process had no pid during recovery",
+                ));
+                self.write_process(process)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -794,6 +812,7 @@ fn pid_alive(pid: u32) -> RefineResult<bool> {
         let status = Command::new("kill")
             .arg("-0")
             .arg(pid.to_string())
+            .stderr(Stdio::null())
             .status()
             .map_err(|error| {
                 RefineError::Io(format!(

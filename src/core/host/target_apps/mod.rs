@@ -584,9 +584,11 @@ impl FileTargetAppService {
     fn mark_target_processes_stopped(&self) -> RefineResult<()> {
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         for process in supervisor
-            .list()?
+            .recover_owner(ProcessOwner::TargetApp)?
             .into_iter()
-            .filter(|process| process.owner == ProcessOwner::TargetApp)
+            .filter(|process| {
+                process.owner == ProcessOwner::TargetApp && process.state != "stopped"
+            })
         {
             let _ = supervisor.signal(&process.id, "stop");
         }

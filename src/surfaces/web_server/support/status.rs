@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::core::host::agent_providers::{AgentProviderService, HostAgentProviderService};
 use crate::core::host::installation::InstallTarget;
-use crate::core::host::process_supervision::{FileProcessSupervisor, ManagedProcess};
+use crate::core::host::process_supervision::{FileProcessSupervisor, ManagedProcess, ProcessOwner};
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::core::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
@@ -241,7 +241,8 @@ pub(in crate::surfaces::web_server) fn process_summary_value_with_chat_sessions(
     let mut process_values = Vec::new();
     let mut seen_process_ids = BTreeSet::new();
     for process_root in process_roots(runtime_root, durable_root) {
-        let processes = FileProcessSupervisor::new(&process_root).list()?;
+        let processes =
+            FileProcessSupervisor::new(&process_root).recover_owner(ProcessOwner::TargetApp)?;
         for process in processes {
             if !seen_process_ids.insert(process.id.clone()) {
                 continue;
@@ -354,25 +355,14 @@ fn is_current_process_api_value(process: &Value) -> bool {
 }
 
 fn is_current_process_object(process: &JsonObject) -> bool {
-    let kind = process.get("kind").and_then(Value::as_str).unwrap_or("");
-    if is_long_lived_process_kind(kind) {
-        return true;
-    }
     let status = process.get("status").and_then(Value::as_str).unwrap_or("");
     !is_terminal_process_status(status)
-}
-
-fn is_long_lived_process_kind(kind: &str) -> bool {
-    matches!(
-        kind,
-        "daemon" | "supervisor" | "ui" | "runner" | "target_app"
-    )
 }
 
 fn is_terminal_process_status(status: &str) -> bool {
     matches!(
         status,
-        "exited" | "failed" | "stopped" | "cancelled" | "complete" | "completed"
+        "exited" | "failed" | "stopped" | "cancelled" | "complete" | "completed" | "interrupted"
     )
 }
 

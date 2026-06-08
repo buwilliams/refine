@@ -20,7 +20,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use super::*;
 use crate::core::host::agent_providers::smoke_ai_env_lock;
 use crate::core::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcess, ProcessSupervisor,
+    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
 };
 use crate::core::product::project_state::{
     DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection,
@@ -214,12 +214,12 @@ fn runtime_process_status_counts_only_current_agents() {
 
     let status = runtime_process_status_value(&runtime);
     assert_eq!(status["agent_count"], 0);
-    assert_eq!(status["process_count"], 2);
+    assert_eq!(status["process_count"], 1);
     assert_eq!(status["running_process_count"], 1);
 
     let summary = runtime_process_summary_value(&runtime);
     let processes = summary["processes"].as_array().unwrap();
-    assert_eq!(processes.len(), 2);
+    assert_eq!(processes.len(), 1);
     assert!(
         processes
             .iter()
@@ -228,7 +228,7 @@ fn runtime_process_status_counts_only_current_agents() {
     assert!(
         processes
             .iter()
-            .any(|process| process["id"] == "stopped-ui")
+            .all(|process| process["id"] != "stopped-ui")
     );
     assert!(
         !processes
@@ -2733,7 +2733,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .register(ManagedProcess {
             id: "agent-context".to_string(),
             owner: crate::core::host::process_supervision::ProcessOwner::Agent,
-            pid: None,
+            pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Agent context".to_string()),
             details: Some(json!({"gap_id": "GAPCTX", "round_idx": 1}).to_string()),
@@ -2749,7 +2749,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .register(ManagedProcess {
             id: "chat-context".to_string(),
             owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
-            pid: None,
+            pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Chat context".to_string()),
             details: Some(
@@ -2767,7 +2767,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .register(ManagedProcess {
             id: "ui-context".to_string(),
             owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
-            pid: None,
+            pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("UI context".to_string()),
             details: Some(json!({"kind": "ui"}).to_string()),
@@ -2872,6 +2872,63 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .find(|process| process["id"] == "ui-context")
         .unwrap();
     assert_eq!(ui_context["kind"], "ui");
+
+    supervisor
+        .register(ManagedProcess {
+            id: "exited-target-context".to_string(),
+            owner: ProcessOwner::TargetApp,
+            pid: None,
+            state: "exited".to_string(),
+            label: Some("sh".to_string()),
+            details: Some("-c old-app-status".to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: Some(0),
+        })
+        .unwrap();
+    supervisor
+        .register(ManagedProcess {
+            id: "dead-target-context".to_string(),
+            owner: ProcessOwner::TargetApp,
+            pid: Some(99_999_999),
+            state: "running".to_string(),
+            label: Some("sh".to_string()),
+            details: Some("-c stale-app-status".to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    let listed_after_target_records = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/processes".to_string(),
+        body: None,
+    });
+    assert_eq!(listed_after_target_records.status, 200);
+    let listed_after_target_records = listed_after_target_records.body["processes"]
+        .as_array()
+        .unwrap();
+    assert!(
+        !listed_after_target_records
+            .iter()
+            .any(|process| process["id"] == "exited-target-context")
+    );
+    assert!(
+        !listed_after_target_records
+            .iter()
+            .any(|process| process["id"] == "dead-target-context")
+    );
+    assert_eq!(
+        supervisor.inspect("dead-target-context").unwrap().state,
+        "exited"
+    );
+
     let summary = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/processes?summary=1".to_string(),
@@ -3417,6 +3474,24 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(app_status.status, 200);
     assert_eq!(app_status.body["attached"], true);
 
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    supervisor
+        .register(ManagedProcess {
+            id: "old-target-app-process".to_string(),
+            owner: ProcessOwner::TargetApp,
+            pid: None,
+            state: "running".to_string(),
+            label: Some("sh".to_string()),
+            details: Some("-c old target app".to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+
     let other_app = temp_root.join("other");
     fs::create_dir_all(&other_app).unwrap();
     let attached = server.handle(ApiRequest {
@@ -3428,6 +3503,10 @@ fn web_server_reports_project_registry_and_updates_settings() {
     assert_eq!(
         attached.body["client_repo"],
         other_app.display().to_string()
+    );
+    assert_eq!(
+        supervisor.inspect("old-target-app-process").unwrap().state,
+        "stopped"
     );
     let dashboard = server.handle(ApiRequest {
         method: "GET".to_string(),

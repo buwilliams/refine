@@ -12,7 +12,9 @@ use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
 use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
-use crate::core::host::process_supervision::FileProcessSupervisor;
+use crate::core::host::process_supervision::{
+    FileProcessSupervisor, ProcessOwner, ProcessSupervisor,
+};
 use crate::core::host::target_apps::TargetAppGeneratedConfig;
 use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::core::product::project_registry::{ProjectRegistryService, registry_apps_array};
@@ -990,6 +992,7 @@ impl InProcessWebServer {
                 }),
             );
         };
+        self.stop_target_app_for_project_change();
         match service.attach(path) {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
@@ -1077,6 +1080,7 @@ impl InProcessWebServer {
                 "name or path is required".to_string(),
             ));
         };
+        self.stop_target_app_for_project_change();
         match service.switch(name) {
             Ok(status) => ApiResponse::json(200, project_status_value(status)),
             Err(error) => error_response(error),
@@ -1087,6 +1091,7 @@ impl InProcessWebServer {
         let Some(service) = self.project_registry_service() else {
             return runtime_root_unavailable("detach project");
         };
+        self.stop_target_app_for_project_change();
         match service.detach() {
             Ok(status) => {
                 if let Err(error) = self.refresh_runtime_projection_cache() {
@@ -1095,6 +1100,24 @@ impl InProcessWebServer {
                 ApiResponse::json(200, project_status_value(status))
             }
             Err(error) => error_response(error),
+        }
+    }
+
+    fn stop_target_app_for_project_change(&self) {
+        if self.current_durable_root().ok().flatten().is_some() {
+            let _ = self.target_app_service().and_then(|service| service.stop());
+        }
+        let Some(runtime_root) = &self.runtime_root else {
+            return;
+        };
+        let supervisor = FileProcessSupervisor::new(runtime_root);
+        if let Ok(processes) = supervisor.recover_owner(ProcessOwner::TargetApp) {
+            for process in processes
+                .into_iter()
+                .filter(|process| process.owner == ProcessOwner::TargetApp)
+            {
+                let _ = supervisor.signal(&process.id, "stop");
+            }
         }
     }
 
