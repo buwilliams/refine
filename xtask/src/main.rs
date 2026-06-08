@@ -16,6 +16,7 @@ fn main() {
         Some("test-smoke-ai") => test_smoke_ai(),
         Some("test-cli") => test_cli(),
         Some("test-cluster-ssh") => test_cluster_ssh(),
+        Some("test-install-uninstall") => test_install_uninstall(),
         Some("test-multi-instance-sync") => test_multi_instance_sync(),
         Some("test-ui") => test_ui(),
         Some("test-surface") => test_surface(),
@@ -48,6 +49,7 @@ fn test_all() -> Result<(), String> {
     test_smoke_ai()?;
     test_cli()?;
     test_cluster_ssh()?;
+    test_install_uninstall()?;
     test_multi_instance_sync()?;
     test_ui()?;
     check_git_diff()
@@ -147,6 +149,23 @@ fn test_cluster_ssh() -> Result<(), String> {
         .env("REFINE_DAEMON_PORT", test_port())
         .env("REFINE_SMOKE_AI_PATH", smoke_ai);
     run(&mut command, "run SSH-backed cluster CLI tests")
+}
+
+fn test_install_uninstall() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    let mut command = Command::new("cargo");
+    command
+        .args([
+            "test",
+            "--test",
+            "install_uninstall_docker",
+            "--",
+            "--ignored",
+            "--test-threads=1",
+            "--nocapture",
+        ])
+        .current_dir(&repo_root);
+    run(&mut command, "run Docker-backed install/uninstall tests")
 }
 
 fn test_multi_instance_sync() -> Result<(), String> {

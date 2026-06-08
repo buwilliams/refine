@@ -46,7 +46,7 @@ Run the full verification set with Cargo:
 cargo test
 ```
 
-`cargo test` runs `xtask test-all`, which runs the Rust subset, xtask checks, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, multi-instance sync tests, Playwright UI tests, and `git diff --check`.
+`cargo test` runs `xtask test-all`, which runs the Rust subset, xtask checks, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, multi-instance sync tests, Playwright UI tests, and `git diff --check`.
 
 Focused suites:
 
@@ -54,6 +54,7 @@ Focused suites:
 cargo run --manifest-path xtask/Cargo.toml -- test-rust
 cargo run --manifest-path xtask/Cargo.toml -- test-surface
 cargo run --manifest-path xtask/Cargo.toml -- test-cluster-ssh
+cargo run --manifest-path xtask/Cargo.toml -- test-install-uninstall
 ```
 
 ## License

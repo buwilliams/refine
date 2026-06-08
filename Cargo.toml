@@ -42,6 +42,11 @@ path = "tests/cluster_ssh_cli.rs"
 test = false
 
 [[test]]
+name = "install_uninstall_docker"
+path = "tests/install_uninstall_docker.rs"
+test = false
+
+[[test]]
 name = "multi_instance_sync"
 path = "tests/multi_instance_sync.rs"
 test = false
