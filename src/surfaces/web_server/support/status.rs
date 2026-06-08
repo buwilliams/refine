@@ -233,6 +233,7 @@ pub(in crate::surfaces::web_server) fn process_summary_value(
     let process_values: Vec<_> = processes
         .into_iter()
         .map(|process| process.api_json())
+        .filter(is_current_process_api_value)
         .collect();
     let runner_reachable = runner_reachable_value(runtime_root);
     Ok(json!({
@@ -246,6 +247,36 @@ pub(in crate::surfaces::web_server) fn process_summary_value(
             "process_model": "supervisor"
         }
     }))
+}
+
+fn is_current_process_api_value(process: &Value) -> bool {
+    let Some(process) = process.as_object() else {
+        return false;
+    };
+    is_current_process_object(process)
+}
+
+fn is_current_process_object(process: &JsonObject) -> bool {
+    let kind = process.get("kind").and_then(Value::as_str).unwrap_or("");
+    if is_long_lived_process_kind(kind) {
+        return true;
+    }
+    let status = process.get("status").and_then(Value::as_str).unwrap_or("");
+    !is_terminal_process_status(status)
+}
+
+fn is_long_lived_process_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "daemon" | "supervisor" | "ui" | "runner" | "target_app"
+    )
+}
+
+fn is_terminal_process_status(status: &str) -> bool {
+    matches!(
+        status,
+        "exited" | "failed" | "stopped" | "cancelled" | "complete" | "completed"
+    )
 }
 
 fn runner_reachable_value(runtime_root: &Path) -> bool {
@@ -402,6 +433,7 @@ pub(in crate::surfaces::web_server) fn runtime_process_summary_value(
             runtime
                 .processes
                 .iter()
+                .filter(|process| is_current_process_object(process))
                 .cloned()
                 .map(Value::Object)
                 .collect(),
@@ -423,14 +455,17 @@ pub(in crate::surfaces::web_server) fn runtime_process_status_value(
         .supervisor
         .clone()
         .unwrap_or_else(|| serde_json::Map::new());
-    let process_count = runtime.processes.len();
-    let agent_count = runtime
+    let current_processes = runtime
         .processes
+        .iter()
+        .filter(|process| is_current_process_object(process))
+        .collect::<Vec<_>>();
+    let process_count = current_processes.len();
+    let agent_count = current_processes
         .iter()
         .filter(|process| process.get("kind").and_then(Value::as_str) == Some("agent"))
         .count();
-    let running_count = runtime
-        .processes
+    let running_count = current_processes
         .iter()
         .filter(|process| process.get("status").and_then(Value::as_str) == Some("running"))
         .count();

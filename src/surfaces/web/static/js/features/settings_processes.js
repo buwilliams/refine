@@ -20,7 +20,7 @@ function renderProcessesTab(processData, settings, diag, dash) {
     processes, { backgroundStopped, agentsPaused }, backend, runnerReachable, diag,
   ).map((proc) => renderManagedProcessRow(proc)).join("");
   const subprocessRows = (processes || [])
-    .filter(isSubprocessRecord)
+    .filter(isCurrentSubprocessRecord)
     .map((proc) => renderSubprocessProcessRow(proc, anchorMs)).join("");
   const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
   const subprocessBody = [subprocessRows, workRows].filter(Boolean).join("");
@@ -140,7 +140,7 @@ function isLongLivedManagedProcess(proc = {}) {
 
 function isCurrentLongLivedManagedProcess(proc = {}) {
   if (!isLongLivedManagedProcess(proc)) return false;
-  return !new Set(["exited", "failed", "stopped", "cancelled", "complete", "completed"]).has(proc.status);
+  return isCurrentProcessStatus(proc.status);
 }
 
 function syntheticTargetAppProcess() {
@@ -167,6 +167,14 @@ function syntheticTargetAppProcess() {
 
 function isSubprocessRecord(proc = {}) {
   return !isLongLivedManagedProcess(proc);
+}
+
+function isCurrentSubprocessRecord(proc = {}) {
+  return isSubprocessRecord(proc) && isCurrentProcessStatus(proc.status);
+}
+
+function isCurrentProcessStatus(status = "") {
+  return !new Set(["exited", "failed", "stopped", "cancelled", "complete", "completed"]).has(status);
 }
 
 function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
@@ -208,6 +216,9 @@ function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
   return [
     {
       ...supervisor,
+      agents_paused: agentScheduler.agents_paused,
+      background_processes_stopped: background.background_processes_stopped,
+      runner_reachable: agentScheduler.runner_reachable,
       supervisor_parent: true,
       supervisor_expanded: supervisorProcessExpanded,
       supervisor_child_count: children.length,

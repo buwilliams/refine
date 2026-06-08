@@ -526,8 +526,29 @@ test("controls background and agent processes from the Processes tab", async ({ 
   await ensureAttachedProject(request);
   await jsonObject(await request.post("/api/processes/background", { data: { stopped: false } }));
   await jsonObject(await request.post("/api/processes/agents", { data: { paused: false } }));
+  const processDirs = testRuntimeProcessDirs();
+  const supervisorId = "000-supervisor-controls";
+  const processPaths = processDirs.map((processDir) => path.join(processDir, `${supervisorId}.json`));
 
   try {
+    for (const processDir of processDirs) fs.mkdirSync(processDir, { recursive: true });
+    for (const processDir of processDirs) {
+      fs.writeFileSync(path.join(processDir, `${supervisorId}.json`), JSON.stringify({
+        id: supervisorId,
+        owner: "daemon",
+        pid: null,
+        state: "running",
+        label: "Supervisor controls",
+        details: "",
+        started_at: new Date().toISOString(),
+      }, null, 2));
+    }
+    await expect.poll(async () => {
+      const summary = await jsonObject(await request.get("/api/processes"));
+      return (summary.processes as Array<{ id?: string; kind?: string }> | undefined ?? [])
+        .map((process) => `${process.id}:${process.kind}`);
+    }).toContain(`${supervisorId}:daemon`);
+
     await page.goto("/#/node/processes");
     await expect(page.getByTestId("settings-pane-processes")).toHaveClass(/active/);
     await expect(page.getByTestId("managed-process-table")).toBeVisible();
@@ -538,6 +559,15 @@ test("controls background and agent processes from the Processes tab", async ({ 
     const agentRow = page.locator(
       '[data-testid="managed-process-row"][data-process-kind="agent_scheduler"]',
     );
+    const supervisorRow = page.locator(
+      '[data-testid="managed-process-row"][data-process-kind="supervisor"]',
+    );
+    await expect(supervisorRow).toBeVisible();
+    await expect(supervisorRow.getByTestId("process-agent-toggle")).toHaveText("Pause agents");
+    await supervisorRow.getByTestId("process-supervisor-toggle").click();
+    await expect(supervisorRow.getByTestId("process-supervisor-toggle")).toHaveAttribute("aria-expanded", "true");
+    await expect(backgroundRow).toBeVisible();
+    await expect(agentRow).toBeVisible();
     await expect(backgroundRow.getByTestId("managed-process-status")).toHaveText("active");
     await expect(backgroundRow.getByTestId("process-background-toggle")).toHaveText("Stop Background");
     await expect(backgroundRow.getByTestId("process-hard-reset-worktree")).toBeEnabled();
@@ -580,6 +610,7 @@ test("controls background and agent processes from the Processes tab", async ({ 
     expect(agentsPausedPayload.agents_paused).toBe(true);
     await expect(agentRow.getByTestId("managed-process-status")).toHaveText("paused");
     await expect(agentRow.getByTestId("process-agent-toggle")).toHaveText("Unpause agents");
+    await expect(supervisorRow.getByTestId("process-agent-toggle")).toHaveText("Unpause agents");
 
     const agentsUnpaused = page.waitForResponse((response) =>
       response.url().includes("/api/processes/agents") &&
@@ -590,9 +621,12 @@ test("controls background and agent processes from the Processes tab", async ({ 
     const agentsUnpausedPayload = await (await agentsUnpaused).json();
     expect(agentsUnpausedPayload.agents_paused).toBe(false);
     await expect(agentRow.getByTestId("managed-process-status")).toHaveText("active");
+    await expect(agentRow.getByTestId("process-agent-toggle")).toHaveText("Pause agents");
+    await expect(supervisorRow.getByTestId("process-agent-toggle")).toHaveText("Pause agents");
   } finally {
     await request.post("/api/processes/background", { data: { stopped: false } }).catch(() => undefined);
     await request.post("/api/processes/agents", { data: { paused: false } }).catch(() => undefined);
+    for (const processPath of processPaths) fs.rmSync(processPath, { force: true });
   }
 });
 
@@ -731,6 +765,7 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
   const processPaths = processDirs.flatMap((processDir) => [
     path.join(processDir, "ui-agent-process.json"),
     path.join(processDir, "ui-chat-process.json"),
+    path.join(processDir, "ui-exited-process.json"),
   ]);
   let gapId = "";
   let sessionId = "";
@@ -773,6 +808,16 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
       details: JSON.stringify({ session_id: sessionId, mode: "standalone" }),
       started_at: new Date().toISOString(),
       }, null, 2));
+      fs.writeFileSync(path.join(processDir, "ui-exited-process.json"), JSON.stringify({
+      id: "ui-exited-process",
+      owner: "agent",
+      pid: null,
+      state: "exited",
+      label: "UI exited agent",
+      details: JSON.stringify({ gap_id: gapId, round_idx: 0 }),
+      started_at: new Date().toISOString(),
+      exit_code: 0,
+      }, null, 2));
     }
 
     await expect.poll(async () => {
@@ -791,6 +836,9 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
     await expect(agentRow.getByTestId("process-cancel-agent")).toBeVisible();
     await expect(chatRow).toBeVisible();
     await expect(chatRow.getByTestId("process-stop-chat")).toBeVisible();
+    await expect(page.locator(
+      '[data-testid="subprocess-row"][data-process-id="ui-exited-process"]',
+    )).toHaveCount(0);
 
     const cancelled = page.waitForResponse((response) =>
       response.url().includes(`/api/gaps/${encodeURIComponent(gapId)}/cancel`) &&

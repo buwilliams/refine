@@ -31,6 +31,9 @@ use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::gap::{GapIndexProjection, GapPriority};
 use crate::model::log::ActivityEntry;
 use crate::model::workflow::GapStatus;
+use crate::surfaces::web_server::support::{
+    runtime_process_status_value, runtime_process_summary_value,
+};
 
 #[test]
 fn web_server_routes_work_gap_queries_through_projection() {
@@ -166,6 +169,77 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
                 .unwrap()
                 .contains("Refine cannot reach the runtime worker")
     }));
+}
+
+#[test]
+fn runtime_process_status_counts_only_current_agents() {
+    let mut runtime = RuntimeProjection {
+        supervisor: json!({"runner_reachable": true}).as_object().cloned(),
+        ..RuntimeProjection::default()
+    };
+    runtime.processes = vec![
+        json!({
+            "id": "exited-agent",
+            "kind": "agent",
+            "status": "exited"
+        })
+        .as_object()
+        .cloned()
+        .unwrap(),
+        json!({
+            "id": "completed-agent",
+            "kind": "agent",
+            "status": "completed"
+        })
+        .as_object()
+        .cloned()
+        .unwrap(),
+        json!({
+            "id": "running-chat",
+            "kind": "chat",
+            "status": "running"
+        })
+        .as_object()
+        .cloned()
+        .unwrap(),
+        json!({
+            "id": "stopped-ui",
+            "kind": "ui",
+            "status": "stopped"
+        })
+        .as_object()
+        .cloned()
+        .unwrap(),
+    ];
+
+    let status = runtime_process_status_value(&runtime);
+    assert_eq!(status["agent_count"], 0);
+    assert_eq!(status["process_count"], 2);
+    assert_eq!(status["running_process_count"], 1);
+
+    let summary = runtime_process_summary_value(&runtime);
+    let processes = summary["processes"].as_array().unwrap();
+    assert_eq!(processes.len(), 2);
+    assert!(
+        processes
+            .iter()
+            .any(|process| process["id"] == "running-chat")
+    );
+    assert!(
+        processes
+            .iter()
+            .any(|process| process["id"] == "stopped-ui")
+    );
+    assert!(
+        !processes
+            .iter()
+            .any(|process| process["id"] == "exited-agent")
+    );
+    assert!(
+        !processes
+            .iter()
+            .any(|process| process["id"] == "completed-agent")
+    );
 }
 
 #[test]
@@ -2660,6 +2734,22 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             exit_code: None,
         })
         .unwrap();
+    supervisor
+        .register(ManagedProcess {
+            id: "exited-agent-context".to_string(),
+            owner: crate::core::host::process_supervision::ProcessOwner::Agent,
+            pid: None,
+            state: "exited".to_string(),
+            label: Some("Exited agent context".to_string()),
+            details: Some(json!({"gap_id": "DONECTX", "round_idx": 1}).to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: Some(0),
+        })
+        .unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -2694,6 +2784,11 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .all(|work| work["status"] == "idle")
     );
     let listed_processes = listed.body["processes"].as_array().unwrap();
+    assert!(
+        !listed_processes
+            .iter()
+            .any(|process| process["id"] == "exited-agent-context")
+    );
     let agent_context = listed_processes
         .iter()
         .find(|process| process["id"] == "agent-context")
