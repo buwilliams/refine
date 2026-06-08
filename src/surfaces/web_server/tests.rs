@@ -1801,6 +1801,90 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
 }
 
 #[test]
+fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_request() {
+    let temp_root = unique_temp_dir("daemon-agent-scheduler-loop");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let smoke_ai = temp_root.join("smoke-ai");
+    fs::create_dir_all(&temp_root).unwrap();
+    fs::write(
+        &smoke_ai,
+        "#!/bin/sh\nprintf '%s\\n' 'smoke-ai loop response'\n",
+    )
+    .unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&smoke_ai, permissions).unwrap();
+    }
+    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+    }
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    FileSettingsService::new(&durable_root)
+        .update(&json!({"agent_cli": "smoke-ai"}))
+        .unwrap();
+
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({"id": "GAP1", "name": "Loop schedulable"})),
+    });
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP1/transition".to_string(),
+        body: Some(json!({"status": "todo"})),
+    });
+
+    let daemon = LocalHttpDaemon {
+        server: server.clone(),
+        static_root: None,
+    };
+    let scheduler_loop = daemon.start_agent_scheduler_loop(Duration::from_millis(25));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        let show = server.handle(ApiRequest {
+            method: "GET".to_string(),
+            path: "/api/gaps/GAP1".to_string(),
+            body: None,
+        });
+        assert_eq!(show.status, 200);
+        if show.body["gap"]["status"] == "review" {
+            break;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "scheduler loop did not dispatch GAP1 before timeout: {}",
+            show.body["gap"]["status"]
+        );
+        thread::sleep(Duration::from_millis(25));
+    }
+    scheduler_loop.stop_for_test();
+
+    let state = fs::read_to_string(runtime_root.join("scheduler-state.json")).unwrap();
+    assert!(state.contains("\"gap_id\": \"GAP1\""));
+    assert!(
+        !fs::read_to_string(runtime_root.join(API_EVENTS_FILE))
+            .unwrap_or_default()
+            .contains("/workflow/schedule")
+    );
+
+    unsafe {
+        if let Some(previous) = previous_smoke_ai {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
     let temp_root = unique_temp_dir("http-import-cancel");
     let durable_root = temp_root.join(".refine");

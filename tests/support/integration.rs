@@ -244,6 +244,10 @@ impl IntegrationFixture {
                 "REFINE_TEST_APP_ROOT".to_string(),
                 self.app_root.display().to_string(),
             ),
+            (
+                "REFINE_AGENT_SCHEDULER_DISABLED".to_string(),
+                "1".to_string(),
+            ),
         ];
         if let Ok(path) = std::env::var("REFINE_SMOKE_AI_PATH") {
             env.push(("REFINE_SMOKE_AI_PATH".to_string(), path));

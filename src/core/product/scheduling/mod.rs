@@ -216,6 +216,12 @@ impl FileSchedulingService {
                 "automation is paused for agents".to_string(),
             ));
         }
+        let pause_state = FileProcessSupervisor::new(&self.runtime_root).pause_state()?;
+        if pause_state.background_processes_stopped || pause_state.agents_paused {
+            return Err(RefineError::Conflict(
+                "automation is paused for agents".to_string(),
+            ));
+        }
         Ok(())
     }
 
@@ -1188,6 +1194,13 @@ mod tests {
         scheduler.pause(SchedulerControl::Agents).unwrap();
         assert!(scheduler.reserve("GAP1").is_err());
         scheduler.resume(SchedulerControl::Agents).unwrap();
+        FileProcessSupervisor::new(temp_root.join("run/8080"))
+            .set_agents_paused(true)
+            .unwrap();
+        assert!(scheduler.reserve("GAP1").is_err());
+        FileProcessSupervisor::new(temp_root.join("run/8080"))
+            .set_agents_paused(false)
+            .unwrap();
 
         let reservation_id = scheduler.reserve("GAP1").unwrap();
         assert_eq!(scheduler.reserve("GAP1").unwrap(), reservation_id);

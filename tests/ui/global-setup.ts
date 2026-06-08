@@ -67,6 +67,7 @@ function refineEnv(): NodeJS.ProcessEnv {
     REFINE_TEST_BASE_URL: baseURL,
     REFINE_TEST_RUNTIME_ROOT: runtimeRoot,
     REFINE_TEST_APP_ROOT: appRoot,
+    REFINE_AGENT_SCHEDULER_DISABLED: "1",
     REFINE_TEST_UPGRADE_LATEST_VERSION: "999.0.0-test"
   };
 }

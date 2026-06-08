@@ -3,10 +3,13 @@ use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
+
+static IDEMPOTENCY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 #[ignore = "daemon-backed multi-instance test; run through `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync`"]
@@ -294,7 +297,7 @@ fn http_json(port: u16, method: &str, path: &str, body: Option<Value>) -> Result
     let request = format!(
         "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: multi-instance-{}\r\n\r\n",
         body.len(),
-        now_millis()
+        unique_idempotency_key()
     );
     stream
         .write_all(request.as_bytes())
@@ -368,6 +371,11 @@ fn now_millis() -> u128 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_millis()
+}
+
+fn unique_idempotency_key() -> String {
+    let sequence = IDEMPOTENCY_COUNTER.fetch_add(1, Ordering::Relaxed);
+    format!("{}-{sequence}", now_millis())
 }
 
 fn query_component(value: &str) -> String {

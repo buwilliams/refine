@@ -1,10 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::Infallible;
+use std::env;
 use std::fs;
 use std::net::{SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant, SystemTime};
 
 use axum::Router;
@@ -22,6 +25,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::metrics::FileMetricsService;
 use crate::core::product::project_state::ProjectionQuery;
+use crate::core::product::scheduling::FileSchedulingService;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::lifecycle::{
     DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
@@ -118,10 +122,34 @@ struct StaticAssetCacheEntry {
 static STATIC_ASSET_CACHE: OnceLock<Mutex<BTreeMap<String, StaticAssetCacheEntry>>> =
     OnceLock::new();
 
+const AGENT_SCHEDULER_INTERVAL: Duration = Duration::from_secs(1);
+
 #[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
     pub server: InProcessWebServer,
     pub static_root: Option<PathBuf>,
+}
+
+pub(super) struct AgentSchedulerLoop {
+    stop: Arc<AtomicBool>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl AgentSchedulerLoop {
+    #[cfg(test)]
+    pub(super) fn stop_for_test(mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
+impl Drop for AgentSchedulerLoop {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        let _ = self.handle.take();
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -178,7 +206,34 @@ impl LocalHttpDaemon {
         lifecycle: FileDaemonLifecycleService,
         port: u16,
     ) -> RefineResult<()> {
+        let _scheduler_loop = if agent_scheduler_loop_disabled() {
+            None
+        } else {
+            Some(self.start_agent_scheduler_loop(AGENT_SCHEDULER_INTERVAL))
+        };
         self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
+    }
+
+    pub(super) fn start_agent_scheduler_loop(&self, interval: Duration) -> AgentSchedulerLoop {
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread_stop = Arc::clone(&stop);
+        let server = self.server.clone();
+        let interval = interval.max(Duration::from_millis(10));
+        let handle = thread::spawn(move || {
+            while !thread_stop.load(Ordering::Relaxed) {
+                let started = Instant::now();
+                let _ = run_agent_scheduler_once(&server);
+                let elapsed = started.elapsed();
+                let remaining = interval.saturating_sub(elapsed);
+                if !remaining.is_zero() {
+                    thread::sleep(remaining);
+                }
+            }
+        });
+        AgentSchedulerLoop {
+            stop,
+            handle: Some(handle),
+        }
     }
 
     fn serve_listener(
@@ -669,6 +724,31 @@ impl LocalHttpDaemon {
         }
         Ok(events)
     }
+}
+
+fn run_agent_scheduler_once(server: &InProcessWebServer) -> RefineResult<()> {
+    let Some(runtime_root) = &server.runtime_root else {
+        return Ok(());
+    };
+    let Some(durable_root) = server.current_durable_root()? else {
+        return Ok(());
+    };
+    let scheduler = FileSchedulingService::with_durable_root(runtime_root, durable_root);
+    let result = scheduler.schedule_and_dispatch();
+    let refresh_result = server.refresh_projection_cache_after_mutation();
+    result?;
+    refresh_result?;
+    Ok(())
+}
+
+fn agent_scheduler_loop_disabled() -> bool {
+    matches!(
+        env::var("REFINE_AGENT_SCHEDULER_DISABLED")
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("1" | "true" | "TRUE" | "yes" | "YES")
+    )
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
