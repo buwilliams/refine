@@ -40,7 +40,7 @@ wsl --install
 
 After Ubuntu opens, use the Install yourself one-liner above.
 
-## Test Suite
+## Tests
 
 Run the full verification set with Cargo:
 
