@@ -1,0 +1,16 @@
+services:
+  ssh:
+    build:
+      context: .
+    ports:
+      - "127.0.0.1:${REFINE_CLUSTER_SSH_PORT}:22"
+    volumes:
+      - type: bind
+        source: ${REFINE_CLUSTER_SSH_AUTHORIZED_KEYS}
+        target: /ssh/authorized_keys
+        read_only: true
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "22"]
+      interval: 1s
+      timeout: 3s
+      retries: 30

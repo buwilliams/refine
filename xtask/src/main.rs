@@ -14,6 +14,7 @@ fn main() {
         Some("runtime-layout") => print_runtime_layout(),
         Some("test-smoke-ai") => test_smoke_ai(),
         Some("test-cli") => test_cli(),
+        Some("test-cluster-ssh") => test_cluster_ssh(),
         Some("test-ui") => test_ui(),
         Some("test-surface") => test_surface(),
         Some("check") | None => check_all(),
@@ -82,6 +83,27 @@ fn test_cli() -> Result<(), String> {
         .env("REFINE_DAEMON_PORT", test_port())
         .env("REFINE_SMOKE_AI_PATH", smoke_ai);
     run(&mut command, "run CLI surface tests")
+}
+
+fn test_cluster_ssh() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    let smoke_ai = ensure_smoke_ai_built(&repo_root)?;
+    let mut command = Command::new("cargo");
+    command
+        .args([
+            "test",
+            "--test",
+            "cluster_ssh_cli",
+            "--",
+            "--ignored",
+            "--test-threads=1",
+            "--nocapture",
+        ])
+        .current_dir(&repo_root)
+        .env("REFINE_TEST_PORT", test_port())
+        .env("REFINE_DAEMON_PORT", test_port())
+        .env("REFINE_SMOKE_AI_PATH", smoke_ai);
+    run(&mut command, "run SSH-backed cluster CLI tests")
 }
 
 fn test_ui() -> Result<(), String> {

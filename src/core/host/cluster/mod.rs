@@ -336,14 +336,16 @@ impl ClusterService for FileClusterRegistryService {
         if remote_command.is_empty() {
             return Err(RefineError::InvalidInput("command is required".to_string()));
         }
-        self.security()?
-            .authorize_host_command("cluster", &remote_command)?;
+        let security = self.security()?;
+        security.authorize_host_command("cluster", &remote_command)?;
+        let known_hosts_path = security.runtime_root.join("cluster-known_hosts");
         let command = ssh_display_command(
             node.ssh_port,
             &node.ssh_user,
             &node.ssh_host,
             &node.ssh_identity_path,
             &remote_command,
+            Some(&known_hosts_path),
         )?;
         let ssh = ssh_process_command(
             node.ssh_port,
@@ -351,8 +353,8 @@ impl ClusterService for FileClusterRegistryService {
             &node.ssh_host,
             &node.ssh_identity_path,
             &remote_command,
+            Some(&known_hosts_path),
         )?;
-        let security = self.security()?;
         let output = FileProcessSupervisor::with_allowed_commands(
             security.runtime_root,
             security.allowed_commands.iter().cloned(),
@@ -432,6 +434,7 @@ fn bootstrap_remote_node_with_runtime(
     runtime_root: impl Into<PathBuf>,
     allowed_commands: impl IntoIterator<Item = impl Into<String>>,
 ) -> RefineResult<RemoteRunResult> {
+    let runtime_root = runtime_root.into();
     if !valid_cluster_node_id(&request.node_id) {
         return Err(RefineError::InvalidInput(format!(
             "invalid cluster node id {}",
@@ -453,12 +456,14 @@ fn bootstrap_remote_node_with_runtime(
         &request.target_app_path,
         request.refine_port,
     );
+    let known_hosts_path = runtime_root.join("cluster-known_hosts");
     let command = ssh_display_command(
         request.ssh_port,
         &request.ssh_user,
         &request.ssh_host,
         &request.ssh_identity_path,
         &remote_command,
+        Some(&known_hosts_path),
     )?;
     if request.dry_run {
         return Ok(RemoteRunResult {
@@ -477,6 +482,7 @@ fn bootstrap_remote_node_with_runtime(
         &request.ssh_host,
         &request.ssh_identity_path,
         &remote_command,
+        Some(&known_hosts_path),
     )?;
     let output = FileProcessSupervisor::with_allowed_commands(runtime_root, allowed_commands)
         .run_to_completion(ManagedProcessSpec {
@@ -547,10 +553,11 @@ fn ssh_process_command(
     host: &str,
     identity_path: &str,
     remote_command: &str,
+    known_hosts_path: Option<&Path>,
 ) -> RefineResult<HostCommand> {
     validate_ssh_prerequisites(identity_path)?;
     let destination = ssh_destination(user, host)?;
-    let mut args = ssh_common_args(port);
+    let mut args = ssh_common_args(port, known_hosts_path);
     let identity_path = identity_path.trim();
     if !identity_path.is_empty() {
         args.push("-i".to_string());
@@ -611,9 +618,20 @@ fn ssh_display_command(
     host: &str,
     identity_path: &str,
     remote_command: &str,
+    known_hosts_path: Option<&Path>,
 ) -> RefineResult<String> {
     let mut parts = vec!["ssh".to_string()];
-    parts.extend(ssh_common_args(port));
+    parts.extend(
+        ssh_common_args(port, known_hosts_path)
+            .into_iter()
+            .map(|part| {
+                if known_hosts_path.is_some() && part.contains('/') {
+                    shell_word(&part)
+                } else {
+                    part
+                }
+            }),
+    );
     let identity_path = identity_path.trim();
     if !identity_path.is_empty() {
         parts.push("-i".to_string());
@@ -624,8 +642,8 @@ fn ssh_display_command(
     Ok(parts.join(" "))
 }
 
-fn ssh_common_args(port: u16) -> Vec<String> {
-    vec![
+fn ssh_common_args(port: u16, known_hosts_path: Option<&Path>) -> Vec<String> {
+    let mut args = vec![
         "-p".to_string(),
         port.to_string(),
         "-o".to_string(),
@@ -636,7 +654,18 @@ fn ssh_common_args(port: u16) -> Vec<String> {
         "ServerAliveInterval=5".to_string(),
         "-o".to_string(),
         "ServerAliveCountMax=2".to_string(),
-    ]
+    ];
+    if let Some(path) = known_hosts_path {
+        args.extend([
+            "-o".to_string(),
+            "StrictHostKeyChecking=accept-new".to_string(),
+            "-o".to_string(),
+            "LogLevel=ERROR".to_string(),
+            "-o".to_string(),
+            format!("UserKnownHostsFile={}", path.display()),
+        ]);
+    }
+    args
 }
 
 fn shell_word(value: &str) -> String {
@@ -733,6 +762,17 @@ mod tests {
         assert!(result.command.contains("-o BatchMode=yes"));
         assert!(result.command.contains("-o ConnectTimeout=10"));
         assert!(result.command.contains("-o ServerAliveCountMax=2"));
+        assert!(
+            result
+                .command
+                .contains("-o StrictHostKeyChecking=accept-new")
+        );
+        assert!(result.command.contains("-o LogLevel=ERROR"));
+        assert!(
+            result
+                .command
+                .contains("-o 'UserKnownHostsFile=run/cluster-processes/cluster-known_hosts'")
+        );
         assert!(result.command.contains("-i '~/.ssh/refine_ed25519'"));
         assert!(result.command.contains("'deploy@example.com'"));
         assert!(result.remote_command.contains("refine_port=8081"));
@@ -780,6 +820,7 @@ mod tests {
             "example.com",
             identity.to_str().unwrap(),
             "printf ok",
+            None,
         )
         .unwrap();
 
