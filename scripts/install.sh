@@ -18,6 +18,8 @@ REFINE_INSTALL_DRY_RUN="${REFINE_INSTALL_DRY_RUN:-0}"
 REFINE_INSTALL_ASSUME_DEFAULTS="${REFINE_INSTALL_ASSUME_DEFAULTS:-0}"
 REFINE_INSTALL_UPGRADE="${REFINE_INSTALL_UPGRADE:-1}"
 REFINE_INSTALL_LOG="${REFINE_INSTALL_LOG:-}"
+REFINE_RELEASE_BIN_RELATIVE="${REFINE_RELEASE_BIN_RELATIVE:-bin/refine}"
+REFINE_DEPLOYED_MARKER_RELATIVE="${REFINE_DEPLOYED_MARKER_RELATIVE:-.refine-deployed}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -71,6 +73,7 @@ Environment:
   REFINE_INSTALL_DRY_RUN=1          Print commands instead of running them.
   REFINE_INSTALL_UPGRADE=0          Same behavior as --no-upgrade.
   REFINE_INSTALL_LOG                Install log path. Defaults to /tmp/refine-install-<pid>.log.
+  REFINE_RELEASE_BIN_RELATIVE       Installed binary path inside the checkout. Defaults to bin/refine.
 EOF
 }
 
@@ -768,7 +771,7 @@ ensure_cargo() {
   fi
   die_issue \
     "Rust Cargo install" \
-    "Refine uses Cargo to build and run the native CLI." \
+    "Refine uses Cargo to build the optimized native CLI during install and upgrade." \
     "Install Rust with: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh, then re-run install.sh." \
     "Cargo is required. Install Rust with rustup, then re-run install.sh."
 }
@@ -1110,6 +1113,61 @@ clone_or_update_refine() {
   ok "Cloned Refine release $latest to $checkout"
 }
 
+release_binary_path() {
+  printf '%s/%s\n' "$REFINE_CHECKOUT" "$REFINE_RELEASE_BIN_RELATIVE"
+}
+
+deployed_marker_path() {
+  printf '%s/%s\n' "$REFINE_CHECKOUT" "$REFINE_DEPLOYED_MARKER_RELATIVE"
+}
+
+write_deployed_marker() {
+  local marker="$1"
+  if dry_run; then
+    log_detail "${DIM}+ write deployed marker $marker${RESET}"
+    return 0
+  fi
+  {
+    printf 'mode=deployed\n'
+    printf 'release_bin=%s\n' "$REFINE_RELEASE_BIN_RELATIVE"
+    printf 'built_at=%s\n' "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  } >"$marker"
+}
+
+build_refine_release() {
+  section "Build Refine"
+  local release_bin
+  local marker
+  release_bin="$(release_binary_path)"
+  marker="$(deployed_marker_path)"
+  run cd "$REFINE_CHECKOUT" || die_issue \
+    "Refine checkout access" \
+    "The installer needs to enter the Refine checkout before building the release binary." \
+    "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
+    "Could not enter $REFINE_CHECKOUT"
+  run cargo build --release --locked || die_issue \
+    "Refine release build" \
+    "Installed Refine runs from an optimized production binary so restarts do not depend on Cargo." \
+    "Run manually: cd $REFINE_CHECKOUT && cargo build --release --locked, then re-run install.sh." \
+    "Could not build the optimized Refine binary."
+  run mkdir -p "$(dirname "$release_bin")" || die_issue \
+    "Refine binary directory" \
+    "The installed Refine binary needs a stable path under the checkout." \
+    "Fix permissions for $(dirname "$release_bin"), then re-run install.sh." \
+    "Could not create $(dirname "$release_bin")"
+  run install -m 755 "$REFINE_CHECKOUT/target/release/refine" "$release_bin" || die_issue \
+    "Refine binary install" \
+    "The ./r wrapper uses the stable installed binary for deployed runs." \
+    "Run manually: install -m 755 $REFINE_CHECKOUT/target/release/refine $release_bin, then re-run install.sh." \
+    "Could not install the optimized Refine binary to $release_bin."
+  write_deployed_marker "$marker" || die_issue \
+    "Refine deployed marker" \
+    "The ./r wrapper uses this marker to select deployed binary mode automatically." \
+    "Fix permissions for $REFINE_CHECKOUT, then re-run install.sh." \
+    "Could not write deployed marker $marker."
+  ok "Optimized Refine binary ready: $release_bin"
+}
+
 target_from_remote() {
   local remote="$1"
   local default_dir="$2"
@@ -1207,11 +1265,17 @@ choose_target_app() {
 
 target_refine() {
   section "Refine target app"
-  [ -d "$REFINE_CHECKOUT" ] || die_issue \
-    "Refine checkout setup" \
-    "The Refine checkout is needed to run the Refine CLI and write configuration." \
-    "Check $REFINE_CHECKOUT, then re-run install.sh." \
-    "Refine checkout missing: $REFINE_CHECKOUT"
+  if [ ! -d "$REFINE_CHECKOUT" ]; then
+    if dry_run; then
+      info "Dry run: checkout would exist after clone/build at $REFINE_CHECKOUT"
+    else
+      die_issue \
+        "Refine checkout setup" \
+        "The Refine checkout is needed to run the Refine CLI and write configuration." \
+        "Check $REFINE_CHECKOUT, then re-run install.sh." \
+        "Refine checkout missing: $REFINE_CHECKOUT"
+    fi
+  fi
   run cd "$REFINE_CHECKOUT" || die_issue \
     "Refine checkout access" \
     "The installer needs to enter the Refine checkout to run setup commands." \
@@ -1375,6 +1439,7 @@ main() {
     checkout="${checkout/#\~/$HOME}"
   fi
   clone_or_update_refine "$checkout"
+  build_refine_release
 
   provider_flow
   ensure_playwright_headless

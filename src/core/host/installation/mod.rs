@@ -9,6 +9,7 @@ use crate::core::host::process_supervision::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
 };
 use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::core::supervisor::lifecycle::daemon_executable_string;
 use crate::core::supervisor::runtime::{
     DEFAULT_APP_ID, RuntimeOs, RuntimePathInputs, RuntimePathLayout,
 };
@@ -336,7 +337,7 @@ impl FileInstallationService {
     }
 
     fn systemd_user_unit(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
-        let exe = current_exe_string()?;
+        let exe = daemon_executable_string()?;
         let logs_dir = backend.logs_dir.as_deref().unwrap_or(".");
         Ok(format!(
             "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system start --foreground --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
@@ -349,7 +350,7 @@ impl FileInstallationService {
     }
 
     fn launchd_plist(&self, backend: &InstallBackendRegistration) -> RefineResult<String> {
-        let exe = xml_escape(&current_exe_string()?);
+        let exe = xml_escape(&daemon_executable_string()?);
         let runtime_root = xml_escape(&self.runtime_root.display().to_string());
         let logs_dir = xml_escape(backend.logs_dir.as_deref().unwrap_or("."));
         Ok(format!(
@@ -384,7 +385,7 @@ impl FileInstallationService {
         let manifest = serde_json::json!({
             "service_name": "Refine",
             "display_name": "Refine daemon",
-            "executable": current_exe_string()?,
+            "executable": daemon_executable_string()?,
             "arguments": ["system", "start", "--foreground", "--runtime-root", self.runtime_root.display().to_string()],
             "app_support_dir": backend.app_support_dir,
             "logs_dir": backend.logs_dir,
@@ -774,12 +775,6 @@ fn launchctl_gui_domain() -> String {
     "gui/current".to_string()
 }
 
-fn current_exe_string() -> RefineResult<String> {
-    std::env::current_exe()
-        .map(|path| path.display().to_string())
-        .map_err(|error| RefineError::Io(format!("failed to resolve current executable: {error}")))
-}
-
 fn systemd_escape_arg(value: &str) -> String {
     if value
         .chars()
@@ -812,7 +807,10 @@ fn now_timestamp() -> String {
 mod tests {
     use super::*;
     use std::path::Path;
+    use std::sync::Mutex;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn file_installation_service_persists_update_and_rollback_state() {
@@ -881,6 +879,38 @@ mod tests {
     }
 
     #[test]
+    fn service_metadata_uses_deployed_binary_executable_when_launched_from_wrapper() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        let old_mode = std::env::var("REFINE_LAUNCH_MODE").ok();
+        let old_executable = std::env::var("REFINE_LAUNCH_EXECUTABLE").ok();
+        unsafe {
+            std::env::set_var("REFINE_LAUNCH_MODE", "binary");
+            std::env::set_var("REFINE_LAUNCH_EXECUTABLE", "/opt/refine/bin/refine");
+        }
+
+        let temp_root = unique_temp_dir("installation-release-bin");
+        let runtime_root = temp_root.join("run");
+        let service = test_installation_service(&runtime_root, "1.0.0", &temp_root);
+
+        let installed = service.install(InstallTarget::LinuxCliWeb).unwrap();
+        let service_metadata_path = PathBuf::from(
+            installed
+                .backend
+                .as_ref()
+                .unwrap()
+                .service_metadata_path
+                .as_ref()
+                .unwrap(),
+        );
+        let unit = fs::read_to_string(&service_metadata_path).unwrap();
+        assert!(unit.contains("ExecStart=/opt/refine/bin/refine system start --foreground"));
+
+        restore_env("REFINE_LAUNCH_MODE", old_mode);
+        restore_env("REFINE_LAUNCH_EXECUTABLE", old_executable);
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_installation_service_detects_partial_and_conflicting_backend_state() {
         let temp_root = unique_temp_dir("installation-backend");
         let runtime_root = temp_root.join("run");
@@ -920,6 +950,16 @@ mod tests {
                 xdg_config_home: Some(temp_root.join("config")),
             },
         )
+    }
+
+    fn restore_env(key: &str, value: Option<String>) {
+        unsafe {
+            if let Some(value) = value {
+                std::env::set_var(key, value);
+            } else {
+                std::env::remove_var(key);
+            }
+        }
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

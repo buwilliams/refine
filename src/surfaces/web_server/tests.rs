@@ -3989,6 +3989,8 @@ fn server_with_projection() -> InProcessWebServer {
             web_available: true,
             worker_state: "idle".to_string(),
             target_app_state: "detached".to_string(),
+            launch_mode: "cargo".to_string(),
+            executable_path: Some("cargo".to_string()),
             active_operations: Vec::new(),
             degraded_integrations: Vec::new(),
         },

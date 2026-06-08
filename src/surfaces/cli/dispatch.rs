@@ -27,7 +27,7 @@ use crate::core::product::work_items::{
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::lifecycle::{
     BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
-    http_probe,
+    current_launch_executable, current_launch_mode, http_probe,
 };
 use crate::core::supervisor::runtime::RuntimeRoot;
 use crate::model::workflow::{GapStatus, user_status_transition};
@@ -1689,6 +1689,8 @@ pub(super) fn system_status_response(runtime_root: PathBuf) -> RefineResult<serd
         "product": "refine",
         "version": env!("CARGO_PKG_VERSION"),
         "current_version": env!("CARGO_PKG_VERSION"),
+        "launch_mode": current_launch_mode(),
+        "executable_path": current_launch_executable(),
         "api_contract_version": API_CONTRACT_VERSION,
         "running_ports": running_ports,
         "ports": ports,

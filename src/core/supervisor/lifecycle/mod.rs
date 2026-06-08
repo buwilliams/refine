@@ -23,6 +23,10 @@ pub struct DaemonStatus {
     pub web_available: bool,
     pub worker_state: String,
     pub target_app_state: String,
+    #[serde(default = "default_launch_mode")]
+    pub launch_mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub executable_path: Option<String>,
     pub active_operations: Vec<String>,
     pub degraded_integrations: Vec<String>,
 }
@@ -118,9 +122,7 @@ impl FileDaemonLifecycleService {
         }
         let runtime_root = &self.runtime_root.root;
         let port_runtime_root = self.runtime_root.port_root(port);
-        let exe = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!("failed to locate current executable: {error}"))
-        })?;
+        let exe = daemon_executable_path()?;
         fs::create_dir_all(runtime_root).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create daemon runtime root {}: {error}",
@@ -354,6 +356,8 @@ pub fn running_status(port: u16) -> DaemonStatus {
         web_available: true,
         worker_state: "idle".to_string(),
         target_app_state: "unknown".to_string(),
+        launch_mode: current_launch_mode(),
+        executable_path: current_launch_executable(),
         active_operations: Vec::new(),
         degraded_integrations: Vec::new(),
     }
@@ -366,8 +370,65 @@ pub fn stopped_status(port: u16, degraded_integrations: Vec<String>) -> DaemonSt
         web_available: false,
         worker_state: "stopped".to_string(),
         target_app_state: "unknown".to_string(),
+        launch_mode: current_launch_mode(),
+        executable_path: current_launch_executable(),
         active_operations: Vec::new(),
         degraded_integrations,
+    }
+}
+
+pub fn current_launch_mode() -> String {
+    match std::env::var("REFINE_LAUNCH_MODE")
+        .unwrap_or_default()
+        .trim()
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "binary" | "release" | "deployed" => "binary".to_string(),
+        "cargo" | "dev" | "development" => "cargo".to_string(),
+        _ => infer_launch_mode_from_executable(),
+    }
+}
+
+pub fn current_launch_executable() -> Option<String> {
+    if let Ok(value) = std::env::var("REFINE_LAUNCH_EXECUTABLE")
+        && !value.trim().is_empty()
+    {
+        return Some(value);
+    }
+    std::env::current_exe()
+        .ok()
+        .map(|path| path.display().to_string())
+}
+
+pub fn daemon_executable_path() -> RefineResult<PathBuf> {
+    if current_launch_mode() == "binary"
+        && let Some(path) = current_launch_executable()
+        && path != "cargo"
+    {
+        return Ok(PathBuf::from(path));
+    }
+    std::env::current_exe()
+        .map_err(|error| RefineError::Io(format!("failed to locate current executable: {error}")))
+}
+
+pub fn daemon_executable_string() -> RefineResult<String> {
+    daemon_executable_path().map(|path| path.display().to_string())
+}
+
+fn default_launch_mode() -> String {
+    "unknown".to_string()
+}
+
+fn infer_launch_mode_from_executable() -> String {
+    let path = std::env::current_exe()
+        .ok()
+        .map(|path| path.display().to_string())
+        .unwrap_or_default();
+    if path.contains("/target/debug/") {
+        "cargo".to_string()
+    } else {
+        "binary".to_string()
     }
 }
 

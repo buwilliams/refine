@@ -19,6 +19,7 @@ use crate::core::product::project_registry::{ProjectRegistryService, registry_ap
 use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::core::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
 use crate::model::workflow::GapStatus;
 
 use super::support::*;
@@ -1245,6 +1246,8 @@ impl InProcessWebServer {
                     "upgrade_available": upgrade_available,
                     "current_version": current_version,
                     "latest_version": latest_version,
+                    "launch_mode": current_launch_mode(),
+                    "executable_path": current_launch_executable(),
                     "local_development": local_development,
                     "message": if upgrade_available {
                         format!("Refine {latest_version} is available; current version is {current_version}.")

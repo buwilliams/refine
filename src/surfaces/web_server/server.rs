@@ -1,5 +1,7 @@
 use serde_json::json;
 
+use crate::core::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+
 use super::support::*;
 use super::*;
 
@@ -26,6 +28,8 @@ impl InProcessWebServer {
                 json!({
                     "product": "refine",
                     "version": env!("CARGO_PKG_VERSION"),
+                    "launch_mode": current_launch_mode(),
+                    "executable_path": current_launch_executable(),
                     "api_contract_version": API_CONTRACT_VERSION,
                     "supported_api_contract_versions": [API_CONTRACT_VERSION]
                 }),

@@ -418,9 +418,13 @@ fn system_status_reports_current_version_and_running_ports() {
     assert_eq!(status["product"], "refine");
     assert_eq!(status["version"], env!("CARGO_PKG_VERSION"));
     assert_eq!(status["current_version"], env!("CARGO_PKG_VERSION"));
+    assert!(status["launch_mode"].is_string());
+    assert!(status["executable_path"].is_string());
     assert_eq!(status["running_ports"], serde_json::json!([live_port]));
     assert_eq!(status["ports"].as_array().unwrap().len(), 1);
     assert_eq!(status["ports"][0]["port"], live_port);
+    assert!(status["ports"][0]["launch_mode"].is_string());
+    assert!(status["ports"][0]["executable_path"].is_string());
     assert!(status["ports"][0]["daemon_healthy"].as_bool().unwrap());
 
     fs::remove_dir_all(temp_root).unwrap();
