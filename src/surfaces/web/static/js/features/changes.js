@@ -51,6 +51,20 @@ async function renderChanges() {
   const filterShellOpen = filterShell ? filterShell.open : false;
   $("#main").innerHTML = `
     <h2>Changes</h2>
+    <section class="changes-visualization-panel" data-testid="changes-visualization-panel">
+      <div class="changes-visualization-head">
+        <div class="segmented-control changes-period-control" role="group" aria-label="Git visualization period" data-testid="changes-period-control">
+          ${CHANGES_PERIODS.map((period) => `
+            <button type="button"
+                    data-changes-period="${period}"
+                    data-testid="changes-period-${period}"
+                    ${f.period === period ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>
+              ${period.charAt(0).toUpperCase() + period.slice(1)}
+            </button>`).join("")}
+        </div>
+      </div>
+      <div id="changes-visualization" data-testid="changes-visualization"><p class="muted">Loading...</p></div>
+    </section>
     <details class="filter-shell" id="changes-filter-shell" data-testid="changes-filter-shell"${filterShellOpen ? " open" : ""}>
       <summary>
         <span class="filter-shell-title">Filters</span>
@@ -88,16 +102,6 @@ async function renderChanges() {
         </div>
       </div>
     </details>
-    <div class="segmented-control changes-period-control" role="group" aria-label="Git visualization period" data-testid="changes-period-control">
-      ${CHANGES_PERIODS.map((period) => `
-        <button type="button"
-                data-changes-period="${period}"
-                data-testid="changes-period-${period}"
-                ${f.period === period ? 'class="active" aria-pressed="true"' : 'aria-pressed="false"'}>
-          ${period.charAt(0).toUpperCase() + period.slice(1)}
-        </button>`).join("")}
-    </div>
-    <div id="changes-visualization" data-testid="changes-visualization"><p class="muted">Loading...</p></div>
     <div id="changes-body" data-testid="changes-body"><p class="muted">Loading...</p></div>`;
   $("#changes-q").addEventListener("input", debounce(() => {
     updateChangesFilter({ q: $("#changes-q").value, page: 1 });
@@ -344,16 +348,12 @@ function drawChangesVisualization(changes, period = CHANGES_DEFAULT_PERIOD) {
         const width = Math.max(8, Math.round((row.total / maxTotal) * 100));
         return `
           <div class="card logs-visualization-bucket changes-visualization-bucket" data-testid="changes-bucket">
-            <div class="logs-visualization-bucket-head">
-              <strong data-testid="changes-bucket-label">${htmlEscape(row.label)}</strong>
-              <span class="muted small" data-testid="changes-bucket-total">${row.total} ${row.total === 1 ? "change" : "changes"}</span>
-            </div>
-            <div class="logs-visualization-bar" aria-hidden="true">
+            <strong class="changes-bucket-label" data-testid="changes-bucket-label">${htmlEscape(row.label)}</strong>
+            <span class="muted small changes-bucket-total" data-testid="changes-bucket-total">${row.total} ${row.total === 1 ? "change" : "changes"}</span>
+            <div class="logs-visualization-bar changes-visualization-bar" aria-hidden="true">
               <span class="info" style="width:${width}%"></span>
             </div>
-            <div class="logs-visualization-counts">
-              <span data-testid="changes-bucket-linked">${row.linked} linked ${row.linked === 1 ? "Gap" : "Gaps"}</span>
-            </div>
+            <span class="logs-visualization-counts changes-bucket-linked" data-testid="changes-bucket-linked">${row.linked} linked ${row.linked === 1 ? "Gap" : "Gaps"}</span>
           </div>`;
       }).join("")}
     </section>`;

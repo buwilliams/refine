@@ -84,7 +84,20 @@ test("filters, sorts, and paginates Changes through URL-backed controls", async 
   await expect(page.getByTestId("changes-branch-info")).toContainText(
     gitOutput(["branch", "--show-current"]).trim(),
   );
+  await expect(page.getByTestId("changes-visualization-panel")).toBeVisible();
+  await expect(
+    page.getByTestId("changes-visualization-panel").getByTestId("changes-period-control"),
+  ).toBeVisible();
   await expect(page.getByTestId("changes-filter-shell")).toBeVisible();
+  expect(await page.evaluate(() => {
+    const visualization = document.querySelector("[data-testid='changes-visualization-panel']");
+    const filters = document.querySelector("[data-testid='changes-filter-shell']");
+    return !!(
+      visualization &&
+      filters &&
+      (visualization.compareDocumentPosition(filters) & Node.DOCUMENT_POSITION_FOLLOWING)
+    );
+  })).toBe(true);
   await expect(page.getByTestId("changes-search")).toHaveValue(prefix);
   await expect(page.getByTestId("changes-status-filter")).toHaveValue("backlog");
   await expect(page.getByTestId("changes-priority-filter")).toHaveValue("high");
@@ -166,6 +179,9 @@ test("visualizes Git changes by day, week, month, and year", async ({ page, requ
   await page.goto(`/#/changes?q=${encodeURIComponent(prefix)}&status=backlog&priority=high&limit=50`);
   await expect(page.getByRole("heading", { name: "Changes", level: 2 })).toBeVisible();
   await expect(page.getByTestId("changes-period-day")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("changes-visualization-panel").getByTestId("changes-period-control")).toBeVisible();
+  await expect(page.getByTestId("changes-visualization-grid")).toHaveCSS("flex-wrap", "nowrap");
+  await expect(page.getByTestId("changes-bucket").first()).toHaveCSS("white-space", "nowrap");
   await expect(page.getByTestId("changes-bucket")).toHaveCount(4);
   await expect(page.getByTestId("changes-bucket-label")).toContainText([
     "2025-03-06",
