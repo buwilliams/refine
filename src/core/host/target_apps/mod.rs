@@ -300,8 +300,14 @@ impl FileTargetAppService {
             .and_then(|value| value.as_object().cloned())
             .unwrap_or_default();
 
-        let project_root = self.command_cwd(&settings);
         let mut notes = Vec::new();
+        if clear_generated_wrapper_entrypoints(&mut config) {
+            notes.push(
+                "Ignored existing manage-app wrapper entrypoints while regenerating lifecycle commands."
+                    .to_string(),
+            );
+        }
+        let project_root = self.command_cwd(&settings);
         if project_root.join("package.json").exists() {
             apply_package_json_defaults(&project_root, &mut config)?;
             notes.push("Detected package.json and generated npm-compatible commands.".to_string());
@@ -362,6 +368,12 @@ impl FileTargetAppService {
             config.log_path = ".refine/manage-app.log".to_string();
         }
         let mut notes = Vec::new();
+        if clear_generated_wrapper_entrypoints(config) {
+            notes.push(
+                "Ignored generated manage-app wrapper entrypoints before writing the wrapper."
+                    .to_string(),
+            );
+        }
         let project_root = config_project_root(&self.source_root, &config.cwd);
         apply_static_web_server_defaults(&project_root, config, &mut notes);
         for note in notes {
@@ -855,6 +867,35 @@ fn append_note(notes: &mut String, note: &str) {
     }
 }
 
+fn clear_generated_wrapper_entrypoints(config: &mut TargetAppGeneratedConfig) -> bool {
+    let mut cleared = false;
+    if is_manage_app_wrapper_entrypoint(&config.start_command, "start") {
+        config.start_command.clear();
+        cleared = true;
+    }
+    if is_manage_app_wrapper_entrypoint(&config.stop_command, "stop") {
+        config.stop_command.clear();
+        cleared = true;
+    }
+    if is_manage_app_wrapper_entrypoint(&config.rebuild_command, "rebuild") {
+        config.rebuild_command.clear();
+        cleared = true;
+    }
+    if is_manage_app_wrapper_entrypoint(&config.status_command, "status") {
+        config.status_command.clear();
+        cleared = true;
+    }
+    cleared
+}
+
+fn is_manage_app_wrapper_entrypoint(command: &str, action: &str) -> bool {
+    let command = command.trim();
+    command == format!("./.refine/manage-app.sh {action}")
+        || command == format!(".refine/manage-app.sh {action}")
+        || command == format!("sh ./.refine/manage-app.sh {action}")
+        || command == format!("sh .refine/manage-app.sh {action}")
+}
+
 fn first_nonempty(values: &[String]) -> String {
     values
         .iter()
@@ -1285,6 +1326,56 @@ mod tests {
         assert_eq!(generated.tcp_check_host, "127.0.0.1");
         assert_eq!(generated.tcp_check_port, port.to_string());
         assert!(generated.notes.contains("static web content"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn target_app_generation_does_not_embed_existing_manage_app_entrypoints() {
+        let temp_root = unique_temp_dir("target-app-wrapper-regeneration");
+        let durable_root = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let source_root = temp_root.join("app");
+        let port = free_test_port();
+        fs::create_dir_all(&durable_root).unwrap();
+        fs::create_dir_all(&source_root).unwrap();
+        fs::write(
+            source_root.join("package.json"),
+            r#"{"scripts":{"test":"node --test"}}"#,
+        )
+        .unwrap();
+        fs::write(source_root.join("index.html"), "<h1>Static app</h1>").unwrap();
+        FileSettingsService::new(&durable_root)
+            .update(&json!({
+                "target_app_url": format!("http://127.0.0.1:{port}/"),
+                "target_app_cwd": source_root.to_str().unwrap(),
+                "target_app_start_command": "./.refine/manage-app.sh start",
+                "target_app_stop_command": "./.refine/manage-app.sh stop",
+                "target_app_rebuild_command": "./.refine/manage-app.sh rebuild",
+                "target_app_status_command": "./.refine/manage-app.sh status"
+            }))
+            .unwrap();
+
+        let service = FileTargetAppService::new(&durable_root, &runtime_root, &source_root);
+        let mut generated = service.generate_config().unwrap();
+        service.write_manage_app_wrapper(&mut generated).unwrap();
+
+        assert_eq!(generated.start_command, "./.refine/manage-app.sh start");
+        assert_eq!(generated.stop_command, "./.refine/manage-app.sh stop");
+        assert_eq!(generated.rebuild_command, "./.refine/manage-app.sh rebuild");
+        assert_eq!(generated.status_command, "./.refine/manage-app.sh status");
+        assert!(
+            generated
+                .notes
+                .contains("Ignored existing manage-app wrapper entrypoints")
+        );
+        let wrapper = fs::read_to_string(source_root.join(".refine/manage-app.sh")).unwrap();
+        assert!(!wrapper.contains("START_COMMAND='./.refine/manage-app.sh start'"));
+        assert!(!wrapper.contains("STOP_COMMAND='./.refine/manage-app.sh stop'"));
+        assert!(!wrapper.contains("REBUILD_COMMAND='./.refine/manage-app.sh rebuild'"));
+        assert!(!wrapper.contains("STATUS_COMMAND='./.refine/manage-app.sh status'"));
+        assert!(wrapper.contains("python3 -m http.server"));
+        assert!(wrapper.contains("STATUS_COMMAND='curl -fsS"));
 
         fs::remove_dir_all(temp_root).unwrap();
     }
