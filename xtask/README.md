@@ -10,4 +10,5 @@ Commands:
 - `cargo run --manifest-path xtask/Cargo.toml -- check-static-assets`
 - `cargo run --manifest-path xtask/Cargo.toml -- runtime-layout`
 - `cargo run --manifest-path xtask/Cargo.toml -- test-cluster-ssh`
+- `cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync`
 - `cargo run --manifest-path xtask/Cargo.toml -- check`

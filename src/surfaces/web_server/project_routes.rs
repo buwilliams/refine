@@ -24,6 +24,13 @@ use crate::model::workflow::GapStatus;
 use super::support::*;
 use super::*;
 
+#[derive(Clone, Debug, Default)]
+struct ProjectSyncGitResult {
+    attempted: bool,
+    pulled: bool,
+    detail: Option<String>,
+}
+
 fn configured_provider_from_settings(durable_root: &std::path::Path, body: &Value) -> String {
     body.get("provider")
         .and_then(Value::as_str)
@@ -117,6 +124,105 @@ fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
                 .and_then(|text| text.trim().parse::<u64>().ok())
         })
         .unwrap_or(fallback)
+}
+
+fn sync_attached_project_git_state(
+    durable_root: &std::path::Path,
+) -> RefineResult<ProjectSyncGitResult> {
+    let Some(app_root) = durable_root.parent() else {
+        return Ok(ProjectSyncGitResult::default());
+    };
+    if !app_root.join(".git").exists() {
+        return Ok(ProjectSyncGitResult::default());
+    }
+
+    let inside = run_project_git(app_root, &["rev-parse", "--is-inside-work-tree"])?;
+    if !inside.status.success() || String::from_utf8_lossy(&inside.stdout).trim() != "true" {
+        return Ok(ProjectSyncGitResult::default());
+    }
+
+    let upstream = run_project_git(
+        app_root,
+        &["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )?;
+    if !upstream.status.success() {
+        return Ok(ProjectSyncGitResult {
+            attempted: false,
+            pulled: false,
+            detail: Some("No upstream branch configured.".to_string()),
+        });
+    }
+
+    let status = run_project_git(app_root, &["status", "--porcelain=v1", "-uall"])?;
+    if !status.status.success() {
+        let stderr = String::from_utf8_lossy(&status.stderr).trim().to_string();
+        return Err(RefineError::Conflict(format!(
+            "failed to inspect project worktree before sync{}",
+            if stderr.is_empty() {
+                String::new()
+            } else {
+                format!(": {stderr}")
+            }
+        )));
+    }
+    let blocking_changes = String::from_utf8_lossy(&status.stdout)
+        .lines()
+        .any(project_sync_status_line_blocks_pull);
+    if blocking_changes {
+        return Ok(ProjectSyncGitResult {
+            attempted: false,
+            pulled: false,
+            detail: Some("Local worktree changes present; skipped upstream pull.".to_string()),
+        });
+    }
+
+    let pull = run_project_git(app_root, &["pull", "--ff-only"])?;
+    if !pull.status.success() {
+        let stderr = String::from_utf8_lossy(&pull.stderr).trim().to_string();
+        let stdout = String::from_utf8_lossy(&pull.stdout).trim().to_string();
+        let detail = if stderr.is_empty() { stdout } else { stderr };
+        return Err(RefineError::Conflict(format!(
+            "failed to sync project state from upstream{}",
+            if detail.is_empty() {
+                String::new()
+            } else {
+                format!(": {detail}")
+            }
+        )));
+    }
+    let stdout = String::from_utf8_lossy(&pull.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&pull.stderr).trim().to_string();
+    let detail = [stdout.as_str(), stderr.as_str()]
+        .into_iter()
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(ProjectSyncGitResult {
+        attempted: true,
+        pulled: !detail.contains("Already up to date."),
+        detail: if detail.is_empty() {
+            None
+        } else {
+            Some(detail)
+        },
+    })
+}
+
+fn project_sync_status_line_blocks_pull(line: &str) -> bool {
+    let path = line.get(3..).unwrap_or("").trim();
+    !path.starts_with(".refine/runtime/")
+}
+
+fn run_project_git(
+    app_root: &std::path::Path,
+    args: &[&str],
+) -> RefineResult<std::process::Output> {
+    std::process::Command::new("git")
+        .args(args)
+        .current_dir(app_root)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .output()
+        .map_err(|error| RefineError::Io(format!("failed to run git {}: {error}", args.join(" "))))
 }
 
 fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedConfig> {
@@ -1027,6 +1133,14 @@ impl InProcessWebServer {
     }
 
     pub(super) fn handle_project_sync(&self) -> ApiResponse {
+        let git_sync = match self.current_durable_root() {
+            Ok(Some(durable_root)) => match sync_attached_project_git_state(&durable_root) {
+                Ok(result) => result,
+                Err(error) => return error_response(error),
+            },
+            Ok(None) => ProjectSyncGitResult::default(),
+            Err(error) => return error_response(error),
+        };
         let projection = if self.runtime_root.is_some() {
             match self.rebuild_current_projection_cache() {
                 Ok(projection) => projection,
@@ -1045,7 +1159,12 @@ impl InProcessWebServer {
                 "message": "Project state projection rebuilt.",
                 "projection_version": projection.version,
                 "gap_count": projection.gaps.len(),
-                "feature_count": projection.features.len()
+                "feature_count": projection.features.len(),
+                "git_sync": {
+                    "attempted": git_sync.attempted,
+                    "pulled": git_sync.pulled,
+                    "detail": git_sync.detail
+                }
             }),
         )
     }
