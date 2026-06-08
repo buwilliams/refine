@@ -140,7 +140,9 @@ impl InProcessWebServer {
             return Ok(RuntimeProjection::default());
         };
         let key = runtime_cache_key(runtime_root);
-        let current_fingerprint = runtime_projection_fingerprint(runtime_root)?;
+        let durable_root = self.current_durable_root()?;
+        let current_fingerprint =
+            runtime_projection_fingerprint(runtime_root, durable_root.as_deref())?;
         {
             let cache = HOT_RUNTIME_PROJECTIONS
                 .get_or_init(|| Mutex::new(BTreeMap::new()))
@@ -162,7 +164,8 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(RuntimeProjection::default());
         };
-        let fingerprint = runtime_projection_fingerprint(runtime_root)?;
+        let durable_root = self.current_durable_root()?;
+        let fingerprint = runtime_projection_fingerprint(runtime_root, durable_root.as_deref())?;
         self.refresh_runtime_projection_cache_with_fingerprint(fingerprint)
     }
 
@@ -195,7 +198,9 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return Ok(RuntimeProjection::default());
         };
-        let process = process_summary_value(runtime_root)?;
+        let durable_root = self.current_durable_root()?;
+        let process =
+            process_summary_value_with_chat_sessions(runtime_root, durable_root.as_deref())?;
         let processes = process
             .get("processes")
             .and_then(|value| value.as_array())
@@ -378,6 +383,7 @@ fn store_hot_projection(key: String, snapshot: ProjectionSnapshot) -> RefineResu
 
 fn runtime_projection_fingerprint(
     runtime_root: &Path,
+    durable_root: Option<&Path>,
 ) -> RefineResult<RuntimeProjectionFingerprint> {
     let mut fingerprint = RuntimeProjectionFingerprint::default();
     for path in [
@@ -389,6 +395,10 @@ fn runtime_projection_fingerprint(
         runtime_root.join("metrics/performance.jsonl"),
     ] {
         collect_runtime_path_fingerprint(runtime_root, &path, &mut fingerprint.entries)?;
+    }
+    if let Some(durable_root) = durable_root {
+        let chat_sessions = durable_root.join("chat/sessions");
+        collect_runtime_path_fingerprint(runtime_root, &chat_sessions, &mut fingerprint.entries)?;
     }
     Ok(fingerprint)
 }

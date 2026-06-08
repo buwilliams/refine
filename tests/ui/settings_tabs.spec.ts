@@ -19,6 +19,7 @@ function testRuntimeProcessDirs(): string[] {
   return [
     path.join(runtimeRoot, "processes"),
     path.join(runtimeRoot, port, "processes"),
+    path.join(testAppRoot(), ".refine/runtime/processes"),
   ];
 }
 
@@ -814,11 +815,13 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
   const processDirs = testRuntimeProcessDirs();
   const processPaths = processDirs.flatMap((processDir) => [
     path.join(processDir, "ui-agent-process.json"),
-    path.join(processDir, "ui-chat-process.json"),
     path.join(processDir, "ui-exited-process.json"),
   ]);
+  const sessionsDir = path.join(testAppRoot(), ".refine/chat/sessions");
   let gapId = "";
-  let sessionId = "";
+  let standaloneSessionId = "";
+  let gapSessionId = "";
+  let chatSessionPaths: string[] = [];
 
   try {
     const gapPayload = await jsonObject(await request.post("/api/gaps", {
@@ -829,14 +832,47 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
     }));
     gapId = String((gapPayload.gap as { id?: string } | undefined)?.id ?? "");
     expect(gapId).toBeTruthy();
-    const chatPayload = await jsonObject(await request.post("/api/chat/start", {
-      data: {
-        provider: "smoke-ai",
-        mode: "standalone",
-      },
-    }));
-    sessionId = String(chatPayload.session_id ?? "");
-    expect(sessionId).toBeTruthy();
+    standaloneSessionId = `ui-standalone-chat-${Date.now()}`;
+    gapSessionId = `ui-gap-chat-${Date.now()}`;
+    const now = new Date().toISOString();
+    const writeChatSession = (session: Record<string, unknown>) => {
+      fs.mkdirSync(sessionsDir, { recursive: true });
+      const sessionPath = path.join(sessionsDir, `${String(session.id)}.json`);
+      fs.writeFileSync(sessionPath, JSON.stringify(session, null, 2));
+      chatSessionPaths.push(sessionPath);
+    };
+    writeChatSession({
+      id: standaloneSessionId,
+      mode: "standalone",
+      provider: "smoke-ai",
+      provider_session_id: null,
+      attachment: "standalone",
+      created_at: now,
+      updated_at: now,
+      transcript_events: [],
+      queued_messages: [],
+      queue_dispatching: false,
+      importable_artifacts: [],
+      closed: false,
+      interrupted: false,
+      interruption_detail: null,
+    });
+    writeChatSession({
+      id: gapSessionId,
+      mode: "gap",
+      provider: "smoke-ai",
+      provider_session_id: null,
+      attachment: { gap: gapId },
+      created_at: now,
+      updated_at: now,
+      transcript_events: [],
+      queued_messages: [],
+      queue_dispatching: false,
+      importable_artifacts: [],
+      closed: false,
+      interrupted: false,
+      interruption_detail: null,
+    });
 
     for (const processDir of processDirs) fs.mkdirSync(processDir, { recursive: true });
     for (const processDir of processDirs) {
@@ -845,17 +881,9 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
       owner: "agent",
       pid: null,
       state: "running",
+      status: "running",
       label: "UI test agent",
       details: JSON.stringify({ gap_id: gapId, round_idx: 0 }),
-      started_at: new Date().toISOString(),
-      }, null, 2));
-      fs.writeFileSync(path.join(processDir, "ui-chat-process.json"), JSON.stringify({
-      id: "ui-chat-process",
-      owner: "user_helper",
-      pid: null,
-      state: "running",
-      label: "UI test chat",
-      details: JSON.stringify({ session_id: sessionId, mode: "standalone" }),
       started_at: new Date().toISOString(),
       }, null, 2));
       fs.writeFileSync(path.join(processDir, "ui-exited-process.json"), JSON.stringify({
@@ -863,6 +891,7 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
       owner: "agent",
       pid: null,
       state: "exited",
+      status: "exited",
       label: "UI exited agent",
       details: JSON.stringify({ gap_id: gapId, round_idx: 0 }),
       started_at: new Date().toISOString(),
@@ -873,19 +902,30 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
     await expect.poll(async () => {
       const summary = await jsonObject(await request.get("/api/processes"));
       return (summary.processes as Array<{ id?: string }> | undefined ?? []).map((process) => process.id);
-    }).toEqual(expect.arrayContaining(["ui-agent-process", "ui-chat-process"]));
+    }).toEqual(expect.arrayContaining([
+      "ui-agent-process",
+      `chat-session-${standaloneSessionId}`,
+      `chat-session-${gapSessionId}`,
+    ]));
 
     await page.goto("/#/node/processes");
     const agentRow = page.locator(
       '[data-testid="subprocess-row"][data-process-id="ui-agent-process"]',
     );
-    const chatRow = page.locator(
-      '[data-testid="subprocess-row"][data-process-id="ui-chat-process"]',
+    const standaloneChatRow = page.locator(
+      `[data-testid="subprocess-row"][data-process-id="chat-session-${standaloneSessionId}"]`,
+    );
+    const gapChatRow = page.locator(
+      `[data-testid="subprocess-row"][data-process-id="chat-session-${gapSessionId}"]`,
     );
     await expect(agentRow).toBeVisible();
     await expect(agentRow.getByTestId("process-cancel-agent")).toBeVisible();
-    await expect(chatRow).toBeVisible();
-    await expect(chatRow.getByTestId("process-stop-chat")).toBeVisible();
+    await expect(standaloneChatRow).toBeVisible();
+    await expect(standaloneChatRow).toContainText("Standalone chat");
+    await expect(standaloneChatRow.getByTestId("process-stop-chat")).toBeVisible();
+    await expect(gapChatRow).toBeVisible();
+    await expect(gapChatRow).toContainText("Gap chat");
+    await expect(gapChatRow.getByTestId("process-stop-chat")).toBeVisible();
     await expect(page.locator(
       '[data-testid="subprocess-row"][data-process-id="ui-exited-process"]',
     )).toHaveCount(0);
@@ -904,19 +944,34 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
     expect((cancelledGap.gap as { status?: string } | undefined)?.status).toBe("cancelled");
 
     const stopped = page.waitForResponse((response) =>
-      response.url().includes(`/api/chat/${encodeURIComponent(sessionId)}/stop`) &&
+      response.url().includes(`/api/chat/${encodeURIComponent(standaloneSessionId)}/stop`) &&
       response.request().method() === "POST" &&
       response.status() === 200
     );
-    await chatRow.getByTestId("process-stop-chat").click();
+    await standaloneChatRow.getByTestId("process-stop-chat").click();
     await expect(page.getByTestId("modal-dialog")).toContainText("Stop this chat session?");
     await page.getByTestId("modal-ok").click();
     const stoppedPayload = await (await stopped).json();
     expect(stoppedPayload.alive).toBe(false);
+
+    const gapStopped = page.waitForResponse((response) =>
+      response.url().includes(`/api/chat/${encodeURIComponent(gapSessionId)}/stop`) &&
+      response.request().method() === "POST" &&
+      response.status() === 200
+    );
+    await gapChatRow.getByTestId("process-stop-chat").click();
+    await expect(page.getByTestId("modal-dialog")).toContainText("Stop this chat session?");
+    await page.getByTestId("modal-ok").click();
+    const gapStoppedPayload = await (await gapStopped).json();
+    expect(gapStoppedPayload.alive).toBe(false);
   } finally {
     for (const processPath of processPaths) fs.rmSync(processPath, { force: true });
-    if (sessionId) {
-      await request.post(`/api/chat/${encodeURIComponent(sessionId)}/stop`).catch(() => undefined);
+    for (const sessionPath of chatSessionPaths) fs.rmSync(sessionPath, { force: true });
+    if (standaloneSessionId) {
+      await request.post(`/api/chat/${encodeURIComponent(standaloneSessionId)}/stop`).catch(() => undefined);
+    }
+    if (gapSessionId) {
+      await request.post(`/api/chat/${encodeURIComponent(gapSessionId)}/stop`).catch(() => undefined);
     }
     if (gapId) {
       await request.delete(`/api/gaps/${encodeURIComponent(gapId)}`).catch(() => undefined);

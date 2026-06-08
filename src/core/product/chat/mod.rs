@@ -169,6 +169,49 @@ impl FileChatService {
         self.interrupt(session_id, "stopped")
     }
 
+    pub fn list_sessions(&self) -> RefineResult<Vec<ChatSessionRecord>> {
+        let sessions_dir = self.sessions_dir();
+        if !sessions_dir.exists() {
+            return Ok(Vec::new());
+        }
+        let mut sessions = Vec::new();
+        for entry in fs::read_dir(&sessions_dir).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read chat sessions directory {}: {error}",
+                sessions_dir.display()
+            ))
+        })? {
+            let entry = entry.map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read chat session entry {}: {error}",
+                    sessions_dir.display()
+                ))
+            })?;
+            if entry.path().extension().and_then(|value| value.to_str()) != Some("json") {
+                continue;
+            }
+            let bytes = fs::read_to_string(entry.path()).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read chat session {}: {error}",
+                    entry.path().display()
+                ))
+            })?;
+            let session = serde_json::from_str::<ChatSessionRecord>(&bytes).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse chat session {}: {error}",
+                    entry.path().display()
+                ))
+            })?;
+            sessions.push(session);
+        }
+        sessions.sort_by(|a, b| {
+            b.updated_at
+                .cmp(&a.updated_at)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+        Ok(sessions)
+    }
+
     fn load_record(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
         validate_session_id(session_id)?;
         let path = self.session_path(session_id);

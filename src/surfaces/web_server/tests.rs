@@ -2697,6 +2697,21 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
     let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let chat = FileChatService::with_runtime_root(&durable_root, &runtime_root);
+    let standalone_chat = chat
+        .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), None)
+        .unwrap();
+    let gap_chat = chat
+        .start_with_options(
+            ChatAttachment::Gap("GAPCHAT".to_string()),
+            Some("smoke-ai"),
+            Some("gap"),
+        )
+        .unwrap();
+    let stopped_chat = chat
+        .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), None)
+        .unwrap();
+    chat.stop(&stopped_chat.id).unwrap();
     supervisor
         .launch(crate::core::host::process_supervision::ManagedProcessSpec {
             owner: crate::core::host::process_supervision::ProcessOwner::Agent,
@@ -2832,6 +2847,26 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(chat_context["kind"], "chat");
     assert_eq!(chat_context["session_id"], "chat-context-session");
     assert_eq!(chat_context["mode"], "standalone");
+    let standalone_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == format!("chat-session-{}", standalone_chat.id))
+        .unwrap();
+    assert_eq!(standalone_context["kind"], "chat");
+    assert_eq!(standalone_context["session_id"], standalone_chat.id);
+    assert_eq!(standalone_context["mode"], "standalone");
+    let gap_chat_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == format!("chat-session-{}", gap_chat.id))
+        .unwrap();
+    assert_eq!(gap_chat_context["kind"], "chat");
+    assert_eq!(gap_chat_context["session_id"], gap_chat.id);
+    assert_eq!(gap_chat_context["mode"], "gap");
+    assert_eq!(gap_chat_context["gap_id"], "GAPCHAT");
+    assert!(
+        !listed_processes
+            .iter()
+            .any(|process| process["id"] == format!("chat-session-{}", stopped_chat.id))
+    );
     let ui_context = listed_processes
         .iter()
         .find(|process| process["id"] == "ui-context")
@@ -2844,7 +2879,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(summary.status, 200);
     assert_eq!(summary.body["agent_count"], 2);
-    assert_eq!(summary.body["process_count"], 4);
+    assert_eq!(summary.body["process_count"], 6);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))

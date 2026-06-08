@@ -159,13 +159,26 @@ impl InProcessWebServer {
         if self.runtime_root.is_none() {
             return runtime_root_unavailable("read managed processes");
         }
+        let durable_root = match self.current_durable_root() {
+            Ok(root) => root,
+            Err(error) => return error_response(error),
+        };
         match self.current_projection_with_runtime() {
             Ok(projection) => ApiResponse::json(
                 200,
                 if query_param(raw_path, "summary").as_deref() == Some("1") {
                     runtime_process_status_value(&projection.runtime)
                 } else {
-                    runtime_process_summary_value(&projection.runtime)
+                    let Some(runtime_root) = &self.runtime_root else {
+                        return runtime_root_unavailable("read managed processes");
+                    };
+                    match process_summary_value_with_chat_sessions(
+                        runtime_root,
+                        durable_root.as_deref(),
+                    ) {
+                        Ok(value) => value,
+                        Err(error) => return error_response(error),
+                    }
                 },
             ),
             Err(error) => error_response(error),

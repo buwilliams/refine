@@ -1,5 +1,6 @@
+use std::collections::BTreeSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
@@ -10,6 +11,7 @@ use crate::core::host::installation::InstallTarget;
 use crate::core::host::process_supervision::{FileProcessSupervisor, ManagedProcess};
 use crate::core::observability::activity::{ActivityService, FileActivityService};
 use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::core::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
 use crate::core::product::project_registry::registry_apps_array;
 use crate::core::product::project_state::RuntimeProjection;
 use crate::core::supervisor::errors::RefineResult;
@@ -227,14 +229,30 @@ pub(in crate::surfaces::web_server) fn process_summary_response(
 pub(in crate::surfaces::web_server) fn process_summary_value(
     runtime_root: &Path,
 ) -> RefineResult<Value> {
+    process_summary_value_with_chat_sessions(runtime_root, None)
+}
+
+pub(in crate::surfaces::web_server) fn process_summary_value_with_chat_sessions(
+    runtime_root: &Path,
+    durable_root: Option<&Path>,
+) -> RefineResult<Value> {
     let supervisor = FileProcessSupervisor::new(runtime_root);
     let pause_state = supervisor.pause_state()?;
-    let processes = supervisor.list()?;
-    let process_values: Vec<_> = processes
-        .into_iter()
-        .map(|process| process.api_json())
-        .filter(is_current_process_api_value)
-        .collect();
+    let mut process_values = Vec::new();
+    let mut seen_process_ids = BTreeSet::new();
+    for process_root in process_roots(runtime_root, durable_root) {
+        let processes = FileProcessSupervisor::new(&process_root).list()?;
+        for process in processes {
+            if !seen_process_ids.insert(process.id.clone()) {
+                continue;
+            }
+            let value = process.api_json();
+            if is_current_process_api_value(&value) {
+                process_values.push(value);
+            }
+        }
+    }
+    append_chat_session_processes(&mut process_values, runtime_root, durable_root)?;
     let runner_reachable = runner_reachable_value(runtime_root);
     Ok(json!({
         "runner_reachable": runner_reachable,
@@ -247,6 +265,85 @@ pub(in crate::surfaces::web_server) fn process_summary_value(
             "process_model": "supervisor"
         }
     }))
+}
+
+fn process_roots(runtime_root: &Path, durable_root: Option<&Path>) -> Vec<PathBuf> {
+    let mut roots = vec![runtime_root.to_path_buf()];
+    if let Some(durable_root) = durable_root {
+        let project_runtime_root = durable_root.join("runtime");
+        if project_runtime_root != runtime_root {
+            roots.push(project_runtime_root);
+        }
+    }
+    roots
+}
+
+fn append_chat_session_processes(
+    process_values: &mut Vec<Value>,
+    runtime_root: &Path,
+    durable_root: Option<&Path>,
+) -> RefineResult<()> {
+    let Some(durable_root) = durable_root else {
+        return Ok(());
+    };
+    let existing_session_ids = process_values
+        .iter()
+        .filter_map(|process| process.get("session_id").and_then(Value::as_str))
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
+    let service = FileChatService::with_runtime_root(durable_root, runtime_root);
+    for session in service.list_sessions()? {
+        if !is_process_visible_chat_session(&session) || existing_session_ids.contains(&session.id)
+        {
+            continue;
+        }
+        process_values.push(chat_session_process_value(&session));
+    }
+    Ok(())
+}
+
+fn is_process_visible_chat_session(session: &ChatSessionRecord) -> bool {
+    !session.closed
+        && matches!(session.mode.as_str(), "standalone" | "gap")
+        && matches!(
+            session.attachment,
+            ChatAttachment::Standalone | ChatAttachment::Gap(_)
+        )
+}
+
+fn chat_session_process_value(session: &ChatSessionRecord) -> Value {
+    let gap_id = match &session.attachment {
+        ChatAttachment::Gap(gap_id) => Some(gap_id.as_str()),
+        _ => None,
+    };
+    let details = [
+        Some(session.provider.as_str()),
+        Some(session.mode.as_str()),
+        gap_id,
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(" · ");
+    json!({
+        "id": format!("chat-session-{}", session.id),
+        "kind": "chat",
+        "label": if session.mode == "gap" { "Gap chat" } else { "Standalone chat" },
+        "status": if session.in_flight || session.queue_dispatching { "running" } else { "idle" },
+        "pid": null,
+        "details": details,
+        "session_id": &session.id,
+        "mode": &session.mode,
+        "provider": &session.provider,
+        "gap_id": gap_id,
+        "started_at": &session.created_at,
+        "updated_at": &session.updated_at,
+        "output_available": false,
+        "cpu_priority": {"label": "-"},
+        "max_memory": {"label": "-"},
+        "isolation": "in_process",
+        "actions": ["stop"]
+    })
 }
 
 fn is_current_process_api_value(process: &Value) -> bool {
