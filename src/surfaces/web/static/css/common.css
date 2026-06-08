@@ -1060,23 +1060,20 @@ select {
   padding: 12px;
 }
 .changes-visualization-grid {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
   gap: 8px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-gutter: stable;
+  overflow-x: hidden;
 }
 .changes-visualization-bucket {
-  flex: 0 0 320px;
-  display: grid;
-  grid-template-columns: minmax(74px, 1fr) auto minmax(64px, 0.8fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  min-height: 104px;
+  padding: 10px;
   box-shadow: var(--shadow-sm);
-  white-space: nowrap;
 }
 .changes-bucket-label,
 .changes-bucket-total,
@@ -1085,12 +1082,21 @@ select {
   line-height: 1.2;
 }
 .changes-bucket-label {
+  display: block;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.changes-bucket-total {
+  display: block;
+  color: var(--color-text);
+  font-size: 20px;
+  font-weight: 750;
 }
 .changes-visualization-bar {
-  min-width: 64px;
   height: 6px;
+  width: 100%;
   border-radius: 999px;
   background: var(--color-surface-muted);
   overflow: hidden;
@@ -1104,6 +1110,7 @@ select {
 .changes-bucket-linked {
   color: var(--color-text-muted);
   font-size: 12px;
+  white-space: nowrap;
 }
 @media (max-width: 720px) {
   .changes-visualization-head {
@@ -1113,9 +1120,11 @@ select {
   .changes-period-control {
     flex: 0 0 auto;
   }
-  .changes-visualization-bucket {
-    flex-basis: 300px;
-    grid-template-columns: minmax(64px, 1fr) auto minmax(48px, 0.7fr) auto;
+  .changes-visualization-grid {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  }
+  .changes-bucket-total {
+    font-size: 18px;
   }
 }
 

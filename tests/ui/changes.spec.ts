@@ -180,8 +180,17 @@ test("visualizes Git changes by day, week, month, and year", async ({ page, requ
   await expect(page.getByRole("heading", { name: "Changes", level: 2 })).toBeVisible();
   await expect(page.getByTestId("changes-period-day")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("changes-visualization-panel").getByTestId("changes-period-control")).toBeVisible();
-  await expect(page.getByTestId("changes-visualization-grid")).toHaveCSS("flex-wrap", "nowrap");
-  await expect(page.getByTestId("changes-bucket").first()).toHaveCSS("white-space", "nowrap");
+  await expect(page.getByTestId("changes-visualization-grid")).toHaveCSS("display", "grid");
+  await expect(page.getByTestId("changes-visualization-grid")).toHaveCSS("overflow-x", "hidden");
+  await expect(page.getByTestId("changes-bucket").first()).not.toHaveCSS("white-space", "nowrap");
+  const gridOverflow = await page.getByTestId("changes-visualization-grid").evaluate((el) => ({
+    clientWidth: el.clientWidth,
+    scrollWidth: el.scrollWidth,
+  }));
+  expect(gridOverflow.scrollWidth).toBeLessThanOrEqual(gridOverflow.clientWidth + 1);
+  const firstBucketBox = await page.getByTestId("changes-bucket").first().boundingBox();
+  expect(firstBucketBox?.height ?? 0).toBeGreaterThanOrEqual(100);
+  expect(firstBucketBox?.width ?? 0).toBeGreaterThan(firstBucketBox?.height ?? 0);
   await expect(page.getByTestId("changes-bucket")).toHaveCount(4);
   await expect(page.getByTestId("changes-bucket-label")).toContainText([
     "2025-03-06",
