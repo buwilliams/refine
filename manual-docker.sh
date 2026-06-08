@@ -23,6 +23,7 @@ Options:
   -h, --help  Show this help text.
 
 The container does not install Refine. Run the install one-liner manually inside it.
+First startup bootstraps Linuxbrew so the installer can use brew for dependencies.
 Published browser ports: 8080, 18080, 19080.
 USAGE
 }
@@ -45,10 +46,10 @@ up() {
 
 wait_ready() {
   ensure_compose_file
-  local deadline=$((SECONDS + 180))
+  local deadline=$((SECONDS + 900))
   printf 'Waiting for manual Linux container setup'
   while [ "$SECONDS" -lt "$deadline" ]; do
-    if compose exec -T "$SERVICE" bash -lc 'id -u refine >/dev/null 2>&1 && command -v curl >/dev/null 2>&1'; then
+    if compose exec -T "$SERVICE" bash -lc 'id -u refine >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 && command -v brew >/dev/null 2>&1'; then
       printf '\n'
       return 0
     fi

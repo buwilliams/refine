@@ -22,6 +22,7 @@ REFINE_RELEASE_BIN_RELATIVE="${REFINE_RELEASE_BIN_RELATIVE:-bin/refine}"
 REFINE_DEPLOYED_MARKER_RELATIVE="${REFINE_DEPLOYED_MARKER_RELATIVE:-.refine-deployed}"
 REFINE_INSTALL_RUNTIME_ROOT="${REFINE_INSTALL_RUNTIME_ROOT:-run}"
 REFINE_INSTALL_UPDATE_ONLY="${REFINE_INSTALL_UPDATE_ONLY:-0}"
+REFINE_INSTALL_PACKAGE_MANAGER="${REFINE_INSTALL_PACKAGE_MANAGER:-}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -78,6 +79,7 @@ Environment:
   REFINE_RELEASE_BIN_RELATIVE       Installed binary path inside the checkout. Defaults to bin/refine.
   REFINE_INSTALL_RUNTIME_ROOT       Runtime root used by Refine commands. Defaults to run.
   REFINE_INSTALL_UPDATE_ONLY=1      Upgrade/build/repair only; do not start Refine.
+  REFINE_INSTALL_PACKAGE_MANAGER    Preferred package manager for installer dependencies.
 EOF
 }
 
@@ -607,7 +609,32 @@ with_sudo() {
   fi
 }
 
+package_manager_available() {
+  case "$1" in
+    apt) have apt-get ;;
+    dnf) have dnf ;;
+    yum) have yum ;;
+    pacman) have pacman ;;
+    brew) have brew ;;
+    *) return 1 ;;
+  esac
+}
+
 package_manager() {
+  if [ -n "$REFINE_INSTALL_PACKAGE_MANAGER" ]; then
+    case "$REFINE_INSTALL_PACKAGE_MANAGER" in
+      apt|dnf|yum|pacman|brew)
+        if package_manager_available "$REFINE_INSTALL_PACKAGE_MANAGER"; then
+          printf '%s\n' "$REFINE_INSTALL_PACKAGE_MANAGER"
+          return 0
+        fi
+        warn "Requested package manager is not available: $REFINE_INSTALL_PACKAGE_MANAGER"
+        ;;
+      *)
+        warn "Unsupported REFINE_INSTALL_PACKAGE_MANAGER: $REFINE_INSTALL_PACKAGE_MANAGER"
+        ;;
+    esac
+  fi
   if have apt-get; then
     printf '%s\n' "apt"
   elif have dnf; then

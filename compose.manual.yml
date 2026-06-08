@@ -10,16 +10,23 @@ services:
       - "127.0.0.1:19080:19080"
     environment:
       DEBIAN_FRONTEND: noninteractive
+      HOMEBREW_PREFIX: /home/linuxbrew/.linuxbrew
+      HOMEBREW_CELLAR: /home/linuxbrew/.linuxbrew/Cellar
+      HOMEBREW_REPOSITORY: /home/linuxbrew/.linuxbrew/Homebrew
+      PATH: /home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:/home/refine/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      REFINE_INSTALL_PACKAGE_MANAGER: brew
     command:
       - /bin/bash
       - -lc
       - |
+        set -euo pipefail
         apt-get update
         apt-get install -y --no-install-recommends \
           bash \
           build-essential \
           ca-certificates \
           curl \
+          file \
           git \
           procps \
           sudo \
@@ -31,5 +38,10 @@ services:
         chown -R refine:refine /home/refine
         echo "refine ALL=(ALL) NOPASSWD:ALL" >/etc/sudoers.d/refine
         chmod 0440 /etc/sudoers.d/refine
+        if [ ! -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+          sudo -H -u refine bash -lc 'NONINTERACTIVE=1 CI=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+        fi
+        grep -F 'brew shellenv' /home/refine/.bashrc >/dev/null 2>&1 || \
+          printf '%s\n' 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"' >>/home/refine/.bashrc
         exec sleep infinity
     working_dir: /home/refine
