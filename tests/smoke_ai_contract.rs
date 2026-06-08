@@ -15,6 +15,8 @@ fn run_smoke_ai(args: &[&str], stdin: Option<&str>, debug: bool) -> Output {
     }
     if stdin.is_some() {
         command.stdin(std::process::Stdio::piped());
+    } else {
+        command.stdin(std::process::Stdio::null());
     }
     command
         .stdout(std::process::Stdio::piped())
@@ -22,10 +24,8 @@ fn run_smoke_ai(args: &[&str], stdin: Option<&str>, debug: bool) -> Output {
     let mut child = command.spawn().expect("failed to start smoke-ai fixture");
     if let Some(input) = stdin {
         use std::io::Write;
-        child
-            .stdin
-            .as_mut()
-            .expect("smoke-ai stdin was not piped")
+        let mut smoke_ai_stdin = child.stdin.take().expect("smoke-ai stdin was not piped");
+        smoke_ai_stdin
             .write_all(input.as_bytes())
             .expect("failed to write smoke-ai stdin");
     }
