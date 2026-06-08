@@ -2078,6 +2078,182 @@ fn web_server_hard_resets_git_worktree() {
 }
 
 #[test]
+fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
+    let temp_root = unique_temp_dir("http-project-sync-basic");
+    let app_root = temp_root.join("app");
+    let durable_root = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&durable_root).unwrap();
+
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let no_repo = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/sync".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(no_repo.status, 200);
+    assert_eq!(no_repo.body["git_sync"]["attempted"], false);
+    assert_eq!(no_repo.body["git_sync"]["pulled"], false);
+    assert!(no_repo.body["git_sync"]["detail"].is_null());
+
+    git(&app_root, &["init", "-b", "main"]).unwrap();
+    git(&app_root, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&app_root, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(app_root.join("app.txt"), "initial\n").unwrap();
+    git(&app_root, &["add", "app.txt"]).unwrap();
+    git(&app_root, &["commit", "-m", "initial"]).unwrap();
+    let missing_upstream = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/sync".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(missing_upstream.status, 200);
+    assert_eq!(missing_upstream.body["git_sync"]["attempted"], false);
+    assert_eq!(
+        missing_upstream.body["git_sync"]["detail"],
+        "No upstream branch configured."
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_project_sync_pulls_fast_forward_and_allows_refine_runtime_noise() {
+    let temp_root = unique_temp_dir("http-project-sync-ff");
+    let remote = temp_root.join("remote.git");
+    let seed = temp_root.join("seed");
+    let app_root = temp_root.join("app");
+    fs::create_dir_all(&temp_root).unwrap();
+    git(
+        &temp_root,
+        &["init", "--bare", "-b", "main", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    fs::create_dir_all(&seed).unwrap();
+    git(&seed, &["init", "-b", "main"]).unwrap();
+    git(&seed, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&seed, &["config", "user.name", "Test User"]).unwrap();
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    fs::write(seed.join("app.txt"), "initial\n").unwrap();
+    git(&seed, &["add", "app.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "initial"]).unwrap();
+    git(&seed, &["push", "-u", "origin", "main"]).unwrap();
+    git(
+        &temp_root,
+        &[
+            "clone",
+            remote.to_str().unwrap(),
+            app_root.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    fs::create_dir_all(app_root.join(".refine/runtime/processes")).unwrap();
+    fs::write(
+        app_root.join(".refine/runtime/processes/local.json"),
+        r#"{"id":"local","owner":"maintenance","pid":null,"state":"running","label":"local","details":"runtime noise","started_at":"now"}"#,
+    )
+    .unwrap();
+    fs::write(seed.join("remote.txt"), "remote\n").unwrap();
+    git(&seed, &["add", "remote.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "remote update"]).unwrap();
+    git(&seed, &["push", "origin", "main"]).unwrap();
+
+    let mut server = server_with_projection();
+    server.durable_root = Some(app_root.join(".refine"));
+    server.runtime_root = Some(temp_root.join("run/8080"));
+    let sync = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/sync".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(sync.status, 200);
+    assert_eq!(sync.body["git_sync"]["attempted"], true);
+    assert_eq!(sync.body["git_sync"]["pulled"], true);
+    assert!(app_root.join("remote.txt").exists());
+    assert!(
+        app_root
+            .join(".refine/runtime/processes/local.json")
+            .exists()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_project_sync_skips_pull_for_dirty_user_worktree() {
+    let temp_root = unique_temp_dir("http-project-sync-dirty");
+    let (seed, app_root) = seeded_remote_clone(&temp_root);
+    fs::write(seed.join("remote.txt"), "remote\n").unwrap();
+    git(&seed, &["add", "remote.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "remote update"]).unwrap();
+    git(&seed, &["push", "origin", "main"]).unwrap();
+    fs::write(app_root.join("local.txt"), "local dirty\n").unwrap();
+
+    let mut server = server_with_projection();
+    server.durable_root = Some(app_root.join(".refine"));
+    server.runtime_root = Some(temp_root.join("run/8080"));
+    let sync = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/sync".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(sync.status, 200);
+    assert_eq!(sync.body["git_sync"]["attempted"], false);
+    assert_eq!(
+        sync.body["git_sync"]["detail"],
+        "Local worktree changes present; skipped upstream pull."
+    );
+    assert!(!app_root.join("remote.txt").exists());
+    assert_eq!(
+        fs::read_to_string(app_root.join("local.txt")).unwrap(),
+        "local dirty\n"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_project_sync_reports_pull_failure_for_diverged_branch() {
+    let temp_root = unique_temp_dir("http-project-sync-diverged");
+    let (seed, app_root) = seeded_remote_clone(&temp_root);
+    git(&app_root, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&app_root, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(seed.join("remote.txt"), "remote\n").unwrap();
+    git(&seed, &["add", "remote.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "remote update"]).unwrap();
+    git(&seed, &["push", "origin", "main"]).unwrap();
+    fs::write(app_root.join("local.txt"), "local\n").unwrap();
+    git(&app_root, &["add", "local.txt"]).unwrap();
+    git(&app_root, &["commit", "-m", "local update"]).unwrap();
+
+    let mut server = server_with_projection();
+    server.durable_root = Some(app_root.join(".refine"));
+    server.runtime_root = Some(temp_root.join("run/8080"));
+    let sync = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/sync".to_string(),
+        body: Some(json!({})),
+    });
+    assert_ne!(sync.status, 200);
+    assert!(
+        sync.body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("failed to sync project state from upstream")
+    );
+    assert!(!app_root.join("remote.txt").exists());
+    assert!(app_root.join("local.txt").exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
     let temp_root = unique_temp_dir("http-cleanups");
     let durable_root = temp_root.join(".refine");
@@ -4152,6 +4328,41 @@ fn git(repo: &Path, args: &[&str]) -> RefineResult<()> {
             .to_string(),
         ))
     }
+}
+
+fn seeded_remote_clone(temp_root: &Path) -> (PathBuf, PathBuf) {
+    let remote = temp_root.join("remote.git");
+    let seed = temp_root.join("seed");
+    let app_root = temp_root.join("app");
+    fs::create_dir_all(temp_root).unwrap();
+    git(
+        temp_root,
+        &["init", "--bare", "-b", "main", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    fs::create_dir_all(&seed).unwrap();
+    git(&seed, &["init", "-b", "main"]).unwrap();
+    git(&seed, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&seed, &["config", "user.name", "Test User"]).unwrap();
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    fs::write(seed.join("app.txt"), "initial\n").unwrap();
+    git(&seed, &["add", "app.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "initial"]).unwrap();
+    git(&seed, &["push", "-u", "origin", "main"]).unwrap();
+    git(
+        temp_root,
+        &[
+            "clone",
+            remote.to_str().unwrap(),
+            app_root.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    (seed, app_root)
 }
 
 fn wait_for_http_request_metrics(

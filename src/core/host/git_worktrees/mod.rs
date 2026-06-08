@@ -386,6 +386,14 @@ impl GitWorktreeService for FileGitWorktreeService {
             ".refine".to_string(),
             "-e".to_string(),
             ".refine/**".to_string(),
+            "-e".to_string(),
+            "run".to_string(),
+            "-e".to_string(),
+            "run/**".to_string(),
+            "-e".to_string(),
+            "target".to_string(),
+            "-e".to_string(),
+            "target/**".to_string(),
         ];
         if let Some(runtime_root) = &self.runtime_root
             && let Some(relative_runtime) = relative_child_path(&self.root, runtime_root)
@@ -421,13 +429,15 @@ impl GitWorktreeService for FileGitWorktreeService {
     fn recover(&self) -> RefineResult<MergeResult> {
         let merge = self.git_raw(&["merge", "--abort"])?;
         let rebase = self.git_raw(&["rebase", "--abort"])?;
+        let revert = self.git_raw(&["revert", "--abort"])?;
         let result = MergeResult {
-            ok: merge.success || rebase.success,
+            ok: merge.success || rebase.success || revert.success,
             conflicts: self.conflicts().unwrap_or_default(),
             message: Some(format!(
-                "{}\n{}",
+                "{}\n{}\n{}",
                 trimmed_command_text(&merge),
-                trimmed_command_text(&rebase)
+                trimmed_command_text(&rebase),
+                trimmed_command_text(&revert)
             )),
         };
         if result.ok {
@@ -586,9 +596,7 @@ mod tests {
         let temp_root = unique_temp_dir("git-hard-reset");
         let repo = temp_root.join("repo");
         fs::create_dir_all(&repo).unwrap();
-        git(&repo, &["init"]).unwrap();
-        git(&repo, &["config", "user.email", "test@example.com"]).unwrap();
-        git(&repo, &["config", "user.name", "Test User"]).unwrap();
+        init_repo(&repo);
         fs::write(repo.join("app.txt"), "committed\n").unwrap();
         git(&repo, &["add", "app.txt"]).unwrap();
         git(&repo, &["commit", "-m", "initial"]).unwrap();
@@ -613,6 +621,333 @@ mod tests {
         fs::remove_dir_all(temp_root).unwrap();
     }
 
+    #[test]
+    fn file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes() {
+        let temp_root = unique_temp_dir("git-workflow-happy");
+        let repo = temp_root.join("repo");
+        let remote = temp_root.join("remote.git");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        git(
+            &temp_root,
+            &["init", "--bare", "-b", "main", remote.to_str().unwrap()],
+        )
+        .unwrap();
+        git(
+            &repo,
+            &["remote", "add", "origin", remote.to_str().unwrap()],
+        )
+        .unwrap();
+        commit_file(&repo, "base.txt", "base\n", "initial");
+
+        let service = FileGitWorktreeService::new(&repo);
+        assert_eq!(
+            service.branch("feature/pathspec").unwrap(),
+            "feature/pathspec"
+        );
+        assert_eq!(current_branch(&repo), "feature/pathspec");
+        commit_file(
+            &repo,
+            "tracked.txt",
+            "base tracked\n",
+            "track selected file",
+        );
+        fs::write(repo.join("tracked.txt"), "tracked\n").unwrap();
+        fs::write(repo.join("ignored.txt"), "ignored\n").unwrap();
+        let diff = service.diff(&["tracked.txt".to_string()]).unwrap();
+        assert!(diff.contains("tracked"));
+        assert!(!diff.contains("ignored"));
+
+        let commit = service
+            .commit("commit selected path", &["tracked.txt".to_string()])
+            .unwrap();
+        assert_eq!(
+            git_stdout(&repo, &["show", "--pretty=format:", "--name-only", &commit]),
+            "tracked.txt"
+        );
+        assert!(git_stdout(&repo, &["status", "--porcelain=v1"]).contains("?? ignored.txt"));
+        service.push("origin", "feature/pathspec").unwrap();
+        assert_eq!(
+            git_stdout(&repo, &["rev-parse", "origin/feature/pathspec^{commit}"]),
+            commit
+        );
+
+        git(&repo, &["switch", "main"]).unwrap();
+        let worktree_path = PathBuf::from(service.worktree("feature/worktree").unwrap());
+        assert!(worktree_path.join(".git").exists());
+        assert_eq!(current_branch(&worktree_path), "feature/worktree");
+        let worktree_status = service.inspect(worktree_path.to_str().unwrap()).unwrap();
+        assert_eq!(worktree_status.root, worktree_path.display().to_string());
+        assert_eq!(worktree_status.branch.as_deref(), Some("feature/worktree"));
+        let linked_service = FileGitWorktreeService::new(&worktree_path);
+        fs::write(worktree_path.join("base.txt"), "linked change\n").unwrap();
+        assert!(
+            linked_service
+                .diff(&["base.txt".to_string()])
+                .unwrap()
+                .contains("linked change")
+        );
+        let linked_audit_path = linked_service.audit_path().unwrap();
+        assert!(linked_audit_path.exists());
+        assert_ne!(
+            linked_audit_path,
+            worktree_path.join(".git").join(GIT_AUDIT_FILE)
+        );
+
+        let audit = fs::read_to_string(service.audit_path().unwrap()).unwrap();
+        for action in ["branch", "diff", "commit", "push", "worktree"] {
+            assert!(audit.contains(&format!("\"action\":\"{action}\"")));
+        }
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_merges_rebases_and_recovers_conflicts() {
+        let temp_root = unique_temp_dir("git-conflicts");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+
+        git(&repo, &["switch", "-c", "merge-side"]).unwrap();
+        commit_file(&repo, "app.txt", "merge side\n", "merge side");
+        git(&repo, &["switch", "main"]).unwrap();
+        commit_file(&repo, "app.txt", "main side\n", "main side");
+
+        let service = FileGitWorktreeService::new(&repo);
+        let merge = service.merge("merge-side").unwrap();
+        assert!(!merge.ok);
+        assert_eq!(merge.conflicts, vec!["app.txt"]);
+        assert!(
+            fs::read_to_string(repo.join("app.txt"))
+                .unwrap()
+                .contains("<<<<<<<")
+        );
+        let recovered = service.recover().unwrap();
+        assert!(recovered.ok);
+        assert_eq!(service.conflicts().unwrap(), Vec::<String>::new());
+
+        git(&repo, &["switch", "-c", "rebase-side", "HEAD~1"]).unwrap();
+        commit_file(&repo, "app.txt", "rebase side\n", "rebase side");
+        let rebase = service.rebase("main").unwrap();
+        assert!(!rebase.ok);
+        assert_eq!(rebase.conflicts, vec!["app.txt"]);
+        assert!(
+            fs::read_to_string(repo.join("app.txt"))
+                .unwrap()
+                .contains("<<<<<<<")
+        );
+        let recovered = service.recover().unwrap();
+        assert!(recovered.ok);
+        assert_eq!(service.conflicts().unwrap(), Vec::<String>::new());
+
+        let audit = fs::read_to_string(service.audit_path().unwrap()).unwrap();
+        assert!(audit.contains("\"action\":\"merge\""));
+        assert!(audit.contains("\"action\":\"rebase\""));
+        assert!(audit.contains("\"action\":\"recover\""));
+        assert!(audit.contains("\"status\":\"conflict\""));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_merges_and_rebases_cleanly() {
+        let temp_root = unique_temp_dir("git-clean-integrations");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "base.txt", "base\n", "initial");
+
+        git(&repo, &["switch", "-c", "merge-clean"]).unwrap();
+        commit_file(&repo, "merge.txt", "merge\n", "merge clean");
+        git(&repo, &["switch", "main"]).unwrap();
+        let service = FileGitWorktreeService::new(&repo);
+        let merge = service.merge("merge-clean").unwrap();
+        assert!(merge.ok);
+        assert!(repo.join("merge.txt").exists());
+
+        git(&repo, &["switch", "-c", "rebase-clean"]).unwrap();
+        commit_file(&repo, "rebase.txt", "rebase\n", "rebase clean");
+        git(&repo, &["switch", "main"]).unwrap();
+        commit_file(&repo, "main.txt", "main\n", "main clean");
+        git(&repo, &["switch", "rebase-clean"]).unwrap();
+        let rebase = service.rebase("main").unwrap();
+        assert!(rebase.ok);
+        assert!(repo.join("main.txt").exists());
+        assert!(repo.join("rebase.txt").exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_rejects_invalid_names_and_reports_git_failures() {
+        let temp_root = unique_temp_dir("git-invalid");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+        let service = FileGitWorktreeService::new(&repo);
+
+        for name in ["", "-bad", "bad..name", "bad//name", "bad name"] {
+            assert!(matches!(
+                service.branch(name),
+                Err(RefineError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                service.worktree(name),
+                Err(RefineError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                service.merge(name),
+                Err(RefineError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                service.rebase(name),
+                Err(RefineError::InvalidInput(_))
+            ));
+            assert!(matches!(
+                service.push("origin", name),
+                Err(RefineError::InvalidInput(_))
+            ));
+        }
+        assert!(matches!(
+            service.push("", "main"),
+            Err(RefineError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            service.revert_commit("bad ref!"),
+            Err(RefineError::InvalidInput(_))
+        ));
+        assert!(matches!(
+            service.branch("main"),
+            Err(RefineError::Conflict(_))
+        ));
+        assert!(matches!(
+            service.worktree("main"),
+            Err(RefineError::Conflict(_))
+        ));
+        assert!(matches!(
+            service.push("missing-remote", "main"),
+            Err(RefineError::Conflict(_))
+        ));
+        let missing_revert = service.revert_commit("deadbeef").unwrap();
+        assert!(!missing_revert.ok);
+        assert!(
+            missing_revert
+                .message
+                .unwrap_or_default()
+                .contains("deadbeef")
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_reports_dirty_worktree_merge_failure() {
+        let temp_root = unique_temp_dir("git-dirty-merge");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+        git(&repo, &["switch", "-c", "incoming"]).unwrap();
+        commit_file(&repo, "app.txt", "incoming\n", "incoming");
+        git(&repo, &["switch", "main"]).unwrap();
+        fs::write(repo.join("app.txt"), "dirty local\n").unwrap();
+
+        let result = FileGitWorktreeService::new(&repo)
+            .merge("incoming")
+            .unwrap();
+        assert!(!result.ok);
+        assert!(result.message.unwrap_or_default().contains("local changes"));
+        assert_eq!(
+            fs::read_to_string(repo.join("app.txt")).unwrap(),
+            "dirty local\n"
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_revert_conflict_and_recover_preserves_history() {
+        let temp_root = unique_temp_dir("git-revert-conflict");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "one\n", "initial");
+        commit_file(&repo, "app.txt", "two\n", "second");
+        let second = git_stdout(&repo, &["rev-parse", "HEAD"]);
+        commit_file(&repo, "app.txt", "three\n", "third");
+
+        let service = FileGitWorktreeService::new(&repo);
+        let reverted = service.revert_commit(&second).unwrap();
+        assert!(!reverted.ok);
+        assert_eq!(reverted.conflicts, vec!["app.txt"]);
+        assert!(
+            fs::read_to_string(repo.join("app.txt"))
+                .unwrap()
+                .contains("<<<<<<<")
+        );
+        let recovered = service.recover().unwrap();
+        assert!(recovered.ok);
+        assert_eq!(fs::read_to_string(repo.join("app.txt")).unwrap(), "three\n");
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_hard_reset_preserves_refine_runtime_and_removes_other_noise() {
+        let temp_root = unique_temp_dir("git-hard-reset-runtime");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "committed\n", "initial");
+        fs::write(repo.join("app.txt"), "dirty\n").unwrap();
+        fs::write(repo.join("untracked.txt"), "remove\n").unwrap();
+        fs::create_dir_all(repo.join(".refine/runtime/processes")).unwrap();
+        fs::write(repo.join(".refine/runtime/processes/pid.json"), "{}\n").unwrap();
+        fs::create_dir_all(repo.join("run/8080")).unwrap();
+        fs::write(repo.join("run/8080/state.json"), "{}\n").unwrap();
+        fs::create_dir_all(repo.join("target/tmp")).unwrap();
+        fs::write(repo.join("target/tmp/build.txt"), "build\n").unwrap();
+
+        let service =
+            FileGitWorktreeService::with_runtime_root(&repo, repo.join(".refine/runtime"));
+        let status = service.inspect("").unwrap();
+        assert!(status.dirty_user_changes);
+        assert!(
+            status
+                .refine_owned_artifacts
+                .iter()
+                .any(|path| path == ".refine/")
+        );
+        assert!(
+            status
+                .refine_owned_artifacts
+                .iter()
+                .any(|path| path == "run/")
+        );
+        assert!(
+            status
+                .refine_owned_artifacts
+                .iter()
+                .any(|path| path == "target/")
+        );
+
+        let reset = service.hard_reset().unwrap();
+        assert!(reset.ok);
+        assert_eq!(
+            fs::read_to_string(repo.join("app.txt")).unwrap(),
+            "committed\n"
+        );
+        assert!(!repo.join("untracked.txt").exists());
+        assert!(repo.join(".refine/runtime/processes/pid.json").exists());
+        assert!(repo.join("run/8080/state.json").exists());
+        assert!(repo.join("target/tmp/build.txt").exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
     fn git(repo: &Path, args: &[&str]) -> RefineResult<()> {
         let output = Command::new("git")
             .arg("-C")
@@ -631,6 +966,39 @@ mod tests {
                     .to_string(),
             ))
         }
+    }
+
+    fn git_stdout(repo: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {} failed\nstdout:\n{}\nstderr:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
+    }
+
+    fn init_repo(repo: &Path) {
+        git(repo, &["init", "-b", "main"]).unwrap();
+        git(repo, &["config", "user.email", "test@example.com"]).unwrap();
+        git(repo, &["config", "user.name", "Test User"]).unwrap();
+    }
+
+    fn commit_file(repo: &Path, path: &str, contents: &str, message: &str) {
+        fs::write(repo.join(path), contents).unwrap();
+        git(repo, &["add", path]).unwrap();
+        git(repo, &["commit", "-m", message]).unwrap();
+    }
+
+    fn current_branch(repo: &Path) -> String {
+        git_stdout(repo, &["branch", "--show-current"])
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
