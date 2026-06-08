@@ -460,6 +460,19 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         }
         Commands::Cluster {
             action:
+                ClusterAction::Bootstrap {
+                    id,
+                    dry_run,
+                    durable_root: Some(durable_root),
+                },
+        } => {
+            let result = FileClusterRegistryService::new(durable_root)
+                .bootstrap_node_response(&id, dry_run)?;
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
+            Ok(())
+        }
+        Commands::Cluster {
+            action:
                 ClusterAction::Sync {
                     durable_root: Some(durable_root),
                 },
@@ -2217,9 +2230,7 @@ fn dispatch_node_daemon(action: NodeAction) -> RefineResult<()> {
 
 fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
     let response = match action {
-        ClusterAction::List { durable_root: None } | ClusterAction::Sync { durable_root: None } => {
-            daemon_json("GET", "/cluster", None)?
-        }
+        ClusterAction::List { durable_root: None } => daemon_json("GET", "/cluster", None)?,
         ClusterAction::Show {
             id,
             durable_root: None,
@@ -2292,6 +2303,15 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
             &format!("/cluster/nodes/{}", path_segment(&id)),
             None,
         )?,
+        ClusterAction::Bootstrap {
+            id,
+            dry_run,
+            durable_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/cluster/nodes/{}/bootstrap", path_segment(&id)),
+            Some(json!({ "dry_run": dry_run })),
+        )?,
         ClusterAction::Run {
             id,
             command,
@@ -2313,7 +2333,32 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         ClusterAction::Maintenance { durable_root: None } => {
             let cluster = daemon_json("GET", "/cluster", None)?;
             json!({
-                "maintenance": cluster.get("maintenance").cloned().unwrap_or(serde_json::Value::Null)
+                "ok": true,
+                "maintenance": {
+                    "active": true,
+                    "updated_at": cluster.get("updated_at").cloned().unwrap_or(serde_json::Value::Null)
+                },
+                "cluster": cluster
+            })
+        }
+        ClusterAction::Sync { durable_root: None } => {
+            let cluster = daemon_json("GET", "/cluster", None)?;
+            let synced = cluster
+                .get("nodes")
+                .and_then(|value| value.as_array())
+                .map(|nodes| {
+                    nodes
+                        .iter()
+                        .filter(|node| {
+                            node.get("enabled").and_then(|value| value.as_bool()) != Some(false)
+                        })
+                        .count()
+                })
+                .unwrap_or(0);
+            json!({
+                "ok": true,
+                "synced": synced,
+                "cluster": cluster
             })
         }
         other => {
@@ -2601,6 +2646,7 @@ pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf>
             | ClusterAction::EnableNode { durable_root, .. }
             | ClusterAction::DisableNode { durable_root, .. }
             | ClusterAction::RemoveNode { durable_root, .. }
+            | ClusterAction::Bootstrap { durable_root, .. }
             | ClusterAction::Sync { durable_root }
             | ClusterAction::Run { durable_root, .. }
             | ClusterAction::Transfer { durable_root, .. }

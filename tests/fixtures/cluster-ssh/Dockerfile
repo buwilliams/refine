@@ -1,6 +1,6 @@
 FROM alpine:3.20
 
-RUN apk add --no-cache openssh-server \
+RUN apk add --no-cache git openssh-server \
     && adduser -D -s /bin/sh refine \
     && echo 'refine:refine' | chpasswd \
     && mkdir -p /run/sshd /ssh /home/refine/.ssh

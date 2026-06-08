@@ -412,6 +412,7 @@ impl InProcessWebServer {
     ) -> ApiResponse {
         let durable_root = require_durable_root!(self, "configure cluster node");
         let body = request.body.unwrap_or_else(|| json!({}));
+        let is_create = request.method == "POST" && path_id.is_none();
         let id = path_id
             .or_else(|| {
                 body.get("id")
@@ -449,7 +450,15 @@ impl InProcessWebServer {
             refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
-        match FileClusterRegistryService::new(durable_root).upsert_node(id, update) {
+        let service = FileClusterRegistryService::new(durable_root);
+        let result = if is_create {
+            service
+                .add_node(id)
+                .and_then(|_| service.upsert_node(id, update))
+        } else {
+            service.upsert_node(id, update)
+        };
+        match result {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
@@ -490,9 +499,12 @@ impl InProcessWebServer {
             .get("dry_run")
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
-        match FileClusterRegistryService::new(durable_root)
-            .bootstrap_node_response(node_id, dry_run)
-        {
+        let service = if let Some(runtime_root) = &self.runtime_root {
+            FileClusterRegistryService::with_runtime_root(durable_root, runtime_root)
+        } else {
+            FileClusterRegistryService::new(durable_root)
+        };
+        match service.bootstrap_node_response(node_id, dry_run) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }

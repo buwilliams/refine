@@ -560,6 +560,14 @@ pub enum ClusterAction {
         #[cfg_attr(not(test), arg(skip = None))]
         durable_root: Option<PathBuf>,
     },
+    Bootstrap {
+        id: String,
+        #[arg(long)]
+        dry_run: bool,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        durable_root: Option<PathBuf>,
+    },
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

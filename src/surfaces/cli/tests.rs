@@ -1700,6 +1700,15 @@ fn cluster_commands_use_shared_cluster_registry_service() {
         vec![
             "refine",
             "cluster",
+            "bootstrap",
+            "node-1",
+            "--dry-run",
+            "--durable-root",
+            durable_root.to_str().unwrap(),
+        ],
+        vec![
+            "refine",
+            "cluster",
             "transfer",
             "node-1",
             "GAP1",

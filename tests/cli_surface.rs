@@ -1024,6 +1024,32 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
 
     let add = fixture.run_refine(&["cluster", "add-node", "cluster-smoke"]);
     fixture.assert_success("cluster add-node", &add);
+    let duplicate = fixture.run_refine(&["cluster", "add-node", "cluster-smoke"]);
+    assert!(
+        !duplicate.status.success(),
+        "duplicate cluster node succeeded"
+    );
+    assert!(
+        String::from_utf8_lossy(&duplicate.stderr).contains("already exists"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&duplicate.stderr)
+    );
+    let invalid_host = fixture.run_refine(&[
+        "cluster",
+        "edit-node",
+        "cluster-smoke",
+        "--ssh-host",
+        "deploy@example.com",
+    ]);
+    assert!(
+        !invalid_host.status.success(),
+        "invalid cluster ssh host succeeded"
+    );
+    assert!(
+        String::from_utf8_lossy(&invalid_host.stderr).contains("ssh_host"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&invalid_host.stderr)
+    );
     let edit = fixture.run_refine(&[
         "cluster",
         "edit-node",
@@ -1056,14 +1082,30 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
         "cluster enable-node",
         &fixture.run_refine(&["cluster", "enable-node", "cluster-smoke"]),
     );
-    fixture.assert_success("cluster sync", &fixture.run_refine(&["cluster", "sync"]));
+    let sync = fixture.run_refine(&["cluster", "sync"]);
+    fixture.assert_success("cluster sync", &sync);
+    let sync_payload = fixture.json_stdout(&sync);
+    assert_eq!(sync_payload["ok"], true, "{sync_payload:#}");
+    assert_eq!(sync_payload["synced"], 1, "{sync_payload:#}");
+    assert!(
+        sync_payload["cluster"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|node| node["id"] == "cluster-smoke"),
+        "{sync_payload:#}"
+    );
     let maintenance = fixture.run_refine(&["cluster", "maintenance"]);
     fixture.assert_success("cluster maintenance", &maintenance);
+    let maintenance_payload = fixture.json_stdout(&maintenance);
+    assert_eq!(maintenance_payload["ok"], true, "{maintenance_payload:#}");
+    assert_eq!(
+        maintenance_payload["maintenance"]["active"], true,
+        "{maintenance_payload:#}"
+    );
     assert!(
-        fixture
-            .json_stdout(&maintenance)
-            .get("maintenance")
-            .is_some()
+        maintenance_payload["cluster"]["nodes"].is_array(),
+        "{maintenance_payload:#}"
     );
 
     let gap_id = fixture.create_gap("cluster transfer gap");
