@@ -1257,6 +1257,8 @@ def rebuild_sqlite_cache(
     total_start = perf_metrics.now()
     phase_ms: dict[str, float] = {}
     rows_updated = 0
+    if not db.schema_ready(conn):
+        db.ensure_schema(conn)
     status = ensure_initialized(conn, migrate=True)
     if not status.get("compatible"):
         raise RuntimeError(migration_block_details(status))

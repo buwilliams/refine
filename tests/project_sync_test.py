@@ -170,6 +170,67 @@ def main() -> int:
         assert result["changed"] is True, result
         assert result["stage"] == "refreshed", result
         assert db.get_setting(conn, "branch_name_pattern") == "pulse/{gap_id}"
+
+        from refine_server.paths import relative_gap_path
+
+        transfer_target = project_state.create_node("Transfer Target")
+        transfer_gap = "01PROJECTSYNCTRANSFERAAA"
+        gap_writer.create_gap(
+            gap_id=transfer_gap,
+            name="Transfer sync cache",
+            initial_round=gaps.new_round("Peer", "Actual", "Target"),
+            status="todo",
+            priority="medium",
+            node_id=project_state.DEFAULT_NODE_ID,
+        )
+        project_state.rebuild_sqlite_cache(conn)
+        git(client, "add", ".refine")
+        git(client, "commit", "-m", "seed transferred gap")
+        git(client, "push")
+
+        result = project_state.transfer_gaps(
+            project_state.DEFAULT_NODE_ID,
+            transfer_target["id"],
+            gap_ids={transfer_gap},
+        )
+        assert result["updated"] == 1, result
+        gap_path = client / ".refine" / relative_gap_path(transfer_gap)
+        stat = gap_path.stat()
+        conn.execute(
+            "UPDATE gap_cache_meta SET mtime_ns = ?, size = ? WHERE gap_id = ?",
+            (stat.st_mtime_ns, stat.st_size, transfer_gap),
+        )
+        row = conn.execute(
+            "SELECT node_id FROM gaps_index WHERE id = ?", (transfer_gap,),
+        ).fetchone()
+        assert row["node_id"] == project_state.DEFAULT_NODE_ID, dict(row)
+
+        original_push_current_after_pull = project_sync.push_ops.push_current_after_pull
+
+        def fail_push(*args, **kwargs):  # noqa: ANN002, ANN003, ARG001
+            return {
+                "ok": False,
+                "stage": "push",
+                "message": "forced push failure",
+                "details": "forced push failure",
+            }
+
+        project_sync.push_ops.push_current_after_pull = fail_push
+        try:
+            result = project_sync.commit_and_push_refine_state(
+                conn,
+                rebuild_cache=True,
+                state_message="refine: transfer node gaps",
+            )
+        finally:
+            project_sync.push_ops.push_current_after_pull = original_push_current_after_pull
+        assert result["ok"] is False, result
+        assert result["stage"] == "push", result
+        assert result["rebuild_ms"] >= 0, result
+        row = conn.execute(
+            "SELECT node_id FROM gaps_index WHERE id = ?", (transfer_gap,),
+        ).fetchone()
+        assert row["node_id"] == transfer_target["id"], dict(row)
     finally:
         try:
             conn.close()

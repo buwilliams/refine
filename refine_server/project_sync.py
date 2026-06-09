@@ -12,6 +12,12 @@ _PULSE_HEAD_KEY = "__refine_project_pulse_head"
 _PULSE_UPSTREAM_KEY = "__refine_project_pulse_upstream"
 
 
+def _rebuild_sqlite_cache(conn: sqlite3.Connection) -> float:
+    rebuild_start = perf_metrics.now()
+    project_state.rebuild_sqlite_cache(conn, force=True)
+    return round(perf_metrics.elapsed_ms(rebuild_start), 2)
+
+
 def commit_and_push_refine_state(
     conn: sqlite3.Connection,
     *,
@@ -26,9 +32,11 @@ def commit_and_push_refine_state(
     repo = cwd or git_ops.client_repo_path()
     branch = git_ops.current_branch(cwd=repo)
     if not branch:
+        rebuild_ms = _rebuild_sqlite_cache(conn) if rebuild_cache else 0
         return {
             "ok": False,
             "stage": "precheck",
+            "rebuild_ms": rebuild_ms,
             "message": "Cannot sync Refine state while detached from a branch.",
         }
 
@@ -45,10 +53,12 @@ def commit_and_push_refine_state(
         )
         commit_output = (commit.stdout or commit.stderr or "").strip()
         if not commit.ok:
+            rebuild_ms = _rebuild_sqlite_cache(conn) if rebuild_cache else 0
             return {
                 "ok": False,
                 "stage": "commit",
                 "branch": branch,
+                "rebuild_ms": rebuild_ms,
                 "message": "Could not commit local Refine project state.",
                 "details": commit.stderr or commit.stdout,
                 "dirty_refine_count": len(dirty_refine),
@@ -58,13 +68,13 @@ def commit_and_push_refine_state(
 
     upstream = git_ops.upstream_branch(branch, cwd=repo)
     if upstream is None:
-        if rebuild_cache:
-            project_state.rebuild_sqlite_cache(conn)
+        rebuild_ms = _rebuild_sqlite_cache(conn) if rebuild_cache else 0
         return {
             "ok": True,
             "stage": "skipped",
             "branch": branch,
             "upstream": "",
+            "rebuild_ms": rebuild_ms,
             "committed_state": committed_state,
             "pushed_state": False,
             "pulled": False,
@@ -91,11 +101,13 @@ def commit_and_push_refine_state(
         prompt_context=prompt_context,
     )
     if not push.get("ok"):
+        rebuild_ms = _rebuild_sqlite_cache(conn) if rebuild_cache else 0
         return {
             "ok": False,
             "stage": push.get("stage") or "push",
             "branch": branch,
             "upstream": upstream,
+            "rebuild_ms": rebuild_ms,
             "committed_state": committed_state,
             "pushed_state": bool(push.get("pushed")),
             "pulled": True,
@@ -105,13 +117,13 @@ def commit_and_push_refine_state(
         }
 
     config.get(reload=True)
-    if rebuild_cache:
-        project_state.rebuild_sqlite_cache(conn)
+    rebuild_ms = _rebuild_sqlite_cache(conn) if rebuild_cache else 0
     return {
         "ok": True,
         "stage": "synced",
         "branch": branch,
         "upstream": upstream,
+        "rebuild_ms": rebuild_ms,
         "committed_state": committed_state,
         "pushed_state": bool(push.get("pushed")),
         "pulled": True,
@@ -259,9 +271,7 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
 
     upstream = git_ops.upstream_branch(branch)
     if upstream is None:
-        rebuild_start = perf_metrics.now()
-        project_state.rebuild_sqlite_cache(conn)
-        metric_details["rebuild_ms"] = round(perf_metrics.elapsed_ms(rebuild_start), 2)
+        metric_details["rebuild_ms"] = _rebuild_sqlite_cache(conn)
         msg = f"Branch `{branch}` has no upstream; rebuilt local cache without pulling."
         activity.append(
             conn, message=msg, severity="info", category="git", actor=actor,
@@ -290,20 +300,23 @@ def sync_latest(conn: sqlite3.Connection, *, actor: str = "refine") -> dict:
         ),
     )
     if not sync.get("ok"):
+        rebuild_ms = 0
+        if sync.get("stage") == "push":
+            rebuild_ms = _rebuild_sqlite_cache(conn)
+            metric_details["rebuild_ms"] = rebuild_ms
         return finish({
             "ok": False,
             "stage": sync.get("stage") or "sync",
             "branch": branch,
             "upstream": upstream,
+            "rebuild_ms": rebuild_ms,
             "committed_state": False,
             "message": "Could not sync latest target-app updates.",
             "details": sync.get("details") or sync.get("message"),
         })
 
     config.get(reload=True)
-    rebuild_start = perf_metrics.now()
-    project_state.rebuild_sqlite_cache(conn)
-    metric_details["rebuild_ms"] = round(perf_metrics.elapsed_ms(rebuild_start), 2)
+    metric_details["rebuild_ms"] = _rebuild_sqlite_cache(conn)
     msg = f"Synced `{branch}` from `{upstream}` and rebuilt the cache."
     activity.append(
         conn, message=msg, severity="info", category="git", actor=actor,
@@ -389,9 +402,7 @@ def pulse(conn: sqlite3.Connection, *, actor: str = "runner") -> dict:
 
     previous = _read_pulse_refs(conn)
     if not previous.get("branch"):
-        rebuild_start = perf_metrics.now()
-        project_state.rebuild_sqlite_cache(conn)
-        metric_details["rebuild_ms"] = round(perf_metrics.elapsed_ms(rebuild_start), 2)
+        metric_details["rebuild_ms"] = _rebuild_sqlite_cache(conn)
         _remember_pulse_refs(
             conn, branch=branch, head=head, upstream=remote_head,
         )
@@ -408,9 +419,7 @@ def pulse(conn: sqlite3.Connection, *, actor: str = "runner") -> dict:
         or previous.get("head") != head
         or previous.get("upstream") != remote_head
     ):
-        rebuild_start = perf_metrics.now()
-        project_state.rebuild_sqlite_cache(conn)
-        metric_details["rebuild_ms"] = round(perf_metrics.elapsed_ms(rebuild_start), 2)
+        metric_details["rebuild_ms"] = _rebuild_sqlite_cache(conn)
         _remember_pulse_refs(
             conn, branch=branch, head=head, upstream=remote_head,
         )

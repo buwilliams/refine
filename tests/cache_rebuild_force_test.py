@@ -204,6 +204,43 @@ def main() -> int:
             "ORDER BY id DESC LIMIT 1",
         ).fetchone()
         assert event is not None
+
+        conn.close()
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                Path(f"{cfg.sqlite_path}{suffix}").unlink()
+            except FileNotFoundError:
+                pass
+        conn = db.connect(cfg.sqlite_path)
+        conn.execute(
+            "CREATE TABLE gaps_index ("
+            "id TEXT PRIMARY KEY, "
+            "name TEXT NOT NULL, "
+            "status TEXT NOT NULL, "
+            "priority TEXT NOT NULL DEFAULT 'low', "
+            "reporter TEXT NOT NULL DEFAULT '', "
+            "round_count INTEGER NOT NULL DEFAULT 0, "
+            "created TEXT NOT NULL, "
+            "updated TEXT NOT NULL, "
+            "branch_name TEXT, "
+            "node_id TEXT NOT NULL DEFAULT 'default', "
+            "feature_id TEXT, "
+            "feature_order INTEGER, "
+            "json_path TEXT NOT NULL)"
+        )
+        conn.execute("CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        conn.execute(
+            "CREATE TABLE reporters ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "name TEXT NOT NULL UNIQUE, "
+            "created TEXT NOT NULL)"
+        )
+        assert db.schema_ready(conn) is False
+        project_state.rebuild_sqlite_cache(conn)
+        assert db.schema_ready(conn) is True
+        assert conn.execute(
+            "SELECT COUNT(*) AS n FROM gap_cache_meta"
+        ).fetchone()["n"] == len(gids)
     finally:
         conn.close()
         cleanup_tmp(tmp)
