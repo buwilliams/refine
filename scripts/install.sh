@@ -25,7 +25,9 @@ REFINE_INSTALL_RUNTIME_ROOT="${REFINE_INSTALL_RUNTIME_ROOT:-run}"
 REFINE_INSTALL_UPDATE_ONLY="${REFINE_INSTALL_UPDATE_ONLY:-0}"
 REFINE_INSTALL_PACKAGE_MANAGER="${REFINE_INSTALL_PACKAGE_MANAGER:-}"
 REFINE_INSTALL_HOMEBREW_URL="${REFINE_INSTALL_HOMEBREW_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
-REFINE_PROVIDER_OPTIONS="claude codex gemini copilot smoke-ai"
+REFINE_INSTALL_ALLOW_TEST_PROVIDERS="${REFINE_INSTALL_ALLOW_TEST_PROVIDERS:-0}"
+REFINE_PROVIDER_OPTIONS="claude codex gemini copilot"
+REFINE_TEST_PROVIDER_OPTIONS="smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
 
 if [ -t 1 ] && [ -z "${NO_COLOR:-}" ]; then
@@ -1104,6 +1106,13 @@ provider_in_list() {
   esac
 }
 
+provider_allowed_for_install() {
+  local provider="$1"
+  provider_in_list "$provider" "$REFINE_PROVIDER_OPTIONS" && return 0
+  [ "$REFINE_INSTALL_ALLOW_TEST_PROVIDERS" = "1" ] &&
+    provider_in_list "$provider" "$REFINE_TEST_PROVIDER_OPTIONS"
+}
+
 detect_installed_providers() {
   local installed=""
   local provider binary
@@ -1785,13 +1794,10 @@ provider_flow() {
   report_provider_detection "$installed_providers"
   if [ -n "$REFINE_INSTALL_PROVIDER" ]; then
     SELECTED_PROVIDER="$(printf '%s' "$REFINE_INSTALL_PROVIDER" | tr '[:upper:]' '[:lower:]')"
-    case "$SELECTED_PROVIDER" in
-      claude|codex|gemini|copilot|smoke-ai) ;;
-      *) die "REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot smoke-ai" ;;
-    esac
+    provider_allowed_for_install "$SELECTED_PROVIDER" || die "REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot"
     info "Using provider from REFINE_INSTALL_PROVIDER: $SELECTED_PROVIDER"
   else
-    SELECTED_PROVIDER="$(choice "Provider" "$(first_provider_or_default "$installed_providers")" claude codex gemini copilot smoke-ai)"
+    SELECTED_PROVIDER="$(choice "Provider" "$(first_provider_or_default "$installed_providers")" claude codex gemini copilot)"
   fi
   ensure_provider_cli "$SELECTED_PROVIDER" || true
   run cd "$REFINE_CHECKOUT" || return 0

@@ -77,6 +77,7 @@ fn install_dry_run_builds_and_installs_release_binary_before_start_commands() {
         .env("REFINE_INSTALL_ASSUME_DEFAULTS", "1")
         .env("REFINE_INSTALL_CHECKOUT_DEFAULT", &checkout)
         .env("REFINE_INSTALL_LOG", &log)
+        .env("REFINE_INSTALL_ALLOW_TEST_PROVIDERS", "1")
         .env("REFINE_INSTALL_PROVIDER", "smoke-ai")
         .env("REFINE_INSTALL_TARGET_APP", "")
         .env("REFINE_REPO_URL", "https://example.invalid/refine.git")
@@ -147,6 +148,44 @@ fn install_update_only_dry_run_builds_repairs_and_skips_start_commands() {
     assert!(log.contains(&format!("write deployed marker {repo}/.refine-deployed")));
     assert!(log.contains("./r system repair --port 19080 --runtime-root"));
     assert!(!log.contains("./r system start"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn install_rejects_smoke_ai_without_test_provider_gate() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    let temp_root = unique_temp_dir("install-reject-smoke-ai");
+    let checkout = temp_root.join("refine");
+    let log = temp_root.join("install.log");
+    fs::create_dir_all(&temp_root).unwrap();
+
+    let output = Command::new("bash")
+        .arg(format!("{repo}/scripts/install.sh"))
+        .arg("--yes")
+        .current_dir(&temp_root)
+        .env("REFINE_INSTALL_DRY_RUN", "1")
+        .env("REFINE_INSTALL_ASSUME_DEFAULTS", "1")
+        .env("REFINE_INSTALL_CHECKOUT_DEFAULT", &checkout)
+        .env("REFINE_INSTALL_LOG", &log)
+        .env("REFINE_INSTALL_PROVIDER", "smoke-ai")
+        .env("REFINE_REPO_URL", "https://example.invalid/refine.git")
+        .env("REFINE_INSTALL_DRY_RUN_RELEASE_TAG", "9.8.7")
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "installer unexpectedly accepted smoke-ai: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let combined = format!(
+        "{}\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+        fs::read_to_string(&log).unwrap_or_default()
+    );
+    assert!(combined.contains("REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

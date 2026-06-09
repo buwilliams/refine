@@ -8,40 +8,64 @@ Use this document when an agent is responsible for installing Refine. Follow the
 
 - Run on Linux, macOS, or Ubuntu/WSL. Windows users should open Ubuntu through WSL first.
 - Use a `bash` shell with network access.
-- Make sure `curl` is available to download the installer.
-- Make sure the user can approve dependency installation or choose to install missing dependencies manually. The installer checks and guides the rest.
+- Make sure the user can approve dependency installation or choose to install missing dependencies manually.
+- Install or repair required dependencies before cloning or updating Refine: `curl`, `git`, a C compiler/linker, and Rust Cargo.
 - If using a real provider, make sure the user can complete that provider's CLI authentication on this host.
 
 ## User Questions
 
 Ask only the questions needed for the install path. Useful questions:
 
-- Which agent provider should Refine use: `claude`, `codex`, `gemini`, `copilot`, or `smoke-ai`?
+- Which agent provider should Refine use: `claude`, `codex`, `gemini`, or `copilot`?
 - Should provider CLI installation and auth happen now, or should provider auth be completed later?
 - Where should Refine be installed? Default: `$HOME/refine`.
 - Which UI port should Refine use? Default: `8080`.
-- Should missing host dependencies be installed with Homebrew when the installer offers that path, or should the user install dependencies manually?
+- Is Refine already installed on this host? If yes, where is the checkout?
+- Which package manager should the agent use for missing dependencies: `apt`, `brew`, or manual user setup?
 - Should Playwright Chromium be installed or repaired for regression screenshots?
 - Does the target app need Docker or container support?
 
 ## Install Refine
 
-1. Run the installer:
+1. Check for required tools and install missing dependencies with the user's approved package manager. Do not use `scripts/install.sh`; the agent should make dependency and package-manager choices explicitly.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/buwilliams/refine/main/scripts/install.sh | bash
+curl --version
+git --version
+cc --version
+cargo --version
 ```
 
-2. Answer installer prompts using the user's choices. If the installer fails, preserve the install log path it printed, report the missing dependency or failing command, and stop.
-3. If the installer asks for a manual build, run it from the selected checkout:
+2. If Refine is already installed, update the checkout through the CLI and skip the fresh clone:
+
+```bash
+cd <refine-checkout>
+./r system update
+```
+
+3. For a fresh install, clone the latest published release tag:
+
+```bash
+latest="$(
+  git ls-remote --tags --refs https://github.com/buwilliams/refine.git \
+    | awk -F/ '/refs\/tags\/[0-9]+\.[0-9]+\.[0-9]+$/ { print $NF }' \
+    | sort -t. -k1,1n -k2,2n -k3,3n \
+    | tail -n 1
+)"
+git clone --branch "$latest" https://github.com/buwilliams/refine.git <refine-checkout>
+```
+
+4. Always compile the host-local release binary and mark the checkout as deployed. Do this after either `./r system update` or a fresh clone so `./r` uses `bin/refine` instead of running through Cargo:
 
 ```bash
 cd <refine-checkout>
 cargo build --release --locked
+mkdir -p bin
 install -m 755 target/release/refine bin/refine
+printf 'mode=deployed\nrelease_bin=bin/refine\n' > .refine-deployed
 ```
 
-4. Configure the selected provider:
+5. Configure the selected provider:
 
 ```bash
 cd <refine-checkout>
@@ -49,8 +73,8 @@ cd <refine-checkout>
 ./r agent detect
 ```
 
-5. If the selected provider CLI is missing, install or authenticate it only after the user approves. Treat Refine installation and provider readiness separately.
-6. Use the matching provider auth command when the user approves auth now:
+6. If the selected provider CLI is missing, install or authenticate it only after the user approves. Treat Refine installation and provider readiness separately.
+7. Use the matching provider auth command when the user approves auth now:
 
 ```bash
 claude
@@ -59,7 +83,7 @@ gemini auth login
 copilot login
 ```
 
-For Smoke AI, make the `smoke-ai` executable available on `PATH` before running provider checks.
+Do not offer `smoke-ai` during installation. It is reserved for deterministic tests.
 
 ## After Install
 
@@ -82,7 +106,7 @@ cd <refine-checkout>
 ```
 
 5. If creating a new app, run the user-approved starter command in the new app directory, make the initial git commit, then attach the app.
-6. Finish with the Refine checkout path, UI URL, selected provider, target app status, install log path, and summaries from `./r system status` and `./r system doctor`.
+6. Finish with the Refine checkout path, UI URL, selected provider, target app status, and summaries from `./r system status` and `./r system doctor`.
 
 ## CLI Management
 

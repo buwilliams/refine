@@ -18,6 +18,7 @@ git config --global --add safe.directory /origin/refine
 cd /tmp
 REFINE_REPO_URL=file:///origin/refine \
 REFINE_INSTALL_CHECKOUT_DEFAULT=/home/refine/refine \
+REFINE_INSTALL_ALLOW_TEST_PROVIDERS=1 \
 REFINE_INSTALL_PROVIDER=smoke-ai \
 REFINE_SMOKE_AI_PATH=/bin/true \
 REFINE_INSTALL_TARGET_APP= \
