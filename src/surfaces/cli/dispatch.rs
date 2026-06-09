@@ -232,14 +232,14 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             Ok(())
         }
         Commands::System {
-            action: SystemAction::Update { runtime_root },
+            action: SystemAction::Update { yes, runtime_root },
         } => {
             let runtime_root = absolute_cli_path(runtime_root)?;
             let checkout_path = discover_refine_checkout()?;
             let mut host = FileDeployedUpdateHost::new(runtime_root.clone());
             let summary = run_deployed_update(
                 &mut host,
-                DeployedUpdateOptions::new(checkout_path, runtime_root),
+                DeployedUpdateOptions::new(checkout_path, runtime_root).with_assume_yes(yes),
             );
             print_json(&serde_json::to_value(&summary).unwrap());
             if !summary.ok {

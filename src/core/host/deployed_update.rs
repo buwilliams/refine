@@ -73,6 +73,7 @@ pub trait DeployedUpdateHost {
 pub struct DeployedUpdateOptions {
     pub checkout_path: PathBuf,
     pub runtime_root: PathBuf,
+    pub assume_yes: bool,
 }
 
 impl DeployedUpdateOptions {
@@ -80,7 +81,13 @@ impl DeployedUpdateOptions {
         Self {
             checkout_path: checkout_path.into(),
             runtime_root: runtime_root.into(),
+            assume_yes: false,
         }
+    }
+
+    pub fn with_assume_yes(mut self, assume_yes: bool) -> Self {
+        self.assume_yes = assume_yes;
+        self
     }
 }
 
@@ -90,6 +97,7 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
 ) -> DeployedUpdateSummary {
     let checkout_path = options.checkout_path;
     let runtime_root = options.runtime_root;
+    let assume_yes = options.assume_yes;
     let binary_path = checkout_path.join("bin/refine");
     let mut summary = DeployedUpdateSummary {
         ok: false,
@@ -100,6 +108,7 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
         manual_recovery_command: Some(manual_update_recovery_command(
             &checkout_path,
             &runtime_root,
+            assume_yes,
         )),
         rollback_possible: false,
         ..Default::default()
@@ -138,7 +147,7 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
         }
     }
 
-    let invocation = installer_invocation(&checkout_path, &runtime_root);
+    let invocation = installer_invocation(&checkout_path, &runtime_root, assume_yes);
     let installer = match host.run_installer(&invocation) {
         Ok(outcome) => outcome,
         Err(error) => {
@@ -192,27 +201,38 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
     summary
 }
 
-pub fn installer_invocation(checkout_path: &Path, runtime_root: &Path) -> InstallerInvocation {
+pub fn installer_invocation(
+    checkout_path: &Path,
+    runtime_root: &Path,
+    assume_yes: bool,
+) -> InstallerInvocation {
+    let mut args = vec!["--upgrade".to_string()];
+    if assume_yes {
+        args.insert(0, "--yes".to_string());
+    }
+    let mut env = vec![
+        ("REFINE_INSTALL_UPGRADE".to_string(), "1".to_string()),
+        ("REFINE_INSTALL_UPDATE_ONLY".to_string(), "1".to_string()),
+        (
+            "REFINE_INSTALL_CHECKOUT_DEFAULT".to_string(),
+            checkout_path.display().to_string(),
+        ),
+        (
+            "REFINE_INSTALL_RUNTIME_ROOT".to_string(),
+            runtime_root.display().to_string(),
+        ),
+    ];
+    if assume_yes {
+        env.push((
+            "REFINE_INSTALL_ASSUME_DEFAULTS".to_string(),
+            "1".to_string(),
+        ));
+    }
     InstallerInvocation {
         program: checkout_path.join("scripts/install.sh"),
-        args: vec!["--yes".to_string(), "--upgrade".to_string()],
+        args,
         cwd: checkout_path.to_path_buf(),
-        env: vec![
-            (
-                "REFINE_INSTALL_ASSUME_DEFAULTS".to_string(),
-                "1".to_string(),
-            ),
-            ("REFINE_INSTALL_UPGRADE".to_string(), "1".to_string()),
-            ("REFINE_INSTALL_UPDATE_ONLY".to_string(), "1".to_string()),
-            (
-                "REFINE_INSTALL_CHECKOUT_DEFAULT".to_string(),
-                checkout_path.display().to_string(),
-            ),
-            (
-                "REFINE_INSTALL_RUNTIME_ROOT".to_string(),
-                runtime_root.display().to_string(),
-            ),
-        ],
+        env,
     }
 }
 
@@ -225,12 +245,18 @@ impl InstallerInvocation {
     }
 }
 
-fn manual_update_recovery_command(checkout_path: &Path, runtime_root: &Path) -> String {
+fn manual_update_recovery_command(
+    checkout_path: &Path,
+    runtime_root: &Path,
+    assume_yes: bool,
+) -> String {
+    let yes_flag = if assume_yes { " --yes" } else { "" };
     format!(
-        "cd {} && REFINE_INSTALL_UPDATE_ONLY=1 REFINE_INSTALL_RUNTIME_ROOT={} REFINE_INSTALL_CHECKOUT_DEFAULT={} scripts/install.sh --yes --upgrade",
+        "cd {} && REFINE_INSTALL_UPDATE_ONLY=1 REFINE_INSTALL_RUNTIME_ROOT={} REFINE_INSTALL_CHECKOUT_DEFAULT={} scripts/install.sh{} --upgrade",
         shell_quote(&checkout_path.display().to_string()),
         shell_quote(&runtime_root.display().to_string()),
-        shell_quote(&checkout_path.display().to_string())
+        shell_quote(&checkout_path.display().to_string()),
+        yes_flag
     )
 }
 
@@ -539,7 +565,7 @@ mod tests {
         };
         let summary = run_deployed_update(
             &mut host,
-            DeployedUpdateOptions::new("/tmp/refine", "/tmp/refine/run"),
+            DeployedUpdateOptions::new("/tmp/refine", "/tmp/refine/run").with_assume_yes(true),
         );
 
         assert!(summary.ok);
@@ -559,6 +585,10 @@ mod tests {
         assert_eq!(summary.target_version.as_deref(), Some("9.8.7"));
         assert_eq!(host.invocations.len(), 1);
         assert_eq!(host.invocations[0].args, vec!["--yes", "--upgrade"]);
+        assert!(host.invocations[0].env.contains(&(
+            "REFINE_INSTALL_ASSUME_DEFAULTS".to_string(),
+            "1".to_string()
+        )));
         assert_eq!(
             summary.installer.as_ref().unwrap().command,
             vec!["/tmp/refine/scripts/install.sh", "--yes", "--upgrade"]
@@ -567,6 +597,33 @@ mod tests {
             host.invocations[0]
                 .env
                 .contains(&("REFINE_INSTALL_UPDATE_ONLY".to_string(), "1".to_string()))
+        );
+    }
+
+    #[test]
+    fn deployed_update_leaves_installer_interactive_without_assume_yes() {
+        let mut host = FakeUpdateHost {
+            running_ports: Vec::new(),
+            verify_stopped: true,
+            installer_succeeded: true,
+            installer_status: Some(0),
+            ..Default::default()
+        };
+        let summary = run_deployed_update(
+            &mut host,
+            DeployedUpdateOptions::new("/tmp/refine", "/tmp/refine/run"),
+        );
+
+        assert!(summary.ok);
+        assert_eq!(host.invocations.len(), 1);
+        assert_eq!(host.invocations[0].args, vec!["--upgrade"]);
+        assert!(!host.invocations[0].env.contains(&(
+            "REFINE_INSTALL_ASSUME_DEFAULTS".to_string(),
+            "1".to_string()
+        )));
+        assert_eq!(
+            summary.installer.as_ref().unwrap().command,
+            vec!["/tmp/refine/scripts/install.sh", "--upgrade"]
         );
     }
 
@@ -613,7 +670,7 @@ mod tests {
                 .manual_recovery_command
                 .as_deref()
                 .unwrap()
-                .contains("scripts/install.sh --yes --upgrade")
+                .contains("scripts/install.sh --upgrade")
         );
     }
 

@@ -12,18 +12,15 @@ Use this document when an agent is responsible for installing Refine. Follow the
 - Install or repair required dependencies before cloning or updating Refine: `curl`, `git`, a C compiler/linker, and Rust Cargo.
 - If using a real provider, make sure the user can complete that provider's CLI authentication on this host.
 
-## User Questions
+## Ask If You Cannot Infer
 
-Ask only the questions needed for the install path. Useful questions:
+Ask only when the answer is not clear from the user's environment, prior conversation, or existing files. Keep defaults unless the user has given a reason to choose otherwise.
 
 - Which agent provider should Refine use: `claude`, `codex`, `gemini`, or `copilot`?
-- Should provider CLI installation and auth happen now, or should provider auth be completed later?
 - Where should Refine be installed? Default: `$HOME/refine`.
 - Which UI port should Refine use? Default: `8080`.
-- Is Refine already installed on this host? If yes, where is the checkout?
 - Which package manager should the agent use for missing dependencies: `apt`, `brew`, or manual user setup?
-- Should Playwright Chromium be installed or repaired for regression screenshots?
-- Does the target app need Docker or container support?
+- Should missing provider CLI installation or provider authentication happen now, or should the user complete it later?
 
 ## Install Refine
 
@@ -40,10 +37,10 @@ cargo --version
 
 ```bash
 cd <refine-checkout>
-./r system update
+./r system update --yes
 ```
 
-3. For a fresh install, clone the latest published release tag:
+3. For a fresh install, copy the latest published release files without a `.git` directory:
 
 ```bash
 latest="$(
@@ -52,7 +49,11 @@ latest="$(
     | sort -t. -k1,1n -k2,2n -k3,3n \
     | tail -n 1
 )"
-git clone --branch "$latest" https://github.com/buwilliams/refine.git <refine-checkout>
+tmp="$(mktemp -d)"
+git clone --depth 1 --branch "$latest" https://github.com/buwilliams/refine.git "$tmp/refine"
+mkdir -p <refine-checkout>
+tar -C "$tmp/refine" --exclude .git -cf - . | tar -C <refine-checkout> -xf -
+rm -rf "$tmp"
 ```
 
 4. Always compile the host-local release binary and mark the checkout as deployed. Do this after either `./r system update` or a fresh clone so `./r` uses `bin/refine` instead of running through Cargo:
@@ -97,16 +98,17 @@ cd <refine-checkout>
 ```
 
 2. Open the UI at `http://localhost:<port>`. The default is `http://localhost:8080`.
-3. Ask the user what app Refine should target: an existing local repo, a git remote to clone, a new app to create, or no target app yet.
-4. Attach or create the target app with the matching command:
+3. Attach or create the target app if the target is already clear:
 
 ```bash
 ./r project attach /path/to/app
 ./r project clone <remote-url> /path/to/app --make-current
 ```
 
-5. If creating a new app, run the user-approved starter command in the new app directory, make the initial git commit, then attach the app.
-6. Finish with the Refine checkout path, UI URL, selected provider, target app status, and summaries from `./r system status` and `./r system doctor`.
+4. If creating a new app, run the user-approved starter command in the new app directory, make the initial git commit, then attach the app.
+5. Finish with the Refine checkout path, UI URL, selected provider, target app status, and summaries from `./r system status` and `./r system doctor`.
+6. If no target app is clear, leave Refine running without one and report that the target app still needs to be selected.
+7. Ask only the app guidance needed to continue: should Refine update an existing local app, clone an existing remote app, create a new app, or wait with no target app yet?
 
 ## CLI Management
 
@@ -131,7 +133,7 @@ Runtime lifecycle commands:
 ./r system stop --port <port>
 ./r system restart --port <port>
 ./r system repair --port <port>
-./r system update
+./r system update --yes
 ```
 
 Target app commands:

@@ -1,6 +1,8 @@
 use std::fs;
 #[cfg(unix)]
 use std::os::unix::fs as unix_fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -153,6 +155,45 @@ fn install_update_only_dry_run_builds_repairs_and_skips_start_commands() {
 }
 
 #[test]
+#[cfg(unix)]
+fn install_update_only_dry_run_refreshes_unpacked_checkout() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    let temp_root = unique_temp_dir("install-unpacked-update-dry-run");
+    let checkout = temp_root.join("refine");
+    let log = temp_root.join("install.log");
+    create_minimal_refine_checkout(&checkout);
+
+    let output = Command::new("bash")
+        .arg(format!("{repo}/scripts/install.sh"))
+        .arg("--yes")
+        .arg("--upgrade")
+        .current_dir(&temp_root)
+        .env("REFINE_INSTALL_DRY_RUN", "1")
+        .env("REFINE_INSTALL_ASSUME_DEFAULTS", "1")
+        .env("REFINE_INSTALL_UPDATE_ONLY", "1")
+        .env("REFINE_INSTALL_CHECKOUT_DEFAULT", &checkout)
+        .env("REFINE_INSTALL_LOG", &log)
+        .env("REFINE_REPO_URL", "https://example.invalid/refine.git")
+        .env("REFINE_INSTALL_DRY_RUN_RELEASE_TAG", "9.8.7")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "installer failed: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let log = fs::read_to_string(&log).unwrap();
+    assert!(log.contains("Refine unpacked checkout exists"));
+    assert!(log.contains("remove release-owned files"));
+    assert!(log.contains("copy release files from /tmp/refine-release"));
+    assert!(!log.contains("exists but is not a git checkout"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn install_rejects_smoke_ai_without_test_provider_gate() {
     let repo = env!("CARGO_MANIFEST_DIR");
     let temp_root = unique_temp_dir("install-reject-smoke-ai");
@@ -185,7 +226,9 @@ fn install_rejects_smoke_ai_without_test_provider_gate() {
         String::from_utf8_lossy(&output.stderr),
         fs::read_to_string(&log).unwrap_or_default()
     );
-    assert!(combined.contains("REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot"));
+    assert!(
+        combined.contains("REFINE_INSTALL_PROVIDER must be one of: claude codex gemini copilot")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -231,7 +274,9 @@ fn installer_reports_missing_core_dependencies_and_exits_without_homebrew() {
     assert!(combined.contains("C compiler/linker"));
     assert!(combined.contains("Rust Cargo"));
     assert!(combined.contains("Install Homebrew to manage these dependencies"));
-    assert!(combined.contains("Install the missing dependencies manually, then re-run install.sh."));
+    assert!(
+        combined.contains("Install the missing dependencies manually, then re-run install.sh.")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -299,4 +344,21 @@ fn command_path(root: &Path, commands: &[&str]) -> PathBuf {
         });
     }
     bin
+}
+
+#[cfg(unix)]
+fn create_minimal_refine_checkout(path: &Path) {
+    fs::create_dir_all(path.join("src")).unwrap();
+    fs::create_dir_all(path.join("scripts")).unwrap();
+    fs::write(
+        path.join("Cargo.toml"),
+        "[package]\nname = \"refine\"\nversion = \"0.0.0\"\n",
+    )
+    .unwrap();
+    fs::write(path.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs::write(path.join("scripts/install.sh"), "#!/bin/sh\n").unwrap();
+    fs::write(path.join("r"), "#!/bin/sh\n").unwrap();
+    let mut permissions = fs::metadata(path.join("r")).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path.join("r"), permissions).unwrap();
 }

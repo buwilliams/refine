@@ -1390,6 +1390,72 @@ upgrade_refine_checkout() {
   ok "Refine upgraded to release $latest"
 }
 
+refresh_unpacked_refine_checkout() {
+  local checkout="$1"
+  local latest tmp source
+  latest="$(latest_remote_semver_release_tag)"
+  [ -n "$latest" ] || die_issue \
+    "Refine release lookup" \
+    "The updater needs a published Refine release to refresh an unpacked checkout." \
+    "Check network or GitHub release access, then re-run install.sh." \
+    "No published semver releases found for $REFINE_REPO_URL"
+  if dry_run; then
+    log_detail "${DIM}+ git clone --depth 1 --branch '$latest' '$REFINE_REPO_URL' /tmp/refine-release${RESET}"
+    log_detail "${DIM}+ remove release-owned files from '$checkout' while preserving run, target, bin, .refine-deployed, and .refine-binding${RESET}"
+    log_detail "${DIM}+ copy release files from /tmp/refine-release to '$checkout' without .git${RESET}"
+    REFINE_UPGRADED="1"
+    REFINE_UPGRADED_TO="$latest"
+    ok "Refine unpacked checkout would refresh to release $latest"
+    return 0
+  fi
+  tmp="$(mktemp -d)" || die_issue \
+    "Refine release workspace" \
+    "The updater needs a temporary directory to clone the latest release before copying files." \
+    "Check temporary-directory permissions, then re-run install.sh." \
+    "Could not create a temporary release workspace."
+  source="$tmp/refine"
+  git clone --depth 1 --branch "$latest" "$REFINE_REPO_URL" "$source" || {
+    rm -rf "$tmp"
+    die_issue \
+      "Refine release clone" \
+      "The updater needs the latest Refine release files before refreshing the unpacked checkout." \
+      "Check git/network access to $REFINE_REPO_URL, then re-run install.sh." \
+      "Could not clone Refine release $latest from $REFINE_REPO_URL"
+  }
+  find "$checkout" -mindepth 1 -maxdepth 1 \
+    ! -name target \
+    ! -name run \
+    ! -name bin \
+    ! -name .refine-deployed \
+    ! -name .refine-binding \
+    -exec rm -rf -- {} + || {
+    rm -rf "$tmp"
+    die_issue \
+      "Refine unpacked checkout cleanup" \
+      "The updater needs to remove old release-owned files before copying the latest release." \
+      "Check permissions for $checkout, then re-run install.sh." \
+      "Could not clean old release files from unpacked Refine checkout at $checkout"
+  }
+  (
+    cd "$source" &&
+      tar --exclude .git --exclude target --exclude run --exclude bin --exclude .refine-deployed --exclude .refine-binding -cf - .
+  ) | (
+    cd "$checkout" &&
+      tar -xf -
+  ) || {
+    rm -rf "$tmp"
+    die_issue \
+      "Refine unpacked checkout refresh" \
+      "The updater needs to copy release files into the existing unpacked Refine checkout." \
+      "Check permissions for $checkout, then re-run install.sh." \
+      "Could not refresh unpacked Refine checkout at $checkout"
+  }
+  rm -rf "$tmp"
+  REFINE_UPGRADED="1"
+  REFINE_UPGRADED_TO="$latest"
+  ok "Refreshed unpacked Refine checkout to release $latest"
+}
+
 clone_or_update_refine() {
   local checkout="$1"
   REFINE_CHECKOUT="$checkout"
@@ -1403,6 +1469,11 @@ clone_or_update_refine() {
     fi
     ok "Refine checkout exists: $checkout"
     upgrade_refine_checkout "$checkout" "$REFINE_INSTALL_UPGRADE"
+    return 0
+  fi
+  if is_any_refine_checkout "$checkout"; then
+    ok "Refine unpacked checkout exists: $checkout"
+    refresh_unpacked_refine_checkout "$checkout"
     return 0
   fi
   if [ -e "$checkout" ]; then
