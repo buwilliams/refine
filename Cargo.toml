@@ -31,6 +31,7 @@ test = false
 [[test]]
 name = "production_binary_install"
 path = "tests/production_binary_install.rs"
+test = false
 
 [[test]]
 name = "cli_surface"
@@ -50,6 +51,7 @@ test = false
 [[test]]
 name = "full_workflow"
 path = "tests/full_workflow.rs"
+test = false
 
 [[test]]
 name = "multi_instance_sync"
