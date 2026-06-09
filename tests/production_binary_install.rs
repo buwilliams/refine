@@ -84,7 +84,7 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
     let full = Command::new("bash")
         .arg("r")
         .arg("test")
-        .arg("--full")
+        .arg("full")
         .current_dir(repo)
         .env("REFINE_R_DRY_RUN", "1")
         .env("REFINE_RUN_MODE", "binary")
@@ -100,7 +100,7 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
     let cli = Command::new("bash")
         .arg("r")
         .arg("test")
-        .arg("--cli")
+        .arg("cli")
         .current_dir(repo)
         .env("REFINE_R_DRY_RUN", "1")
         .output()
@@ -121,8 +121,22 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
         .unwrap();
     assert!(help.status.success());
     let help_stderr = String::from_utf8_lossy(&help.stderr);
-    assert!(help_stderr.contains("--full          Run all test suites and repository checks."));
-    assert!(!help_stderr.contains("--full          Run the full release gate."));
+    assert!(
+        help_stderr.contains("full                 Run all test suites and repository checks.")
+    );
+    assert!(!help_stderr.contains("--full"));
+
+    let dashed_suite = Command::new("bash")
+        .arg("r")
+        .arg("test")
+        .arg("--surface")
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .output()
+        .unwrap();
+    assert!(!dashed_suite.status.success());
+    let dashed_suite_stderr = String::from_utf8_lossy(&dashed_suite.stderr);
+    assert!(dashed_suite_stderr.contains("suite names do not use -- prefixes: --surface"));
 
     let unknown = Command::new("bash")
         .arg("r")
@@ -134,7 +148,7 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
         .unwrap();
     assert!(!unknown.status.success());
     let unknown_stderr = String::from_utf8_lossy(&unknown.stderr);
-    assert!(unknown_stderr.contains("unknown test suite option: --unknown"));
+    assert!(unknown_stderr.contains("suite names do not use -- prefixes: --unknown"));
     assert!(unknown_stderr.contains("Usage: ./r test [SUITE]"));
 }
 

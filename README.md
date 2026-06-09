@@ -46,29 +46,26 @@ After Ubuntu opens, use the Install yourself one-liner above.
 
 ## Tests
 
-Use `./r test` as the authoritative test entrypoint. The default command runs only the in-crate Rust unit tests; integration suites are opt-in:
+Use `./r test` as the authoritative test entrypoint. The default command runs only the in-crate Rust unit tests; integration suites are opt-in.
 
 ```bash
-./r test
-./r test --integration
-./r test --full
+./r test [suite]
 ```
 
-The release gate is `./r test`, the unit-only default. Use `./r test --full` when you explicitly want all suites and repository checks: unit tests, Rust doc tests, xtask checks, Rust integration tests, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, full workflow, multi-instance sync, Playwright UI tests, and `git diff --check`.
+Suites:
 
-Focused suites:
-
-```bash
-./r test --rust
-./r test --smoke-ai
-./r test --cli
-./r test --ui
-./r test --surface
-./r test --cluster-ssh
-./r test --install-uninstall
-./r test --full-workflow
-./r test --multi-instance-sync
-```
+- `unit` - in-crate Rust unit tests. This is the default when no suite is provided.
+- `integration` - opt-in integration, daemon, Docker, cluster, and UI suites.
+- `full` - all test suites and repository checks.
+- `rust` - Rust unit, integration, and doc tests.
+- `smoke-ai` - Smoke AI fixture contract.
+- `cli` - daemon-backed CLI surface tests.
+- `ui` - Playwright UI tests.
+- `surface` - smoke AI, CLI, multi-instance sync, and UI suites.
+- `cluster-ssh` - Docker/SSH-backed cluster CLI tests.
+- `install-uninstall` - Docker-backed install/uninstall tests.
+- `full-workflow` - daemon-backed full workflow test.
+- `multi-instance-sync` - multi-instance sync tests.
 
 ## License
 

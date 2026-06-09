@@ -33,25 +33,35 @@ print_test_usage() {
 Usage: ./r test [SUITE]
 
 Suites:
-  --unit          Run in-crate Rust unit tests only. This is the default.
-  --integration   Run opt-in integration, daemon, Docker, cluster, and UI suites.
-  --full          Run all test suites and repository checks.
+  unit                 Run in-crate Rust unit tests only. This is the default.
+  integration          Run opt-in integration, daemon, Docker, cluster, and UI suites.
+  full                 Run all test suites and repository checks.
 
 Focused xtask suites:
-  --rust
-  --surface
-  --smoke-ai
-  --cli
-  --ui
-  --cluster-ssh
-  --install-uninstall
-  --full-workflow
-  --multi-instance-sync
+  rust
+  surface
+  smoke-ai
+  cli
+  ui
+  cluster-ssh
+  install-uninstall
+  full-workflow
+  multi-instance-sync
 EOF
 }
 
+normalize_test_suite() {
+  local suite="${1:-unit}"
+  case "$suite" in
+    --help|-h) printf '%s\n' "$suite" ;;
+    --*) printf '%s\n' "__invalid_dashed_suite__:$suite" ;;
+    *) printf '%s\n' "$suite" ;;
+  esac
+}
+
 run_test_command() {
-  local suite="${1:---unit}"
+  local suite
+  suite="$(normalize_test_suite "${1:-unit}")"
   shift || true
   if [ "$#" -ne 0 ]; then
     printf 'refine: ./r test accepts one suite option, got extra argument: %s\n' "$1" >&2
@@ -60,45 +70,50 @@ run_test_command() {
   fi
 
   case "$suite" in
-    ""|--unit|unit)
+    ""|unit)
       exec cargo test --manifest-path "$ROOT/Cargo.toml"
       ;;
-    --integration|integration)
+    integration)
       exec cargo test --manifest-path "$ROOT/Cargo.toml" -- --integration
       ;;
-    --full|full)
+    full)
       exec cargo test --manifest-path "$ROOT/Cargo.toml" -- --full
       ;;
-    --rust|rust)
+    rust)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-rust
       ;;
-    --surface|surface)
+    surface)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-surface
       ;;
-    --smoke-ai|smoke-ai)
+    smoke-ai)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-smoke-ai
       ;;
-    --cli|cli)
+    cli)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cli
       ;;
-    --ui|ui)
+    ui)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-ui
       ;;
-    --cluster-ssh|cluster-ssh)
+    cluster-ssh)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-cluster-ssh
       ;;
-    --install-uninstall|install-uninstall)
+    install-uninstall)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-install-uninstall
       ;;
-    --full-workflow|full-workflow)
+    full-workflow)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-full-workflow
       ;;
-    --multi-instance-sync|multi-instance-sync)
+    multi-instance-sync)
       exec cargo run --manifest-path "$ROOT/xtask/Cargo.toml" -- test-multi-instance-sync
       ;;
-    --help|-h|help)
+    help|--help|-h)
       print_test_usage
       exit 0
+      ;;
+    __invalid_dashed_suite__:*)
+      printf 'refine: suite names do not use -- prefixes: %s\n' "${suite#__invalid_dashed_suite__:}" >&2
+      print_test_usage
+      exit 2
       ;;
     *)
       printf 'refine: unknown test suite option: %s\n' "$suite" >&2
@@ -109,7 +124,8 @@ run_test_command() {
 }
 
 print_test_dry_run() {
-  local suite="${1:---unit}"
+  local suite
+  suite="$(normalize_test_suite "${1:-unit}")"
   shift || true
   if [ "$#" -ne 0 ]; then
     printf 'refine: ./r test accepts one suite option, got extra argument: %s\n' "$1" >&2
@@ -118,69 +134,74 @@ print_test_dry_run() {
   fi
 
   case "$suite" in
-    ""|--unit|unit)
+    ""|unit)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo test --manifest-path %s/Cargo.toml\n' "$ROOT"
       ;;
-    --integration|integration)
+    integration)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo test --manifest-path %s/Cargo.toml -- --integration\n' "$ROOT"
       ;;
-    --full|full)
+    full)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo test --manifest-path %s/Cargo.toml -- --full\n' "$ROOT"
       ;;
-    --rust|rust)
+    rust)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-rust\n' "$ROOT"
       ;;
-    --surface|surface)
+    surface)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-surface\n' "$ROOT"
       ;;
-    --smoke-ai|smoke-ai)
+    smoke-ai)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-smoke-ai\n' "$ROOT"
       ;;
-    --cli|cli)
+    cli)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-cli\n' "$ROOT"
       ;;
-    --ui|ui)
+    ui)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-ui\n' "$ROOT"
       ;;
-    --cluster-ssh|cluster-ssh)
+    cluster-ssh)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-cluster-ssh\n' "$ROOT"
       ;;
-    --install-uninstall|install-uninstall)
+    install-uninstall)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-install-uninstall\n' "$ROOT"
       ;;
-    --full-workflow|full-workflow)
+    full-workflow)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-full-workflow\n' "$ROOT"
       ;;
-    --multi-instance-sync|multi-instance-sync)
+    multi-instance-sync)
       printf 'mode=test\n'
       printf 'executable=cargo\n'
       printf 'command=cargo run --manifest-path %s/xtask/Cargo.toml -- test-multi-instance-sync\n' "$ROOT"
       ;;
-    --help|-h|help)
+    help|--help|-h)
       print_test_usage
       exit 0
+      ;;
+    __invalid_dashed_suite__:*)
+      printf 'refine: suite names do not use -- prefixes: %s\n' "${suite#__invalid_dashed_suite__:}" >&2
+      print_test_usage
+      exit 2
       ;;
     *)
       printf 'refine: unknown test suite option: %s\n' "$suite" >&2
