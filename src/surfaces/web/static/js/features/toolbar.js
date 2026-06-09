@@ -32,9 +32,6 @@ let filesSearchAbortController = null;
 const chatState = {
   tabs: {},                // tabId → { gapId, label, sessionId, output, closedReason }
   activeTabId: "standalone",
-  pollTimer: null,
-  pollTimerTabId: null,
-  pollTimerSessionId: null,
   open: false,             // dock expanded?
   bodyHeight: null,        // user-resized body height in px; null → 20vh default
   fullscreen: false,       // when true, panel fills viewport below the topbar
@@ -238,12 +235,6 @@ function initToolbar() {
 function initChatDock() { initToolbar(); }
 
 function resetChatForProjectSwitch() {
-  if (chatState.pollTimer) {
-    clearInterval(chatState.pollTimer);
-    chatState.pollTimer = null;
-    chatState.pollTimerTabId = null;
-    chatState.pollTimerSessionId = null;
-  }
   chatState.tabs = {};
   chatState.activeTabId = "standalone";
   chatState.open = false;
@@ -649,7 +640,6 @@ function drawToolbar() {
   }
 
   wireToolbarResize(root);
-  restartPollForActiveTab();
   if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
     loadFilesDirectory("", { expand: true, redraw: true });
   }
@@ -1883,30 +1873,57 @@ function syncGapRoundExtractButton(tab) {
   btn.disabled = !gapChatCanExtractRound(tab);
 }
 
-function restartPollForActiveTab() {
-  const activeTabId = chatState.activeTabId;
-  const t = chatState.tabs[activeTabId];
-  if (t && t.mode !== "files" && t.mode !== "system" && t.sessionId) {
-    if (
-      chatState.pollTimer &&
-      chatState.pollTimerTabId === activeTabId &&
-      chatState.pollTimerSessionId === t.sessionId
-    ) {
-      return;
+function handleChatSseEvent(payload) {
+  const sessionId = String(payload?.session_id || "");
+  if (!sessionId) return;
+  const tab = Object.values(chatState.tabs)
+    .find((candidate) => candidate?.sessionId === sessionId);
+  if (!tab) return;
+  const event = payload?.event && typeof payload.event === "object" ? payload.event : {};
+  const eventId = String(event.id || "");
+  if (eventId) {
+    tab.seenSseEventIds = Array.isArray(tab.seenSseEventIds) ? tab.seenSseEventIds : [];
+    if (tab.seenSseEventIds.includes(eventId)) return;
+    tab.seenSseEventIds.push(eventId);
+    tab.seenSseEventIds = tab.seenSseEventIds.slice(-200);
+  }
+
+  const wasPending = !!tab.pending;
+  tab.pending = !!payload.in_flight;
+  if (payload.closed === true) {
+    tab.closedReason = event.text || "session ended";
+    tab.sessionId = null;
+    tab.pending = false;
+  }
+
+  let changed = false;
+  if (event.progress === true) {
+    changed = appendChatProgressLines(tab, [event.text]) || changed;
+  } else {
+    const line = chatLineFromSseEvent(event);
+    if (line) {
+      if (event.role === "assistant") tab.agentResponded = true;
+      if (event.role === "user") {
+        tab.sentUserInput = true;
+        tab.queuedMessages = [];
+        tab.localQueuedMessages = [];
+      }
+      changed = appendChatOutputLines(tab, [line]) || changed;
     }
   }
-  if (chatState.pollTimer) {
-    clearInterval(chatState.pollTimer);
-    chatState.pollTimer = null;
-    chatState.pollTimerTabId = null;
-    chatState.pollTimerSessionId = null;
+
+  if (changed) markChatActivityPulse(tab);
+  saveChatStateToStorage();
+  if (wasPending !== tab.pending) refreshProcessesTabForChatChange();
+  if (chatState.tabs[chatState.activeTabId] === tab) {
+    if (payload.closed === true || event.role === "user") {
+      drawToolbar();
+    } else {
+      renderActiveChatTranscript(tab);
+      applyPendingIndicator(tab);
+      syncChatActionButtons(tab);
+    }
   }
-  if (!t || t.mode === "files" || t.mode === "system" || !t.sessionId) return;
-  chatState.pollTimerTabId = activeTabId;
-  chatState.pollTimerSessionId = t.sessionId;
-  chatState.pollTimer = setInterval(pollChat, 800);
-  // Fire an immediate poll so the user doesn't wait 800ms for the first read.
-  pollChat();
 }
 
 function switchChatTab(tabId) {
@@ -2389,97 +2406,6 @@ async function refreshGapChatStatus(gapId, { redraw = true } = {}) {
   }
 }
 
-async function pollChat() {
-  const t = chatState.tabs[chatState.activeTabId];
-  if (!t || !t.sessionId) return;
-  if (t.polling) {
-    t.pollAgain = true;
-    return;
-  }
-  t.polling = true;
-  const sid = t.sessionId;
-  try {
-    const r = await api("GET", `/api/chat/${sid}/read`);
-    if (!chatState.tabs[chatState.activeTabId]
-        || chatState.tabs[chatState.activeTabId] !== t
-        || t.sessionId !== sid) {
-      return;
-    }
-    if (r.lines && r.lines.length) {
-      markChatActivityPulse(t);
-      if (chatLinesIncludeAgentResponse(r.lines)) {
-        t.agentResponded = true;
-      }
-      const outputChanged = appendChatOutputLines(t, r.lines);
-      // Only update the DOM if this tab is still active.
-      if (outputChanged &&
-          chatState.activeTabId in chatState.tabs &&
-          chatState.tabs[chatState.activeTabId].sessionId === sid) {
-        const out = $("#chat-output");
-        if (out) {
-          const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 50;
-          // Re-render the full transcript as markdown — incremental
-          // append won't work since block elements (code fences, lists)
-          // can span multiple chunks.
-          out.innerHTML = mdToHtml(t.output || "");
-          if (atBottom) out.scrollTop = out.scrollHeight;
-        }
-      }
-      saveChatStateToStorage();
-    }
-    if (r.progress_lines && r.progress_lines.length) {
-      markChatActivityPulse(t);
-      t.progress = (t.progress || "") + r.progress_lines.join("\n") + "\n";
-      if (chatState.activeTabId in chatState.tabs &&
-          chatState.tabs[chatState.activeTabId].sessionId === sid) {
-        const progress = $("#chat-progress");
-        if (progress) {
-          const atBottom = progress.scrollHeight - progress.scrollTop - progress.clientHeight < 50;
-          progress.innerHTML = renderChatProgress(t.progress || "");
-          if (atBottom) progress.scrollTop = progress.scrollHeight;
-        }
-      }
-      saveChatStateToStorage();
-    }
-    // Pending state is authoritative from the runner: `in_flight` is true
-    // while an agent CLI subprocess is running for this session.
-    const wasPending = !!t.pending;
-    const queuedBefore = JSON.stringify(normalizeQueuedMessages(t.queuedMessages));
-    t.pending = !!r.in_flight;
-    t.queuedMessages = normalizeQueuedMessages(r.queued_messages);
-    const queuedChanged = queuedBefore !== JSON.stringify(t.queuedMessages);
-    applyPendingIndicator(t);
-    syncChatActionButtons(t);
-    if (wasPending !== t.pending) refreshProcessesTabForChatChange();
-    if (queuedChanged && chatState.activeTabId in chatState.tabs) {
-      saveChatStateToStorage();
-      drawToolbar();
-      return;
-    }
-    if (r.alive === false) {
-      t.closedReason = r.closed_reason || "session ended";
-      t.sessionId = null;
-      t.pending = false;
-      saveChatStateToStorage();
-      refreshProcessesTabForChatChange();
-      drawChat();
-    }
-  } catch {
-    // Tolerate transient errors; SSE/poller reconnects on its own.
-  } finally {
-    const pollAgain = !!t.pollAgain;
-    t.polling = false;
-    t.pollAgain = false;
-    if (
-      pollAgain &&
-      chatState.tabs[chatState.activeTabId] === t &&
-      t.sessionId === sid
-    ) {
-      setTimeout(pollChat, 0);
-    }
-  }
-}
-
 function appendChatOutputLines(tab, lines) {
   if (!tab || !Array.isArray(lines) || !lines.length) return false;
   const now = Date.now();
@@ -2505,6 +2431,52 @@ function appendChatOutputLines(tab, lines) {
   if (!next.length) return false;
   tab.output = (tab.output || "") + next.join("\n") + "\n";
   return true;
+}
+
+function appendChatProgressLines(tab, lines) {
+  if (!tab || !Array.isArray(lines) || !lines.length) return false;
+  const existingProgressLines = new Set(
+    String(tab.progress || "")
+      .split(/\n/)
+      .filter((line) => line.trim())
+      .slice(-100),
+  );
+  const next = [];
+  for (const line of lines) {
+    const text = String(line ?? "");
+    if (!text.trim()) continue;
+    if (existingProgressLines.has(text)) continue;
+    next.push(text);
+    existingProgressLines.add(text);
+  }
+  if (!next.length) return false;
+  tab.progress = (tab.progress || "") + next.join("\n") + "\n";
+  return true;
+}
+
+function chatLineFromSseEvent(event) {
+  const text = String(event?.text || "");
+  if (!text.trim()) return "";
+  const role = String(event?.role || "");
+  if (role === "user") return `> ${text}`;
+  if (role === "assistant" || role === "system") return text;
+  return text;
+}
+
+function renderActiveChatTranscript(tab) {
+  if (!tab || chatState.tabs[chatState.activeTabId] !== tab) return;
+  const out = $("#chat-output");
+  if (out) {
+    const atBottom = out.scrollHeight - out.scrollTop - out.clientHeight < 50;
+    out.innerHTML = mdToHtml(tab.output || "");
+    if (atBottom) out.scrollTop = out.scrollHeight;
+  }
+  const progress = $("#chat-progress");
+  if (progress) {
+    const atBottom = progress.scrollHeight - progress.scrollTop - progress.clientHeight < 50;
+    progress.innerHTML = renderChatProgress(tab.progress || "");
+    if (atBottom) progress.scrollTop = progress.scrollHeight;
+  }
 }
 
 async function sendChatLine() {
@@ -2681,7 +2653,6 @@ async function queueChatTextOnServer(tab, text) {
     refreshProcessesTabForChatChange();
     drawToolbar();
     if (shouldKeepChatInputFocused()) focusChatInputSoon();
-    pollChat();
   } catch (e) {
     queueChatTextForTab(tab, text);
     saveChatStateToStorage();

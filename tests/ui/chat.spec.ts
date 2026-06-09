@@ -125,13 +125,13 @@ test("drafts a Gap from standalone chat context through Smoke AI", async ({ page
   }
 });
 
-test("does not duplicate transcript lines when chat redraws race polling", async ({ page, request }) => {
+test("does not duplicate transcript lines when SSE chat events race redraws", async ({ page, request }) => {
   await ensureAttachedProject(request);
-  const sessionId = "ui-poll-race";
+  const sessionId = "ui-sse-race";
   const prompt = "Unique duplicate guard prompt.";
   const response = "Unique duplicate guard response.";
   let inputPosts = 0;
-  let readDelivered = false;
+  let readRequests = 0;
 
   await page.route("**/api/chat/start", async (route) => {
     await route.fulfill({
@@ -166,38 +166,11 @@ test("does not duplicate transcript lines when chat redraws race polling", async
     });
   });
   await page.route(`**/api/chat/${sessionId}/read`, async (route) => {
-    if (!inputPosts || readDelivered) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          alive: true,
-          session_id: sessionId,
-          lines: [],
-          progress_lines: [],
-          queued_messages: [],
-          importable_artifacts: [],
-          in_flight: false,
-          provider_session_id: null,
-        }),
-      });
-      return;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    readDelivered = true;
+    readRequests += 1;
     await route.fulfill({
-      status: 200,
+      status: 500,
       contentType: "application/json",
-      body: JSON.stringify({
-        alive: true,
-        session_id: sessionId,
-        lines: [`> ${prompt}`, response],
-        progress_lines: [],
-        queued_messages: [],
-        importable_artifacts: [],
-        in_flight: false,
-        provider_session_id: null,
-      }),
+      body: JSON.stringify({ error: { message: "chat read should not be called" } }),
     });
   });
 
@@ -215,6 +188,40 @@ test("does not duplicate transcript lines when chat redraws race polling", async
     (window as any).drawToolbar?.();
     (window as any).drawToolbar?.();
   });
+  await page.evaluate(({ id, promptText, responseText }) => {
+    const emit = (event: Record<string, unknown>, inFlight: boolean) => {
+      (window as any).handleChatSseEvent?.({
+        session_id: id,
+        mode: "standalone",
+        provider: "mock",
+        in_flight: inFlight,
+        closed: false,
+        event,
+      });
+    };
+    emit({
+      id: "event-user",
+      role: "user",
+      text: promptText,
+      progress: false,
+      created_at: new Date().toISOString(),
+    }, true);
+    (window as any).drawToolbar?.();
+    emit({
+      id: "event-assistant",
+      role: "assistant",
+      text: responseText,
+      progress: false,
+      created_at: new Date().toISOString(),
+    }, false);
+    emit({
+      id: "event-assistant",
+      role: "assistant",
+      text: responseText,
+      progress: false,
+      created_at: new Date().toISOString(),
+    }, false);
+  }, { id: sessionId, promptText: prompt, responseText: response });
 
   await expect(page.getByTestId("chat-output")).toContainText(response);
   await page.waitForTimeout(250);
@@ -222,6 +229,89 @@ test("does not duplicate transcript lines when chat redraws race polling", async
   expect(transcript?.match(/Unique duplicate guard prompt\./g) ?? []).toHaveLength(1);
   expect(transcript?.match(/Unique duplicate guard response\./g) ?? []).toHaveLength(1);
   expect(inputPosts).toBe(1);
+  expect(readRequests).toBe(0);
+});
+
+test("renders persisted active chat from SSE without read requests", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const sessionId = "ui-sse-only-chat";
+  let readRequests = 0;
+
+  await page.addInitScript((id) => {
+    localStorage.setItem("refine_chat_tabs", JSON.stringify({
+      activeTabId: "standalone",
+      open: true,
+      tabs: {
+        standalone: {
+          gapId: null,
+          label: "Standalone",
+          mode: "standalone",
+          sessionId: id,
+          output: "",
+          progress: "",
+          showProgress: true,
+          closedReason: null,
+          agentResponded: false,
+          sentUserInput: false,
+          queuedMessages: [],
+          localQueuedMessages: [],
+          starting: false,
+        },
+      },
+    }));
+    class MockEventSource {
+      url: string;
+      onerror: (() => void) | null = null;
+      constructor(url: string) {
+        this.url = url;
+      }
+      addEventListener() {}
+      close() {}
+    }
+    (window as any).EventSource = MockEventSource;
+  }, sessionId);
+
+  await page.route(`**/api/chat/${sessionId}/read`, async (route) => {
+    readRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        alive: true,
+        session_id: sessionId,
+        lines: readRequests === 1 ? ["SSE delivered chat line."] : [],
+        progress_lines: [],
+        queued_messages: [],
+        importable_artifacts: [],
+        in_flight: false,
+        provider_session_id: null,
+      }),
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByTestId("chat-status")).toContainText(`Session ${sessionId} active`);
+  await page.waitForTimeout(1200);
+  expect(readRequests).toBe(0);
+
+  await page.evaluate((id) => {
+    (window as any).handleChatSseEvent?.({
+      session_id: id,
+      mode: "standalone",
+      provider: "mock",
+      in_flight: false,
+      closed: false,
+      event: {
+        id: "sse-line-one",
+        role: "assistant",
+        text: "SSE delivered chat line.",
+        progress: false,
+        created_at: new Date().toISOString(),
+      },
+    });
+  }, sessionId);
+  await expect(page.getByTestId("chat-output")).toContainText("SSE delivered chat line.");
+  expect(readRequests).toBe(0);
 });
 
 test("edits and removes standalone queued chat messages", async ({ page, request }) => {
