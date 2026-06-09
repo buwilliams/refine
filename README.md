@@ -12,7 +12,7 @@ refine is an agentic software delivery system that coordinates people and agents
 
 ## Install with your agent
 
-If you want OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine for you, point it at:
+Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:
 
 ```bash
 https://raw.githubusercontent.com/buwilliams/refine/refs/heads/main/docs/agent-install.md
