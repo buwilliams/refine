@@ -24,6 +24,7 @@ REFINE_DEPLOYED_MARKER_RELATIVE="${REFINE_DEPLOYED_MARKER_RELATIVE:-.refine-depl
 REFINE_INSTALL_RUNTIME_ROOT="${REFINE_INSTALL_RUNTIME_ROOT:-run}"
 REFINE_INSTALL_UPDATE_ONLY="${REFINE_INSTALL_UPDATE_ONLY:-0}"
 REFINE_INSTALL_PACKAGE_MANAGER="${REFINE_INSTALL_PACKAGE_MANAGER:-}"
+REFINE_INSTALL_HOMEBREW_URL="${REFINE_INSTALL_HOMEBREW_URL:-https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh}"
 REFINE_PROVIDER_OPTIONS="claude codex gemini copilot smoke-ai"
 ORIGINAL_PATH="${PATH:-}"
 
@@ -80,7 +81,8 @@ Environment:
   REFINE_RELEASE_BIN_RELATIVE       Installed binary path inside the checkout. Defaults to bin/refine.
   REFINE_INSTALL_RUNTIME_ROOT       Runtime root used by Refine commands. Defaults to run.
   REFINE_INSTALL_UPDATE_ONLY=1      Upgrade/build/repair only; do not start Refine.
-  REFINE_INSTALL_PACKAGE_MANAGER    Preferred package manager for installer dependencies.
+  REFINE_INSTALL_PACKAGE_MANAGER    Package manager for installer dependencies. Only brew is supported.
+  REFINE_INSTALL_HOMEBREW_URL       Homebrew install script URL.
 EOF
 }
 
@@ -676,10 +678,6 @@ with_sudo() {
 
 package_manager_available() {
   case "$1" in
-    apt) have apt-get ;;
-    dnf) have dnf ;;
-    yum) have yum ;;
-    pacman) have pacman ;;
     brew) have brew ;;
     *) return 1 ;;
   esac
@@ -688,7 +686,11 @@ package_manager_available() {
 package_manager() {
   if [ -n "$REFINE_INSTALL_PACKAGE_MANAGER" ]; then
     case "$REFINE_INSTALL_PACKAGE_MANAGER" in
-      apt|dnf|yum|pacman|brew)
+      brew)
+        if dry_run; then
+          printf '%s\n' "$REFINE_INSTALL_PACKAGE_MANAGER"
+          return 0
+        fi
         if package_manager_available "$REFINE_INSTALL_PACKAGE_MANAGER"; then
           printf '%s\n' "$REFINE_INSTALL_PACKAGE_MANAGER"
           return 0
@@ -700,15 +702,7 @@ package_manager() {
         ;;
     esac
   fi
-  if have apt-get; then
-    printf '%s\n' "apt"
-  elif have dnf; then
-    printf '%s\n' "dnf"
-  elif have yum; then
-    printf '%s\n' "yum"
-  elif have pacman; then
-    printf '%s\n' "pacman"
-  elif have brew; then
+  if have brew; then
     printf '%s\n' "brew"
   else
     printf '%s\n' ""
@@ -728,35 +722,30 @@ install_packages() {
     return 1
   fi
   case "$pm" in
-    apt)
-      with_sudo apt-get update || return 1
-      with_sudo apt-get install -y $packages
-      ;;
-    dnf)
-      with_sudo dnf install -y $packages
-      ;;
-    yum)
-      with_sudo yum install -y $packages
-      ;;
-    pacman)
-      with_sudo pacman -Sy --needed --noconfirm $packages
-      ;;
     brew)
       run brew install $packages
       ;;
   esac
 }
 
-find_gcc_binary() {
+find_cc_binary() {
   local prefix path
+  if have cc; then
+    command -v cc
+    return 0
+  fi
   if have gcc; then
     command -v gcc
+    return 0
+  fi
+  if have clang; then
+    command -v clang
     return 0
   fi
   if have brew; then
     prefix="$(brew --prefix 2>/dev/null || true)"
     if [ -n "$prefix" ]; then
-      for path in "$prefix"/bin/gcc-*; do
+      for path in "$prefix"/opt/llvm/bin/clang "$prefix"/bin/gcc-*; do
         [ -x "$path" ] || continue
         printf '%s\n' "$path"
         return 0
@@ -776,6 +765,8 @@ find_ld_binary() {
     prefix="$(brew --prefix 2>/dev/null || true)"
     if [ -n "$prefix" ]; then
       for path in \
+        "$prefix"/opt/llvm/bin/ld.lld \
+        "$prefix"/opt/llvm/bin/lld \
         "$prefix"/opt/binutils/bin/ld \
         "$prefix"/Cellar/binutils/*/bin/ld \
         "$prefix"/Cellar/binutils/*/x86_64-*/bin/ld; do
@@ -816,24 +807,19 @@ ensure_c_linker() {
   fi
   warn "C compiler/linker is not fully installed"
   case "$(package_manager)" in
-    apt)
-      install_packages build-essential || true
-      ;;
-    dnf|yum)
-      install_packages gcc gcc-c++ make || true
-      ;;
-    pacman)
-      install_packages base-devel || true
-      ;;
     brew)
-      install_packages gcc binutils glibc || true
+      if is_macos; then
+        install_packages llvm || true
+      else
+        install_packages gcc binutils glibc || true
+      fi
       configure_brew_c_toolchain_env
       ;;
     *)
       ;;
   esac
   configure_brew_c_toolchain_env
-  ensure_command_shim cc "$(find_gcc_binary || true)" || true
+  ensure_command_shim cc "$(find_cc_binary || true)" || true
   ensure_command_shim ld "$(find_ld_binary || true)" || true
   if have cc && have ld; then
     ok "C compiler/linker ready: $(command -v cc), $(command -v ld)"
@@ -955,6 +941,114 @@ install_cargo_toolchain() {
     return 0
   fi
   install_rust_toolchain
+}
+
+missing_core_dependencies() {
+  local missing=""
+  append_path_now "$HOME/.cargo/bin"
+  have curl || missing="${missing}${missing:+, }curl"
+  have git || missing="${missing}${missing:+, }git"
+  { have cc && have ld; } || missing="${missing}${missing:+, }C compiler/linker"
+  have cargo || missing="${missing}${missing:+, }Rust Cargo"
+  printf '%s\n' "$missing"
+}
+
+manual_dependency_steps() {
+  say "Install the missing dependencies, then re-run install.sh:"
+  if is_macos; then
+    say "  - Command Line Tools: xcode-select --install"
+    say "  - Rust Cargo: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    say "  - curl and git: install them with your preferred macOS package manager or tools setup."
+  else
+    say "  - curl and git from your OS package manager."
+    say "  - C compiler/linker from your OS package manager, such as build-essential, gcc/make, or base-devel."
+    say "  - Rust Cargo: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+  fi
+}
+
+append_homebrew_paths_now() {
+  append_path_now "/opt/homebrew/bin"
+  append_path_now "/usr/local/bin"
+  append_path_now "/home/linuxbrew/.linuxbrew/bin"
+}
+
+install_homebrew_package_manager() {
+  local tmp=""
+  if have brew; then
+    ok "Homebrew found: $(command -v brew)"
+    return 0
+  fi
+  if ! have curl; then
+    warn "curl is required to install Homebrew automatically."
+    return 1
+  fi
+  if dry_run; then
+    if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
+      log_detail "${DIM}+ NONINTERACTIVE=1 bash <(curl -fsSL '$REFINE_INSTALL_HOMEBREW_URL')${RESET}"
+    else
+      log_detail "${DIM}+ bash <(curl -fsSL '$REFINE_INSTALL_HOMEBREW_URL')${RESET}"
+    fi
+    append_homebrew_paths_now
+    REFINE_INSTALL_PACKAGE_MANAGER="brew"
+    return 0
+  fi
+  tmp="$(mktemp)" || return 1
+  if ! curl -fsSL "$REFINE_INSTALL_HOMEBREW_URL" -o "$tmp"; then
+    rm -f "$tmp"
+    warn "Could not download Homebrew installer from $REFINE_INSTALL_HOMEBREW_URL"
+    return 1
+  fi
+  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
+    NONINTERACTIVE=1 bash "$tmp" || {
+      rm -f "$tmp"
+      warn "Homebrew installer failed"
+      return 1
+    }
+  else
+    bash "$tmp" || {
+      rm -f "$tmp"
+      warn "Homebrew installer failed"
+      return 1
+    }
+  fi
+  rm -f "$tmp"
+  append_homebrew_paths_now
+  REFINE_INSTALL_PACKAGE_MANAGER="brew"
+  if have brew; then
+    ok "Homebrew installed: $(command -v brew)"
+    return 0
+  fi
+  warn "Homebrew install finished, but brew is not on PATH yet."
+  return 1
+}
+
+ensure_dependency_manager_for_missing_core_deps() {
+  local missing="$1"
+  local default_answer="n"
+  [ -n "$missing" ] || return 0
+  section "Install dependencies"
+  warn "Missing required install dependencies: $missing"
+  manual_dependency_steps
+  say
+  if have brew; then
+    ok "Homebrew found: $(command -v brew)"
+    return 0
+  fi
+  if [ "$REFINE_INSTALL_ASSUME_DEFAULTS" = "1" ]; then
+    default_answer="y"
+  fi
+  if ! confirm "Install Homebrew to manage these dependencies" "$default_answer"; then
+    die_issue \
+      "Required install dependencies" \
+      "Refine needs these tools before it can clone, build, and run the native CLI: $missing." \
+      "Install the missing dependencies manually, then re-run install.sh." \
+      "Missing required install dependencies: $missing"
+  fi
+  install_homebrew_package_manager || die_issue \
+    "Homebrew install" \
+    "Homebrew was selected to install missing Refine dependencies: $missing." \
+    "Install Homebrew or install the missing dependencies manually, then re-run install.sh." \
+    "Could not install Homebrew automatically."
 }
 
 ensure_cargo() {
@@ -1657,6 +1751,7 @@ restart_refine_after_upgrade() {
 
 preflight() {
   section "System check"
+  local missing
   if is_wsl; then
     ok "Running inside WSL"
   elif is_linux; then
@@ -1666,6 +1761,8 @@ preflight() {
   else
     warn "Unsupported OS: $(uname -s). Refine is tested on Linux/WSL and macOS."
   fi
+  missing="$(missing_core_dependencies)"
+  ensure_dependency_manager_for_missing_core_deps "$missing"
   ensure_command curl curl || die_issue \
     "curl install" \
     "The installer uses curl to download setup helpers and check Refine releases." \

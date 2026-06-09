@@ -1,4 +1,7 @@
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs as unix_fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -148,10 +151,113 @@ fn install_update_only_dry_run_builds_repairs_and_skips_start_commands() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+#[cfg(unix)]
+fn installer_reports_missing_core_dependencies_and_exits_without_homebrew() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    let temp_root = unique_temp_dir("install-missing-deps");
+    let checkout = temp_root.join("refine");
+    let log = temp_root.join("install.log");
+    let path = command_path(&temp_root, &["dirname", "grep", "tr", "uname"]);
+    fs::create_dir_all(&temp_root).unwrap();
+
+    let output = Command::new("/bin/bash")
+        .arg(format!("{repo}/scripts/install.sh"))
+        .current_dir(&temp_root)
+        .stdin(std::process::Stdio::null())
+        .env_clear()
+        .env("HOME", &temp_root)
+        .env("PATH", &path)
+        .env("REFINE_INSTALL_DRY_RUN", "1")
+        .env("REFINE_INSTALL_CHECKOUT_DEFAULT", &checkout)
+        .env("REFINE_INSTALL_LOG", &log)
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "installer unexpectedly succeeded: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let combined = format!(
+        "{}\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+        fs::read_to_string(&log).unwrap_or_default()
+    );
+    assert!(combined.contains("Missing required install dependencies"));
+    assert!(combined.contains("curl"));
+    assert!(combined.contains("git"));
+    assert!(combined.contains("C compiler/linker"));
+    assert!(combined.contains("Rust Cargo"));
+    assert!(combined.contains("Install Homebrew to manage these dependencies"));
+    assert!(combined.contains("Install the missing dependencies manually, then re-run install.sh."));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+#[cfg(unix)]
+fn installer_yes_dry_run_bootstraps_homebrew_for_missing_core_dependencies() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    let temp_root = unique_temp_dir("install-homebrew-dry-run");
+    let checkout = temp_root.join("refine");
+    let log = temp_root.join("install.log");
+    let path = command_path(&temp_root, &["curl", "dirname", "grep", "tr", "uname"]);
+    fs::create_dir_all(&temp_root).unwrap();
+
+    let output = Command::new("/bin/bash")
+        .arg(format!("{repo}/scripts/install.sh"))
+        .arg("--yes")
+        .current_dir(&temp_root)
+        .stdin(std::process::Stdio::null())
+        .env_clear()
+        .env("HOME", &temp_root)
+        .env("PATH", &path)
+        .env("REFINE_INSTALL_DRY_RUN", "1")
+        .env("REFINE_INSTALL_CHECKOUT_DEFAULT", &checkout)
+        .env("REFINE_INSTALL_LOG", &log)
+        .env("REFINE_REPO_URL", "https://example.invalid/refine.git")
+        .env("REFINE_INSTALL_DRY_RUN_RELEASE_TAG", "9.8.7")
+        .output()
+        .unwrap();
+
+    assert!(
+        !output.status.success(),
+        "installer unexpectedly succeeded without real git/cargo: stdout={}\nstderr={}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let combined = format!(
+        "{}\n{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr),
+        fs::read_to_string(&log).unwrap_or_default()
+    );
+    assert!(combined.contains("NONINTERACTIVE=1 bash <(curl -fsSL"));
+    assert!(combined.contains("brew install git"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn unique_temp_dir(prefix: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_nanos();
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+}
+
+#[cfg(unix)]
+fn command_path(root: &Path, commands: &[&str]) -> PathBuf {
+    let bin = root.join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    for command in commands {
+        let target = format!("/usr/bin/{command}");
+        unix_fs::symlink(&target, bin.join(command)).unwrap_or_else(|error| {
+            panic!("failed to symlink {command} from {target}: {error}");
+        });
+    }
+    bin
 }
