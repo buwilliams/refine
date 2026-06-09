@@ -874,6 +874,29 @@ fn local_http_daemon_serves_static_assets() {
 }
 
 #[test]
+fn local_http_daemon_reports_startup_cache_progress() {
+    let daemon = LocalHttpDaemon {
+        server: server_with_projection(),
+        static_root: None,
+    };
+    let mut messages = Vec::new();
+
+    daemon
+        .recover_runtime_state_with_progress(|message| messages.push(message.to_string()))
+        .unwrap();
+
+    assert_eq!(
+        messages,
+        vec![
+            "warming project and runtime caches",
+            "warming diagnostics cache",
+            "warming static asset cache",
+            "startup cache warming complete",
+        ]
+    );
+}
+
+#[test]
 fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     let temp_root = unique_temp_dir("http-hot-projection-metrics");
     let durable_root = temp_root.join(".refine");

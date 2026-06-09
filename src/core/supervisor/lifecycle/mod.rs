@@ -3,7 +3,7 @@ use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, TcpStream};
 use std::path::PathBuf;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +15,8 @@ use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
 use crate::core::supervisor::runtime::RuntimeRoot;
 
 pub const DAEMON_STATUS_FILE: &str = "daemon-status.json";
+const BACKGROUND_DAEMON_READY_TIMEOUT: Duration = Duration::from_secs(120);
+const BACKGROUND_DAEMON_READY_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DaemonStatus {
@@ -179,19 +181,32 @@ impl FileDaemonLifecycleService {
             authorization_command: Some("refine daemon start".to_string()),
             sensitive: true,
         })?;
-        for _ in 0..50 {
+        eprintln!(
+            "refine: starting daemon at http://{}:{}",
+            config.bind_address, port
+        );
+        let mut stderr_offset = 0;
+        let deadline = Instant::now() + BACKGROUND_DAEMON_READY_TIMEOUT;
+        loop {
+            relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
             let managed = supervisor.wait(&process.id)?;
             if managed.state != "running" {
+                relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
                 return Err(RefineError::Conflict(format!(
                     "daemon process exited before becoming reachable: {}",
                     managed.state
                 )));
             }
             if http_probe(port).is_ok() {
+                relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
                 return self.status(port);
             }
-            thread::sleep(Duration::from_millis(100));
+            if Instant::now() >= deadline {
+                break;
+            }
+            thread::sleep(BACKGROUND_DAEMON_READY_POLL_INTERVAL);
         }
+        relay_daemon_startup_output(process.stderr_path.as_deref(), &mut stderr_offset);
         Err(RefineError::Degraded(format!(
             "daemon did not become reachable on 127.0.0.1:{port}"
         )))
@@ -276,6 +291,23 @@ fn detached_command_parts(exe: &std::path::Path) -> (String, Vec<String>) {
     #[cfg(not(unix))]
     {
         (exe.display().to_string(), Vec::new())
+    }
+}
+
+fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) {
+    let Some(path) = path else {
+        return;
+    };
+    let Ok(output) = fs::read_to_string(path) else {
+        return;
+    };
+    if output.len() <= *offset {
+        return;
+    }
+    let next = &output[*offset..];
+    *offset = output.len();
+    for line in next.lines().filter(|line| !line.trim().is_empty()) {
+        eprintln!("{line}");
     }
 }
 

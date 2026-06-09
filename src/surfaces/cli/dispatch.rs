@@ -1680,8 +1680,11 @@ fn run_system_start(
         root: runtime_root.clone(),
     }
     .port_root(actual_port);
+    eprintln!("refine: preparing daemon at http://{addr}");
+    eprintln!("refine: loading active project registry");
     let project_status = FileProjectRegistryService::new(&runtime_root, None).status()?;
     let snapshot = if let Some(client_repo) = project_status.client_repo {
+        eprintln!("refine: warming project cache for {client_repo}");
         let durable_root = PathBuf::from(client_repo).join(".refine");
         let store = FileProjectStateStore::new(&durable_root);
         let cache_root = cache_dir
@@ -1689,6 +1692,7 @@ fn run_system_start(
             .unwrap_or_else(|| port_runtime_root.join("cache"));
         store.load_or_refresh_projection(&cache_root)?
     } else {
+        eprintln!("refine: no active project; using empty project cache");
         ProjectionSnapshot::default()
     };
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
@@ -1704,7 +1708,9 @@ fn run_system_start(
         },
         static_root: static_root.or_else(default_static_root),
     };
-    daemon.recover_runtime_state()?;
+    daemon.recover_runtime_state_with_progress(|message| {
+        eprintln!("refine: {message}");
+    })?;
     eprintln!("running foreground Refine daemon at http://{addr}");
     if once {
         daemon.serve_once(listener)?;

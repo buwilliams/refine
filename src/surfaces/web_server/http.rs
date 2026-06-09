@@ -160,16 +160,28 @@ struct AxumDaemonState {
 
 impl LocalHttpDaemon {
     pub fn recover_runtime_state(&self) -> RefineResult<()> {
+        self.recover_runtime_state_with_progress(|_| {})
+    }
+
+    pub fn recover_runtime_state_with_progress(
+        &self,
+        mut report: impl FnMut(&str),
+    ) -> RefineResult<()> {
         if let Some(durable_root) = self.server.current_durable_root()? {
+            report("recovering interrupted chat turns");
             self.server
                 .chat_service(&durable_root)
                 .recover_interrupted_turns(
                     "Daemon restarted before the provider turn completed.",
                 )?;
         }
+        report("warming project and runtime caches");
         let _ = self.server.warm_current_projection_cache()?;
+        report("warming diagnostics cache");
         self.server.warm_diagnostics_cache()?;
+        report("warming static asset cache");
         self.warm_static_cache()?;
+        report("startup cache warming complete");
         Ok(())
     }
 
