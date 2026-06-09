@@ -3111,6 +3111,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .collect::<Vec<_>>(),
         vec![
             "merger",
+            "plan_draft_extractor",
             "target_app_rebuilder",
             "target_app_config_generator",
             "sqlite_cache_rebuild",

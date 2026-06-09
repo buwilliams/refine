@@ -46,13 +46,13 @@ After Ubuntu opens, use the Install yourself one-liner above.
 
 ## Tests
 
-Run the full verification set with Cargo:
+The default Cargo test command is intentionally lightweight and does not run the long release gate. Run the full verification set explicitly when needed:
 
 ```bash
-cargo test
+cargo run --manifest-path xtask/Cargo.toml -- test-all
 ```
 
-`cargo test` runs `xtask test-all`, which runs the Rust subset, xtask checks, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, multi-instance sync tests, Playwright UI tests, and `git diff --check`.
+`xtask test-all` runs the Rust subset, xtask checks, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, multi-instance sync tests, Playwright UI tests, and `git diff --check`.
 
 Focused suites:
 

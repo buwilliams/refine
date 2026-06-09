@@ -1,6 +1,6 @@
 [package]
 name = "refine"
-version = "3.0.2"
+version = "3.0.3"
 edition = "2024"
 autotests = false
 
@@ -17,6 +17,7 @@ test = false
 name = "test_all"
 path = "tests/test_all.rs"
 harness = false
+test = false
 
 [[test]]
 name = "smoke_ai_contract"
