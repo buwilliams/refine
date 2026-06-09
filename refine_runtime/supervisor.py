@@ -387,39 +387,24 @@ class Supervisor:
                 and self.worker_socket == socket_path
             ):
                 existing_worker = self.worker
-        if (
-            existing_worker is not None
-            and self._can_ping_worker(socket_path)
-            and self._worker_local_node_matches(socket_path, local_node_id)
-        ):
-            with self._lock:
-                if self.worker is existing_worker:
-                    return self._worker_result()
 
-        with self._lock:
-            if (
-                self.worker is not None
-                and self.worker.poll() is None
-                and self.worker_socket == socket_path
-            ):
-                worker_alive = True
-            else:
-                worker_alive = False
-        if worker_alive:
-            if (
-                self._can_ping_worker(socket_path)
-                and self._worker_local_node_matches(socket_path, local_node_id)
-            ):
-                with self._lock:
-                    return self._worker_result()
+        if existing_worker is not None:
+            ping_ok = self._can_ping_worker(socket_path)
+            node_matches = (
+                self._worker_local_node_matches(socket_path, local_node_id)
+                if ping_ok
+                else False
+            )
             with self._lock:
-                if self.worker is not None and self.worker.poll() is not None:
-                    self._stop_worker_locked()
-                else:
-                    return self._worker_result()
+                if self.worker is existing_worker and self.worker.poll() is None:
+                    if not ping_ok or node_matches:
+                        return self._worker_result()
+                self._stop_worker_locked()
         else:
             with self._lock:
                 self._stop_worker_locked()
+
+        with self._lock:
             env = os.environ.copy()
             env[config.ENV_CONFIG_PATH] = str(cfg.config_path)
             env["REFINE_UI_PORT"] = str(self.port)

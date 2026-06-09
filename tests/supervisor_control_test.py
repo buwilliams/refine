@@ -190,6 +190,7 @@ def main() -> int:
     exercise_ipc_server_does_not_unlink_replacement_socket()
     exercise_ipc_server_rebinds_deleted_socket()
     exercise_worker_start_failure_includes_recent_output()
+    exercise_worker_health_checks_do_not_restart_on_timeout()
     root = Path(__file__).resolve().parents[1]
     runtime_source = (root / "refine_ui" / "runtime.py").read_text(encoding="utf-8")
     api_source = (root / "refine_ui" / "api.py").read_text(encoding="utf-8")
@@ -282,6 +283,46 @@ def exercise_worker_start_failure_includes_recent_output() -> None:
         assert "exit code 1" in message
         assert "Recent worker output" in message
         assert "sqlite3.InterfaceError" in message
+
+
+def exercise_worker_health_checks_do_not_restart_on_timeout() -> None:
+    from refine_runtime.supervisor import Supervisor
+    import refine_runtime.supervisor as supervisor_mod
+    from refine_runtime.supervisor_protocol import M_ENSURE_WORKER
+    from refine_server import config
+    from tests.helpers import cleanup_tmp, init_refine, make_client_repo
+
+    tmp, client = make_client_repo("refine-supervisor-worker-health-")
+    conn = init_refine(client)
+    conn.close()
+    cfg_path = client / ".refine" / "refine.toml"
+    old_resource_manager = supervisor_mod.ResourceManager
+    try:
+        fake_resources = FakeResourceManager()
+        supervisor_mod.ResourceManager = lambda _settings: fake_resources  # type: ignore[assignment]
+        supervisor = Supervisor(host="127.0.0.1", port=19879, cfg_path=str(cfg_path))
+        supervisor.resources = fake_resources
+        supervisor.capabilities = supervisor.resources.capabilities()
+        supervisor._can_ping_worker = lambda _path: True  # type: ignore[method-assign]
+        supervisor._worker_local_node_matches = lambda _path, _node_id: True  # type: ignore[method-assign]
+        first = supervisor.dispatch(M_ENSURE_WORKER, {"config_path": str(cfg_path)})
+        assert first["worker_pid"] == 1000, first
+
+        supervisor._can_ping_worker = lambda _path: False  # type: ignore[method-assign]
+        reused = supervisor.dispatch(M_ENSURE_WORKER, {"config_path": str(cfg_path)})
+        assert reused["worker_pid"] == 1000, reused
+        assert [proc.pid for proc in fake_resources.procs if proc.kind == "worker"] == [1000]
+        assert fake_resources.procs[0].terminated is False
+
+        supervisor._can_ping_worker = lambda _path: True  # type: ignore[method-assign]
+        supervisor._worker_local_node_matches = lambda _path, _node_id: False  # type: ignore[method-assign]
+        restarted = supervisor.dispatch(M_ENSURE_WORKER, {"config_path": str(cfg_path)})
+        assert restarted["worker_pid"] == 1001, restarted
+        assert fake_resources.procs[0].terminated is True
+    finally:
+        supervisor_mod.ResourceManager = old_resource_manager  # type: ignore[assignment]
+        shutil.rmtree(config.local_run_dir(port=19879), ignore_errors=True)
+        cleanup_tmp(tmp)
 
 
 class FakeResourceManager:
