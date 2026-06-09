@@ -4,11 +4,11 @@
 
 refine is an agentic software delivery system that coordinates people and agents across distributed machines. Product, support, and customers — anyone who can articulate what the app does today vs what it should do instead - can make meaningful contributions to your software. Build new apps, implement features, and fix bugs while keeping feedback cheap, local, and repeatable.
 
-- **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 - **Agent-first** - install refine and manage your node cluster with your favorite agent.
 - **Teams** - extend product feedback and app edits to your whole team.
 - **Organize** - keep planning, features, Gaps, chat, and human verification in one workflow. Your team can move from idea to reviewed app edit without losing context.
 - **Orchestrate** - run refine across decentralized repositories, branches, processes, and node clusters. Cheap feedback loops keep work moving while git keeps everyone in sync.
+- **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 
 ## Install with your agent
 
