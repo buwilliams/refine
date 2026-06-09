@@ -12,6 +12,8 @@ fn main() {
         Some("api-contract") => print_api_contract(),
         Some("check-static-assets") => check_static_assets(),
         Some("runtime-layout") => print_runtime_layout(),
+        Some("test-unit") => test_unit(),
+        Some("test-integration") => test_integration(),
         Some("test-rust") => test_rust(),
         Some("test-smoke-ai") => test_smoke_ai(),
         Some("test-cli") => test_cli(),
@@ -45,28 +47,45 @@ fn test_surface() -> Result<(), String> {
 }
 
 fn test_all() -> Result<(), String> {
-    test_rust()?;
+    test_unit()?;
+    test_doc()?;
     check_all()?;
-    test_smoke_ai()?;
-    test_cli()?;
-    test_cluster_ssh()?;
-    test_install_uninstall()?;
-    test_full_workflow()?;
-    test_multi_instance_sync()?;
-    test_ui()?;
+    test_integration()?;
     check_git_diff()
 }
 
+fn test_unit() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    run(
+        Command::new("cargo")
+            .args(["test", "--lib", "--bins", "--", "--test-threads=1"])
+            .current_dir(&repo_root),
+        "run Rust unit tests",
+    )
+}
+
 fn test_rust() -> Result<(), String> {
+    test_unit()?;
+    test_cargo_integrations()?;
+    test_doc()
+}
+
+fn test_doc() -> Result<(), String> {
+    let repo_root = repo_root()?;
+    run(
+        Command::new("cargo")
+            .args(["test", "--doc"])
+            .current_dir(&repo_root),
+        "run Rust doc tests",
+    )
+}
+
+fn test_cargo_integrations() -> Result<(), String> {
     let repo_root = repo_root()?;
     run(
         Command::new("cargo")
             .args([
                 "test",
-                "--lib",
-                "--bins",
-                "--test",
-                "smoke_ai_contract",
                 "--test",
                 "cli_durable_root",
                 "--test",
@@ -75,14 +94,19 @@ fn test_rust() -> Result<(), String> {
                 "--test-threads=1",
             ])
             .current_dir(&repo_root),
-        "run Rust subset tests",
-    )?;
-    run(
-        Command::new("cargo")
-            .args(["test", "--doc"])
-            .current_dir(&repo_root),
-        "run Rust doc tests",
+        "run Cargo integration tests",
     )
+}
+
+fn test_integration() -> Result<(), String> {
+    test_cargo_integrations()?;
+    test_smoke_ai()?;
+    test_cli()?;
+    test_cluster_ssh()?;
+    test_install_uninstall()?;
+    test_full_workflow()?;
+    test_multi_instance_sync()?;
+    test_ui()
 }
 
 fn test_smoke_ai() -> Result<(), String> {

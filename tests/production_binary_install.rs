@@ -64,6 +64,68 @@ fn wrapper_auto_mode_selects_cargo_for_source_and_binary_for_deployed_checkout()
 }
 
 #[test]
+fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+
+    let unit = Command::new("bash")
+        .arg("r")
+        .arg("test")
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .output()
+        .unwrap();
+    assert!(unit.status.success());
+    let unit_output = String::from_utf8_lossy(&unit.stdout);
+    assert!(unit_output.contains("mode=test"));
+    assert!(unit_output.contains(&format!(
+        "command=cargo test --manifest-path {repo}/Cargo.toml"
+    )));
+
+    let full = Command::new("bash")
+        .arg("r")
+        .arg("test")
+        .arg("--full")
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .env("REFINE_RUN_MODE", "binary")
+        .output()
+        .unwrap();
+    assert!(full.status.success());
+    let full_output = String::from_utf8_lossy(&full.stdout);
+    assert!(full_output.contains("mode=test"));
+    assert!(full_output.contains(&format!(
+        "command=cargo test --manifest-path {repo}/Cargo.toml -- --full"
+    )));
+
+    let cli = Command::new("bash")
+        .arg("r")
+        .arg("test")
+        .arg("--cli")
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .output()
+        .unwrap();
+    assert!(cli.status.success());
+    let cli_output = String::from_utf8_lossy(&cli.stdout);
+    assert!(cli_output.contains(&format!(
+        "command=cargo run --manifest-path {repo}/xtask/Cargo.toml -- test-cli"
+    )));
+
+    let unknown = Command::new("bash")
+        .arg("r")
+        .arg("test")
+        .arg("--unknown")
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .output()
+        .unwrap();
+    assert!(!unknown.status.success());
+    let unknown_stderr = String::from_utf8_lossy(&unknown.stderr);
+    assert!(unknown_stderr.contains("unknown test suite option: --unknown"));
+    assert!(unknown_stderr.contains("Usage: ./r test [SUITE]"));
+}
+
+#[test]
 fn install_dry_run_builds_and_installs_release_binary_before_start_commands() {
     let repo = env!("CARGO_MANIFEST_DIR");
     let temp_root = unique_temp_dir("install-dry-run");

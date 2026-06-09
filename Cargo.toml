@@ -17,7 +17,6 @@ test = false
 name = "test_all"
 path = "tests/test_all.rs"
 harness = false
-test = false
 
 [[test]]
 name = "smoke_ai_contract"

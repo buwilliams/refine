@@ -46,21 +46,28 @@ After Ubuntu opens, use the Install yourself one-liner above.
 
 ## Tests
 
-The default Cargo test command is intentionally lightweight and does not run the long release gate. Run the full verification set explicitly when needed:
+Use `./r test` as the authoritative test entrypoint. The default command runs only the in-crate Rust unit tests; integration suites are opt-in:
 
 ```bash
-cargo run --manifest-path xtask/Cargo.toml -- test-all
+./r test
+./r test --integration
+./r test --full
 ```
 
-`xtask test-all` runs the Rust subset, xtask checks, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, multi-instance sync tests, Playwright UI tests, and `git diff --check`.
+Use `./r test --full` for the full verification set. The full gate runs unit tests, Rust doc tests, xtask checks, Rust integration tests, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, full workflow, multi-instance sync, Playwright UI tests, and `git diff --check`.
 
 Focused suites:
 
 ```bash
-cargo run --manifest-path xtask/Cargo.toml -- test-rust
-cargo run --manifest-path xtask/Cargo.toml -- test-surface
-cargo run --manifest-path xtask/Cargo.toml -- test-cluster-ssh
-cargo run --manifest-path xtask/Cargo.toml -- test-install-uninstall
+./r test --rust
+./r test --smoke-ai
+./r test --cli
+./r test --ui
+./r test --surface
+./r test --cluster-ssh
+./r test --install-uninstall
+./r test --full-workflow
+./r test --multi-instance-sync
 ```
 
 ## License
