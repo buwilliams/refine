@@ -2075,15 +2075,28 @@ async function draftGapsFromPlan() {
   if (!t) return;
   const transcript = planTranscriptText(t);
   if (!planHasAgentResponse(t) || !transcript) {
-    toast("Wait for the agent to respond before drafting Gaps.", "error");
+    toast("Wait for the agent to respond before drafting a Feature.", "error");
     return;
   }
-  if (typeof openPlanDraftModalFromText !== "function") {
+  if (
+    typeof extractPlanDraftsInBackground !== "function" ||
+    typeof openPlanDraftModalFromResult !== "function"
+  ) {
     toast("Plan drafting is unavailable.", "error");
     return;
   }
-  openPlanDraftModalFromText(transcript);
+  toast("Extracting Plan Feature and Gaps in the background.", "info");
+  recordUiNotice("Plan Draft extraction started", {
+    kind: "info",
+    source: "background-job",
+  });
   minimizeToolbar();
+  try {
+    const result = await extractPlanDraftsInBackground(transcript);
+    await openPlanDraftModalFromResult(transcript, result);
+  } catch (error) {
+    await showActionError(error, "Plan Draft extraction failed");
+  }
 }
 
 async function draftGapFromStandaloneChat() {

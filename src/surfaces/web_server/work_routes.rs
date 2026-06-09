@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use crate::core::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -101,6 +101,58 @@ impl ImportDuplicateActions {
             "move_noop": self.move_noop,
             "updated_original": self.updated_original
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plan_import_result_sanitizes_feature_metadata_and_reads_feature_gaps() {
+        let output = json!({
+            "feature": {
+                "name": "Personal Budget App — Product Spec",
+                "description": "created by Plan Mode",
+                "gaps": [
+                    {
+                        "name": "Track spending by category",
+                        "actual": "Users cannot categorize transactions.",
+                        "target": "Users can assign each transaction to a budget category.",
+                        "priority": "medium"
+                    },
+                    {
+                        "name": "Monthly budget overview",
+                        "actual": "Users cannot see monthly budget progress.",
+                        "target": "Users can compare month-to-date spending against budget limits.",
+                        "priority": "high"
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
+        let feature = result.feature_destination.unwrap();
+        assert_eq!(feature.name, "Personal Budget App");
+        assert_eq!(feature.description, "");
+        assert_eq!(result.drafts.len(), 2);
+        assert_eq!(result.drafts[0].name, "Track spending by category");
+        assert_eq!(
+            result.drafts[0].target,
+            "Users can assign each transaction to a budget category."
+        );
+        assert_eq!(result.drafts[0].reporter, "Product");
+        assert_eq!(result.drafts[1].priority, "high");
+    }
+
+    #[test]
+    fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
+        let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
+        assert!(prompt.contains("feature"));
+        assert!(prompt.contains("Gap drafts must be concrete product behavior"));
+        assert!(prompt.contains("do not mention Refine"));
+        assert!(prompt.contains("Product Spec"));
     }
 }
 
@@ -206,8 +258,13 @@ fn nonempty_import_option(value: &str) -> Option<&str> {
 fn import_extraction_prompt(text: &str, purpose: &str) -> String {
     let instruction = match purpose {
         "plan" => {
-            "Draft Feature Gap drafts from this Plan chat transcript. Return only draft data, \
-             one draft per line, using actual => target text."
+            "Extract one product Feature and its Gaps from this Plan chat transcript. Return only \
+             one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
+             \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
+             \"priority\":\"low\"}]}. The feature name and description must describe the user's \
+             product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
+             extraction, or how the plan was created. Gap drafts must be concrete product behavior \
+             gaps that are relevant to the spec."
         }
         "round" => {
             "Draft Round data from this Gap chat transcript. Return only one actual => target line."
@@ -222,6 +279,18 @@ fn import_extraction_prompt(text: &str, purpose: &str) -> String {
         }
     };
     format!("{instruction}\n\n{text}")
+}
+
+#[derive(Clone, Debug)]
+struct ImportExtractionResult {
+    drafts: Vec<ImportDraft>,
+    feature_destination: Option<PlanFeatureDestination>,
+}
+
+#[derive(Clone, Debug)]
+struct PlanFeatureDestination {
+    name: String,
+    description: String,
 }
 
 fn import_provider_from_settings(durable_root: &std::path::Path, body: &Value) -> String {
@@ -256,18 +325,25 @@ fn import_provider_from_settings(durable_root: &std::path::Path, body: &Value) -
         .unwrap_or_else(|| "claude".to_string())
 }
 
-fn parse_provider_import_output(
+fn parse_provider_import_result(
     output: &str,
     reporter: Option<&str>,
-) -> crate::core::supervisor::errors::RefineResult<Vec<crate::core::product::imports::ImportDraft>>
-{
+) -> crate::core::supervisor::errors::RefineResult<ImportExtractionResult> {
     if let Ok(value) = serde_json::from_str::<Value>(output) {
+        let feature_destination = plan_feature_destination_from_value(&value);
         let body = match value {
             Value::Array(items) => json!({ "drafts": items, "reporter": reporter.unwrap_or("") }),
+            Value::Object(mut object) => {
+                normalize_plan_feature_draft_object(&mut object);
+                Value::Object(object)
+            }
             other => other,
         };
         if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
-            return Ok(drafts);
+            return Ok(ImportExtractionResult {
+                drafts,
+                feature_destination,
+            });
         }
     }
 
@@ -282,11 +358,123 @@ fn parse_provider_import_output(
     {
         let body = json!({ "drafts": items, "reporter": reporter.unwrap_or("") });
         if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
-            return Ok(drafts);
+            return Ok(ImportExtractionResult {
+                drafts,
+                feature_destination: None,
+            });
         }
     }
 
-    FileImportService::new(PathBuf::new()).parse_text(output, reporter)
+    FileImportService::new(PathBuf::new())
+        .parse_text(output, reporter)
+        .map(|drafts| ImportExtractionResult {
+            drafts,
+            feature_destination: None,
+        })
+}
+
+fn normalize_plan_feature_draft_object(object: &mut Map<String, Value>) {
+    if object.get("drafts").is_some() || object.get("items").is_some() {
+        return;
+    }
+    if let Some(gaps) = object.get("gaps").cloned() {
+        object.insert("drafts".to_string(), gaps);
+        return;
+    }
+    if let Some(feature) = object.get("feature").and_then(Value::as_object) {
+        if let Some(gaps) = feature
+            .get("gaps")
+            .or_else(|| feature.get("drafts"))
+            .or_else(|| feature.get("items"))
+            .cloned()
+        {
+            object.insert("drafts".to_string(), gaps);
+        }
+    }
+}
+
+fn plan_feature_destination_from_value(value: &Value) -> Option<PlanFeatureDestination> {
+    let feature = match value {
+        Value::Object(object) => object
+            .get("feature")
+            .and_then(Value::as_object)
+            .or(Some(object)),
+        _ => None,
+    }?;
+    let name = sanitize_plan_feature_name(
+        feature
+            .get("name")
+            .or_else(|| feature.get("feature_name"))
+            .or_else(|| feature.get("title"))
+            .and_then(Value::as_str)
+            .unwrap_or(""),
+    );
+    let description = sanitize_plan_feature_description(
+        feature
+            .get("description")
+            .or_else(|| feature.get("summary"))
+            .and_then(Value::as_str)
+            .unwrap_or(""),
+    );
+    if name.is_empty() && description.is_empty() {
+        return None;
+    }
+    Some(PlanFeatureDestination { name, description })
+}
+
+fn sanitize_plan_feature_name(raw: &str) -> String {
+    let mut value = collapse_ws(raw);
+    for suffix in [
+        " - Product Spec",
+        " – Product Spec",
+        " — Product Spec",
+        ": Product Spec",
+        " Product Spec",
+    ] {
+        if value.to_lowercase().ends_with(&suffix.to_lowercase()) {
+            value.truncate(value.len().saturating_sub(suffix.len()));
+            value = collapse_ws(&value);
+        }
+    }
+    for prefix in ["Product Spec:", "Plan:", "Feature:", "Project:"] {
+        if value.to_lowercase().starts_with(&prefix.to_lowercase()) {
+            value = collapse_ws(&value[prefix.len()..]);
+        }
+    }
+    trim_feature_text(value, 80)
+}
+
+fn sanitize_plan_feature_description(raw: &str) -> String {
+    let value = collapse_ws(raw);
+    let lower = value.to_lowercase();
+    if lower.is_empty()
+        || lower.contains("created by plan")
+        || lower.contains("created from plan")
+        || lower.contains("plan mode")
+        || lower.contains("refine")
+        || lower.contains("product spec")
+        || lower.contains("draft")
+        || lower.contains("extract")
+    {
+        return String::new();
+    }
+    trim_feature_text(value, 500)
+}
+
+fn collapse_ws(raw: &str) -> String {
+    raw.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn trim_feature_text(value: String, max_chars: usize) -> String {
+    if value.chars().count() <= max_chars {
+        return value.trim().to_string();
+    }
+    let mut trimmed = value.chars().take(max_chars).collect::<String>();
+    trimmed = trimmed
+        .trim_end_matches(|ch: char| !ch.is_alphanumeric())
+        .trim()
+        .to_string();
+    trimmed
 }
 
 fn feature_detail_response_from_gaps(
@@ -2105,6 +2293,90 @@ impl InProcessWebServer {
     pub(super) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "extract imported Gaps");
         let body = request.body.unwrap_or_else(|| json!({}));
+        if body
+            .get("background")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            let Some(runtime_root) = &self.runtime_root else {
+                return runtime_root_unavailable("extract imported Gaps in the background");
+            };
+            let purpose = body
+                .get("purpose")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .unwrap_or("import");
+            let owner = if purpose == "plan" {
+                "import:extract:plan"
+            } else {
+                "import:extract"
+            };
+            let registry = FileJobRegistry::new(runtime_root);
+            let job = match registry.register(owner) {
+                Ok(job) => job,
+                Err(error) => return error_response(error),
+            };
+            let _ = registry.update_progress(
+                &job.id,
+                json!({
+                    "message": if purpose == "plan" {
+                        "Extracting Plan Feature and Gaps"
+                    } else {
+                        "Extracting import drafts"
+                    },
+                    "completed": 0,
+                    "total": 1
+                }),
+            );
+            let job = registry.status(&job.id).unwrap_or(job);
+            let server = self.clone();
+            let job_id = job.id.clone();
+            let runtime_root = runtime_root.clone();
+            thread::spawn(move || {
+                let registry = FileJobRegistry::new(&runtime_root);
+                let response = server.import_extract_response(durable_root, body);
+                let mut result = response.body.clone();
+                match result.as_object_mut() {
+                    Some(object) => {
+                        object.insert("http_status".to_string(), json!(response.status));
+                    }
+                    None => {
+                        result = json!({
+                            "http_status": response.status,
+                            "body": result
+                        });
+                    }
+                }
+                if response.status >= 400 {
+                    let error = result
+                        .get("error")
+                        .cloned()
+                        .unwrap_or_else(|| result.clone());
+                    let _ = registry.fail_with_error(&job_id, error);
+                    return;
+                }
+                let draft_count = result
+                    .get("drafts")
+                    .and_then(Value::as_array)
+                    .map(Vec::len)
+                    .unwrap_or(0);
+                let _ = registry.update_progress(
+                    &job_id,
+                    json!({
+                        "message": "Plan Feature and Gap drafts extracted",
+                        "completed": 1,
+                        "total": 1,
+                        "draft_count": draft_count
+                    }),
+                );
+                let _ = registry.finish_with_result(&job_id, JobState::Succeeded, result);
+            });
+            return ApiResponse::json(202, json!({"job": job_response(job)}));
+        }
+        self.import_extract_response(durable_root, body)
+    }
+
+    fn import_extract_response(&self, durable_root: PathBuf, body: Value) -> ApiResponse {
         let text = body_text(&body);
         let purpose = body
             .get("purpose")
@@ -2122,19 +2394,32 @@ impl InProcessWebServer {
             Ok(output) => output,
             Err(error) => return error_response(error),
         };
-        match parse_provider_import_output(
+        match parse_provider_import_result(
             &output,
             body.get("reporter").and_then(|value| value.as_str()),
         ) {
-            Ok(drafts) => ApiResponse::json(
-                200,
-                json!({
-                    "drafts": drafts,
+            Ok(result) => {
+                let mut body = json!({
+                    "drafts": result.drafts,
                     "provider": provider,
                     "purpose": purpose,
                     "source": "provider"
-                }),
-            ),
+                });
+                if let Some(feature) = result.feature_destination
+                    && let Some(object) = body.as_object_mut()
+                {
+                    object.insert(
+                        "feature_destination".to_string(),
+                        json!({
+                            "mode": "new",
+                            "newName": feature.name,
+                            "newDescription": feature.description,
+                            "existingId": ""
+                        }),
+                    );
+                }
+                ApiResponse::json(200, body)
+            }
             Err(error) => error_response(error),
         }
     }

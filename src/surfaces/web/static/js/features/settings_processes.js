@@ -614,6 +614,7 @@ function runnerWorkKindLabel(kind) {
   return {
     merger: "merger",
     governance: "governance",
+    plan_draft_extractor: "Plan Draft extractor",
     target_app_rebuilder: "target-app rebuilder",
     target_app_config_generator: "target-app config generator",
     sqlite_cache_rebuild: "projection cache rebuilder",

@@ -9,7 +9,7 @@ const FALLBACK: &str = "smoke-ai fallback response\n\nThis deterministic fallbac
 const GAP_AGENT: &str = "smoke-ai gap-agent response\n\nThe disposable refine-smoke Gap has been reviewed and no source changes are required.\n";
 const GOVERNANCE: &str = "smoke-ai governance response\n\nUse clear ownership, reversible changes, and explicit cleanup for refine-smoke artifacts.\n";
 const IMPORT: &str = "{\"kind\": \"import\", \"name\": \"refine-smoke imported gap one\", \"priority\": \"low\"}\n{\"kind\": \"import\", \"name\": \"refine-smoke imported gap two\", \"priority\": \"low\"}\n";
-const PLAN: &str = "smoke-ai plan actual behavior one => smoke-ai plan target behavior one\nsmoke-ai plan actual behavior two => smoke-ai plan target behavior two\n";
+const PLAN: &str = "{\n  \"feature\": {\n    \"name\": \"Smoke AI Plan Feature\",\n    \"description\": \"A deterministic product capability planned by the Smoke AI fixture.\",\n    \"gaps\": [\n      {\n        \"name\": \"Smoke AI plan gap one\",\n        \"actual\": \"smoke-ai plan actual behavior one\",\n        \"target\": \"smoke-ai plan target behavior one\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      },\n      {\n        \"name\": \"Smoke AI plan gap two\",\n        \"actual\": \"smoke-ai plan actual behavior two\",\n        \"target\": \"smoke-ai plan target behavior two\",\n        \"reporter\": \"\",\n        \"priority\": \"low\"\n      }\n    ]\n  }\n}\n";
 const ROUND: &str = "smoke-ai round actual behavior => smoke-ai round target behavior\n";
 const STANDALONE_GAP: &str =
     "smoke-ai standalone actual behavior => smoke-ai standalone target behavior\n";

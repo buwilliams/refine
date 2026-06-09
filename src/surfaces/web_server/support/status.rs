@@ -383,28 +383,43 @@ fn runner_reachable_value(runtime_root: &Path) -> bool {
 
 fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
     let status = if background_stopped { "paused" } else { "idle" };
-    let merger_job = FileJobRegistry::new(runtime_root)
+    let jobs = FileJobRegistry::new(runtime_root)
         .recover()
-        .ok()
-        .and_then(|jobs| {
-            jobs.into_iter()
-                .rev()
-                .find(|job| job.owner.starts_with("merger:"))
-        });
+        .unwrap_or_default();
+    let merger_job = jobs
+        .iter()
+        .rev()
+        .find(|job| job.owner.starts_with("merger:"));
+    let plan_extract_job = jobs
+        .iter()
+        .rev()
+        .find(|job| job.owner == "import:extract:plan");
     let merger_status = if background_stopped {
         "paused".to_string()
     } else {
         merger_job
-            .as_ref()
             .map(|job| job.state.as_api_status().to_string())
             .unwrap_or_else(|| "idle".to_string())
     };
     let merger_gap_id = merger_job
-        .as_ref()
         .and_then(|job| job.owner.strip_prefix("merger:"))
         .map(ToString::to_string);
+    let plan_extract_status = if background_stopped {
+        "paused".to_string()
+    } else {
+        plan_extract_job
+            .map(|job| job.state.as_api_status().to_string())
+            .unwrap_or_else(|| "idle".to_string())
+    };
+    let plan_extract_details = plan_extract_job
+        .and_then(|job| job.progress.get("message").and_then(Value::as_str))
+        .unwrap_or("Plan Draft extraction is ready for Draft Feature requests");
     let mut rows = [
         ("merger", "serial Gap branch merger"),
+        (
+            "plan_draft_extractor",
+            "Plan Draft extraction is ready for Draft Feature requests",
+        ),
         (
             "target_app_rebuilder",
             "target-app rebuild worker is ready for manual rebuild requests",
@@ -431,8 +446,17 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
                 "elapsed_seconds": 0,
                 "queued": 0,
                 "details": details,
-                "job_id": merger_job.as_ref().map(|job| job.id.clone()),
+                "job_id": merger_job.map(|job| job.id.clone()),
                 "gap_id": merger_gap_id
+            })
+        } else if kind == "plan_draft_extractor" {
+            json!({
+                "kind": kind,
+                "status": plan_extract_status,
+                "elapsed_seconds": 0,
+                "queued": 0,
+                "details": plan_extract_details,
+                "job_id": plan_extract_job.map(|job| job.id.clone())
             })
         } else {
             json!({
