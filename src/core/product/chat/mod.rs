@@ -763,13 +763,14 @@ impl FileChatService {
             ChatAttachment::Feature(id) => format!("Feature {id}"),
             ChatAttachment::Standalone => "standalone chat".to_string(),
         };
+        let instructions = chat_mode_instructions(record);
         let context = self
             .attached_product_context(record)
             .unwrap_or_else(|error| {
                 format!("Attachment context could not be rebuilt from durable records: {error}")
             });
         format!(
-            "Refine {mode} chat attached to {attachment}.\n\nCurrent durable context:\n{context}\n\nUser message:\n{message}",
+            "Refine {mode} chat attached to {attachment}.\n\n{instructions}\n\nCurrent durable context:\n{context}\n\nUser message:\n{message}",
             mode = record.mode
         )
     }
@@ -816,6 +817,28 @@ impl FileChatService {
         .map_err(|error| {
             RefineError::Serialization(format!("failed to encode chat attachment context: {error}"))
         })
+    }
+}
+
+fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
+    if record.mode.eq_ignore_ascii_case("plan") {
+        return "Plan Mode drafts the whole picture of the software. Respond with a product \
+                spec that defines the software purpose, the major features it should include, \
+                and the user/system surfaces where those features appear. Include enough \
+                concrete behavior that the Draft Feature action can later extract Features and \
+                Gaps from the transcript. Do not reduce the answer to generic strategy, \
+                prioritization advice, or a single suggested next action.";
+    }
+    match &record.attachment {
+        ChatAttachment::Gap(_) => {
+            "Discuss the attached Gap and focus on concrete changes, evidence, and next steps for that Gap."
+        }
+        ChatAttachment::Feature(_) => {
+            "Discuss the attached Feature and focus on its included Gaps, workflow state, and delivery plan."
+        }
+        ChatAttachment::Standalone => {
+            "Discuss the requested Refine workflow. When drafting work, use concrete Gap-ready behavior."
+        }
     }
 }
 
@@ -1108,6 +1131,29 @@ mod tests {
         assert!(prompt.contains("\"id\": \"GAP1\""));
         assert!(prompt.contains("\"name\": \"Checkout fails\""));
         assert!(prompt.contains("What changed?"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_chat_service_plan_prompt_drafts_software_specs() {
+        let temp_root = unique_temp_dir("chat-plan-prompt");
+        let durable_root = temp_root.join(".refine");
+        let service = FileChatService::new(&durable_root);
+        let session = service
+            .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("plan"))
+            .unwrap();
+
+        let prompt = service.chat_prompt(&session, "Plan authentication cleanup.");
+        assert!(prompt.contains("Plan Mode drafts the whole picture of the software"));
+        assert!(prompt.contains("product spec"));
+        assert!(prompt.contains("software purpose"));
+        assert!(prompt.contains("major features"));
+        assert!(prompt.contains("user/system surfaces"));
+        assert!(prompt.contains("Draft Feature action can later extract Features and Gaps"));
+        assert!(prompt.contains("Do not reduce the answer to generic strategy"));
+        assert!(!prompt.contains("highest-leverage"));
+        assert!(prompt.contains("Plan authentication cleanup."));
 
         fs::remove_dir_all(temp_root).unwrap();
     }
