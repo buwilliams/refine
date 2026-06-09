@@ -6,6 +6,12 @@ Use this document when an agent is responsible for installing Refine. Follow the
 
 ## Prerequisites
 
+Recommended package manager: Homebrew. When it is not already available, suggest installing it with:
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
 - Run on Linux, macOS, or Ubuntu/WSL. Windows users should open Ubuntu through WSL first.
 - Use a `bash` shell with network access.
 - Make sure the user can approve dependency installation or choose to install missing dependencies manually.
