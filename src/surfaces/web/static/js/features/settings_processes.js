@@ -19,6 +19,9 @@ function renderProcessesTab(processData, settings, diag, dash) {
   const rows = buildManagedProcessRows(
     processes, { backgroundStopped, agentsPaused }, backend, runnerReachable, diag,
   ).map((proc) => renderManagedProcessRow(proc)).join("");
+  const agentRows = (processes || [])
+    .filter(isCurrentAgentProviderProcessRecord)
+    .map((proc) => renderAgentProcessRow(proc, anchorMs)).join("");
   const subprocessRows = (processes || [])
     .filter(isCurrentSubprocessRecord)
     .map((proc) => renderSubprocessProcessRow(proc, anchorMs)).join("");
@@ -44,6 +47,29 @@ function renderProcessesTab(processData, settings, diag, dash) {
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>` : `<p class="muted">No managed processes found.</p>`}
+    </section>
+
+    <section class="settings-section">
+      <h3>${renderSettingsGuideLabel("Agents", "process-agent-processes")}</h3>
+      ${agentRows ? `
+        <table class="table process-table agents-process-table mobile-card-table" data-testid="agent-process-table">
+          <colgroup>
+            <col class="agent-col">
+            <col class="status-col">
+            <col class="pid-col">
+            <col class="round-col">
+            <col class="cpu-col">
+            <col class="memory-col">
+            <col class="elapsed-col">
+            <col class="idle-col">
+            <col class="agent-actions-col">
+          </colgroup>
+          <thead><tr>
+            <th>Agent</th><th>Status</th><th>PID</th><th>Context</th>
+            <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Idle</th><th></th>
+          </tr></thead>
+          <tbody>${agentRows}</tbody>
+        </table>` : `<p class="muted">No agent provider calls running.</p>`}
     </section>
 
     <section class="settings-section">
@@ -166,11 +192,19 @@ function syntheticTargetAppProcess() {
 }
 
 function isSubprocessRecord(proc = {}) {
-  return !isLongLivedManagedProcess(proc);
+  return !isLongLivedManagedProcess(proc) && !isAgentProviderProcessRecord(proc);
 }
 
 function isCurrentSubprocessRecord(proc = {}) {
   return isSubprocessRecord(proc) && isCurrentProcessStatus(proc.status);
+}
+
+function isAgentProviderProcessRecord(proc = {}) {
+  return new Set(["agent", "chat"]).has(proc.kind);
+}
+
+function isCurrentAgentProviderProcessRecord(proc = {}) {
+  return isAgentProviderProcessRecord(proc) && isCurrentProcessStatus(proc.status);
 }
 
 function isCurrentProcessStatus(status = "") {
@@ -320,7 +354,7 @@ function renderAgentProcessRow(proc, anchorMs) {
     ? String(Number(proc.round_idx) + 1)
     : "";
   return `
-    <tr data-testid="subprocess-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+    <tr data-testid="agent-process-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
       <td data-label="Agent">${label}</td>
       <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
       <td data-label="PID">${pid}</td>

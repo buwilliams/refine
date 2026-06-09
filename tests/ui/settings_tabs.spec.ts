@@ -766,7 +766,7 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
   }
 });
 
-test("keeps long subprocess labels inside the subprocess column", async ({ page, request }) => {
+test("keeps long agent labels inside the agent column", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const processDirs = testRuntimeProcessDirs();
   const processId = "ui-long-subprocess-label";
@@ -794,8 +794,8 @@ test("keeps long subprocess labels inside the subprocess column", async ({ page,
 
     await page.setViewportSize({ width: 1040, height: 800 });
     await page.goto("/#/node/processes");
-    const row = page.locator(`[data-testid="subprocess-row"][data-process-id="${processId}"]`);
-    const labelCode = row.locator('td[data-label="Subprocess"] code');
+    const row = page.locator(`[data-testid="agent-process-row"][data-process-id="${processId}"]`);
+    const labelCode = row.locator('td[data-label="Agent"] code');
     const statusCell = row.locator('td[data-label="Status"]');
     await expect(row).toBeVisible();
     await expect(labelCode).toBeVisible();
@@ -911,14 +911,15 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
 
     await page.goto("/#/node/processes");
     const agentRow = page.locator(
-      '[data-testid="subprocess-row"][data-process-id="ui-agent-process"]',
+      '[data-testid="agent-process-row"][data-process-id="ui-agent-process"]',
     );
     const standaloneChatRow = page.locator(
-      `[data-testid="subprocess-row"][data-process-id="chat-session-${standaloneSessionId}"]`,
+      `[data-testid="agent-process-row"][data-process-id="chat-session-${standaloneSessionId}"]`,
     );
     const gapChatRow = page.locator(
-      `[data-testid="subprocess-row"][data-process-id="chat-session-${gapSessionId}"]`,
+      `[data-testid="agent-process-row"][data-process-id="chat-session-${gapSessionId}"]`,
     );
+    await expect(page.getByTestId("agent-process-table")).toBeVisible();
     await expect(agentRow).toBeVisible();
     await expect(agentRow.getByTestId("process-cancel-agent")).toBeVisible();
     await expect(standaloneChatRow).toBeVisible();
@@ -928,7 +929,7 @@ test("cancels agent and stops chat subprocesses from the Processes tab", async (
     await expect(gapChatRow).toContainText("Gap chat");
     await expect(gapChatRow.getByTestId("process-stop-chat")).toBeVisible();
     await expect(page.locator(
-      '[data-testid="subprocess-row"][data-process-id="ui-exited-process"]',
+      '[data-testid="agent-process-row"][data-process-id="ui-exited-process"]',
     )).toHaveCount(0);
 
     const cancelled = page.waitForResponse((response) =>
