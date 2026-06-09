@@ -684,13 +684,13 @@ test("runs AI plan, draft, and target-app generation from the command palette", 
     const extracted = page.waitForResponse((response) =>
       response.url().includes("/api/import/extract") &&
       response.request().method() === "POST" &&
-      response.status() === 200
+      response.status() === 202
     );
     await runPaletteCommand(page, "draft-gaps");
-    await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
+    await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0);
     const extractPayload = await (await extracted).json();
-    expect(extractPayload.provider).toBe("smoke-ai");
-    expect(extractPayload.source).toBe("provider");
+    expect(String(extractPayload.job?.id ?? "")).toBeTruthy();
+    await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
     await page.getByTestId("import-feature-new-name").fill(featureName);
     await expect(page.getByTestId("import-draft-actual").first()).toHaveValue(/smoke-ai plan actual behavior one/);
 

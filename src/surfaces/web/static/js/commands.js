@@ -280,12 +280,12 @@ registerCommand({
 
 registerCommand({
   id: "plan.draft",
-  title: "Draft Gaps from plan",
+  title: "Draft Feature from plan",
   group: "AI",
   aliases: ["draft-plan", "draft-gaps"],
   visible: () => !!chatState?.tabs?.plan,
   enabled: () => planHasAgentResponse(chatState.tabs.plan),
-  disabledMessage: "Wait for the agent to respond before drafting Gaps.",
+  disabledMessage: "Wait for the agent to respond before drafting a Feature.",
   run: () => draftGapsFromPlan(),
 });
 

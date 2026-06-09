@@ -18,6 +18,9 @@ async function extractImportDrafts(text, draftsRoot, signal = null, options = {}
     throw new Error(`AI extraction failed: ${e.message}`);
   }
   const drafts = r.drafts || [];
+  if (r.feature_destination && Array.isArray(drafts)) {
+    drafts.featureDestination = r.feature_destination;
+  }
   if (draftsRoot) {
     drawImportProgress(draftsRoot, {
       phase: "complete",
@@ -26,6 +29,68 @@ async function extractImportDrafts(text, draftsRoot, signal = null, options = {}
     });
   }
   return drafts;
+}
+
+let planDraftExtractionPromise = null;
+
+async function extractPlanDraftsInBackground(text) {
+  if (planDraftExtractionPromise) return await planDraftExtractionPromise;
+  planDraftExtractionPromise = (async () => {
+    const response = await api("POST", "/api/import/extract", {
+      text,
+      purpose: "plan",
+      background: true,
+    });
+    if (!response?.job?.id) return response;
+    recordUiNotice("Plan Draft extraction queued", {
+      kind: "queued",
+      source: "background-job",
+      details: { job_id: response.job.id },
+    });
+    try {
+      const result = await waitForBackgroundJob(response.job.id, {
+        onProgress: (progress, job) => {
+          const message = String(progress?.message || "").trim();
+          if (message) {
+            recordUiNotice(message, {
+              kind: job?.status === "complete" ? "success" : "info",
+              source: "background-job",
+              details: { job_id: response.job.id },
+            });
+          }
+          if (state.currentRoute === "node" && typeof refreshCurrentSettingsSurface === "function") {
+            refreshCurrentSettingsSurface();
+          }
+        },
+      });
+      if (result?.http_status && result.http_status >= 400) {
+        const raw = result.error || {};
+        const err = new Error(raw.message || "Plan Draft extraction failed");
+        err.details = raw.details;
+        err.code = raw.code;
+        throw err;
+      }
+      recordUiNotice("Plan Draft extraction completed", {
+        kind: "success",
+        source: "background-job",
+        details: { job_id: response.job.id },
+      });
+      return result;
+    } catch (error) {
+      recordUiNotice(error.message || "Plan Draft extraction failed", {
+        kind: "error",
+        source: "background-job",
+        details: { job_id: response.job.id, code: error.code || "" },
+      });
+      throw error;
+    } finally {
+      planDraftExtractionPromise = null;
+      if (state.currentRoute === "node" && typeof refreshCurrentSettingsSurface === "function") {
+        refreshCurrentSettingsSurface();
+      }
+    }
+  })();
+  return await planDraftExtractionPromise;
 }
 
 function drawImportProgress(root, state) {
@@ -54,6 +119,25 @@ async function reviewImportDrafts(root, drafts, close, saveSession = null) {
 }
 
 async function openPlanDraftModalFromText(text) {
+  const drafts = await extractImportDrafts(text, null, null, { purpose: "plan" });
+  await openPlanDraftModalFromDrafts(text, drafts, {
+    mode: "new",
+    newName: drafts.featureDestination?.newName || inferPlanFeatureName(text),
+    newDescription: drafts.featureDestination?.newDescription || inferPlanFeatureDescription(text),
+    existingId: "",
+  });
+}
+
+async function openPlanDraftModalFromResult(text, result) {
+  await openPlanDraftModalFromDrafts(text, result?.drafts || [], result?.feature_destination || {
+    mode: "new",
+    newName: inferPlanFeatureName(text),
+    newDescription: inferPlanFeatureDescription(text),
+    existingId: "",
+  });
+}
+
+async function openPlanDraftModalFromDrafts(_text, drafts, featureDestination) {
   const root = document.createElement("div");
   root.className = "modal-backdrop";
   root.innerHTML = `
@@ -95,7 +179,6 @@ async function openPlanDraftModalFromText(text) {
   root.querySelector("[data-cancel]").addEventListener("click", () => close(false));
   const draftsRoot = root.querySelector("#import-drafts");
   try {
-    const drafts = await extractImportDrafts(text, draftsRoot, abort.signal, { purpose: "plan" });
     drafts.forEach((draft) => {
       draft.reporter = draft.reporter || state.lastReporter || "";
       draft.priority = draft.priority || "low";
@@ -105,12 +188,7 @@ async function openPlanDraftModalFromText(text) {
     if (closed) return;
     drawImportDrafts(root, annotated, close, {
       clearSession: false,
-      featureDestination: {
-        mode: "new",
-        newName: inferPlanFeatureName(text),
-        newDescription: "Created from Plan Mode.",
-        existingId: "",
-      },
+      featureDestination,
     });
   } catch (e) {
     if (e.name === "AbortError") return;
@@ -127,8 +205,21 @@ function inferPlanFeatureName(text) {
     .find(Boolean) || "Planned Feature";
   const cleaned = firstLine
     .replace(/^(plan|feature|proposal)\s*[:\-]\s*/i, "")
+    .replace(/\s*[-–—:]\s*product spec$/i, "")
+    .replace(/\s+product spec$/i, "")
     .trim() || "Planned Feature";
   return cleaned.length > 80 ? cleaned.slice(0, 77).trimEnd() + "..." : cleaned;
+}
+
+function inferPlanFeatureDescription(text) {
+  const lines = String(text || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^>\s*/.test(line))
+    .filter((line) => !/refine|plan mode|product spec|draft|extract/i.test(line));
+  const candidate = lines.find((line, index) => index > 0 && line.length > 20) || "";
+  return candidate.length > 500 ? candidate.slice(0, 497).trimEnd() + "..." : candidate;
 }
 
 async function annotateImportDuplicateDrafts(drafts) {

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { ensureAttachedProject, jsonObject } from "./helpers";
 
 async function selectReporter(page: Page) {
@@ -17,6 +17,26 @@ async function closePlanTabIfPresent(page: Page) {
     await planTab.locator("[data-close-tab]").click();
     await expect(page.getByTestId("toolbar-tab-plan")).toHaveCount(0);
   }
+}
+
+function waitForPlanExtractionQueued(page: Page) {
+  return page.waitForResponse((response) =>
+    response.url().includes("/api/import/extract") &&
+    response.request().method() === "POST" &&
+    response.status() === 202
+  );
+}
+
+async function expectPlanExtractionProcess(request: APIRequestContext, jobId: string) {
+  const processPayload = await jsonObject(await request.get("/api/processes"));
+  const runnerWork = processPayload.runner_work as Array<{
+    kind?: string;
+    job_id?: string;
+    status?: string;
+  }> | undefined;
+  const planExtractor = (runnerWork ?? []).find((work) => work.kind === "plan_draft_extractor");
+  expect(planExtractor?.job_id).toBe(jobId);
+  expect(["running", "complete"].includes(String(planExtractor?.status ?? ""))).toBe(true);
 }
 
 test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ page, request }) => {
@@ -97,9 +117,17 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
     await expect(page.getByTestId("chat-output")).toContainText("smoke-ai plan actual behavior one", { timeout: 45_000 });
     await expect(page.getByTestId("plan-draft")).toBeEnabled();
 
+    const extractionQueued = waitForPlanExtractionQueued(page);
     await page.getByTestId("plan-draft").click();
+    await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0);
+    const extractionPayload = await (await extractionQueued).json();
+    const extractionJobId = String(extractionPayload.job?.id ?? "");
+    expect(extractionJobId).toBeTruthy();
+    await expectPlanExtractionProcess(request, extractionJobId);
     await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
     await expect(page.getByTestId("import-feature-mode-new")).toBeChecked();
+    await expect(page.getByTestId("import-feature-new-name")).toHaveValue("Smoke AI Plan Feature");
+    await expect(page.getByTestId("import-feature-new-description")).toHaveValue("A deterministic product capability planned by the Smoke AI fixture.");
     await expect(page.getByTestId("import-draft-actual").first()).toHaveValue(/smoke-ai plan actual behavior one/);
     await expect(page.getByTestId("import-draft-target").first()).toHaveValue(/smoke-ai plan target behavior one/);
     await expect(page.getByTestId("import-duplicate-decision")).toHaveText("Needs duplicate resolution");
@@ -230,7 +258,11 @@ test("updates an original Gap from a Plan draft duplicate decision", async ({ pa
     await expect(page.getByTestId("chat-output")).toContainText("smoke-ai plan actual behavior one", { timeout: 45_000 });
     await expect(page.getByTestId("plan-draft")).toBeEnabled();
 
+    const extractionQueued = waitForPlanExtractionQueued(page);
     await page.getByTestId("plan-draft").click();
+    await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0);
+    const extractionPayload = await (await extractionQueued).json();
+    expect(String(extractionPayload.job?.id ?? "")).toBeTruthy();
     await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
     await expect(page.getByTestId("import-duplicate-decision")).toHaveText("Needs duplicate resolution");
     await page.getByTestId("import-draft-priority").first().selectOption("high");
