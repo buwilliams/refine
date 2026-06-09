@@ -54,7 +54,7 @@ Use `./r test` as the authoritative test entrypoint. The default command runs on
 ./r test --full
 ```
 
-Use `./r test --full` for the full verification set. The full gate runs unit tests, Rust doc tests, xtask checks, Rust integration tests, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, full workflow, multi-instance sync, Playwright UI tests, and `git diff --check`.
+The release gate is `./r test`, the unit-only default. Use `./r test --full` when you explicitly want all suites and repository checks: unit tests, Rust doc tests, xtask checks, Rust integration tests, smoke AI contract, daemon-backed CLI surface, Docker/SSH-backed cluster CLI tests, Docker-backed install/uninstall tests, full workflow, multi-instance sync, Playwright UI tests, and `git diff --check`.
 
 Focused suites:
 

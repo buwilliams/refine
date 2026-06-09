@@ -35,7 +35,7 @@ Usage: ./r test [SUITE]
 Suites:
   --unit          Run in-crate Rust unit tests only. This is the default.
   --integration   Run opt-in integration, daemon, Docker, cluster, and UI suites.
-  --full          Run the full release gate.
+  --full          Run all test suites and repository checks.
 
 Focused xtask suites:
   --rust

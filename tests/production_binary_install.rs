@@ -111,6 +111,19 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
         "command=cargo run --manifest-path {repo}/xtask/Cargo.toml -- test-cli"
     )));
 
+    let help = Command::new("bash")
+        .arg("r")
+        .arg("test")
+        .arg("--help")
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .output()
+        .unwrap();
+    assert!(help.status.success());
+    let help_stderr = String::from_utf8_lossy(&help.stderr);
+    assert!(help_stderr.contains("--full          Run all test suites and repository checks."));
+    assert!(!help_stderr.contains("--full          Run the full release gate."));
+
     let unknown = Command::new("bash")
         .arg("r")
         .arg("test")
