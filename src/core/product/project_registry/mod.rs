@@ -17,6 +17,12 @@ pub const APP_REGISTRY_FILE: &str = "apps.json";
 
 pub trait ProjectRegistryService {
     fn register(&self, app: RegisteredApp) -> RefineResult<AppRegistry>;
+    fn create_local_project(
+        &self,
+        path: &str,
+        name: Option<&str>,
+        make_current: bool,
+    ) -> RefineResult<ProjectStatus>;
     fn attach(&self, path: &str) -> RefineResult<ProjectStatus>;
     fn switch(&self, name: &str) -> RefineResult<ProjectStatus>;
     fn detach(&self) -> RefineResult<ProjectStatus>;
@@ -222,6 +228,9 @@ impl FileProjectRegistryService {
 
     pub fn attach_with_migration(&self, path: &str) -> RefineResult<ProjectStatus> {
         let app_path = normalize_app_path(path)?;
+        if should_create_local_project(&app_path)? {
+            return self.create_local_project_at(&app_path, None, true);
+        }
         let display_path = app_path.display().to_string();
         self.ensure_schema_ready(&app_path)?;
         let mut registry = self.load()?;
@@ -241,6 +250,49 @@ impl FileProjectRegistryService {
         );
         self.save(&registry)?;
         project_status_for(registry, Some(display_path), true)
+    }
+
+    pub fn create_local_project_at(
+        &self,
+        app_path: &Path,
+        name: Option<&str>,
+        make_current: bool,
+    ) -> RefineResult<ProjectStatus> {
+        if app_path.exists() && !app_path.is_dir() {
+            return Err(RefineError::Conflict(format!(
+                "project destination {} exists and is not a directory",
+                app_path.display()
+            )));
+        }
+        if app_path.exists() && !should_create_local_project(app_path)? {
+            return Err(RefineError::Conflict(format!(
+                "project destination {} is not empty",
+                app_path.display()
+            )));
+        }
+        if let Some(parent) = app_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to create project parent {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        fs::create_dir_all(app_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create project directory {}: {error}",
+                app_path.display()
+            ))
+        })?;
+        self.git_init(app_path)?;
+        FileProjectMigrationService::with_runtime_root(
+            app_path.join(".refine"),
+            self.runtime_root.clone(),
+        )
+        .initialize_current_schema()?;
+        let display_path = app_path.display().to_string();
+        self.register_path(name, &display_path, make_current)?;
+        self.inspect(&display_path)
     }
 
     pub fn switch_with_migration(&self, name: &str) -> RefineResult<ProjectStatus> {
@@ -325,6 +377,43 @@ impl FileProjectRegistryService {
         };
         Ok(PathBuf::from(app).join(".refine"))
     }
+
+    fn git_init(&self, app_path: &Path) -> RefineResult<()> {
+        if app_path.join(".git").exists() {
+            return Ok(());
+        }
+        let output = FileProcessSupervisor::new(&self.runtime_root).run_to_completion(
+            ManagedProcessSpec {
+                owner: ProcessOwner::Maintenance,
+                command: "git".to_string(),
+                args: vec![
+                    "init".to_string(),
+                    "-b".to_string(),
+                    "main".to_string(),
+                    app_path.display().to_string(),
+                ],
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: Some("git init".to_string()),
+                sensitive: false,
+            },
+        )?;
+        if output.success() {
+            Ok(())
+        } else {
+            let stderr = output.stderr.trim().to_string();
+            Err(RefineError::Conflict(format!(
+                "git init failed{}",
+                if stderr.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {stderr}")
+                }
+            )))
+        }
+    }
 }
 
 impl ProjectRegistryService for FileProjectRegistryService {
@@ -333,6 +422,16 @@ impl ProjectRegistryService for FileProjectRegistryService {
         upsert_app(&mut registry, app, false);
         self.save(&registry)?;
         Ok(registry)
+    }
+
+    fn create_local_project(
+        &self,
+        path: &str,
+        name: Option<&str>,
+        make_current: bool,
+    ) -> RefineResult<ProjectStatus> {
+        let app_path = normalize_app_path(path)?;
+        self.create_local_project_at(&app_path, name, make_current)
     }
 
     fn attach(&self, path: &str) -> RefineResult<ProjectStatus> {
@@ -464,6 +563,22 @@ fn upsert_app(registry: &mut AppRegistry, app: RegisteredApp, make_current: bool
     if make_current {
         registry.active_app = Some(key);
     }
+}
+
+fn should_create_local_project(app_path: &Path) -> RefineResult<bool> {
+    if !app_path.exists() {
+        return Ok(true);
+    }
+    if !app_path.is_dir() || app_path.join(".git").exists() {
+        return Ok(false);
+    }
+    let mut entries = fs::read_dir(app_path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to inspect project directory {}: {error}",
+            app_path.display()
+        ))
+    })?;
+    Ok(entries.next().is_none())
 }
 
 pub fn registry_apps_array(registry: &AppRegistry) -> Vec<serde_json::Value> {
@@ -604,6 +719,32 @@ mod tests {
                 .unwrap()
                 .name,
             "cloned"
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_project_registry_attach_creates_missing_local_project() {
+        let temp_root = unique_temp_dir("project-registry-create-local");
+        let runtime_root = temp_root.join("run/8080");
+        let destination = temp_root.join("new-app");
+        let service = FileProjectRegistryService::new(&runtime_root, None);
+
+        let status = service.attach(destination.to_str().unwrap()).unwrap();
+
+        assert_eq!(
+            status.client_repo.as_deref(),
+            Some(destination.to_str().unwrap())
+        );
+        assert!(destination.join(".git").exists());
+        assert!(destination.join(".refine/refine.json").exists());
+        assert!(runtime_root.join("processes").exists());
+        assert!(!destination.join(".refine/runtime/processes").exists());
+        let registry = service.load().unwrap();
+        assert_eq!(
+            registry.active_app.as_deref(),
+            Some(destination.to_str().unwrap())
         );
 
         fs::remove_dir_all(temp_root).unwrap();

@@ -42,6 +42,36 @@ impl FileProjectMigrationService {
         schema_status(&self.durable_root)
     }
 
+    pub fn initialize_current_schema(&self) -> RefineResult<()> {
+        let schema = self.status()?;
+        if schema.compatible && !schema.migration_required && schema.schema_version.is_some() {
+            return Ok(());
+        }
+        if schema.migration_required {
+            return Err(RefineError::Conflict(
+                schema
+                    .operator_instructions
+                    .clone()
+                    .or(schema.reason.clone())
+                    .unwrap_or_else(|| "project migration required".to_string()),
+            ));
+        }
+        if !schema.compatible {
+            return Err(RefineError::Conflict(
+                schema
+                    .reason
+                    .unwrap_or_else(|| "project schema is not compatible".to_string()),
+            ));
+        }
+        fs::create_dir_all(&self.durable_root).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create durable root {}: {error}",
+                self.durable_root.display()
+            ))
+        })?;
+        write_json_atomic(&self.config_path(), &current_project_config())
+    }
+
     pub fn migrate(&self) -> RefineResult<ProjectMigrationReport> {
         let before = self.status()?;
         if before.compatible && !before.migration_required {
@@ -128,16 +158,7 @@ impl FileProjectMigrationService {
         });
         write_json_atomic(&backup_dir.join("manifest.json"), &manifest)?;
 
-        let config = ProjectConfig {
-            schema_version: CURRENT_PROJECT_SCHEMA_VERSION,
-            refine: RefineVersion {
-                version: env!("CARGO_PKG_VERSION").to_string(),
-            },
-            created_at: now_timestamp(),
-            updated_at: now_timestamp(),
-            settings: JsonObject::new(),
-        };
-        write_json_atomic(&config_path, &config)?;
+        write_json_atomic(&config_path, &current_project_config())?;
         Ok(backup_dir)
     }
 
@@ -313,6 +334,18 @@ fn write_json_atomic(path: &Path, value: &impl serde::Serialize) -> RefineResult
     fs::rename(&temp_path, path).map_err(|error| {
         RefineError::Io(format!("failed to commit JSON {}: {error}", path.display()))
     })
+}
+
+fn current_project_config() -> ProjectConfig {
+    ProjectConfig {
+        schema_version: CURRENT_PROJECT_SCHEMA_VERSION,
+        refine: RefineVersion {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+        },
+        created_at: now_timestamp(),
+        updated_at: now_timestamp(),
+        settings: JsonObject::new(),
+    }
 }
 
 fn remove_file_if_exists(path: &Path) -> RefineResult<()> {

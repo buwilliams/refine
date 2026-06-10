@@ -4157,6 +4157,33 @@ fn web_server_reports_project_registry_and_updates_settings() {
 }
 
 #[test]
+fn web_server_project_attach_creates_missing_local_project() {
+    let temp_root = unique_temp_dir("http-project-create-local");
+    let destination = temp_root.join("new-app");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.runtime_root = Some(runtime_root.clone());
+
+    let attached = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/attach".to_string(),
+        body: Some(json!({"path": destination.display().to_string()})),
+    });
+
+    assert_eq!(attached.status, 200);
+    assert_eq!(
+        attached.body["client_repo"],
+        destination.display().to_string()
+    );
+    assert!(destination.join(".git").exists());
+    assert!(destination.join(".refine/refine.json").exists());
+    assert!(runtime_root.join("processes").exists());
+    assert!(!destination.join(".refine/runtime/processes").exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_applies_runtime_settings_updates_immediately() {
     let temp_root = unique_temp_dir("http-runtime-settings-apply");
     let app_root = temp_root.join("app");

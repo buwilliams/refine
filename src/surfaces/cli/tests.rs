@@ -301,6 +301,34 @@ fn project_clone_uses_shared_file_project_registry_service() {
 }
 
 #[test]
+fn project_attach_creates_missing_local_project() {
+    let temp_root = unique_temp_dir("cli-project-create-local");
+    let runtime_root = temp_root.join("run");
+    let destination = temp_root.join("new-app");
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "attach",
+            destination.to_str().unwrap(),
+            "--runtime-root",
+            runtime_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    assert!(destination.join(".git").exists());
+    assert!(destination.join(".refine/refine.json").exists());
+    let registry: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(runtime_root.join("apps.json")).unwrap()).unwrap();
+    assert_eq!(registry["active_app"], destination.to_str().unwrap());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn project_and_system_doctor_and_migrate_use_observability_services() {
     let temp_root = unique_temp_dir("cli-doctor-migrate");
     let durable_root = temp_root.join(".refine");
