@@ -302,6 +302,11 @@ impl LocalHttpDaemon {
         if request.method == "GET" && (request.path == "/events" || request.path == "/api/sse") {
             return self.sse_response("events");
         }
+        if request.method == "GET"
+            && let Some(session_id) = terminal_events_route(&request.path)
+        {
+            return self.terminal_sse_response(session_id);
+        }
         self.handle_wire_request(request).into_response()
     }
 
@@ -312,6 +317,9 @@ impl LocalHttpDaemon {
                 Ok(events) => WireResponse::sse(events),
                 Err(error) => WireResponse::json(error_response(error)),
             };
+        }
+        if request.method == "GET" && terminal_events_route(&request.path).is_some() {
+            return WireResponse::json(self.server.handle_terminal_events_snapshot(&request.path));
         }
 
         if request.method != "GET" {
@@ -656,6 +664,54 @@ impl LocalHttpDaemon {
             .into_response()
     }
 
+    fn terminal_sse_response(&self, session_id: String) -> Response {
+        let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
+        tokio::spawn(async move {
+            let mut after = 0_u64;
+            loop {
+                match terminal_events_since(&session_id, after) {
+                    Ok(events) => {
+                        for payload in events {
+                            let seq = payload.get("seq").and_then(Value::as_u64).unwrap_or(after);
+                            let event = payload
+                                .get("event")
+                                .and_then(Value::as_str)
+                                .unwrap_or("terminal_output");
+                            if seq > after {
+                                after = seq;
+                            }
+                            if tx
+                                .send(Ok(Event::default().event(event).data(payload.to_string())))
+                                .await
+                                .is_err()
+                            {
+                                return;
+                            }
+                            if event == "terminal_exit" {
+                                return;
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        let event = Event::default()
+                            .event("terminal_error")
+                            .data(json!({"message": error.to_string()}).to_string());
+                        let _ = tx.send(Ok(event)).await;
+                        return;
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(80)).await;
+            }
+        });
+        Sse::new(ReceiverStream::new(rx))
+            .keep_alive(
+                KeepAlive::new()
+                    .interval(Duration::from_secs(15))
+                    .text("heartbeat"),
+            )
+            .into_response()
+    }
+
     fn server_sent_event_frames(&self, stream: &str) -> RefineResult<Vec<SseEventFrame>> {
         let projection = self.server.current_projection_with_runtime()?;
         let mut events = vec![
@@ -740,6 +796,18 @@ impl LocalHttpDaemon {
         }
         Ok(events)
     }
+}
+
+fn terminal_events_route(path: &str) -> Option<String> {
+    let path = path.split('?').next().unwrap_or(path);
+    let rest = path
+        .strip_prefix("/api/terminal/")
+        .or_else(|| path.strip_prefix("/terminal/"))?;
+    let session_id = rest.strip_suffix("/events")?;
+    if session_id.is_empty() || session_id.contains('/') {
+        return None;
+    }
+    Some(session_id.to_string())
 }
 
 fn run_agent_scheduler_once(server: &InProcessWebServer) -> RefineResult<()> {

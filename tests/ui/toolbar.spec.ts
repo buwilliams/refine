@@ -239,15 +239,9 @@ test("filters system operations in the toolbar", async ({ page, request }) => {
   await expect(page.getByTestId("system-log-line").filter({ hasText: "toolbar limit operation 259" })).toBeVisible();
 });
 
-test("runs terminal commands and submits gaps for merge from the toolbar", async ({ page, request }) => {
+test("runs an interactive terminal session from the toolbar", async ({ page, request }) => {
   await ensureAttachedProject(request);
-  const created = await jsonObject(await request.post("/api/gaps", {
-    data: { name: `Terminal merge ${Date.now()}` },
-  }));
-  const gap = created.gap as Record<string, unknown>;
-  const gapId = String(gap.id ?? "");
-  expect(gapId).toBeTruthy();
-  await jsonObject(await request.post(`/api/gaps/${encodeURIComponent(gapId)}/start`, { data: {} }));
+  const marker = `toolbar-terminal-ok-${Date.now()}`;
 
   await page.goto("/");
 
@@ -259,20 +253,24 @@ test("runs terminal commands and submits gaps for merge from the toolbar", async
 
   await page.getByTestId("toolbar-tab-terminal").click();
   await expect(page.getByTestId("toolbar-terminal-panel")).toBeVisible();
-  await expect(page.getByTestId("terminal-worktree-select")).toContainText("rust-test-app");
+  await expect(page.getByTestId("toolbar-tab-terminal").getByTestId("toolbar-tab-close")).toHaveCount(0);
+  await expect(page.getByTestId("terminal-worktree-select")).toHaveCount(0);
+  await expect(page.getByTestId("terminal-run")).toHaveCount(0);
+  await expect(page.getByTestId("terminal-gap-id")).toHaveCount(0);
+  await expect(page.getByTestId("terminal-submit-merge")).toHaveCount(0);
 
-  await page.getByTestId("terminal-command-input").fill("printf toolbar-terminal-ok");
-  await page.getByTestId("terminal-run").click();
-  await expect(page.getByTestId("terminal-output")).toContainText("toolbar-terminal-ok");
+  const output = page.getByTestId("terminal-output");
+  await output.click();
+  await page.keyboard.type(`printf ${marker}`);
+  await page.keyboard.press("Enter");
+  await expect(output).toContainText(marker);
 
-  await page.getByTestId("terminal-gap-id").fill(gapId);
-  await page.getByTestId("terminal-submit-merge").click();
-  await expect(page.getByTestId("terminal-output")).toContainText(`Gap ${gapId} -> ready-merge`);
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
   await expect.poll(async () => {
-    const detail = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(gapId)}`));
-    const current = detail.gap as Record<string, unknown>;
-    return String(current.status ?? "");
-  }).toBe("ready-merge");
+    const text = await output.textContent();
+    return (text?.match(new RegExp(marker, "g")) || []).length;
+  }).toBeGreaterThanOrEqual(2);
 });
 
 test("resets project-scoped toolbar state when switching apps", async ({ page, request }) => {

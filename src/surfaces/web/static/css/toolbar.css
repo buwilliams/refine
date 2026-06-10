@@ -562,9 +562,7 @@ button.chat-activity-toggle:hover:not(:disabled) {
   height: 100%;
   gap: 8px;
 }
-.terminal-toolbar,
-.terminal-command-row,
-.terminal-merge-row {
+.terminal-titlebar {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -576,64 +574,35 @@ button.chat-activity-toggle:hover:not(:disabled) {
   color: var(--muted);
   white-space: nowrap;
 }
-#terminal-worktree-select {
-  flex: 0 1 420px;
-  min-width: 180px;
-  max-width: min(520px, 55vw);
-  height: 32px;
-  font-size: 13px;
-}
-.terminal-icon-btn {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-.terminal-icon-btn svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-#terminal-command-input {
-  flex: 1;
-  min-width: 0;
-  min-height: 42px;
-  max-height: 96px;
-  resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 13px;
-  line-height: 1.35;
-}
-#terminal-gap-id {
-  flex: 0 1 260px;
-  min-width: 160px;
-  height: 32px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  font-size: 13px;
-}
 .terminal-output {
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: 10px 12px;
+  padding: 12px 14px;
   overflow: auto;
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  background: #111827;
-  color: #e5e7eb;
-  box-shadow: var(--shadow-sm);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #fbfbf7;
+  color: #111827;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   font-size: 12.5px;
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
+  outline: none;
+  cursor: text;
+}
+.terminal-output.focused,
+.terminal-output:focus {
+  border-color: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.18), inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+}
+.terminal-output .xterm {
+  height: 100%;
+}
+.terminal-output .xterm-viewport {
+  background: #fbfbf7 !important;
 }
 
 /* --- Files tab -------------------------------------------------------- */

@@ -2748,82 +2748,56 @@ fn web_server_serves_source_file_tree_read_and_search() {
 }
 
 #[test]
-fn web_server_runs_terminal_commands_in_selected_git_worktrees() {
+fn web_server_runs_interactive_terminal_session() {
     let temp_root = unique_temp_dir("http-terminal");
-    let sibling = temp_root.parent().unwrap().join(format!(
-        "{}-sibling",
-        temp_root.file_name().unwrap().to_string_lossy()
-    ));
     let durable_root = temp_root.join(".refine");
     fs::create_dir_all(&durable_root).unwrap();
     fs::write(temp_root.join("README.md"), "terminal root\n").unwrap();
-    git(&temp_root, &["init"]).unwrap();
-    git(
-        &temp_root,
-        &["config", "user.email", "refine@example.invalid"],
-    )
-    .unwrap();
-    git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
-    git(&temp_root, &["add", "README.md"]).unwrap();
-    git(&temp_root, &["commit", "-m", "init"]).unwrap();
-    git(
-        &temp_root,
-        &[
-            "worktree",
-            "add",
-            "-b",
-            "terminal-branch",
-            sibling.to_str().unwrap(),
-        ],
-    )
-    .unwrap();
-    fs::write(sibling.join("terminal-marker.txt"), "selected-worktree\n").unwrap();
 
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root);
 
-    let worktrees = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/terminal/worktrees".to_string(),
+    let start = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({"cols": 80, "rows": 20})),
+    });
+    assert_eq!(start.status, 200);
+    assert_eq!(start.body["cwd"], temp_root.display().to_string());
+    let session_id = start.body["id"].as_str().unwrap().to_string();
+
+    let input = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/input"),
+        body: Some(json!({"data": "printf 'terminal:%s' \"$(cat README.md)\"\r"})),
+    });
+    assert_eq!(input.status, 200);
+
+    let mut output = String::new();
+    for _ in 0..40 {
+        let events = server.handle(ApiRequest {
+            method: "GET".to_string(),
+            path: format!("/api/terminal/{session_id}/events"),
+            body: None,
+        });
+        assert_eq!(events.status, 200);
+        for event in events.body["events"].as_array().unwrap() {
+            output.push_str(event["data"].as_str().unwrap_or(""));
+        }
+        if output.contains("terminal:terminal root") {
+            break;
+        }
+        thread::sleep(Duration::from_millis(50));
+    }
+    assert!(output.contains("terminal:terminal root"), "{output:?}");
+
+    let stop = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/terminal/{session_id}/stop"),
         body: None,
     });
-    assert_eq!(worktrees.status, 200);
-    let rows = worktrees.body["worktrees"].as_array().unwrap();
-    assert!(
-        rows.iter()
-            .any(|row| row["path"] == temp_root.display().to_string())
-    );
-    assert!(rows.iter().any(|row| {
-        row["path"] == sibling.display().to_string() && row["branch"] == "terminal-branch"
-    }));
+    assert_eq!(stop.status, 200);
 
-    let run = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/terminal/run".to_string(),
-        body: Some(json!({
-            "worktree_path": sibling.display().to_string(),
-            "command": "printf 'terminal:%s' \"$(cat terminal-marker.txt)\""
-        })),
-    });
-    assert_eq!(run.status, 200);
-    assert_eq!(run.body["ok"], true);
-    assert_eq!(run.body["stdout"], "terminal:selected-worktree");
-
-    let rejected = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/terminal/run".to_string(),
-        body: Some(json!({
-            "worktree_path": "/",
-            "command": "pwd"
-        })),
-    });
-    assert_eq!(rejected.status, 400);
-
-    git(
-        &temp_root,
-        &["worktree", "remove", "--force", sibling.to_str().unwrap()],
-    )
-    .unwrap();
     fs::remove_dir_all(temp_root).unwrap();
 }
 

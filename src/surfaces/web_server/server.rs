@@ -312,12 +312,32 @@ impl InProcessWebServer {
             return self.handle_performance_cleanup(request);
         }
 
-        if request.method == "GET" && request.path == "/terminal/worktrees" {
-            return self.handle_terminal_worktrees();
+        if request.method == "POST" && request.path == "/terminal/session" {
+            return self.handle_terminal_session_start(request);
         }
 
-        if request.method == "POST" && request.path == "/terminal/run" {
-            return self.handle_terminal_run(request);
+        if request.method == "GET"
+            && let Some(_) = terminal_session_route(&request.path, "/events")
+        {
+            return self.handle_terminal_events_snapshot(&raw_path);
+        }
+
+        if request.method == "POST"
+            && let Some(session_id) = terminal_session_route(&request.path, "/input")
+        {
+            return self.handle_terminal_input(request, &session_id);
+        }
+
+        if request.method == "POST"
+            && let Some(session_id) = terminal_session_route(&request.path, "/resize")
+        {
+            return self.handle_terminal_resize(request, &session_id);
+        }
+
+        if request.method == "POST"
+            && let Some(session_id) = terminal_session_route(&request.path, "/stop")
+        {
+            return self.handle_terminal_stop(&session_id);
         }
 
         if request.method == "GET" && request.path == "/files/tree" {
@@ -746,6 +766,15 @@ impl InProcessWebServer {
             ),
         }
     }
+}
+
+fn terminal_session_route(path: &str, suffix: &str) -> Option<String> {
+    let rest = path.strip_prefix("/terminal/")?;
+    let session_id = rest.strip_suffix(suffix)?;
+    if session_id.is_empty() || session_id.contains('/') {
+        return None;
+    }
+    Some(session_id.to_string())
 }
 
 fn cluster_node_id_from_path(path: &str) -> Option<String> {

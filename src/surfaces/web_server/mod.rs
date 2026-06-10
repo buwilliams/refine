@@ -123,7 +123,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/terminal",
-        capability: "worktree terminal commands and merge submission",
+        capability: "interactive terminal sessions",
     },
     ApiRouteGroup {
         prefix: "/diagnostics",

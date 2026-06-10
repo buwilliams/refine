@@ -64,16 +64,20 @@ const filesState = {
   error: "",
 };
 const terminalState = {
-  worktrees: [],
-  selectedPath: "",
-  command: "",
-  output: "",
+  sessionId: "",
+  cwd: "",
+  display: "",
+  term: null,
+  cursor: 0,
+  inputBuffer: "",
+  inputFlushTimer: null,
+  lastSeq: 0,
   loading: false,
-  running: false,
-  submitting: false,
+  connected: false,
+  exited: false,
   error: "",
-  gapIdInput: "",
 };
+let terminalEventSource = null;
 
 function ensureStandaloneTab() {
   if (!chatState.tabs.standalone) {
@@ -295,15 +299,28 @@ function resetFilesState() {
 }
 
 function resetTerminalState() {
-  terminalState.worktrees = [];
-  terminalState.selectedPath = "";
-  terminalState.command = "";
-  terminalState.output = "";
+  if (terminalEventSource) {
+    terminalEventSource.close();
+    terminalEventSource = null;
+  }
+  terminalState.sessionId = "";
+  terminalState.cwd = "";
+  terminalState.display = "";
+  if (terminalState.term) {
+    terminalState.term.dispose();
+    terminalState.term = null;
+  }
+  terminalState.cursor = 0;
+  terminalState.inputBuffer = "";
+  if (terminalState.inputFlushTimer) {
+    clearTimeout(terminalState.inputFlushTimer);
+    terminalState.inputFlushTimer = null;
+  }
+  terminalState.lastSeq = 0;
   terminalState.loading = false;
-  terminalState.running = false;
-  terminalState.submitting = false;
+  terminalState.connected = false;
+  terminalState.exited = false;
   terminalState.error = "";
-  terminalState.gapIdInput = "";
 }
 
 // Publish the topbar's actual height as --topbar-height on <html> so the
@@ -587,7 +604,7 @@ function drawToolbar() {
                   data-testid="toolbar-tab-${htmlEscape(id)}"
                   title="${htmlEscape(toolbarTabTitle(t))}">
             ${htmlEscape(t.label)}${t.sessionId ? ` <span class="toolbar-tab-dot" data-testid="toolbar-tab-dot" title="active session"></span>` : ""}
-            ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
+            ${id === "standalone" || id === FILES_TAB_ID || id === SYSTEM_TAB_ID || id === TERMINAL_TAB_ID ? "" : `<span class="toolbar-tab-close" data-close-tab="${htmlEscape(id)}" data-testid="toolbar-tab-close" title="Close tab">×</span>`}
           </button>`).join("")}
       </div>
       <button class="toolbar-dock-toggle toolbar-dock-fullscreen-btn${chatState.fullscreen ? " active" : ""}"
@@ -687,8 +704,11 @@ function drawToolbar() {
   if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
     loadFilesDirectory("", { expand: true, redraw: true });
   }
-  if (terminalActive && !terminalState.loading && !terminalState.worktrees.length && !terminalState.error) {
-    loadTerminalWorktrees();
+  if (terminalActive && !terminalState.loading && !terminalState.sessionId && !terminalState.error) {
+    startTerminalSession();
+  }
+  if (terminalActive) {
+    focusTerminalSoon();
   }
 }
 
@@ -993,185 +1013,306 @@ function toolbarIcon(name) {
 }
 
 function renderTerminalPanel() {
-  const selected = selectedTerminalWorktree();
-  const worktrees = terminalState.worktrees || [];
-  const selectedGapId = selected?.gap_id || "";
-  const gapId = selectedGapId || terminalState.gapIdInput || "";
   const status = terminalState.loading
-    ? "Loading worktrees..."
+    ? "Starting shell..."
     : terminalState.error
       ? terminalState.error
-      : selected
-        ? `${selected.branch || "detached"}${selected.gap_id ? ` - Gap ${selected.gap_id} (${selected.gap_status || "unknown"})` : ""}`
-        : "Select a worktree.";
-  const commandDisabled = terminalState.running || terminalState.loading || !selected;
-  const submitDisabled = terminalState.submitting || !gapId.trim();
+      : terminalState.exited
+        ? "Shell exited."
+        : terminalState.connected
+          ? terminalState.cwd || "Shell active."
+          : "Connecting...";
   return `
     <div class="terminal-panel" data-testid="toolbar-terminal-panel">
-      <div class="terminal-toolbar">
-        <label for="terminal-worktree-select" class="terminal-label">Worktree</label>
-        <select id="terminal-worktree-select"
-                data-testid="terminal-worktree-select"
-                ${terminalState.loading ? "disabled" : ""}>
-          ${worktrees.length
-            ? worktrees.map((worktree) => `
-                <option value="${htmlEscape(worktree.path || "")}"
-                        ${worktree.path === terminalState.selectedPath ? "selected" : ""}>
-                  ${htmlEscape(worktree.label || worktree.path || "worktree")}
-                </option>`).join("")
-            : `<option value="">${terminalState.loading ? "Loading..." : "No Git worktrees"}</option>`}
-        </select>
-        <button type="button" class="secondary terminal-icon-btn"
-                data-terminal-refresh data-testid="terminal-refresh" title="Refresh" aria-label="Refresh">
-          ${toolbarIcon("refresh")}
-        </button>
+      <div class="terminal-titlebar">
         <span class="muted small" data-testid="terminal-status">${htmlEscape(status)}</span>
       </div>
-      <div class="terminal-command-row">
-        <textarea id="terminal-command-input"
-                  data-testid="terminal-command-input"
-                  rows="2"
-                  spellcheck="false"
-                  placeholder="bash command"
-                  ${commandDisabled ? "disabled" : ""}>${htmlEscape(terminalState.command || "")}</textarea>
-        <button type="button" class="primary"
-                data-terminal-run data-testid="terminal-run"
-                ${commandDisabled || !(terminalState.command || "").trim() ? "disabled" : ""}>
-          ${terminalState.running ? "Running" : "Run"}
-        </button>
-      </div>
-      <div class="terminal-merge-row" data-testid="terminal-merge-row">
-        <label for="terminal-gap-id" class="terminal-label">Gap</label>
-        <input id="terminal-gap-id"
-               data-testid="terminal-gap-id"
-               value="${htmlEscape(gapId)}"
-               placeholder="Gap ID"
-               ${selectedGapId ? "disabled" : ""}>
-        <button type="button" class="secondary"
-                data-terminal-submit-merge
-                data-testid="terminal-submit-merge"
-                ${submitDisabled ? "disabled" : ""}>
-          ${terminalState.submitting ? "Submitting" : "Submit gap for merge"}
-        </button>
-      </div>
-      <pre class="terminal-output" data-testid="terminal-output">${htmlEscape(terminalState.output || "")}</pre>
+      <div class="terminal-output"
+           data-testid="terminal-output"
+           tabindex="0"
+           role="textbox"
+           aria-label="Terminal"
+           spellcheck="false"></div>
     </div>`;
 }
 
 function bindTerminalPanel(root) {
-  root.querySelector("#terminal-worktree-select")?.addEventListener("change", (e) => {
-    terminalState.selectedPath = e.target.value || "";
-    const selected = selectedTerminalWorktree();
-    if (selected?.gap_id) terminalState.gapIdInput = "";
-    drawToolbar();
-  });
-  root.querySelector("[data-terminal-refresh]")?.addEventListener("click", () => {
-    loadTerminalWorktrees();
-  });
-  root.querySelector("#terminal-command-input")?.addEventListener("input", (e) => {
-    terminalState.command = e.target.value || "";
-    const run = root.querySelector("[data-terminal-run]");
-    if (run) run.disabled = terminalState.running || !terminalState.command.trim();
-  });
-  root.querySelector("#terminal-command-input")?.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      e.preventDefault();
-      runTerminalCommand();
-    }
-  });
-  root.querySelector("#terminal-gap-id")?.addEventListener("input", (e) => {
-    terminalState.gapIdInput = e.target.value || "";
-    const submit = root.querySelector("[data-terminal-submit-merge]");
-    if (submit) submit.disabled = terminalState.submitting || !terminalGapId().trim();
-  });
-  root.querySelector("[data-terminal-run]")?.addEventListener("click", runTerminalCommand);
-  root.querySelector("[data-terminal-submit-merge]")?.addEventListener("click", submitTerminalGapForMerge);
+  const output = root.querySelector(".terminal-output");
+  output?.addEventListener("focus", () => output.classList.add("focused"));
+  output?.addEventListener("blur", () => output.classList.remove("focused"));
+  ensureTerminalRenderer(output);
 }
 
-function selectedTerminalWorktree() {
-  const worktrees = terminalState.worktrees || [];
-  if (!worktrees.length) return null;
-  const selectedPath = terminalState.selectedPath || worktrees.find((worktree) => worktree.current)?.path || worktrees[0].path;
-  return worktrees.find((worktree) => worktree.path === selectedPath) || worktrees[0] || null;
-}
-
-async function loadTerminalWorktrees() {
+async function startTerminalSession() {
   terminalState.loading = true;
   terminalState.error = "";
   drawToolbar();
   try {
-    const result = await api("GET", "/api/terminal/worktrees");
-    terminalState.worktrees = result.worktrees || [];
-    if (!terminalState.worktrees.some((worktree) => worktree.path === terminalState.selectedPath)) {
-      terminalState.selectedPath = terminalState.worktrees.find((worktree) => worktree.current)?.path
-        || terminalState.worktrees[0]?.path
-        || "";
+    const size = terminalSize();
+    const result = await api("POST", "/api/terminal/session", size);
+    terminalState.sessionId = result.id || "";
+    terminalState.cwd = result.cwd || "";
+    terminalState.connected = !!terminalState.sessionId;
+    terminalState.exited = false;
+    terminalState.lastSeq = 0;
+    connectTerminalEvents();
+    terminalState.loading = false;
+    drawToolbar();
+    focusTerminalSoon();
+  } catch (e) {
+    terminalState.loading = false;
+    terminalState.error = e.message || String(e);
+    drawToolbar();
+  }
+}
+
+function connectTerminalEvents() {
+  if (terminalEventSource) terminalEventSource.close();
+  if (!terminalState.sessionId) return;
+  terminalEventSource = new EventSource(`/api/terminal/${encodeURIComponent(terminalState.sessionId)}/events`);
+  terminalEventSource.addEventListener("terminal_output", handleTerminalEvent);
+  terminalEventSource.addEventListener("terminal_error", (event) => {
+    handleTerminalEvent(event);
+    terminalState.error = "Terminal stream error.";
+    drawToolbar();
+  });
+  terminalEventSource.addEventListener("terminal_exit", (event) => {
+    handleTerminalEvent(event);
+    terminalState.exited = true;
+    terminalState.connected = false;
+    if (terminalEventSource) {
+      terminalEventSource.close();
+      terminalEventSource = null;
     }
-    terminalState.loading = false;
     drawToolbar();
+  });
+  terminalEventSource.onerror = () => {
+    if (!terminalState.exited) {
+      terminalState.error = "Terminal connection lost.";
+      drawToolbar();
+    }
+  };
+}
+
+function handleTerminalEvent(event) {
+  try {
+    const payload = JSON.parse(event.data || "{}");
+    const seq = Number(payload.seq || 0);
+    if (seq && seq <= terminalState.lastSeq) return;
+    if (seq) terminalState.lastSeq = seq;
+    terminalReceiveOutput(payload.data || "");
+  } catch {
+    terminalReceiveOutput(event.data || "");
+  }
+}
+
+function handleTerminalKeydown(e) {
+  if (!terminalState.sessionId || terminalState.exited) return;
+  const data = terminalKeyData(e);
+  if (data == null) return;
+  e.preventDefault();
+  queueTerminalInput(data);
+}
+
+function handleTerminalPaste(e) {
+  if (!terminalState.sessionId || terminalState.exited) return;
+  const text = e.clipboardData?.getData("text/plain") || "";
+  if (!text) return;
+  e.preventDefault();
+  queueTerminalInput(text.replace(/\r?\n/g, "\r"));
+}
+
+function terminalKeyData(e) {
+  if (e.ctrlKey && e.key && e.key.length === 1) {
+    const code = e.key.toUpperCase().charCodeAt(0);
+    if (code >= 64 && code <= 95) return String.fromCharCode(code - 64);
+  }
+  if (e.altKey || e.metaKey) return null;
+  const special = {
+    Enter: "\r",
+    Backspace: "\x7f",
+    Tab: "\t",
+    Escape: "\x1b",
+    ArrowUp: "\x1b[A",
+    ArrowDown: "\x1b[B",
+    ArrowRight: "\x1b[C",
+    ArrowLeft: "\x1b[D",
+    Home: "\x1b[H",
+    End: "\x1b[F",
+    Delete: "\x1b[3~",
+    PageUp: "\x1b[5~",
+    PageDown: "\x1b[6~",
+  };
+  if (special[e.key]) return special[e.key];
+  if (e.key && e.key.length === 1) return e.key;
+  return null;
+}
+
+function queueTerminalInput(data) {
+  terminalState.inputBuffer += data;
+  if (terminalState.inputFlushTimer) return;
+  terminalState.inputFlushTimer = setTimeout(flushTerminalInput, 12);
+}
+
+async function flushTerminalInput() {
+  const data = terminalState.inputBuffer;
+  terminalState.inputBuffer = "";
+  terminalState.inputFlushTimer = null;
+  if (!data || !terminalState.sessionId) return;
+  try {
+    await api("POST", `/api/terminal/${encodeURIComponent(terminalState.sessionId)}/input`, { data });
   } catch (e) {
-    terminalState.loading = false;
     terminalState.error = e.message || String(e);
     drawToolbar();
   }
 }
 
-async function runTerminalCommand() {
-  const selected = selectedTerminalWorktree();
-  const command = (terminalState.command || "").trim();
-  if (!selected || !command || terminalState.running) return;
-  terminalState.running = true;
-  terminalState.error = "";
-  appendTerminalOutput(`$ ${command}\n`);
-  drawToolbar();
-  try {
-    const result = await api("POST", "/api/terminal/run", {
-      worktree_path: selected.path || "",
-      command,
-    });
-    const stdout = result.stdout || "";
-    const stderr = result.stderr || "";
-    const code = result.code == null ? "" : `exit ${result.code}`;
-    appendTerminalOutput(`${stdout}${stderr ? `${stdout ? "\n" : ""}${stderr}` : ""}${result.ok ? "" : `\n[${code || "command failed"}]`}\n`);
-  } catch (e) {
-    appendTerminalOutput(`[error] ${e.message || String(e)}\n`);
-  } finally {
-    terminalState.running = false;
-    drawToolbar();
-    scrollTerminalOutputToEnd();
-  }
-}
-
-function terminalGapId() {
-  return selectedTerminalWorktree()?.gap_id || terminalState.gapIdInput || "";
-}
-
-async function submitTerminalGapForMerge() {
-  const gapId = terminalGapId().trim();
-  if (!gapId || terminalState.submitting) return;
-  terminalState.submitting = true;
-  terminalState.error = "";
-  drawToolbar();
-  try {
-    const result = await api("POST", `/api/gaps/${encodeURIComponent(gapId)}/submit-merge`, {});
-    toast(`Gap ${gapId} submitted for merge`, "info");
-    appendTerminalOutput(`[Gap ${gapId} -> ${result.gap?.status || "ready-merge"}]\n`);
-    await loadTerminalWorktrees();
-  } catch (e) {
-    terminalState.error = e.message || String(e);
-    toast("Could not submit gap for merge: " + terminalState.error, "error");
-  } finally {
-    terminalState.submitting = false;
-    drawToolbar();
-  }
-}
-
-function appendTerminalOutput(text) {
-  terminalState.output = `${terminalState.output || ""}${text || ""}`;
-  if (terminalState.output.length > TERMINAL_OUTPUT_MAX_CHARS) {
-    terminalState.output = terminalState.output.slice(-TERMINAL_OUTPUT_MAX_CHARS);
+function terminalReceiveOutput(text) {
+  if (terminalState.term) {
+    terminalState.term.write(text || "");
+  } else {
+    terminalState.display = `${terminalState.display || ""}${text || ""}`;
   }
   scrollTerminalOutputToEnd();
+}
+
+function ensureTerminalRenderer(output) {
+  if (!output || !window.Terminal) return;
+  if (terminalState.term?.element && output.contains(terminalState.term.element)) return;
+  if (terminalState.term) {
+    terminalState.term.dispose();
+    terminalState.term = null;
+  }
+  const size = terminalSize(output);
+  const term = new window.Terminal({
+    cols: size.cols,
+    rows: size.rows,
+    cursorBlink: true,
+    convertEol: true,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace',
+    fontSize: 12.5,
+    lineHeight: 1.35,
+    scrollback: 2000,
+    theme: {
+      background: "#fbfbf7",
+      foreground: "#111827",
+      cursor: "#111827",
+      selectionBackground: "#dbeafe",
+      black: "#111827",
+      red: "#b91c1c",
+      green: "#047857",
+      yellow: "#a16207",
+      blue: "#1d4ed8",
+      magenta: "#7e22ce",
+      cyan: "#0e7490",
+      white: "#f8fafc",
+      brightBlack: "#64748b",
+      brightRed: "#dc2626",
+      brightGreen: "#059669",
+      brightYellow: "#ca8a04",
+      brightBlue: "#2563eb",
+      brightMagenta: "#9333ea",
+      brightCyan: "#0891b2",
+      brightWhite: "#ffffff",
+    },
+  });
+  term.open(output);
+  if (terminalState.display) term.write(terminalState.display);
+  term.onData((data) => queueTerminalInput(data));
+  terminalState.term = term;
+}
+
+function terminalApplyOutput(text) {
+  for (let index = 0; index < text.length; index += 1) {
+    const ch = text[index];
+    if (ch === "\x1b") {
+      const consumed = terminalApplyEscape(text.slice(index));
+      if (consumed > 0) {
+        index += consumed - 1;
+        continue;
+      }
+    }
+    if (ch === "\r") {
+      terminalState.cursor = terminalLineStart();
+    } else if (ch === "\n") {
+      terminalInsert("\n");
+    } else if (ch === "\b" || ch === "\x7f") {
+      terminalBackspace();
+    } else if (ch >= " " || ch === "\t") {
+      terminalInsert(ch);
+    }
+  }
+  if (terminalState.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
+    const excess = terminalState.display.length - TERMINAL_OUTPUT_MAX_CHARS;
+    terminalState.display = terminalState.display.slice(excess);
+    terminalState.cursor = Math.max(0, terminalState.cursor - excess);
+  }
+}
+
+function terminalApplyEscape(text) {
+  const match = /^\x1b\[(\??[0-9;]*)([A-Za-z~])/.exec(text);
+  if (!match) return 0;
+  const params = match[1] || "";
+  const final = match[2];
+  const first = parseInt(params.replace(/^\?/, "").split(";")[0] || "1", 10) || 1;
+  if (final === "K") {
+    const end = terminalLineEnd();
+    terminalState.display = terminalState.display.slice(0, terminalState.cursor) + terminalState.display.slice(end);
+  } else if (final === "G") {
+    terminalState.cursor = Math.min(terminalLineStart() + Math.max(0, first - 1), terminalLineEnd());
+  } else if (final === "C") {
+    terminalState.cursor = Math.min(terminalState.cursor + first, terminalLineEnd());
+  } else if (final === "D") {
+    terminalState.cursor = Math.max(terminalState.cursor - first, terminalLineStart());
+  }
+  return match[0].length;
+}
+
+function terminalInsert(ch) {
+  const before = terminalState.display.slice(0, terminalState.cursor);
+  const after = terminalState.display.slice(terminalState.cursor);
+  terminalState.display = before + ch + after;
+  terminalState.cursor += ch.length;
+}
+
+function terminalBackspace() {
+  const start = terminalLineStart();
+  if (terminalState.cursor <= start) return;
+  terminalState.display =
+    terminalState.display.slice(0, terminalState.cursor - 1) +
+    terminalState.display.slice(terminalState.cursor);
+  terminalState.cursor -= 1;
+}
+
+function terminalLineStart() {
+  return terminalState.display.lastIndexOf("\n", Math.max(0, terminalState.cursor - 1)) + 1;
+}
+
+function terminalLineEnd() {
+  const next = terminalState.display.indexOf("\n", terminalState.cursor);
+  return next === -1 ? terminalState.display.length : next;
+}
+
+function terminalSize(output = document.querySelector(".terminal-output")) {
+  if (!output) return { cols: 100, rows: 30 };
+  const styles = window.getComputedStyle(output);
+  const fontSize = parseFloat(styles.fontSize) || 13;
+  const lineHeight = parseFloat(styles.lineHeight) || fontSize * 1.4;
+  return {
+    cols: Math.max(20, Math.floor(output.clientWidth / (fontSize * 0.62))),
+    rows: Math.max(8, Math.floor(output.clientHeight / lineHeight)),
+  };
+}
+
+function focusTerminalSoon() {
+  requestAnimationFrame(() => {
+    const output = document.querySelector(".terminal-output");
+    if (terminalState.term) {
+      terminalState.term.focus();
+    } else if (output && document.activeElement !== output) {
+      output.focus({ preventScroll: true });
+    }
+  });
 }
 
 function scrollTerminalOutputToEnd() {

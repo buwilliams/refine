@@ -2435,32 +2435,92 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_terminal_worktrees(&self) -> ApiResponse {
+    pub(super) fn handle_terminal_session_start(&self, request: ApiRequest) -> ApiResponse {
         let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("list terminal worktrees");
+            return durable_root_unavailable("start terminal session");
         };
-        let projection = match self.current_projection() {
-            Ok(projection) => projection,
-            Err(error) => return error_response(error),
-        };
-        match terminal_worktrees_response(&source_root, &projection) {
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let cols = body
+            .get("cols")
+            .and_then(Value::as_u64)
+            .and_then(|value| u16::try_from(value).ok())
+            .unwrap_or(0);
+        let rows = body
+            .get("rows")
+            .and_then(Value::as_u64)
+            .and_then(|value| u16::try_from(value).ok())
+            .unwrap_or(0);
+        match terminal_session_start_response(&source_root, cols, rows) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_terminal_run(&self, request: ApiRequest) -> ApiResponse {
-        let Some(source_root) = self.source_root() else {
-            return durable_root_unavailable("run terminal command");
-        };
+    pub(super) fn handle_terminal_input(
+        &self,
+        request: ApiRequest,
+        session_id: &str,
+    ) -> ApiResponse {
         let body = request.body.unwrap_or_else(|| json!({}));
-        let worktree_path = body
-            .get("worktree_path")
-            .and_then(Value::as_str)
-            .unwrap_or("");
-        let command = body.get("command").and_then(Value::as_str).unwrap_or("");
-        match terminal_run_response(&source_root, worktree_path, command) {
+        let data = body.get("data").and_then(Value::as_str).unwrap_or("");
+        match terminal_input_response(session_id, data) {
             Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_terminal_resize(
+        &self,
+        request: ApiRequest,
+        session_id: &str,
+    ) -> ApiResponse {
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let cols = body
+            .get("cols")
+            .and_then(Value::as_u64)
+            .and_then(|value| u16::try_from(value).ok())
+            .unwrap_or(0);
+        let rows = body
+            .get("rows")
+            .and_then(Value::as_u64)
+            .and_then(|value| u16::try_from(value).ok())
+            .unwrap_or(0);
+        match terminal_resize_response(session_id, cols, rows) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_terminal_stop(&self, session_id: &str) -> ApiResponse {
+        match terminal_stop_response(session_id) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_terminal_events_snapshot(&self, raw_path: &str) -> ApiResponse {
+        let Some(session_id) = raw_path
+            .split('?')
+            .next()
+            .and_then(|path| path.strip_prefix("/api/terminal/"))
+            .and_then(|rest| rest.strip_suffix("/events"))
+            .or_else(|| {
+                raw_path
+                    .split('?')
+                    .next()
+                    .and_then(|path| path.strip_prefix("/terminal/"))
+                    .and_then(|rest| rest.strip_suffix("/events"))
+            })
+        else {
+            return error_response(RefineError::InvalidInput(
+                "terminal session id is required".to_string(),
+            ));
+        };
+        let after = query_param(raw_path, "after")
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or(0);
+        match terminal_events_since(session_id, after) {
+            Ok(events) => ApiResponse::json(200, json!({ "events": events })),
             Err(error) => error_response(error),
         }
     }
