@@ -67,11 +67,17 @@ fn file_work_item_service_edits_notes_and_deletes_gap_json() {
         .unwrap();
 
     let edited = service
-        .update_gap_metadata_summary("GAP1", Some("Renamed"), Some("high"), Some("Reviewer"))
+        .update_gap_metadata_summary(
+            "GAP1",
+            Some("Renamed"),
+            Some("high"),
+            Some("Reporter"),
+            None,
+        )
         .unwrap();
     assert_eq!(edited.gap.name, "Renamed");
     assert_eq!(edited.gap.priority, GapPriority::High);
-    assert_eq!(edited.gap.assignee.as_deref(), Some("Reviewer"));
+    assert_eq!(edited.gap.reporter.as_deref(), Some("Reporter"));
 
     service
         .add_gap_note_summary("GAP1", "Reviewer", "Needs a note")
@@ -99,11 +105,19 @@ fn file_work_item_service_appends_and_edits_latest_round() {
         .unwrap();
     assert_eq!(gap.gap.round_count, 1);
     let gap = service
-        .edit_latest_gap_round_summary("GAP1", Some("Reviewer"), Some("New actual"), None)
+        .edit_latest_gap_round_summary(
+            "GAP1",
+            Some("Reviewer"),
+            Some("Reviewer"),
+            Some("New actual"),
+            None,
+        )
         .unwrap();
     assert_eq!(gap.gap.reporter.as_deref(), Some("Reviewer"));
+    assert_eq!(gap.gap.assignee.as_deref(), Some("Reviewer"));
     let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
+    assert!(written.contains("\"assignee\": \"Reviewer\""));
     assert!(written.contains("\"actual\": \"New actual\""));
     assert!(written.contains("\"target\": \"Target\""));
     assert!(written.contains("\"rule_state\": \"unclassified\""));
@@ -404,7 +418,7 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
 
     nodes.activate("default").unwrap();
     let err = service
-        .update_gap_metadata_summary("GAP1", Some("Blocked"), None, None)
+        .update_gap_metadata_summary("GAP1", Some("Blocked"), None, None, None)
         .unwrap_err();
     assert_eq!(
         err.category(),
@@ -428,7 +442,7 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
         )
         .unwrap();
     let updated = service
-        .update_gap_metadata_summary("GAP1", Some("Default-owned"), None, None)
+        .update_gap_metadata_summary("GAP1", Some("Default-owned"), None, None, None)
         .unwrap();
     assert_eq!(updated.gap.name, "Default-owned");
 

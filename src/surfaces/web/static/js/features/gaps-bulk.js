@@ -67,8 +67,8 @@ async function openBulkModal(field) {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Rewrites the latest round's <strong>reporter</strong> on each Gap.
-        Earlier rounds keep their original reporter.
+        Updates each Gap's original <strong>reporter</strong>.
+        Round history keeps its original reporters.
       </p>`;
   } else if (field === "assignee") {
     const opts = (state.reporters || [])
@@ -78,7 +78,10 @@ async function openBulkModal(field) {
       <select class="modal-input" id="bulk-value-assignee" data-testid="bulk-value-assignee" style="width:100%">
         <option value="">— pick assignee —</option>
         ${opts}
-      </select>`;
+      </select>
+      <p class="muted small" style="margin-top:6px">
+        Updates the latest round's <strong>assignee</strong>, which is each Gap's current owner.
+      </p>`;
   }
 
   const body = () => `

@@ -38,7 +38,7 @@ pub struct Gap {
     pub status: GapStatus,
     pub priority: GapPriority,
     #[serde(default)]
-    pub assignee: Option<String>,
+    pub reporter: Option<String>,
     pub branch_name: Option<String>,
     pub feature_id: Option<String>,
     pub feature_order: Option<i64>,
@@ -80,6 +80,8 @@ pub struct GapNote {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct GapRound {
     pub reporter: String,
+    #[serde(default)]
+    pub assignee: Option<String>,
     pub actual: String,
     pub target: String,
     pub created: Timestamp,

@@ -230,7 +230,8 @@ fn persist_import_draft_with_duplicate_decision(
                                 &duplicate_id,
                                 None,
                                 Some(&draft.priority),
-                                draft.assignee.as_deref().or(Some(&draft.reporter)),
+                                None,
+                                None,
                             )?;
                         } else {
                             let actual = (decision == "update_original_actual")
@@ -240,12 +241,18 @@ fn persist_import_draft_with_duplicate_decision(
                             let reporter = (decision == "update_original_reporter")
                                 .then(|| nonempty_import_option(&draft.reporter))
                                 .flatten();
-                            service.edit_latest_gap_round_summary(
-                                &duplicate_id,
-                                reporter,
-                                actual,
-                                target,
-                            )?;
+                            if let Some(reporter) = reporter {
+                                service.update_gap_reporter_summary(&duplicate_id, reporter)?;
+                            }
+                            if actual.is_some() || target.is_some() {
+                                service.edit_latest_gap_round_summary(
+                                    &duplicate_id,
+                                    None,
+                                    None,
+                                    actual,
+                                    target,
+                                )?;
+                            }
                         }
                         actions.updated_original += 1;
                     }
@@ -263,20 +270,21 @@ fn persist_import_draft_with_duplicate_decision(
     let gap = service.create_gap_summary(&draft.name, None)?;
     created_gap_ids.push(gap.gap.id.clone());
     if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
-        service.append_gap_round_summary(
+        service.append_gap_round_summary_with_assignee(
             &gap.gap.id,
             nonempty_or_import_value(&draft.reporter, "Imported"),
+            draft.assignee.as_deref(),
             &draft.actual,
             &draft.target,
         )?;
     }
-    let assignee = draft.assignee.as_deref().or(Some(&draft.reporter));
-    if gap.gap.priority.as_str() != draft.priority || assignee.is_some() {
+    if gap.gap.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
         service.update_gap_metadata_summary(
             &gap.gap.id,
             None,
             (gap.gap.priority.as_str() != draft.priority).then_some(draft.priority.as_str()),
-            assignee,
+            nonempty_import_option(&draft.reporter),
+            None,
         )?;
     }
     if let Some(feature_id) = feature_id {
@@ -1012,19 +1020,26 @@ impl InProcessWebServer {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
         };
-        if priority != "low" || !assignee.is_empty() {
+        if priority != "low" || !reporter.is_empty() {
             match service.update_gap_metadata_summary(
                 &gap.gap.id,
                 None,
                 (priority != "low").then_some(priority),
-                (!assignee.is_empty()).then_some(assignee),
+                (!reporter.is_empty()).then_some(reporter),
+                None,
             ) {
                 Ok(updated) => gap = updated,
                 Err(error) => return error_response(error),
             }
         }
         if !reporter.is_empty() && !actual.is_empty() && !target.is_empty() {
-            match service.append_gap_round_summary(&gap.gap.id, reporter, actual, target) {
+            match service.append_gap_round_summary_with_assignee(
+                &gap.gap.id,
+                reporter,
+                (!assignee.is_empty()).then_some(assignee),
+                actual,
+                target,
+            ) {
                 Ok(updated) => gap = updated,
                 Err(error) => return error_response(error),
             }
@@ -1250,6 +1265,11 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("assignee"))
             .and_then(|assignee| assignee.as_str());
+        let reporter = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("reporter"))
+            .and_then(|reporter| reporter.as_str());
         let notes = match request.body.as_ref().and_then(|body| body.get("notes")) {
             Some(Value::Array(notes)) => Some(notes.clone()),
             Some(_) => {
@@ -1298,8 +1318,14 @@ impl InProcessWebServer {
                 Err(error) => return error_response(error),
             },
         };
-        if name.is_some() || priority.is_some() || assignee.is_some() {
-            match service.update_gap_metadata_summary(gap_id, name, priority, assignee) {
+        if name.is_some() || priority.is_some() || reporter.is_some() {
+            match service.update_gap_metadata_summary(gap_id, name, priority, reporter, None) {
+                Ok(updated) => gap = updated,
+                Err(error) => return error_response(error),
+            }
+        }
+        if let Some(assignee) = assignee {
+            match service.update_gap_assignee_summary(gap_id, assignee) {
                 Ok(updated) => gap = updated,
                 Err(error) => return error_response(error),
             }
@@ -1388,9 +1414,14 @@ impl InProcessWebServer {
         else {
             return invalid_round_body();
         };
+        let assignee = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("assignee"))
+            .and_then(|value| value.as_str());
         match self
             .work_item_service(durable_root)
-            .append_gap_round_summary(gap_id, reporter, actual, target)
+            .append_gap_round_summary_with_assignee(gap_id, reporter, assignee, actual, target)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
             Err(error) => error_response(error),
@@ -1417,6 +1448,11 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("actual"))
             .and_then(|value| value.as_str());
+        let assignee = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("assignee"))
+            .and_then(|value| value.as_str());
         let target = request
             .body
             .as_ref()
@@ -1424,7 +1460,7 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str());
         match self
             .work_item_service(durable_root)
-            .edit_latest_gap_round_summary(gap_id, reporter, actual, target)
+            .edit_latest_gap_round_summary(gap_id, reporter, assignee, actual, target)
         {
             Ok(gap) => ApiResponse::json(200, json!({"gap": gap.gap})),
             Err(error) => error_response(error),

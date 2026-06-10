@@ -342,10 +342,12 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
               "priority": "high",
               "created": "2026-01-01T00:00:00Z",
               "updated": "2026-01-02T00:00:00Z",
+              "reporter": "Buddy",
               "feature_id": "FEATURE1",
               "feature_order": 2,
               "rounds": [
-                {"reporter": "Buddy", "actual": "Broken", "target": "Works"}
+                {"reporter": "Buddy", "assignee": "Alice", "actual": "Broken", "target": "Works"},
+                {"reporter": "Reviewer", "assignee": "Coder", "actual": "Still broken", "target": "Works"}
               ],
               "notes": [{"body": "OAuth path"}]
             }"#,
@@ -392,9 +394,11 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
     assert_eq!(gap.gap.status, GapStatus::Todo);
     assert_eq!(gap.gap.priority, GapPriority::High);
     assert_eq!(gap.gap.reporter.as_deref(), Some("Buddy"));
-    assert_eq!(gap.gap.round_count, 1);
+    assert_eq!(gap.gap.assignee.as_deref(), Some("Coder"));
+    assert_eq!(gap.gap.round_count, 2);
     assert_eq!(gap.gap.node_id.as_deref(), Some("default"));
     assert!(gap.searchable_text.contains("OAuth path"));
+    assert!(gap.searchable_text.contains("Coder"));
 
     let feature = &snapshot.features["FEATURE1"];
     assert_eq!(feature.gap_ids, vec!["GAP1"]);
@@ -439,6 +443,14 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
         None
     );
     assert_eq!(snapshot.dashboard.attention_indicators.len(), 1);
+    assert_eq!(
+        snapshot
+            .dashboard
+            .assignee_stats
+            .get("Coder")
+            .and_then(|counts| counts.get(&GapStatus::Todo)),
+        Some(&1)
+    );
     assert_eq!(snapshot.activity.len(), 2);
     assert_eq!(snapshot.gaps["GAP2"].activity_ids, vec!["act-1"]);
     assert!(snapshot.activity["act-1"].searchable_text.contains("#app"));

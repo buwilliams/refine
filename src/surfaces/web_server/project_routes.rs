@@ -384,10 +384,8 @@ impl InProcessWebServer {
                 "preflight": preflight,
                 "activity": activity,
                 "runner_reachable": runner_reachable,
-                "reporter_stats": reporter_stats_rows(
-                    &projection.dashboard.reporter_stats,
-                    &projection.dashboard.assignee_stats
-                ),
+                "assignee_stats": assignee_stats_rows(&projection.dashboard.assignee_stats),
+                "reporter_stats": assignee_stats_rows(&projection.dashboard.assignee_stats),
                 "node_scope": node_filter,
                 "node_filter": node_filter,
                 "quality_timing": self.quality_timing_setting(),
@@ -1479,48 +1477,32 @@ impl InProcessWebServer {
     }
 }
 
-fn reporter_stats_rows(
-    reporter_stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>,
+fn assignee_stats_rows(
     assignee_stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>,
 ) -> Vec<Value> {
-    let mut names = reporter_stats
-        .keys()
-        .cloned()
-        .collect::<std::collections::BTreeSet<_>>();
-    names.extend(
-        assignee_stats
-            .keys()
-            .filter(|name| name.as_str() != "unassigned")
-            .cloned(),
-    );
-    names
+    assignee_stats
         .iter()
-        .map(|reporter| {
-            let empty = BTreeMap::new();
-            let counts = reporter_stats.get(reporter).unwrap_or(&empty);
-            let assigned_counts = assignee_stats.get(reporter).unwrap_or(&empty);
-            let reported = counts.values().copied().sum::<usize>();
+        .filter(|(assignee, _)| assignee.as_str() != "unassigned")
+        .map(|(assignee, counts)| {
+            let assigned = counts.values().copied().sum::<usize>();
             let done = counts.get(&GapStatus::Done).copied().unwrap_or_default();
             let cancelled = counts
                 .get(&GapStatus::Cancelled)
                 .copied()
                 .unwrap_or_default();
-            let active = reported.saturating_sub(done + cancelled);
-            let assigned = assigned_counts.values().copied().sum::<usize>();
-            let assigned_review = assigned_counts
-                .get(&GapStatus::Review)
-                .copied()
-                .unwrap_or_default();
-            let completion_rate = if reported == 0 {
+            let active = assigned.saturating_sub(done + cancelled);
+            let assigned_review = counts.get(&GapStatus::Review).copied().unwrap_or_default();
+            let completion_rate = if assigned == 0 {
                 0.0
             } else {
-                (done as f64 / reported as f64) * 100.0
+                (done as f64 / assigned as f64) * 100.0
             };
             json!({
-                "reporter": reporter,
+                "assignee": assignee,
+                "reporter": assignee,
                 "active": active,
                 "done": done,
-                "reported": reported,
+                "reported": assigned,
                 "assigned": assigned,
                 "assigned_review": assigned_review,
                 "completion_rate": completion_rate

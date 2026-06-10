@@ -485,6 +485,11 @@ function openFeatureModal(feature = null, options = {}) {
   const reporterOptions = (state.reporters || [])
     .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
     .join("");
+  const featureReporter = feature?.reporter || state.lastReporter || "";
+  const missingFeatureReporter = featureReporter
+    && !(state.reporters || []).some((r) => r.name === featureReporter)
+    ? `<option value="${htmlEscape(featureReporter)}">${htmlEscape(featureReporter)}</option>`
+    : "";
   const featureAssignee = feature?.assignee || state.lastReporter || "";
   const missingFeatureAssignee = featureAssignee
     && !(state.reporters || []).some((r) => r.name === featureAssignee)
@@ -503,6 +508,8 @@ function openFeatureModal(feature = null, options = {}) {
           </div>
           <div class="feature-modal-meta muted small" data-testid="feature-metadata">
             ID <code>${htmlEscape(feature.id)}</code> · created ${fmtTime(feature.created)} · updated ${fmtTime(feature.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
+            · reporter <strong>${htmlEscape(feature.reporter || "unreported")}</strong>
+            · assignee <strong>${htmlEscape(feature.assignee || "unassigned")}</strong>
           </div>
         </div>
         <div class="actions feature-modal-top-actions">
@@ -524,6 +531,12 @@ function openFeatureModal(feature = null, options = {}) {
         <input type="text" id="feature-name" class="modal-input" data-testid="feature-name" value="${htmlEscape(feature?.name || "")}">
         <label>Description</label>
         <textarea id="feature-description" data-testid="feature-description">${htmlEscape(feature?.description || "")}</textarea>
+        <label>Reporter</label>
+        <select id="feature-reporter" class="modal-input" data-testid="feature-reporter">
+          <option value="">— pick reporter —</option>
+          ${missingFeatureReporter}
+          ${reporterOptions}
+        </select>
         <label>Assignee</label>
         <select id="feature-assignee" class="modal-input" data-testid="feature-assignee">
           <option value="">— pick assignee —</option>
@@ -563,6 +576,8 @@ function openFeatureModal(feature = null, options = {}) {
   if (feature) {
     bindFeatureAutosave(root, feature);
   } else {
+    const reporterSelect = root.querySelector("#feature-reporter");
+    if (reporterSelect) reporterSelect.value = featureReporter;
     const assigneeSelect = root.querySelector("#feature-assignee");
     if (assigneeSelect) assigneeSelect.value = featureAssignee;
     root.querySelector("[data-cancel]")?.addEventListener("click", close);
@@ -570,7 +585,7 @@ function openFeatureModal(feature = null, options = {}) {
       const body = {
         name: root.querySelector("#feature-name")?.value.trim() || "",
         description: root.querySelector("#feature-description")?.value.trim() || "",
-        reporter: state.lastReporter || "",
+        reporter: root.querySelector("#feature-reporter")?.value.trim() || state.lastReporter || "",
         assignee: root.querySelector("#feature-assignee")?.value.trim() || state.lastReporter || "",
       };
       if (!body.name) {
@@ -588,6 +603,8 @@ function openFeatureModal(feature = null, options = {}) {
     });
   }
   if (feature) {
+    const reporterSelect = root.querySelector("#feature-reporter");
+    if (reporterSelect) reporterSelect.value = feature.reporter || "";
     const assigneeSelect = root.querySelector("#feature-assignee");
     if (assigneeSelect) assigneeSelect.value = feature.assignee || "";
     const reloadModal = async () => {
@@ -625,11 +642,13 @@ function bindFeatureAutosave(root, feature) {
   const controls = [
     root.querySelector("#feature-name"),
     root.querySelector("#feature-description"),
+    root.querySelector("#feature-reporter"),
     root.querySelector("#feature-assignee"),
   ].filter(Boolean);
   const saved = {
     name: feature.name || "",
     description: feature.description || "",
+    reporter: feature.reporter || "",
     assignee: feature.assignee || "",
   };
   let inFlight = false;
@@ -637,20 +656,25 @@ function bindFeatureAutosave(root, feature) {
   const restoreSaved = () => {
     const name = root.querySelector("#feature-name");
     const description = root.querySelector("#feature-description");
+    const reporter = root.querySelector("#feature-reporter");
     const assignee = root.querySelector("#feature-assignee");
     if (name) name.value = saved.name;
     if (description) description.value = saved.description;
+    if (reporter) reporter.value = saved.reporter;
     if (assignee) assignee.value = saved.assignee;
   };
   const currentBody = () => ({
     name: root.querySelector("#feature-name")?.value.trim() || "",
     description: root.querySelector("#feature-description")?.value.trim() || "",
-    reporter: feature.reporter || "",
+    reporter: root.querySelector("#feature-reporter")?.value.trim() || "",
     assignee: root.querySelector("#feature-assignee")?.value.trim() || "",
   });
   const currentDiffersFromSaved = () => {
     const body = currentBody();
-    return body.name !== saved.name || body.description !== saved.description || body.assignee !== saved.assignee;
+    return body.name !== saved.name
+      || body.description !== saved.description
+      || body.reporter !== saved.reporter
+      || body.assignee !== saved.assignee;
   };
   const save = async () => {
     if (inFlight) {
@@ -663,13 +687,17 @@ function bindFeatureAutosave(root, feature) {
       restoreSaved();
       return;
     }
-    if (body.name === saved.name && body.description === saved.description && body.assignee === saved.assignee) return;
+    if (body.name === saved.name
+        && body.description === saved.description
+        && body.reporter === saved.reporter
+        && body.assignee === saved.assignee) return;
     inFlight = true;
     try {
       const result = await api("PATCH", `/api/features/${encodeURIComponent(feature.id)}`, body);
       const updated = result.feature || {};
       saved.name = updated.name || body.name;
       saved.description = updated.description || body.description;
+      saved.reporter = updated.reporter || body.reporter;
       saved.assignee = updated.assignee || body.assignee;
       if (state.currentRoute === "features") await refreshFeaturesTable();
     } catch (e) {

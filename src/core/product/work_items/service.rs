@@ -188,7 +188,7 @@ impl FileWorkItemService {
         object.insert("name".to_string(), Value::String(name.to_string()));
         object.insert("status".to_string(), Value::String("backlog".to_string()));
         object.insert("priority".to_string(), Value::String("low".to_string()));
-        object.insert("assignee".to_string(), Value::Null);
+        object.insert("reporter".to_string(), Value::Null);
         object.insert("branch_name".to_string(), Value::Null);
         object.insert("feature_id".to_string(), Value::Null);
         object.insert("feature_order".to_string(), Value::Null);
@@ -647,8 +647,8 @@ impl FileWorkItemService {
                         .ok_or_else(|| RefineError::InvalidInput("invalid status".to_string()))?;
                     self.set_gap_status_unchecked(&gap.gap.id, &status)?;
                 }
-                "reporter" => self.set_latest_round_reporter(&gap.gap.id, &raw_value)?,
-                "assignee" => self.set_gap_assignee_unchecked(&gap.gap.id, &raw_value)?,
+                "reporter" => self.set_gap_reporter_unchecked(&gap.gap.id, &raw_value)?,
+                "assignee" => self.set_latest_round_assignee(&gap.gap.id, &raw_value)?,
                 _ => unreachable!(),
             }
             ids.push(gap.gap.id);
@@ -977,6 +977,7 @@ impl FileWorkItemService {
         gap_id: &str,
         name: Option<&str>,
         priority: Option<&str>,
+        reporter: Option<&str>,
         assignee: Option<&str>,
     ) -> RefineResult<GapSummaryProjection> {
         let current = self.show_gap_summary(gap_id)?;
@@ -1006,24 +1007,69 @@ impl FileWorkItemService {
                 Value::String(priority.as_str().to_string()),
             );
         }
-        if let Some(assignee) = assignee {
-            let assignee = assignee.trim();
-            if !assignee.is_empty() && !valid_reporter_name(assignee) {
+        if let Some(reporter) = reporter {
+            let reporter = reporter.trim();
+            if !reporter.is_empty() && !valid_reporter_name(reporter) {
                 return Err(RefineError::InvalidInput(
-                    "invalid assignee name".to_string(),
+                    "invalid reporter name".to_string(),
                 ));
             }
             object.insert(
-                "assignee".to_string(),
-                if assignee.is_empty() {
+                "reporter".to_string(),
+                if reporter.is_empty() {
                     Value::Null
                 } else {
-                    Value::String(assignee.to_string())
+                    Value::String(reporter.to_string())
                 },
             );
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&gap_path, &value)?;
+        if let Some(assignee) = assignee {
+            self.set_latest_round_assignee(gap_id, assignee)?;
+        }
+        self.show_gap_summary(gap_id)
+    }
+
+    fn validate_gap_assignee(assignee: &str) -> RefineResult<&str> {
+        let assignee = assignee.trim();
+        if !assignee.is_empty() && !valid_reporter_name(assignee) {
+            return Err(RefineError::InvalidInput(
+                "invalid assignee name".to_string(),
+            ));
+        }
+        Ok(assignee)
+    }
+
+    fn validate_gap_reporter(reporter: &str) -> RefineResult<&str> {
+        let reporter = reporter.trim();
+        if !reporter.is_empty() && !valid_reporter_name(reporter) {
+            return Err(RefineError::InvalidInput(
+                "invalid reporter name".to_string(),
+            ));
+        }
+        Ok(reporter)
+    }
+
+    pub fn update_gap_assignee_summary(
+        &self,
+        gap_id: &str,
+        assignee: &str,
+    ) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        validate_gap_operation(&current.gap.status, &GapOperation::EditMetadata)?;
+        self.set_latest_round_assignee(gap_id, assignee)?;
+        self.show_gap_summary(gap_id)
+    }
+
+    pub fn update_gap_reporter_summary(
+        &self,
+        gap_id: &str,
+        reporter: &str,
+    ) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        validate_gap_operation(&current.gap.status, &GapOperation::EditMetadata)?;
+        self.set_gap_reporter_unchecked(gap_id, reporter)?;
         self.show_gap_summary(gap_id)
     }
 
@@ -1147,9 +1193,25 @@ impl FileWorkItemService {
         actual: &str,
         target: &str,
     ) -> RefineResult<GapSummaryProjection> {
+        self.append_gap_round_summary_with_assignee(gap_id, reporter, None, actual, target)
+    }
+
+    pub fn append_gap_round_summary_with_assignee(
+        &self,
+        gap_id: &str,
+        reporter: &str,
+        assignee: Option<&str>,
+        actual: &str,
+        target: &str,
+    ) -> RefineResult<GapSummaryProjection> {
         let current = self.show_gap_summary(gap_id)?;
         validate_gap_operation(&current.gap.status, &GapOperation::SubmitNewRound)?;
-        let reporter = reporter.trim();
+        let reporter = Self::validate_gap_reporter(reporter)?;
+        let assignee = assignee
+            .map(Self::validate_gap_assignee)
+            .transpose()?
+            .filter(|value| !value.is_empty())
+            .unwrap_or(reporter);
         let actual = actual.trim();
         let target = target.trim();
         if reporter.is_empty() || actual.is_empty() || target.is_empty() {
@@ -1162,7 +1224,7 @@ impl FileWorkItemService {
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
         })?;
-        let round = new_round_value(reporter, actual, target);
+        let round = new_round_value(reporter, assignee, actual, target);
         match object.get_mut("rounds") {
             Some(Value::Array(rounds)) => rounds.push(round),
             _ => {
@@ -1184,6 +1246,7 @@ impl FileWorkItemService {
         &self,
         gap_id: &str,
         reporter: Option<&str>,
+        assignee: Option<&str>,
         actual: Option<&str>,
         target: Option<&str>,
     ) -> RefineResult<GapSummaryProjection> {
@@ -1211,7 +1274,18 @@ impl FileWorkItemService {
         if let Some(reporter) = reporter {
             latest.insert(
                 "reporter".to_string(),
-                Value::String(reporter.trim().to_string()),
+                Value::String(Self::validate_gap_reporter(reporter)?.to_string()),
+            );
+        }
+        if let Some(assignee) = assignee {
+            let assignee = Self::validate_gap_assignee(assignee)?;
+            latest.insert(
+                "assignee".to_string(),
+                if assignee.is_empty() {
+                    Value::Null
+                } else {
+                    Value::String(assignee.to_string())
+                },
             );
         }
         if let Some(actual) = actual {
@@ -1407,12 +1481,20 @@ impl FileWorkItemService {
         write_json_atomically(&gap_path, &value)
     }
 
-    fn set_gap_assignee_unchecked(&self, gap_id: &str, assignee: &str) -> RefineResult<()> {
+    fn set_gap_reporter_unchecked(&self, gap_id: &str, reporter: &str) -> RefineResult<()> {
+        let reporter = Self::validate_gap_reporter(reporter)?;
         let (gap_path, mut value) = self.read_gap_value(gap_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
         })?;
-        object.insert("assignee".to_string(), Value::String(assignee.to_string()));
+        object.insert(
+            "reporter".to_string(),
+            if reporter.is_empty() {
+                Value::Null
+            } else {
+                Value::String(reporter.to_string())
+            },
+        );
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(&gap_path, &value)
     }
@@ -1455,7 +1537,8 @@ impl FileWorkItemService {
         write_json_atomically(&gap_path, &value)
     }
 
-    fn set_latest_round_reporter(&self, gap_id: &str, reporter: &str) -> RefineResult<()> {
+    fn set_latest_round_assignee(&self, gap_id: &str, assignee: &str) -> RefineResult<()> {
+        let assignee = Self::validate_gap_assignee(assignee)?;
         let (gap_path, mut value) = self.read_gap_value(gap_id)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
@@ -1475,7 +1558,14 @@ impl FileWorkItemService {
             ))
         })?;
         let now = now_timestamp();
-        latest.insert("reporter".to_string(), Value::String(reporter.to_string()));
+        latest.insert(
+            "assignee".to_string(),
+            if assignee.is_empty() {
+                Value::Null
+            } else {
+                Value::String(assignee.to_string())
+            },
+        );
         latest.insert("updated".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
         write_json_atomically(&gap_path, &value)
@@ -1828,10 +1918,11 @@ fn attach_latest_log_fields(
     Ok(())
 }
 
-fn new_round_value(reporter: &str, actual: &str, target: &str) -> Value {
+fn new_round_value(reporter: &str, assignee: &str, actual: &str, target: &str) -> Value {
     let now = now_timestamp();
     let mut round = Map::new();
     round.insert("reporter".to_string(), Value::String(reporter.to_string()));
+    round.insert("assignee".to_string(), Value::String(assignee.to_string()));
     round.insert("actual".to_string(), Value::String(actual.to_string()));
     round.insert("target".to_string(), Value::String(target.to_string()));
     round.insert("created".to_string(), Value::String(now.clone()));

@@ -318,6 +318,7 @@ function drawGapDetail(gap) {
       </div>
       <div class="muted small" style="margin-bottom:14px" data-testid="gap-metadata">
         ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
+        · reporter <strong>${htmlEscape(gap.reporter || "unreported")}</strong>
         · assignee <strong>${htmlEscape(gap.assignee || "unassigned")}</strong>
         ${gap.branch_name ? ` · branch <code>${gap.branch_name}</code>` : ""}
       </div>
@@ -604,8 +605,7 @@ async function openGapReporterModal(gap) {
       await refreshReporters();
     } catch {}
   }
-  const latest = (gap.rounds || [])[Math.max(0, (gap.rounds || []).length - 1)] || {};
-  const current = latest.reporter || "";
+  const current = gap.reporter || "";
   const reporters = state.reporters || [];
   const options = reporters
     .map((r) => `<option value="${htmlEscape(r.name)}" ${r.name === current ? "selected" : ""}>${htmlEscape(r.name)}</option>`)
@@ -624,7 +624,7 @@ async function openGapReporterModal(gap) {
         <option value="__add__">+ Add new reporter…</option>
       </select>
       <p class="muted small" style="margin-top:6px">
-        Rewrites the latest round's reporter. Earlier rounds keep their original reporter.
+        Updates who first reported this Gap. Round history keeps its original reporters.
       </p>
     </div>
     <div class="modal-actions">
@@ -648,14 +648,8 @@ async function openGapReporterModal(gap) {
   next = (next || "").trim();
   if (!next || next === current) return;
   try {
-    let r = await api("POST", "/api/gaps/bulk", {
-      selected_ids: [gap.id],
-      update: { reporter: next },
-      background: false,
-    });
-    r = await resolveBackgroundJobResponse(r, "Reporter update is running in the background");
-    if (r.updated) toast(`Reporter set to ${next}`, "info");
-    else toast("Reporter was not changed", "warn");
+    await api("PATCH", "/api/gaps/" + gap.id, { reporter: next });
+    toast(`Reporter set to ${next}`, "info");
     await loadGapDetail(gap.id);
   } catch (e) {
     await showActionError(e, "Reporter update failed");
@@ -685,6 +679,9 @@ async function openGapAssigneeModal(gap) {
         ${missingCurrent}
         ${options}
       </select>
+      <p class="muted small" style="margin-top:6px">
+        Updates the latest round's assignee, which is this Gap's current owner.
+      </p>
     </div>
     <div class="modal-actions">
       <button class="secondary" data-cancel data-testid="modal-cancel">Cancel</button>
@@ -760,7 +757,11 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}) {
           ? `<span class="status-pill ${rnd.quality_state === "passed" ? "qa" : "failed"}">quality: ${htmlEscape(rnd.quality_state)}</span>`
           : ""}
         <span class="spacer"></span>
-        <span class="muted small">${htmlEscape(rnd.reporter || "(no reporter)")} · ${fmtTime(rnd.created)}</span>
+        <span class="muted small">
+          reporter ${htmlEscape(rnd.reporter || "(none)")}
+          · assignee ${htmlEscape(rnd.assignee || "(none)")}
+          · ${fmtTime(rnd.created)}
+        </span>
       </summary>
       <div class="round-body">
         <dl class="pair">
@@ -894,11 +895,12 @@ function bindRoundFormSubmit(gap) {
     if (!actual && !target) return toast("Provide actual or target", "error");
     const kind = form.dataset.kind;
     try {
+      const assignee = gap.assignee || reporter;
       if (kind === "submit") {
-        await api("POST", `/api/gaps/${gap.id}/rounds`, { reporter, actual, target });
+        await api("POST", `/api/gaps/${gap.id}/rounds`, { reporter, assignee, actual, target });
         toast("New round submitted", "info");
       } else {
-        await api("PATCH", `/api/gaps/${gap.id}/rounds/latest`, { reporter, actual, target });
+        await api("PATCH", `/api/gaps/${gap.id}/rounds/latest`, { reporter, assignee, actual, target });
         toast("Round updated", "info");
       }
       _gapRoundFormDraft = null;

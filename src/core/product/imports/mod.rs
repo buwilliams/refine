@@ -166,20 +166,22 @@ impl FileImportService {
         for draft in drafts {
             let gap = work_items.create_gap_summary(&draft.name, None)?;
             if !draft.actual.trim().is_empty() || !draft.target.trim().is_empty() {
-                work_items.append_gap_round_summary(
+                work_items.append_gap_round_summary_with_assignee(
                     &gap.gap.id,
                     nonempty_or(&draft.reporter, "Imported"),
+                    draft.assignee.as_deref(),
                     &draft.actual,
                     &draft.target,
                 )?;
             }
-            if gap.gap.priority.as_str() != draft.priority || draft.assignee.is_some() {
+            if gap.gap.priority.as_str() != draft.priority || !draft.reporter.trim().is_empty() {
                 work_items.update_gap_metadata_summary(
                     &gap.gap.id,
                     None,
                     (gap.gap.priority.as_str() != draft.priority)
                         .then_some(draft.priority.as_str()),
-                    draft.assignee.as_deref(),
+                    nonempty_option(&draft.reporter),
+                    None,
                 )?;
             }
             if let Some(feature_id) = feature_id {
@@ -334,6 +336,11 @@ fn normalized_priority(priority: &str) -> RefineResult<String> {
 fn nonempty_or<'a>(value: &'a str, fallback: &'a str) -> &'a str {
     let value = value.trim();
     if value.is_empty() { fallback } else { value }
+}
+
+fn nonempty_option(value: &str) -> Option<&str> {
+    let value = value.trim();
+    (!value.is_empty()).then_some(value)
 }
 
 #[cfg(test)]

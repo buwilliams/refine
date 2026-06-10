@@ -1873,7 +1873,7 @@ mod tests {
         for id in ["GAP1", "GAP2", "GAP3", "GAP4"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
-                .update_gap_metadata_summary(id, None, Some("high"), None)
+                .update_gap_metadata_summary(id, None, Some("high"), None, None)
                 .unwrap();
             work_items
                 .transition_gap_status(id, GapStatus::Todo)
@@ -1912,7 +1912,7 @@ mod tests {
         for (id, priority) in [("LOW", "low"), ("MEDIUM", "medium"), ("HIGH", "high")] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
-                .update_gap_metadata_summary(id, None, Some(priority), None)
+                .update_gap_metadata_summary(id, None, Some(priority), None, None)
                 .unwrap();
             work_items
                 .transition_gap_status(id, GapStatus::Todo)

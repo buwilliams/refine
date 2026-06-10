@@ -1147,7 +1147,7 @@ fn web_server_appends_and_edits_latest_round() {
     let edit = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/work/gaps/GAP1/rounds/latest".to_string(),
-        body: Some(json!({"reporter": "Reviewer", "actual": "Revised"})),
+        body: Some(json!({"reporter": "Reviewer", "assignee": "Reviewer", "actual": "Revised"})),
     });
     assert_eq!(edit.status, 200);
     assert_eq!(edit.body["gap"]["reporter"], "Reviewer");
@@ -1163,6 +1163,7 @@ fn web_server_appends_and_edits_latest_round() {
     assert_eq!(detail.status, 200);
     assert_eq!(detail.body["gap"]["round_count"], 1);
     assert_eq!(detail.body["gap"]["rounds"][0]["reporter"], "Reviewer");
+    assert_eq!(detail.body["gap"]["rounds"][0]["assignee"], "Reviewer");
     assert_eq!(detail.body["gap"]["rounds"][0]["actual"], "Revised");
 
     let reporters = server.handle(ApiRequest {
@@ -4539,7 +4540,12 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps/GAP2/rounds".to_string(),
-        body: Some(json!({"reporter": "Alice", "actual": "Needs work", "target": "Works"})),
+        body: Some(json!({
+            "reporter": "Alice",
+            "assignee": "Carol",
+            "actual": "Needs work",
+            "target": "Works"
+        })),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4619,22 +4625,23 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         all_dashboard.body["counts"],
         all_dashboard.body["all_node_counts"]
     );
-    let reporter_stats = dashboard.body["reporter_stats"].as_array().unwrap();
-    let alice = reporter_stats
+    let assignee_stats = dashboard.body["assignee_stats"].as_array().unwrap();
+    let alice = assignee_stats
         .iter()
-        .find(|row| row["reporter"] == "Alice")
+        .find(|row| row["assignee"] == "Alice")
         .unwrap();
-    assert_eq!(alice["reported"], 2);
+    assert_eq!(alice["assigned"], 1);
     assert_eq!(alice["active"], 1);
-    assert_eq!(alice["done"], 1);
-    assert_eq!(alice["completion_rate"], 50.0);
-    let bob = reporter_stats
+    assert_eq!(alice["done"], 0);
+    assert_eq!(alice["completion_rate"], 0.0);
+    let carol = assignee_stats
         .iter()
-        .find(|row| row["reporter"] == "Bob")
+        .find(|row| row["assignee"] == "Carol")
         .unwrap();
-    assert_eq!(bob["reported"], 1);
-    assert_eq!(bob["active"], 0);
-    assert_eq!(bob["done"], 0);
+    assert_eq!(carol["assigned"], 1);
+    assert_eq!(carol["active"], 0);
+    assert_eq!(carol["done"], 1);
+    assert_eq!(carol["completion_rate"], 100.0);
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()

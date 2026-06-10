@@ -1103,6 +1103,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 name.as_deref(),
                 priority.as_deref(),
                 None,
+                None,
             )?;
             println!(
                 "{}",
@@ -1180,6 +1181,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 service.edit_latest_gap_round_summary(
                     &id,
                     reporter.as_deref(),
+                    None,
                     actual.as_deref(),
                     target.as_deref(),
                 )?

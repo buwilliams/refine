@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use chrono::Utc;
 use serde_json::{Value, json};
@@ -292,6 +292,9 @@ impl FileReporterService {
             .to_string();
         reporter["name"] = Value::String(clean.clone());
         self.save_reporters(&reporters)?;
+        if old != clean {
+            rewrite_reporter_references(&self.durable_root, &old, &clean)?;
+        }
         Ok(json!({"ok": true, "old": old, "new": clean}))
     }
 
@@ -332,6 +335,7 @@ impl FileReporterService {
             return Err(RefineError::NotFound("Reporter was not found".to_string()));
         }
         self.delete(id)?;
+        rewrite_reporter_references(&self.durable_root, &old, &new)?;
         Ok(json!({"ok": true, "old": old, "new": new}))
     }
 
@@ -356,12 +360,13 @@ impl FileReporterService {
     }
 
     fn seed_reporters_from_gap_rounds(&self) -> RefineResult<Vec<Value>> {
-        let gaps_root = self.durable_root.join("gaps");
-        if !gaps_root.exists() {
-            return Ok(Vec::new());
-        }
         let mut names = BTreeSet::new();
-        collect_gap_reporter_names(&gaps_root, &mut names)?;
+        collect_reporter_names(&self.durable_root.join("gaps"), "gap.json", &mut names)?;
+        collect_reporter_names(
+            &self.durable_root.join("features"),
+            "feature.json",
+            &mut names,
+        )?;
         let now = now_timestamp();
         Ok(names
             .into_iter()
@@ -770,13 +775,17 @@ fn normalize_reporters(value: &Value) -> Vec<Value> {
     reporters
 }
 
-fn collect_gap_reporter_names(
-    path: &std::path::Path,
+fn collect_reporter_names(
+    path: &Path,
+    file_name: &str,
     names: &mut BTreeSet<String>,
 ) -> RefineResult<()> {
+    if !path.exists() {
+        return Ok(());
+    }
     for entry in fs::read_dir(path).map_err(|error| {
         RefineError::Io(format!(
-            "failed to read Gap directory {}: {error}",
+            "failed to read reporter directory {}: {error}",
             path.display()
         ))
     })? {
@@ -788,28 +797,108 @@ fn collect_gap_reporter_names(
         })?;
         let path = entry.path();
         if path.is_dir() {
-            collect_gap_reporter_names(&path, names)?;
+            collect_reporter_names(&path, file_name, names)?;
             continue;
         }
-        if path.file_name().and_then(|value| value.to_str()) != Some("gap.json") {
+        if path.file_name().and_then(|value| value.to_str()) != Some(file_name) {
             continue;
         }
         let value = read_json_or_default(path.clone(), json!({}))?;
+        collect_reporter_name(value.get("reporter"), names);
+        collect_reporter_name(value.get("assignee"), names);
         for round in value
             .get("rounds")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
-            if let Some(name) = round.get("reporter").and_then(Value::as_str) {
-                let clean = name.trim();
-                if !clean.is_empty() {
-                    names.insert(clean.to_string());
+            collect_reporter_name(round.get("reporter"), names);
+            collect_reporter_name(round.get("assignee"), names);
+        }
+    }
+    Ok(())
+}
+
+fn collect_reporter_name(value: Option<&Value>, names: &mut BTreeSet<String>) {
+    if let Some(name) = value.and_then(Value::as_str) {
+        let clean = name.trim();
+        if !clean.is_empty() {
+            names.insert(clean.to_string());
+        }
+    }
+}
+
+fn rewrite_reporter_references(durable_root: &Path, old: &str, new: &str) -> RefineResult<()> {
+    if old.trim().is_empty() || old == new {
+        return Ok(());
+    }
+    rewrite_reporter_references_in_tree(&durable_root.join("gaps"), "gap.json", old, new)?;
+    rewrite_reporter_references_in_tree(&durable_root.join("features"), "feature.json", old, new)
+}
+
+fn rewrite_reporter_references_in_tree(
+    path: &Path,
+    file_name: &str,
+    old: &str,
+    new: &str,
+) -> RefineResult<()> {
+    if !path.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read reporter directory {}: {error}",
+            path.display()
+        ))
+    })? {
+        let entry = entry.map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read reporter directory entry {}: {error}",
+                path.display()
+            ))
+        })?;
+        let path = entry.path();
+        if path.is_dir() {
+            rewrite_reporter_references_in_tree(&path, file_name, old, new)?;
+            continue;
+        }
+        if path.file_name().and_then(|value| value.to_str()) != Some(file_name) {
+            continue;
+        }
+        let mut value = read_json_or_default(path.clone(), json!({}))?;
+        if rewrite_reporter_reference_value(&mut value, old, new) {
+            write_json(path, &value)?;
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_reporter_reference_value(value: &mut Value, old: &str, new: &str) -> bool {
+    let mut changed = false;
+    if let Some(object) = value.as_object_mut() {
+        changed |= rewrite_reporter_field(object.get_mut("reporter"), old, new);
+        changed |= rewrite_reporter_field(object.get_mut("assignee"), old, new);
+        if let Some(rounds) = object.get_mut("rounds").and_then(Value::as_array_mut) {
+            for round in rounds {
+                if let Some(round_object) = round.as_object_mut() {
+                    changed |= rewrite_reporter_field(round_object.get_mut("reporter"), old, new);
+                    changed |= rewrite_reporter_field(round_object.get_mut("assignee"), old, new);
                 }
             }
         }
     }
-    Ok(())
+    changed
+}
+
+fn rewrite_reporter_field(value: Option<&mut Value>, old: &str, new: &str) -> bool {
+    let Some(value) = value else {
+        return false;
+    };
+    if value.as_str() == Some(old) {
+        *value = Value::String(new.to_string());
+        return true;
+    }
+    false
 }
 
 fn normalize_reporter_name(name: &str) -> RefineResult<String> {
@@ -890,6 +979,33 @@ mod tests {
             .unwrap();
         assert_eq!(guidance_payload["guidance"].as_array().unwrap().len(), 1);
 
+        let gap_dir = durable_root.join("gaps/GA/P1");
+        let feature_dir = durable_root.join("features/FE/A1");
+        fs::create_dir_all(&gap_dir).unwrap();
+        fs::create_dir_all(&feature_dir).unwrap();
+        fs::write(
+            gap_dir.join("gap.json"),
+            serde_json::to_string_pretty(&json!({
+                "id": "GAP1",
+                "reporter": "Buddy",
+                "rounds": [
+                    {"reporter": "Alex", "assignee": "Buddy", "actual": "A", "target": "B"}
+                ]
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            feature_dir.join("feature.json"),
+            serde_json::to_string_pretty(&json!({
+                "id": "FEA1",
+                "reporter": "Buddy",
+                "assignee": "Buddy"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+
         let reporters = FileReporterService::new(&durable_root);
         let buddy = reporters.create("Buddy").unwrap()["reporter"].clone();
         let alex = reporters.create("Alex").unwrap()["reporter"].clone();
@@ -907,6 +1023,16 @@ mod tests {
                 .len(),
             1
         );
+        let gap: Value =
+            serde_json::from_str(&fs::read_to_string(gap_dir.join("gap.json")).unwrap()).unwrap();
+        assert_eq!(gap["reporter"], "Alex");
+        assert_eq!(gap["rounds"][0]["reporter"], "Alex");
+        assert_eq!(gap["rounds"][0]["assignee"], "Alex");
+        let feature: Value =
+            serde_json::from_str(&fs::read_to_string(feature_dir.join("feature.json")).unwrap())
+                .unwrap();
+        assert_eq!(feature["reporter"], "Alex");
+        assert_eq!(feature["assignee"], "Alex");
 
         fs::remove_dir_all(temp_root).unwrap();
     }

@@ -365,7 +365,13 @@ impl FileChatService {
         let submit_result = (|| -> RefineResult<GapSummaryProjection> {
             work_items.append_gap_round_summary(&gap_id, reporter, actual, target)?;
             if priority != "low" {
-                work_items.update_gap_metadata_summary(&gap_id, None, Some(priority), None)?;
+                work_items.update_gap_metadata_summary(
+                    &gap_id,
+                    None,
+                    Some(priority),
+                    None,
+                    None,
+                )?;
             }
             match worktree_git.commit(&format!("Submit {gap_id} from standalone chat"), &[]) {
                 Ok(_) => {}

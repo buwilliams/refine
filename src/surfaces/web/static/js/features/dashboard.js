@@ -172,9 +172,9 @@ function drawDashboard(d, opts = {}) {
   const counts = d.counts || {};
   const orderedStatuses = workflowStatuses();
   const dash = $("#dash");
-  const reporterStats = d.reporter_stats || [];
+  const assigneeStats = d.assignee_stats || d.reporter_stats || [];
   const reviewsShellOpen = dashboardPanelOpen("reviews-for-reporter-card", true);
-  const reporterStatsShellOpen = dashboardPanelOpen("dashboard-reporter-stats-shell", false);
+  const assigneeStatsShellOpen = dashboardPanelOpen("dashboard-assignee-stats-shell", false);
   const showReviewPanel = !!reviewReporter || needsAttention.length > 0;
   syncDashboardScopeSwitch(scope);
   // Guard against late-arriving SSE refreshes after the user navigated
@@ -251,55 +251,56 @@ function drawDashboard(d, opts = {}) {
       </div>
     </details>` : ""}
 
-    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-reporter-stats-shell" data-testid="dashboard-reporter-stats-panel"${reporterStatsShellOpen ? " open" : ""}>
-      <summary data-testid="dashboard-reporter-stats-summary">
-        <span class="filter-shell-title">Reporter throughput</span>
-        <span class="filter-pill" data-testid="dashboard-reporter-stats-count">${fmtCount(reporterStats.length)}</span>
+    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-assignee-stats-shell" data-testid="dashboard-assignee-stats-panel"${assigneeStatsShellOpen ? " open" : ""}>
+      <summary data-testid="dashboard-assignee-stats-summary">
+        <span class="filter-shell-title">Assignee throughput</span>
+        <span class="filter-pill" data-testid="dashboard-assignee-stats-count">${fmtCount(assigneeStats.length)}</span>
       </summary>
       <div class="filter-shell-body">
-        ${reporterStats.length === 0
-          ? `<p class="muted">No reporter activity yet.</p>`
+        ${assigneeStats.length === 0
+          ? `<p class="muted">No assignee activity yet.</p>`
           : `<table class="table">
               <thead><tr>
-                <th>Reporter</th>
+                <th>Assignee</th>
                 <th>Active</th>
                 <th>Done</th>
-                <th>Reported</th>
                 <th>Assigned</th>
                 <th>Review</th>
-                <th>Done / Reported</th>
+                <th>Done / Assigned</th>
               </tr></thead>
               <tbody>
-                ${reporterStats.map((s) => `
-                  <tr class="reporter-stats-row"
-                      data-testid="dashboard-reporter-stats-row"
-                      data-reporter="${htmlEscape(s.reporter)}"
-                      title="See Gaps reported by ${htmlEscape(s.reporter)}">
-                    <td>${htmlEscape(s.reporter)}</td>
+                ${assigneeStats.map((s) => {
+                  const assignee = s.assignee || s.reporter || "";
+                  return `
+                  <tr class="assignee-stats-row"
+                      data-testid="dashboard-assignee-stats-row"
+                      data-assignee="${htmlEscape(assignee)}"
+                      title="See Gaps assigned to ${htmlEscape(assignee)}">
+                    <td>${htmlEscape(assignee)}</td>
                     <td>${fmtCount(s.active)}</td>
                     <td>${fmtCount(s.done)}</td>
-                    <td>${fmtCount(s.reported)}</td>
                     <td>${fmtCount(s.assigned || 0)}</td>
                     <td>${fmtCount(s.assigned_review || 0)}</td>
                     <td><span class="metric-good">${s.completion_rate.toFixed(1)}%</span></td>
-                  </tr>`).join("")}
+                  </tr>`;
+                }).join("")}
               </tbody>
             </table>`}
       </div>
     </details>
 
   `;
-  // Click any reporter row → deep-link into the Gaps list filtered by
-  // that reporter. We use data-reporter + a delegated listener so the
+  // Click any assignee row -> deep-link into the Gaps list filtered by
+  // that assignee. We use data-assignee + a delegated listener so the
   // name can contain spaces/quotes without HTML-escaping hazards.
-  $$(".reporter-stats-row").forEach((row) => {
+  $$(".assignee-stats-row").forEach((row) => {
     row.addEventListener("click", () => {
-      location.hash = gapsHash({ reporter: row.dataset.reporter, node: scope });
+      location.hash = gapsHash({ assignee: row.dataset.assignee, node: scope });
     });
   });
 
   wireDashboardPanelPersistence("reviews-for-reporter-card");
-  wireDashboardPanelPersistence("dashboard-reporter-stats-shell");
+  wireDashboardPanelPersistence("dashboard-assignee-stats-shell");
   wireReviewsForReporter(reviewsForReporter);
 }
 

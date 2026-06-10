@@ -203,12 +203,8 @@ impl FileProjectStateStore {
             .cloned()
             .unwrap_or_default();
         let valid_rounds: Vec<&Value> = rounds.iter().filter(|round| round.is_object()).collect();
-        let reporter = valid_rounds.last().and_then(|round| {
-            round
-                .as_object()
-                .and_then(|object| text(object.get("reporter")))
-        });
-        let assignee = nullable_text(object.get("assignee"));
+        let reporter = gap_reporter(object, &valid_rounds);
+        let assignee = latest_round_assignee(object, &valid_rounds);
         let notes = object
             .get("notes")
             .and_then(Value::as_array)
@@ -226,7 +222,7 @@ impl FileProjectStateStore {
         }
         for round in &valid_rounds {
             if let Some(round) = round.as_object() {
-                for key in ["reporter", "actual", "target"] {
+                for key in ["reporter", "assignee", "actual", "target"] {
                     if let Some(value) = text(round.get(key)) {
                         searchable_parts.push(value);
                     }
@@ -408,6 +404,42 @@ impl FileProjectStateStore {
             FileGitWorktreeService::new(source_root)
         }
     }
+}
+
+fn gap_reporter(
+    object: &serde_json::Map<String, Value>,
+    valid_rounds: &[&Value],
+) -> Option<String> {
+    nullable_text(object.get("reporter"))
+        .or_else(|| {
+            valid_rounds.first().and_then(|round| {
+                round
+                    .as_object()
+                    .and_then(|object| nullable_text(object.get("reporter")))
+            })
+        })
+        .or_else(|| nullable_text(object.get("assignee")))
+}
+
+fn latest_round_assignee(
+    object: &serde_json::Map<String, Value>,
+    valid_rounds: &[&Value],
+) -> Option<String> {
+    valid_rounds
+        .last()
+        .and_then(|round| {
+            round
+                .as_object()
+                .and_then(|object| nullable_text(object.get("assignee")))
+        })
+        .or_else(|| nullable_text(object.get("assignee")))
+        .or_else(|| {
+            valid_rounds.last().and_then(|round| {
+                round
+                    .as_object()
+                    .and_then(|object| nullable_text(object.get("reporter")))
+            })
+        })
 }
 
 impl ProjectStateStore for FileProjectStateStore {
