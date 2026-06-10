@@ -1,19 +1,15 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::core::host::process_supervision::FileProcessSupervisor;
 use crate::core::host::quality::{
     FileQualityService, QualityCheckRequest, QualityJobRunner, QualityService, QualitySettingsPatch,
 };
 use crate::core::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
-use crate::core::product::chat::{ChatAttachment, ChatService, ChatSessionWorktree};
-use crate::core::product::work_items::FileWorkItemService;
+use crate::core::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::model::workflow::GapStatus;
 
 use super::support::*;
 use super::*;
@@ -339,35 +335,25 @@ impl InProcessWebServer {
             .clone()
             .or_else(|| effective_chat_provider(configured_provider()));
         let service = self.chat_service(&durable_root);
-        match service.start_with_options(attachment.clone(), provider.as_deref(), mode) {
-            Ok(mut session) => {
-                if matches!(attachment, ChatAttachment::Standalone) {
-                    let Some(runtime_root) = &self.runtime_root else {
-                        let _ = service.interrupt(&session.id, "standalone worktree setup failed");
-                        return runtime_root_unavailable("start standalone chat sessions");
-                    };
-                    match create_standalone_chat_worktree(&durable_root, &runtime_root, &session.id)
-                        .and_then(|worktree| service.attach_worktree(&session.id, worktree))
-                    {
-                        Ok(updated) => session = updated,
-                        Err(error) => {
-                            let _ =
-                                service.interrupt(&session.id, "standalone worktree setup failed");
-                            return error_response(error);
-                        }
-                    }
-                }
-                ApiResponse::json(
-                    201,
-                    json!({
-                        "ok": true,
-                        "session_id": session.id,
-                        "provider": session.provider,
-                        "mode": session.mode,
-                        "worktree": session.worktree
-                    }),
-                )
+        let result = if matches!(attachment, ChatAttachment::Standalone) {
+            if self.runtime_root.is_none() {
+                return runtime_root_unavailable("start standalone chat sessions");
             }
+            service.start_standalone_with_options(provider.as_deref(), mode)
+        } else {
+            service.start_with_options(attachment.clone(), provider.as_deref(), mode)
+        };
+        match result {
+            Ok(session) => ApiResponse::json(
+                201,
+                json!({
+                    "ok": true,
+                    "session_id": session.id,
+                    "provider": session.provider,
+                    "mode": session.mode,
+                    "worktree": session.worktree
+                }),
+            ),
             Err(error) => error_response(error),
         }
     }
@@ -493,22 +479,7 @@ impl InProcessWebServer {
             return chat_session_id_required();
         };
         let service = self.chat_service(&durable_root);
-        let existing = match service.resume(session_id) {
-            Ok(session) => session,
-            Err(error) => return error_response(error),
-        };
-        if matches!(existing.attachment, ChatAttachment::Standalone)
-            && existing
-                .worktree
-                .as_ref()
-                .and_then(|worktree| worktree.submitted_gap_id.as_deref())
-                .is_none()
-            && let Some(worktree) = existing.worktree.as_ref()
-            && let Err(error) = cleanup_standalone_chat_worktree(&durable_root, worktree)
-        {
-            return error_response(error);
-        }
-        match service.stop(session_id) {
+        match service.stop_with_standalone_cleanup(session_id) {
             Ok(session) => ApiResponse::json(
                 200,
                 json!({
@@ -524,10 +495,9 @@ impl InProcessWebServer {
 
     pub(super) fn handle_chat_submit_ready_merge(&self, request: ApiRequest) -> ApiResponse {
         let durable_root = require_durable_root!(self, "submit standalone chat for merge");
-        let runtime_root = match &self.runtime_root {
-            Some(root) => root.clone(),
-            None => return runtime_root_unavailable("submit standalone chat for merge"),
-        };
+        if self.runtime_root.is_none() {
+            return runtime_root_unavailable("submit standalone chat for merge");
+        }
         let Some(session_id) = request
             .path
             .strip_prefix("/chat/")
@@ -538,212 +508,48 @@ impl InProcessWebServer {
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         let service = self.chat_service(&durable_root);
-        let session = match service.resume(session_id) {
-            Ok(session) => session,
-            Err(error) => return error_response(error),
-        };
-        if !matches!(session.attachment, ChatAttachment::Standalone) {
-            return error_response(RefineError::InvalidInput(
-                "only standalone chat sessions can be submitted for merge".to_string(),
-            ));
-        }
-        if session.closed {
-            return error_response(RefineError::Conflict(format!(
-                "Chat session {session_id} is closed"
-            )));
-        }
-        let read_state = match service.read(session_id) {
-            Ok(read) => read,
-            Err(error) => return error_response(error),
-        };
-        if session.in_flight
-            || session.queue_dispatching
-            || !session.queued_messages.is_empty()
-            || read_state.in_flight
-            || !read_state.queued_messages.is_empty()
-        {
-            return error_response(RefineError::Conflict(
-                "wait for the standalone chat to finish before submitting for merge".to_string(),
-            ));
-        }
-        let Some(worktree) = session.worktree.clone() else {
-            return error_response(RefineError::Conflict(format!(
-                "Chat session {session_id} has no standalone worktree"
-            )));
-        };
-        if worktree.submitted_gap_id.is_some() {
-            return error_response(RefineError::Conflict(format!(
-                "Chat session {session_id} was already submitted"
-            )));
-        }
-
-        let actual = body
-            .get("actual")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
-        let target = body
-            .get("target")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
-        let reporter = body
-            .get("reporter")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim();
-        let priority = body
-            .get("priority")
-            .and_then(Value::as_str)
-            .unwrap_or("low")
-            .trim();
-        let Some(name) = body
-            .get("name")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .map(str::to_string)
-            .or_else(|| derive_standalone_gap_name(actual, target))
-        else {
-            return error_response(RefineError::InvalidInput(
-                "body.name, body.actual, or body.target is required".to_string(),
-            ));
-        };
-        if reporter.is_empty() || actual.is_empty() || target.is_empty() {
-            return error_response(RefineError::InvalidInput(
-                "reporter, actual, and target are required".to_string(),
-            ));
-        }
-        if !matches!(priority, "low" | "medium" | "high") {
-            return error_response(RefineError::InvalidInput(
-                "priority must be one of low, medium, or high".to_string(),
-            ));
-        }
-
-        let settings = match FileSettingsService::new(&durable_root).load() {
-            Ok(settings) => settings,
-            Err(error) => return error_response(error),
-        };
-        let target_branch = settings
-            .get("merge_target_branch")
-            .and_then(Value::as_str)
-            .map(str::trim)
-            .filter(|value| !value.is_empty())
-            .unwrap_or("main");
-        let worktree_git = FileGitWorktreeService::with_runtime_root(&worktree.path, &runtime_root);
-        let work_items =
-            FileWorkItemService::with_projection_cache(&durable_root, runtime_root.join("cache"));
-        let gap = match work_items.create_gap_summary(&name, None) {
-            Ok(gap) => gap,
-            Err(error) => return error_response(error),
-        };
-        let gap_id = gap.gap.id.clone();
-        let submit_result = (|| -> RefineResult<_> {
-            work_items.append_gap_round_summary(&gap_id, reporter, actual, target)?;
-            if priority != "low" {
-                work_items.update_gap_metadata_summary(&gap_id, None, Some(priority), None)?;
-            }
-            match worktree_git.commit(&format!("Submit {gap_id} from standalone chat"), &[]) {
-                Ok(_) => {}
-                Err(error) => {
-                    if !worktree_git.has_commits_since(target_branch)? {
-                        return Err(error);
-                    }
-                }
-            }
-            work_items.set_gap_branch_name(&gap_id, &worktree.branch)?;
-            work_items.transition_gap_status(&gap_id, GapStatus::Todo)?;
-            work_items.advance_automated_gap_status(&gap_id, GapStatus::InProgress)?;
-            work_items.advance_automated_gap_status(&gap_id, GapStatus::Qa)?;
-            let gap = work_items.advance_automated_gap_status(&gap_id, GapStatus::ReadyMerge)?;
-            service.mark_worktree_submitted(session_id, &gap_id)?;
-            service.interrupt(session_id, "submitted for ready-merge")?;
-            Ok(gap)
-        })();
-        match submit_result {
-            Ok(gap) => match self.refresh_projection_cache_after_mutation() {
+        let submit = service.submit_standalone_ready_merge(
+            session_id,
+            StandaloneReadyMergeRequest {
+                name: body.get("name").and_then(Value::as_str).map(str::to_string),
+                reporter: body
+                    .get("reporter")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                actual: body
+                    .get("actual")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                target: body
+                    .get("target")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+                priority: body
+                    .get("priority")
+                    .and_then(Value::as_str)
+                    .unwrap_or("low")
+                    .to_string(),
+            },
+        );
+        match submit {
+            Ok(result) => match self.refresh_projection_cache_after_mutation() {
                 Ok(()) => ApiResponse::json(
                     201,
                     json!({
                         "ok": true,
-                        "gap": gap.gap,
+                        "gap": result.gap.gap,
                         "session_id": session_id,
-                        "worktree": worktree
+                        "worktree": result.worktree
                     }),
                 ),
                 Err(error) => error_response(error),
             },
-            Err(error) => {
-                let _ = work_items.delete_gap_record(&gap_id);
-                error_response(error)
-            }
+            Err(error) => error_response(error),
         }
     }
-}
-
-fn create_standalone_chat_worktree(
-    durable_root: &Path,
-    runtime_root: &Path,
-    session_id: &str,
-) -> RefineResult<ChatSessionWorktree> {
-    let source_root = durable_root.parent().ok_or_else(|| {
-        RefineError::InvalidInput(format!(
-            "durable root {} has no source repository parent",
-            durable_root.display()
-        ))
-    })?;
-    let branch = format!("refine/standalone/{session_id}");
-    let git = FileGitWorktreeService::with_runtime_root(source_root, runtime_root);
-    let target = git
-        .git_path("refine-standalone-worktrees")?
-        .join(session_id);
-    if let Some(parent) = target.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create standalone worktree directory {}: {error}",
-                parent.display()
-            ))
-        })?;
-    }
-    let path = git.ensure_worktree(&branch, &target)?;
-    Ok(ChatSessionWorktree {
-        branch,
-        path,
-        submitted_gap_id: None,
-    })
-}
-
-fn cleanup_standalone_chat_worktree(
-    durable_root: &Path,
-    worktree: &ChatSessionWorktree,
-) -> RefineResult<()> {
-    let source_root = durable_root.parent().ok_or_else(|| {
-        RefineError::InvalidInput(format!(
-            "durable root {} has no source repository parent",
-            durable_root.display()
-        ))
-    })?;
-    let git = FileGitWorktreeService::new(source_root);
-    let path = PathBuf::from(&worktree.path);
-    if path.exists() {
-        git.remove_worktree(&path, true)?;
-    }
-    let _ = git.delete_branch(&worktree.branch, true);
-    Ok(())
-}
-
-fn derive_standalone_gap_name(actual: &str, target: &str) -> Option<String> {
-    let source = [target.trim(), actual.trim()]
-        .into_iter()
-        .find(|value| !value.is_empty())?;
-    let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut name = collapsed.chars().take(80).collect::<String>();
-    if collapsed.chars().count() > 80 {
-        name = name
-            .trim_end_matches(|ch: char| !ch.is_alphanumeric())
-            .to_string();
-    }
-    (!name.trim().is_empty()).then(|| name.trim().to_string())
 }
 
 fn effective_chat_provider(configured: Option<String>) -> Option<String> {

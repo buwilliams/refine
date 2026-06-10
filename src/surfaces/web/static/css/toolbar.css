@@ -83,14 +83,21 @@
   flex-direction: column;
   padding: 10px 12px 12px;
   background: var(--color-bg);
-  overflow: hidden;
-  /* Height is set inline by JS (user-resizable); fall back to ~20vh. */
-  height: 20vh;
-  min-height: 120px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Height is set inline by JS (user-resizable); fall back to a usable chat panel. */
+  height: 32vh;
+  min-height: 320px;
   max-height: 85vh;
 }
 .toolbar-dock.open .toolbar-dock-body { display: flex; }
 .toolbar-dock.open .toolbar-dock-collapse { transform: rotate(180deg); }
+.toolbar-dock-body > .actions { flex: 0 0 auto; }
+.toolbar-dock-body [data-testid="standalone-worktree-path"] {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .toolbar-dock-body .chat-output-box { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .toolbar-dock-body .chat-output-box .chat-output { flex: 1; min-height: 0; }
 

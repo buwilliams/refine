@@ -235,13 +235,13 @@ function saveChatStateToStorage() {
 }
 
 function defaultToolbarBodyHeight() {
-  return Math.max(120, Math.round(window.innerHeight * 0.20));
+  return Math.max(320, Math.round(window.innerHeight * 0.32));
 }
 
 function defaultChatBodyHeight() { return defaultToolbarBodyHeight(); }
 
 function clampToolbarBodyHeight(px) {
-  const min = 120;
+  const min = 320;
   const max = Math.max(min, Math.round(window.innerHeight * 0.85));
   return Math.max(min, Math.min(max, Math.round(px)));
 }

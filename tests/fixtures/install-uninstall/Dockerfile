@@ -9,6 +9,7 @@ RUN apt-get update \
         netcat-openbsd \
         procps \
     && rm -rf /var/lib/apt/lists/* \
+    && printf '%s\n' 'export PATH=/usr/local/cargo/bin:/home/refine/.cargo/bin:$PATH' >/etc/profile.d/refine-cargo-path.sh \
     && useradd -m -s /bin/bash refine
 
 USER refine

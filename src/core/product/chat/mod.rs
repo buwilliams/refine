@@ -11,10 +11,14 @@ use serde_json::{Value, json};
 use crate::core::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
-use crate::core::product::project_state::FileProjectStateStore;
+use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::core::product::project_state::{FileProjectStateStore, GapSummaryProjection};
+use crate::core::product::work_items::FileWorkItemService;
+use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::model::log::LogEntry;
+use crate::model::workflow::GapStatus;
 use crate::model::{JsonObject, Timestamp};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -79,6 +83,21 @@ pub struct ChatReadResult {
     pub in_flight: bool,
     pub provider_session_id: Option<String>,
     pub worktree: Option<ChatSessionWorktree>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct StandaloneReadyMergeRequest {
+    pub name: Option<String>,
+    pub reporter: String,
+    pub actual: String,
+    pub target: String,
+    pub priority: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StandaloneReadyMergeResult {
+    pub gap: GapSummaryProjection,
+    pub worktree: ChatSessionWorktree,
 }
 
 pub trait ChatService {
@@ -211,6 +230,156 @@ impl FileChatService {
         self.interrupt(session_id, "stopped")
     }
 
+    pub fn start_standalone_with_options(
+        &self,
+        provider: Option<&str>,
+        mode: Option<&str>,
+    ) -> RefineResult<ChatSessionRecord> {
+        let mut session = self.start_with_options(ChatAttachment::Standalone, provider, mode)?;
+        match self
+            .create_standalone_worktree(&session.id)
+            .and_then(|worktree| self.attach_worktree(&session.id, worktree))
+        {
+            Ok(updated) => {
+                session = updated;
+                Ok(session)
+            }
+            Err(error) => {
+                let _ = self.interrupt(&session.id, "standalone worktree setup failed");
+                Err(error)
+            }
+        }
+    }
+
+    pub fn stop_with_standalone_cleanup(
+        &self,
+        session_id: &str,
+    ) -> RefineResult<ChatSessionRecord> {
+        let existing = self.load_record(session_id)?;
+        if matches!(existing.attachment, ChatAttachment::Standalone)
+            && existing
+                .worktree
+                .as_ref()
+                .and_then(|worktree| worktree.submitted_gap_id.as_deref())
+                .is_none()
+            && let Some(worktree) = existing.worktree.as_ref()
+        {
+            self.cleanup_standalone_worktree(worktree)?;
+        }
+        self.stop(session_id)
+    }
+
+    pub fn submit_standalone_ready_merge(
+        &self,
+        session_id: &str,
+        request: StandaloneReadyMergeRequest,
+    ) -> RefineResult<StandaloneReadyMergeResult> {
+        let session = self.load_record(session_id)?;
+        if !matches!(session.attachment, ChatAttachment::Standalone) {
+            return Err(RefineError::InvalidInput(
+                "only standalone chat sessions can be submitted for merge".to_string(),
+            ));
+        }
+        if session.closed {
+            return Err(RefineError::Conflict(format!(
+                "Chat session {session_id} is closed"
+            )));
+        }
+        let read_state = self.read(session_id)?;
+        if session.in_flight
+            || session.queue_dispatching
+            || !session.queued_messages.is_empty()
+            || read_state.in_flight
+            || !read_state.queued_messages.is_empty()
+        {
+            return Err(RefineError::Conflict(
+                "wait for the standalone chat to finish before submitting for merge".to_string(),
+            ));
+        }
+        let Some(worktree) = session.worktree.clone() else {
+            return Err(RefineError::Conflict(format!(
+                "Chat session {session_id} has no standalone worktree"
+            )));
+        };
+        if worktree.submitted_gap_id.is_some() {
+            return Err(RefineError::Conflict(format!(
+                "Chat session {session_id} was already submitted"
+            )));
+        }
+
+        let actual = request.actual.trim();
+        let target = request.target.trim();
+        let reporter = request.reporter.trim();
+        let priority = request.priority.trim();
+        let name = request
+            .name
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+            .or_else(|| derive_standalone_gap_name(actual, target))
+            .ok_or_else(|| {
+                RefineError::InvalidInput(
+                    "body.name, body.actual, or body.target is required".to_string(),
+                )
+            })?;
+        if reporter.is_empty() || actual.is_empty() || target.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "reporter, actual, and target are required".to_string(),
+            ));
+        }
+        if !matches!(priority, "low" | "medium" | "high") {
+            return Err(RefineError::InvalidInput(
+                "priority must be one of low, medium, or high".to_string(),
+            ));
+        }
+
+        let settings = FileSettingsService::new(&self.durable_root).load()?;
+        let target_branch = settings
+            .get("merge_target_branch")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .unwrap_or("main");
+        let worktree_git =
+            FileGitWorktreeService::with_runtime_root(&worktree.path, &self.runtime_root);
+        let work_items = FileWorkItemService::with_projection_cache(
+            &self.durable_root,
+            self.runtime_root.join("cache"),
+        );
+        let gap = work_items.create_gap_summary(&name, None)?;
+        let gap_id = gap.gap.id.clone();
+        let submit_result = (|| -> RefineResult<GapSummaryProjection> {
+            work_items.append_gap_round_summary(&gap_id, reporter, actual, target)?;
+            if priority != "low" {
+                work_items.update_gap_metadata_summary(&gap_id, None, Some(priority), None)?;
+            }
+            match worktree_git.commit(&format!("Submit {gap_id} from standalone chat"), &[]) {
+                Ok(_) => {}
+                Err(error) => {
+                    if !worktree_git.has_commits_since(target_branch)? {
+                        return Err(error);
+                    }
+                }
+            }
+            work_items.set_gap_branch_name(&gap_id, &worktree.branch)?;
+            work_items.transition_gap_status(&gap_id, GapStatus::Todo)?;
+            work_items.advance_automated_gap_status(&gap_id, GapStatus::InProgress)?;
+            work_items.advance_automated_gap_status(&gap_id, GapStatus::Qa)?;
+            let gap = work_items.advance_automated_gap_status(&gap_id, GapStatus::ReadyMerge)?;
+            self.mark_worktree_submitted(session_id, &gap_id)?;
+            self.interrupt(session_id, "submitted for ready-merge")?;
+            Ok(gap)
+        })();
+        match submit_result {
+            Ok(gap) => Ok(StandaloneReadyMergeResult { gap, worktree }),
+            Err(error) => {
+                let _ = work_items.delete_gap_record(&gap_id);
+                Err(error)
+            }
+        }
+    }
+
     pub fn list_sessions(&self) -> RefineResult<Vec<ChatSessionRecord>> {
         let sessions_dir = self.sessions_dir();
         if !sessions_dir.exists() {
@@ -299,6 +468,50 @@ impl FileChatService {
 
     fn session_path(&self, session_id: &str) -> PathBuf {
         self.sessions_dir().join(format!("{session_id}.json"))
+    }
+
+    fn create_standalone_worktree(&self, session_id: &str) -> RefineResult<ChatSessionWorktree> {
+        let source_root = self.durable_root.parent().ok_or_else(|| {
+            RefineError::InvalidInput(format!(
+                "durable root {} has no source repository parent",
+                self.durable_root.display()
+            ))
+        })?;
+        let branch = format!("refine/standalone/{session_id}");
+        let git = FileGitWorktreeService::with_runtime_root(source_root, &self.runtime_root);
+        let target = git
+            .git_path("refine-standalone-worktrees")?
+            .join(session_id);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to create standalone worktree directory {}: {error}",
+                    parent.display()
+                ))
+            })?;
+        }
+        let path = git.ensure_worktree(&branch, &target)?;
+        Ok(ChatSessionWorktree {
+            branch,
+            path,
+            submitted_gap_id: None,
+        })
+    }
+
+    fn cleanup_standalone_worktree(&self, worktree: &ChatSessionWorktree) -> RefineResult<()> {
+        let source_root = self.durable_root.parent().ok_or_else(|| {
+            RefineError::InvalidInput(format!(
+                "durable root {} has no source repository parent",
+                self.durable_root.display()
+            ))
+        })?;
+        let git = FileGitWorktreeService::new(source_root);
+        let path = PathBuf::from(&worktree.path);
+        if path.exists() {
+            git.remove_worktree(&path, true)?;
+        }
+        let _ = git.delete_branch(&worktree.branch, true);
+        Ok(())
     }
 
     pub fn resume_provider_turn(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
@@ -976,6 +1189,20 @@ fn event_bool(event: &JsonObject, key: &str) -> bool {
         .get(key)
         .and_then(|value| value.as_bool())
         .unwrap_or(false)
+}
+
+fn derive_standalone_gap_name(actual: &str, target: &str) -> Option<String> {
+    let source = [target.trim(), actual.trim()]
+        .into_iter()
+        .find(|value| !value.is_empty())?;
+    let collapsed = source.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut name = collapsed.chars().take(80).collect::<String>();
+    if collapsed.chars().count() > 80 {
+        name = name
+            .trim_end_matches(|ch: char| !ch.is_alphanumeric())
+            .to_string();
+    }
+    (!name.trim().is_empty()).then(|| name.trim().to_string())
 }
 
 fn importable_artifacts_from_output(output: &str) -> Vec<JsonObject> {

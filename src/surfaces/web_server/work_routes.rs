@@ -149,6 +149,32 @@ mod tests {
     }
 
     #[test]
+    fn plan_import_result_reads_embedded_pretty_json_before_text_fallback() {
+        let output = r#"Provider notes before JSON:
+{
+  "feature": {
+    "name": "Smoke AI Plan Feature",
+    "description": "A deterministic product capability planned by the Smoke AI fixture.",
+    "gaps": [
+      {
+        "name": "Smoke AI plan gap one",
+        "actual": "smoke-ai plan actual behavior one",
+        "target": "smoke-ai plan target behavior one",
+        "priority": "low"
+      }
+    ]
+  }
+}
+Provider notes after JSON."#;
+
+        let result = parse_provider_import_result(output, Some("Product")).unwrap();
+        let feature = result.feature_destination.unwrap();
+        assert_eq!(feature.name, "Smoke AI Plan Feature");
+        assert_eq!(result.drafts.len(), 1);
+        assert_eq!(result.drafts[0].actual, "smoke-ai plan actual behavior one");
+    }
+
+    #[test]
     fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
         let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
         assert!(prompt.contains("feature"));
@@ -338,22 +364,30 @@ fn parse_provider_import_result(
     output: &str,
     reporter: Option<&str>,
 ) -> crate::core::supervisor::errors::RefineResult<ImportExtractionResult> {
-    if let Ok(value) = serde_json::from_str::<Value>(output) {
-        let feature_destination = plan_feature_destination_from_value(&value);
-        let body = match value {
-            Value::Array(items) => json!({ "drafts": items, "reporter": reporter.unwrap_or("") }),
-            Value::Object(mut object) => {
-                normalize_plan_feature_draft_object(&mut object);
-                Value::Object(object)
-            }
-            other => other,
-        };
-        if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
-            return Ok(ImportExtractionResult {
-                drafts,
-                feature_destination,
-            });
-        }
+    if let Some(result) = parse_structured_import_result(output, reporter) {
+        return Ok(result);
+    }
+
+    FileImportService::new(PathBuf::new())
+        .parse_text(output, reporter)
+        .map(|drafts| ImportExtractionResult {
+            drafts,
+            feature_destination: None,
+        })
+}
+
+fn parse_structured_import_result(
+    output: &str,
+    reporter: Option<&str>,
+) -> Option<ImportExtractionResult> {
+    if let Ok(value) = serde_json::from_str::<Value>(output)
+        && let Some(result) = import_extraction_from_json_value(value, reporter)
+    {
+        return Some(result);
+    }
+
+    if let Some(result) = embedded_json_import_extraction(output, reporter) {
+        return Some(result);
     }
 
     let json_lines = output
@@ -367,19 +401,82 @@ fn parse_provider_import_result(
     {
         let body = json!({ "drafts": items, "reporter": reporter.unwrap_or("") });
         if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
-            return Ok(ImportExtractionResult {
+            return Some(ImportExtractionResult {
                 drafts,
                 feature_destination: None,
             });
         }
     }
 
-    FileImportService::new(PathBuf::new())
-        .parse_text(output, reporter)
+    None
+}
+
+fn embedded_json_import_extraction(
+    output: &str,
+    reporter: Option<&str>,
+) -> Option<ImportExtractionResult> {
+    for (idx, ch) in output.char_indices() {
+        if ch != '{' && ch != '[' {
+            continue;
+        }
+        let mut values = serde_json::Deserializer::from_str(&output[idx..]).into_iter::<Value>();
+        let Some(Ok(value)) = values.next() else {
+            continue;
+        };
+        if let Some(result) = import_extraction_from_json_value(value, reporter) {
+            return Some(result);
+        }
+    }
+    None
+}
+
+fn import_extraction_from_json_value(
+    value: Value,
+    reporter: Option<&str>,
+) -> Option<ImportExtractionResult> {
+    let feature_destination = plan_feature_destination_from_value(&value);
+    let body = match value {
+        Value::Array(items) => json!({ "drafts": items, "reporter": reporter.unwrap_or("") }),
+        Value::Object(mut object) => {
+            normalize_plan_feature_draft_object(&mut object);
+            Value::Object(object)
+        }
+        other => other,
+    };
+    import_drafts_from_value(&body, reporter)
+        .ok()
         .map(|drafts| ImportExtractionResult {
             drafts,
-            feature_destination: None,
+            feature_destination,
         })
+}
+
+fn import_extraction_response(
+    result: ImportExtractionResult,
+    provider: &str,
+    purpose: &str,
+    source: &str,
+) -> ApiResponse {
+    let mut body = json!({
+        "drafts": result.drafts,
+        "provider": provider,
+        "purpose": purpose,
+        "source": source
+    });
+    if let Some(feature) = result.feature_destination
+        && let Some(object) = body.as_object_mut()
+    {
+        object.insert(
+            "feature_destination".to_string(),
+            json!({
+                "mode": "new",
+                "newName": feature.name,
+                "newDescription": feature.description,
+                "existingId": ""
+            }),
+        );
+    }
+    ApiResponse::json(200, body)
 }
 
 fn normalize_plan_feature_draft_object(object: &mut Map<String, Value>) {
@@ -2481,7 +2578,13 @@ impl InProcessWebServer {
             .and_then(Value::as_str)
             .map(str::trim)
             .unwrap_or("import");
+        let reporter = body.get("reporter").and_then(|value| value.as_str());
         let provider = import_provider_from_settings(&durable_root, &body);
+        if purpose == "plan"
+            && let Some(result) = parse_structured_import_result(text, reporter)
+        {
+            return import_extraction_response(result, &provider, purpose, "input");
+        }
         let cwd = self.source_root().map(|path| path.display().to_string());
         let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
             provider: provider.clone(),
@@ -2492,32 +2595,8 @@ impl InProcessWebServer {
             Ok(output) => output,
             Err(error) => return error_response(error),
         };
-        match parse_provider_import_result(
-            &output,
-            body.get("reporter").and_then(|value| value.as_str()),
-        ) {
-            Ok(result) => {
-                let mut body = json!({
-                    "drafts": result.drafts,
-                    "provider": provider,
-                    "purpose": purpose,
-                    "source": "provider"
-                });
-                if let Some(feature) = result.feature_destination
-                    && let Some(object) = body.as_object_mut()
-                {
-                    object.insert(
-                        "feature_destination".to_string(),
-                        json!({
-                            "mode": "new",
-                            "newName": feature.name,
-                            "newDescription": feature.description,
-                            "existingId": ""
-                        }),
-                    );
-                }
-                ApiResponse::json(200, body)
-            }
+        match parse_provider_import_result(&output, reporter) {
+            Ok(result) => import_extraction_response(result, &provider, purpose, "provider"),
             Err(error) => error_response(error),
         }
     }
@@ -2549,12 +2628,20 @@ impl InProcessWebServer {
         };
         let mut matches = Vec::new();
         for (index, draft) in drafts.iter().enumerate() {
-            let needle = normalized_dedup_text(&[
+            let mut needles = vec![normalized_dedup_text(&[
                 draft.name.as_str(),
                 draft.actual.as_str(),
                 draft.target.as_str(),
-            ]);
-            if needle.is_empty() {
+            ])];
+            if !draft.actual.trim().is_empty() && !draft.target.trim().is_empty() {
+                let behavior =
+                    normalized_dedup_text(&[draft.actual.as_str(), draft.target.as_str()]);
+                if !needles.iter().any(|needle| needle == &behavior) {
+                    needles.push(behavior);
+                }
+            }
+            needles.retain(|needle| !needle.is_empty());
+            if needles.is_empty() {
                 continue;
             }
             if let Some(existing) = projection.gaps.values().find(|gap| {
@@ -2563,7 +2650,9 @@ impl InProcessWebServer {
                     gap.searchable_text.as_str(),
                     gap.gap.id.as_str(),
                 ]);
-                haystack == needle || (!haystack.is_empty() && haystack.contains(&needle))
+                needles.iter().any(|needle| {
+                    haystack == *needle || (!haystack.is_empty() && haystack.contains(needle))
+                })
             }) {
                 matches.push(json!({
                     "index": index + 1,

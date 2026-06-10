@@ -3683,6 +3683,7 @@ fn web_server_manages_durable_chat_sessions() {
     let temp_root = unique_temp_dir("http-chat");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
     write_fake_provider(
         &durable_root,
         "smoke-ai",
@@ -4944,20 +4945,30 @@ fn wait_for_chat_read_line(
     session_id: &str,
     needle: &str,
 ) -> ApiResponse {
+    let mut lines = Vec::new();
+    let mut progress_lines = Vec::new();
     for _ in 0..100 {
-        let read = server.handle(ApiRequest {
+        let mut read = server.handle(ApiRequest {
             method: "GET".to_string(),
             path: format!("/api/chat/{session_id}/read"),
             body: None,
         });
-        let has_line = read
+        if let Some(values) = read.body.get("lines").and_then(|value| value.as_array()) {
+            lines.extend(values.iter().cloned());
+        }
+        if let Some(values) = read
             .body
-            .get("lines")
+            .get("progress_lines")
             .and_then(|value| value.as_array())
-            .into_iter()
-            .flatten()
+        {
+            progress_lines.extend(values.iter().cloned());
+        }
+        let has_line = lines
+            .iter()
             .any(|line| line.as_str().unwrap_or("").contains(needle));
         if has_line {
+            read.body["lines"] = serde_json::Value::Array(lines);
+            read.body["progress_lines"] = serde_json::Value::Array(progress_lines);
             return read;
         }
         thread::sleep(Duration::from_millis(25));
