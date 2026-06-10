@@ -678,7 +678,7 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
     let schedule = fixture.run_refine(&["workflow", "schedule"]);
     fixture.assert_success("workflow schedule", &schedule);
     let schedule_payload = fixture.json_stdout(&schedule);
-    assert_eq!(schedule_payload["promoted"], 1, "{schedule_payload:#}");
+    assert_eq!(schedule_payload["promoted"], 2, "{schedule_payload:#}");
     assert!(
         schedule_payload["dispatched"]
             .as_array()
@@ -692,8 +692,22 @@ fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture)
             ),
         "{schedule_payload:#}"
     );
+    assert!(
+        schedule_payload["dispatched"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(
+                |dispatch| dispatch["gap_id"].as_str() == Some(second.as_str())
+                    && dispatch["final_status"].as_str() == Some("review")
+                    && dispatch["merge"]["ok"].as_bool() == Some(true)
+                    && dispatch["provider"].as_str() == Some("smoke-ai")
+            ),
+        "{schedule_payload:#}"
+    );
     assert!(schedule_payload["merged"].is_null(), "{schedule_payload:#}");
     assert_eq!(fixture.gap_field(&first, "status"), "review");
+    assert_eq!(fixture.gap_field(&second, "status"), "review");
 
     let runtime_root = fixture.runtime_root.display().to_string();
     let pause = fixture.run_refine(&["workflow", "pause", "--runtime-root", &runtime_root]);

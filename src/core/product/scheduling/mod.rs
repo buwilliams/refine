@@ -28,6 +28,7 @@ use crate::core::supervisor::config::{ConfigService, FileGovernanceService, File
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::model::JsonObject;
+use crate::model::gap::GapPriority;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
 
@@ -182,17 +183,23 @@ impl FileSchedulingService {
         if let Some(durable_root) = &self.durable_root {
             let settings = FileSettingsService::new(durable_root).load()?;
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", policy.global_limit);
-            policy.per_node_limit =
-                setting_usize(&settings, "parallel_per_node_cap", policy.per_node_limit);
-            policy.per_provider_limit = setting_usize(
+            policy.per_node_limit = setting_cap_with_default_values(
+                &settings,
+                "parallel_per_node_cap",
+                policy.global_limit,
+                &[1, 2],
+            );
+            policy.per_provider_limit = setting_cap_with_default_values(
                 &settings,
                 "parallel_per_provider_cap",
-                policy.per_provider_limit,
+                policy.global_limit,
+                &[2],
             );
-            policy.per_target_app_limit = setting_usize(
+            policy.per_target_app_limit = setting_cap_with_default_values(
                 &settings,
                 "parallel_per_target_app_cap",
-                policy.per_target_app_limit,
+                policy.global_limit,
+                &[2],
             );
             policy.provider = setting_string(&settings, "agent_cli", &policy.provider);
             policy.target_app_id = durable_root
@@ -387,6 +394,20 @@ impl FileSchedulingService {
                 && other.gap.feature_id.as_deref() == Some(feature_id)
                 && other.gap.node_id.as_deref().unwrap_or("default") == node_id
                 && matches!(other.gap.status, GapStatus::InProgress | GapStatus::Qa)
+        })
+    }
+
+    fn priority_dispatch_eligible(
+        snapshot: &ProjectionSnapshot,
+        gap: &GapSummaryProjection,
+    ) -> bool {
+        let node_id = gap.gap.node_id.as_deref().unwrap_or("default");
+        !snapshot.gaps.values().any(|other| {
+            other.gap.id != gap.gap.id
+                && other.gap.status == GapStatus::Todo
+                && other.gap.node_id.as_deref().unwrap_or("default") == node_id
+                && priority_rank(&other.gap.priority) > priority_rank(&gap.gap.priority)
+                && Self::feature_dispatch_eligible(snapshot, other)
         })
     }
 
@@ -1027,13 +1048,18 @@ impl SchedulingService for FileSchedulingService {
             .values()
             .filter(|projection| projection.gap.status == GapStatus::Todo)
             .filter(|projection| Self::feature_dispatch_eligible(&snapshot, projection))
+            .filter(|projection| Self::priority_dispatch_eligible(&snapshot, projection))
             .cloned()
             .collect::<Vec<_>>();
         eligible.sort_by(|a, b| {
-            a.gap
-                .feature_order
-                .unwrap_or(i64::MAX)
-                .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+            priority_rank(&b.gap.priority)
+                .cmp(&priority_rank(&a.gap.priority))
+                .then_with(|| {
+                    a.gap
+                        .feature_order
+                        .unwrap_or(i64::MAX)
+                        .cmp(&b.gap.feature_order.unwrap_or(i64::MAX))
+                })
                 .then_with(|| a.gap.created.cmp(&b.gap.created))
                 .then_with(|| a.gap.id.cmp(&b.gap.id))
         });
@@ -1097,6 +1123,11 @@ impl SchedulingService for FileSchedulingService {
             if !Self::feature_dispatch_eligible(&snapshot, &gap) {
                 return Err(RefineError::Conflict(format!(
                     "Gap {gap_id} is blocked by Feature order"
+                )));
+            }
+            if !Self::priority_dispatch_eligible(&snapshot, &gap) {
+                return Err(RefineError::Conflict(format!(
+                    "Gap {gap_id} is blocked by higher priority work"
                 )));
             }
             Some(gap)
@@ -1164,6 +1195,12 @@ impl SchedulingService for FileSchedulingService {
             if !Self::feature_dispatch_eligible(&snapshot, gap) {
                 return Err(RefineError::Conflict(format!(
                     "Gap {} is blocked by Feature order",
+                    reservation.gap_id
+                )));
+            }
+            if !Self::priority_dispatch_eligible(&snapshot, gap) {
+                return Err(RefineError::Conflict(format!(
+                    "Gap {} is blocked by higher priority work",
                     reservation.gap_id
                 )));
             }
@@ -1309,6 +1346,27 @@ fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -> usize {
         .unwrap_or(fallback)
 }
 
+fn setting_cap_with_default_values(
+    settings: &JsonObject,
+    key: &str,
+    fallback: usize,
+    default_values: &[usize],
+) -> usize {
+    let Some(value) = settings
+        .get(key)
+        .and_then(|value| value.as_str())
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .filter(|value| *value > 0)
+    else {
+        return fallback;
+    };
+    if fallback > value && default_values.contains(&value) {
+        fallback
+    } else {
+        value
+    }
+}
+
 fn setting_i64(settings: &JsonObject, key: &str, fallback: i64) -> i64 {
     settings
         .get(key)
@@ -1435,6 +1493,14 @@ fn default_target_app_id() -> String {
     "default".to_string()
 }
 
+fn priority_rank(priority: &GapPriority) -> u8 {
+    match priority {
+        GapPriority::Low => 0,
+        GapPriority::Medium => 1,
+        GapPriority::High => 2,
+    }
+}
+
 fn new_reservation_id() -> String {
     format!("res-{}", Uuid::new_v4())
 }
@@ -1512,7 +1578,7 @@ mod tests {
         settings
             .update(&json!({"backlog_promote_after_seconds": "0"}))
             .unwrap();
-        assert_eq!(scheduler.promote().unwrap(), 1);
+        assert_eq!(scheduler.promote().unwrap(), 2);
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
             GapStatus::Todo
@@ -1522,8 +1588,84 @@ mod tests {
             GapStatus::Todo
         );
         let state = scheduler.load_state().unwrap();
+        assert_eq!(state.reservations.len(), 2);
+        assert_eq!(
+            state
+                .reservations
+                .iter()
+                .map(|reservation| reservation.gap_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["GAP1", "GAP2"]
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_uses_global_cap_for_single_node_defaults() {
+        let temp_root = unique_temp_dir("scheduler-global-cap");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        FileSettingsService::new(&durable_root)
+            .update(&json!({"parallel_run_cap": 3}))
+            .unwrap();
+        let work_items = FileWorkItemService::new(&durable_root);
+        for id in ["GAP1", "GAP2", "GAP3", "GAP4"] {
+            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items
+                .update_gap_metadata_summary(id, None, Some("high"))
+                .unwrap();
+            work_items
+                .transition_gap_status(id, GapStatus::Todo)
+                .unwrap();
+        }
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.promote().unwrap(), 3);
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.policy.global_limit, 3);
+        assert_eq!(state.policy.per_node_limit, 3);
+        assert_eq!(state.policy.per_provider_limit, 3);
+        assert_eq!(state.policy.per_target_app_limit, 3);
+        assert_eq!(state.reservations.len(), 3);
+        assert_eq!(
+            state
+                .reservations
+                .iter()
+                .map(|reservation| reservation.gap_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["GAP1", "GAP2", "GAP3"]
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_blocks_lower_priority_work_behind_higher_priority_gaps() {
+        let temp_root = unique_temp_dir("scheduler-priority-band");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        FileSettingsService::new(&durable_root)
+            .update(&json!({"parallel_run_cap": 3}))
+            .unwrap();
+        let work_items = FileWorkItemService::new(&durable_root);
+        for (id, priority) in [("LOW", "low"), ("MEDIUM", "medium"), ("HIGH", "high")] {
+            work_items.create_gap_summary(id, Some(id)).unwrap();
+            work_items
+                .update_gap_metadata_summary(id, None, Some(priority))
+                .unwrap();
+            work_items
+                .transition_gap_status(id, GapStatus::Todo)
+                .unwrap();
+        }
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert!(scheduler.reserve("MEDIUM").is_err());
+        assert!(scheduler.reserve("LOW").is_err());
+        assert_eq!(scheduler.promote().unwrap(), 1);
+        let state = scheduler.load_state().unwrap();
         assert_eq!(state.reservations.len(), 1);
-        assert_eq!(state.reservations[0].gap_id, "GAP1");
+        assert_eq!(state.reservations[0].gap_id, "HIGH");
 
         fs::remove_dir_all(temp_root).unwrap();
     }

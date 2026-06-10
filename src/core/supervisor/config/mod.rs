@@ -375,7 +375,7 @@ fn default_settings() -> JsonObject {
     let mut settings = JsonObject::new();
     for (key, value) in [
         ("parallel_run_cap", "2"),
-        ("parallel_per_node_cap", "1"),
+        ("parallel_per_node_cap", "2"),
         ("parallel_per_provider_cap", "2"),
         ("parallel_per_target_app_cap", "2"),
         ("branch_name_pattern", "refine/{gap_id}"),
