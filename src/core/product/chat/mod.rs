@@ -1548,6 +1548,34 @@ mod tests {
     }
 
     #[test]
+    fn file_chat_service_starts_plan_mode_for_unborn_project_repo() {
+        let temp_root = unique_temp_dir("chat-plan-unborn");
+        init_unborn_git_app(&temp_root);
+        fs::write(temp_root.join("draft.txt"), "local draft\n").unwrap();
+        let durable_root = temp_root.join(".refine");
+        let service = FileChatService::new(&durable_root);
+
+        let session = service
+            .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("plan"))
+            .unwrap();
+        let worktree = PathBuf::from(session.worktree.as_ref().unwrap().path.clone());
+
+        assert!(worktree.join(".git").exists());
+        assert_eq!(
+            git_stdout(&worktree, &["branch", "--show-current"]),
+            session.worktree.as_ref().unwrap().branch
+        );
+        assert_eq!(
+            git_stdout(&temp_root, &["log", "--pretty=%s", "-1"]),
+            "Initialize Refine workspace"
+        );
+        assert!(!worktree.join("draft.txt").exists());
+        assert!(temp_root.join("draft.txt").exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_chat_service_persists_importable_artifacts_from_provider_output() {
         let temp_root = unique_temp_dir("chat-artifacts");
         init_git_app(&temp_root);
@@ -1822,6 +1850,11 @@ mod tests {
         git(repo, &["commit", "-m", "initial"]);
     }
 
+    fn init_unborn_git_app(repo: &Path) {
+        fs::create_dir_all(repo.join(".refine")).unwrap();
+        git(repo, &["init", "-b", "main"]);
+    }
+
     fn git(repo: &Path, args: &[&str]) {
         let output = Command::new("git")
             .arg("-C")
@@ -1836,6 +1869,23 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
+    }
+
+    fn git_stdout(repo: &Path, args: &[&str]) -> String {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {} failed\nstdout:\n{}\nstderr:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        String::from_utf8_lossy(&output.stdout).trim().to_string()
     }
 
     fn wait_for_chat_line(

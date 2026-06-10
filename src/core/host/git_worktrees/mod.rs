@@ -192,7 +192,7 @@ impl FileGitWorktreeService {
     }
 
     fn git_output(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
-        let output = self.git_raw(args)?;
+        let output = self.git_raw_with_env(args, &[])?;
         if output.success {
             Ok(output)
         } else {
@@ -201,6 +201,27 @@ impl FileGitWorktreeService {
     }
 
     fn git_raw(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
+        self.git_raw_with_env(args, &[])
+    }
+
+    fn git_output_with_env(
+        &self,
+        args: &[&str],
+        env: &[(&str, &str)],
+    ) -> RefineResult<HostCommandOutput> {
+        let output = self.git_raw_with_env(args, env)?;
+        if output.success {
+            Ok(output)
+        } else {
+            Err(RefineError::Conflict(trimmed_command_text(&output)))
+        }
+    }
+
+    fn git_raw_with_env(
+        &self,
+        args: &[&str],
+        env: &[(&str, &str)],
+    ) -> RefineResult<HostCommandOutput> {
         let mut process_args = vec!["-C".to_string(), self.root.display().to_string()];
         process_args.extend(args.iter().map(|arg| arg.to_string()));
         let output = FileProcessSupervisor::new(self.process_runtime_root()).run_to_completion(
@@ -209,7 +230,10 @@ impl FileGitWorktreeService {
                 command: "git".to_string(),
                 args: process_args,
                 cwd: None,
-                env: Vec::new(),
+                env: env
+                    .iter()
+                    .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
+                    .collect(),
                 stdin: None,
                 limits: None,
                 authorization_command: Some(format!("git {}", args.join(" "))),
@@ -221,6 +245,44 @@ impl FileGitWorktreeService {
             stdout: output.stdout.into_bytes(),
             stderr: output.stderr.into_bytes(),
         })
+    }
+
+    fn head_commit_exists(&self) -> RefineResult<bool> {
+        Ok(self
+            .git_raw(&["rev-parse", "--verify", "HEAD^{commit}"])?
+            .success)
+    }
+
+    fn ensure_head_commit(&self) -> RefineResult<()> {
+        if self.head_commit_exists()? {
+            return Ok(());
+        }
+        self.git_output_with_env(
+            &[
+                "-c",
+                "commit.gpgsign=false",
+                "commit",
+                "--allow-empty",
+                "--only",
+                "--no-verify",
+                "-m",
+                "Initialize Refine workspace",
+            ],
+            &[
+                ("GIT_AUTHOR_NAME", "Refine"),
+                ("GIT_AUTHOR_EMAIL", "refine@example.invalid"),
+                ("GIT_COMMITTER_NAME", "Refine"),
+                ("GIT_COMMITTER_EMAIL", "refine@example.invalid"),
+            ],
+        )?;
+        let commit = stdout(self.git_output(&["rev-parse", "HEAD"])?)?
+            .trim()
+            .to_string();
+        self.audit(
+            "bootstrap_head",
+            "ok",
+            json!({"commit": commit, "message": "Initialize Refine workspace"}),
+        )
     }
 
     fn process_runtime_root(&self) -> PathBuf {
@@ -392,6 +454,7 @@ impl GitWorktreeService for FileGitWorktreeService {
 
     fn worktree(&self, branch: &str) -> RefineResult<String> {
         validate_branch_name(branch)?;
+        self.ensure_head_commit()?;
         let parent = self.root.parent().unwrap_or_else(|| Path::new("."));
         let target = parent.join(format!(
             "{}-{}",
@@ -418,6 +481,7 @@ impl GitWorktreeService for FileGitWorktreeService {
 
     fn ensure_branch_from_head(&self, name: &str) -> RefineResult<String> {
         validate_branch_name(name)?;
+        self.ensure_head_commit()?;
         if !self.branch_exists(name)? {
             self.git_output(&["branch", name])?;
             self.audit("branch", "ok", json!({"name": name, "reused": false}))?;
@@ -443,6 +507,7 @@ impl GitWorktreeService for FileGitWorktreeService {
             self.root.join(target)
         };
         if !self.branch_exists(branch)? {
+            self.ensure_head_commit()?;
             self.git_output(&[
                 "worktree",
                 "add",
@@ -873,6 +938,43 @@ mod tests {
         for action in ["branch", "diff", "commit", "push", "worktree"] {
             assert!(audit.contains(&format!("\"action\":\"{action}\"")));
         }
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_bootstraps_unborn_repo_for_worktree() {
+        let temp_root = unique_temp_dir("git-worktree-unborn");
+        let repo = temp_root.join("repo");
+        let target = temp_root.join("standalone");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        fs::write(repo.join("staged.txt"), "staged\n").unwrap();
+        fs::write(repo.join("untracked.txt"), "untracked\n").unwrap();
+        git(&repo, &["add", "staged.txt"]).unwrap();
+
+        let service = FileGitWorktreeService::new(&repo);
+        let path = PathBuf::from(
+            service
+                .ensure_worktree("refine/standalone/test", &target)
+                .unwrap(),
+        );
+
+        assert_eq!(path, target);
+        assert!(path.join(".git").exists());
+        assert_eq!(current_branch(&path), "refine/standalone/test");
+        assert_eq!(
+            git_stdout(&repo, &["log", "--pretty=%s", "-1"]),
+            "Initialize Refine workspace"
+        );
+        assert_eq!(
+            git_stdout(&repo, &["show", "--pretty=format:", "--name-only", "HEAD"]),
+            ""
+        );
+        assert!(git_stdout(&repo, &["status", "--porcelain=v1"]).contains("A  staged.txt"));
+        assert!(git_stdout(&repo, &["status", "--porcelain=v1"]).contains("?? untracked.txt"));
+        assert!(!path.join("staged.txt").exists());
+        assert!(!path.join("untracked.txt").exists());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
