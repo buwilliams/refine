@@ -288,7 +288,10 @@ impl FileChatService {
             path_override: self.provider_path_override(),
             runtime_root: Some(self.runtime_root.clone()),
         };
-        match provider.resume_detailed(&record.provider, &provider_session_id) {
+        let provider_name = record.provider.clone();
+        match provider.resume_detailed_with_output(&provider_name, &provider_session_id, |line| {
+            let _ = self.append_provider_activity_progress(&mut record, &line);
+        }) {
             Ok(result) => {
                 self.apply_provider_success(&mut record, result, "Provider session resumed.");
                 self.finish_provider_job(&job.id, JobState::Succeeded, "Provider session resumed")?;
@@ -443,6 +446,32 @@ impl FileChatService {
         record.interruption_detail = Some(detail);
     }
 
+    fn append_provider_activity_progress(
+        &self,
+        record: &mut ChatSessionRecord,
+        line: &str,
+    ) -> RefineResult<()> {
+        let text = line.trim();
+        if text.is_empty() {
+            return Ok(());
+        }
+        let duplicate = record.transcript_events.iter().rev().take(20).any(|event| {
+            event_bool(event, "progress") && event_text(event).as_deref() == Some(text)
+        });
+        if duplicate {
+            return Ok(());
+        }
+        record.transcript_events.push(chat_event(
+            "progress",
+            text,
+            true,
+            record.provider_session_id.clone(),
+            Some(json!({"source": "provider_output"})),
+        ));
+        record.updated_at = now_timestamp();
+        self.write_record(record)
+    }
+
     fn mark_record_interrupted(&self, record: &mut ChatSessionRecord, detail: &str) {
         record.in_flight = false;
         record.queue_dispatching = false;
@@ -571,12 +600,17 @@ impl FileChatService {
                 path_override: self.provider_path_override(),
                 runtime_root: Some(self.runtime_root.clone()),
             };
-            match provider.invoke_detailed(ProviderInvocation {
-                provider: record.provider.clone(),
-                prompt: self.chat_prompt(&record, &message),
-                session_id: record.provider_session_id.clone(),
-                cwd: Some(self.project_root().display().to_string()),
-            }) {
+            match provider.invoke_detailed_with_output(
+                ProviderInvocation {
+                    provider: record.provider.clone(),
+                    prompt: self.chat_prompt(&record, &message),
+                    session_id: record.provider_session_id.clone(),
+                    cwd: Some(self.project_root().display().to_string()),
+                },
+                |line| {
+                    let _ = self.append_provider_activity_progress(&mut record, &line);
+                },
+            ) {
                 Ok(result) => {
                     self.apply_provider_success(&mut record, result, "Provider turn completed.");
                     self.finish_provider_job(
@@ -1111,6 +1145,51 @@ mod tests {
     }
 
     #[test]
+    fn file_chat_service_streams_provider_output_into_progress() {
+        let temp_root = unique_temp_dir("chat-provider-stream");
+        let durable_root = temp_root.join(".refine");
+        write_fake_provider_script(
+            &durable_root,
+            "claude",
+            "#!/bin/sh\nprintf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"streamed activity line\"}}'\nsleep 1\nprintf '%s\\n' '{\"item\":{\"type\":\"agent_message\",\"text\":\"final response line\"}}'\n",
+        );
+        let service = FileChatService::new(&durable_root);
+        let session = service
+            .start_with_options(ChatAttachment::Standalone, Some("claude"), Some("chat"))
+            .unwrap();
+
+        service.append_user_message(&session.id, "hello").unwrap();
+        let streamed = wait_for_chat_read(&service, &session.id, |read| {
+            read.in_flight
+                && read
+                    .progress_lines
+                    .iter()
+                    .any(|line| line.contains("streamed activity line"))
+        });
+        assert!(
+            streamed
+                .progress_lines
+                .iter()
+                .any(|line| line.contains("streamed activity line"))
+        );
+        let completed = wait_for_chat_read(&service, &session.id, |read| {
+            !read.in_flight
+                && read
+                    .lines
+                    .iter()
+                    .any(|line| line.contains("final response line"))
+        });
+        assert!(
+            completed
+                .lines
+                .iter()
+                .any(|line| line.contains("final response line"))
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_chat_service_rebuilds_attached_gap_context_from_durable_records() {
         let temp_root = unique_temp_dir("chat-gap-context");
         let durable_root = temp_root.join(".refine");
@@ -1409,6 +1488,24 @@ mod tests {
         service.read(session_id).unwrap()
     }
 
+    fn wait_for_chat_read<F>(
+        service: &FileChatService,
+        session_id: &str,
+        predicate: F,
+    ) -> ChatReadResult
+    where
+        F: Fn(&ChatReadResult) -> bool,
+    {
+        for _ in 0..100 {
+            let read = service.read(session_id).unwrap();
+            if predicate(&read) {
+                return read;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        service.read(session_id).unwrap()
+    }
+
     fn wait_for_chat_record<F>(
         service: &FileChatService,
         session_id: &str,
@@ -1427,6 +1524,14 @@ mod tests {
         service.resume(session_id).unwrap()
     }
 
+    fn write_fake_provider_script(durable_root: &PathBuf, name: &str, script: &str) {
+        let bin_dir = durable_root.join("provider-bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let path = bin_dir.join(name);
+        fs::write(&path, script).unwrap();
+        make_provider_executable(&path);
+    }
+
     fn write_fake_provider(durable_root: &PathBuf, name: &str, exit_code: i32, output: &str) {
         let bin_dir = durable_root.join("provider-bin");
         fs::create_dir_all(&bin_dir).unwrap();
@@ -1437,6 +1542,10 @@ mod tests {
             "#!/bin/sh\nprintf '%s\\n' {output:?}\nexit {exit_code}"
         )
         .unwrap();
+        make_provider_executable(&path);
+    }
+
+    fn make_provider_executable(path: &Path) {
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

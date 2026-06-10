@@ -314,6 +314,52 @@ test("renders persisted active chat from SSE without read requests", async ({ pa
   expect(readRequests).toBe(0);
 });
 
+test("streams agent activity events into the toolbar Activity panel", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const sessionId = "ui-activity-stream";
+
+  await page.route("**/api/chat/start", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        session_id: sessionId,
+        mode: "standalone",
+        provider: "mock",
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.removeItem("refine_chat_tabs");
+  });
+  await page.goto("/");
+
+  await page.getByTestId("toolbar-tab-standalone").click();
+  await startStandaloneChat(page);
+  await page.evaluate((id) => {
+    (window as any).handleChatSseEvent?.({
+      session_id: id,
+      mode: "standalone",
+      provider: "mock",
+      in_flight: true,
+      closed: false,
+      event: {
+        id: "event-progress",
+        role: "progress",
+        text: "agent activity streaming line",
+        progress: true,
+        created_at: new Date().toISOString(),
+      },
+    });
+  }, sessionId);
+
+  await expect(page.getByTestId("chat-activity-toggle")).toBeVisible();
+  await expect(page.getByTestId("chat-activity-toggle")).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("chat-progress-panel")).toBeVisible();
+  await expect(page.getByTestId("chat-progress")).toContainText("agent activity streaming line");
+});
+
 test("edits and removes standalone queued chat messages", async ({ page, request }) => {
   test.setTimeout(120_000);
   await ensureAttachedProject(request);

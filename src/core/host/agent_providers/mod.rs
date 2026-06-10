@@ -6,7 +6,7 @@ use std::sync::{Mutex, OnceLock};
 use serde::{Deserialize, Serialize};
 
 use crate::core::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner,
+    FileProcessSupervisor, ManagedProcessOutputStream, ManagedProcessSpec, ProcessOwner,
 };
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 
@@ -170,6 +170,17 @@ impl HostAgentProviderService {
         &self,
         invocation: ProviderInvocation,
     ) -> RefineResult<ProviderInvocationResult> {
+        self.invoke_detailed_with_output(invocation, |_| {})
+    }
+
+    pub fn invoke_detailed_with_output<F>(
+        &self,
+        invocation: ProviderInvocation,
+        on_output: F,
+    ) -> RefineResult<ProviderInvocationResult>
+    where
+        F: FnMut(String),
+    {
         let (spec, binary) = self.resolve_binary_for_provider(&invocation.provider)?;
         let cwd = invocation.cwd.as_deref().map(Path::new);
         let args = spec.chat_args(
@@ -178,7 +189,7 @@ impl HostAgentProviderService {
             invocation.session_id.as_deref(),
             cwd,
         );
-        self.run_provider_command_result(&args, cwd, spec.output_format)
+        self.run_provider_command_result_with_output(&args, cwd, spec.output_format, on_output)
     }
 
     pub fn resume_detailed(
@@ -186,6 +197,18 @@ impl HostAgentProviderService {
         provider: &str,
         session_id: &str,
     ) -> RefineResult<ProviderInvocationResult> {
+        self.resume_detailed_with_output(provider, session_id, |_| {})
+    }
+
+    pub fn resume_detailed_with_output<F>(
+        &self,
+        provider: &str,
+        session_id: &str,
+        on_output: F,
+    ) -> RefineResult<ProviderInvocationResult>
+    where
+        F: FnMut(String),
+    {
         let (spec, binary) = self.resolve_binary_for_provider(provider)?;
         if !spec.supports_resume {
             return Err(RefineError::InvalidInput(format!(
@@ -194,15 +217,19 @@ impl HostAgentProviderService {
             )));
         }
         let args = spec.chat_args(&binary, "", Some(session_id), None);
-        self.run_provider_command_result(&args, None, spec.output_format)
+        self.run_provider_command_result_with_output(&args, None, spec.output_format, on_output)
     }
 
-    fn run_provider_command_result(
+    fn run_provider_command_result_with_output<F>(
         &self,
         args: &[String],
         cwd: Option<&Path>,
         output_format: &str,
-    ) -> RefineResult<ProviderInvocationResult> {
+        mut on_output: F,
+    ) -> RefineResult<ProviderInvocationResult>
+    where
+        F: FnMut(String),
+    {
         let Some((binary, rest)) = args.split_first() else {
             return Err(RefineError::InvalidInput(
                 "provider command cannot be empty".to_string(),
@@ -212,8 +239,9 @@ impl HostAgentProviderService {
             .runtime_root
             .clone()
             .unwrap_or_else(|| PathBuf::from("run/agent-processes"));
-        let output =
-            FileProcessSupervisor::new(runtime_root).run_to_completion(ManagedProcessSpec {
+        let mut formatter = ProviderActivityFormatter::new(output_format);
+        let output = FileProcessSupervisor::new(runtime_root).run_to_completion_with_output(
+            ManagedProcessSpec {
                 owner: ProcessOwner::Agent,
                 command: binary.to_string(),
                 args: rest.to_vec(),
@@ -223,7 +251,16 @@ impl HostAgentProviderService {
                 limits: None,
                 authorization_command: Some(args.join(" ")),
                 sensitive: false,
-            })?;
+            },
+            |stream, bytes| {
+                for line in formatter.push(stream, bytes) {
+                    on_output(line);
+                }
+            },
+        )?;
+        for line in formatter.finish() {
+            on_output(line);
+        }
         let success = output.success();
         let exit_code = output.process.exit_code;
         let stdout = output.stdout;
@@ -494,6 +531,142 @@ fn executable_file(path: &Path) -> bool {
     path.is_file()
 }
 
+struct ProviderActivityFormatter {
+    output_format: String,
+    stdout_buffer: String,
+    stderr_buffer: String,
+}
+
+impl ProviderActivityFormatter {
+    fn new(output_format: &str) -> Self {
+        Self {
+            output_format: output_format.to_string(),
+            stdout_buffer: String::new(),
+            stderr_buffer: String::new(),
+        }
+    }
+
+    fn push(&mut self, stream: ManagedProcessOutputStream, bytes: &[u8]) -> Vec<String> {
+        let chunk = String::from_utf8_lossy(bytes);
+        let buffer = match stream {
+            ManagedProcessOutputStream::Stdout => &mut self.stdout_buffer,
+            ManagedProcessOutputStream::Stderr => &mut self.stderr_buffer,
+        };
+        buffer.push_str(&chunk);
+        let mut lines = Vec::new();
+        while let Some(index) = buffer.find('\n') {
+            let mut line = buffer.drain(..=index).collect::<String>();
+            line.truncate(line.trim_end_matches(['\r', '\n']).len());
+            if let Some(activity) = provider_activity_line(stream, &line, &self.output_format) {
+                lines.push(activity);
+            }
+        }
+        lines
+    }
+
+    fn finish(&mut self) -> Vec<String> {
+        let mut lines = Vec::new();
+        let stdout = std::mem::take(&mut self.stdout_buffer);
+        if let Some(activity) = provider_activity_line(
+            ManagedProcessOutputStream::Stdout,
+            &stdout,
+            &self.output_format,
+        ) {
+            lines.push(activity);
+        }
+        let stderr = std::mem::take(&mut self.stderr_buffer);
+        if let Some(activity) = provider_activity_line(
+            ManagedProcessOutputStream::Stderr,
+            &stderr,
+            &self.output_format,
+        ) {
+            lines.push(activity);
+        }
+        lines
+    }
+}
+
+fn provider_activity_line(
+    stream: ManagedProcessOutputStream,
+    line: &str,
+    output_format: &str,
+) -> Option<String> {
+    let line = line.trim();
+    if line.is_empty() {
+        return None;
+    }
+    if stream == ManagedProcessOutputStream::Stderr {
+        return Some(format!(
+            "stderr: {}",
+            line.chars().take(1000).collect::<String>()
+        ));
+    }
+    if output_format == "plain" {
+        return Some(line.chars().take(1000).collect());
+    }
+    let Ok(event) = serde_json::from_str::<serde_json::Value>(line) else {
+        return None;
+    };
+    provider_activity_text_from_json(&event).map(|text| text.chars().take(1000).collect())
+}
+
+fn provider_activity_text_from_json(event: &serde_json::Value) -> Option<String> {
+    let object = event.as_object()?;
+    if let Some(item) = object.get("item").and_then(|value| value.as_object()) {
+        let item_type = item.get("type").and_then(|value| value.as_str());
+        let text = item
+            .get("text")
+            .or_else(|| item.get("content"))
+            .or_else(|| object.get("text"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty());
+        if matches!(item_type, Some("agent_message" | "assistant_message")) {
+            return text.map(str::to_string);
+        }
+        if let (Some(item_type), Some(text)) = (item_type, text) {
+            return Some(format!("{item_type}: {text}"));
+        }
+    }
+    if object.get("type").and_then(|value| value.as_str()) == Some("assistant.message") {
+        return object
+            .get("data")
+            .and_then(|value| value.get("content"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+    }
+    if object.get("type").and_then(|value| value.as_str()) == Some("assistant.message_delta") {
+        return object
+            .get("data")
+            .and_then(|value| value.get("deltaContent"))
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string);
+    }
+    if object.get("type").and_then(|value| value.as_str()) == Some("assistant") {
+        return object
+            .get("message")
+            .and_then(|value| value.get("content"))
+            .and_then(text_from_content)
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty());
+    }
+    for key in ["delta", "text", "message", "result"] {
+        if let Some(text) = object
+            .get(key)
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return Some(text.to_string());
+        }
+    }
+    None
+}
+
 fn extract_final_text(stdout: &str, output_format: &str) -> String {
     if output_format == "plain" {
         return stdout.trim().to_string();
@@ -756,6 +929,22 @@ mod tests {
             "{\"type\":\"assistant.message_delta\",\"data\":{\"deltaContent\":\"lo\"}}\n"
         );
         assert_eq!(extract_final_text(copilot, "copilot_json"), "hello");
+    }
+
+    #[test]
+    fn provider_activity_formatter_extracts_readable_stream_events() {
+        let mut formatter = ProviderActivityFormatter::new("codex_json");
+        let lines = formatter.push(
+            ManagedProcessOutputStream::Stdout,
+            b"{\"item\":{\"type\":\"agent_message\",\"text\":\"streamed agent text\"}}\n",
+        );
+        assert_eq!(lines, vec!["streamed agent text"]);
+
+        let lines = formatter.push(
+            ManagedProcessOutputStream::Stdout,
+            b"{\"type\":\"assistant.message_delta\",\"data\":{\"deltaContent\":\"delta text\"}}\n",
+        );
+        assert_eq!(lines, vec!["delta text"]);
     }
 
     #[test]

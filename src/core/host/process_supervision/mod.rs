@@ -1,10 +1,11 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::mpsc;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -89,6 +90,12 @@ pub struct ManagedProcessOutput {
     pub process: ManagedProcess,
     pub stdout: String,
     pub stderr: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ManagedProcessOutputStream {
+    Stdout,
+    Stderr,
 }
 
 impl ManagedProcessOutput {
@@ -307,6 +314,17 @@ impl FileProcessSupervisor {
         &self,
         spec: ManagedProcessSpec,
     ) -> RefineResult<ManagedProcessOutput> {
+        self.run_to_completion_with_output(spec, |_, _| {})
+    }
+
+    pub fn run_to_completion_with_output<F>(
+        &self,
+        spec: ManagedProcessSpec,
+        mut on_output: F,
+    ) -> RefineResult<ManagedProcessOutput>
+    where
+        F: FnMut(ManagedProcessOutputStream, &[u8]),
+    {
         self.validate_launch(&spec)?;
         fs::create_dir_all(self.processes_dir()).map_err(|error| {
             RefineError::Io(format!(
@@ -379,35 +397,120 @@ impl FileProcessSupervisor {
         };
         self.write_process(&process)?;
 
-        let output = child.wait_with_output().map_err(|error| {
+        let stdout = child.stdout.take().ok_or_else(|| {
             RefineError::Io(format!(
-                "failed to wait for managed process {}: {error}",
+                "managed process {} did not expose stdout",
                 process.id
             ))
         })?;
-        fs::write(&stdout_path, &output.stdout).map_err(|error| {
+        let stderr = child.stderr.take().ok_or_else(|| {
             RefineError::Io(format!(
-                "failed to write process stdout log {}: {error}",
+                "managed process {} did not expose stderr",
+                process.id
+            ))
+        })?;
+        let (tx, rx) = mpsc::channel();
+        let stdout_thread =
+            spawn_output_reader(stdout, ManagedProcessOutputStream::Stdout, tx.clone());
+        let stderr_thread = spawn_output_reader(stderr, ManagedProcessOutputStream::Stderr, tx);
+        let mut stdout_file = fs::File::create(&stdout_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process stdout log {}: {error}",
                 stdout_path.display()
             ))
         })?;
-        fs::write(&stderr_path, &output.stderr).map_err(|error| {
+        let mut stderr_file = fs::File::create(&stderr_path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to write process stderr log {}: {error}",
+                "failed to create process stderr log {}: {error}",
                 stderr_path.display()
             ))
         })?;
-        process.state = if output.status.success() {
+        let mut stdout_bytes = Vec::new();
+        let mut stderr_bytes = Vec::new();
+        let mut reader_done = 0usize;
+        let mut reader_error = None;
+        let mut status = None;
+        while reader_done < 2 || status.is_none() {
+            match rx.recv_timeout(Duration::from_millis(25)) {
+                Ok(ProcessOutputEvent::Chunk { stream, bytes }) => {
+                    match stream {
+                        ManagedProcessOutputStream::Stdout => {
+                            stdout_file.write_all(&bytes).map_err(|error| {
+                                RefineError::Io(format!(
+                                    "failed to write process stdout log {}: {error}",
+                                    stdout_path.display()
+                                ))
+                            })?;
+                            stdout_bytes.extend_from_slice(&bytes);
+                        }
+                        ManagedProcessOutputStream::Stderr => {
+                            stderr_file.write_all(&bytes).map_err(|error| {
+                                RefineError::Io(format!(
+                                    "failed to write process stderr log {}: {error}",
+                                    stderr_path.display()
+                                ))
+                            })?;
+                            stderr_bytes.extend_from_slice(&bytes);
+                        }
+                    }
+                    on_output(stream, &bytes);
+                }
+                Ok(ProcessOutputEvent::Done) => reader_done += 1,
+                Ok(ProcessOutputEvent::Error(error)) => {
+                    reader_done += 1;
+                    if reader_error.is_none() {
+                        reader_error = Some(error);
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+            if status.is_none() {
+                status = child.try_wait().map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to inspect managed process {}: {error}",
+                        process.id
+                    ))
+                })?;
+            }
+        }
+        let status = match status {
+            Some(status) => status,
+            None => child.wait().map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to wait for managed process {}: {error}",
+                    process.id
+                ))
+            })?,
+        };
+        let _ = stdout_thread.join();
+        let _ = stderr_thread.join();
+        stdout_file.flush().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to flush process stdout log {}: {error}",
+                stdout_path.display()
+            ))
+        })?;
+        stderr_file.flush().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to flush process stderr log {}: {error}",
+                stderr_path.display()
+            ))
+        })?;
+        if let Some(error) = reader_error {
+            return Err(error);
+        }
+        process.state = if status.success() {
             "exited".to_string()
         } else {
             "failed".to_string()
         };
-        process.exit_code = output.status.code();
+        process.exit_code = status.code();
         self.write_process(&process)?;
         Ok(ManagedProcessOutput {
             process,
-            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
+            stderr: String::from_utf8_lossy(&stderr_bytes).to_string(),
         })
     }
 
@@ -626,6 +729,48 @@ impl ProcessSupervisor for FileProcessSupervisor {
         }
         Ok(recovered)
     }
+}
+
+enum ProcessOutputEvent {
+    Chunk {
+        stream: ManagedProcessOutputStream,
+        bytes: Vec<u8>,
+    },
+    Done,
+    Error(RefineError),
+}
+
+fn spawn_output_reader<R>(
+    mut reader: R,
+    stream: ManagedProcessOutputStream,
+    tx: mpsc::Sender<ProcessOutputEvent>,
+) -> std::thread::JoinHandle<()>
+where
+    R: Read + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let mut buffer = [0_u8; 8192];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => {
+                    let _ = tx.send(ProcessOutputEvent::Done);
+                    return;
+                }
+                Ok(read) => {
+                    let _ = tx.send(ProcessOutputEvent::Chunk {
+                        stream,
+                        bytes: buffer[..read].to_vec(),
+                    });
+                }
+                Err(error) => {
+                    let _ = tx.send(ProcessOutputEvent::Error(RefineError::Io(format!(
+                        "failed to read managed process {stream:?}: {error}"
+                    ))));
+                    return;
+                }
+            }
+        }
+    })
 }
 
 impl FileProcessSupervisor {
