@@ -620,7 +620,7 @@ function drawToolbar() {
               aria-label="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}"
               title="${chatState.open ? "Collapse Toolbar" : "Expand Toolbar"}">▾</button>
     </div>
-    <div class="toolbar-dock-body"
+    <div class="toolbar-dock-body${terminalActive ? " terminal-toolbar-body" : ""}"
          data-testid="toolbar-body"
          style="${chatState.bodyHeight ? `height:${chatState.bodyHeight}px` : ""}">
       ${filesActive
@@ -1323,6 +1323,10 @@ function focusTerminalSoon() {
 }
 
 function scrollTerminalOutputToEnd() {
+  if (terminalState.term && typeof terminalState.term.scrollToBottom === "function") {
+    terminalState.term.scrollToBottom();
+    return;
+  }
   requestAnimationFrame(() => {
     const output = document.querySelector(".terminal-output");
     if (output) output.scrollTop = output.scrollHeight;

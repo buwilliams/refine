@@ -100,6 +100,9 @@
 }
 .toolbar-dock-body .chat-output-box { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .toolbar-dock-body .chat-output-box .chat-output { flex: 1; min-height: 0; }
+.toolbar-dock-body.terminal-toolbar-body {
+  overflow: hidden;
+}
 
 /* Fullscreen mode: dock fills the area from just below the topbar to the
    bottom edge. The user-resizable height is overridden and the resize
@@ -579,7 +582,7 @@ button.chat-activity-toggle:hover:not(:disabled) {
   min-height: 0;
   margin: 0;
   padding: 12px 14px;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   background: #fbfbf7;
