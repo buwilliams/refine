@@ -419,12 +419,16 @@ impl FileSchedulingService {
         }
         let snapshot = self.projection_snapshot(durable_root)?;
         let service = FileWorkItemService::new(durable_root);
+        let active_node_id = FileNodeRegistryService::new(durable_root).active_node_id()?;
         let now = Utc::now();
         let mut promoted = 0;
         let mut candidates = snapshot
             .gaps
             .values()
             .filter(|projection| projection.gap.status == GapStatus::Backlog)
+            .filter(|projection| {
+                projection.gap.node_id.as_deref().unwrap_or("default") == active_node_id
+            })
             .filter(|projection| Self::feature_dispatch_eligible(&snapshot, projection))
             .filter(|projection| backlog_gap_age_seconds(projection, now) >= Some(threshold))
             .cloned()
@@ -1954,6 +1958,48 @@ mod tests {
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
             GapStatus::Todo
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_runtime_settings_skip_off_node_backlog_promotions() {
+        let temp_root = unique_temp_dir("scheduler-runtime-settings-off-node");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        FileSettingsService::new(&durable_root)
+            .update(&json!({"backlog_promote_after_seconds": "0"}))
+            .unwrap();
+        FileNodeRegistryService::new(&durable_root)
+            .create("remote-node")
+            .unwrap();
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_gap_summary("Local backlog", Some("LOCAL"))
+            .unwrap();
+        work_items
+            .create_gap_summary("Remote backlog", Some("REMOTE"))
+            .unwrap();
+        work_items
+            .bulk_transfer_gaps_to_node(
+                "remote-node",
+                BulkGapSelection {
+                    selected_ids: Some(vec!["REMOTE".to_string()]),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.apply_runtime_settings().unwrap(), 1);
+        assert_eq!(
+            work_items.show_gap_summary("LOCAL").unwrap().gap.status,
+            GapStatus::Todo
+        );
+        assert_eq!(
+            work_items.show_gap_summary("REMOTE").unwrap().gap.status,
+            GapStatus::Backlog
         );
 
         fs::remove_dir_all(temp_root).unwrap();
