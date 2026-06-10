@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { attachProject, ensureAttachedProject, projectStatus } from "./helpers";
+import { attachProject, ensureAttachedProject, jsonObject, projectStatus } from "./helpers";
 
 function testAppRoot(): string {
   return process.env.REFINE_TEST_APP_ROOT ||
@@ -239,6 +239,42 @@ test("filters system operations in the toolbar", async ({ page, request }) => {
   await expect(page.getByTestId("system-log-line").filter({ hasText: "toolbar limit operation 259" })).toBeVisible();
 });
 
+test("runs terminal commands and submits gaps for merge from the toolbar", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const created = await jsonObject(await request.post("/api/gaps", {
+    data: { name: `Terminal merge ${Date.now()}` },
+  }));
+  const gap = created.gap as Record<string, unknown>;
+  const gapId = String(gap.id ?? "");
+  expect(gapId).toBeTruthy();
+  await jsonObject(await request.post(`/api/gaps/${encodeURIComponent(gapId)}/start`, { data: {} }));
+
+  await page.goto("/");
+
+  const tabs = page.locator(".toolbar-tab");
+  await expect(tabs.nth(0)).toHaveText(/System/);
+  await expect(tabs.nth(1)).toHaveText(/Files/);
+  await expect(tabs.nth(2)).toHaveText(/Terminal/);
+  await expect(tabs.nth(3)).toHaveText(/Standalone/);
+
+  await page.getByTestId("toolbar-tab-terminal").click();
+  await expect(page.getByTestId("toolbar-terminal-panel")).toBeVisible();
+  await expect(page.getByTestId("terminal-worktree-select")).toContainText("rust-test-app");
+
+  await page.getByTestId("terminal-command-input").fill("printf toolbar-terminal-ok");
+  await page.getByTestId("terminal-run").click();
+  await expect(page.getByTestId("terminal-output")).toContainText("toolbar-terminal-ok");
+
+  await page.getByTestId("terminal-gap-id").fill(gapId);
+  await page.getByTestId("terminal-submit-merge").click();
+  await expect(page.getByTestId("terminal-output")).toContainText(`Gap ${gapId} -> ready-merge`);
+  await expect.poll(async () => {
+    const detail = await jsonObject(await request.get(`/api/gaps/${encodeURIComponent(gapId)}`));
+    const current = detail.gap as Record<string, unknown>;
+    return String(current.status ?? "");
+  }).toBe("ready-merge");
+});
+
 test("resets project-scoped toolbar state when switching apps", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const original = await projectStatus(request);
@@ -302,7 +338,7 @@ test("resets project-scoped toolbar state when switching apps", async ({ page, r
       fullscreen: false,
       bodyHeight: null,
       systemFilters: [],
-      tabIds: ["system", "files", "standalone"],
+      tabIds: ["system", "files", "terminal", "standalone"],
     });
   } finally {
     await attachProject(request, originalPath);

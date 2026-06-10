@@ -715,6 +715,7 @@ impl InProcessWebServer {
             "verify" => service.verify_gap_summary(gap_id),
             "retry-quality" => service.retry_gap_quality_summary(gap_id),
             "retry-merge" => service.retry_gap_merge_summary(gap_id),
+            "submit-merge" => service.submit_gap_for_merge_summary(gap_id),
             "merge" => service.merge_gap_summary(gap_id),
             "undo" => service.undo_gap_summary(gap_id),
             _ => {
@@ -2265,6 +2266,36 @@ impl InProcessWebServer {
             .unwrap_or(20)
             .clamp(1, 200);
         match files_search_response(&source_root, &query, max_entries) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_terminal_worktrees(&self) -> ApiResponse {
+        let Some(source_root) = self.source_root() else {
+            return durable_root_unavailable("list terminal worktrees");
+        };
+        let projection = match self.current_projection() {
+            Ok(projection) => projection,
+            Err(error) => return error_response(error),
+        };
+        match terminal_worktrees_response(&source_root, &projection) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_terminal_run(&self, request: ApiRequest) -> ApiResponse {
+        let Some(source_root) = self.source_root() else {
+            return durable_root_unavailable("run terminal command");
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let worktree_path = body
+            .get("worktree_path")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let command = body.get("command").and_then(Value::as_str).unwrap_or("");
+        match terminal_run_response(&source_root, worktree_path, command) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }

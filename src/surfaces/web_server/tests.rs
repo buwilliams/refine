@@ -1381,6 +1381,7 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
         ("GAP1", "Verify Gap"),
         ("GAP2", "Retry Quality"),
         ("GAP3", "Retry Merge"),
+        ("GAP4", "Submit Merge"),
     ] {
         server.handle(ApiRequest {
             method: "POST".to_string(),
@@ -1442,6 +1443,28 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
     });
     assert_eq!(retry_quality.status, 200);
     assert_eq!(retry_quality.body["gap"]["status"], "qa");
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP4/start".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(started.status, 200);
+    assert_eq!(started.body["gap"]["status"], "in-progress");
+    let submitted = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP4/submit-merge".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(submitted.status, 200);
+    assert_eq!(submitted.body["gap"]["status"], "ready-merge");
+    let submitted_again = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps/GAP4/submit-merge".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(submitted_again.status, 200);
+    assert_eq!(submitted_again.body["gap"]["status"], "ready-merge");
 
     let retry_merge = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2719,6 +2742,86 @@ fn web_server_serves_source_file_tree_read_and_search() {
     assert_eq!(traversal.status, 400);
     assert_eq!(traversal.body["error"]["code"], "invalid_input");
 
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_runs_terminal_commands_in_selected_git_worktrees() {
+    let temp_root = unique_temp_dir("http-terminal");
+    let sibling = temp_root.parent().unwrap().join(format!(
+        "{}-sibling",
+        temp_root.file_name().unwrap().to_string_lossy()
+    ));
+    let durable_root = temp_root.join(".refine");
+    fs::create_dir_all(&durable_root).unwrap();
+    fs::write(temp_root.join("README.md"), "terminal root\n").unwrap();
+    git(&temp_root, &["init"]).unwrap();
+    git(
+        &temp_root,
+        &["config", "user.email", "refine@example.invalid"],
+    )
+    .unwrap();
+    git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+    git(&temp_root, &["add", "README.md"]).unwrap();
+    git(&temp_root, &["commit", "-m", "init"]).unwrap();
+    git(
+        &temp_root,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "terminal-branch",
+            sibling.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    fs::write(sibling.join("terminal-marker.txt"), "selected-worktree\n").unwrap();
+
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root);
+
+    let worktrees = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/terminal/worktrees".to_string(),
+        body: None,
+    });
+    assert_eq!(worktrees.status, 200);
+    let rows = worktrees.body["worktrees"].as_array().unwrap();
+    assert!(
+        rows.iter()
+            .any(|row| row["path"] == temp_root.display().to_string())
+    );
+    assert!(rows.iter().any(|row| {
+        row["path"] == sibling.display().to_string() && row["branch"] == "terminal-branch"
+    }));
+
+    let run = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/run".to_string(),
+        body: Some(json!({
+            "worktree_path": sibling.display().to_string(),
+            "command": "printf 'terminal:%s' \"$(cat terminal-marker.txt)\""
+        })),
+    });
+    assert_eq!(run.status, 200);
+    assert_eq!(run.body["ok"], true);
+    assert_eq!(run.body["stdout"], "terminal:selected-worktree");
+
+    let rejected = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/run".to_string(),
+        body: Some(json!({
+            "worktree_path": "/",
+            "command": "pwd"
+        })),
+    });
+    assert_eq!(rejected.status, 400);
+
+    git(
+        &temp_root,
+        &["worktree", "remove", "--force", sibling.to_str().unwrap()],
+    )
+    .unwrap();
     fs::remove_dir_all(temp_root).unwrap();
 }
 

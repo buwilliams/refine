@@ -312,6 +312,14 @@ impl InProcessWebServer {
             return self.handle_performance_cleanup(request);
         }
 
+        if request.method == "GET" && request.path == "/terminal/worktrees" {
+            return self.handle_terminal_worktrees();
+        }
+
+        if request.method == "POST" && request.path == "/terminal/run" {
+            return self.handle_terminal_run(request);
+        }
+
         if request.method == "GET" && request.path == "/files/tree" {
             return self.handle_files_tree(&raw_path);
         }
@@ -658,6 +666,7 @@ impl InProcessWebServer {
                 || request.path.ends_with("/verify")
                 || request.path.ends_with("/retry-quality")
                 || request.path.ends_with("/retry-merge")
+                || request.path.ends_with("/submit-merge")
                 || request.path.ends_with("/merge")
                 || request.path.ends_with("/undo"))
         {

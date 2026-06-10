@@ -547,6 +547,88 @@ button.chat-activity-toggle:hover:not(:disabled) {
   font-style: italic;
 }
 
+/* --- Terminal tab ----------------------------------------------------- */
+.terminal-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  gap: 8px;
+}
+.terminal-toolbar,
+.terminal-command-row,
+.terminal-merge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.terminal-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+#terminal-worktree-select {
+  flex: 0 1 420px;
+  min-width: 180px;
+  max-width: min(520px, 55vw);
+  height: 32px;
+  font-size: 13px;
+}
+.terminal-icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.terminal-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#terminal-command-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 42px;
+  max-height: 96px;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  line-height: 1.35;
+}
+#terminal-gap-id {
+  flex: 0 1 260px;
+  min-width: 160px;
+  height: 32px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+}
+.terminal-output {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background: #111827;
+  color: #e5e7eb;
+  box-shadow: var(--shadow-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* --- Files tab -------------------------------------------------------- */
 .files-panel {
   min-height: 0;

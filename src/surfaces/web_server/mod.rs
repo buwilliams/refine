@@ -122,6 +122,10 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "source tree, file read, source search",
     },
     ApiRouteGroup {
+        prefix: "/terminal",
+        capability: "worktree terminal commands and merge submission",
+    },
+    ApiRouteGroup {
         prefix: "/diagnostics",
         capability: "system diagnostics",
     },

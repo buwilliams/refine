@@ -8,7 +8,8 @@
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const FILES_TAB_ID = "files";
 const SYSTEM_TAB_ID = "system";
-const STANDARD_TOOLBAR_TAB_ORDER = [SYSTEM_TAB_ID, FILES_TAB_ID, "standalone"];
+const TERMINAL_TAB_ID = "terminal";
+const STANDARD_TOOLBAR_TAB_ORDER = [SYSTEM_TAB_ID, FILES_TAB_ID, TERMINAL_TAB_ID, "standalone"];
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const SYSTEM_LOG_FILTERS = [
   { status: "info", label: "Info" },
@@ -25,6 +26,7 @@ const FILES_TREE_MAX_ENTRIES = 200;
 const FILES_SEARCH_MAX_RESULTS = 20;
 const FILES_SEARCH_DEBOUNCE_MS = 250;
 const FILE_TEXT_CHUNK_BYTES = 128_000;
+const TERMINAL_OUTPUT_MAX_CHARS = 50_000;
 const CHAT_ACTIVITY_PULSE_MS = 1800;
 let filesSearchTimer = null;
 let filesSearchRequestSeq = 0;
@@ -61,6 +63,17 @@ const filesState = {
   loading: false,
   error: "",
 };
+const terminalState = {
+  worktrees: [],
+  selectedPath: "",
+  command: "",
+  output: "",
+  loading: false,
+  running: false,
+  submitting: false,
+  error: "",
+  gapIdInput: "",
+};
 
 function ensureStandaloneTab() {
   if (!chatState.tabs.standalone) {
@@ -73,6 +86,7 @@ function ensureStandaloneTab() {
   ensureChatTabQueueState(chatState.tabs.standalone);
   ensureFilesTab();
   ensureSystemTab();
+  ensureTerminalTab();
   reorderStandardToolbarTabs();
 }
 
@@ -96,6 +110,17 @@ function ensureSystemTab() {
     };
   }
   ensureChatTabQueueState(chatState.tabs[SYSTEM_TAB_ID]);
+}
+
+function ensureTerminalTab() {
+  if (!chatState.tabs[TERMINAL_TAB_ID]) {
+    chatState.tabs[TERMINAL_TAB_ID] = {
+      gapId: null, label: "Terminal", mode: "terminal",
+      sessionId: null, output: "", closedReason: null,
+      agentResponded: false, sentUserInput: false, progress: "", showProgress: true,
+    };
+  }
+  ensureChatTabQueueState(chatState.tabs[TERMINAL_TAB_ID]);
 }
 
 function reorderStandardToolbarTabs() {
@@ -123,7 +148,7 @@ function currentToolbarTab() {
 
 function currentChatTab() {
   const tab = currentToolbarTab();
-  if (!tab || tab.mode === "files" || tab.mode === "system") return null;
+  if (!tab || tab.mode === "files" || tab.mode === "system" || tab.mode === "terminal") return null;
   return tab;
 }
 
@@ -243,6 +268,7 @@ function resetChatForProjectSwitch() {
   systemOperationState.filters.clear();
   ensureStandaloneTab();
   resetFilesState();
+  resetTerminalState();
   saveChatStateToStorage();
   drawToolbar();
 }
@@ -266,6 +292,18 @@ function resetFilesState() {
   filesState.searchError = "";
   filesState.loading = false;
   filesState.error = "";
+}
+
+function resetTerminalState() {
+  terminalState.worktrees = [];
+  terminalState.selectedPath = "";
+  terminalState.command = "";
+  terminalState.output = "";
+  terminalState.loading = false;
+  terminalState.running = false;
+  terminalState.submitting = false;
+  terminalState.error = "";
+  terminalState.gapIdInput = "";
 }
 
 // Publish the topbar's actual height as --topbar-height on <html> so the
@@ -507,6 +545,7 @@ function drawToolbar() {
   const activeId = chatState.activeTabId;
   const filesActive = active.mode === "files";
   const systemActive = active.mode === "system";
+  const terminalActive = active.mode === "terminal";
   const hasSession = !!active.sessionId;
 
   const startLabel = active.gapId
@@ -568,19 +607,22 @@ function drawToolbar() {
         ? renderFilesPanel()
         : systemActive
           ? renderSystemPanel()
-          : renderChatPanel(active, {
-              toggleClass,
-              toggleLabel,
-              statusLine,
-              hasSession,
-            })}
+          : terminalActive
+            ? renderTerminalPanel()
+            : renderChatPanel(active, {
+                toggleClass,
+                toggleLabel,
+                statusLine,
+                hasSession,
+              })}
     </div>
   `;
-  if (!filesActive && !systemActive) applyPendingIndicator(active);
+  if (!filesActive && !systemActive && !terminalActive) applyPendingIndicator(active);
   if (filesActive) bindFilesPanel(root);
   if (systemActive) bindSystemPanel(root);
+  if (terminalActive) bindTerminalPanel(root);
 
-  if (chatState.open && !filesActive && !systemActive) {
+  if (chatState.open && !filesActive && !systemActive && !terminalActive) {
     const out = $("#chat-output");
     if (out) out.scrollTop = out.scrollHeight;
     if (active.gapId && !active.gapStatus) refreshGapChatStatus(active.gapId);
@@ -612,7 +654,7 @@ function drawToolbar() {
   });
   $("#btn-dock-toggle")?.addEventListener("click", toggleToolbar);
   $("#btn-dock-fullscreen")?.addEventListener("click", toggleToolbarFullscreen);
-  if (!filesActive && !systemActive) {
+  if (!filesActive && !systemActive && !terminalActive) {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
     $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
     $("#btn-standalone-draft-gap")?.addEventListener("click", draftGapFromStandaloneChat);
@@ -643,6 +685,9 @@ function drawToolbar() {
   if (filesActive && !filesState.entriesByPath[""] && !filesState.loading) {
     loadFilesDirectory("", { expand: true, redraw: true });
   }
+  if (terminalActive && !terminalState.loading && !terminalState.worktrees.length && !terminalState.error) {
+    loadTerminalWorktrees();
+  }
 }
 
 function drawChatDock() { drawToolbar(); }
@@ -650,6 +695,7 @@ function drawChatDock() { drawToolbar(); }
 function toolbarTabTitle(tab) {
   if (tab.mode === "files") return "File browser";
   if (tab.mode === "system") return "System operations";
+  if (tab.mode === "terminal") return "Terminal";
   return tab.gapId || "Standalone chat";
 }
 
@@ -931,6 +977,195 @@ function toolbarIcon(name) {
     search: '<path d="m21 21-4.3-4.3"></path><circle cx="11" cy="11" r="7"></circle>',
   };
   return `<svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">${icons[name] || ""}</svg>`;
+}
+
+function renderTerminalPanel() {
+  const selected = selectedTerminalWorktree();
+  const worktrees = terminalState.worktrees || [];
+  const selectedGapId = selected?.gap_id || "";
+  const gapId = selectedGapId || terminalState.gapIdInput || "";
+  const status = terminalState.loading
+    ? "Loading worktrees..."
+    : terminalState.error
+      ? terminalState.error
+      : selected
+        ? `${selected.branch || "detached"}${selected.gap_id ? ` - Gap ${selected.gap_id} (${selected.gap_status || "unknown"})` : ""}`
+        : "Select a worktree.";
+  const commandDisabled = terminalState.running || terminalState.loading || !selected;
+  const submitDisabled = terminalState.submitting || !gapId.trim();
+  return `
+    <div class="terminal-panel" data-testid="toolbar-terminal-panel">
+      <div class="terminal-toolbar">
+        <label for="terminal-worktree-select" class="terminal-label">Worktree</label>
+        <select id="terminal-worktree-select"
+                data-testid="terminal-worktree-select"
+                ${terminalState.loading ? "disabled" : ""}>
+          ${worktrees.length
+            ? worktrees.map((worktree) => `
+                <option value="${htmlEscape(worktree.path || "")}"
+                        ${worktree.path === terminalState.selectedPath ? "selected" : ""}>
+                  ${htmlEscape(worktree.label || worktree.path || "worktree")}
+                </option>`).join("")
+            : `<option value="">${terminalState.loading ? "Loading..." : "No Git worktrees"}</option>`}
+        </select>
+        <button type="button" class="secondary terminal-icon-btn"
+                data-terminal-refresh data-testid="terminal-refresh" title="Refresh" aria-label="Refresh">
+          ${toolbarIcon("refresh")}
+        </button>
+        <span class="muted small" data-testid="terminal-status">${htmlEscape(status)}</span>
+      </div>
+      <div class="terminal-command-row">
+        <textarea id="terminal-command-input"
+                  data-testid="terminal-command-input"
+                  rows="2"
+                  spellcheck="false"
+                  placeholder="bash command"
+                  ${commandDisabled ? "disabled" : ""}>${htmlEscape(terminalState.command || "")}</textarea>
+        <button type="button" class="primary"
+                data-terminal-run data-testid="terminal-run"
+                ${commandDisabled || !(terminalState.command || "").trim() ? "disabled" : ""}>
+          ${terminalState.running ? "Running" : "Run"}
+        </button>
+      </div>
+      <div class="terminal-merge-row" data-testid="terminal-merge-row">
+        <label for="terminal-gap-id" class="terminal-label">Gap</label>
+        <input id="terminal-gap-id"
+               data-testid="terminal-gap-id"
+               value="${htmlEscape(gapId)}"
+               placeholder="Gap ID"
+               ${selectedGapId ? "disabled" : ""}>
+        <button type="button" class="secondary"
+                data-terminal-submit-merge
+                data-testid="terminal-submit-merge"
+                ${submitDisabled ? "disabled" : ""}>
+          ${terminalState.submitting ? "Submitting" : "Submit gap for merge"}
+        </button>
+      </div>
+      <pre class="terminal-output" data-testid="terminal-output">${htmlEscape(terminalState.output || "")}</pre>
+    </div>`;
+}
+
+function bindTerminalPanel(root) {
+  root.querySelector("#terminal-worktree-select")?.addEventListener("change", (e) => {
+    terminalState.selectedPath = e.target.value || "";
+    const selected = selectedTerminalWorktree();
+    if (selected?.gap_id) terminalState.gapIdInput = "";
+    drawToolbar();
+  });
+  root.querySelector("[data-terminal-refresh]")?.addEventListener("click", () => {
+    loadTerminalWorktrees();
+  });
+  root.querySelector("#terminal-command-input")?.addEventListener("input", (e) => {
+    terminalState.command = e.target.value || "";
+    const run = root.querySelector("[data-terminal-run]");
+    if (run) run.disabled = terminalState.running || !terminalState.command.trim();
+  });
+  root.querySelector("#terminal-command-input")?.addEventListener("keydown", (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      runTerminalCommand();
+    }
+  });
+  root.querySelector("#terminal-gap-id")?.addEventListener("input", (e) => {
+    terminalState.gapIdInput = e.target.value || "";
+    const submit = root.querySelector("[data-terminal-submit-merge]");
+    if (submit) submit.disabled = terminalState.submitting || !terminalGapId().trim();
+  });
+  root.querySelector("[data-terminal-run]")?.addEventListener("click", runTerminalCommand);
+  root.querySelector("[data-terminal-submit-merge]")?.addEventListener("click", submitTerminalGapForMerge);
+}
+
+function selectedTerminalWorktree() {
+  const worktrees = terminalState.worktrees || [];
+  if (!worktrees.length) return null;
+  const selectedPath = terminalState.selectedPath || worktrees.find((worktree) => worktree.current)?.path || worktrees[0].path;
+  return worktrees.find((worktree) => worktree.path === selectedPath) || worktrees[0] || null;
+}
+
+async function loadTerminalWorktrees() {
+  terminalState.loading = true;
+  terminalState.error = "";
+  drawToolbar();
+  try {
+    const result = await api("GET", "/api/terminal/worktrees");
+    terminalState.worktrees = result.worktrees || [];
+    if (!terminalState.worktrees.some((worktree) => worktree.path === terminalState.selectedPath)) {
+      terminalState.selectedPath = terminalState.worktrees.find((worktree) => worktree.current)?.path
+        || terminalState.worktrees[0]?.path
+        || "";
+    }
+    terminalState.loading = false;
+    drawToolbar();
+  } catch (e) {
+    terminalState.loading = false;
+    terminalState.error = e.message || String(e);
+    drawToolbar();
+  }
+}
+
+async function runTerminalCommand() {
+  const selected = selectedTerminalWorktree();
+  const command = (terminalState.command || "").trim();
+  if (!selected || !command || terminalState.running) return;
+  terminalState.running = true;
+  terminalState.error = "";
+  appendTerminalOutput(`$ ${command}\n`);
+  drawToolbar();
+  try {
+    const result = await api("POST", "/api/terminal/run", {
+      worktree_path: selected.path || "",
+      command,
+    });
+    const stdout = result.stdout || "";
+    const stderr = result.stderr || "";
+    const code = result.code == null ? "" : `exit ${result.code}`;
+    appendTerminalOutput(`${stdout}${stderr ? `${stdout ? "\n" : ""}${stderr}` : ""}${result.ok ? "" : `\n[${code || "command failed"}]`}\n`);
+  } catch (e) {
+    appendTerminalOutput(`[error] ${e.message || String(e)}\n`);
+  } finally {
+    terminalState.running = false;
+    drawToolbar();
+    scrollTerminalOutputToEnd();
+  }
+}
+
+function terminalGapId() {
+  return selectedTerminalWorktree()?.gap_id || terminalState.gapIdInput || "";
+}
+
+async function submitTerminalGapForMerge() {
+  const gapId = terminalGapId().trim();
+  if (!gapId || terminalState.submitting) return;
+  terminalState.submitting = true;
+  terminalState.error = "";
+  drawToolbar();
+  try {
+    const result = await api("POST", `/api/gaps/${encodeURIComponent(gapId)}/submit-merge`, {});
+    toast(`Gap ${gapId} submitted for merge`, "info");
+    appendTerminalOutput(`[Gap ${gapId} -> ${result.gap?.status || "ready-merge"}]\n`);
+    await loadTerminalWorktrees();
+  } catch (e) {
+    terminalState.error = e.message || String(e);
+    toast("Could not submit gap for merge: " + terminalState.error, "error");
+  } finally {
+    terminalState.submitting = false;
+    drawToolbar();
+  }
+}
+
+function appendTerminalOutput(text) {
+  terminalState.output = `${terminalState.output || ""}${text || ""}`;
+  if (terminalState.output.length > TERMINAL_OUTPUT_MAX_CHARS) {
+    terminalState.output = terminalState.output.slice(-TERMINAL_OUTPUT_MAX_CHARS);
+  }
+  scrollTerminalOutputToEnd();
+}
+
+function scrollTerminalOutputToEnd() {
+  requestAnimationFrame(() => {
+    const output = document.querySelector(".terminal-output");
+    if (output) output.scrollTop = output.scrollHeight;
+  });
 }
 
 function renderFilesPanel() {

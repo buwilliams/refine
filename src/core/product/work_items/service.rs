@@ -743,6 +743,16 @@ impl FileWorkItemService {
         self.show_gap_summary(gap_id)
     }
 
+    pub fn submit_gap_for_merge_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
+        let current = self.show_gap_summary(gap_id)?;
+        if current.gap.status == GapStatus::ReadyMerge {
+            return Ok(current);
+        }
+        validate_gap_operation(&current.gap.status, &GapOperation::SubmitMerge)?;
+        self.set_gap_status_unchecked(gap_id, &GapStatus::ReadyMerge)?;
+        self.show_gap_summary(gap_id)
+    }
+
     pub fn merge_gap_summary(&self, gap_id: &str) -> RefineResult<GapSummaryProjection> {
         let current = self.show_gap_summary(gap_id)?;
         validate_gap_operation(&current.gap.status, &GapOperation::Merge)?;
