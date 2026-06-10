@@ -2833,7 +2833,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(temp_root.join("child")).unwrap();
-    fs::create_dir_all(&durable_root).unwrap();
+    init_git_app(&temp_root);
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -3112,7 +3112,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     let temp_root = unique_temp_dir("http-processes");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    fs::create_dir_all(&durable_root).unwrap();
+    init_git_app(&temp_root);
     let supervisor = FileProcessSupervisor::new(&runtime_root);
     let chat = FileChatService::with_runtime_root(&durable_root, &runtime_root);
     let standalone_chat = chat
@@ -3949,6 +3949,7 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let temp_root = unique_temp_dir("http-chat-recovery");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
     let chat = FileChatService::with_runtime_root(&durable_root, &runtime_root);
     let session = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))

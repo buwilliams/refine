@@ -335,14 +335,10 @@ impl InProcessWebServer {
             .clone()
             .or_else(|| effective_chat_provider(configured_provider()));
         let service = self.chat_service(&durable_root);
-        let result = if matches!(attachment, ChatAttachment::Standalone) {
-            if self.runtime_root.is_none() {
-                return runtime_root_unavailable("start standalone chat sessions");
-            }
-            service.start_standalone_with_options(provider.as_deref(), mode)
-        } else {
-            service.start_with_options(attachment.clone(), provider.as_deref(), mode)
-        };
+        if matches!(attachment, ChatAttachment::Standalone) && self.runtime_root.is_none() {
+            return runtime_root_unavailable("start standalone chat sessions");
+        }
+        let result = service.start_with_options(attachment.clone(), provider.as_deref(), mode);
         match result {
             Ok(session) => ApiResponse::json(
                 201,

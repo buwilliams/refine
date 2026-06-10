@@ -176,9 +176,11 @@ test("submits standalone worktree as a ready-merge Gap", async ({ page, request 
   await startStandaloneChat(page);
   await expect(page.getByTestId("standalone-worktree-path")).toContainText(worktree.path);
   await expect(page.getByTestId("standalone-submit-merge")).toBeEnabled();
+  await expect(page.getByTestId("standalone-submit-merge")).toHaveText("Submit Gap");
 
   await page.getByTestId("standalone-submit-merge").click();
   await expect(page.getByTestId("standalone-ready-merge-modal")).toBeVisible();
+  await expect(page.locator("#standalone-ready-merge-title")).toHaveText("Submit Gap");
   await expect(page.getByTestId("standalone-ready-merge-worktree")).toHaveText(worktree.path);
   await page.getByTestId("standalone-ready-merge-actual").fill("Standalone work is only local.");
   await page.getByTestId("standalone-ready-merge-target").fill("Standalone work is ready to merge.");

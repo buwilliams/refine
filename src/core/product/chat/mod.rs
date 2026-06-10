@@ -143,6 +143,18 @@ impl FileChatService {
         provider: Option<&str>,
         mode: Option<&str>,
     ) -> RefineResult<ChatSessionRecord> {
+        if matches!(attachment, ChatAttachment::Standalone) {
+            return self.start_standalone_with_options(provider, mode);
+        }
+        self.start_record_with_options(attachment, provider, mode)
+    }
+
+    fn start_record_with_options(
+        &self,
+        attachment: ChatAttachment,
+        provider: Option<&str>,
+        mode: Option<&str>,
+    ) -> RefineResult<ChatSessionRecord> {
         let now = now_timestamp();
         let attachment_mode = match &attachment {
             ChatAttachment::Gap(_) => "gap",
@@ -235,7 +247,8 @@ impl FileChatService {
         provider: Option<&str>,
         mode: Option<&str>,
     ) -> RefineResult<ChatSessionRecord> {
-        let mut session = self.start_with_options(ChatAttachment::Standalone, provider, mode)?;
+        let mut session =
+            self.start_record_with_options(ChatAttachment::Standalone, provider, mode)?;
         match self
             .create_standalone_worktree(&session.id)
             .and_then(|worktree| self.attach_worktree(&session.id, worktree))
@@ -1380,6 +1393,7 @@ fn chat_job_log(severity: &str, message: &str, details: Option<JsonObject>) -> L
 #[cfg(test)]
 mod tests {
     use std::io::Write;
+    use std::process::Command;
 
     use super::*;
     use crate::core::product::work_items::FileWorkItemService;
@@ -1434,6 +1448,7 @@ mod tests {
     #[test]
     fn file_chat_service_streams_provider_output_into_progress() {
         let temp_root = unique_temp_dir("chat-provider-stream");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         write_fake_provider_script(
             &durable_root,
@@ -1504,6 +1519,7 @@ mod tests {
     #[test]
     fn file_chat_service_plan_prompt_drafts_software_specs() {
         let temp_root = unique_temp_dir("chat-plan-prompt");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         let service = FileChatService::new(&durable_root);
         let session = service
@@ -1527,6 +1543,7 @@ mod tests {
     #[test]
     fn file_chat_service_persists_importable_artifacts_from_provider_output() {
         let temp_root = unique_temp_dir("chat-artifacts");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         write_fake_provider(
             &durable_root,
@@ -1564,24 +1581,14 @@ mod tests {
     #[test]
     fn file_chat_service_runs_standalone_provider_turns_in_attached_worktree() {
         let temp_root = unique_temp_dir("chat-standalone-worktree-cwd");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
-        let worktree = temp_root.join("standalone-worktree");
-        fs::create_dir_all(&worktree).unwrap();
         write_cwd_provider(&durable_root, "smoke-ai");
         let service = FileChatService::new(&durable_root);
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
-        service
-            .attach_worktree(
-                &session.id,
-                ChatSessionWorktree {
-                    branch: "refine/standalone/test".to_string(),
-                    path: worktree.display().to_string(),
-                    submitted_gap_id: None,
-                },
-            )
-            .unwrap();
+        let worktree = PathBuf::from(session.worktree.as_ref().unwrap().path.clone());
 
         service
             .append_user_message(&session.id, "write cwd marker")
@@ -1599,6 +1606,7 @@ mod tests {
     #[test]
     fn file_chat_service_persists_provider_failure() {
         let temp_root = unique_temp_dir("chat-failure");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         write_fake_provider(&durable_root, "smoke-ai", 2, "provider failed");
         let service = FileChatService::new(&durable_root);
@@ -1623,6 +1631,7 @@ mod tests {
     #[test]
     fn file_chat_service_persists_provider_session_id_and_in_flight_lifecycle() {
         let temp_root = unique_temp_dir("chat-provider-session");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         write_fake_provider(
             &durable_root,
@@ -1667,6 +1676,7 @@ mod tests {
     #[test]
     fn file_chat_service_edits_removes_and_batches_queued_messages() {
         let temp_root = unique_temp_dir("chat-queue");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         write_fake_provider(&durable_root, "smoke-ai", 0, "queued provider response");
         let service = FileChatService::new(&durable_root);
@@ -1717,6 +1727,7 @@ mod tests {
     #[test]
     fn file_chat_service_recovers_stale_in_flight_turns() {
         let temp_root = unique_temp_dir("chat-recovery");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         let service = FileChatService::new(&durable_root);
         let session = service
@@ -1754,6 +1765,7 @@ mod tests {
     #[test]
     fn file_chat_service_resumes_provider_session_when_supported() {
         let temp_root = unique_temp_dir("chat-provider-resume");
+        init_git_app(&temp_root);
         let durable_root = temp_root.join(".refine");
         write_fake_provider(
             &durable_root,
@@ -1791,6 +1803,32 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn init_git_app(repo: &Path) {
+        fs::create_dir_all(repo.join(".refine")).unwrap();
+        git(repo, &["init", "-b", "main"]);
+        git(repo, &["config", "user.email", "test@example.com"]);
+        git(repo, &["config", "user.name", "Test User"]);
+        fs::write(repo.join("app.txt"), "base\n").unwrap();
+        git(repo, &["add", "app.txt"]);
+        git(repo, &["commit", "-m", "initial"]);
+    }
+
+    fn git(repo: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(repo)
+            .args(args)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {} failed\nstdout:\n{}\nstderr:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     fn wait_for_chat_line(
