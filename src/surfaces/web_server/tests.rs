@@ -3965,6 +3965,57 @@ fn web_server_reports_project_registry_and_updates_settings() {
 }
 
 #[test]
+fn web_server_applies_runtime_settings_updates_immediately() {
+    let temp_root = unique_temp_dir("http-runtime-settings-apply");
+    let app_root = temp_root.join("app");
+    let durable_root = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&durable_root).unwrap();
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let created = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/gaps".to_string(),
+        body: Some(json!({"id": "GAP1", "name": "Instant runtime settings"})),
+    });
+    assert_eq!(created.status, 201);
+
+    let updated = server.handle(ApiRequest {
+        method: "PATCH".to_string(),
+        path: "/api/settings".to_string(),
+        body: Some(json!({
+            "parallel_run_cap": 6,
+            "parallel_per_node_cap": 6,
+            "backlog_promote_after_seconds": "0"
+        })),
+    });
+    assert_eq!(updated.status, 200);
+    assert_eq!(updated.body["settings"]["parallel_run_cap"], "6");
+    assert_eq!(
+        updated.body["settings"]["backlog_promote_after_seconds"],
+        "0"
+    );
+
+    let state = fs::read_to_string(runtime_root.join("scheduler-state.json")).unwrap();
+    let state: serde_json::Value = serde_json::from_str(&state).unwrap();
+    assert_eq!(state["policy"]["global_limit"], 6);
+    assert_eq!(state["policy"]["per_node_limit"], 6);
+    assert_eq!(state["reservations"].as_array().unwrap().len(), 0);
+
+    let gap = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/gaps/GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(gap.status, 200);
+    assert_eq!(gap.body["gap"]["status"], "todo");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn web_server_migrates_legacy_project_state_automatically() {
     let temp_root = unique_temp_dir("http-project-migration");
     let runtime_root = temp_root.join("run/8080");

@@ -18,6 +18,7 @@ use crate::core::host::process_supervision::{
 use crate::core::host::target_apps::TargetAppGeneratedConfig;
 use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::core::product::project_registry::{ProjectRegistryService, registry_apps_array};
+use crate::core::product::scheduling::FileSchedulingService;
 use crate::core::product::work_items::BulkGapSelection;
 use crate::core::supervisor::errors::{RefineError, RefineResult};
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
@@ -1246,8 +1247,15 @@ impl InProcessWebServer {
                 return error_response(error);
             }
         }
-        match FileSettingsService::new(durable_root).update(&body) {
+        match FileSettingsService::new(&durable_root).update(&body) {
             Ok(value) => {
+                if let Some(runtime_root) = &self.runtime_root {
+                    let scheduler =
+                        FileSchedulingService::with_durable_root(runtime_root, durable_root);
+                    if let Err(error) = scheduler.apply_runtime_settings() {
+                        return error_response(error);
+                    }
+                }
                 let value = self.with_runtime_settings(value);
                 if let Err(error) = self.current_projection_with_runtime() {
                     return error_response(error);

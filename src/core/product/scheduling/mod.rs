@@ -204,6 +204,21 @@ impl FileSchedulingService {
         Ok(policy)
     }
 
+    pub fn apply_runtime_settings(&self) -> RefineResult<usize> {
+        let mut state = self.load_state()?;
+        state.policy = self.policy()?;
+        let promoted = match &self.durable_root {
+            Some(durable_root) => match self.ensure_automation_running(&state) {
+                Ok(()) => self.promote_backlog_to_todo(durable_root)?,
+                Err(RefineError::Conflict(_)) => 0,
+                Err(error) => return Err(error),
+            },
+            None => 0,
+        };
+        self.save_state(&mut state)?;
+        Ok(promoted)
+    }
+
     pub fn set_agent_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         let state = if paused {
@@ -1509,6 +1524,39 @@ mod tests {
         let state = scheduler.load_state().unwrap();
         assert_eq!(state.reservations.len(), 1);
         assert_eq!(state.reservations[0].gap_id, "GAP1");
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_scheduler_applies_runtime_settings_without_waiting_for_schedule() {
+        let temp_root = unique_temp_dir("scheduler-apply-runtime-settings");
+        let durable_root = temp_root.join("durable");
+        let runtime_root = temp_root.join("run/8080");
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_gap_summary("Instant Backlog", Some("GAP1"))
+            .unwrap();
+        FileSettingsService::new(&durable_root)
+            .update(&json!({
+                "parallel_run_cap": 7,
+                "parallel_per_node_cap": 7,
+                "backlog_promote_after_seconds": "0",
+                "agent_cli": "smoke-ai"
+            }))
+            .unwrap();
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        assert_eq!(scheduler.apply_runtime_settings().unwrap(), 1);
+        let state = scheduler.load_state().unwrap();
+        assert_eq!(state.policy.global_limit, 7);
+        assert_eq!(state.policy.per_node_limit, 7);
+        assert_eq!(state.policy.provider, "smoke-ai");
+        assert!(state.reservations.is_empty());
+        assert_eq!(
+            work_items.show_gap_summary("GAP1").unwrap().gap.status,
+            GapStatus::Todo
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
