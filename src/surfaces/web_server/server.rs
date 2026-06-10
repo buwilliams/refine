@@ -8,9 +8,11 @@ use super::*;
 impl InProcessWebServer {
     pub fn handle(&self, request: ApiRequest) -> ApiResponse {
         let method = request.method.clone();
+        let path = request.path.clone();
         let response = self.handle_inner(request);
         if method != "GET"
             && response.status < 400
+            && should_refresh_projection_after_mutation(&path)
             && let Err(error) = self.refresh_projection_cache_after_mutation()
         {
             return error_response(error);
@@ -775,6 +777,32 @@ fn terminal_session_route(path: &str, suffix: &str) -> Option<String> {
         return None;
     }
     Some(session_id.to_string())
+}
+
+fn should_refresh_projection_after_mutation(path: &str) -> bool {
+    let path = normalize_api_path(path);
+    !path.starts_with("/terminal/")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn terminal_mutations_do_not_refresh_projection_cache() {
+        assert!(!should_refresh_projection_after_mutation(
+            "/api/terminal/session"
+        ));
+        assert!(!should_refresh_projection_after_mutation(
+            "/api/terminal/session-1/input"
+        ));
+        assert!(!should_refresh_projection_after_mutation(
+            "/terminal/session-1/resize"
+        ));
+        assert!(should_refresh_projection_after_mutation(
+            "/api/gaps/GAP1/start"
+        ));
+    }
 }
 
 fn cluster_node_id_from_path(path: &str) -> Option<String> {

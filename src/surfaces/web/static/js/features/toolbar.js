@@ -71,6 +71,7 @@ const terminalState = {
   cursor: 0,
   inputBuffer: "",
   inputFlushTimer: null,
+  inputSendPromise: Promise.resolve(),
   lastSeq: 0,
   loading: false,
   connected: false,
@@ -316,6 +317,7 @@ function resetTerminalState() {
     clearTimeout(terminalState.inputFlushTimer);
     terminalState.inputFlushTimer = null;
   }
+  terminalState.inputSendPromise = Promise.resolve();
   terminalState.lastSeq = 0;
   terminalState.loading = false;
   terminalState.connected = false;
@@ -1154,17 +1156,22 @@ function queueTerminalInput(data) {
   terminalState.inputFlushTimer = setTimeout(flushTerminalInput, 12);
 }
 
-async function flushTerminalInput() {
+function flushTerminalInput() {
   const data = terminalState.inputBuffer;
   terminalState.inputBuffer = "";
   terminalState.inputFlushTimer = null;
   if (!data || !terminalState.sessionId) return;
-  try {
-    await api("POST", `/api/terminal/${encodeURIComponent(terminalState.sessionId)}/input`, { data });
-  } catch (e) {
-    terminalState.error = e.message || String(e);
-    drawToolbar();
-  }
+  const sessionId = terminalState.sessionId;
+  terminalState.inputSendPromise = terminalState.inputSendPromise
+    .catch(() => undefined)
+    .then(async () => {
+      try {
+        await api("POST", `/api/terminal/${encodeURIComponent(sessionId)}/input`, { data });
+      } catch (e) {
+        terminalState.error = e.message || String(e);
+        drawToolbar();
+      }
+    });
 }
 
 function terminalReceiveOutput(text) {
