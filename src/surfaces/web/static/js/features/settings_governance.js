@@ -97,7 +97,7 @@ function renderSettingsGovernanceTab(gov) {
     <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Rules", "governance-rules")}</h3>
       <p class="muted small" style="margin-top:0">
-        One-line rules the Governance agent applies before implementation.
+        One-line rules the Governance agent applies before and after implementation.
       </p>
       ${gov.configured ? "" : `
         <p class="muted small" style="color:var(--warn)">

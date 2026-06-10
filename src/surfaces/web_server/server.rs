@@ -535,6 +535,13 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/chat/")
+            && request.path.ends_with("/submit-ready-merge")
+        {
+            return self.handle_chat_submit_ready_merge(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/chat/")
             && request.path.ends_with("/stop")
         {
             return self.handle_chat_stop(request);

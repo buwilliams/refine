@@ -3780,6 +3780,7 @@ fn web_server_edits_and_removes_queued_chat_messages() {
     let temp_root = unique_temp_dir("http-chat-queue");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -3828,6 +3829,116 @@ fn web_server_edits_and_removes_queued_chat_messages() {
     });
     assert_eq!(removed.status, 200);
     assert_eq!(removed.body["queued_messages"].as_array().unwrap().len(), 0);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_standalone_chat_start_and_stop_manage_worktree() {
+    let temp_root = unique_temp_dir("http-chat-standalone-worktree");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/chat/start".to_string(),
+        body: Some(json!({"provider": "smoke-ai"})),
+    });
+    assert_eq!(started.status, 201, "{started:#?}");
+    let session_id = started.body["session_id"].as_str().unwrap().to_string();
+    let worktree_path = PathBuf::from(started.body["worktree"]["path"].as_str().unwrap());
+    let branch = started.body["worktree"]["branch"].as_str().unwrap();
+    assert!(worktree_path.join(".git").exists());
+    assert_eq!(
+        git_stdout(&worktree_path, &["branch", "--show-current"]),
+        branch
+    );
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/chat/{session_id}/stop"),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200, "{stopped:#?}");
+    assert!(!worktree_path.exists());
+    assert!(
+        git(
+            &temp_root,
+            &["rev-parse", "--verify", &format!("refs/heads/{branch}")]
+        )
+        .is_err()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_submit_standalone_chat_creates_ready_merge_gap_and_preserves_worktree() {
+    let temp_root = unique_temp_dir("http-chat-standalone-submit");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
+    let mut server = server_with_projection();
+    server.durable_root = Some(durable_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/chat/start".to_string(),
+        body: Some(json!({"provider": "smoke-ai"})),
+    });
+    assert_eq!(started.status, 201, "{started:#?}");
+    let session_id = started.body["session_id"].as_str().unwrap().to_string();
+    let worktree_path = PathBuf::from(started.body["worktree"]["path"].as_str().unwrap());
+    let branch = started.body["worktree"]["branch"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    fs::write(
+        worktree_path.join("experiment.txt"),
+        "standalone experiment\n",
+    )
+    .unwrap();
+
+    let submitted = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/chat/{session_id}/submit-ready-merge"),
+        body: Some(json!({
+            "reporter": "QA",
+            "actual": "Standalone experiment is not merged.",
+            "target": "Standalone experiment is ready for the merge workflow.",
+            "priority": "medium"
+        })),
+    });
+    assert_eq!(submitted.status, 201, "{submitted:#?}");
+    let gap_id = submitted.body["gap"]["id"].as_str().unwrap().to_string();
+    assert_eq!(submitted.body["gap"]["status"], "ready-merge");
+    assert_eq!(submitted.body["gap"]["branch_name"], branch);
+    assert_eq!(submitted.body["gap"]["priority"], "medium");
+    assert!(worktree_path.exists());
+    assert_eq!(
+        git_stdout(&worktree_path, &["rev-list", "--count", "main..HEAD"]),
+        "1"
+    );
+
+    let session: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(durable_root.join(format!("chat/sessions/{session_id}.json"))).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(session["closed"], true);
+    assert_eq!(session["worktree"]["submitted_gap_id"], gap_id);
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/chat/{session_id}/stop"),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200, "{stopped:#?}");
+    assert!(worktree_path.exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -4730,6 +4841,33 @@ fn git(repo: &Path, args: &[&str]) -> RefineResult<()> {
             .to_string(),
         ))
     }
+}
+
+fn git_stdout(repo: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {} failed\nstdout:\n{}\nstderr:\n{}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+fn init_git_app(repo: &Path) {
+    fs::create_dir_all(repo.join(".refine")).unwrap();
+    git(repo, &["init", "-b", "main"]).unwrap();
+    git(repo, &["config", "user.email", "test@example.com"]).unwrap();
+    git(repo, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(repo.join("app.txt"), "base\n").unwrap();
+    git(repo, &["add", "app.txt"]).unwrap();
+    git(repo, &["commit", "-m", "initial"]).unwrap();
 }
 
 fn seeded_remote_clone(temp_root: &Path) -> (PathBuf, PathBuf) {

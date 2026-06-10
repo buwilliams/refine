@@ -145,6 +145,43 @@ impl FileGitWorktreeService {
         Ok(result)
     }
 
+    pub fn remove_worktree(&self, path: &Path, force: bool) -> RefineResult<()> {
+        let target = path.to_str().unwrap_or("");
+        if target.trim().is_empty() {
+            return Err(RefineError::InvalidInput(
+                "worktree path is required".to_string(),
+            ));
+        }
+        let mut args = vec!["worktree", "remove"];
+        if force {
+            args.push("--force");
+        }
+        args.push(target);
+        self.git_output(&args)?;
+        self.audit(
+            "worktree_remove",
+            "ok",
+            json!({"target": path.display().to_string(), "force": force}),
+        )
+    }
+
+    pub fn delete_branch(&self, branch: &str, force: bool) -> RefineResult<()> {
+        validate_branch_name(branch)?;
+        self.git_output(&["branch", if force { "-D" } else { "-d" }, branch])?;
+        self.audit(
+            "branch_delete",
+            "ok",
+            json!({"branch": branch, "force": force}),
+        )
+    }
+
+    pub fn has_commits_since(&self, base_branch: &str) -> RefineResult<bool> {
+        validate_branch_name(base_branch)?;
+        let output =
+            stdout(self.git_output(&["rev-list", "--count", &format!("{base_branch}..HEAD")])?)?;
+        Ok(output.trim().parse::<usize>().unwrap_or(0) > 0)
+    }
+
     fn root_for(&self, path: &str) -> PathBuf {
         let path = path.trim();
         if path.is_empty() {

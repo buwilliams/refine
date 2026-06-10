@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::core::host::agent_providers::{
@@ -613,6 +613,33 @@ impl FileSchedulingService {
             }))),
         )?;
 
+        let governance = match self.evaluate_workflow_governance(
+            durable_root,
+            &settings,
+            &reservation.provider,
+            &worktree_path,
+            &agent_cwd,
+            &reservation.gap_id,
+            round_idx,
+        ) {
+            Ok(evaluation) => evaluation,
+            Err(error) => {
+                self.fail_workflow(&workflow, "governance", &error)?;
+                return Err(error);
+            }
+        };
+        self.record_governance(&workflow, &governance)?;
+        if governance.failed {
+            let error = RefineError::Conflict(
+                governance
+                    .message
+                    .clone()
+                    .unwrap_or_else(|| "governance checks failed".to_string()),
+            );
+            self.fail_workflow(&workflow, "governance", &error)?;
+            return Err(error);
+        }
+
         if let Err(error) = workflow.advance(self, GapStatus::Qa, "in-progress") {
             self.fail_workflow(&workflow, "state", &error)?;
             return Err(error);
@@ -630,19 +657,6 @@ impl FileSchedulingService {
         if !quality.ok {
             let error = RefineError::Conflict("quality checks failed".to_string());
             self.fail_workflow(&workflow, "quality", &error)?;
-            return Err(error);
-        }
-
-        let governance = self.evaluate_workflow_governance(durable_root, &settings)?;
-        self.record_governance(&workflow, &governance)?;
-        if governance.failed {
-            let error = RefineError::Conflict(
-                governance
-                    .message
-                    .clone()
-                    .unwrap_or_else(|| "governance checks failed".to_string()),
-            );
-            self.fail_workflow(&workflow, "governance", &error)?;
             return Err(error);
         }
 
@@ -817,6 +831,11 @@ impl FileSchedulingService {
         &self,
         durable_root: &Path,
         _settings: &JsonObject,
+        provider_name: &str,
+        worktree_path: &str,
+        provider_cwd: &Path,
+        gap_id: &str,
+        round_idx: usize,
     ) -> RefineResult<GovernanceEvaluation> {
         let governance = FileGovernanceService::new(durable_root).load()?;
         let rules = governance
@@ -824,25 +843,59 @@ impl FileSchedulingService {
             .and_then(|value| value.as_array())
             .cloned()
             .unwrap_or_default();
-        let failed_actions = rules
-            .iter()
-            .filter_map(|rule| {
-                let action = rule
-                    .get("action")
-                    .and_then(|value| value.as_str())
-                    .unwrap_or("allow");
-                matches!(action, "block" | "fail" | "failed").then(|| rule.clone())
-            })
-            .collect::<Vec<_>>();
-        let failed = !failed_actions.is_empty();
+        if rules.is_empty() {
+            return Ok(GovernanceEvaluation {
+                failed: false,
+                message: None,
+                details: json_object(json!({
+                    "phase": "post_implementation",
+                    "configured": false,
+                    "governance_configured": governance.get("configured").and_then(Value::as_bool).unwrap_or(false),
+                    "rules_checked": 0,
+                    "failed_actions": []
+                })),
+            });
+        }
+        let prompt = post_implementation_governance_prompt(
+            &governance,
+            &rules,
+            worktree_path,
+            provider_cwd,
+            gap_id,
+            round_idx,
+        );
+        let provider =
+            HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"));
+        let output = provider.invoke(ProviderInvocation {
+            provider: provider_name.to_string(),
+            prompt,
+            session_id: None,
+            cwd: Some(provider_cwd.display().to_string()),
+        })?;
+        let mut evaluation = parse_governance_provider_output(&output, rules.len());
+        evaluation.details.insert(
+            "provider".to_string(),
+            Value::String(provider_name.to_string()),
+        );
+        evaluation.details.insert(
+            "worktree".to_string(),
+            Value::String(worktree_path.to_string()),
+        );
+        evaluation.details.insert(
+            "cwd".to_string(),
+            Value::String(provider_cwd.display().to_string()),
+        );
+        evaluation.details.insert(
+            "governance_configured".to_string(),
+            governance
+                .get("configured")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                .into(),
+        );
         Ok(GovernanceEvaluation {
-            failed,
-            message: failed.then(|| "Governance rules blocked implementation.".to_string()),
-            details: json_object(json!({
-                "configured": !rules.is_empty(),
-                "rules_checked": rules.len(),
-                "failed_actions": failed_actions
-            })),
+            details: evaluation.details,
+            ..evaluation
         })
     }
 
@@ -1462,6 +1515,207 @@ fn merge_message_has_index_lock(result: &MergeResult) -> bool {
         .is_some_and(|message| message.contains("index.lock"))
 }
 
+fn post_implementation_governance_prompt(
+    governance: &Value,
+    rules: &[Value],
+    worktree_path: &str,
+    provider_cwd: &Path,
+    gap_id: &str,
+    round_idx: usize,
+) -> String {
+    let product = governance
+        .get("product")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let constitution = governance
+        .get("constitution")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let rules_json = serde_json::to_string_pretty(rules).unwrap_or_else(|_| "[]".to_string());
+    format!(
+        "Post-implementation governance review for Gap {gap_id}, round {}.\n\
+         Inspect the current implementation worktree and determine whether the completed \
+         implementation violates any Governance rule. The implementation has already been \
+         committed on the current branch; inspect the repository and compare the branch changes \
+         when needed. Do not edit files.\n\n\
+         Worktree root: {worktree_path}\n\
+         Provider cwd: {}\n\n\
+         Return only JSON with this shape:\n\
+         {{\"status\":\"passed|failed\",\"message\":\"short human-readable result\",\
+         \"violations\":[{{\"rule_id\":\"...\",\"rule\":\"...\",\"message\":\"...\"}}]}}\n\n\
+         Product:\n{product}\n\n\
+         Constitution:\n{constitution}\n\n\
+         Governance rules:\n{rules_json}",
+        round_idx + 1,
+        provider_cwd.display()
+    )
+}
+
+fn parse_governance_provider_output(output: &str, rules_checked: usize) -> GovernanceEvaluation {
+    let trimmed = output.trim();
+    if let Some(value) = parse_json_value(trimmed) {
+        return governance_evaluation_from_json(value, trimmed, rules_checked);
+    }
+
+    let normalized = trimmed.to_ascii_lowercase();
+    let failed = !normalized.contains("no violation")
+        && !normalized.contains("no governance violation")
+        && (normalized.contains("rule violation")
+            || normalized.contains("violates governance")
+            || normalized.contains("governance failed")
+            || normalized.contains("status: failed"));
+    let message = failed.then(|| {
+        if trimmed.is_empty() {
+            "Governance rule violation detected.".to_string()
+        } else {
+            governance_violation_message(trimmed)
+        }
+    });
+    GovernanceEvaluation {
+        failed,
+        message,
+        details: json_object(json!({
+            "phase": "post_implementation",
+            "configured": true,
+            "rules_checked": rules_checked,
+            "failed_actions": if failed {
+                json!([{"action": "fail", "message": trimmed}])
+            } else {
+                json!([])
+            },
+            "raw_output": trimmed
+        })),
+    }
+}
+
+fn governance_evaluation_from_json(
+    value: Value,
+    raw_output: &str,
+    rules_checked: usize,
+) -> GovernanceEvaluation {
+    let violations = value
+        .get("violations")
+        .or_else(|| value.get("rule_violations"))
+        .or_else(|| value.get("failed_actions"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let status = value
+        .get("status")
+        .or_else(|| value.get("verdict"))
+        .or_else(|| value.get("result"))
+        .and_then(Value::as_str)
+        .map(|status| status.trim().to_ascii_lowercase());
+    let ok = value.get("ok").and_then(Value::as_bool);
+    let explicit_failed = value
+        .get("failed")
+        .or_else(|| value.get("violates"))
+        .or_else(|| value.get("violation"))
+        .and_then(Value::as_bool);
+    let failed = explicit_failed
+        .or_else(|| ok.map(|ok| !ok))
+        .or_else(|| {
+            status.as_ref().map(|status| {
+                matches!(
+                    status.as_str(),
+                    "failed" | "fail" | "blocked" | "violated" | "violation"
+                )
+            })
+        })
+        .unwrap_or_else(|| !violations.is_empty());
+    let provider_message = value
+        .get("message")
+        .or_else(|| value.get("reason"))
+        .or_else(|| value.get("summary"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|message| !message.is_empty())
+        .map(ToString::to_string);
+    let message = if failed {
+        Some(provider_message.unwrap_or_else(|| violation_message_from_actions(&violations)))
+    } else {
+        provider_message
+    };
+    GovernanceEvaluation {
+        failed,
+        message,
+        details: json_object(json!({
+            "phase": "post_implementation",
+            "configured": true,
+            "rules_checked": rules_checked,
+            "failed_actions": violations,
+            "raw_output": raw_output,
+            "verdict": value
+        })),
+    }
+}
+
+fn parse_json_value(raw: &str) -> Option<Value> {
+    serde_json::from_str::<Value>(raw)
+        .ok()
+        .or_else(|| extract_json_object(raw).and_then(|json| serde_json::from_str(&json).ok()))
+}
+
+fn extract_json_object(raw: &str) -> Option<String> {
+    let start = raw.find('{')?;
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (offset, ch) in raw[start..].char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_string = true,
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(raw[start..=start + offset].to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn violation_message_from_actions(actions: &[Value]) -> String {
+    actions
+        .iter()
+        .find_map(|action| {
+            action
+                .get("message")
+                .or_else(|| action.get("reason"))
+                .or_else(|| action.get("text"))
+                .or_else(|| action.get("rule"))
+                .and_then(Value::as_str)
+                .map(governance_violation_message)
+        })
+        .unwrap_or_else(|| "Governance rule violation detected.".to_string())
+}
+
+fn governance_violation_message(message: &str) -> String {
+    let message = message.trim();
+    if message.is_empty() {
+        "Governance rule violation detected.".to_string()
+    } else if message
+        .to_ascii_lowercase()
+        .contains("governance rule violation")
+    {
+        message.to_string()
+    } else {
+        format!("Governance rule violation: {message}")
+    }
+}
+
 fn gap_agent_prompt(gap_id: &str) -> String {
     format!(
         "Run the gap agent for ready Gap {gap_id}. Work on Gap {gap_id}, report deterministic command outcomes, and leave the Gap ready for review."
@@ -1512,9 +1766,11 @@ fn now_timestamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::core::host::agent_providers::smoke_ai_env_lock;
     use crate::core::product::nodes::FileNodeRegistryService;
     use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
-    use crate::core::supervisor::config::FileSettingsService;
+    use crate::core::supervisor::config::{FileGovernanceService, FileSettingsService};
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -1845,6 +2101,97 @@ mod tests {
     }
 
     #[test]
+    fn file_scheduler_fails_in_progress_gap_on_post_implementation_governance_violation() {
+        let temp_root = unique_temp_dir("scheduler-governance");
+        let durable_root = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::create_dir_all(&temp_root).unwrap();
+        fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+        git(&temp_root, &["init", "-q"]).unwrap();
+        git(
+            &temp_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&temp_root, &["add", "app.py"]).unwrap();
+        git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            "#!/bin/sh\n\
+             case \"$*\" in\n\
+             *\"Post-implementation governance review\"*)\n\
+               printf '%s\\n' '{\"status\":\"failed\",\"message\":\"Do not append smoke markers.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Do not append smoke markers.\",\"message\":\"app.py contains a smoke marker\"}]}'\n\
+               ;;\n\
+             *)\n\
+               printf '\\n# scheduled by smoke-ai governance violation\\n' >> app.py\n\
+               printf '%s\\n' 'smoke-ai gap-agent response'\n\
+               ;;\n\
+             esac\n",
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&durable_root);
+        work_items
+            .create_gap_summary("Governed implementation", Some("GAP1"))
+            .unwrap();
+        work_items
+            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .unwrap();
+        work_items
+            .transition_gap_status("GAP1", GapStatus::Todo)
+            .unwrap();
+        FileSettingsService::new(&durable_root)
+            .update(&json!({"agent_cli": "smoke-ai"}))
+            .unwrap();
+        FileGovernanceService::new(&durable_root)
+            .save(&json!({
+                "product": "A small app.",
+                "constitution": "Keep generated markers out of app.py.",
+                "rules": [{"id": "rule-1", "text": "Do not append smoke markers.", "source": "manual"}]
+            }))
+            .unwrap();
+
+        let scheduler = FileSchedulingService::with_durable_root(&runtime_root, &durable_root);
+        let error = scheduler.schedule_and_dispatch().unwrap_err();
+        assert!(error.to_string().contains("Do not append smoke markers."));
+        let gap = work_items.show_gap_detail("GAP1").unwrap();
+        assert_eq!(gap["status"], "failed");
+        let latest = &gap["rounds"][0];
+        assert_eq!(latest["rule_state"], "failed");
+        assert_eq!(latest["quality_state"], "unclassified");
+        assert!(
+            latest["governance_message"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Do not append smoke markers.")
+        );
+        assert_eq!(latest["governance_details"]["phase"], "post_implementation");
+        assert_eq!(latest["governance_rule_actions"][0]["rule_id"], "rule-1");
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_scheduler_pauses_cancels_and_retries_jobs() {
         let temp_root = unique_temp_dir("scheduler-controls");
         let scheduler = FileSchedulingService::new(temp_root.join("run/8080"));
@@ -1887,5 +2234,22 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
+
+    fn git(repo: &Path, args: &[&str]) -> RefineResult<()> {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .map_err(|error| RefineError::Io(format!("failed to run git: {error}")))?;
+        if output.status.success() {
+            return Ok(());
+        }
+        Err(RefineError::Io(format!(
+            "git {} failed\nstdout:\n{}\nstderr:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )))
     }
 }

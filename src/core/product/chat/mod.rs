@@ -32,6 +32,8 @@ pub struct ChatSessionRecord {
     pub provider: String,
     pub provider_session_id: Option<String>,
     pub attachment: ChatAttachment,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree: Option<ChatSessionWorktree>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
     pub transcript_events: Vec<JsonObject>,
@@ -47,6 +49,14 @@ pub struct ChatSessionRecord {
     pub last_turn_started_at: Option<Timestamp>,
     pub interrupted: bool,
     pub interruption_detail: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ChatSessionWorktree {
+    pub branch: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submitted_gap_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -68,6 +78,7 @@ pub struct ChatReadResult {
     pub closed_reason: Option<String>,
     pub in_flight: bool,
     pub provider_session_id: Option<String>,
+    pub worktree: Option<ChatSessionWorktree>,
 }
 
 pub trait ChatService {
@@ -125,6 +136,7 @@ impl FileChatService {
             provider: provider.unwrap_or("claude").trim().to_string(),
             provider_session_id: None,
             attachment,
+            worktree: None,
             created_at: now.clone(),
             updated_at: now,
             transcript_events: Vec::new(),
@@ -162,7 +174,37 @@ impl FileChatService {
             closed_reason: record.interruption_detail.clone(),
             in_flight: record.in_flight || record.queue_dispatching || active_job,
             provider_session_id: record.provider_session_id.clone(),
+            worktree: record.worktree.clone(),
         })
+    }
+
+    pub fn attach_worktree(
+        &self,
+        session_id: &str,
+        worktree: ChatSessionWorktree,
+    ) -> RefineResult<ChatSessionRecord> {
+        let mut record = self.load_record(session_id)?;
+        record.worktree = Some(worktree);
+        record.updated_at = now_timestamp();
+        self.write_record(&record)?;
+        Ok(record)
+    }
+
+    pub fn mark_worktree_submitted(
+        &self,
+        session_id: &str,
+        gap_id: &str,
+    ) -> RefineResult<ChatSessionRecord> {
+        let mut record = self.load_record(session_id)?;
+        let Some(worktree) = record.worktree.as_mut() else {
+            return Err(RefineError::Conflict(format!(
+                "Chat session {session_id} has no standalone worktree"
+            )));
+        };
+        worktree.submitted_gap_id = Some(gap_id.to_string());
+        record.updated_at = now_timestamp();
+        self.write_record(&record)?;
+        Ok(record)
     }
 
     pub fn stop(&self, session_id: &str) -> RefineResult<ChatSessionRecord> {
@@ -605,7 +647,7 @@ impl FileChatService {
                     provider: record.provider.clone(),
                     prompt: self.chat_prompt(&record, &message),
                     session_id: record.provider_session_id.clone(),
-                    cwd: Some(self.project_root().display().to_string()),
+                    cwd: Some(self.chat_cwd(&record).display().to_string()),
                 },
                 |line| {
                     let _ = self.append_provider_activity_progress(&mut record, &line);
@@ -775,6 +817,17 @@ impl FileChatService {
             .unwrap_or_else(|| self.durable_root.clone())
     }
 
+    fn chat_cwd(&self, record: &ChatSessionRecord) -> PathBuf {
+        match &record.attachment {
+            ChatAttachment::Standalone => record
+                .worktree
+                .as_ref()
+                .map(|worktree| PathBuf::from(&worktree.path))
+                .unwrap_or_else(|| self.project_root()),
+            _ => self.project_root(),
+        }
+    }
+
     fn provider_path_override(&self) -> Option<String> {
         let mut paths = Vec::new();
         paths.push(self.durable_root.join("provider-bin"));
@@ -845,7 +898,14 @@ impl FileChatService {
                 }))
             }
             ChatAttachment::Standalone => {
-                Ok("standalone chat; no attached product record".to_string())
+                let mut context = json!({
+                    "type": "standalone",
+                    "description": "standalone chat; no attached product record"
+                });
+                if let Some(worktree) = &record.worktree {
+                    context["worktree"] = json!(worktree);
+                }
+                serde_json::to_string_pretty(&context)
             }
         }
         .map_err(|error| {
@@ -871,7 +931,7 @@ fn chat_mode_instructions(record: &ChatSessionRecord) -> &'static str {
             "Discuss the attached Feature and focus on its included Gaps, workflow state, and delivery plan."
         }
         ChatAttachment::Standalone => {
-            "Discuss the requested Refine workflow. When drafting work, use concrete Gap-ready behavior."
+            "Discuss the requested Refine workflow. Do implementation experiments in the attached standalone Git worktree. When drafting work, use concrete Gap-ready behavior."
         }
     }
 }
@@ -1275,6 +1335,41 @@ mod tests {
     }
 
     #[test]
+    fn file_chat_service_runs_standalone_provider_turns_in_attached_worktree() {
+        let temp_root = unique_temp_dir("chat-standalone-worktree-cwd");
+        let durable_root = temp_root.join(".refine");
+        let worktree = temp_root.join("standalone-worktree");
+        fs::create_dir_all(&worktree).unwrap();
+        write_cwd_provider(&durable_root, "smoke-ai");
+        let service = FileChatService::new(&durable_root);
+        let session = service
+            .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
+            .unwrap();
+        service
+            .attach_worktree(
+                &session.id,
+                ChatSessionWorktree {
+                    branch: "refine/standalone/test".to_string(),
+                    path: worktree.display().to_string(),
+                    submitted_gap_id: None,
+                },
+            )
+            .unwrap();
+
+        service
+            .append_user_message(&session.id, "write cwd marker")
+            .unwrap();
+        wait_for_chat_line(&service, &session.id, "cwd provider response");
+        assert_eq!(
+            fs::read_to_string(worktree.join("provider-cwd.txt")).unwrap(),
+            format!("{}\n", worktree.display())
+        );
+        assert!(!temp_root.join("provider-cwd.txt").exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_chat_service_persists_provider_failure() {
         let temp_root = unique_temp_dir("chat-failure");
         let durable_root = temp_root.join(".refine");
@@ -1546,6 +1641,25 @@ mod tests {
     }
 
     fn make_provider_executable(path: &Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&path).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&path, permissions).unwrap();
+        }
+    }
+
+    fn write_cwd_provider(durable_root: &PathBuf, name: &str) {
+        let bin_dir = durable_root.join("provider-bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let path = bin_dir.join(name);
+        let mut file = fs::File::create(&path).unwrap();
+        writeln!(
+            file,
+            "#!/bin/sh\npwd > provider-cwd.txt\nprintf '%s\\n' 'cwd provider response'"
+        )
+        .unwrap();
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;

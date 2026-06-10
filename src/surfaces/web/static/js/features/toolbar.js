@@ -484,6 +484,7 @@ async function startStandaloneChatSession(tab) {
   try {
     const r = await api("POST", "/api/chat/start", {});
     tab.sessionId = r.session_id;
+    tab.worktree = r.worktree || null;
     tab.closedReason = null;
     tab.progress = "";
     tab.showProgress = true;
@@ -658,6 +659,7 @@ function drawToolbar() {
     $("#btn-chat-toggle")?.addEventListener("click", toggleActiveChat);
     $("#btn-plan-draft")?.addEventListener("click", draftGapsFromPlan);
     $("#btn-standalone-draft-gap")?.addEventListener("click", draftGapFromStandaloneChat);
+    $("#btn-standalone-submit-merge")?.addEventListener("click", submitStandaloneChatForMerge);
     $("#btn-gap-round-extract")?.addEventListener("click", extractRoundFromGapChat);
     $("#btn-chat-clear")?.addEventListener("click", clearActiveChat);
     $("#chat-activity-toggle")?.addEventListener("click", toggleChatProgress);
@@ -709,6 +711,9 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
   const progressToggleLabel = showProgress ? "Collapse activity" : "Expand activity";
   const inputPlaceholder = chatInputPlaceholder(active);
   const queuedMessages = allQueuedMessages(active);
+  const standaloneWorktreePath = active.mode === "standalone" && active.worktree?.path
+    ? String(active.worktree.path)
+    : "";
   return `
       <div class="actions" style="margin-bottom:10px">
         <button id="btn-chat-toggle" class="${toggleClass}" data-testid="chat-toggle">${htmlEscape(toggleLabel)}</button>
@@ -721,6 +726,10 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           <button id="btn-standalone-draft-gap" class="secondary" data-testid="standalone-draft-gap"
                   ${standaloneChatCanDraftGap(active) ? "" : "disabled"}>
             Draft Gap
+          </button>
+          <button id="btn-standalone-submit-merge" class="secondary" data-testid="standalone-submit-merge"
+                  ${standaloneChatCanSubmitReadyMerge(active) ? "" : "disabled"}>
+            Submit for merge
           </button>` : ""}
         ${active.gapId ? `
           <button id="btn-gap-round-extract" class="secondary" data-testid="gap-draft-round"
@@ -741,6 +750,10 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
         <span class="spacer"></span>
         <span id="chat-status" class="muted small" data-testid="chat-status">${htmlEscape(statusLine)}</span>
       </div>
+      ${standaloneWorktreePath ? `
+        <div class="muted small" style="margin:-4px 0 8px" data-testid="standalone-worktree-path">
+          Worktree: <code>${htmlEscape(standaloneWorktreePath)}</code>
+        </div>` : ""}
       <div class="chat-output-box">
         <div id="chat-output" class="chat-output" data-testid="chat-output">${mdToHtml(active.output || "")}</div>
         <button type="button"
@@ -2087,6 +2100,7 @@ function chatInputPlaceholder(tab) {
 function syncChatActionButtons(tab) {
   syncPlanDraftButton(tab);
   syncStandaloneDraftGapButton(tab);
+  syncStandaloneSubmitMergeButton(tab);
   syncGapRoundExtractButton(tab);
 }
 
@@ -2100,6 +2114,12 @@ function syncStandaloneDraftGapButton(tab) {
   const btn = $("#btn-standalone-draft-gap");
   if (!btn || !tab || tab.mode !== "standalone") return;
   btn.disabled = !standaloneChatCanDraftGap(tab);
+}
+
+function syncStandaloneSubmitMergeButton(tab) {
+  const btn = $("#btn-standalone-submit-merge");
+  if (!btn || !tab || tab.mode !== "standalone") return;
+  btn.disabled = !standaloneChatCanSubmitReadyMerge(tab);
 }
 
 function syncGapRoundExtractButton(tab) {
@@ -2200,6 +2220,7 @@ async function clearActiveChat() {
       refreshProcessesTabForChatChange();
     }
     t.sessionId = null;
+    t.worktree = null;
     t.output = "";
     t.progress = "";
     t.showProgress = true;
@@ -2223,6 +2244,7 @@ async function toggleActiveChat() {
     await withButtonBusy(btn, "Stopping…", async () => {
       try { await api("POST", `/api/chat/${t.sessionId}/stop`); } catch {}
       t.sessionId = null;
+      t.worktree = null;
       t.closedReason = "stopped by user";
       saveChatStateToStorage();
       refreshProcessesTabForChatChange();
@@ -2284,6 +2306,16 @@ function standaloneChatCanDraftGap(tab) {
     && tab.mode === "standalone"
     && !tab.pending
     && standaloneChatTranscriptText(tab)
+  );
+}
+
+function standaloneChatCanSubmitReadyMerge(tab) {
+  return !!(
+    tab
+    && tab.mode === "standalone"
+    && tab.sessionId
+    && tab.worktree?.path
+    && !tab.pending
   );
 }
 
@@ -2351,6 +2383,20 @@ async function draftGapFromStandaloneChat() {
     return;
   }
   openStandaloneGapDraftModalFromText(transcript);
+  minimizeToolbar();
+}
+
+async function submitStandaloneChatForMerge() {
+  const t = chatState.tabs.standalone;
+  if (!standaloneChatCanSubmitReadyMerge(t)) {
+    toast("Start a standalone session and wait for active work to finish.", "error");
+    return;
+  }
+  if (!state.lastReporter) {
+    toast("Pick a reporter in the top-right selector", "error");
+    return;
+  }
+  openStandaloneReadyMergeModal(t);
   minimizeToolbar();
 }
 
@@ -2478,6 +2524,141 @@ async function loadStandaloneGapDraft({ transcript, root, bodyRoot, saveButton, 
         if (gapId) location.hash = "#/gaps/" + encodeURIComponent(gapId);
       } catch (err) {
         await showActionError(err, "Could not create drafted Gap");
+      }
+    });
+  });
+}
+
+function openStandaloneReadyMergeModal(tab) {
+  const transcript = standaloneChatTranscriptText(tab);
+  const root = document.createElement("div");
+  root.className = "modal-backdrop";
+  root.innerHTML = `
+    <div class="modal import-modal" role="dialog" aria-modal="true"
+         data-testid="standalone-ready-merge-modal"
+         aria-labelledby="standalone-ready-merge-title">
+      <div class="modal-title" id="standalone-ready-merge-title">Submit for merge</div>
+      <div class="modal-body" style="max-height:72vh;overflow:auto">
+        <div class="muted small" style="margin-bottom:8px">
+          Review the Gap details before handing the standalone worktree to the merge workflow.
+        </div>
+        <div class="muted small" style="margin-bottom:8px">
+          Worktree: <code data-testid="standalone-ready-merge-worktree">${htmlEscape(tab.worktree?.path || "")}</code>
+        </div>
+        <div id="standalone-ready-merge-body" data-testid="standalone-ready-merge-body"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" data-cancel data-testid="standalone-ready-merge-cancel">Cancel</button>
+        <button id="btn-submit-standalone-ready-merge" data-testid="standalone-ready-merge-submit" disabled>Submit</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(root);
+  let closed = false;
+  const abort = new AbortController();
+  function close() {
+    if (closed) return;
+    closed = true;
+    abort.abort();
+    document.removeEventListener("keydown", onKey, true);
+    root.remove();
+  }
+  function onKey(e) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close();
+    }
+  }
+  document.addEventListener("keydown", onKey, true);
+  root.addEventListener("click", (e) => {
+    if (e.target === root) close();
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", close);
+  const bodyRoot = root.querySelector("#standalone-ready-merge-body");
+  const submitButton = root.querySelector("#btn-submit-standalone-ready-merge");
+  loadStandaloneReadyMergeDraft({
+    tab,
+    transcript,
+    root,
+    bodyRoot,
+    submitButton,
+    close,
+    signal: abort.signal,
+  }).catch((e) => {
+    if (e.name === "AbortError") return;
+    renderStandaloneReadyMergeForm({ draft: {}, tab, root, bodyRoot, submitButton, close });
+  });
+}
+
+async function loadStandaloneReadyMergeDraft({ tab, transcript, root, bodyRoot, submitButton, close, signal }) {
+  let draft = {};
+  if (transcript && typeof extractImportDrafts === "function") {
+    const drafts = await extractImportDrafts(transcript, bodyRoot, signal, { purpose: "standalone_gap" });
+    if (signal.aborted) return;
+    draft = (drafts || []).find((item) => {
+      return String(item?.actual || item?.target || item?.name || "").trim();
+    }) || {};
+  }
+  renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButton, close });
+}
+
+function renderStandaloneReadyMergeForm({ draft, tab, root, bodyRoot, submitButton, close }) {
+  const reporter = state.lastReporter || draft.reporter || "";
+  bodyRoot.innerHTML = `
+    <p class="muted small">Submitting as <strong>${htmlEscape(reporter)}</strong>. Change the Reporter in the top-right selector.</p>
+    <form id="standalone-ready-merge-form" class="round-form">
+      <div class="form-row">
+        <label>Actual (current behavior)</label>
+        <textarea name="actual" data-testid="standalone-ready-merge-actual">${htmlEscape(draft.actual || "")}</textarea>
+      </div>
+      <div class="form-row">
+        <label>Target (desired behavior)</label>
+        <textarea name="target" data-testid="standalone-ready-merge-target">${htmlEscape(draft.target || draft.name || "")}</textarea>
+      </div>
+      <div class="form-row">
+        <label>Priority</label>
+        <select name="priority" data-testid="standalone-ready-merge-priority">
+          ${["low", "medium", "high"].map((priority) => `
+            <option value="${priority}" ${(draft.priority || "low") === priority ? "selected" : ""}>${priority[0].toUpperCase()}${priority.slice(1)}</option>
+          `).join("")}
+        </select>
+      </div>
+    </form>
+  `;
+  submitButton.disabled = false;
+  submitButton.addEventListener("click", async () => {
+    const form = root.querySelector("#standalone-ready-merge-form");
+    if (!form) return;
+    const fd = new FormData(form);
+    const nextReporter = String(state.lastReporter || reporter || "").trim();
+    const actual = String(fd.get("actual") || "").trim();
+    const target = String(fd.get("target") || "").trim();
+    const priority = String(fd.get("priority") || "low").trim() || "low";
+    if (!nextReporter) return toast("Pick a reporter in the top-right selector", "error");
+    if (!actual || !target) return toast("Provide actual and target", "error");
+    await withButtonBusy(submitButton, "Submitting…", async () => {
+      try {
+        const r = await api("POST", `/api/chat/${tab.sessionId}/submit-ready-merge`, {
+          reporter: nextReporter,
+          actual,
+          target,
+          priority,
+        });
+        const gapId = r?.gap?.id || "";
+        tab.sessionId = null;
+        tab.pending = false;
+        tab.closedReason = "submitted for ready-merge";
+        tab.worktree = r?.worktree || tab.worktree || null;
+        if (tab.worktree && gapId) tab.worktree.submitted_gap_id = gapId;
+        tab.output = `${tab.output || ""}\n[refine] Submitted standalone worktree as ready-merge Gap ${gapId || "new"}.\n`;
+        saveChatStateToStorage();
+        refreshProcessesTabForChatChange();
+        drawChat();
+        toast("Gap submitted for merge", "info");
+        close();
+        if (gapId) location.hash = "#/gaps/" + encodeURIComponent(gapId);
+      } catch (err) {
+        await showActionError(err, "Could not submit standalone worktree");
       }
     });
   });

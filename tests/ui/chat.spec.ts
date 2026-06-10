@@ -125,6 +125,76 @@ test("drafts a Gap from standalone chat context through Smoke AI", async ({ page
   }
 });
 
+test("submits standalone worktree as a ready-merge Gap", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const sessionId = "ui-ready-merge-session";
+  const worktree = {
+    branch: "refine/standalone/ui-ready-merge-session",
+    path: "/tmp/refine-ui-ready-merge-worktree",
+    submitted_gap_id: null,
+  };
+  let submittedBody: Record<string, unknown> | null = null;
+
+  await page.addInitScript(() => {
+    localStorage.removeItem("refine_chat_tabs");
+    localStorage.setItem("refine_last_reporter", "refine-smoke");
+  });
+  await page.route("**/api/chat/start", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        session_id: sessionId,
+        provider: "mock",
+        mode: "standalone",
+        worktree,
+      }),
+    });
+  });
+  await page.route(`**/api/chat/${sessionId}/submit-ready-merge`, async (route) => {
+    submittedBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        session_id: sessionId,
+        gap: {
+          id: "GAPREADYMERGE",
+          status: "ready-merge",
+          branch_name: worktree.branch,
+          priority: submittedBody.priority,
+        },
+        worktree: { ...worktree, submitted_gap_id: "GAPREADYMERGE" },
+      }),
+    });
+  });
+  await page.goto("/");
+
+  await page.getByTestId("toolbar-tab-standalone").click();
+  await startStandaloneChat(page);
+  await expect(page.getByTestId("standalone-worktree-path")).toContainText(worktree.path);
+  await expect(page.getByTestId("standalone-submit-merge")).toBeEnabled();
+
+  await page.getByTestId("standalone-submit-merge").click();
+  await expect(page.getByTestId("standalone-ready-merge-modal")).toBeVisible();
+  await expect(page.getByTestId("standalone-ready-merge-worktree")).toHaveText(worktree.path);
+  await page.getByTestId("standalone-ready-merge-actual").fill("Standalone work is only local.");
+  await page.getByTestId("standalone-ready-merge-target").fill("Standalone work is ready to merge.");
+  await page.getByTestId("standalone-ready-merge-priority").selectOption("medium");
+  await page.getByTestId("standalone-ready-merge-submit").click();
+
+  await expect(page.getByTestId("standalone-ready-merge-modal")).toHaveCount(0);
+  await expect(page).toHaveURL(/#\/gaps\/GAPREADYMERGE$/);
+  expect(submittedBody).toMatchObject({
+    reporter: "refine-smoke",
+    actual: "Standalone work is only local.",
+    target: "Standalone work is ready to merge.",
+    priority: "medium",
+  });
+});
+
 test("does not duplicate transcript lines when SSE chat events race redraws", async ({ page, request }) => {
   await ensureAttachedProject(request);
   const sessionId = "ui-sse-race";
