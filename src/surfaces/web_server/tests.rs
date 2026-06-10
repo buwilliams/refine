@@ -1643,7 +1643,7 @@ fn web_server_cancels_and_deletes_features() {
     assert_eq!(feature_cancel.body["rollup"]["cancelled_count"], 2);
     assert_eq!(feature_cancel.body["runtime_reconciled"]["processes"], 1);
     assert_eq!(feature_cancel.body["runtime_reconciled"]["jobs"], 1);
-    assert_eq!(supervisor.inspect(&process.id).unwrap().state, "stopped");
+    assert!(supervisor.inspect(&process.id).is_err());
     assert_eq!(
         FileJobRegistry::new(&runtime_root)
             .status(&job.id)
@@ -2933,8 +2933,8 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
         .register(ManagedProcess {
             id: "sse-process".to_string(),
             owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
-            pid: None,
-            state: "completed".to_string(),
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
             label: Some("sse".to_string()),
             details: None,
             stdout_path: Some(stdout_path.display().to_string()),
@@ -3334,10 +3334,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .iter()
             .any(|process| process["id"] == "dead-target-context")
     );
-    assert_eq!(
-        supervisor.inspect("dead-target-context").unwrap().state,
-        "exited"
-    );
+    assert!(supervisor.inspect("dead-target-context").is_err());
 
     let summary = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -3372,8 +3369,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .register(crate::core::host::process_supervision::ManagedProcess {
             id: "stream-test".to_string(),
             owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
-            pid: None,
-            state: "completed".to_string(),
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
             label: Some("stream".to_string()),
             details: None,
             stdout_path: Some(stdout_path.display().to_string()),
@@ -4028,10 +4025,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         attached.body["client_repo"],
         other_app.display().to_string()
     );
-    assert_eq!(
-        supervisor.inspect("old-target-app-process").unwrap().state,
-        "stopped"
-    );
+    assert!(supervisor.inspect("old-target-app-process").is_err());
     let dashboard = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/dashboard".to_string(),
@@ -4179,7 +4173,7 @@ fn web_server_project_attach_creates_missing_local_project() {
     );
     assert!(destination.join(".git").exists());
     assert!(destination.join(".refine/refine.json").exists());
-    assert!(runtime_root.join("processes").exists());
+    assert!(!runtime_root.join("processes").exists());
     assert!(!destination.join(".refine/runtime/processes").exists());
 
     fs::remove_dir_all(temp_root).unwrap();

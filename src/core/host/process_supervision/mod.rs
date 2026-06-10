@@ -210,10 +210,22 @@ impl FileProcessSupervisor {
             let entry = entry.map_err(|error| {
                 RefineError::Io(format!("failed to inspect process registry entry: {error}"))
             })?;
-            if entry.path().extension().and_then(|ext| ext.to_str()) != Some("json") {
+            let path = entry.path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+                if is_stale_process_temp(&path) {
+                    match fs::remove_file(&path) {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(error) => {
+                            return Err(RefineError::Io(format!(
+                                "failed to remove stale process temp {}: {error}",
+                                path.display()
+                            )));
+                        }
+                    }
+                }
                 continue;
             }
-            let path = entry.path();
             let bytes = fs::read(&path).map_err(|error| {
                 RefineError::Io(format!(
                     "failed to read process {}: {error}",
@@ -221,7 +233,10 @@ impl FileProcessSupervisor {
                 ))
             })?;
             match serde_json::from_slice::<ManagedProcess>(&bytes) {
-                Ok(process) => processes.push(process),
+                Ok(process) if process.state == "running" => processes.push(process),
+                Ok(process) => {
+                    self.remove_process_artifacts(&process)?;
+                }
                 Err(_) if bytes.is_empty() => continue,
                 Err(_) => continue,
             }
@@ -234,7 +249,9 @@ impl FileProcessSupervisor {
         let mut recovered = Vec::new();
         for mut process in self.list()? {
             if process.owner == owner && process.state == "running" {
-                self.recover_running_process(&mut process)?;
+                if !self.recover_running_process(&mut process)? {
+                    continue;
+                }
             }
             recovered.push(process);
         }
@@ -305,7 +322,44 @@ impl FileProcessSupervisor {
         write_json_atomically(&path, &encoded, "process")
     }
 
+    fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
+        for path in [
+            process.stdout_path.as_deref(),
+            process.stderr_path.as_deref(),
+            process.stdin_path.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            match fs::remove_file(path) {
+                Ok(()) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to remove process artifact {path}: {error}"
+                    )));
+                }
+            }
+        }
+        let path = self.processes_dir().join(format!("{}.json", process.id));
+        match fs::remove_file(&path) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to remove process {}: {error}",
+                    path.display()
+                )));
+            }
+        }
+        Ok(())
+    }
+
     pub fn register(&self, process: ManagedProcess) -> RefineResult<ManagedProcess> {
+        if process.state != "running" {
+            self.remove_process_artifacts(&process)?;
+            return Ok(process);
+        }
         self.write_process(&process)?;
         Ok(process)
     }
@@ -497,16 +551,16 @@ impl FileProcessSupervisor {
                 stderr_path.display()
             ))
         })?;
-        if let Some(error) = reader_error {
-            return Err(error);
-        }
         process.state = if status.success() {
             "exited".to_string()
         } else {
             "failed".to_string()
         };
         process.exit_code = status.code();
-        self.write_process(&process)?;
+        self.remove_process_artifacts(&process)?;
+        if let Some(error) = reader_error {
+            return Err(error);
+        }
         Ok(ManagedProcessOutput {
             process,
             stdout: String::from_utf8_lossy(&stdout_bytes).to_string(),
@@ -647,10 +701,11 @@ impl ProcessSupervisor for FileProcessSupervisor {
                 }
             }
             process.state = "stopped".to_string();
+            self.remove_process_artifacts(&process)?;
         } else {
             process.state = format!("signalled:{signal}");
+            self.write_process(&process)?;
         }
-        self.write_process(&process)?;
         Ok(process)
     }
 
@@ -661,7 +716,7 @@ impl ProcessSupervisor for FileProcessSupervisor {
             && !pid_alive(pid)?
         {
             process.state = "exited".to_string();
-            self.write_process(&process)?;
+            self.remove_process_artifacts(&process)?;
         }
         Ok(process)
     }
@@ -693,28 +748,25 @@ impl ProcessSupervisor for FileProcessSupervisor {
                 path.display()
             ))
         })?;
-        serde_json::from_slice(&bytes).map_err(|error| {
+        let process = serde_json::from_slice::<ManagedProcess>(&bytes).map_err(|error| {
             RefineError::Serialization(format!(
                 "failed to parse process {}: {error}",
                 path.display()
             ))
-        })
+        })?;
+        if process.state != "running" {
+            self.remove_process_artifacts(&process)?;
+            return Err(RefineError::NotFound(format!(
+                "Process {process_id} was not found"
+            )));
+        }
+        Ok(process)
     }
 
     fn cleanup(&self, process_id: &str) -> RefineResult<()> {
-        if let Ok(process) = self.inspect(process_id)
-            && process.state == "running"
-        {
+        if let Ok(process) = self.inspect(process_id) {
             let _ = self.signal(process_id, "terminate");
-        }
-        let path = self.processes_dir().join(format!("{process_id}.json"));
-        if path.exists() {
-            fs::remove_file(&path).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to remove process {}: {error}",
-                    path.display()
-                ))
-            })?;
+            self.remove_process_artifacts(&process)?;
         }
         Ok(())
     }
@@ -723,7 +775,9 @@ impl ProcessSupervisor for FileProcessSupervisor {
         let mut recovered = Vec::new();
         for mut process in self.list()? {
             if process.state == "running" {
-                self.recover_running_process(&mut process)?;
+                if !self.recover_running_process(&mut process)? {
+                    continue;
+                }
             }
             recovered.push(process);
         }
@@ -774,7 +828,7 @@ where
 }
 
 impl FileProcessSupervisor {
-    fn recover_running_process(&self, process: &mut ManagedProcess) -> RefineResult<()> {
+    fn recover_running_process(&self, process: &mut ManagedProcess) -> RefineResult<bool> {
         match process.pid {
             Some(pid) if pid_alive(pid)? => {}
             Some(_) => {
@@ -783,7 +837,8 @@ impl FileProcessSupervisor {
                     process.details.take(),
                     "process was not alive during recovery",
                 ));
-                self.write_process(process)?;
+                self.remove_process_artifacts(process)?;
+                return Ok(false);
             }
             None => {
                 process.state = "interrupted".to_string();
@@ -791,10 +846,11 @@ impl FileProcessSupervisor {
                     process.details.take(),
                     "running process had no pid during recovery",
                 ));
-                self.write_process(process)?;
+                self.remove_process_artifacts(process)?;
+                return Ok(false);
             }
         }
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -862,6 +918,20 @@ fn append_detail(existing: Option<String>, message: &str) -> String {
         Some(existing) if !existing.trim().is_empty() => format!("{existing}; {message}"),
         _ => message.to_string(),
     }
+}
+
+fn is_stale_process_temp(path: &Path) -> bool {
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    if !file_name.starts_with('.') || path.extension().and_then(|ext| ext.to_str()) != Some("tmp") {
+        return false;
+    }
+    path.metadata()
+        .and_then(|metadata| metadata.modified())
+        .ok()
+        .and_then(|modified| SystemTime::now().duration_since(modified).ok())
+        .is_some_and(|age| age > Duration::from_secs(30))
 }
 
 fn now_millis_string() -> String {
@@ -1035,14 +1105,14 @@ mod tests {
     use std::time::Duration;
 
     #[test]
-    fn file_process_supervisor_persists_processes_and_pause_state() {
+    fn file_process_supervisor_tracks_running_processes_and_pause_state() {
         let temp_root = unique_temp_dir("processes");
         let supervisor = FileProcessSupervisor::new(temp_root.join("run/8080"));
         let process = supervisor
             .launch(ManagedProcessSpec {
                 owner: ProcessOwner::Agent,
                 command: shell_binary().to_string(),
-                args: shell_args("printf process-launched").to_vec(),
+                args: long_running_shell_args().to_vec(),
                 cwd: None,
                 env: Vec::new(),
                 stdin: None,
@@ -1058,8 +1128,6 @@ mod tests {
         assert_eq!(supervisor.list().unwrap().len(), 1);
         assert_eq!(process.api_json()["kind"], "agent");
         assert_eq!(process.state, "running");
-        let waited = supervisor.wait(&process.id).unwrap();
-        assert!(matches!(waited.state.as_str(), "running" | "exited"));
 
         let stopped = supervisor.set_background_processes_stopped(true).unwrap();
         assert!(stopped.background_processes_stopped);
@@ -1067,8 +1135,10 @@ mod tests {
         assert!(paused.agents_paused);
         assert!(supervisor.pause_state_path().exists());
 
-        supervisor.signal(&process.id, "stop").unwrap();
-        assert_eq!(supervisor.inspect(&process.id).unwrap().state, "stopped");
+        let stopped = supervisor.signal(&process.id, "stop").unwrap();
+        assert_eq!(stopped.state, "stopped");
+        assert!(supervisor.inspect(&process.id).is_err());
+        assert_eq!(supervisor.list().unwrap().len(), 0);
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1097,6 +1167,7 @@ mod tests {
 
         let stopped = supervisor.signal(&process.id, "kill").unwrap();
         assert_eq!(stopped.state, "stopped");
+        assert!(supervisor.inspect(&process.id).is_err());
         for _ in 0..20 {
             if child.try_wait().unwrap().is_some() {
                 break;
@@ -1178,7 +1249,8 @@ mod tests {
             })
             .unwrap();
         let recovered = supervisor.recover().unwrap();
-        assert_eq!(recovered[0].state, "interrupted");
+        assert!(recovered.is_empty());
+        assert!(supervisor.inspect("stale").is_err());
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1231,13 +1303,12 @@ mod tests {
 
         assert_eq!(process.details.as_deref(), Some("redacted"));
         assert!(process.stdin_path.is_none());
-        let registry = fs::read_to_string(
-            supervisor
+        assert!(
+            !supervisor
                 .processes_dir()
-                .join(format!("{}.json", process.id)),
-        )
-        .unwrap();
-        assert!(!registry.contains("secret-value"));
+                .join(format!("{}.json", process.id))
+                .exists()
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
@@ -1284,6 +1355,14 @@ mod tests {
             vec!["/C".to_string(), script.to_string()]
         } else {
             vec!["-c".to_string(), script.to_string()]
+        }
+    }
+
+    fn long_running_shell_args() -> Vec<String> {
+        if cfg!(windows) {
+            shell_args("ping -n 30 127.0.0.1 >NUL")
+        } else {
+            shell_args("sleep 30")
         }
     }
 

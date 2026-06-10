@@ -1,7 +1,6 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-#[cfg(test)]
 use std::process::Command;
 
 use chrono::Utc;
@@ -222,6 +221,9 @@ impl FileGitWorktreeService {
         args: &[&str],
         env: &[(&str, &str)],
     ) -> RefineResult<HostCommandOutput> {
+        if is_read_only_git_command(args) {
+            return self.git_raw_untracked(args, env);
+        }
         let mut process_args = vec!["-C".to_string(), self.root.display().to_string()];
         process_args.extend(args.iter().map(|arg| arg.to_string()));
         let output = FileProcessSupervisor::new(self.process_runtime_root()).run_to_completion(
@@ -244,6 +246,25 @@ impl FileGitWorktreeService {
             success: output.success(),
             stdout: output.stdout.into_bytes(),
             stderr: output.stderr.into_bytes(),
+        })
+    }
+
+    fn git_raw_untracked(
+        &self,
+        args: &[&str],
+        env: &[(&str, &str)],
+    ) -> RefineResult<HostCommandOutput> {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&self.root)
+            .args(args)
+            .envs(env.iter().map(|(key, value)| (*key, *value)))
+            .output()
+            .map_err(|error| RefineError::Io(format!("failed to run git: {error}")))?;
+        Ok(HostCommandOutput {
+            success: output.status.success(),
+            stdout: output.stdout,
+            stderr: output.stderr,
         })
     }
 
@@ -764,6 +785,18 @@ fn validate_branch_name(branch: &str) -> RefineResult<()> {
     Ok(())
 }
 
+fn is_read_only_git_command(args: &[&str]) -> bool {
+    match args {
+        ["branch", "--show-current"] => true,
+        ["worktree", "list", "--porcelain"] => true,
+        [command, ..] => matches!(
+            *command,
+            "diff" | "log" | "rev-list" | "rev-parse" | "show" | "status"
+        ),
+        [] => false,
+    }
+}
+
 fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
@@ -975,6 +1008,28 @@ mod tests {
         assert!(git_stdout(&repo, &["status", "--porcelain=v1"]).contains("?? untracked.txt"));
         assert!(!path.join("staged.txt").exists());
         assert!(!path.join("untracked.txt").exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_does_not_track_read_only_git_probes() {
+        let temp_root = unique_temp_dir("git-read-only-untracked");
+        let repo = temp_root.join("repo");
+        let runtime_root = temp_root.join("run/8080");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "app.txt", "base\n", "initial");
+
+        let service = FileGitWorktreeService::with_runtime_root(&repo, &runtime_root);
+        service.inspect("").unwrap();
+        service.recent_changes(10).unwrap();
+        service.diff(&["app.txt".to_string()]).unwrap();
+
+        let process_count = fs::read_dir(runtime_root.join("processes"))
+            .map(|entries| entries.count())
+            .unwrap_or(0);
+        assert_eq!(process_count, 0);
 
         fs::remove_dir_all(temp_root).unwrap();
     }

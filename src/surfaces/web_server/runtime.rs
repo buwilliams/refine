@@ -445,7 +445,7 @@ fn collect_runtime_path_fingerprint(
                 .map(|duration| duration.as_millis()),
         },
     );
-    if metadata.is_dir() {
+    if metadata.is_dir() && should_scan_runtime_path_children(runtime_root, path) {
         let dir_entries = match fs::read_dir(path) {
             Ok(entries) => entries,
             Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
@@ -479,6 +479,15 @@ fn is_transient_runtime_path(path: &Path) -> bool {
     file_name.starts_with('.') && path.extension().and_then(|value| value.to_str()) == Some("tmp")
 }
 
+fn should_scan_runtime_path_children(runtime_root: &Path, path: &Path) -> bool {
+    let relative = path
+        .strip_prefix(runtime_root)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/");
+    !matches!(relative.as_str(), "processes" | "jobs")
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -486,7 +495,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn runtime_fingerprint_skips_atomic_temp_files() {
+    fn runtime_fingerprint_summarizes_process_dir_and_skips_atomic_temp_files() {
         let temp_root = unique_temp_dir("runtime-fingerprint-temp");
         let runtime_root = temp_root.join("run/8080");
         let processes = runtime_root.join("processes");
@@ -500,7 +509,8 @@ mod tests {
 
         let fingerprint = runtime_projection_fingerprint(&runtime_root, None).unwrap();
 
-        assert!(fingerprint.entries.contains_key("processes/proc-live.json"));
+        assert!(fingerprint.entries.contains_key("processes"));
+        assert!(!fingerprint.entries.contains_key("processes/proc-live.json"));
         assert!(
             !fingerprint
                 .entries
