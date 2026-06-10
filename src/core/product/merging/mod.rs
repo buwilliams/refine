@@ -203,8 +203,9 @@ impl FileMergerService {
     }
 
     fn next_ready_merge_gap(&self) -> RefineResult<Option<GapSummaryProjection>> {
-        let snapshot = FileProjectStateStore::new(&self.durable_root)
-            .load_or_refresh_projection(&self.runtime_root.join("cache"))?;
+        let snapshot =
+            FileProjectStateStore::with_runtime_root(&self.durable_root, &self.runtime_root)
+                .load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         let mut candidates = snapshot
             .gaps
             .values()

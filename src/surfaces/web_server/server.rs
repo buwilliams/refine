@@ -781,7 +781,7 @@ fn terminal_session_route(path: &str, suffix: &str) -> Option<String> {
 
 fn should_refresh_projection_after_mutation(path: &str) -> bool {
     let path = normalize_api_path(path);
-    !path.starts_with("/terminal/")
+    !path.starts_with("/terminal/") && path != "/project/sync"
 }
 
 #[cfg(test)]
@@ -798,6 +798,9 @@ mod tests {
         ));
         assert!(!should_refresh_projection_after_mutation(
             "/terminal/session-1/resize"
+        ));
+        assert!(!should_refresh_projection_after_mutation(
+            "/api/project/sync"
         ));
         assert!(should_refresh_projection_after_mutation(
             "/api/gaps/GAP1/start"

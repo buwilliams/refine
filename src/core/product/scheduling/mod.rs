@@ -366,7 +366,7 @@ impl FileSchedulingService {
     }
 
     fn projection_snapshot(&self, durable_root: &Path) -> RefineResult<ProjectionSnapshot> {
-        FileProjectStateStore::new(durable_root)
+        FileProjectStateStore::with_runtime_root(durable_root, &self.runtime_root)
             .load_or_refresh_projection(&self.runtime_root.join("cache"))
     }
 

@@ -22,6 +22,7 @@ use super::super::*;
 use super::*;
 
 const PROVIDER_STATUS_CACHE_TTL: Duration = Duration::from_secs(30);
+const LEGACY_PROCESS_ROOT_ENTRY_LIMIT: usize = 512;
 
 #[derive(Clone, Debug)]
 struct ProviderStatusCacheEntry {
@@ -272,11 +273,26 @@ fn process_roots(runtime_root: &Path, durable_root: Option<&Path>) -> Vec<PathBu
     let mut roots = vec![runtime_root.to_path_buf()];
     if let Some(durable_root) = durable_root {
         let project_runtime_root = durable_root.join("runtime");
-        if project_runtime_root != runtime_root {
+        if project_runtime_root != runtime_root
+            && should_scan_legacy_process_root(&project_runtime_root)
+        {
             roots.push(project_runtime_root);
         }
     }
     roots
+}
+
+fn should_scan_legacy_process_root(project_runtime_root: &Path) -> bool {
+    let processes_dir = project_runtime_root.join("processes");
+    if !processes_dir.exists() {
+        return true;
+    }
+    fs::read_dir(&processes_dir)
+        .map(|entries| {
+            entries.take(LEGACY_PROCESS_ROOT_ENTRY_LIMIT + 1).count()
+                <= LEGACY_PROCESS_ROOT_ENTRY_LIMIT
+        })
+        .unwrap_or(false)
 }
 
 fn append_chat_session_processes(
@@ -685,4 +701,32 @@ pub(in crate::surfaces::web_server) fn project_status_value(
         }],
         "message": status.message
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn process_roots_skip_oversized_legacy_runtime_process_registry() {
+        let temp_root = std::env::temp_dir().join(format!(
+            "refine-legacy-process-roots-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let runtime_root = temp_root.join("run/8080");
+        let durable_root = temp_root.join("app/.refine");
+        let legacy_processes = durable_root.join("runtime/processes");
+        fs::create_dir_all(&runtime_root).unwrap();
+        fs::create_dir_all(&legacy_processes).unwrap();
+        for index in 0..=LEGACY_PROCESS_ROOT_ENTRY_LIMIT {
+            fs::write(legacy_processes.join(format!("proc-{index}.json")), "{}").unwrap();
+        }
+
+        assert_eq!(
+            process_roots(&runtime_root, Some(&durable_root)),
+            vec![runtime_root]
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
 }

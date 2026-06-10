@@ -1089,7 +1089,8 @@ impl FileChatService {
     }
 
     fn attached_product_context(&self, record: &ChatSessionRecord) -> RefineResult<String> {
-        let store = FileProjectStateStore::new(&self.durable_root);
+        let store =
+            FileProjectStateStore::with_runtime_root(&self.durable_root, &self.runtime_root);
         let snapshot = store.load_or_refresh_projection(&self.runtime_root.join("cache"))?;
         match &record.attachment {
             ChatAttachment::Gap(id) => {

@@ -1009,7 +1009,13 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     cache_dir,
                 },
         } => {
-            let store = FileProjectStateStore::new(&durable_root);
+            let store = cache_dir
+                .as_ref()
+                .and_then(|cache_dir| cache_dir.parent())
+                .map(|runtime_root| {
+                    FileProjectStateStore::with_runtime_root(&durable_root, runtime_root)
+                })
+                .unwrap_or_else(|| FileProjectStateStore::new(&durable_root));
             let snapshot = store.rebuild_projection()?;
             if let Some(cache_dir) = &cache_dir {
                 store.persist_projection_snapshot(&cache_dir, &snapshot)?;
@@ -1689,10 +1695,10 @@ fn run_system_start(
     let snapshot = if let Some(client_repo) = project_status.client_repo {
         eprintln!("refine: warming project cache for {client_repo}");
         let durable_root = PathBuf::from(client_repo).join(".refine");
-        let store = FileProjectStateStore::new(&durable_root);
         let cache_root = cache_dir
             .clone()
             .unwrap_or_else(|| port_runtime_root.join("cache"));
+        let store = FileProjectStateStore::with_runtime_root(&durable_root, &port_runtime_root);
         store.load_or_refresh_projection(&cache_root)?
     } else {
         eprintln!("refine: no active project; using empty project cache");

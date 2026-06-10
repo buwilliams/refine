@@ -74,7 +74,7 @@ impl InProcessWebServer {
                 if let Some(snapshot) = hot_projection(&key)? {
                     return Ok(snapshot);
                 }
-                let store = FileProjectStateStore::new(&durable_root);
+                let store = FileProjectStateStore::with_runtime_root(&durable_root, runtime_root);
                 let snapshot = store.load_or_refresh_projection(&runtime_root.join("cache"))?;
                 store_hot_projection(key, snapshot.clone())?;
                 Ok(snapshot)
@@ -254,7 +254,7 @@ impl InProcessWebServer {
         let Some(durable_root) = self.current_durable_root()? else {
             return Ok(None);
         };
-        let snapshot = FileProjectStateStore::new(&durable_root)
+        let snapshot = FileProjectStateStore::with_runtime_root(&durable_root, runtime_root)
             .load_or_refresh_projection(&runtime_root.join("cache"))?;
         store_hot_projection(
             projection_cache_key(&durable_root, runtime_root),
@@ -265,6 +265,14 @@ impl InProcessWebServer {
     }
 
     pub(super) fn rebuild_current_projection_cache(&self) -> RefineResult<ProjectionSnapshot> {
+        let projection = self.rebuild_current_project_projection_cache()?;
+        let _ = self.refresh_runtime_projection_cache()?;
+        Ok(projection)
+    }
+
+    pub(super) fn rebuild_current_project_projection_cache(
+        &self,
+    ) -> RefineResult<ProjectionSnapshot> {
         let Some(runtime_root) = &self.runtime_root else {
             return Err(RefineError::InvalidInput(
                 "runtime root is required to rebuild projection cache".to_string(),
@@ -275,14 +283,13 @@ impl InProcessWebServer {
                 "durable root is required to rebuild projection cache".to_string(),
             ));
         };
-        let store = FileProjectStateStore::new(&durable_root);
+        let store = FileProjectStateStore::with_runtime_root(&durable_root, runtime_root);
         let projection = store.rebuild_projection()?;
         store.persist_projection_snapshot(&runtime_root.join("cache"), &projection)?;
         store_hot_projection(
             projection_cache_key(&durable_root, runtime_root),
             projection.clone(),
         )?;
-        let _ = self.refresh_runtime_projection_cache()?;
         Ok(projection)
     }
 
@@ -305,7 +312,7 @@ impl InProcessWebServer {
         let Some(durable_root) = self.current_durable_root()? else {
             return Ok(());
         };
-        FileProjectStateStore::new(durable_root)
+        FileProjectStateStore::with_runtime_root(durable_root, runtime_root)
             .persist_projection_snapshot(&runtime_root.join("cache"), projection)
     }
 

@@ -100,10 +100,16 @@ impl FileWorkItemService {
     fn projection_snapshot(
         &self,
     ) -> RefineResult<crate::core::product::project_state::ProjectionSnapshot> {
-        let store = FileProjectStateStore::new(&self.durable_root);
         if let Some(cache_dir) = &self.projection_cache_dir {
+            let store = cache_dir
+                .parent()
+                .map(|runtime_root| {
+                    FileProjectStateStore::with_runtime_root(&self.durable_root, runtime_root)
+                })
+                .unwrap_or_else(|| FileProjectStateStore::new(&self.durable_root));
             store.load_or_refresh_projection(cache_dir)
         } else {
+            let store = FileProjectStateStore::new(&self.durable_root);
             store.rebuild_projection()
         }
     }

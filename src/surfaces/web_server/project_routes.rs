@@ -1180,7 +1180,7 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         let projection = if self.runtime_root.is_some() {
-            match self.rebuild_current_projection_cache() {
+            match self.rebuild_current_project_projection_cache() {
                 Ok(projection) => projection,
                 Err(error) => return error_response(error),
             }

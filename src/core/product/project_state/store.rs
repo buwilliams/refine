@@ -37,12 +37,24 @@ pub trait ProjectStateStore {
 #[derive(Clone, Debug)]
 pub struct FileProjectStateStore {
     pub durable_root: PathBuf,
+    pub runtime_root: Option<PathBuf>,
 }
 
 impl FileProjectStateStore {
     pub fn new(durable_root: impl Into<PathBuf>) -> Self {
         Self {
             durable_root: durable_root.into(),
+            runtime_root: None,
+        }
+    }
+
+    pub fn with_runtime_root(
+        durable_root: impl Into<PathBuf>,
+        runtime_root: impl Into<PathBuf>,
+    ) -> Self {
+        Self {
+            durable_root: durable_root.into(),
+            runtime_root: Some(runtime_root.into()),
         }
     }
 
@@ -329,7 +341,7 @@ impl FileProjectStateStore {
         let Some(source_root) = self.source_root() else {
             return BTreeMap::new();
         };
-        let service = FileGitWorktreeService::new(source_root);
+        let service = self.git_service(source_root);
         let branch = service.inspect("").ok().and_then(|status| status.branch);
         let Ok(changes) = service.recent_changes(1000) else {
             return BTreeMap::new();
@@ -366,7 +378,7 @@ impl FileProjectStateStore {
 
     fn git_head_fingerprint(&self) -> Option<SourceFingerprint> {
         let source_root = self.source_root()?;
-        let service = FileGitWorktreeService::new(source_root);
+        let service = self.git_service(source_root);
         let branch = service
             .inspect("")
             .ok()
@@ -387,6 +399,14 @@ impl FileProjectStateStore {
             modified_unix_ms: None,
             content_hash: Some(format!("{branch}:{latest}")),
         })
+    }
+
+    fn git_service(&self, source_root: PathBuf) -> FileGitWorktreeService {
+        if let Some(runtime_root) = &self.runtime_root {
+            FileGitWorktreeService::with_runtime_root(source_root, runtime_root)
+        } else {
+            FileGitWorktreeService::new(source_root)
+        }
     }
 }
 

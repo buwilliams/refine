@@ -486,7 +486,7 @@ fn normalize_app_path(path: &str) -> RefineResult<PathBuf> {
     if raw.is_empty() {
         return Err(RefineError::InvalidInput("path is required".to_string()));
     }
-    let path = PathBuf::from(raw);
+    let path = expand_home_path(raw);
     let path = if path.is_absolute() {
         path
     } else {
@@ -495,6 +495,20 @@ fn normalize_app_path(path: &str) -> RefineResult<PathBuf> {
             .join(path)
     };
     Ok(path)
+}
+
+fn expand_home_path(raw: &str) -> PathBuf {
+    if raw == "~" {
+        return std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(raw));
+    }
+    if let Some(rest) = raw.strip_prefix("~/") {
+        if let Some(home) = std::env::var_os("HOME") {
+            return PathBuf::from(home).join(rest);
+        }
+    }
+    PathBuf::from(raw)
 }
 
 fn now_timestamp() -> String {
@@ -506,6 +520,18 @@ mod tests {
     use super::*;
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn normalize_app_path_expands_home_prefix() {
+        let Some(home) = std::env::var_os("HOME").map(PathBuf::from) else {
+            return;
+        };
+
+        assert_eq!(
+            normalize_app_path("~/refine-test-app").unwrap(),
+            home.join("refine-test-app")
+        );
+    }
 
     #[test]
     fn file_project_registry_persists_apps_and_active_status() {

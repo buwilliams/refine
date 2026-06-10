@@ -524,6 +524,29 @@ fn rebuild_projection_scans_git_changes_and_joins_gap_display_fields() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn rebuild_projection_with_runtime_root_records_git_processes_outside_durable_runtime() {
+    let temp_root = unique_temp_dir("projection-runtime-root");
+    let durable_root = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&durable_root).unwrap();
+    git(&temp_root, &["init"]).unwrap();
+    git(&temp_root, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&temp_root, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(temp_root.join("app.txt"), "one\n").unwrap();
+    git(&temp_root, &["add", "app.txt"]).unwrap();
+    git(&temp_root, &["commit", "-m", "initial"]).unwrap();
+
+    FileProjectStateStore::with_runtime_root(&durable_root, &runtime_root)
+        .rebuild_projection()
+        .unwrap();
+
+    assert!(!durable_root.join("runtime/processes").exists());
+    assert!(runtime_root.join("processes").exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn gap_projection(id: &str, status: GapStatus, node_id: Option<&str>) -> GapSummaryProjection {
     GapSummaryProjection {
         gap: GapIndexProjection {
