@@ -305,6 +305,7 @@ function drawGapDetail(gap) {
             <div class="nav-menu-panel gap-action-panel">
               <button class="nav-menu-item" type="button" id="btn-view-logs" data-testid="gap-action-view-logs">View Logs</button>
               <button class="nav-menu-item" type="button" id="btn-reporter" data-testid="gap-action-reporter">Reporter</button>
+              <button class="nav-menu-item" type="button" id="btn-assignee" data-testid="gap-action-assignee">Assignee</button>
               <button class="nav-menu-item" type="button" id="btn-rename" data-testid="gap-action-rename">Rename</button>
               <button class="nav-menu-item" type="button" id="btn-priority" data-testid="gap-action-priority">Change Priority</button>
               <button class="nav-menu-item" type="button" id="btn-gap-feature-assign" data-testid="gap-action-assign-feature">Move to Feature</button>
@@ -317,6 +318,7 @@ function drawGapDetail(gap) {
       </div>
       <div class="muted small" style="margin-bottom:14px" data-testid="gap-metadata">
         ID <code>${gap.id}</code> · created ${fmtTime(gap.created)} · updated ${fmtTime(gap.updated)} · node <span title="${htmlEscape(nodeOwnerTitle)}">${htmlEscape(nodeDisplayName)}</span>
+        · assignee <strong>${htmlEscape(gap.assignee || "unassigned")}</strong>
         ${gap.branch_name ? ` · branch <code>${gap.branch_name}</code>` : ""}
       </div>
       ${renderGapFeatureAssociation(gap)}
@@ -435,6 +437,10 @@ function drawGapDetail(gap) {
   $("#btn-reporter")?.addEventListener("click", async () => {
     closeGapActionMenu();
     await openGapReporterModal(gap);
+  });
+  $("#btn-assignee")?.addEventListener("click", async () => {
+    closeGapActionMenu();
+    await openGapAssigneeModal(gap);
   });
   $("#btn-rename")?.addEventListener("click", async () => {
     closeGapActionMenu();
@@ -653,6 +659,45 @@ async function openGapReporterModal(gap) {
     await loadGapDetail(gap.id);
   } catch (e) {
     await showActionError(e, "Reporter update failed");
+  }
+}
+
+async function openGapAssigneeModal(gap) {
+  if (typeof refreshReporters === "function") {
+    try {
+      await refreshReporters();
+    } catch {}
+  }
+  const current = gap.assignee || "";
+  const reporters = state.reporters || [];
+  const options = reporters
+    .map((r) => `<option value="${htmlEscape(r.name)}" ${r.name === current ? "selected" : ""}>${htmlEscape(r.name)}</option>`)
+    .join("");
+  const missingCurrent = current && !reporters.some((r) => r.name === current)
+    ? `<option value="${htmlEscape(current)}" selected>${htmlEscape(current)}</option>`
+    : "";
+  const body = () => `
+    <div class="modal-title">Change assignee</div>
+    <div class="modal-body">
+      <label for="modal-assignee-select">Assignee</label>
+      <select class="modal-input" id="modal-assignee-select" data-testid="gap-assignee-select" style="width:100%">
+        <option value="">— pick assignee —</option>
+        ${missingCurrent}
+        ${options}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel data-testid="modal-cancel">Cancel</button>
+      <button data-ok data-testid="modal-ok">Save</button>
+    </div>`;
+  const next = await _openModal(body, { cancel: null, ok: current }, ".modal-input");
+  if (next === null || !next || next === current) return;
+  try {
+    await api("PATCH", "/api/gaps/" + gap.id, { assignee: next });
+    toast(`Assignee set to ${next}`, "info");
+    await loadGapDetail(gap.id);
+  } catch (e) {
+    await showActionError(e, "Assignee update failed");
   }
 }
 

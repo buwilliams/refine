@@ -10,6 +10,8 @@ pub struct Feature {
     pub name: String,
     pub description: Option<String>,
     pub reporter: Option<String>,
+    #[serde(default)]
+    pub assignee: Option<String>,
     pub node_id: Option<String>,
     pub created: Timestamp,
     pub updated: Timestamp,
@@ -22,6 +24,8 @@ pub struct FeatureIndexProjection {
     pub name: String,
     pub description: Option<String>,
     pub reporter: Option<String>,
+    #[serde(default)]
+    pub assignee: Option<String>,
     pub node_id: Option<String>,
     pub created: Timestamp,
     pub updated: Timestamp,

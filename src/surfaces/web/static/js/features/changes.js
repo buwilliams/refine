@@ -213,6 +213,7 @@ function drawChanges(data, f) {
     { key: "gap", label: "Gap" },
     { key: "status", label: "Status" },
     { key: "priority", label: "Priority" },
+    { key: "assignee", label: "Assignee" },
     { key: "commit", label: "Merge commit" },
   ];
   const sortHeads = columns.map((c) => {
@@ -243,6 +244,7 @@ function drawChanges(data, f) {
             <td data-label="Priority" data-testid="changes-priority-cell">${c.priority
               ? `<span class="priority-pill priority-${c.priority}">${c.priority}</span>`
               : `<span class="muted small">-</span>`}</td>
+            <td class="muted small" data-label="Assignee" data-testid="changes-assignee-cell">${c.assignee ? htmlEscape(c.assignee) : "-"}</td>
             <td class="muted small" data-label="Merge commit" data-testid="changes-commit-cell"><code>${c.commit.slice(0, 10)}...</code></td>
             <td data-label="Actions"><button class="secondary" data-undo-commit="${htmlEscape(c.commit)}"
                        data-testid="changes-undo"

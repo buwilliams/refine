@@ -383,6 +383,15 @@ registerCommand({
 });
 
 registerCommand({
+  id: "gaps.bulk.assignee",
+  title: "Bulk: set selected Gap assignee",
+  group: "Gaps",
+  aliases: ["bulk-assignee"],
+  visible: () => state.currentRoute === "gaps",
+  run: ({ button } = {}) => openBulkModal("assignee", { button }),
+});
+
+registerCommand({
   id: "gaps.bulk.feature",
   title: "Bulk: assign selected Gaps to Feature",
   group: "Gaps",

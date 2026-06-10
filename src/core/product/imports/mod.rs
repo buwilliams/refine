@@ -12,6 +12,8 @@ pub struct ImportDraft {
     pub actual: String,
     pub target: String,
     pub reporter: String,
+    #[serde(default)]
+    pub assignee: Option<String>,
     pub priority: String,
     #[serde(default)]
     pub duplicate_decision: String,
@@ -48,6 +50,10 @@ impl FileImportService {
                     actual: actual.to_string(),
                     target: target.to_string(),
                     reporter: reporter.unwrap_or("").trim().to_string(),
+                    assignee: reporter
+                        .map(str::trim)
+                        .filter(|reporter| !reporter.is_empty())
+                        .map(str::to_string),
                     priority: "low".to_string(),
                     duplicate_decision: String::new(),
                 }
@@ -95,6 +101,14 @@ impl FileImportService {
                 actual: actual.to_string(),
                 target: target.to_string(),
                 reporter: nonempty_or(value("reporter"), reporter.unwrap_or("")).to_string(),
+                assignee: Some(
+                    nonempty_or(
+                        value("assignee"),
+                        nonempty_or(value("reporter"), reporter.unwrap_or("")),
+                    )
+                    .to_string(),
+                )
+                .filter(|assignee| !assignee.is_empty()),
                 priority,
                 duplicate_decision: String::new(),
             });
@@ -159,8 +173,14 @@ impl FileImportService {
                     &draft.target,
                 )?;
             }
-            if gap.gap.priority.as_str() != draft.priority {
-                work_items.update_gap_metadata_summary(&gap.gap.id, None, Some(&draft.priority))?;
+            if gap.gap.priority.as_str() != draft.priority || draft.assignee.is_some() {
+                work_items.update_gap_metadata_summary(
+                    &gap.gap.id,
+                    None,
+                    (gap.gap.priority.as_str() != draft.priority)
+                        .then_some(draft.priority.as_str()),
+                    draft.assignee.as_deref(),
+                )?;
             }
             if let Some(feature_id) = feature_id {
                 work_items.assign_gap_to_feature(feature_id, &gap.gap.id)?;
@@ -233,11 +253,14 @@ fn import_draft_from_value(
             "draft {index} priority must be one of low, medium, or high"
         ))
     })?;
+    let reporter = nonempty_or(field("reporter"), default_reporter).to_string();
+    let assignee = nonempty_or(field("assignee"), &reporter).to_string();
     Ok(ImportDraft {
         name: import_name(field("name"), &actual, &target),
         actual,
         target,
-        reporter: nonempty_or(field("reporter"), default_reporter).to_string(),
+        reporter,
+        assignee: (!assignee.is_empty()).then_some(assignee),
         priority,
         duplicate_decision: field("duplicate_decision").to_string(),
     })
@@ -323,7 +346,7 @@ mod tests {
         let temp_root = unique_temp_dir("import");
         let durable_root = temp_root.join(".refine");
         FileWorkItemService::new(&durable_root)
-            .create_feature_summary("Feature", Some("FEA1"), None, None)
+            .create_feature_summary("Feature", Some("FEA1"), None, None, None)
             .unwrap();
 
         let result = FileImportService::new(&durable_root)

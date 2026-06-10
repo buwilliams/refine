@@ -37,6 +37,8 @@ pub struct Gap {
     pub name: String,
     pub status: GapStatus,
     pub priority: GapPriority,
+    #[serde(default)]
+    pub assignee: Option<String>,
     pub branch_name: Option<String>,
     pub feature_id: Option<String>,
     pub feature_order: Option<i64>,
@@ -54,6 +56,8 @@ pub struct GapIndexProjection {
     pub status: GapStatus,
     pub priority: GapPriority,
     pub reporter: Option<String>,
+    #[serde(default)]
+    pub assignee: Option<String>,
     pub round_count: usize,
     pub created: Timestamp,
     pub updated: Timestamp,

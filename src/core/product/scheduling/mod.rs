@@ -1613,7 +1613,7 @@ mod tests {
         for id in ["GAP1", "GAP2", "GAP3", "GAP4"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
-                .update_gap_metadata_summary(id, None, Some("high"))
+                .update_gap_metadata_summary(id, None, Some("high"), None)
                 .unwrap();
             work_items
                 .transition_gap_status(id, GapStatus::Todo)
@@ -1652,7 +1652,7 @@ mod tests {
         for (id, priority) in [("LOW", "low"), ("MEDIUM", "medium"), ("HIGH", "high")] {
             work_items.create_gap_summary(id, Some(id)).unwrap();
             work_items
-                .update_gap_metadata_summary(id, None, Some(priority))
+                .update_gap_metadata_summary(id, None, Some(priority), None)
                 .unwrap();
             work_items
                 .transition_gap_status(id, GapStatus::Todo)
@@ -1801,7 +1801,7 @@ mod tests {
             .unwrap();
         let work_items = FileWorkItemService::new(&durable_root);
         work_items
-            .create_feature_summary("Feature", Some("FEAT1"), None, None)
+            .create_feature_summary("Feature", Some("FEAT1"), None, None, None)
             .unwrap();
         for id in ["FIRST", "SECOND"] {
             work_items.create_gap_summary(id, Some(id)).unwrap();

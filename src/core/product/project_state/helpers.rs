@@ -39,6 +39,7 @@ pub(super) fn change_searchable_text(change: &ChangeSummaryProjection) -> String
         change.gap_id.as_deref(),
         change.gap_name.as_deref(),
         change.gap_priority.as_deref(),
+        change.gap_assignee.as_deref(),
         change.gap_status.as_ref().map(GapStatus::as_str),
     ]
     .into_iter()

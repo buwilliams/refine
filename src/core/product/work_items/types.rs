@@ -6,6 +6,7 @@ pub struct BulkGapFilter {
     pub status: Option<String>,
     pub q: Option<String>,
     pub reporter: Option<String>,
+    pub assignee: Option<String>,
     pub feature: Option<String>,
     pub rounds_gte: Option<usize>,
     pub rounds_lte: Option<usize>,
@@ -27,6 +28,25 @@ pub enum BulkGapUpdate {
     Priority(String),
     Status(String),
     Reporter(String),
+    Assignee(String),
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BulkFeatureFilter {
+    pub status: Option<String>,
+    pub q: Option<String>,
+    pub reporter: Option<String>,
+    pub assignee: Option<String>,
+    pub node: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct BulkFeatureSelection {
+    #[serde(default)]
+    pub filter: BulkFeatureFilter,
+    pub selected_ids: Option<Vec<String>>,
+    #[serde(default)]
+    pub exclude_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

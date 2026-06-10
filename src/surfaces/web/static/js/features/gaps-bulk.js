@@ -19,7 +19,7 @@ const BULK_STATUS_OPTIONS = [
 function gapsBulkFilterFromHash() {
   const f = gapsFilterFromHash();
   const filter = {};
-  for (const key of ["status", "q", "reporter", "feature", "node"]) {
+  for (const key of ["status", "q", "reporter", "assignee", "feature", "node"]) {
     if (f[key]) filter[key] = f[key];
   }
   if (f.rounds_gte !== "") filter.rounds_gte = parseInt(f.rounds_gte, 10);
@@ -39,7 +39,7 @@ async function openBulkModal(field) {
     return;
   }
   const countText = _selectionCountText("selected");
-  const label = { priority: "Priority", status: "Status", reporter: "Reporter" }[field];
+  const label = { priority: "Priority", status: "Status", reporter: "Reporter", assignee: "Assignee" }[field];
 
   let valueControlHtml = "";
   if (field === "priority") {
@@ -70,6 +70,15 @@ async function openBulkModal(field) {
         Rewrites the latest round's <strong>reporter</strong> on each Gap.
         Earlier rounds keep their original reporter.
       </p>`;
+  } else if (field === "assignee") {
+    const opts = (state.reporters || [])
+      .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
+      .join("");
+    valueControlHtml = `
+      <select class="modal-input" id="bulk-value-assignee" data-testid="bulk-value-assignee" style="width:100%">
+        <option value="">— pick assignee —</option>
+        ${opts}
+      </select>`;
   }
 
   const body = () => `
@@ -143,6 +152,7 @@ function applyGapsFilterIndicator(f) {
     "search": !!f.q,
     "filter-status": !!f.status,
     "filter-reporter": !!f.reporter,
+    "filter-assignee": !!f.assignee,
     "filter-feature": !!f.feature,
     "filter-rounds-gte": !!f.rounds_gte,
     "filter-rounds-lte": !!f.rounds_lte,
@@ -350,6 +360,7 @@ function describeGapsFilter(filter) {
   const parts = [];
   if (filter.status)   parts.push(`status=${filter.status}`);
   if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
+  if (filter.assignee) parts.push(`assignee=${filter.assignee}`);
   if (filter.feature)  parts.push(`feature=${filter.feature}`);
   if (filter.rounds_gte) parts.push(`rounds≥${filter.rounds_gte}`);
   if (filter.rounds_lte) parts.push(`rounds≤${filter.rounds_lte}`);

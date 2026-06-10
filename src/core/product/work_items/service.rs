@@ -182,6 +182,7 @@ impl FileWorkItemService {
         object.insert("name".to_string(), Value::String(name.to_string()));
         object.insert("status".to_string(), Value::String("backlog".to_string()));
         object.insert("priority".to_string(), Value::String("low".to_string()));
+        object.insert("assignee".to_string(), Value::Null);
         object.insert("branch_name".to_string(), Value::Null);
         object.insert("feature_id".to_string(), Value::Null);
         object.insert("feature_order".to_string(), Value::Null);
@@ -219,6 +220,15 @@ impl FileWorkItemService {
         object.insert(
             "round_count".to_string(),
             Value::from(current.gap.round_count),
+        );
+        object.insert(
+            "assignee".to_string(),
+            current
+                .gap
+                .assignee
+                .clone()
+                .map(Value::String)
+                .unwrap_or(Value::Null),
         );
         if let Some(display_name) = current
             .node_display_name
@@ -279,6 +289,7 @@ impl FileWorkItemService {
         id: Option<&str>,
         description: Option<&str>,
         reporter: Option<&str>,
+        assignee: Option<&str>,
     ) -> RefineResult<FeatureSummaryProjection> {
         let name = name.trim();
         if name.is_empty() {
@@ -315,6 +326,10 @@ impl FileWorkItemService {
             "reporter".to_string(),
             Value::String(reporter.unwrap_or("").trim().to_string()),
         );
+        object.insert(
+            "assignee".to_string(),
+            Value::String(assignee.or(reporter).unwrap_or("").trim().to_string()),
+        );
         object.insert("node_id".to_string(), Value::String(node_id));
         object.insert("created".to_string(), Value::String(now.clone()));
         object.insert("updated".to_string(), Value::String(now));
@@ -337,6 +352,7 @@ impl FileWorkItemService {
         name: Option<&str>,
         description: Option<&str>,
         reporter: Option<&str>,
+        assignee: Option<&str>,
     ) -> RefineResult<FeatureSummaryProjection> {
         let feature = self.show_feature_summary(feature_id)?;
         self.ensure_feature_owned(&feature)?;
@@ -378,6 +394,22 @@ impl FileWorkItemService {
             object.insert(
                 "reporter".to_string(),
                 Value::String(reporter.trim().to_string()),
+            );
+        }
+        if let Some(assignee) = assignee {
+            let assignee = assignee.trim();
+            if !assignee.is_empty() && !valid_reporter_name(assignee) {
+                return Err(RefineError::InvalidInput(
+                    "invalid assignee name".to_string(),
+                ));
+            }
+            object.insert(
+                "assignee".to_string(),
+                if assignee.is_empty() {
+                    Value::Null
+                } else {
+                    Value::String(assignee.to_string())
+                },
             );
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
@@ -563,6 +595,7 @@ impl FileWorkItemService {
             BulkGapUpdate::Priority(value) => ("priority".to_string(), value.trim().to_string()),
             BulkGapUpdate::Status(value) => ("status".to_string(), value.trim().to_lowercase()),
             BulkGapUpdate::Reporter(value) => ("reporter".to_string(), value.trim().to_string()),
+            BulkGapUpdate::Assignee(value) => ("assignee".to_string(), value.trim().to_string()),
         };
         if field == "priority" && GapPriority::parse_wire(&raw_value).is_none() {
             return Err(RefineError::InvalidInput(
@@ -582,6 +615,11 @@ impl FileWorkItemService {
         if field == "reporter" && !valid_reporter_name(&raw_value) {
             return Err(RefineError::InvalidInput(
                 "invalid reporter name".to_string(),
+            ));
+        }
+        if field == "assignee" && !valid_reporter_name(&raw_value) {
+            return Err(RefineError::InvalidInput(
+                "invalid assignee name".to_string(),
             ));
         }
 
@@ -604,6 +642,7 @@ impl FileWorkItemService {
                     self.set_gap_status_unchecked(&gap.gap.id, &status)?;
                 }
                 "reporter" => self.set_latest_round_reporter(&gap.gap.id, &raw_value)?,
+                "assignee" => self.set_gap_assignee_unchecked(&gap.gap.id, &raw_value)?,
                 _ => unreachable!(),
             }
             ids.push(gap.gap.id);
@@ -640,6 +679,36 @@ impl FileWorkItemService {
             ids,
             failures: Vec::new(),
             failed: 0,
+        })
+    }
+
+    pub fn bulk_update_features(
+        &self,
+        selection: BulkFeatureSelection,
+        assignee: &str,
+    ) -> RefineResult<BulkUpdateResult> {
+        let assignee = assignee.trim();
+        if !valid_reporter_name(assignee) {
+            return Err(RefineError::InvalidInput(
+                "invalid assignee name".to_string(),
+            ));
+        }
+        let features = self.select_bulk_feature_summaries(&selection)?;
+        let mut ids = Vec::new();
+        for feature in features {
+            self.ensure_feature_owned(&feature)?;
+            self.set_feature_assignee_unchecked(&feature.feature.id, assignee)?;
+            ids.push(feature.feature.id);
+        }
+        Ok(BulkUpdateResult {
+            updated: ids.len(),
+            ids,
+            field: "assignee".to_string(),
+            value: assignee.to_string(),
+            skipped: 0,
+            skipped_details: Vec::new(),
+            failed: 0,
+            failures: Vec::new(),
         })
     }
 
@@ -902,6 +971,7 @@ impl FileWorkItemService {
         gap_id: &str,
         name: Option<&str>,
         priority: Option<&str>,
+        assignee: Option<&str>,
     ) -> RefineResult<GapSummaryProjection> {
         let current = self.show_gap_summary(gap_id)?;
         validate_gap_operation(&current.gap.status, &GapOperation::EditMetadata)?;
@@ -928,6 +998,22 @@ impl FileWorkItemService {
             object.insert(
                 "priority".to_string(),
                 Value::String(priority.as_str().to_string()),
+            );
+        }
+        if let Some(assignee) = assignee {
+            let assignee = assignee.trim();
+            if !assignee.is_empty() && !valid_reporter_name(assignee) {
+                return Err(RefineError::InvalidInput(
+                    "invalid assignee name".to_string(),
+                ));
+            }
+            object.insert(
+                "assignee".to_string(),
+                if assignee.is_empty() {
+                    Value::Null
+                } else {
+                    Value::String(assignee.to_string())
+                },
             );
         }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
@@ -1315,6 +1401,43 @@ impl FileWorkItemService {
         write_json_atomically(&gap_path, &value)
     }
 
+    fn set_gap_assignee_unchecked(&self, gap_id: &str, assignee: &str) -> RefineResult<()> {
+        let (gap_path, mut value) = self.read_gap_value(gap_id)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Gap {} is not a JSON object", gap_path.display()))
+        })?;
+        object.insert("assignee".to_string(), Value::String(assignee.to_string()));
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        write_json_atomically(&gap_path, &value)
+    }
+
+    fn set_feature_assignee_unchecked(&self, feature_id: &str, assignee: &str) -> RefineResult<()> {
+        let feature = self.show_feature_summary(feature_id)?;
+        self.ensure_feature_owned(&feature)?;
+        let feature_path = feature_json_path(&self.durable_root, feature_id);
+        let bytes = fs::read(&feature_path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read Feature {}: {error}",
+                feature_path.display()
+            ))
+        })?;
+        let mut value: Value = serde_json::from_slice(&bytes).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to parse Feature {}: {error}",
+                feature_path.display()
+            ))
+        })?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "Feature {} is not a JSON object",
+                feature_path.display()
+            ))
+        })?;
+        object.insert("assignee".to_string(), Value::String(assignee.to_string()));
+        object.insert("updated".to_string(), Value::String(now_timestamp()));
+        write_json_atomically(&feature_path, &value)
+    }
+
     fn set_gap_node_unchecked(&self, gap_id: &str, node_id: &str) -> RefineResult<()> {
         let current = self.show_gap_summary(gap_id)?;
         let (gap_path, mut value) = self.read_gap_value_unchecked(&current)?;
@@ -1447,6 +1570,40 @@ impl FileWorkItemService {
         }
         Ok((gaps, skipped_details))
     }
+
+    fn select_bulk_feature_summaries(
+        &self,
+        selection: &BulkFeatureSelection,
+    ) -> RefineResult<Vec<FeatureSummaryProjection>> {
+        let excluded: BTreeSet<_> = selection
+            .exclude_ids
+            .iter()
+            .map(|id| id.trim().to_uppercase())
+            .filter(|id| !id.is_empty())
+            .collect();
+        let mut features = if let Some(selected_ids) = &selection.selected_ids {
+            let mut selected = Vec::new();
+            for id in selected_ids {
+                let id = id.trim().to_uppercase();
+                if id.is_empty() || excluded.contains(&id) {
+                    continue;
+                }
+                selected.push(self.show_feature_summary(&id)?);
+            }
+            selected
+        } else {
+            let active_node_id = self.active_node_id()?;
+            self.list_feature_summaries()?
+                .into_iter()
+                .filter(|feature| !excluded.contains(&feature.feature.id))
+                .filter(|feature| {
+                    bulk_feature_matches_filter(feature, &selection.filter, &active_node_id)
+                })
+                .collect()
+        };
+        features.sort_by(|a, b| a.feature.id.cmp(&b.feature.id));
+        Ok(features)
+    }
 }
 
 fn now_timestamp() -> String {
@@ -1471,6 +1628,16 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
         .filter(|s| !s.is_empty())
     {
         if gap.gap.reporter.as_deref() != Some(reporter) {
+            return false;
+        }
+    }
+    if let Some(assignee) = filter
+        .assignee
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if gap.gap.assignee.as_deref() != Some(assignee) {
             return false;
         }
     }
@@ -1515,9 +1682,98 @@ fn bulk_gap_matches_filter(gap: &GapSummaryProjection, filter: &BulkGapFilter) -
         let query = query.to_lowercase();
         let haystack = gap.searchable_text.to_lowercase();
         let reporter = gap.gap.reporter.as_deref().unwrap_or("").to_lowercase();
+        let assignee = gap.gap.assignee.as_deref().unwrap_or("").to_lowercase();
         if !haystack.contains(&query)
             && !gap.gap.id.to_lowercase().contains(&query)
             && !reporter.contains(&query)
+            && !assignee.contains(&query)
+        {
+            return false;
+        }
+    }
+    true
+}
+
+fn bulk_feature_matches_filter(
+    feature: &FeatureSummaryProjection,
+    filter: &BulkFeatureFilter,
+    active_node_id: &str,
+) -> bool {
+    if let Some(status) = filter
+        .status
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if feature.status.as_str() != status {
+            return false;
+        }
+    }
+    if let Some(reporter) = filter
+        .reporter
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if feature.feature.reporter.as_deref() != Some(reporter) {
+            return false;
+        }
+    }
+    if let Some(assignee) = filter
+        .assignee
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        if feature.feature.assignee.as_deref() != Some(assignee) {
+            return false;
+        }
+    }
+    if let Some(node) = filter
+        .node
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        match node {
+            "all" => {}
+            "current" => {
+                if feature.feature.node_id.as_deref().unwrap_or("default") != active_node_id {
+                    return false;
+                }
+            }
+            node => {
+                if feature.feature.node_id.as_deref().unwrap_or("default") != node {
+                    return false;
+                }
+            }
+        }
+    }
+    if let Some(query) = filter.q.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        let query = query.to_lowercase();
+        let reporter = feature
+            .feature
+            .reporter
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+        let assignee = feature
+            .feature
+            .assignee
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+        let description = feature
+            .feature
+            .description
+            .as_deref()
+            .unwrap_or("")
+            .to_lowercase();
+        if !feature.feature.id.to_lowercase().contains(&query)
+            && !feature.feature.name.to_lowercase().contains(&query)
+            && !description.contains(&query)
+            && !reporter.contains(&query)
+            && !assignee.contains(&query)
         {
             return false;
         }

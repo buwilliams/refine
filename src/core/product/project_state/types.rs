@@ -83,6 +83,8 @@ pub struct ChangeSummaryProjection {
     pub gap_name: Option<String>,
     pub gap_status: Option<GapStatus>,
     pub gap_priority: Option<String>,
+    #[serde(default)]
+    pub gap_assignee: Option<String>,
     pub searchable_text: String,
     #[serde(default)]
     pub order: usize,
@@ -93,6 +95,8 @@ pub struct DashboardProjection {
     pub all_node_status_counts: BTreeMap<GapStatus, usize>,
     pub current_node_status_counts: BTreeMap<GapStatus, usize>,
     pub reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    #[serde(default)]
+    pub assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>>,
     pub attention_indicators: Vec<String>,
     pub recent_activity_ids: Vec<String>,
 }
@@ -142,6 +146,7 @@ pub struct GapProjectionQuery {
     pub q: Option<String>,
     pub status: Option<GapStatus>,
     pub reporter: Option<String>,
+    pub assignee: Option<String>,
     pub node: Option<String>,
     pub current_node_id: Option<String>,
     pub feature: Option<String>,
@@ -158,6 +163,7 @@ pub struct FeatureProjectionQuery {
     pub q: Option<String>,
     pub status: Option<GapStatus>,
     pub reporter: Option<String>,
+    pub assignee: Option<String>,
     pub node: Option<String>,
     pub current_node_id: Option<String>,
 }

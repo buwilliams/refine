@@ -196,6 +196,7 @@ impl FileProjectStateStore {
                 .as_object()
                 .and_then(|object| text(object.get("reporter")))
         });
+        let assignee = nullable_text(object.get("assignee"));
         let notes = object
             .get("notes")
             .and_then(Value::as_array)
@@ -204,6 +205,7 @@ impl FileProjectStateStore {
         let mut searchable_parts = vec![
             text(object.get("name")).unwrap_or_else(|| "Untitled Gap".to_string()),
             reporter.clone().unwrap_or_default(),
+            assignee.clone().unwrap_or_default(),
         ];
         for note in notes.iter().filter_map(Value::as_object) {
             if let Some(body) = text(note.get("body")) {
@@ -227,6 +229,7 @@ impl FileProjectStateStore {
                 status: gap_status(object.get("status")),
                 priority: gap_priority(object.get("priority")),
                 reporter,
+                assignee,
                 round_count: valid_rounds.len(),
                 created: text(object.get("created")).unwrap_or_else(|| "unknown".to_string()),
                 updated: text(object.get("updated"))
@@ -262,6 +265,9 @@ impl FileProjectStateStore {
             name: text(object.get("name")).unwrap_or_else(|| "Untitled Feature".to_string()),
             description: Some(text(object.get("description")).unwrap_or_default()),
             reporter: Some(text(object.get("reporter")).unwrap_or_default()),
+            assignee: nullable_text(object.get("assignee"))
+                .or_else(|| text(object.get("reporter")))
+                .filter(|assignee| !assignee.is_empty()),
             node_id: Some(
                 nullable_text(object.get("node_id")).unwrap_or_else(|| "default".to_string()),
             ),
@@ -343,6 +349,7 @@ impl FileProjectStateStore {
                     gap_name: Some(joined_gap.gap.name.clone()),
                     gap_status: Some(joined_gap.gap.status.clone()),
                     gap_priority: Some(joined_gap.gap.priority.as_str().to_string()),
+                    gap_assignee: joined_gap.gap.assignee.clone(),
                     searchable_text: String::new(),
                     order,
                 };
@@ -534,6 +541,7 @@ impl ProjectStateStore for FileProjectStateStore {
                 .map(|gap| &gap.gap.status),
         );
         let mut reporter_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
+        let mut assignee_stats: BTreeMap<String, BTreeMap<GapStatus, usize>> = BTreeMap::new();
         for gap in gaps.values() {
             let reporter = gap
                 .gap
@@ -543,6 +551,17 @@ impl ProjectStateStore for FileProjectStateStore {
                 .unwrap_or_else(|| "unknown".to_string());
             *reporter_stats
                 .entry(reporter)
+                .or_default()
+                .entry(gap.gap.status.clone())
+                .or_default() += 1;
+            let assignee = gap
+                .gap
+                .assignee
+                .clone()
+                .filter(|assignee| !assignee.is_empty())
+                .unwrap_or_else(|| "unassigned".to_string());
+            *assignee_stats
+                .entry(assignee)
                 .or_default()
                 .entry(gap.gap.status.clone())
                 .or_default() += 1;
@@ -570,6 +589,7 @@ impl ProjectStateStore for FileProjectStateStore {
                 all_node_status_counts,
                 current_node_status_counts,
                 reporter_stats,
+                assignee_stats,
                 attention_indicators,
                 recent_activity_ids,
             },

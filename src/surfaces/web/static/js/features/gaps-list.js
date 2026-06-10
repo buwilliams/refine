@@ -2,7 +2,7 @@
 
 const GAPS_DEFAULT_DIR = {
   name: "asc", status: "asc", priority: "asc",
-  reporter: "asc", rounds: "asc", node: "asc", updated: "desc", id: "desc",
+  reporter: "asc", assignee: "asc", rounds: "asc", node: "asc", updated: "desc", id: "desc",
 };
 
 // Mirror Logs' entries-limit dropdown so the two screens feel consistent.
@@ -14,6 +14,7 @@ function gapsHash(parts) {
   if (parts.q)        next.set("q", parts.q);
   if (parts.status)   next.set("status", parts.status);
   if (parts.reporter) next.set("reporter", parts.reporter);
+  if (parts.assignee) next.set("assignee", parts.assignee);
   if (parts.feature)  next.set("feature", parts.feature);
   if (parts.rounds_gte !== undefined && parts.rounds_gte !== "") {
     next.set("rounds_gte", parts.rounds_gte);
@@ -78,6 +79,13 @@ async function renderGapsList() {
           ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
             ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
         </select>
+        <select id="filter-assignee" data-testid="gaps-assignee-filter">
+          <option value="" ${f.assignee === "" ? "selected" : ""}>all assignees</option>
+          ${(state.reporters || []).map((r) =>
+            `<option value="${htmlEscape(r.name)}" ${r.name === f.assignee ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
+          ${f.assignee && !(state.reporters || []).some((r) => r.name === f.assignee)
+            ? `<option value="${htmlEscape(f.assignee)}" selected>${htmlEscape(f.assignee)}</option>` : ""}
+        </select>
         <select id="filter-node" data-testid="gaps-node-filter">
           <option value="all" ${f.node === "" || f.node === "all" ? "selected" : ""}>all nodes</option>
           <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
@@ -118,6 +126,7 @@ async function renderGapsList() {
         <button class="secondary small" id="bulk-set-status" data-testid="gaps-bulk-status">Status…</button>
         <button class="secondary small" id="bulk-set-priority" data-testid="gaps-bulk-priority">Priority…</button>
         <button class="secondary small" id="bulk-set-reporter" data-testid="gaps-bulk-reporter">Reporter…</button>
+        <button class="secondary small" id="bulk-set-assignee" data-testid="gaps-bulk-assignee">Assignee…</button>
         <button class="secondary small" id="bulk-assign-feature" data-testid="gaps-bulk-feature">Feature…</button>
         <button class="secondary small" id="bulk-transfer-node" data-testid="gaps-bulk-transfer-node">Node…</button>
         <button class="secondary small" id="bulk-delete" data-testid="gaps-bulk-delete">Delete…</button>
@@ -140,6 +149,8 @@ async function renderGapsList() {
     updateGapsFilter({ status: e.target.value, page: 1 }));
   $("#filter-reporter").addEventListener("change", (e) =>
     updateGapsFilter({ reporter: e.target.value, page: 1 }));
+  $("#filter-assignee").addEventListener("change", (e) =>
+    updateGapsFilter({ assignee: e.target.value, page: 1 }));
   $("#filter-feature").addEventListener("input", debounce((e) =>
     updateGapsFilter({ feature: e.target.value.trim(), page: 1 }), 250));
   $("#filter-node").addEventListener("change", (e) =>
@@ -168,6 +179,7 @@ async function renderGapsList() {
   bindCommand("#bulk-set-priority", "gaps.bulk.priority");
   bindCommand("#bulk-set-status", "gaps.bulk.status");
   bindCommand("#bulk-set-reporter", "gaps.bulk.reporter");
+  bindCommand("#bulk-set-assignee", "gaps.bulk.assignee");
   bindCommand("#bulk-assign-feature", "gaps.bulk.feature");
   bindCommand("#bulk-transfer-node", "gaps.bulk.transfer_node");
   bindCommand("#bulk-delete", "gaps.bulk.delete");
@@ -210,6 +222,7 @@ function gapsFilterFromHash() {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
     reporter: hashQs.get("reporter") || "",
+    assignee: hashQs.get("assignee") || "",
     feature: hashQs.get("feature") || "",
     rounds_gte: hashQs.get("rounds_gte") || "",
     rounds_lte: hashQs.get("rounds_lte") || "",
@@ -234,6 +247,7 @@ function updateGapsFilter(patch) {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
     reporter: "reporter" in patch ? patch.reporter : current.reporter,
+    assignee: "assignee" in patch ? patch.assignee : current.assignee,
     feature: "feature" in patch ? patch.feature : current.feature,
     rounds_gte: "rounds_gte" in patch ? patch.rounds_gte : current.rounds_gte,
     rounds_lte: "rounds_lte" in patch ? patch.rounds_lte : current.rounds_lte,
@@ -255,6 +269,7 @@ function gapsWorkflowStatusHash(status, filter = gapsFilterFromHash()) {
     q: filter.q,
     status,
     reporter: filter.reporter,
+    assignee: filter.assignee,
     feature: filter.feature,
     rounds_gte: filter.rounds_gte,
     rounds_lte: filter.rounds_lte,
@@ -287,6 +302,7 @@ async function refreshGapsTable() {
   if (f.status) params.set("status", f.status);
   if (f.q) params.set("q", f.q);
   if (f.reporter) params.set("reporter", f.reporter);
+  if (f.assignee) params.set("assignee", f.assignee);
   if (f.feature) params.set("feature", f.feature);
   if (f.rounds_gte) params.set("rounds_gte", f.rounds_gte);
   if (f.rounds_lte) params.set("rounds_lte", f.rounds_lte);
@@ -326,6 +342,7 @@ async function refreshGapsTable() {
     applyGapsFilterIndicator(f);
     const renderState = {
       q: f.q, status: f.status, feature: f.feature,
+      assignee: f.assignee,
       rounds_gte: f.rounds_gte, rounds_lte: f.rounds_lte,
       sort: f.effectiveSort, dir: f.effectiveDir,
       page: data.page || {
@@ -408,6 +425,7 @@ function drawGapsTable(gaps, state) {
     { key: "status",   label: "Status",   sortable: true },
     { key: "priority", label: "Priority", sortable: true },
     { key: "reporter", label: "Reporter", sortable: true },
+    { key: "assignee", label: "Assignee", sortable: true },
     { key: "feature", label: "Feature", sortable: false },
     { key: "node", label: "Node", sortable: true },
     { key: "updated",  label: "Updated",  sortable: true },
@@ -441,6 +459,7 @@ function drawGapsTable(gaps, state) {
         <col class="gaps-col-status">
         <col class="gaps-col-priority">
         <col class="gaps-col-reporter">
+        <col class="gaps-col-assignee">
         <col class="gaps-col-feature">
         <col class="gaps-col-node">
         <col class="gaps-col-updated">
@@ -464,6 +483,7 @@ function drawGapsTable(gaps, state) {
             <td class="gaps-status-cell" data-label="Status"><span class="status-pill ${g.status}">${workflowStatusLabel(g.status)}</span></td>
             <td data-label="Priority"><span class="priority-pill priority-${g.priority || "low"}">${g.priority || "low"}</span></td>
             <td class="muted small" data-label="Reporter">${g.reporter ? htmlEscape(g.reporter) : "—"}</td>
+            <td class="muted small" data-label="Assignee">${g.assignee ? htmlEscape(g.assignee) : "—"}</td>
             <td class="muted small" data-label="Feature">${renderGapFeatureCell(g)}</td>
             <td class="muted small" data-label="Node">${htmlEscape(g.node_display_name || g.node_id || "Unknown")}</td>
             <td class="muted small" data-label="Updated">${fmtTime(g.updated)}</td>

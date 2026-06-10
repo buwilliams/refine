@@ -4,7 +4,7 @@ const FEATURES_DEFAULT_LIMIT = 50;
 const FEATURES_LIMIT_OPTIONS = [50, 100, 250, 500, 1000];
 const FEATURE_MODAL_GAP_PAGE_SIZE = 25;
 const FEATURES_DEFAULT_DIR = {
-  name: "asc", status: "asc", reporter: "asc", node: "asc", updated: "desc",
+  name: "asc", status: "asc", reporter: "asc", assignee: "asc", node: "asc", updated: "desc",
 };
 const FEATURES_STATUS_OPTIONS = [
   "", "backlog", "todo", "in-progress", "qa", "ready-merge",
@@ -21,6 +21,7 @@ function featuresHash(parts) {
   if (parts.q) next.set("q", parts.q);
   if (parts.status) next.set("status", parts.status);
   if (parts.reporter) next.set("reporter", parts.reporter);
+  if (parts.assignee) next.set("assignee", parts.assignee);
   if (parts.node) next.set("node", parts.node);
   if (parts.limit && parts.limit !== FEATURES_DEFAULT_LIMIT) next.set("limit", String(parts.limit));
   if (parts.page && parts.page > 1) next.set("page", String(parts.page));
@@ -39,6 +40,7 @@ function featuresFilterFromHash() {
     q: hashQs.get("q") || "",
     status: hashQs.get("status") || "",
     reporter: hashQs.get("reporter") || "",
+    assignee: hashQs.get("assignee") || "",
     node: hashQs.get("node") || "",
     limit: parseInt(hashQs.get("limit") || String(FEATURES_DEFAULT_LIMIT), 10)
            || FEATURES_DEFAULT_LIMIT,
@@ -81,6 +83,13 @@ async function renderFeaturesList() {
               ${f.reporter && !(state.reporters || []).some((r) => r.name === f.reporter)
                 ? `<option value="${htmlEscape(f.reporter)}" selected>${htmlEscape(f.reporter)}</option>` : ""}
             </select>
+            <select id="features-assignee" data-testid="features-assignee-filter">
+              <option value="" ${f.assignee === "" ? "selected" : ""}>all assignees</option>
+              ${(state.reporters || []).map((r) =>
+                `<option value="${htmlEscape(r.name)}" ${r.name === f.assignee ? "selected" : ""}>${htmlEscape(r.name)}</option>`).join("")}
+              ${f.assignee && !(state.reporters || []).some((r) => r.name === f.assignee)
+                ? `<option value="${htmlEscape(f.assignee)}" selected>${htmlEscape(f.assignee)}</option>` : ""}
+            </select>
             <select id="features-node" data-testid="features-node-filter">
               <option value="" ${f.node === "" ? "selected" : ""}>all nodes</option>
               <option value="current" ${f.node === "current" ? "selected" : ""}>current node</option>
@@ -92,6 +101,7 @@ async function renderFeaturesList() {
                 `<option value="${n}" ${n === f.limit ? "selected" : ""}>${n} entries</option>`).join("")}
             </select>
             <span class="spacer"></span>
+            <button class="secondary" id="features-bulk-assignee" data-testid="features-bulk-assignee">Assignee…</button>
             <button class="secondary" id="features-clear" data-testid="features-clear-filters">Clear filters</button>
           </div>
         </div>
@@ -105,6 +115,8 @@ async function renderFeaturesList() {
     updateFeaturesFilter({ status: e.target.value, page: 1 }));
   $("#features-reporter")?.addEventListener("change", (e) =>
     updateFeaturesFilter({ reporter: e.target.value, page: 1 }));
+  $("#features-assignee")?.addEventListener("change", (e) =>
+    updateFeaturesFilter({ assignee: e.target.value, page: 1 }));
   $("#features-node")?.addEventListener("change", (e) =>
     updateFeaturesFilter({ node: e.target.value, page: 1 }));
   $("#features-limit")?.addEventListener("change", (e) =>
@@ -113,6 +125,7 @@ async function renderFeaturesList() {
     history.replaceState(null, "", "#/features");
     renderFeaturesList();
   });
+  $("#features-bulk-assignee")?.addEventListener("click", () => openFeatureBulkAssigneeModal());
   await refreshFeaturesTable();
 }
 
@@ -122,6 +135,7 @@ function updateFeaturesFilter(patch) {
     q: "q" in patch ? patch.q : current.q,
     status: "status" in patch ? patch.status : current.status,
     reporter: "reporter" in patch ? patch.reporter : current.reporter,
+    assignee: "assignee" in patch ? patch.assignee : current.assignee,
     node: "node" in patch ? patch.node : current.node,
     limit: "limit" in patch ? patch.limit : current.limit,
     page: "page" in patch ? patch.page : current.page,
@@ -137,7 +151,7 @@ async function refreshFeaturesTable() {
   const f = featuresFilterFromHash();
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries({
-    q: f.q, status: f.status, reporter: f.reporter, node: f.node,
+    q: f.q, status: f.status, reporter: f.reporter, assignee: f.assignee, node: f.node,
     limit: f.limit, offset: (f.page - 1) * f.limit,
     sort: f.sort, dir: f.dir,
   })) {
@@ -153,7 +167,7 @@ function drawFeaturesTable(features, stateForRender) {
   const total = page.total ?? ((page.offset || 0) + features.length + (page.has_more ? 1 : 0));
   $("#features-count").textContent = `${total} feature${total === 1 ? "" : "s"}`;
   $("#features-filtered").hidden = !(
-    stateForRender.q || stateForRender.status || stateForRender.reporter || stateForRender.node
+    stateForRender.q || stateForRender.status || stateForRender.reporter || stateForRender.assignee || stateForRender.node
   );
   if (!features.length) {
     root.innerHTML = `
@@ -172,11 +186,12 @@ function drawFeaturesTable(features, stateForRender) {
       <td data-label="Progress">${feature.done_count || 0} / ${feature.gap_count || 0} done</td>
       <td data-label="Next">${feature.next_gap ? htmlEscape(feature.next_gap.name || feature.next_gap.id) : '<span class="muted small">-</span>'}</td>
       <td class="muted small" data-label="Reporter">${htmlEscape(feature.reporter || "-")}</td>
+      <td class="muted small" data-label="Assignee">${htmlEscape(feature.assignee || "-")}</td>
       <td class="muted small" data-label="Node">${htmlEscape(feature.node_display_name || feature.node_id || "-")}</td>
       <td class="muted small" data-label="Updated">${fmtTime(feature.updated)}</td>
     </tr>`;
   }).join("") : `
-    <tr><td colspan="7" class="muted">No Features match the current filters.</td></tr>`;
+    <tr><td colspan="8" class="muted">No Features match the current filters.</td></tr>`;
   root.innerHTML = `
     <div class="table-scroll">
       <table class="table features-table mobile-card-table">
@@ -186,6 +201,7 @@ function drawFeaturesTable(features, stateForRender) {
           <col class="features-col-progress">
           <col class="features-col-next">
           <col class="features-col-reporter">
+          <col class="features-col-assignee">
           <col class="features-col-node">
           <col class="features-col-updated">
         </colgroup>
@@ -195,6 +211,7 @@ function drawFeaturesTable(features, stateForRender) {
           <th>Progress</th>
           <th>Current / next Gap</th>
           ${featureSortHeader("reporter", "Reporter", stateForRender)}
+          ${featureSortHeader("assignee", "Assignee", stateForRender)}
           ${featureSortHeader("node", "Node", stateForRender)}
           ${featureSortHeader("updated", "Updated", stateForRender)}
         </tr></thead>
@@ -247,6 +264,61 @@ function featureSortHeader(key, label, stateForRender) {
   </th>`;
 }
 
+function featureBulkFilterFromHash() {
+  const f = featuresFilterFromHash();
+  const filter = {};
+  for (const key of ["status", "q", "reporter", "assignee", "node"]) {
+    if (f[key]) filter[key] = f[key];
+  }
+  return filter;
+}
+
+async function openFeatureBulkAssigneeModal() {
+  const filter = featureBulkFilterFromHash();
+  const filterDesc = describeFeatureFilter(filter);
+  const opts = (state.reporters || [])
+    .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
+    .join("");
+  const body = () => `
+    <div class="modal-title">Bulk set assignee</div>
+    <div class="modal-body">
+      <div class="muted small" style="margin-bottom:8px">
+        Applies to ${htmlEscape(filterDesc)}.
+      </div>
+      <label for="feature-bulk-assignee-value">New assignee</label>
+      <select class="modal-input" id="feature-bulk-assignee-value" data-testid="feature-bulk-assignee-value" style="width:100%">
+        <option value="">— pick assignee —</option>
+        ${opts}
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="secondary" data-cancel data-testid="feature-bulk-assignee-cancel">Cancel</button>
+      <button data-ok data-testid="feature-bulk-assignee-apply">Apply</button>
+    </div>`;
+  const assignee = await _openModal(body, { cancel: null, ok: "" }, ".modal-input");
+  if (assignee === null || !assignee) return;
+  try {
+    const r = await api("POST", "/api/features/bulk", {
+      filter,
+      update: { assignee },
+    });
+    toast(`Updated ${r.updated} feature${r.updated === 1 ? "" : "s"}`, "info");
+    await refreshFeaturesTable();
+  } catch (e) {
+    await showActionError(e, "Feature bulk update failed");
+  }
+}
+
+function describeFeatureFilter(filter) {
+  const parts = [];
+  if (filter.status) parts.push(`status=${filter.status}`);
+  if (filter.reporter) parts.push(`reporter=${filter.reporter}`);
+  if (filter.assignee) parts.push(`assignee=${filter.assignee}`);
+  if (filter.node && filter.node !== "all") parts.push(`node=${filter.node}`);
+  if (filter.q) parts.push(`q="${filter.q}"`);
+  return parts.length ? parts.join(", ") : "all features";
+}
+
 async function renderFeatureDetail(route) {
   if (renderNoProjectIfDetached("Features")) return;
   openFeatureDetailModal(route.id);
@@ -289,6 +361,7 @@ function renderFeatureGapTable(gaps, options = {}) {
       <td data-label="Status"><span class="status-pill ${htmlEscape(gap.status || "backlog")}" data-testid="feature-gap-status">${workflowStatusLabel(gap.status || "backlog")}</span></td>
       <td data-label="Priority" data-testid="feature-gap-priority">${htmlEscape(gap.priority || "low")}</td>
       <td data-label="Reporter" data-testid="feature-gap-reporter">${htmlEscape(gap.reporter || "-")}</td>
+      <td data-label="Assignee" data-testid="feature-gap-assignee">${htmlEscape(gap.assignee || "-")}</td>
       <td data-label="Updated" data-testid="feature-gap-updated">${fmtTime(gap.updated)}</td>
       ${actions ? `<td data-label="Actions">
         <div class="actions compact-actions">
@@ -314,11 +387,11 @@ function renderFeatureGapTable(gaps, options = {}) {
       </td>` : ""}
     </tr>`;
   }).join("") : `
-    <tr><td colspan="${actions ? 8 : 6}" class="muted">No Gaps are assigned to this Feature.</td></tr>`;
+    <tr><td colspan="${actions ? 9 : 7}" class="muted">No Gaps are assigned to this Feature.</td></tr>`;
   return `
     <div class="table-scroll">
       <table class="table feature-gaps-table mobile-card-table">
-        <thead><tr>${actions ? '<th class="feature-gap-drag-col"></th>' : ""}<th>Order</th><th>Gap</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Updated</th>${actions ? "<th>Actions</th>" : ""}</tr></thead>
+        <thead><tr>${actions ? '<th class="feature-gap-drag-col"></th>' : ""}<th>Order</th><th>Gap</th><th>Status</th><th>Priority</th><th>Reporter</th><th>Assignee</th><th>Updated</th>${actions ? "<th>Actions</th>" : ""}</tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
@@ -409,6 +482,14 @@ function openFeatureModal(feature = null, options = {}) {
   const nodeOwnerTitle = feature?.node_id
     ? `Node owner: ${nodeDisplayName} (${feature.node_id})`
     : `Node owner: ${nodeDisplayName}`;
+  const reporterOptions = (state.reporters || [])
+    .map((r) => `<option value="${htmlEscape(r.name)}">${htmlEscape(r.name)}</option>`)
+    .join("");
+  const featureAssignee = feature?.assignee || state.lastReporter || "";
+  const missingFeatureAssignee = featureAssignee
+    && !(state.reporters || []).some((r) => r.name === featureAssignee)
+    ? `<option value="${htmlEscape(featureAssignee)}">${htmlEscape(featureAssignee)}</option>`
+    : "";
   root.innerHTML = `
     <div class="modal feature-modal ${feature ? "feature-detail-modal" : "feature-create-modal"}" role="dialog" aria-modal="true" aria-labelledby="feature-modal-title" data-testid="${feature ? "feature-detail-modal" : "feature-create-modal"}">
       <button class="modal-close" type="button" aria-label="Close" data-testid="feature-modal-close">×</button>
@@ -443,6 +524,12 @@ function openFeatureModal(feature = null, options = {}) {
         <input type="text" id="feature-name" class="modal-input" data-testid="feature-name" value="${htmlEscape(feature?.name || "")}">
         <label>Description</label>
         <textarea id="feature-description" data-testid="feature-description">${htmlEscape(feature?.description || "")}</textarea>
+        <label>Assignee</label>
+        <select id="feature-assignee" class="modal-input" data-testid="feature-assignee">
+          <option value="">— pick assignee —</option>
+          ${missingFeatureAssignee}
+          ${reporterOptions}
+        </select>
         ${feature ? `<div class="feature-modal-gap-heading">
           <div class="modal-title compact">Ordered Gaps</div>
           <div class="actions feature-gap-heading-actions">
@@ -476,12 +563,15 @@ function openFeatureModal(feature = null, options = {}) {
   if (feature) {
     bindFeatureAutosave(root, feature);
   } else {
+    const assigneeSelect = root.querySelector("#feature-assignee");
+    if (assigneeSelect) assigneeSelect.value = featureAssignee;
     root.querySelector("[data-cancel]")?.addEventListener("click", close);
     root.querySelector("[data-ok]")?.addEventListener("click", async () => {
       const body = {
         name: root.querySelector("#feature-name")?.value.trim() || "",
         description: root.querySelector("#feature-description")?.value.trim() || "",
         reporter: state.lastReporter || "",
+        assignee: root.querySelector("#feature-assignee")?.value.trim() || state.lastReporter || "",
       };
       if (!body.name) {
         toast("Feature name is required", "error");
@@ -498,6 +588,8 @@ function openFeatureModal(feature = null, options = {}) {
     });
   }
   if (feature) {
+    const assigneeSelect = root.querySelector("#feature-assignee");
+    if (assigneeSelect) assigneeSelect.value = feature.assignee || "";
     const reloadModal = async () => {
       const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
       openFeatureModal(data.feature, { gapPage, navigateAway });
@@ -533,27 +625,32 @@ function bindFeatureAutosave(root, feature) {
   const controls = [
     root.querySelector("#feature-name"),
     root.querySelector("#feature-description"),
+    root.querySelector("#feature-assignee"),
   ].filter(Boolean);
   const saved = {
     name: feature.name || "",
     description: feature.description || "",
+    assignee: feature.assignee || "",
   };
   let inFlight = false;
   let pending = false;
   const restoreSaved = () => {
     const name = root.querySelector("#feature-name");
     const description = root.querySelector("#feature-description");
+    const assignee = root.querySelector("#feature-assignee");
     if (name) name.value = saved.name;
     if (description) description.value = saved.description;
+    if (assignee) assignee.value = saved.assignee;
   };
   const currentBody = () => ({
     name: root.querySelector("#feature-name")?.value.trim() || "",
     description: root.querySelector("#feature-description")?.value.trim() || "",
     reporter: feature.reporter || "",
+    assignee: root.querySelector("#feature-assignee")?.value.trim() || "",
   });
   const currentDiffersFromSaved = () => {
     const body = currentBody();
-    return body.name !== saved.name || body.description !== saved.description;
+    return body.name !== saved.name || body.description !== saved.description || body.assignee !== saved.assignee;
   };
   const save = async () => {
     if (inFlight) {
@@ -566,13 +663,14 @@ function bindFeatureAutosave(root, feature) {
       restoreSaved();
       return;
     }
-    if (body.name === saved.name && body.description === saved.description) return;
+    if (body.name === saved.name && body.description === saved.description && body.assignee === saved.assignee) return;
     inFlight = true;
     try {
       const result = await api("PATCH", `/api/features/${encodeURIComponent(feature.id)}`, body);
       const updated = result.feature || {};
       saved.name = updated.name || body.name;
       saved.description = updated.description || body.description;
+      saved.assignee = updated.assignee || body.assignee;
       if (state.currentRoute === "features") await refreshFeaturesTable();
     } catch (e) {
       restoreSaved();

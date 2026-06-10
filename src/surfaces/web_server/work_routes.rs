@@ -18,7 +18,9 @@ use crate::core::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
-use crate::core::product::work_items::{BulkGapSelection, FileWorkItemService};
+use crate::core::product::work_items::{
+    BulkFeatureSelection, BulkGapSelection, FileWorkItemService,
+};
 use crate::core::supervisor::config::{ConfigService, FileSettingsService};
 use crate::core::supervisor::errors::RefineError;
 use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
@@ -202,6 +204,7 @@ fn persist_import_draft_with_duplicate_decision(
                                 &duplicate_id,
                                 None,
                                 Some(&draft.priority),
+                                draft.assignee.as_deref().or(Some(&draft.reporter)),
                             )?;
                         } else {
                             let actual = (decision == "update_original_actual")
@@ -241,8 +244,14 @@ fn persist_import_draft_with_duplicate_decision(
             &draft.target,
         )?;
     }
-    if gap.gap.priority.as_str() != draft.priority {
-        service.update_gap_metadata_summary(&gap.gap.id, None, Some(&draft.priority))?;
+    let assignee = draft.assignee.as_deref().or(Some(&draft.reporter));
+    if gap.gap.priority.as_str() != draft.priority || assignee.is_some() {
+        service.update_gap_metadata_summary(
+            &gap.gap.id,
+            None,
+            (gap.gap.priority.as_str() != draft.priority).then_some(draft.priority.as_str()),
+            assignee,
+        )?;
     }
     if let Some(feature_id) = feature_id {
         service.assign_gap_to_feature(feature_id, &gap.gap.id)?;
@@ -782,6 +791,12 @@ impl InProcessWebServer {
             .and_then(|reporter| reporter.as_str())
             .unwrap_or("")
             .trim();
+        let assignee = body
+            .and_then(|body| body.get("assignee"))
+            .and_then(|assignee| assignee.as_str())
+            .map(str::trim)
+            .filter(|assignee| !assignee.is_empty())
+            .unwrap_or(reporter);
         let priority = body
             .and_then(|body| body.get("priority"))
             .and_then(|priority| priority.as_str())
@@ -900,8 +915,13 @@ impl InProcessWebServer {
             Ok(gap) => gap,
             Err(error) => return error_response(error),
         };
-        if priority != "low" {
-            match service.update_gap_metadata_summary(&gap.gap.id, None, Some(priority)) {
+        if priority != "low" || !assignee.is_empty() {
+            match service.update_gap_metadata_summary(
+                &gap.gap.id,
+                None,
+                (priority != "low").then_some(priority),
+                (!assignee.is_empty()).then_some(assignee),
+            ) {
                 Ok(updated) => gap = updated,
                 Err(error) => return error_response(error),
             }
@@ -1000,11 +1020,17 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("reporter"))
             .and_then(|reporter| reporter.as_str());
+        let assignee = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("assignee"))
+            .and_then(|assignee| assignee.as_str());
         match self.work_item_service(durable_root).create_feature_summary(
             name,
             id,
             description,
             reporter,
+            assignee,
         ) {
             Ok(feature) => ApiResponse::json(
                 201,
@@ -1031,6 +1057,7 @@ impl InProcessWebServer {
                 body.get("name").and_then(|value| value.as_str()),
                 body.get("description").and_then(|value| value.as_str()),
                 body.get("reporter").and_then(|value| value.as_str()),
+                body.get("assignee").and_then(|value| value.as_str()),
             ) {
             Ok(feature) => ApiResponse::json(
                 200,
@@ -1040,6 +1067,38 @@ impl InProcessWebServer {
                     "rollup": feature.rollup
                 }),
             ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_feature_bulk_update(&self, request: ApiRequest) -> ApiResponse {
+        let durable_root = require_durable_root!(self, "bulk update features");
+        let Some(body) = request.body.as_ref() else {
+            return invalid_bulk_body();
+        };
+        let selection = match serde_json::from_value::<BulkFeatureSelection>(body.clone()) {
+            Ok(selection) => selection,
+            Err(_) => return invalid_bulk_body(),
+        };
+        let Some(assignee) = body
+            .get("update")
+            .and_then(Value::as_object)
+            .and_then(|update| {
+                if update.len() == 1 {
+                    update.get("assignee")
+                } else {
+                    None
+                }
+            })
+            .and_then(Value::as_str)
+        else {
+            return invalid_bulk_body();
+        };
+        match self
+            .work_item_service(durable_root)
+            .bulk_update_features(selection, assignee)
+        {
+            Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
     }
@@ -1089,6 +1148,11 @@ impl InProcessWebServer {
             .as_ref()
             .and_then(|body| body.get("priority"))
             .and_then(|priority| priority.as_str());
+        let assignee = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("assignee"))
+            .and_then(|assignee| assignee.as_str());
         let notes = match request.body.as_ref().and_then(|body| body.get("notes")) {
             Some(Value::Array(notes)) => Some(notes.clone()),
             Some(_) => {
@@ -1137,8 +1201,8 @@ impl InProcessWebServer {
                 Err(error) => return error_response(error),
             },
         };
-        if name.is_some() || priority.is_some() {
-            match service.update_gap_metadata_summary(gap_id, name, priority) {
+        if name.is_some() || priority.is_some() || assignee.is_some() {
+            match service.update_gap_metadata_summary(gap_id, name, priority, assignee) {
                 Ok(updated) => gap = updated,
                 Err(error) => return error_response(error),
             }
@@ -1757,6 +1821,7 @@ impl InProcessWebServer {
             q: query_param(raw_path, "q"),
             status: query_param(raw_path, "status").and_then(|value| GapStatus::parse_wire(&value)),
             reporter: query_param(raw_path, "reporter"),
+            assignee: query_param(raw_path, "assignee"),
             node: query_param(raw_path, "node"),
             current_node_id: Some(current_node_id),
             feature: query_param(raw_path, "feature"),
@@ -1855,6 +1920,7 @@ impl InProcessWebServer {
             q: query_param(raw_path, "q"),
             status: query_param(raw_path, "status").and_then(|value| GapStatus::parse_wire(&value)),
             reporter: query_param(raw_path, "reporter"),
+            assignee: query_param(raw_path, "assignee"),
             node: query_param(raw_path, "node"),
             current_node_id: Some(current_node_id),
         };
@@ -2031,6 +2097,7 @@ impl InProcessWebServer {
                     "name": change.gap_name,
                     "status": change.gap_status,
                     "priority": change.gap_priority,
+                    "assignee": change.gap_assignee,
                     "committed": change.committed_time,
                     "subject": change.subject,
                     "branch": change.branch

@@ -34,6 +34,11 @@ pub(in crate::surfaces::web_server) fn import_destination_feature_id(
                 body.get("feature_reporter")
                     .or_else(|| body.get("reporter"))
                     .and_then(|value| value.as_str()),
+                body.get("feature_assignee")
+                    .or_else(|| body.get("assignee"))
+                    .or_else(|| body.get("feature_reporter"))
+                    .or_else(|| body.get("reporter"))
+                    .and_then(|value| value.as_str()),
             )
             .map(Some);
     }
@@ -148,9 +153,12 @@ pub(in crate::surfaces::web_server) fn parse_bulk_gap_update(
     body: &serde_json::Value,
 ) -> Option<BulkGapUpdate> {
     let update = body.get("update")?.as_object()?;
-    let mut entries = update
-        .iter()
-        .filter(|(key, _)| matches!(key.as_str(), "priority" | "status" | "reporter"));
+    let mut entries = update.iter().filter(|(key, _)| {
+        matches!(
+            key.as_str(),
+            "priority" | "status" | "reporter" | "assignee"
+        )
+    });
     let (field, value) = entries.next()?;
     if entries.next().is_some() {
         return None;
@@ -160,6 +168,7 @@ pub(in crate::surfaces::web_server) fn parse_bulk_gap_update(
         "priority" => Some(BulkGapUpdate::Priority(value)),
         "status" => Some(BulkGapUpdate::Status(value)),
         "reporter" => Some(BulkGapUpdate::Reporter(value)),
+        "assignee" => Some(BulkGapUpdate::Assignee(value)),
         _ => None,
     }
 }

@@ -67,10 +67,11 @@ fn file_work_item_service_edits_notes_and_deletes_gap_json() {
         .unwrap();
 
     let edited = service
-        .update_gap_metadata_summary("GAP1", Some("Renamed"), Some("high"))
+        .update_gap_metadata_summary("GAP1", Some("Renamed"), Some("high"), Some("Reviewer"))
         .unwrap();
     assert_eq!(edited.gap.name, "Renamed");
     assert_eq!(edited.gap.priority, GapPriority::High);
+    assert_eq!(edited.gap.assignee.as_deref(), Some("Reviewer"));
 
     service
         .add_gap_note_summary("GAP1", "Reviewer", "Needs a note")
@@ -119,9 +120,16 @@ fn file_work_item_service_creates_features_and_updates_gap_membership() {
     service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
 
     let feature = service
-        .create_feature_summary("Feature A", Some("FEA1"), Some("desc"), Some("Reporter"))
+        .create_feature_summary(
+            "Feature A",
+            Some("FEA1"),
+            Some("desc"),
+            Some("Reporter"),
+            Some("Reviewer"),
+        )
         .unwrap();
     assert_eq!(feature.feature.id, "FEA1");
+    assert_eq!(feature.feature.assignee.as_deref(), Some("Reviewer"));
     assert!(durable_root.join("features/FE/A1/feature.json").exists());
 
     let feature = service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
@@ -152,7 +160,7 @@ fn file_work_item_service_reorders_and_moves_feature_workflow() {
     service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
     service.create_gap_summary("Gap C", Some("GAP3")).unwrap();
     service
-        .create_feature_summary("Feature A", Some("FEA1"), None, None)
+        .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
     service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
     service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
@@ -188,7 +196,7 @@ fn file_work_item_service_cancels_and_deletes_features_through_gap_paths() {
         service.create_gap_summary(name, Some(id)).unwrap();
     }
     service
-        .create_feature_summary("Feature A", Some("FEA1"), None, None)
+        .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
         .unwrap();
     for gap_id in ["GAP1", "GAP2", "GAP3"] {
         service.assign_gap_to_feature("FEA1", gap_id).unwrap();
@@ -303,9 +311,48 @@ fn file_work_item_service_bulk_updates_deletes_and_assigns_gaps() {
     let written = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(written.contains("\"reporter\": \"Reviewer\""));
 
-    service
-        .create_feature_summary("Bulk Feature", Some("FEA1"), None, None)
+    let assignee_result = service
+        .bulk_update_gaps(
+            BulkGapSelection {
+                selected_ids: Some(vec!["GAP1".to_string(), "GAP2".to_string()]),
+                ..Default::default()
+            },
+            BulkGapUpdate::Assignee("Assignee".to_string()),
+        )
         .unwrap();
+    assert_eq!(assignee_result.updated, 2);
+    assert_eq!(
+        service
+            .show_gap_summary("GAP1")
+            .unwrap()
+            .gap
+            .assignee
+            .as_deref(),
+        Some("Assignee")
+    );
+
+    service
+        .create_feature_summary("Bulk Feature", Some("FEA1"), None, None, None)
+        .unwrap();
+    let feature_assignee_result = service
+        .bulk_update_features(
+            BulkFeatureSelection {
+                selected_ids: Some(vec!["FEA1".to_string()]),
+                ..Default::default()
+            },
+            "Feature Reviewer",
+        )
+        .unwrap();
+    assert_eq!(feature_assignee_result.updated, 1);
+    assert_eq!(
+        service
+            .show_feature_summary("FEA1")
+            .unwrap()
+            .feature
+            .assignee
+            .as_deref(),
+        Some("Feature Reviewer")
+    );
     let assign_result = service
         .bulk_assign_gaps_to_feature(
             "FEA1",
@@ -348,7 +395,7 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
         .unwrap();
     assert_eq!(local_gap.gap.node_id.as_deref(), Some("remote-node"));
     let local_feature = service
-        .create_feature_summary("Remote feature", Some("FEA1"), None, None)
+        .create_feature_summary("Remote feature", Some("FEA1"), None, None, None)
         .unwrap();
     assert_eq!(
         local_feature.feature.node_id.as_deref(),
@@ -357,14 +404,14 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
 
     nodes.activate("default").unwrap();
     let err = service
-        .update_gap_metadata_summary("GAP1", Some("Blocked"), None)
+        .update_gap_metadata_summary("GAP1", Some("Blocked"), None, None)
         .unwrap_err();
     assert_eq!(
         err.category(),
         crate::core::supervisor::errors::ErrorCategory::Conflict
     );
     let err = service
-        .update_feature_metadata_summary("FEA1", Some("Blocked"), None, None)
+        .update_feature_metadata_summary("FEA1", Some("Blocked"), None, None, None)
         .unwrap_err();
     assert_eq!(
         err.category(),
@@ -381,7 +428,7 @@ fn file_work_item_service_uses_active_node_and_rejects_foreign_mutations() {
         )
         .unwrap();
     let updated = service
-        .update_gap_metadata_summary("GAP1", Some("Default-owned"), None)
+        .update_gap_metadata_summary("GAP1", Some("Default-owned"), None, None)
         .unwrap();
     assert_eq!(updated.gap.name, "Default-owned");
 

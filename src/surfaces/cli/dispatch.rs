@@ -1096,6 +1096,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 &id,
                 name.as_deref(),
                 priority.as_deref(),
+                None,
             )?;
             println!(
                 "{}",
@@ -1370,6 +1371,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 id.as_deref(),
                 description.as_deref(),
                 reporter.as_deref(),
+                None,
             )?;
             println!(
                 "{}",
@@ -1397,6 +1399,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 name.as_deref(),
                 description.as_deref(),
                 reporter.as_deref(),
+                None,
             )?;
             println!(
                 "{}",

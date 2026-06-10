@@ -170,6 +170,14 @@ fn gap_matches(
     {
         return false;
     }
+    if query
+        .assignee
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .is_some_and(|assignee| gap.assignee.as_deref() != Some(assignee))
+    {
+        return false;
+    }
     if let Some(node) = query
         .node
         .as_deref()
@@ -236,6 +244,11 @@ fn gap_matches(
                 .reporter
                 .as_deref()
                 .map(|reporter| reporter.to_lowercase().contains(&q))
+                .unwrap_or(false)
+            && !gap
+                .assignee
+                .as_deref()
+                .map(|assignee| assignee.to_lowercase().contains(&q))
                 .unwrap_or(false)
         {
             return false;
@@ -432,6 +445,14 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
     {
         return false;
     }
+    if query
+        .assignee
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .is_some_and(|assignee| feature.assignee.as_deref() != Some(assignee))
+    {
+        return false;
+    }
     if let Some(node) = query
         .node
         .as_deref()
@@ -467,6 +488,11 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
                 .as_deref()
                 .map(|reporter| reporter.to_lowercase().contains(&q))
                 .unwrap_or(false)
+            && !feature
+                .assignee
+                .as_deref()
+                .map(|assignee| assignee.to_lowercase().contains(&q))
+                .unwrap_or(false)
         {
             return false;
         }
@@ -481,6 +507,7 @@ fn sort_gaps(rows: &mut [GapIndexProjection], sort: &str, dir: &str) {
             "status" => a.status.cmp(&b.status),
             "priority" => priority_rank(&a.priority).cmp(&priority_rank(&b.priority)),
             "reporter" => a.reporter.cmp(&b.reporter),
+            "assignee" => a.assignee.cmp(&b.assignee),
             "rounds" | "round_count" => a.round_count.cmp(&b.round_count),
             "node" => a.node_id.cmp(&b.node_id),
             "created" => a.created.cmp(&b.created),
@@ -502,6 +529,7 @@ fn sort_features(rows: &mut [FeatureSummaryProjection], sort: &str, dir: &str) {
             "name" => a.feature.name.cmp(&b.feature.name),
             "status" => a.status.cmp(&b.status),
             "reporter" => a.feature.reporter.cmp(&b.feature.reporter),
+            "assignee" => a.feature.assignee.cmp(&b.feature.assignee),
             "node" => a.feature.node_id.cmp(&b.feature.node_id),
             "created" => a.feature.created.cmp(&b.feature.created),
             "id" => a.feature.id.cmp(&b.feature.id),
@@ -545,6 +573,7 @@ fn sort_changes(rows: &mut [ChangeSummaryProjection], sort: &str, dir: &str) {
             "gap_id" | "gap" => a.gap_id.cmp(&b.gap_id),
             "status" => a.gap_status.cmp(&b.gap_status),
             "priority" => a.gap_priority.cmp(&b.gap_priority),
+            "assignee" => a.gap_assignee.cmp(&b.gap_assignee),
             _ => b
                 .order
                 .cmp(&a.order)

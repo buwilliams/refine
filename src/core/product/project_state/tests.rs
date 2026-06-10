@@ -97,6 +97,7 @@ fn projection_query_filters_sorts_and_pages_gaps_and_features() {
             name: "Auth work".to_string(),
             description: Some("OAuth fixes".to_string()),
             reporter: Some("Alice".to_string()),
+            assignee: Some("Alice".to_string()),
             node_id: Some("default".to_string()),
             created: "created".to_string(),
             updated: "updated".to_string(),
@@ -171,6 +172,7 @@ fn projection_query_filters_sorts_and_pages_gaps_and_features() {
     let features = snapshot.list_features(FeatureProjectionQuery {
         q: Some("oauth".to_string()),
         reporter: Some("Alice".to_string()),
+        assignee: None,
         status: Some(GapStatus::Todo),
         node: Some("current".to_string()),
         current_node_id: Some("default".to_string()),
@@ -530,6 +532,7 @@ fn gap_projection(id: &str, status: GapStatus, node_id: Option<&str>) -> GapSumm
             status,
             priority: GapPriority::Medium,
             reporter: None,
+            assignee: None,
             round_count: 0,
             created: "created".to_string(),
             updated: "updated".to_string(),

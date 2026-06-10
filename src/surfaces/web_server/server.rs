@@ -556,6 +556,10 @@ impl InProcessWebServer {
             return self.handle_feature_create(request);
         }
 
+        if request.method == "POST" && request.path == "/work/features/bulk" {
+            return self.handle_feature_bulk_update(request);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/work/features/")
             && request.path.ends_with("/gaps/bulk")

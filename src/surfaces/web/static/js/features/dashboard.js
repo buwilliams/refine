@@ -92,7 +92,7 @@ async function refreshDashboard() {
     const [d, reviews] = await Promise.all([
       dashboardApi("GET", `/api/dashboard?node=${nodeParam}`),
       reporter
-        ? dashboardApi("GET", "/api/gaps?status=review&reporter=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
+        ? dashboardApi("GET", "/api/gaps?status=review&assignee=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
         : Promise.resolve({ gaps: [] }),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
@@ -191,7 +191,7 @@ function drawDashboard(d, opts = {}) {
     ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card" data-testid="dashboard-review-panel"${reviewsShellOpen ? " open" : ""}>
       <summary data-testid="dashboard-review-summary">
-        <span class="filter-shell-title">Awaiting your review</span>
+        <span class="filter-shell-title">Awaiting your Review</span>
         ${reviewReporter ? `<span class="muted small">${htmlEscape(reviewReporter)}</span>` : ""}
         <span class="filter-pill" data-testid="dashboard-review-count">${fmtCount(reviewsForReporter.length)}</span>
         ${needsAttention.length ? `<span class="filter-pill">Needs attention</span>` : ""}
@@ -265,6 +265,8 @@ function drawDashboard(d, opts = {}) {
                 <th>Active</th>
                 <th>Done</th>
                 <th>Reported</th>
+                <th>Assigned</th>
+                <th>Review</th>
                 <th>Done / Reported</th>
               </tr></thead>
               <tbody>
@@ -277,6 +279,8 @@ function drawDashboard(d, opts = {}) {
                     <td>${fmtCount(s.active)}</td>
                     <td>${fmtCount(s.done)}</td>
                     <td>${fmtCount(s.reported)}</td>
+                    <td>${fmtCount(s.assigned || 0)}</td>
+                    <td>${fmtCount(s.assigned_review || 0)}</td>
                     <td><span class="metric-good">${s.completion_rate.toFixed(1)}%</span></td>
                   </tr>`).join("")}
               </tbody>

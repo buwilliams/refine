@@ -384,7 +384,10 @@ impl InProcessWebServer {
                 "preflight": preflight,
                 "activity": activity,
                 "runner_reachable": runner_reachable,
-                "reporter_stats": reporter_stats_rows(&projection.dashboard.reporter_stats),
+                "reporter_stats": reporter_stats_rows(
+                    &projection.dashboard.reporter_stats,
+                    &projection.dashboard.assignee_stats
+                ),
                 "node_scope": node_filter,
                 "node_filter": node_filter,
                 "quality_timing": self.quality_timing_setting(),
@@ -1476,10 +1479,26 @@ impl InProcessWebServer {
     }
 }
 
-fn reporter_stats_rows(stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>) -> Vec<Value> {
-    stats
+fn reporter_stats_rows(
+    reporter_stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>,
+    assignee_stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>,
+) -> Vec<Value> {
+    let mut names = reporter_stats
+        .keys()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    names.extend(
+        assignee_stats
+            .keys()
+            .filter(|name| name.as_str() != "unassigned")
+            .cloned(),
+    );
+    names
         .iter()
-        .map(|(reporter, counts)| {
+        .map(|reporter| {
+            let empty = BTreeMap::new();
+            let counts = reporter_stats.get(reporter).unwrap_or(&empty);
+            let assigned_counts = assignee_stats.get(reporter).unwrap_or(&empty);
             let reported = counts.values().copied().sum::<usize>();
             let done = counts.get(&GapStatus::Done).copied().unwrap_or_default();
             let cancelled = counts
@@ -1487,6 +1506,11 @@ fn reporter_stats_rows(stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>) -> 
                 .copied()
                 .unwrap_or_default();
             let active = reported.saturating_sub(done + cancelled);
+            let assigned = assigned_counts.values().copied().sum::<usize>();
+            let assigned_review = assigned_counts
+                .get(&GapStatus::Review)
+                .copied()
+                .unwrap_or_default();
             let completion_rate = if reported == 0 {
                 0.0
             } else {
@@ -1497,6 +1521,8 @@ fn reporter_stats_rows(stats: &BTreeMap<String, BTreeMap<GapStatus, usize>>) -> 
                 "active": active,
                 "done": done,
                 "reported": reported,
+                "assigned": assigned,
+                "assigned_review": assigned_review,
                 "completion_rate": completion_rate
             })
         })
