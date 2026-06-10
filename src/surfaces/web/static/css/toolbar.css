@@ -381,6 +381,17 @@ button.chat-activity-toggle:hover:not(:disabled) {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
+.chat-status-working {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 700;
+}
+.chat-status-pending-dots {
+  color: currentColor;
+  flex: 0 0 auto;
+}
 .chat-pending-dots {
   display: inline-flex;
   gap: 3px;

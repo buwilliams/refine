@@ -387,6 +387,7 @@ impl InProcessWebServer {
                 200,
                 json!({
                     "ok": true,
+                    "in_flight": session.in_flight || session.queue_dispatching,
                     "queued_messages": session.queued_messages
                 }),
             ),

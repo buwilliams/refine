@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant, UNIX_EPOCH};
@@ -412,15 +413,22 @@ fn collect_runtime_path_fingerprint(
     path: &Path,
     entries: &mut BTreeMap<String, RuntimePathFingerprint>,
 ) -> RefineResult<()> {
+    if is_transient_runtime_path(path) {
+        return Ok(());
+    }
     if !path.exists() {
         return Ok(());
     }
-    let metadata = fs::metadata(path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to stat runtime path {}: {error}",
-            path.display()
-        ))
-    })?;
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(RefineError::Io(format!(
+                "failed to stat runtime path {}: {error}",
+                path.display()
+            )));
+        }
+    };
     let relative = path
         .strip_prefix(runtime_root)
         .unwrap_or(path)
@@ -438,17 +446,75 @@ fn collect_runtime_path_fingerprint(
         },
     );
     if metadata.is_dir() {
-        for entry in fs::read_dir(path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to read runtime directory {}: {error}",
-                path.display()
-            ))
-        })? {
-            let entry = entry.map_err(|error| {
-                RefineError::Io(format!("failed to read runtime entry: {error}"))
-            })?;
+        let dir_entries = match fs::read_dir(path) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read runtime directory {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        for entry in dir_entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) if error.kind() == ErrorKind::NotFound => continue,
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to read runtime entry: {error}"
+                    )));
+                }
+            };
             collect_runtime_path_fingerprint(runtime_root, &entry.path(), entries)?;
         }
     }
     Ok(())
+}
+
+fn is_transient_runtime_path(path: &Path) -> bool {
+    let Some(file_name) = path.file_name().and_then(|value| value.to_str()) else {
+        return false;
+    };
+    file_name.starts_with('.') && path.extension().and_then(|value| value.to_str()) == Some("tmp")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::*;
+
+    #[test]
+    fn runtime_fingerprint_skips_atomic_temp_files() {
+        let temp_root = unique_temp_dir("runtime-fingerprint-temp");
+        let runtime_root = temp_root.join("run/8080");
+        let processes = runtime_root.join("processes");
+        fs::create_dir_all(&processes).unwrap();
+        fs::write(processes.join("proc-live.json"), "{}\n").unwrap();
+        fs::write(
+            processes.join(".proc-live.json.proc-temp.tmp"),
+            "{\"partial\":",
+        )
+        .unwrap();
+
+        let fingerprint = runtime_projection_fingerprint(&runtime_root, None).unwrap();
+
+        assert!(fingerprint.entries.contains_key("processes/proc-live.json"));
+        assert!(
+            !fingerprint
+                .entries
+                .contains_key("processes/.proc-live.json.proc-temp.tmp")
+        );
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
+    }
 }

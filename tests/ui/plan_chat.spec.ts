@@ -210,6 +210,94 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
   }
 });
 
+test("shows agent working state after sending Plan input", async ({ page, request }) => {
+  await ensureAttachedProject(request);
+  const sessionId = "ui-plan-working";
+
+  await page.route("**/api/chat/start", async (route) => {
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify({
+        session_id: sessionId,
+        mode: "plan",
+        provider: "mock",
+      }),
+    });
+  });
+  await page.route(`**/api/chat/${sessionId}/input`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        in_flight: true,
+        queued_messages: [],
+      }),
+    });
+  });
+
+  await page.addInitScript(() => {
+    localStorage.removeItem("refine_chat_tabs");
+  });
+  await page.goto("/");
+  await page.evaluate(() => {
+    return (window as unknown as { RefineCommands: { run: (id: string) => Promise<unknown> } }).RefineCommands.run("plan.open");
+  });
+
+  await expect(page.getByTestId("toolbar-tab-plan")).toHaveClass(/active/);
+  await expect(page.getByTestId("chat-status")).toContainText("active");
+  await page.getByTestId("chat-input").fill("Long Plan Mode prompt that should visibly start agent work.");
+  const inputAccepted = page.waitForResponse((response) =>
+    response.url().includes(`/api/chat/${sessionId}/input`) &&
+    response.request().method() === "POST" &&
+    response.status() === 200
+  );
+  await page.getByTestId("chat-send").click();
+  await inputAccepted;
+
+  await expect(page.getByTestId("chat-status")).toContainText("Agent working");
+  await expect(page.getByTestId("chat-activity-label")).toHaveText("Agent working");
+  await expect(page.locator("#chat-input-pending-dots")).toBeVisible();
+
+  await page.evaluate((id) => {
+    (window as any).handleChatSseEvent?.({
+      session_id: id,
+      mode: "plan",
+      provider: "mock",
+      in_flight: false,
+      closed: false,
+      event: {
+        id: "event-user-replay",
+        role: "user",
+        text: "Long Plan Mode prompt that should visibly start agent work.",
+        progress: false,
+        created_at: new Date().toISOString(),
+      },
+    });
+  }, sessionId);
+  await expect(page.getByTestId("chat-status")).toContainText("Agent working");
+
+  await page.evaluate((id) => {
+    (window as any).handleChatSseEvent?.({
+      session_id: id,
+      mode: "plan",
+      provider: "mock",
+      in_flight: false,
+      closed: false,
+      event: {
+        id: "event-assistant-complete",
+        role: "assistant",
+        text: "Plan response complete.",
+        progress: false,
+        created_at: new Date().toISOString(),
+      },
+    });
+  }, sessionId);
+  await expect(page.getByTestId("chat-status")).toContainText("active");
+  await expect(page.locator("#chat-input-pending-dots")).toBeHidden();
+});
+
 test("updates an original Gap from a Plan draft duplicate decision", async ({ page, request }) => {
   test.setTimeout(120_000);
   await ensureAttachedProject(request);

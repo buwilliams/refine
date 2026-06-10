@@ -3784,6 +3784,7 @@ fn web_server_edits_and_removes_queued_chat_messages() {
         body: Some(json!({"text": "queued text"})),
     });
     assert_eq!(input.status, 200);
+    assert_eq!(input.body["in_flight"], true);
     let message_id = input.body["queued_messages"][0]["id"]
         .as_str()
         .unwrap()

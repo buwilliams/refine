@@ -578,11 +578,7 @@ function drawToolbar() {
     : startLabel;
   const toggleClass = hasSession ? "danger" : "";
 
-  const statusLine = !active.sessionId
-    ? "No active session."
-    : (active.closedReason
-        ? `Session ${active.sessionId} ended — ${active.closedReason}.`
-        : `Session ${active.sessionId} active.`);
+  const statusLine = chatStatusLine(active);
 
   root.classList.toggle("open", !!chatState.open);
   root.classList.toggle("fullscreen", !!chatState.fullscreen);
@@ -770,7 +766,13 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
             Gap ${htmlEscape(active.gapId.slice(0, 10))}…
           </a>` : ""}
         <span class="spacer"></span>
-        <span id="chat-status" class="muted small" data-testid="chat-status">${htmlEscape(statusLine)}</span>
+        <span id="chat-status" class="muted small${chatActivityIsPulsing(active) ? " chat-status-working" : ""}" data-testid="chat-status">
+          ${chatActivityIsPulsing(active) ? `
+            <span class="chat-pending-dots chat-status-pending-dots" aria-hidden="true">
+              <span></span><span></span><span></span>
+            </span>` : ""}
+          <span>${htmlEscape(statusLine)}</span>
+        </span>
       </div>
       ${standaloneWorktreePath ? `
         <div class="muted small" style="margin:-4px 0 8px" data-testid="standalone-worktree-path">
@@ -2213,6 +2215,7 @@ function applyPendingIndicator(tab) {
   const label = $("#chat-activity-label");
   const input = $("#chat-input");
   const send = $("#btn-chat-send");
+  const status = $("#chat-status");
   if (toggle) {
     toggle.hidden = !tab || !(tab.sessionId || tab.progress);
     toggle.setAttribute("aria-expanded", tab?.showProgress === false ? "false" : "true");
@@ -2226,6 +2229,13 @@ function applyPendingIndicator(tab) {
     input.classList.toggle("chat-input-waiting", chatActivityIsPulsing(tab));
   }
   if (send) send.disabled = !tab || !!tab.sending;
+  if (status && tab) {
+    status.classList.toggle("chat-status-working", chatActivityIsPulsing(tab));
+    status.innerHTML = `${chatActivityIsPulsing(tab) ? `
+      <span class="chat-pending-dots chat-status-pending-dots" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>` : ""}<span>${htmlEscape(chatStatusLine(tab))}</span>`;
+  }
   syncChatActionButtons(tab);
 }
 
@@ -2235,11 +2245,24 @@ function markChatActivityPulse(tab) {
 }
 
 function chatActivityIsPulsing(tab) {
-  return !!tab?.pending;
+  return !!(tab?.pending || tab?.starting);
 }
 
 function chatActivityLabel(tab) {
+  if (tab?.starting) return "Starting session";
+  if (tab?.pending) return "Agent working";
   return "Activity panel";
+}
+
+function chatStatusLine(tab) {
+  if (!tab?.sessionId) {
+    if (tab?.starting) return "Starting session.";
+    return "No active session.";
+  }
+  if (tab.closedReason) return `Session ${tab.sessionId} ended — ${tab.closedReason}.`;
+  if (tab.pending) return `Agent working in session ${tab.sessionId}.`;
+  if (tab.sending) return `Sending message to session ${tab.sessionId}.`;
+  return `Session ${tab.sessionId} active.`;
 }
 
 function chatInputPlaceholder(tab) {
@@ -2296,7 +2319,12 @@ function handleChatSseEvent(payload) {
   }
 
   const wasPending = !!tab.pending;
-  tab.pending = !!payload.in_flight;
+  const payloadInFlight = payload.in_flight === true;
+  if (payloadInFlight) {
+    tab.pending = true;
+  } else if (chatSseEventCanClearPending(event)) {
+    tab.pending = false;
+  }
   if (payload.closed === true) {
     tab.closedReason = event.text || "session ended";
     tab.sessionId = null;
@@ -2331,6 +2359,11 @@ function handleChatSseEvent(payload) {
       syncChatActionButtons(tab);
     }
   }
+}
+
+function chatSseEventCanClearPending(event) {
+  const role = String(event?.role || "");
+  return role === "assistant" || role === "system";
 }
 
 function switchChatTab(tabId) {
@@ -3226,8 +3259,13 @@ async function flushLocalQueuedMessages(tab) {
 async function queueChatTextOnServer(tab, text) {
   if (!tab?.sessionId) return;
   try {
+    tab.pending = true;
+    saveChatStateToStorage();
+    drawToolbar();
+    if (shouldKeepChatInputFocused()) focusChatInputSoon();
     const r = await api("POST", `/api/chat/${tab.sessionId}/input`, { text });
     tab.queuedMessages = normalizeQueuedMessages(r.queued_messages);
+    tab.pending = r.in_flight === undefined ? true : !!r.in_flight;
     tab.closedReason = null;
     tab.sentUserInput = true;
     saveChatStateToStorage();
@@ -3236,6 +3274,7 @@ async function queueChatTextOnServer(tab, text) {
     if (shouldKeepChatInputFocused()) focusChatInputSoon();
   } catch (e) {
     queueChatTextForTab(tab, text);
+    tab.pending = false;
     saveChatStateToStorage();
     drawToolbar();
     if (shouldKeepChatInputFocused()) focusChatInputSoon();
