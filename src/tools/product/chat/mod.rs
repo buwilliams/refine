@@ -475,7 +475,7 @@ impl FileChatService {
         let encoded = serde_json::to_string_pretty(record).map_err(|error| {
             RefineError::Serialization(format!("failed to encode chat session: {error}"))
         })?;
-        fs::write(&path, format!("{encoded}\n")).map_err(|error| {
+        write_chat_record_atomically(&path, format!("{encoded}\n").as_bytes()).map_err(|error| {
             RefineError::Io(format!(
                 "failed to write chat session {}: {error}",
                 path.display()
@@ -1397,6 +1397,12 @@ fn default_chat_runtime_root(refine_dir: &Path) -> PathBuf {
         .parent()
         .map(|root| root.join("run/chat"))
         .unwrap_or_else(|| refine_dir.join("run/chat"))
+}
+
+fn write_chat_record_atomically(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let temp_path = path.with_extension(format!("json.{}.tmp", new_event_id()));
+    fs::write(&temp_path, bytes)?;
+    fs::rename(&temp_path, path)
 }
 
 fn chat_session_id_from_operation(operation: &OperationHandle) -> Option<&str> {

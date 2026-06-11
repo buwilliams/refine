@@ -1786,7 +1786,9 @@ mod tests {
             fs::set_permissions(&smoke_ai, permissions).unwrap();
         }
 
-        let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
         unsafe {
             std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());

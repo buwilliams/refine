@@ -1810,7 +1810,9 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
         permissions.set_mode(0o755);
         fs::set_permissions(&smoke_ai, permissions).unwrap();
     }
-    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+    let _smoke_ai_env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
         std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
@@ -1819,7 +1821,11 @@ fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
     FileSettingsService::new(&refine_dir)
-        .update(&json!({"agent_cli": "smoke-ai"}))
+        .update(&json!({
+            "agent_cli": "smoke-ai",
+            "target_app_build_command": "printf build-ok",
+            "allowed_commands": "printf"
+        }))
         .unwrap();
 
     server.handle(ApiRequest {
@@ -3553,7 +3559,9 @@ fn web_server_manages_refine_chat_sessions() {
     let temp_root = unique_temp_dir("http-chat");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
+    let _smoke_ai_env_guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     write_fake_provider(
         &refine_dir,
         "smoke-ai",
