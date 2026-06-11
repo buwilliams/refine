@@ -19,7 +19,7 @@ use crate::surfaces::web_server::{
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
+use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::deployed_update::{
     DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
 };
@@ -279,7 +279,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .list_response()?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -291,8 +291,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let node = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
-                .show(&id)?;
+            let node =
+                FileClusterService::new(refine_dir_for_target_root(&target_root)).show(&id)?;
             println!("{}", serde_json::to_string_pretty(&node).unwrap());
             Ok(())
         }
@@ -303,8 +303,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
-                .add_node(&id)?;
+            let cluster =
+                FileClusterService::new(refine_dir_for_target_root(&target_root)).add_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
         }
@@ -324,10 +324,10 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .upsert_node(
                     &id,
-                    ClusterNodeUpdate {
+                    NodeRemoteUpdate {
                         display_name,
                         ssh_host,
                         ssh_user,
@@ -349,7 +349,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .set_enabled(&id, true)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -361,7 +361,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .set_enabled(&id, false)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -373,7 +373,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let cluster = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let cluster = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .remove_node(&id)?;
             println!("{}", serde_json::to_string_pretty(&cluster).unwrap());
             Ok(())
@@ -386,7 +386,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .bootstrap_node_response(&id, dry_run)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -397,7 +397,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let sync = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let sync = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .sync_response()?;
             println!("{}", serde_json::to_string_pretty(&sync).unwrap());
             Ok(())
@@ -410,7 +410,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
+            let result = FileClusterService::new(refine_dir_for_target_root(&target_root))
                 .run_remote(&id, &command)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -423,7 +423,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileClusterRegistryService::new(refine_dir_for_target_root(&target_root));
+            let service = FileClusterService::new(refine_dir_for_target_root(&target_root));
             service.transfer(&item_id, &id)?;
             let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root))
                 .bulk_transfer_gaps_to_node(
@@ -443,9 +443,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let maintenance =
-                FileClusterRegistryService::new(refine_dir_for_target_root(&target_root))
-                    .maintenance_response()?;
+            let maintenance = FileClusterService::new(refine_dir_for_target_root(&target_root))
+                .maintenance_response()?;
             println!("{}", serde_json::to_string_pretty(&maintenance).unwrap());
             Ok(())
         }
@@ -2526,7 +2525,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
                     })
                 })
                 .cloned()
-                .ok_or_else(|| RefineError::NotFound(format!("cluster node {id} was not found")))?;
+                .ok_or_else(|| RefineError::NotFound(format!("node {id} was not found")))?;
             json!({ "node": node })
         }
         ClusterAction::AddNode {
@@ -2548,7 +2547,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
         } => daemon_json(
             "PATCH",
             &format!("/cluster/nodes/{}", path_segment(&id)),
-            Some(cluster_node_edit_body(
+            Some(remote_node_edit_body(
                 display_name,
                 ssh_host,
                 ssh_user,
@@ -2653,7 +2652,7 @@ fn dispatch_cluster_daemon(action: ClusterAction) -> RefineResult<()> {
 }
 
 #[allow(clippy::too_many_arguments)]
-fn cluster_node_edit_body(
+fn remote_node_edit_body(
     display_name: Option<String>,
     ssh_host: Option<String>,
     ssh_user: Option<String>,

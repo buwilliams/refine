@@ -724,10 +724,7 @@ fn cluster_local_registry_commands(fixture: &IntegrationFixture) {
     let add = fixture.run_refine(&["cluster", "add-node", "cluster-smoke"]);
     fixture.assert_success("cluster add-node", &add);
     let duplicate = fixture.run_refine(&["cluster", "add-node", "cluster-smoke"]);
-    assert!(
-        !duplicate.status.success(),
-        "duplicate cluster node succeeded"
-    );
+    assert!(!duplicate.status.success(), "duplicate node succeeded");
     assert!(
         String::from_utf8_lossy(&duplicate.stderr).contains("already exists"),
         "stderr:\n{}",

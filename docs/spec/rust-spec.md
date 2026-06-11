@@ -130,10 +130,11 @@ Representative model-oriented CLI groups:
 - `refine node`: local node identity, active-node selection, ownership, and
   transfer. Actions include `list`, `show`, `create`, `activate`, `archive`,
   `rename`, `settings`, and `transfer`.
-- `refine cluster`: cluster registry, remote nodes, project-state sync,
+- `refine cluster`: cluster operations over nodes, project-state sync,
   maintenance, and bounded remote operations. Actions include `list`, `show`,
   `add-node`, `edit-node`, `enable-node`, `disable-node`, `remove-node`,
-  `sync`, `run`, `transfer`, and `maintenance`.
+  `sync`, `run`, `transfer`, and `maintenance`; compatibility commands persist
+  their node configuration in the Node registry.
 - `refine log`: activity, round logs, diagnostics logs, support bundles, and
   exported evidence. Actions include `list`, `tail`, `show`, `query`,
   `export`, and `bundle`.
@@ -413,44 +414,45 @@ Rules:
   undo, delete, assign to Feature, remove from Feature, reorder in Feature,
   move Feature workflow, and cancel Feature.
 
-### Cluster Model
+### Cluster Operations Model
 
 Module: `model::cluster`; path: `src/model/cluster/`.
 
-Owns the git-synced cluster registry shape and cluster-level state. Runtime SSH
-execution belongs in `tools::host::cluster`; the model only defines the records
-and validation vocabulary.
+Defines compatibility response shapes and validation vocabulary for operations
+over a set of Nodes. Nodes themselves are canonical in `model::node` and are
+persisted in the Node registry; runtime SSH execution belongs in
+`tools::host::cluster`.
 
 Properties:
 
 - `Cluster`: `nodes` and `updated_at`.
-- `ClusterNode`: `id`, `display_name`, `ssh_host`, `ssh_port`,
-  `refine_checkout`, `target_app_path`, `refine_port`, `enabled`, `health`,
-  `created_at`, and `updated_at`.
-- `ClusterHealth`: at minimum `status` and `checked_at`, with room for
-  provider-specific details.
+- `ClusterNode`: compatibility alias for `Node`.
+- `ClusterHealth`: compatibility alias for `NodeHealth`.
 - `RemoteRunResult`: `node_id`, `command`, `remote_command`, `exit_code`,
   `stdout`, `stderr`, and `ok`.
 
 Rules:
 
-- Cluster node ids are lowercase ids that start with a letter or digit and use
-  only lowercase letters, digits, `_`, or `-`.
+- Node ids used by cluster operations are lowercase ids that start with a letter
+  or digit and use only lowercase letters, digits, `_`, or `-`.
 - `ssh_host` must be a host, not a `user@host` string.
-- Disabled cluster nodes remain registered but cannot run remote Refine
-  commands.
+- Disabled nodes remain registered but cannot run remote Refine commands.
 
 ### Node Model
 
 Module: `model::node`; path: `src/model/node/`.
 
-Owns local Refine node identity and node-scoped settings. A node is the unit of
-ownership for Gaps and Features inside one target app; a cluster node is the
-remote-registration form of a node.
+Owns Refine node identity, node-scoped settings, and optional remote-management
+configuration. A node is the unit of ownership for Gaps and Features inside one
+target app; a cluster is the set of nodes and the operations Refine can perform
+over that set.
 
 Properties:
 
-- `Node`: `id`, `display_name`, `created_at`, `updated_at`, and `archived`.
+- `Node`: `id`, `display_name`, `created_at`, `updated_at`, `enabled`,
+  optional SSH/bootstrap fields, optional `health`, and `archived`.
+- `NodeHealth`: at minimum `status` and `checked_at`, with room for
+  provider-specific details.
 - `NodeRegistry`: `nodes`.
 - `ActiveNodeSelection`: `active_node_id`, `refine_dir`, and `updated_at`.
 - `NodeSettings`: application, runtime, target-app config, and target-app
@@ -1215,10 +1217,10 @@ Runtime projection:
 
 Project, settings, and source-tree caches:
 
-- Keep project registry, active-project status, node registry, cluster registry,
-  reporters, guidance, governance, quality, and application settings as small
-  keyed maps with typed lookups. The current UI needs quick list and lookup
-  behavior for these, not heavy secondary indexes.
+- Keep project registry, active-project status, node registry, reporters,
+  guidance, governance, quality, and application settings as small keyed maps
+  with typed lookups. The current UI needs quick list and lookup behavior for
+  these, not heavy secondary indexes.
 - Keep file tree, file read, and file search caches separate from workflow
   projections. They describe the target application's source tree, not Refine
   workflow state, and should be invalidated by filesystem fingerprints or Git

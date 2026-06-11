@@ -18,7 +18,7 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
+use crate::tools::host::cluster::{ClusterService, FileClusterService, NodeRemoteUpdate};
 use crate::tools::host::target_apps::TargetAppGeneratedConfig;
 use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
 use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
@@ -545,24 +545,24 @@ impl InProcessWebServer {
                         "nodes": [],
                         "maintenance": null,
                         "enabled": false,
-                        "message": "No cluster nodes configured."
+                        "message": "No nodes configured."
                     }),
                 );
             }
             Err(error) => return error_response(error),
         };
-        match FileClusterRegistryService::new(refine_dir).list_response() {
+        match FileClusterService::new(refine_dir).list_response() {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_cluster_node_upsert(
+    pub(super) fn handle_remote_node_upsert(
         &self,
         request: ApiRequest,
         path_id: Option<String>,
     ) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "configure cluster node");
+        let refine_dir = require_refine_dir!(self, "configure node");
         let body = request.body.unwrap_or_else(|| json!({}));
         let is_create = request.method == "POST" && path_id.is_none();
         let id = path_id
@@ -573,7 +573,7 @@ impl InProcessWebServer {
             })
             .unwrap_or_default();
         let id = id.trim();
-        let update = ClusterNodeUpdate {
+        let update = NodeRemoteUpdate {
             display_name: body
                 .get("display_name")
                 .and_then(|value| value.as_str())
@@ -602,7 +602,7 @@ impl InProcessWebServer {
             refine_port: body.get("refine_port").and_then(|value| value.as_u64()),
             enabled: body.get("enabled").and_then(|value| value.as_bool()),
         };
-        let service = FileClusterRegistryService::new(refine_dir);
+        let service = FileClusterService::new(refine_dir);
         let result = if is_create {
             service
                 .add_node(id)
@@ -616,25 +616,23 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_cluster_node_delete(&self, node_id: Option<String>) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "remove cluster node");
+    pub(super) fn handle_remote_node_delete(&self, node_id: Option<String>) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "remove node");
         let Some(node_id) = node_id
             .as_deref()
             .map(str::trim)
             .filter(|value| !value.is_empty())
         else {
-            return error_response(RefineError::InvalidInput(
-                "cluster node id is required".to_string(),
-            ));
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
         };
-        match FileClusterRegistryService::new(refine_dir).remove_node(node_id) {
+        match FileClusterService::new(refine_dir).remove_node(node_id) {
             Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_cluster_node_bootstrap(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "bootstrap cluster node");
+    pub(super) fn handle_remote_node_bootstrap(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "bootstrap node");
         let Some(node_id) = request
             .path
             .strip_prefix("/cluster/nodes/")
@@ -642,9 +640,7 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|value| !value.is_empty())
         else {
-            return error_response(RefineError::InvalidInput(
-                "cluster node id is required".to_string(),
-            ));
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         let dry_run = body
@@ -652,9 +648,9 @@ impl InProcessWebServer {
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
         let service = if let Some(runtime_root) = &self.runtime_root {
-            FileClusterRegistryService::with_runtime_root(refine_dir, runtime_root)
+            FileClusterService::with_runtime_root(refine_dir, runtime_root)
         } else {
-            FileClusterRegistryService::new(refine_dir)
+            FileClusterService::new(refine_dir)
         };
         match service.bootstrap_node_response(node_id, dry_run) {
             Ok(value) => ApiResponse::json(200, value),
@@ -662,7 +658,7 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_cluster_node_run(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_remote_node_run(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "run cluster command");
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("run cluster command");
@@ -674,16 +670,14 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|value| !value.is_empty())
         else {
-            return error_response(RefineError::InvalidInput(
-                "cluster node id is required".to_string(),
-            ));
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         let command = body
             .get("command")
             .and_then(|value| value.as_str())
             .unwrap_or("");
-        match FileClusterRegistryService::with_runtime_root(refine_dir, runtime_root)
+        match FileClusterService::with_runtime_root(refine_dir, runtime_root)
             .run_remote_response(node_id, command)
         {
             Ok(value) => ApiResponse::json(200, value),
@@ -691,7 +685,7 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_cluster_node_transfer(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_remote_node_transfer(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "transfer cluster item");
         let Some(node_id) = request
             .path
@@ -700,9 +694,7 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|value| !value.is_empty())
         else {
-            return error_response(RefineError::InvalidInput(
-                "cluster node id is required".to_string(),
-            ));
+            return error_response(RefineError::InvalidInput("node id is required".to_string()));
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         let item_id = body
@@ -713,8 +705,7 @@ impl InProcessWebServer {
         if item_id.is_empty() {
             return error_response(RefineError::InvalidInput("item_id is required".to_string()));
         }
-        if let Err(error) = FileClusterRegistryService::new(&refine_dir).transfer(item_id, node_id)
-        {
+        if let Err(error) = FileClusterService::new(&refine_dir).transfer(item_id, node_id) {
             return error_response(error);
         }
         let selection = BulkGapSelection {

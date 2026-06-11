@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::model::{JsonObject, Timestamp};
+use crate::model::Timestamp;
+use crate::model::node::{Node, NodeHealth};
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct Cluster {
@@ -8,31 +9,8 @@ pub struct Cluster {
     pub updated_at: Timestamp,
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ClusterNode {
-    pub id: String,
-    pub display_name: String,
-    pub ssh_host: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub ssh_user: String,
-    #[serde(default, skip_serializing_if = "String::is_empty")]
-    pub ssh_identity_path: String,
-    pub ssh_port: u16,
-    pub refine_checkout: String,
-    pub target_app_path: String,
-    pub refine_port: u16,
-    pub enabled: bool,
-    pub health: Option<ClusterHealth>,
-    pub created_at: Timestamp,
-    pub updated_at: Timestamp,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct ClusterHealth {
-    pub status: String,
-    pub checked_at: Timestamp,
-    pub details: Option<JsonObject>,
-}
+pub type ClusterNode = Node;
+pub type ClusterHealth = NodeHealth;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct RemoteRunResult {
@@ -45,7 +23,7 @@ pub struct RemoteRunResult {
     pub ok: bool,
 }
 
-pub fn valid_cluster_node_id(id: &str) -> bool {
+pub fn valid_node_id(id: &str) -> bool {
     let mut chars = id.chars();
     let Some(first) = chars.next() else {
         return false;
@@ -72,13 +50,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn cluster_node_id_validation_matches_spec() {
-        assert!(valid_cluster_node_id("node-1"));
-        assert!(valid_cluster_node_id("1_node"));
-        assert!(!valid_cluster_node_id(""));
-        assert!(!valid_cluster_node_id("Node"));
-        assert!(!valid_cluster_node_id("-node"));
-        assert!(!valid_cluster_node_id("node.example"));
+    fn node_id_validation_matches_cluster_operation_spec() {
+        assert!(valid_node_id("node-1"));
+        assert!(valid_node_id("1_node"));
+        assert!(!valid_node_id(""));
+        assert!(!valid_node_id("Node"));
+        assert!(!valid_node_id("-node"));
+        assert!(!valid_node_id("node.example"));
     }
 
     #[test]

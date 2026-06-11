@@ -103,7 +103,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/cluster",
-        capability: "cluster node registry and remote operations",
+        capability: "node registry and remote operations",
     },
     ApiRouteGroup {
         prefix: "/changes",

@@ -57,11 +57,11 @@ function renderSettingsNodesTab({
                 <button class="secondary" data-cluster-bootstrap="${htmlEscape(node.id)}" data-testid="cluster-node-bootstrap">Bootstrap</button>
                 <button class="secondary" data-cluster-toggle="${htmlEscape(node.id)}" data-enabled="${node.enabled === false ? "0" : "1"}" data-testid="cluster-node-toggle">${node.enabled === false ? "Enable" : "Disable"}</button>
               </td>
-            </tr>`).join("") || `<tr data-testid="cluster-node-empty"><td colspan="6" class="muted">No cluster nodes registered.</td></tr>`}
+            </tr>`).join("") || `<tr data-testid="cluster-node-empty"><td colspan="6" class="muted">No nodes registered.</td></tr>`}
         </tbody>
       </table>
       <div class="actions" style="margin-top:8px">
-        <button id="cluster-node-add" data-testid="cluster-node-add">Register cluster node</button>
+        <button id="cluster-node-add" data-testid="cluster-node-add">Register node</button>
       </div>
     </section>`;
 }
@@ -126,11 +126,11 @@ function bindSettingsNodesTab() {
   }));
   $("#cluster-node-add")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
-    const id = await modalPrompt("Node ID", "", { title: "Register cluster node" });
+    const id = await modalPrompt("Node ID", "", { title: "Register node" });
     if (!id || !id.trim()) return;
-    const sshHost = await modalPrompt("SSH host", "", { title: "Register cluster node" });
+    const sshHost = await modalPrompt("SSH host", "", { title: "Register node" });
     if (!sshHost || !sshHost.trim()) return;
-    const targetAppPath = await modalPrompt("Target app path", "", { title: "Register cluster node" });
+    const targetAppPath = await modalPrompt("Target app path", "", { title: "Register node" });
     if (targetAppPath == null) return;
     await withButtonBusy(btn, "Registering...", async () => {
       try {
@@ -145,17 +145,17 @@ function bindSettingsNodesTab() {
     });
   });
   $$("[data-cluster-configure]").forEach((b) => b.addEventListener("click", async () => {
-    const displayName = await modalPrompt("Display name", b.dataset.name || "", { title: "Configure cluster node" });
+    const displayName = await modalPrompt("Display name", b.dataset.name || "", { title: "Configure node" });
     if (displayName == null) return;
-    const sshHost = await modalPrompt("SSH host", b.dataset.sshHost || "", { title: "Configure cluster node" });
+    const sshHost = await modalPrompt("SSH host", b.dataset.sshHost || "", { title: "Configure node" });
     if (sshHost == null || !sshHost.trim()) return;
-    const sshPort = await modalPrompt("SSH port", b.dataset.sshPort || "22", { title: "Configure cluster node" });
+    const sshPort = await modalPrompt("SSH port", b.dataset.sshPort || "22", { title: "Configure node" });
     if (sshPort == null) return;
-    const refineCheckout = await modalPrompt("Refine checkout path", b.dataset.refineCheckout || "~/refine", { title: "Configure cluster node" });
+    const refineCheckout = await modalPrompt("Refine checkout path", b.dataset.refineCheckout || "~/refine", { title: "Configure node" });
     if (refineCheckout == null) return;
-    const targetAppPath = await modalPrompt("Target app path", b.dataset.targetAppPath || "", { title: "Configure cluster node" });
+    const targetAppPath = await modalPrompt("Target app path", b.dataset.targetAppPath || "", { title: "Configure node" });
     if (targetAppPath == null) return;
-    const refinePort = await modalPrompt("Refine UI port", b.dataset.refinePort || "8080", { title: "Configure cluster node" });
+    const refinePort = await modalPrompt("Refine UI port", b.dataset.refinePort || "8080", { title: "Configure node" });
     if (refinePort == null) return;
     await withButtonBusy(b, "Saving...", async () => {
       try {
@@ -184,14 +184,14 @@ function bindSettingsNodesTab() {
   }));
   $$("[data-cluster-bootstrap]").forEach((b) => b.addEventListener("click", async () => {
     const ok = await modalConfirm(
-      "Bootstrap this cluster node over SSH using the current host user?",
-      { title: "Bootstrap cluster node", okLabel: "Bootstrap" },
+      "Bootstrap this node over SSH using the current host user?",
+      { title: "Bootstrap node", okLabel: "Bootstrap" },
     );
     if (!ok) return;
     await withButtonBusy(b, "Bootstrapping...", async () => {
       try {
         const result = await api("POST", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.clusterBootstrap) + "/bootstrap", {});
-        toast(result.ok ? "Cluster node bootstrapped" : "Cluster bootstrap failed", result.ok ? "info" : "error");
+        toast(result.ok ? "Node bootstrapped" : "Cluster bootstrap failed", result.ok ? "info" : "error");
         await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
     });

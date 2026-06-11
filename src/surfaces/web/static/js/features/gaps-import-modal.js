@@ -43,7 +43,7 @@ function openImportModal() {
             </div>
             <label class="checkbox-row">
               <input type="checkbox" id="import-csv-distribute" data-testid="import-csv-distribute">
-              <span>Distribute across cluster nodes</span>
+              <span>Distribute across nodes</span>
             </label>
           </section>
           <section class="settings-pane import-panel" data-import-panel="upload">
@@ -61,7 +61,7 @@ function openImportModal() {
             </div>
             <label class="checkbox-row">
               <input type="checkbox" id="import-upload-distribute" data-testid="import-upload-distribute">
-              <span>Distribute across cluster nodes</span>
+              <span>Distribute across nodes</span>
             </label>
           </section>
           <div id="import-drafts" class="import-drafts" data-testid="import-drafts" style="margin-top:14px"></div>

@@ -95,7 +95,7 @@ Nav & Guide: Manage Drop-down
 				Add app (file path / Git clone URL / new directory), Switch to selected (migration check), Remove selected (danger), Copy from node, Generate with AI, Select app template
 				Disabled unless supervisor/registry enabled
 				Nodes section: table (name + active pill, ID, gap counts), Activate, Rename, Archive (danger), Create node
-				Cluster section: Git-synced remote nodes (name/ID, SSH host/port, version/port, health), Configure, Bootstrap (over SSH), Enable/Disable, Register cluster node
+					Cluster section: remote node management (name/ID, SSH host/port, version/port, health), Configure, Bootstrap (over SSH), Enable/Disable, Register node
 			Reporters
 				List with counts; Rename (cascades rounds), Merge (move gaps to destination), Remove (danger, keeps history), Add reporter
 			Processes
@@ -233,7 +233,7 @@ Modals
 		Feature destination: standalone / new (name + description) / existing (dropdown); bulk save; duplicate detection
 	Import Gaps Modal (#/gaps/import)
 		Tabs/sources: AI Import (paste text), CSV Import (paste CSV), CSV Upload (Choose CSV file)
-		Distribute across cluster nodes checkbox; Extract drafts / Parse CSV / Parse upload (progress)
+			Distribute across nodes checkbox; Extract drafts / Parse CSV / Parse upload (progress)
 		Review (drafts, 25/page)
 			Per draft: checkbox, order, name (+ error), reporter, priority, node, actual, target; possible-duplicate info
 			Duplicate decision per row: move original to backlog / ignore / import

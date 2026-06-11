@@ -1600,7 +1600,7 @@ fn node_commands_use_shared_node_registry_service() {
 }
 
 #[test]
-fn cluster_commands_use_shared_cluster_registry_service() {
+fn cluster_commands_use_shared_cluster_service() {
     let temp_root = unique_temp_dir("cli-cluster-registry");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
@@ -1721,10 +1721,19 @@ fn cluster_commands_use_shared_cluster_registry_service() {
 
     let gap = fs::read_to_string(refine_dir.join("gaps/GA/P1/gap.json")).unwrap();
     assert!(gap.contains("\"node_id\": \"node-1\""));
-    let cluster: serde_json::Value =
-        serde_json::from_str(&fs::read_to_string(refine_dir.join("cluster.json")).unwrap())
-            .unwrap();
-    assert_eq!(cluster["nodes"].as_array().unwrap().len(), 0);
+    assert!(!refine_dir.join("cluster.json").exists());
+    let nodes: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(refine_dir.join("nodes.json")).unwrap()).unwrap();
+    let node = nodes["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == "node-1")
+        .unwrap();
+    assert_eq!(node["ssh_host"], "example.com");
+    assert_eq!(node["ssh_user"], "deploy");
+    assert_eq!(node["ssh_port"], 2222);
+    assert_eq!(node["archived"], true);
 
     fs::remove_dir_all(temp_root).unwrap();
 }

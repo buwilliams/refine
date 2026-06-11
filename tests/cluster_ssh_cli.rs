@@ -79,7 +79,8 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "{dry_bootstrap_payload:#}"
     );
     assert_eq!(
-        dry_bootstrap_payload["cluster"]["nodes"][0]["health"]["status"], "ready",
+        node_in_cluster_payload(&dry_bootstrap_payload, "docker-ssh")["health"]["status"],
+        "ready",
         "{dry_bootstrap_payload:#}"
     );
 
@@ -213,7 +214,8 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
         "{bootstrap_payload:#}"
     );
     assert_eq!(
-        bootstrap_payload["cluster"]["nodes"][0]["health"]["status"], "ready",
+        node_in_cluster_payload(&bootstrap_payload, "docker-ssh")["health"]["status"],
+        "ready",
         "{bootstrap_payload:#}"
     );
 
@@ -222,7 +224,7 @@ fn cluster_cli_runs_commands_over_real_ssh_container() {
     let removed_show = fixture.run_refine(&["cluster", "show", "docker-ssh"]);
     assert!(
         !removed_show.status.success(),
-        "removed cluster node was still visible"
+        "removed node was still visible"
     );
 }
 
@@ -360,6 +362,18 @@ fn repo_root() -> PathBuf {
         }
         assert!(current.pop(), "failed to locate repository root");
     }
+}
+
+fn node_in_cluster_payload<'a>(
+    payload: &'a serde_json::Value,
+    node_id: &str,
+) -> &'a serde_json::Value {
+    payload["cluster"]["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == node_id)
+        .unwrap()
 }
 
 fn free_loopback_port() -> u16 {

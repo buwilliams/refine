@@ -228,38 +228,38 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST" && request.path == "/cluster/nodes" {
-            return self.handle_cluster_node_upsert(request, None);
+            return self.handle_remote_node_upsert(request, None);
         }
 
         if request.method == "PATCH" && request.path.starts_with("/cluster/nodes/") {
-            let node_id = cluster_node_id_from_path(&request.path);
-            return self.handle_cluster_node_upsert(request, node_id);
+            let node_id = node_id_from_cluster_path(&request.path);
+            return self.handle_remote_node_upsert(request, node_id);
         }
 
         if request.method == "DELETE" && request.path.starts_with("/cluster/nodes/") {
-            let node_id = cluster_node_id_from_path(&request.path);
-            return self.handle_cluster_node_delete(node_id);
+            let node_id = node_id_from_cluster_path(&request.path);
+            return self.handle_remote_node_delete(node_id);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/cluster/nodes/")
             && request.path.ends_with("/bootstrap")
         {
-            return self.handle_cluster_node_bootstrap(request);
+            return self.handle_remote_node_bootstrap(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/cluster/nodes/")
             && request.path.ends_with("/run")
         {
-            return self.handle_cluster_node_run(request);
+            return self.handle_remote_node_run(request);
         }
 
         if request.method == "POST"
             && request.path.starts_with("/cluster/nodes/")
             && request.path.ends_with("/transfer")
         {
-            return self.handle_cluster_node_transfer(request);
+            return self.handle_remote_node_transfer(request);
         }
 
         if request.method == "GET" && request.path == "/target-app/status" {
@@ -792,7 +792,7 @@ mod tests {
     }
 }
 
-fn cluster_node_id_from_path(path: &str) -> Option<String> {
+fn node_id_from_cluster_path(path: &str) -> Option<String> {
     path.strip_prefix("/cluster/nodes/")
         .and_then(|rest| rest.split('/').next())
         .map(str::trim)

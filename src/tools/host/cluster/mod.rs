@@ -2,12 +2,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::model::cluster::{
-    Cluster, ClusterHealth, ClusterNode, RemoteRunResult, valid_cluster_node_id, valid_ssh_host,
-    valid_ssh_user,
+    Cluster, ClusterHealth, RemoteRunResult, valid_node_id, valid_ssh_host, valid_ssh_user,
 };
+use crate::model::node::{Node, NodeRegistry};
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::FileSecurityService;
+use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate};
 
 pub const CLUSTER_REGISTRY_FILE: &str = "cluster.json";
 
@@ -33,13 +34,13 @@ pub trait ClusterService {
 }
 
 #[derive(Clone, Debug)]
-pub struct FileClusterRegistryService {
+pub struct FileClusterService {
     pub refine_dir: PathBuf,
     pub runtime_root: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct ClusterNodeUpdate {
+pub struct NodeRemoteUpdate {
     pub display_name: Option<String>,
     pub ssh_host: Option<String>,
     pub ssh_user: Option<String>,
@@ -51,7 +52,7 @@ pub struct ClusterNodeUpdate {
     pub enabled: Option<bool>,
 }
 
-impl FileClusterRegistryService {
+impl FileClusterService {
     pub fn new(refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             refine_dir: refine_dir.into(),
@@ -73,6 +74,10 @@ impl FileClusterRegistryService {
         self.refine_dir.join(CLUSTER_REGISTRY_FILE)
     }
 
+    fn nodes(&self) -> FileNodeRegistryService {
+        FileNodeRegistryService::new(&self.refine_dir)
+    }
+
     pub fn list_response(&self) -> RefineResult<serde_json::Value> {
         let cluster = self.registry()?;
         Ok(cluster_response(cluster))
@@ -81,47 +86,46 @@ impl FileClusterRegistryService {
     pub fn show(&self, id: &str) -> RefineResult<serde_json::Value> {
         let cluster = self.registry()?;
         let Some(node) = cluster.nodes.iter().find(|node| node.id == id) else {
-            return Err(RefineError::NotFound(format!(
-                "cluster node {id} was not found"
-            )));
+            return Err(RefineError::NotFound(format!("node {id} was not found")));
         };
         Ok(serde_json::json!({"node": node}))
     }
 
     pub fn add_node(&self, id: &str) -> RefineResult<serde_json::Value> {
-        if !valid_cluster_node_id(id) {
+        if !valid_node_id(id) {
             return Err(RefineError::InvalidInput(
-                "cluster node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
+                "node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
             ));
         }
-        let mut cluster = self.registry()?;
-        if cluster.nodes.iter().any(|node| node.id == id) {
-            return Err(RefineError::Conflict(format!(
-                "cluster node {id} already exists"
-            )));
+        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        if registry
+            .nodes
+            .iter()
+            .any(|node| node.id == id && !node.archived)
+        {
+            return Err(RefineError::Conflict(format!("node {id} already exists")));
         }
-        cluster.nodes.push(default_cluster_node(id));
-        cluster.updated_at = now_timestamp();
-        self.save(&cluster)?;
-        Ok(cluster_response(cluster))
+        registry.nodes.push(default_node(id));
+        self.save_nodes(&registry)?;
+        Ok(cluster_response(self.cluster_from_registry(registry)))
     }
 
     pub fn upsert_node(
         &self,
         id: &str,
-        update: ClusterNodeUpdate,
+        update: NodeRemoteUpdate,
     ) -> RefineResult<serde_json::Value> {
         let id = id.trim();
-        if !valid_cluster_node_id(id) {
+        if !valid_node_id(id) {
             return Err(RefineError::InvalidInput(
-                "cluster node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
+                "node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
             ));
         }
-        let mut cluster = self.registry()?;
-        let existing_index = cluster.nodes.iter().position(|node| node.id == id);
+        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let existing_index = registry.nodes.iter().position(|node| node.id == id);
         let mut node = existing_index
-            .and_then(|index| cluster.nodes.get(index).cloned())
-            .unwrap_or_else(|| default_cluster_node(id));
+            .and_then(|index| registry.nodes.get(index).cloned())
+            .unwrap_or_else(|| default_node(id));
         if let Some(display_name) = update.display_name {
             node.display_name = display_name.trim().to_string();
         }
@@ -162,15 +166,15 @@ impl FileClusterRegistryService {
         if let Some(enabled) = update.enabled {
             node.enabled = enabled;
         }
+        node.archived = false;
         node.updated_at = now_timestamp();
         if let Some(index) = existing_index {
-            cluster.nodes[index] = node;
+            registry.nodes[index] = node;
         } else {
-            cluster.nodes.push(node);
+            registry.nodes.push(node);
         }
-        cluster.updated_at = now_timestamp();
-        self.save(&cluster)?;
-        Ok(cluster_response(cluster))
+        self.save_nodes(&registry)?;
+        Ok(cluster_response(self.cluster_from_registry(registry)))
     }
 
     pub fn bootstrap_node_response(
@@ -178,13 +182,17 @@ impl FileClusterRegistryService {
         node_id: &str,
         dry_run: bool,
     ) -> RefineResult<serde_json::Value> {
-        let mut cluster = self.registry()?;
-        let Some(index) = cluster.nodes.iter().position(|node| node.id == node_id) else {
+        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let Some(index) = registry
+            .nodes
+            .iter()
+            .position(|node| node.id == node_id && !node.archived)
+        else {
             return Err(RefineError::NotFound(format!(
-                "cluster node {node_id} was not found"
+                "node {node_id} was not found"
             )));
         };
-        let node = cluster.nodes[index].clone();
+        let node = registry.nodes[index].clone();
         let request = ClusterBootstrapRequest {
             node_id: node_id.to_string(),
             ssh_host: node.ssh_host,
@@ -204,13 +212,14 @@ impl FileClusterRegistryService {
         )?;
         let mut details = serde_json::Map::new();
         details.insert("bootstrap".to_string(), serde_json::json!(result.clone()));
-        cluster.nodes[index].health = Some(ClusterHealth {
+        registry.nodes[index].health = Some(ClusterHealth {
             status: if result.ok { "ready" } else { "failed" }.to_string(),
             checked_at: now_timestamp(),
             details: Some(details),
         });
-        cluster.updated_at = now_timestamp();
-        self.save(&cluster)?;
+        registry.nodes[index].updated_at = now_timestamp();
+        self.save_nodes(&registry)?;
+        let cluster = self.cluster_from_registry(registry);
         Ok(serde_json::json!({
             "ok": result.ok,
             "node_id": node_id,
@@ -221,31 +230,27 @@ impl FileClusterRegistryService {
     }
 
     pub fn set_enabled(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
-        let mut cluster = self.registry()?;
-        let Some(node) = cluster.nodes.iter_mut().find(|node| node.id == id) else {
-            return Err(RefineError::NotFound(format!(
-                "cluster node {id} was not found"
-            )));
+        let mut registry = self.load_node_registry_with_legacy_cluster()?;
+        let Some(node) = registry
+            .nodes
+            .iter_mut()
+            .find(|node| node.id == id && !node.archived)
+        else {
+            return Err(RefineError::NotFound(format!("node {id} was not found")));
         };
         node.enabled = enabled;
         node.updated_at = now_timestamp();
-        cluster.updated_at = now_timestamp();
-        self.save(&cluster)?;
-        Ok(cluster_response(cluster))
+        self.save_nodes(&registry)?;
+        Ok(cluster_response(self.cluster_from_registry(registry)))
     }
 
     pub fn remove_node(&self, id: &str) -> RefineResult<serde_json::Value> {
-        let mut cluster = self.registry()?;
-        let before = cluster.nodes.len();
-        cluster.nodes.retain(|node| node.id != id);
-        if cluster.nodes.len() == before {
-            return Err(RefineError::NotFound(format!(
-                "cluster node {id} was not found"
-            )));
-        }
-        cluster.updated_at = now_timestamp();
-        self.save(&cluster)?;
-        Ok(cluster_response(cluster))
+        let update = NodeUpdate {
+            display_name: None,
+            archived: Some(true),
+        };
+        self.nodes().update(id, update)?;
+        self.list_response()
     }
 
     pub fn run_remote_response(
@@ -281,32 +286,78 @@ impl FileClusterRegistryService {
         }))
     }
 
-    fn save(&self, cluster: &Cluster) -> RefineResult<()> {
-        write_json(&self.path(), cluster)
+    fn save_nodes(&self, registry: &NodeRegistry) -> RefineResult<()> {
+        self.nodes().save_registry(registry)
     }
-}
 
-impl ClusterService for FileClusterRegistryService {
-    fn registry(&self) -> RefineResult<Cluster> {
+    fn load_node_registry_with_legacy_cluster(&self) -> RefineResult<NodeRegistry> {
+        let mut registry = self.nodes().load_registry()?;
+        let Some(legacy) = self.load_legacy_cluster()? else {
+            return Ok(registry);
+        };
+
+        let mut changed = false;
+        for legacy_node in legacy.nodes {
+            if let Some(node) = registry
+                .nodes
+                .iter_mut()
+                .find(|node| node.id == legacy_node.id)
+            {
+                changed |= merge_legacy_node(node, legacy_node);
+            } else {
+                registry.nodes.push(legacy_node);
+                changed = true;
+            }
+        }
+        if changed {
+            self.save_nodes(&registry)?;
+        }
+        Ok(registry)
+    }
+
+    fn load_legacy_cluster(&self) -> RefineResult<Option<Cluster>> {
         let path = self.path();
         if !path.exists() {
-            return Ok(Cluster {
-                nodes: Vec::new(),
-                updated_at: now_timestamp(),
-            });
+            return Ok(None);
         }
         let bytes = fs::read(&path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to read cluster registry {}: {error}",
+                "failed to read legacy cluster registry {}: {error}",
                 path.display()
             ))
         })?;
-        serde_json::from_slice::<Cluster>(&bytes).map_err(|error| {
-            RefineError::Serialization(format!(
-                "failed to parse cluster registry {}: {error}",
-                path.display()
-            ))
-        })
+        serde_json::from_slice::<Cluster>(&bytes)
+            .map(Some)
+            .map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to parse legacy cluster registry {}: {error}",
+                    path.display()
+                ))
+            })
+    }
+
+    fn cluster_from_registry(&self, registry: NodeRegistry) -> Cluster {
+        let updated_at = registry
+            .nodes
+            .iter()
+            .map(|node| node.updated_at.clone())
+            .max()
+            .unwrap_or_else(now_timestamp);
+        Cluster {
+            nodes: registry
+                .nodes
+                .into_iter()
+                .filter(|node| !node.archived)
+                .collect(),
+            updated_at,
+        }
+    }
+}
+
+impl ClusterService for FileClusterService {
+    fn registry(&self) -> RefineResult<Cluster> {
+        let registry = self.load_node_registry_with_legacy_cluster()?;
+        Ok(self.cluster_from_registry(registry))
     }
 
     fn transfer(&self, _gap_or_feature_id: &str, node_id: &str) -> RefineResult<()> {
@@ -322,7 +373,7 @@ impl ClusterService for FileClusterRegistryService {
         validate_remote_node_enabled(&cluster, node_id)?;
         let Some(node) = cluster.nodes.iter().find(|node| node.id == node_id) else {
             return Err(RefineError::NotFound(format!(
-                "cluster node {node_id} was not found"
+                "node {node_id} was not found"
             )));
         };
         if !valid_ssh_host(&node.ssh_host) {
@@ -381,14 +432,11 @@ impl ClusterService for FileClusterRegistryService {
     }
 
     fn maintenance(&self, _active: bool, _reason: Option<String>) -> RefineResult<Cluster> {
-        let mut cluster = self.registry()?;
-        cluster.updated_at = now_timestamp();
-        self.save(&cluster)?;
-        Ok(cluster)
+        self.registry()
     }
 }
 
-impl FileClusterRegistryService {
+impl FileClusterService {
     fn security(&self) -> RefineResult<FileSecurityService> {
         let runtime_root = self
             .runtime_root
@@ -399,24 +447,22 @@ impl FileClusterRegistryService {
 }
 
 pub fn validate_remote_node_enabled(cluster: &Cluster, node_id: &str) -> RefineResult<()> {
-    if !valid_cluster_node_id(node_id) {
+    if !valid_node_id(node_id) {
         return Err(RefineError::InvalidInput(format!(
-            "invalid cluster node id {node_id}"
+            "invalid node id {node_id}"
         )));
     }
 
     let Some(node) = cluster.nodes.iter().find(|node| node.id == node_id) else {
         return Err(RefineError::NotFound(format!(
-            "cluster node {node_id} was not found"
+            "node {node_id} was not found"
         )));
     };
 
     if node.enabled {
         Ok(())
     } else {
-        Err(RefineError::Conflict(format!(
-            "cluster node {node_id} is disabled"
-        )))
+        Err(RefineError::Conflict(format!("node {node_id} is disabled")))
     }
 }
 
@@ -434,9 +480,9 @@ fn bootstrap_remote_node_with_runtime(
     allowed_commands: impl IntoIterator<Item = impl Into<String>>,
 ) -> RefineResult<RemoteRunResult> {
     let runtime_root = runtime_root.into();
-    if !valid_cluster_node_id(&request.node_id) {
+    if !valid_node_id(&request.node_id) {
         return Err(RefineError::InvalidInput(format!(
-            "invalid cluster node id {}",
+            "invalid node id {}",
             request.node_id
         )));
     }
@@ -672,9 +718,9 @@ fn shell_word(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
 
-fn default_cluster_node(id: &str) -> ClusterNode {
+fn default_node(id: &str) -> Node {
     let now = now_timestamp();
-    ClusterNode {
+    Node {
         id: id.to_string(),
         display_name: id.to_string(),
         ssh_host: String::new(),
@@ -688,7 +734,30 @@ fn default_cluster_node(id: &str) -> ClusterNode {
         health: None,
         created_at: now.clone(),
         updated_at: now,
+        archived: false,
     }
+}
+
+fn merge_legacy_node(node: &mut Node, legacy: Node) -> bool {
+    let before = node.clone();
+    if node.display_name == node.id && !legacy.display_name.trim().is_empty() {
+        node.display_name = legacy.display_name;
+    }
+    node.ssh_host = legacy.ssh_host;
+    node.ssh_user = legacy.ssh_user;
+    node.ssh_identity_path = legacy.ssh_identity_path;
+    node.ssh_port = legacy.ssh_port;
+    node.refine_checkout = legacy.refine_checkout;
+    node.target_app_path = legacy.target_app_path;
+    node.refine_port = legacy.refine_port;
+    node.enabled = legacy.enabled;
+    node.health = legacy.health;
+    node.archived = false;
+    if *node == before {
+        return false;
+    }
+    node.updated_at = now_timestamp();
+    true
 }
 
 fn port_or_default(value: u64, default: u16) -> u16 {
@@ -705,30 +774,10 @@ fn cluster_response(cluster: Cluster) -> serde_json::Value {
         "enabled": !cluster.nodes.is_empty(),
         "updated_at": cluster.updated_at,
         "message": if cluster.nodes.is_empty() {
-            "No cluster nodes configured."
+            "No nodes configured."
         } else {
-            "Cluster nodes configured."
+            "Nodes configured."
         }
-    })
-}
-
-fn write_json(path: &Path, value: &impl serde::Serialize) -> RefineResult<()> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create cluster registry directory {}: {error}",
-                parent.display()
-            ))
-        })?;
-    }
-    let encoded = serde_json::to_string_pretty(value).map_err(|error| {
-        RefineError::Serialization(format!("failed to encode cluster registry: {error}"))
-    })?;
-    fs::write(path, format!("{encoded}\n")).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to write cluster registry {}: {error}",
-            path.display()
-        ))
     })
 }
 
@@ -834,12 +883,12 @@ mod tests {
     }
 
     #[test]
-    fn file_cluster_registry_manages_node_lifecycle() {
+    fn file_cluster_service_manages_node_lifecycle() {
         let temp_root = unique_temp_dir("cluster");
         let refine_dir = temp_root.join(".refine");
-        let service = FileClusterRegistryService::new(&refine_dir);
+        let service = FileClusterService::new(&refine_dir);
 
-        assert_eq!(service.list_response().unwrap()["enabled"], false);
+        assert_eq!(service.list_response().unwrap()["enabled"], true);
         service.add_node("node-1").unwrap();
         service.set_enabled("node-1", false).unwrap();
         assert_eq!(service.show("node-1").unwrap()["node"]["enabled"], false);
@@ -848,29 +897,85 @@ mod tests {
         service.sync().unwrap();
         service.maintenance_response().unwrap();
         service.remove_node("node-1").unwrap();
-        assert_eq!(service.registry().unwrap().nodes.len(), 0);
+        assert!(
+            service
+                .registry()
+                .unwrap()
+                .nodes
+                .iter()
+                .all(|node| node.id != "node-1")
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }
 
     #[test]
-    fn file_cluster_registry_authorizes_remote_run_commands() {
+    fn file_cluster_service_migrates_legacy_cluster_json_to_nodes() {
+        let temp_root = unique_temp_dir("cluster-legacy-migration");
+        let refine_dir = temp_root.join(".refine");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::write(
+            refine_dir.join("cluster.json"),
+            serde_json::json!({
+                "nodes": [{
+                    "id": "node-1",
+                    "display_name": "Legacy Node",
+                    "ssh_host": "example.com",
+                    "ssh_user": "deploy",
+                    "ssh_identity_path": "~/.ssh/refine_ed25519",
+                    "ssh_port": 2222,
+                    "refine_checkout": "/srv/refine",
+                    "target_app_path": "/srv/app",
+                    "refine_port": 18081,
+                    "enabled": true,
+                    "health": null,
+                    "created_at": "2026-01-01T00:00:00Z",
+                    "updated_at": "2026-01-01T00:00:00Z"
+                }],
+                "updated_at": "2026-01-01T00:00:00Z"
+            })
+            .to_string(),
+        )
+        .unwrap();
+
+        let service = FileClusterService::new(&refine_dir);
+        let response = service.list_response().unwrap();
+        let migrated_node = response["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["id"] == "node-1")
+            .unwrap();
+        assert_eq!(migrated_node["ssh_host"], "example.com");
+        assert_eq!(migrated_node["ssh_port"], 2222);
+        let nodes_path = refine_dir.join("nodes.json");
+        let first_nodes = fs::read_to_string(&nodes_path).unwrap();
+
+        service.list_response().unwrap();
+        let second_nodes = fs::read_to_string(&nodes_path).unwrap();
+        assert_eq!(first_nodes, second_nodes);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_cluster_service_authorizes_remote_run_commands() {
         let temp_root = unique_temp_dir("cluster-security");
         let refine_dir = temp_root.join(".refine");
         let runtime_root = temp_root.join("run/8080");
         FileSettingsService::new(&refine_dir)
             .update(&serde_json::json!({"allowed_commands": "printf"}))
             .unwrap();
-        let service = FileClusterRegistryService::with_runtime_root(&refine_dir, &runtime_root);
+        let service = FileClusterService::with_runtime_root(&refine_dir, &runtime_root);
         service
             .upsert_node(
                 "node-1",
-                ClusterNodeUpdate {
+                NodeRemoteUpdate {
                     ssh_host: Some("example.com".to_string()),
                     ssh_user: Some("deploy".to_string()),
                     ssh_identity_path: Some("~/.ssh/refine_ed25519".to_string()),
                     enabled: Some(true),
-                    ..ClusterNodeUpdate::default()
+                    ..NodeRemoteUpdate::default()
                 },
             )
             .unwrap();

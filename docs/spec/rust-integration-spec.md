@@ -88,7 +88,7 @@ surfaces:
 - Gap lifecycle commands: create, list, show, edit, note, round, workflow
   movement, retry, verify, merge, undo, and delete.
 - Feature lifecycle and membership commands.
-- Node and cluster registry commands.
+- Node registry and cluster-operation commands.
 - Activity log list, tail, query, show, export, and support bundle commands.
 - Agent detect/configure/auth/diagnose/invoke/resume through Smoke AI.
 

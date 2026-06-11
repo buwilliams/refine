@@ -79,7 +79,7 @@ const GUIDE_CATEGORIES = [
         { hash: "#/node/application", selector: "#node-add" }),
       guideItem("cluster-manage", "Cluster", "Educate and configure",
         "Cluster lists remote nodes that can be bootstrapped or maintained over SSH for the same target app.",
-        "Default: no cluster nodes unless the project needs remote Refine nodes.",
+        "Default: no nodes unless the project needs remote Refine nodes.",
         { hash: "#/node/application", selector: "#cluster-node-add" },
         { canUseDefault: false }),
       guideItem("project-application", "Application", "Educate",

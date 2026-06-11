@@ -2503,7 +2503,7 @@ fn web_server_manages_nodes_and_transfers_gap_ownership() {
 }
 
 #[test]
-fn web_server_manages_cluster_node_registry() {
+fn web_server_manages_cluster_operations_over_nodes() {
     let temp_root = unique_temp_dir("http-cluster-registry");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
@@ -2523,13 +2523,19 @@ fn web_server_manages_cluster_node_registry() {
     });
     assert_eq!(registered.status, 200);
     assert_eq!(registered.body["enabled"], true);
-    assert_eq!(registered.body["nodes"][0]["ssh_host"], "example.com");
-    assert_eq!(registered.body["nodes"][0]["ssh_user"], "deploy");
+    let registered_node = registered.body["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == "node-1")
+        .unwrap();
+    assert_eq!(registered_node["ssh_host"], "example.com");
+    assert_eq!(registered_node["ssh_user"], "deploy");
     assert_eq!(
-        registered.body["nodes"][0]["ssh_identity_path"],
+        registered_node["ssh_identity_path"],
         "~/.ssh/refine_ed25519"
     );
-    assert!(refine_dir.join("cluster.json").exists());
+    assert!(!refine_dir.join("cluster.json").exists());
 
     let disabled = server.handle(ApiRequest {
         method: "PATCH".to_string(),
@@ -2537,8 +2543,14 @@ fn web_server_manages_cluster_node_registry() {
         body: Some(json!({"enabled": false, "ssh_port": 2222})),
     });
     assert_eq!(disabled.status, 200);
-    assert_eq!(disabled.body["nodes"][0]["enabled"], false);
-    assert_eq!(disabled.body["nodes"][0]["ssh_port"], 2222);
+    let disabled_node = disabled.body["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["id"] == "node-1")
+        .unwrap();
+    assert_eq!(disabled_node["enabled"], false);
+    assert_eq!(disabled_node["ssh_port"], 2222);
 
     let bootstrap = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -2567,7 +2579,12 @@ fn web_server_manages_cluster_node_registry() {
             .contains("'deploy@example.com'")
     );
     assert_eq!(
-        bootstrap.body["cluster"]["nodes"][0]["health"]["status"],
+        bootstrap.body["cluster"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["id"] == "node-1")
+            .unwrap()["health"]["status"],
         "ready"
     );
 
@@ -4701,7 +4718,8 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         body: None,
     });
     assert_eq!(cluster.status, 200);
-    assert_eq!(cluster.body["enabled"], false);
+    assert_eq!(cluster.body["enabled"], true);
+    assert_eq!(cluster.body["nodes"][0]["id"], "default");
 
     fs::remove_dir_all(temp_root).unwrap();
 }

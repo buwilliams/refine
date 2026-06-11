@@ -96,6 +96,15 @@ impl FileNodeRegistryService {
             display_name: id.clone(),
             created_at: now.clone(),
             updated_at: now,
+            enabled: true,
+            ssh_host: String::new(),
+            ssh_user: String::new(),
+            ssh_identity_path: String::new(),
+            ssh_port: 22,
+            refine_checkout: "~/refine".to_string(),
+            target_app_path: String::new(),
+            refine_port: 8080,
+            health: None,
             archived: false,
         });
         self.save_registry(&registry)?;
@@ -117,6 +126,15 @@ impl FileNodeRegistryService {
             display_name: display_name.to_string(),
             created_at: now.clone(),
             updated_at: now,
+            enabled: true,
+            ssh_host: String::new(),
+            ssh_user: String::new(),
+            ssh_identity_path: String::new(),
+            ssh_port: 22,
+            refine_checkout: "~/refine".to_string(),
+            target_app_path: String::new(),
+            refine_port: 8080,
+            health: None,
             archived: false,
         };
         registry.nodes.push(node.clone());
@@ -225,7 +243,7 @@ impl FileNodeRegistryService {
         }
     }
 
-    fn load_registry(&self) -> RefineResult<NodeRegistry> {
+    pub(crate) fn load_registry(&self) -> RefineResult<NodeRegistry> {
         let path = self.registry_path();
         if !path.exists() {
             return Ok(NodeRegistry {
@@ -250,7 +268,7 @@ impl FileNodeRegistryService {
         Ok(registry)
     }
 
-    fn save_registry(&self, registry: &NodeRegistry) -> RefineResult<()> {
+    pub(crate) fn save_registry(&self, registry: &NodeRegistry) -> RefineResult<()> {
         write_json(&self.registry_path(), registry)
     }
 
@@ -309,6 +327,15 @@ fn default_node(id: &str, display_name: &str) -> Node {
         display_name: display_name.to_string(),
         created_at: now.clone(),
         updated_at: now,
+        enabled: true,
+        ssh_host: String::new(),
+        ssh_user: String::new(),
+        ssh_identity_path: String::new(),
+        ssh_port: 22,
+        refine_checkout: "~/refine".to_string(),
+        target_app_path: String::new(),
+        refine_port: 8080,
+        health: None,
         archived: false,
     }
 }
@@ -324,6 +351,15 @@ fn node_value(node: &Node, active: bool) -> Value {
     json!({
         "id": node.id,
         "display_name": node.display_name,
+        "enabled": node.enabled,
+        "ssh_host": node.ssh_host,
+        "ssh_user": node.ssh_user,
+        "ssh_identity_path": node.ssh_identity_path,
+        "ssh_port": node.ssh_port,
+        "refine_checkout": node.refine_checkout,
+        "target_app_path": node.target_app_path,
+        "refine_port": node.refine_port,
+        "health": node.health,
         "archived": node.archived,
         "active": active,
         "created_at": node.created_at,
