@@ -47,6 +47,12 @@ pub trait GitWorktreeService {
     fn merge_no_ff(&self, branch: &str) -> RefineResult<MergeResult>;
     fn rebase(&self, branch: &str) -> RefineResult<MergeResult>;
     fn commit(&self, message: &str, pathspecs: &[String]) -> RefineResult<String>;
+    fn commit_or_current_if_clean_since(
+        &self,
+        message: &str,
+        pathspecs: &[String],
+        base_branch: &str,
+    ) -> RefineResult<String>;
     fn commit_allow_empty(&self, message: &str, pathspecs: &[String]) -> RefineResult<String>;
     fn push(&self, remote: &str, branch: &str) -> RefineResult<()>;
     fn hard_reset(&self) -> RefineResult<MergeResult>;
@@ -177,6 +183,41 @@ impl FileGitWorktreeService {
         let output =
             stdout(self.git_output(&["rev-list", "--count", &format!("{base_branch}..HEAD")])?)?;
         Ok(output.trim().parse::<usize>().unwrap_or(0) > 0)
+    }
+
+    fn head_commit(&self) -> RefineResult<String> {
+        stdout(self.git_output(&["rev-parse", "HEAD"])?).map(|commit| commit.trim().to_string())
+    }
+
+    fn is_clean(&self) -> RefineResult<bool> {
+        stdout(self.git_output(&["status", "--porcelain=v1"])?)
+            .map(|status| status.trim().is_empty())
+    }
+
+    fn current_clean_commit_since(&self, base_branch: &str) -> RefineResult<Option<String>> {
+        if self.is_clean()? && self.has_commits_since(base_branch)? {
+            return self.head_commit().map(Some);
+        }
+        Ok(None)
+    }
+
+    fn audit_existing_commit(
+        &self,
+        commit: &str,
+        message: &str,
+        pathspecs: &[String],
+        base_branch: &str,
+    ) -> RefineResult<()> {
+        self.audit(
+            "commit_existing",
+            "ok",
+            json!({
+                "commit": commit,
+                "message": message,
+                "pathspecs": pathspecs,
+                "base_branch": base_branch
+            }),
+        )
     }
 
     fn root_for(&self, path: &str) -> PathBuf {
@@ -624,6 +665,30 @@ impl GitWorktreeService for FileGitWorktreeService {
         self.commit_inner(message, pathspecs, false)
     }
 
+    fn commit_or_current_if_clean_since(
+        &self,
+        message: &str,
+        pathspecs: &[String],
+        base_branch: &str,
+    ) -> RefineResult<String> {
+        if let Some(commit) = self.current_clean_commit_since(base_branch)? {
+            self.audit_existing_commit(&commit, message, pathspecs, base_branch)?;
+            return Ok(commit);
+        }
+        match self.commit_inner(message, pathspecs, false) {
+            Ok(commit) => Ok(commit),
+            Err(error) if is_nothing_to_commit_error(&error) => {
+                if let Some(commit) = self.current_clean_commit_since(base_branch)? {
+                    self.audit_existing_commit(&commit, message, pathspecs, base_branch)?;
+                    Ok(commit)
+                } else {
+                    Err(error)
+                }
+            }
+            Err(error) => Err(error),
+        }
+    }
+
     fn commit_allow_empty(&self, message: &str, pathspecs: &[String]) -> RefineResult<String> {
         self.commit_inner(message, pathspecs, true)
     }
@@ -737,6 +802,11 @@ fn trimmed_command_text(output: &HostCommandOutput) -> String {
     format!("{}\n{}", stdout.trim(), stderr.trim())
         .trim()
         .to_string()
+}
+
+fn is_nothing_to_commit_error(error: &RefineError) -> bool {
+    let message = error.to_string().to_lowercase();
+    message.contains("nothing to commit") || message.contains("nothing added to commit")
 }
 
 fn parse_git_change(raw: &str) -> Option<GitChange> {
@@ -1222,6 +1292,33 @@ mod tests {
         let recovered = service.recover().unwrap();
         assert!(recovered.ok);
         assert_eq!(fs::read_to_string(repo.join("app.txt")).unwrap(), "three\n");
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_git_worktree_service_accepts_clean_branch_commit_since_base() {
+        let temp_root = unique_temp_dir("git-existing-commit");
+        let repo = temp_root.join("repo");
+        fs::create_dir_all(&repo).unwrap();
+        init_repo(&repo);
+        commit_file(&repo, "base.txt", "base\n", "initial");
+        git(&repo, &["switch", "-c", "feature/precommitted"]).unwrap();
+        commit_file(&repo, "agent.txt", "agent\n", "agent commit");
+        let precommitted = git_stdout(&repo, &["rev-parse", "HEAD"]);
+
+        let service = FileGitWorktreeService::new(&repo);
+        let commit = service
+            .commit_or_current_if_clean_since("Refine commit wrapper", &[], "main")
+            .unwrap();
+        assert_eq!(commit, precommitted);
+        assert_eq!(
+            git_stdout(&repo, &["log", "--pretty=%s", "-1"]),
+            "agent commit"
+        );
+        let audit = fs::read_to_string(service.audit_path().unwrap()).unwrap();
+        assert!(audit.contains("\"action\":\"commit_existing\""));
+        assert!(audit.contains(&precommitted));
 
         fs::remove_dir_all(temp_root).unwrap();
     }

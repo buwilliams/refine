@@ -1844,6 +1844,105 @@ mod tests {
     }
 
     #[test]
+    fn file_automation_accepts_agent_precommitted_implementation_branch() {
+        let temp_root = unique_temp_dir("automation-agent-precommit");
+        let target_root = temp_root.clone();
+        let refine_dir = target_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::create_dir_all(&temp_root).unwrap();
+        fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+        git(&temp_root, &["init", "-q"]).unwrap();
+        git(
+            &temp_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&temp_root, &["add", "app.py"]).unwrap();
+        git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            "#!/bin/sh\n\
+             printf '%s\\n' 'agent precommitted implementation' > agent.txt\n\
+             git add agent.txt\n\
+             git commit -q -m 'agent precommit'\n\
+             printf '%s\\n' 'smoke-ai committed before Refine commit step'\n",
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_gap_summary("Precommitted implementation", Some("GAP1"))
+            .unwrap();
+        work_items
+            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .unwrap();
+        work_items
+            .transition_gap_status("GAP1", GapStatus::Todo)
+            .unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        let result = automation.evaluate_workflow().unwrap();
+        assert_eq!(result.steps.len(), 1);
+        assert_eq!(result.steps[0].commit.len(), 40);
+        assert_eq!(
+            work_items.show_gap_summary("GAP1").unwrap().gap.status,
+            GapStatus::Review
+        );
+        assert_eq!(
+            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            "agent precommitted implementation\n"
+        );
+        assert_eq!(
+            git_stdout(&target_root, &["rev-parse", "HEAD"])
+                .unwrap()
+                .trim(),
+            result.steps[0].commit
+        );
+        assert_eq!(
+            git_stdout(&target_root, &["log", "--pretty=%s", "-1"])
+                .unwrap()
+                .trim(),
+            "agent precommit"
+        );
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+
+        fs::remove_dir_all(temp_root.parent().unwrap().join(format!(
+            "{}-refine-GAP1-round-1",
+            temp_root.file_name().unwrap().to_string_lossy()
+        )))
+        .ok();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_automation_fails_gap_reverts_merge_and_recreates_worktree_on_qa_failure() {
         let temp_root = unique_temp_dir("automation-qa-revert");
         let target_root = temp_root.clone();

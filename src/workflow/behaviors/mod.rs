@@ -143,9 +143,11 @@ impl WorkflowBehavior for WorkflowImplementation {
 
         let worktree_git =
             FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
-        let commit = match worktree_git.commit(
+        let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
+        let commit = match worktree_git.commit_or_current_if_clean_since(
             &format!("Implement {} round {}", ctx.gap_id, ctx.round_idx + 1),
             &[],
+            &target_branch,
         ) {
             Ok(commit) => commit,
             Err(error) => return fail(ctx, "commit", error),
