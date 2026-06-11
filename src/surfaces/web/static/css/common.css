@@ -131,7 +131,7 @@
 .status-pill.in-progress { background: var(--color-warning-soft); color: var(--color-warning); }
 .status-pill.qa          { background: var(--color-success-soft); color: #0f766e; }
 .status-pill.ready-merge { background: #fff0d7; color: #9a5b00; }
-.status-pill.awaiting-rebuild { background: var(--color-warning-soft); color: var(--color-warning); }
+.status-pill.build { background: var(--color-warning-soft); color: var(--color-warning); }
 
 /* System screen tab strip. Mirrors the Toolbar dock tabs so Settings
    sections read as tabs instead of plain text links. */

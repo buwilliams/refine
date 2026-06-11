@@ -2,16 +2,13 @@ use super::dispatch::{
     absolute_cli_path, dispatch, explicit_durable_root_path, system_status_response,
 };
 use super::*;
-use crate::core::host::agent_providers::smoke_ai_env_lock;
-use crate::core::observability::activity::ActivityService;
-use crate::core::observability::activity::FileActivityService;
-use crate::core::product::project_state::PROJECTION_SNAPSHOT_FILE;
-use crate::core::product::project_state::{FileProjectStateStore, ProjectStateStore};
-use crate::core::supervisor::config::FileSettingsService;
-use crate::core::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
-use crate::core::supervisor::runtime::RuntimeRoot;
+use crate::tools::observability::activity::ActivityService;
+use crate::tools::observability::activity::FileActivityService;
+use crate::tools::product::project_state::PROJECTION_SNAPSHOT_FILE;
+use crate::tools::product::project_state::{FileProjectStateStore, ProjectStateStore};
+use crate::tools::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
+use crate::tools::supervisor::runtime::RuntimeRoot;
 use clap::Parser;
-use serde_json::json;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, TcpListener};
@@ -32,8 +29,7 @@ fn explicit_durable_root_path_detects_internal_cli_escape_hatch() {
     assert_eq!(explicit_durable_root_path(&command), Some(&durable_root));
 
     let default_daemon_command = Commands::Workflow {
-        action: WorkflowAction::Schedule {
-            durable_root: PathBuf::new(),
+        action: WorkflowAction::Pause {
             runtime_root: PathBuf::from("run"),
         },
     };
@@ -778,90 +774,6 @@ fn gap_merge_and_undo_use_shared_file_work_item_service() {
 }
 
 #[test]
-fn workflow_schedule_uses_file_scheduler_service() {
-    let temp_root = unique_temp_dir("cli-workflow-schedule");
-    let durable_root = temp_root.join(".refine");
-    let runtime_root = temp_root.join("run/8080");
-    let smoke_ai = temp_root.join("smoke-ai");
-    fs::create_dir_all(&temp_root).unwrap();
-    init_test_git_repo(&temp_root);
-    fs::write(
-        &smoke_ai,
-        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai\\n' >> app.py\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
-    )
-    .unwrap();
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&smoke_ai, permissions).unwrap();
-    }
-    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
-    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
-    }
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "gap",
-            "create",
-            "Schedulable Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--id",
-            "GAP1",
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    FileSettingsService::new(&durable_root)
-        .update(&json!({"agent_cli": "smoke-ai"}))
-        .unwrap();
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "transition",
-            "GAP1",
-            "todo",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "schedule",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--runtime-root",
-            runtime_root.to_str().unwrap(),
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-
-    let scheduler_state = fs::read_to_string(runtime_root.join("scheduler-state.json")).unwrap();
-    assert!(scheduler_state.contains("\"gap_id\": \"GAP1\""));
-    assert!(scheduler_state.contains("\"state\": \"completed\""));
-    let gap = fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json")).unwrap();
-    assert!(gap.contains("\"status\": \"review\""));
-    unsafe {
-        if let Some(previous) = previous_smoke_ai {
-            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
-        } else {
-            std::env::remove_var("REFINE_SMOKE_AI_PATH");
-        }
-    }
-
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
 fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-feature-membership");
     let durable_root = temp_root.join(".refine");
@@ -955,7 +867,7 @@ fn feature_create_list_show_and_membership_use_shared_file_work_item_service() {
 }
 
 #[test]
-fn cli_gap_lifecycle_membership_and_feature_edit_use_core_services() {
+fn cli_gap_lifecycle_membership_and_feature_edit_use_tool_services() {
     let temp_root = unique_temp_dir("cli-gap-lifecycle");
     let durable_root = temp_root.join(".refine");
     for (command, args) in [
@@ -1294,236 +1206,6 @@ fn feature_import_uses_shared_import_service() {
     assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));
     assert_eq!(gap.gap.priority.as_str(), "high");
     assert_eq!(gap.gap.reporter.as_deref(), Some("QA"));
-
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
-fn workflow_transition_uses_shared_file_work_item_service() {
-    let temp_root = unique_temp_dir("cli-workflow-transition");
-    let durable_root = temp_root.join(".refine");
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "gap",
-            "create",
-            "Workflow Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--id",
-            "GAP1",
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "transition",
-            "GAP1",
-            "todo",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
-            .unwrap()
-            .contains("\"status\": \"todo\"")
-    );
-
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
-fn workflow_bulk_transition_uses_shared_file_work_item_service() {
-    let temp_root = unique_temp_dir("cli-workflow-bulk");
-    let durable_root = temp_root.join(".refine");
-    for (id, name) in [("GAP1", "Gap One"), ("GAP2", "Gap Two")] {
-        dispatch(
-            Cli::try_parse_from([
-                "refine",
-                "gap",
-                "create",
-                name,
-                "--durable-root",
-                durable_root.to_str().unwrap(),
-                "--id",
-                id,
-            ])
-            .unwrap(),
-        )
-        .unwrap();
-    }
-
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "bulk-transition",
-            "todo",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--selected-id",
-            "GAP1",
-            "--selected-id",
-            "GAP2",
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
-            .unwrap()
-            .contains("\"status\": \"todo\"")
-    );
-    assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P2/gap.json"))
-            .unwrap()
-            .contains("\"status\": \"todo\"")
-    );
-
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
-fn workflow_control_commands_use_core_state() {
-    let temp_root = unique_temp_dir("cli-workflow-control");
-    let durable_root = temp_root.join(".refine");
-    let runtime_root = temp_root.join("run");
-    let smoke_ai = temp_root.join("smoke-ai");
-    fs::create_dir_all(&temp_root).unwrap();
-    init_test_git_repo(&temp_root);
-    fs::write(
-        &smoke_ai,
-        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai control\\n' >> app.py\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
-    )
-    .unwrap();
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&smoke_ai, permissions).unwrap();
-    }
-    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
-    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
-    }
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "gap",
-            "create",
-            "Workflow Control Gap",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--id",
-            "GAP1",
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "transition",
-            "GAP1",
-            "todo",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    FileSettingsService::new(&durable_root)
-        .update(&json!({"agent_cli": "smoke-ai"}))
-        .unwrap();
-
-    for argv in [
-        vec![
-            "refine",
-            "workflow",
-            "schedule",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--runtime-root",
-            runtime_root.to_str().unwrap(),
-        ],
-        vec![
-            "refine",
-            "workflow",
-            "pause",
-            "--runtime-root",
-            runtime_root.to_str().unwrap(),
-        ],
-        vec![
-            "refine",
-            "workflow",
-            "resume",
-            "--runtime-root",
-            runtime_root.to_str().unwrap(),
-        ],
-        vec![
-            "refine",
-            "workflow",
-            "enforce",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-        ],
-    ] {
-        dispatch(Cli::try_parse_from(argv).unwrap()).unwrap();
-    }
-    unsafe {
-        if let Some(previous) = previous_smoke_ai {
-            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
-        } else {
-            std::env::remove_var("REFINE_SMOKE_AI_PATH");
-        }
-    }
-
-    let pause_state: serde_json::Value = serde_json::from_str(
-        &fs::read_to_string(runtime_root.join("process-control.json")).unwrap(),
-    )
-    .unwrap();
-    assert_eq!(pause_state["agents_paused"], false);
-    assert_eq!(pause_state["background_processes_stopped"], false);
-
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "bulk-transition",
-            "failed",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-            "--selected-id",
-            "GAP1",
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    dispatch(
-        Cli::try_parse_from([
-            "refine",
-            "workflow",
-            "restore",
-            "--durable-root",
-            durable_root.to_str().unwrap(),
-        ])
-        .unwrap(),
-    )
-    .unwrap();
-    assert!(
-        fs::read_to_string(durable_root.join("gaps/GA/P1/gap.json"))
-            .unwrap()
-            .contains("\"status\": \"todo\"")
-    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -1884,30 +1566,6 @@ fn agent_configure_and_diagnose_use_provider_service() {
         Cli::try_parse_from(["refine", "agent", "configure", "--provider", "nope"]).unwrap(),
     );
     assert!(invalid.is_err());
-}
-
-fn init_test_git_repo(repo: &std::path::Path) {
-    fs::write(repo.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
-    for args in [
-        vec!["init", "-q"],
-        vec!["config", "user.email", "refine-test@example.invalid"],
-        vec!["config", "user.name", "Refine Test"],
-        vec!["add", "app.py"],
-        vec!["commit", "-q", "-m", "Initialize test app"],
-    ] {
-        let output = std::process::Command::new("git")
-            .arg("-C")
-            .arg(repo)
-            .args(args)
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "git command failed\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        );
-    }
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {

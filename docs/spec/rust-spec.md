@@ -5,9 +5,9 @@
 Define a Rust-native Refine architecture with three user-facing surfaces:
 **web**, **desktop**, and **CLI**. All surfaces talk to one local
 supervisor daemon that owns host integration, process lifecycle, project
-attachment, target-app operations, agent execution, and durable Refine state.
-The reason to centralize real work in `core` is complete feature parity:
-Desktop, browser, and CLI should expose the same product capabilities through
+attachment, target-app operations, agent execution, workflow automation, and
+durable Refine state. Real work is centralized in `workflow` and `tools` so
+Desktop, browser, and CLI expose the same product capabilities through
 different presentation and transport layers.
 
 The Rust direction is a product architecture for a native local Refine
@@ -29,7 +29,7 @@ Python or `uv` for Refine itself.
 - Make installation, update, diagnostics, and recovery native OS behaviors.
 - Keep business logic shared across web, desktop, and CLI surfaces.
 - Preserve complete feature parity across web, desktop, and CLI by routing
-  product behavior through shared `core` modules.
+  product behavior through shared `workflow` and `tools` modules.
 - Support an incremental port that can be validated workflow by workflow.
 
 ## Non-Goals
@@ -47,9 +47,10 @@ Python or `uv` for Refine itself.
 Refine has three surfaces over one local system. They should have complete
 feature parity. A surface may choose a different interaction style, but missing
 capabilities should be treated as implementation gaps unless explicitly
-documented as product decisions. This is the main reason `core` exists:
-workflow semantics, state mutation, process lifecycle, provider execution, and
-storage orchestration are implemented once and exposed through every surface.
+documented as product decisions. This is the main reason `workflow` and
+`tools` exist: workflow semantics, state mutation, process lifecycle, provider
+execution, and storage orchestration are implemented once and exposed through
+every surface.
 
 ### Desktop
 
@@ -84,7 +85,7 @@ Responsibilities:
 - Use the same HTTP and server-sent-event APIs as Desktop.
 
 The web surface should remain deployable as static assets served by the daemon.
-Business logic belongs in Rust core services, not in frontend-only code. The
+Business logic belongs in Rust workflow/tools services, not in frontend-only code. The
 Rust-owned web UI asset tree lives under `src/surfaces/web/static/`, so native
 Refine is self-contained and does not depend on Python-owned static files.
 
@@ -98,7 +99,7 @@ Responsibilities:
 - Put actions under the model they operate on rather than copying the old Python
   CLI groupings.
 - Emit human-readable output and structured JSON for automation.
-- Call the same daemon APIs and core operations as the UI surfaces.
+- Call the same daemon APIs and workflow/tools operations as the UI surfaces.
 
 The CLI may also run limited bootstrap commands when the daemon is not yet
 installed, but normal operation should go through the daemon.
@@ -123,10 +124,9 @@ Representative model-oriented CLI groups:
   workflow movement, import-backed creation, cancellation, and deletion.
   Actions include `create`, `list`, `show`, `edit`, `add-gap`, `remove-gap`,
   `reorder-gap`, `move`, `cancel`, `delete`, and `import`.
-- `refine workflow`: cross-model workflow decisions and bulk state operations
-  whose primary object is the state machine rather than one record. Actions
-  include `allowed`, `transition`, `bulk-transition`, `schedule`, `pause`,
-  `resume`, `restore`, and `enforce`.
+- `refine workflow`: controls for the always-on workflow engine. Public
+  actions include `pause` and `resume`; workflow state movement is automatic
+  while the daemon is running.
 - `refine node`: local node identity, active-node selection, ownership, and
   transfer. Actions include `list`, `show`, `create`, `activate`, `archive`,
   `rename`, `settings`, and `transfer`.
@@ -166,7 +166,7 @@ Desktop shell      Browser UI          CLI
      HTTP, SSE, static assets,
      local-origin checks, request parsing, response shaping
                       |
-                    core
+                    workflow/tools
    supervisor, product workflow, host adapters,
    jobs, storage orchestration, observability
                       |
@@ -181,7 +181,7 @@ The supervisor daemon is the single local authority. It contains the local web
 server that serves UI assets and exposes the HTTP and server-sent-event routes
 used by Desktop, browser, and CLI surfaces. Route
 handlers are transport adapters: they handle HTTP concerns, translate requests
-and responses, and call `core` for real work. Surfaces do not directly mutate
+and responses, and call `workflow/tools` for real work. Surfaces do not directly mutate
 durable state or own long-lived OS processes.
 
 ## Capability Model
@@ -212,9 +212,9 @@ Each capability should define:
   surfaces or duplicating another capability's responsibilities.
 
 Product actions compose these capabilities through the daemon. For example, a
-Gap execution workflow may use work-item, scheduling, provider, process, Git,
-storage, event, and log abstractions, but those abstractions remain centralized
-instead of being rebuilt inside the Gap execution code.
+Gap execution workflow may use work-item, workflow claim, provider, process,
+Git, storage, event, and log abstractions, but those abstractions remain
+centralized instead of being rebuilt inside the Gap execution code.
 
 ## Model
 
@@ -250,7 +250,7 @@ Rules:
 - Processing modules ask `model` what states and operations are valid
   before mutating state or launching work.
 - Avoid vague top-level buckets such as `process`, `events`, or `records`.
-  OS process behavior belongs under `core::host::process_supervision`; event
+  OS process behavior belongs under `tools::host::process_supervision`; event
   delivery belongs under the daemon web server and observability; persisted
   record shapes live beside the product model they describe.
 
@@ -304,8 +304,8 @@ Rules:
 - `model::project` defines project identity, attachment status, schema status,
   app registry entries, and runtime-selection record shapes.
 - It should not choose paths, read TOML/JSON, scan Git, or mutate `run/`; those
-  behaviors belong in `core::product::project_registry`,
-  `core::product::project_state`, and `core::supervisor::runtime`.
+  behaviors belong in `tools::product::project_registry`,
+  `tools::product::project_state`, and `tools::supervisor::runtime`.
 
 ### Gap Model
 
@@ -366,9 +366,9 @@ Rules:
   independent durable field in the Python baseline.
 - Feature workflow actions can move eligible Gaps to `backlog` or `todo`.
   Protected Gap statuses are `review`, `done`, `ready-merge`, and
-  `awaiting-rebuild`.
+  `build`.
 - Cancelling a Feature is a system-owned cascade operation. It cancels
-  `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`, `awaiting-rebuild`,
+  `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`, `build`,
   `review`, and `failed` Gaps through the shared Gap cancel path, skips `done`
   Gaps, and skips already `cancelled` Gaps.
 - Feature cancel must stop or reconcile active work before recording the final
@@ -385,10 +385,10 @@ Gap and Feature workflows.
 Properties:
 
 - `GapStatus`: `backlog`, `todo`, `in-progress`, `qa`, `ready-merge`,
-  `awaiting-rebuild`, `review`, `done`, `failed`, and `cancelled`.
+  `build`, `review`, `done`, `failed`, and `cancelled`.
 - `TerminalGapStatus`: `done` and `cancelled`.
 - `AutomatedGapStatus`: `in-progress`, `qa`, `ready-merge`, and
-  `awaiting-rebuild`.
+  `build`.
 - `UserStatusTransition`: currently `backlog -> todo`, `todo -> backlog`,
   `review -> todo`, `done -> review`, `failed -> todo`, and
   `cancelled -> todo`; same-status updates are no-ops.
@@ -396,16 +396,16 @@ Properties:
   `ready-merge`, plus the special `__last_workflow_state` restore operation.
 - `FeatureWorkflowTarget`: `backlog` or `todo`.
 - `FeatureProtectedStatus`: `review`, `done`, `ready-merge`, and
-  `awaiting-rebuild`.
+  `build`.
 - `FeatureCancelStatus`: `backlog`, `todo`, `in-progress`, `qa`,
-  `ready-merge`, `awaiting-rebuild`, `review`, and `failed`.
+  `ready-merge`, `build`, `review`, and `failed`.
 
 Rules:
 
 - Manual status updates cannot enter system-owned states through ordinary
   metadata edits; dedicated workflow actions own those transitions.
 - The model should answer whether an operation is allowed for a given Gap or
-  Feature state. `core` performs the operation only after the model approves
+  Feature state. `workflow/tools` performs the operation only after the model approves
   it.
 - Examples of operations the model should name: create Gap, edit Gap metadata,
   edit notes, submit new round, edit latest round, start implementation,
@@ -418,7 +418,7 @@ Rules:
 Module: `model::cluster`; path: `src/model/cluster/`.
 
 Owns the git-synced cluster registry shape and cluster-level state. Runtime SSH
-execution belongs in `core::host::cluster`; the model only defines the records
+execution belongs in `tools::host::cluster`; the model only defines the records
 and validation vocabulary.
 
 Properties:
@@ -470,7 +470,7 @@ Rules:
 Module: `model::log`; path: `src/model/log/`.
 
 Owns the canonical log and activity entry shape. Writing, retention, indexing,
-streaming, and support-bundle export belong in `core::observability`.
+streaming, and support-bundle export belong in `tools::observability`.
 
 Properties:
 
@@ -491,11 +491,11 @@ Rules:
 - Workflow transitions should be representable as log entries with
   `category = "state"` and messages that can identify the previous and next
   workflow state.
-- `model::log` defines data; `core::observability` owns append, search,
+- `model::log` defines data; `tools::observability` owns append, search,
   cleanup, metrics, streaming, diagnostics, and support bundles.
 - Storage serializes and deserializes model records; it does not invent shadow
   model definitions.
-- UI, CLI, API, scheduler, process, provider, and quality code should all use
+- UI, CLI, API, automation, process, provider, and quality code should all use
   the same model types for Gap state and allowed operations.
 - If a workflow rule can be expressed as data or a pure state transition, it
   belongs in `model`, not in a runner, route handler, or button callback.
@@ -504,7 +504,7 @@ Rules:
 
 ### Installation And Update
 
-Module: `core::host::installation`; path: `src/core/host/installation/`.
+Module: `tools::host::installation`; path: `src/tools/host/installation/`.
 
 Owns abstractions for: install, repair, update, rollback, uninstall.
 
@@ -512,7 +512,7 @@ Requirements:
 
 - Install Refine without requiring host Python.
 - Register the daemon with the host OS where appropriate.
-- Keep Desktop app updates and daemon/core updates coherent.
+- Keep Desktop app updates and daemon/workflow/tools updates coherent.
 - Detect and report stale, partial, or conflicting installs.
 - Support rollback when an update fails before state migration completes.
 - Preserve user data and target-app state across upgrades.
@@ -528,7 +528,7 @@ OS backends:
 
 ### Daemon Lifecycle
 
-Module: `core::supervisor::lifecycle`; path: `src/core/supervisor/lifecycle/`.
+Module: `tools::supervisor::lifecycle`; path: `src/tools/supervisor/lifecycle/`.
 
 Owns abstractions for: start, stop, restart, status, health, recover.
 
@@ -552,7 +552,7 @@ Requirements:
 
 ### Surface Events
 
-Module: `core::supervisor::runtime`; path: `src/core/supervisor/runtime/`.
+Module: `tools::supervisor::runtime`; path: `src/tools/supervisor/runtime/`.
 
 Owns abstractions for: open UI, stream state, deliver notifications, and surface
 runtime context.
@@ -567,7 +567,7 @@ Requirements:
 
 ### Project Registry
 
-Module: `core::product::project_registry`; path: `src/core/product/project_registry/`.
+Module: `tools::product::project_registry`; path: `src/tools/product/project_registry/`.
 
 Owns abstractions for: register, attach, switch, detach, clone, remove, inspect.
 
@@ -582,7 +582,7 @@ Requirements:
 
 ### Project State
 
-Module: `core::product::project_state`; path: `src/core/product/project_state/`.
+Module: `tools::product::project_state`; path: `src/tools/product/project_state/`.
 
 Owns abstractions for: initialize, read, mutate, migrate, sync, rebuild
 projections.
@@ -598,18 +598,18 @@ Requirements:
   fingerprints, so startup can load the snapshot and rescan only changed,
   missing, or new durable records.
 - The projection snapshot and required indexes are part of
-  `core::product::project_state`; routes should ask core for query results
+  `tools::product::project_state`; routes should ask tools for query results
   instead of rebuilding ad hoc indexes per surface.
 - A full durable-record scan remains the fallback when the projection snapshot
   is missing, corrupt, incompatible, or intentionally discarded.
 - Durable records remain the source of truth. Projection state must be
   rebuildable after corruption or version upgrades.
-- Mutations flow through shared core services and emit audit/activity events.
+- Mutations flow through shared workflow/tools services and emit audit/activity events.
 - Migrations are versioned, idempotent, and observable.
 
 ### Work Items
 
-Module: `core::product::work_items`; path: `src/core/product/work_items/`.
+Module: `tools::product::work_items`; path: `src/tools/product/work_items/`.
 
 Owns abstractions for: create, import, deduplicate, list, update, transition, cancel,
 delete, assign, reorder.
@@ -621,27 +621,31 @@ Requirements:
 - Imports support AI extraction, CSV paste, CSV file, and structured review.
 - UI and CLI call shared work-item operations.
 - State transitions are validated centrally.
-- Node or machine ownership is enforced before mutation or scheduling.
+- Node or machine ownership is enforced before mutation or workflow claims.
 
-### Scheduling And Execution
+### Workflow Engine
 
-Module: `core::product::scheduling`; path: `src/core/product/scheduling/`.
+Module: `workflow`; path: `src/workflow/`.
 
-Owns abstractions for: promote, reserve, dispatch, pause, resume, cancel, retry.
+Owns abstractions for: engine, context, behavior, claim, pause, resume, cancel,
+retry, and workflow-state evaluation.
 
 Requirements:
 
-- Scheduler chooses eligible work from durable state.
+- Workflow is always on while the daemon is running.
+- Workflow behavior modules evaluate eligible Gaps by durable workflow state.
 - Feature ordering is respected.
 - Global, per-node, per-provider, and per-target-app concurrency limits are
   enforced centrally.
-- Execution reservations survive daemon restart or are reconciled safely.
-- Manual user controls can pause agents, target-app processes, specific jobs,
-  or all automation.
+- Workflow claims survive daemon restart or are reconciled safely.
+- Agents, QA, merge, governance, and target-app build are tools invoked by
+  workflow behaviors.
+- Public automation controls pause or resume workflow automation; there is no
+  public schedule/run/tick command.
 
 ### Agent Providers
 
-Module: `core::host::agent_providers`; path: `src/core/host/agent_providers/`.
+Module: `tools::host::agent_providers`; path: `src/tools/host/agent_providers/`.
 
 Owns abstractions for: detect, configure, authenticate, invoke, parse, resume, diagnose.
 
@@ -657,14 +661,14 @@ Requirements:
 
 ### Process Supervision
 
-Module: `core::host::process_supervision`; path: `src/core/host/process_supervision/`.
+Module: `tools::host::process_supervision`; path: `src/tools/host/process_supervision/`.
 
 Owns abstractions for: launch, signal, wait, stream, inspect, limit, clean up.
 
 Requirements:
 
 - The daemon owns all managed OS process lifecycle.
-- Surfaces never launch or kill managed target-app, agent, rebuild, test, or
+- Surfaces never launch or kill managed target-app, agent, build, test, or
   helper processes directly.
 - Managed processes have typed ownership: daemon, target app, agent, quality,
   import, maintenance, or user-initiated helper.
@@ -690,7 +694,7 @@ OS backends should cover:
 
 ### Target App Operations
 
-Module: `core::host::target_apps`; path: `src/core/host/target_apps/`.
+Module: `tools::host::target_apps`; path: `src/tools/host/target_apps/`.
 
 Owns abstractions for: configure, start, stop, restart, status, rebuild, open, diagnose.
 
@@ -705,7 +709,7 @@ Requirements:
 
 ### Git And Worktrees
 
-Module: `core::host::git_worktrees`; path: `src/core/host/git_worktrees/`.
+Module: `tools::host::git_worktrees`; path: `src/tools/host/git_worktrees/`.
 
 Owns abstractions for: inspect, branch, worktree, diff, merge, rebase, commit, reset,
 push, recover.
@@ -723,7 +727,7 @@ Requirements:
 
 ### Quality And Verification
 
-Module: `core::host::quality`; path: `src/core/host/quality/`.
+Module: `tools::host::quality`; path: `src/tools/host/quality/`.
 
 Owns abstractions for: run checks, browser QA, regressions, screenshots, compare, gate.
 
@@ -737,7 +741,7 @@ Requirements:
 
 ### Chat And Planning
 
-Module: `core::product::chat`; path: `src/core/product/chat/`.
+Module: `tools::product::chat`; path: `src/tools/product/chat/`.
 
 Owns abstractions for: start, resume, stream, attach to Gap or Feature, persist context.
 
@@ -766,7 +770,7 @@ Requirements:
 
 ### Observability And Diagnostics
 
-Module: `core::observability`; path: `src/core/observability/`.
+Module: `tools::observability`; path: `src/tools/observability/`.
 
 Owns abstractions for: activity, logs, metrics, doctor, support bundle.
 
@@ -782,7 +786,7 @@ Requirements:
 
 ### Security And Permissions
 
-Module: `core::supervisor::security`; path: `src/core/supervisor/security/`.
+Module: `tools::supervisor::security`; path: `src/tools/supervisor/security/`.
 
 Owns abstractions for: secret storage, command allowlists, redaction, and audit.
 
@@ -797,15 +801,15 @@ Requirements:
 
 ### Cluster And Multi-Node
 
-Module: `core::host::cluster`; path: `src/core/host/cluster/`.
+Module: `tools::host::cluster`; path: `src/tools/host/cluster/`.
 
 Owns abstractions for: node registry, transfer, sync, remote command, ownership.
 
 Requirements:
 
 - Local daemon identity is explicit.
-- Work ownership is enforced before scheduling or mutation.
-- Project-state sync is a shared core operation.
+- Work ownership is enforced before workflow claims or mutation.
+- Project-state sync is a shared workflow/tools operation.
 - Remote execution and cluster maintenance have bounded, visible operations.
 - The Rust architecture should preserve the distinction between UI selection
   and runtime ownership.
@@ -815,10 +819,10 @@ Requirements:
 Native Refine now owns the repository root. The long-lived `python` branch
 preserves the 2.3.8 Python implementation; `main` is the Rust implementation.
 
-Use one core product Cargo package at the repository root. Use Rust modules for
+Use one Rust product Cargo package at the repository root. Use Rust modules for
 namespaces, code ownership, service traits, and abstraction boundaries. The
 project may become a small Cargo workspace to host a thin desktop Tauri wrapper,
-but capabilities should not be split into separate packages. The core product
+but capabilities should not be split into separate packages. The Rust product
 remains one package; the desktop package exists only for native shell packaging
 and Tauri integration.
 
@@ -844,12 +848,16 @@ refine/
           images/
           js/
       web_server/
-    core/
+    workflow/
+      behavior.rs
+      behaviors/
+      context.rs
+      mod.rs
+    tools/
       product/
         project_registry/
         project_state/
         work_items/
-        scheduling/
         chat/
         imports/
         nodes/
@@ -892,9 +900,9 @@ refine/
 ```
 
 The complete web UI asset tree lives under `src/surfaces/web/static/`.
-Core product code lives under `src/`, and repository automation lives under
+Rust product code lives under `src/`, and repository automation lives under
 `xtask/`, so the native architecture is explicit at the repository root. The
-Tauri wrapper lives under `desktop/src-tauri/` and depends on the core product
+Tauri wrapper lives under `desktop/src-tauri/` and depends on the Rust product
 package. It should not own capabilities, durable state rules, process lifecycle,
 provider behavior, or workflow logic.
 
@@ -918,17 +926,20 @@ graph:
 surfaces
   surfaces::{cli, desktop, web, web_server}
       |
-core
-  core::supervisor::{lifecycle, jobs, security, runtime, config}
-  core::product::{work_items, scheduling, project_state, ...}
-  core::host::{process_supervision, target_apps, git_worktrees, ...}
+workflow
+  workflow::{engine, context, behavior, behaviors}
+      |
+tools
+  tools::supervisor::{lifecycle, jobs, security, runtime, config}
+  tools::product::{work_items, project_state, ...}
+  tools::host::{process_supervision, target_apps, git_worktrees, ...}
       |
 model
   model::{project, gap, feature, workflow, cluster, node, log}
 
 side channel for all processing layers
 observability
-  core::observability::{logs, activity, metrics, diagnostics}
+  tools::observability::{logs, activity, metrics, diagnostics}
 ```
 
 Rules:
@@ -936,14 +947,15 @@ Rules:
 - `model::*` modules own canonical data types, persisted records,
   workflow states, operation rules, and pure validation. They should not depend
   on processing, surface, host, supervisor, or observability modules.
-- `core::product::*` modules own Refine domain behavior and durable workflow
-  semantics built on `model`.
-- `core::host::*` modules own OS, Git, process, provider, browser, Docker,
+- `workflow::*` modules own workflow state movement and behavior orchestration.
+- `tools::product::*` modules own durable stores and product IO used by
+  workflow and surfaces.
+- `tools::host::*` modules own OS, Git, process, provider, browser, Docker,
   toolchain, target-app, quality, and cluster integration using model-defined
   process and ownership types.
-- `core::supervisor::*` modules own daemon authority, runtime lifecycle, jobs,
+- `tools::supervisor::*` modules own daemon authority, runtime lifecycle, jobs,
   security, configuration, error translation, and testing support.
-- `core::observability::*` modules own the single abstraction for logs,
+- `tools::observability::*` modules own the single abstraction for logs,
   activity, metrics, diagnostics, and support bundles. Processing modules emit
   through this abstraction; model modules do not.
 - `surfaces::*` modules own entrypoints and adapters for CLI, web,
@@ -953,7 +965,7 @@ Rules:
 - Avoid a generic `shared` module. Put code in the module that owns the concept.
   If a primitive is genuinely cross-cutting, give it a narrow named home inside
   the relevant container instead of creating a catch-all utility bucket.
-- Test support lives under `core::supervisor::testing` and per-capability test
+- Test support lives under `tools::supervisor::testing` and per-capability test
   fixtures. It can depend broadly on production modules, but production modules
   cannot depend on test-only code.
 
@@ -965,18 +977,18 @@ product capability:
 - `model`; path: `src/model/`. Owns canonical state types,
   workflow-state enums, allowed-operation rules, persisted record definitions, and
   pure validation.
-- `core::supervisor::runtime`; path: `src/core/supervisor/runtime/`. Owns
+- `tools::supervisor::runtime`; path: `src/tools/supervisor/runtime/`. Owns
   runtime bootstrap, OS path selection, instance identity, process startup
   context, and repo-root `run/` path resolution.
-- `core::supervisor::jobs`; path: `src/core/supervisor/jobs/`. Owns the
+- `tools::supervisor::jobs`; path: `src/tools/supervisor/jobs/`. Owns the
   job registry, operation handles, cancellation plumbing, and operation
   recovery coordination.
-- `core::supervisor::config`; path: `src/core/supervisor/config/`. Owns
+- `tools::supervisor::config`; path: `src/tools/supervisor/config/`. Owns
   loading, validating, and merging user, project, and runtime configuration.
-- `core::supervisor::errors`; path: `src/core/supervisor/errors/`. Owns
+- `tools::supervisor::errors`; path: `src/tools/supervisor/errors/`. Owns
   error categories and translation into daemon web-server responses and CLI
   output.
-- `core::supervisor::testing`; path: `src/core/supervisor/testing/`. Owns
+- `tools::supervisor::testing`; path: `src/tools/supervisor/testing/`. Owns
   black-box fixtures, fake supervisors, fake providers, fake process handles,
   and contract-test helpers.
 - `surfaces::cli`; path: `src/surfaces/cli/`. Owns the CLI
@@ -991,7 +1003,7 @@ product capability:
 - `surfaces::web_server`; path: `src/surfaces/web_server/`. Owns the
   local daemon web server: HTTP routes, server-sent-event streams, static asset
   serving, local-origin checks, request parsing, response shaping, and
-  translation into supervisor and core services.
+  translation into supervisor and workflow/tools services.
 
 `xtask/` should contain repository automation that is not part of the
 shipped product: code generation, API contract export, fixture refresh, release
@@ -1010,10 +1022,10 @@ Responsibilities:
   updates.
 - Handle local-origin checks, request parsing, response shaping, and API version
   negotiation.
-- Translate transport requests into supervisor-facing core services.
+- Translate transport requests into supervisor-facing workflow/tools services.
 - Keep route handlers thin; workflow logic, state mutation, process lifecycle,
   provider execution, Git behavior, and storage orchestration belong in
-  `core`.
+  `workflow/tools`.
 
 The CLI should normally talk to the same daemon web server using structured
 HTTP/JSON contracts. It may run limited bootstrap commands when the daemon is
@@ -1034,7 +1046,7 @@ The CLI adapter maps model actions onto the appropriate daemon routes.
 API requirements:
 
 - Stable typed contracts.
-- Module-oriented routes or methods that map clearly onto `core` services.
+- Module-oriented routes or methods that map clearly onto `workflow/tools` services.
 - Streaming operation events.
 - Idempotency keys for mutating long-running operations.
 - Consistent error codes and machine-readable details.
@@ -1244,7 +1256,7 @@ Refine itself should be native and should not require host Python.
 
 Dependency classes:
 
-- Required core dependencies: bundled with Refine or implemented in Rust.
+- Required Rust product dependencies: bundled with Refine or implemented in Rust.
 - Cache/query dependencies: use the projection snapshot and in-memory indexes
   described in the Storage Model. Do not add a query database dependency for
   workflow list, count, facet, search, sort, or lookup behavior.
@@ -1292,7 +1304,7 @@ redesign can be handled later as a separate product/design pass.
 ## Testing Strategy
 
 Testing should verify capabilities through public surfaces.
-Parity matters: when a product capability is implemented in `core`, tests
+Parity matters: when a product capability is implemented in `workflow/tools`, tests
 should prove it is reachable through web, desktop, and CLI surfaces unless a
 documented product decision says otherwise.
 
@@ -1305,7 +1317,7 @@ Required layers:
 - Contract tests for daemon web-server request/response and event contracts.
 - CLI tests with JSON output checks for the model-oriented command groups.
 - Web/Desktop UI smoke tests through the shared API.
-- Surface parity tests that verify core capabilities are available through the
+- Surface parity tests that verify workflow/tools capabilities are available through the
   CLI, browser UI, and Desktop webview.
 - Black-box compatibility tests that run representative workflows against the
   Rust implementation.
@@ -1344,7 +1356,7 @@ implementation details.
   integrations.
 - Business logic is shared across surfaces.
 - Web, desktop, and CLI surfaces are expected to reach complete feature parity
-  through shared `core` modules.
+  through shared `workflow/tools` modules.
 - The Rust project contains its own web UI asset tree under
   `src/surfaces/web/static/`, so it does not depend on Python-owned static
   files.
@@ -1357,8 +1369,8 @@ implementation details.
   count, facet, search, sort, and lookup needs.
 - The document records the resolved daemon, provider, storage, dependency, UI,
   and implementation-scope decisions.
-- The document defines a core Rust package at the repository root, leaves room
+- The document defines a workflow/tools Rust package at the repository root, leaves room
   for a thin Tauri wrapper package, assigns capabilities to modules and
-  directory paths inside the concrete `core::*` containers, and preserves the
+  directory paths inside the concrete `tools::*` containers, and preserves the
   current logical runtime-state shape while allowing the physical runtime root
   to vary between checkout and installed deployments.

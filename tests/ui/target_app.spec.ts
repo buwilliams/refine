@@ -5,13 +5,13 @@ const EMPTY_TARGET_APP_SETTINGS = {
   target_app_url: "",
   target_app_start_command: "",
   target_app_stop_command: "",
-  target_app_rebuild_command: "",
+  target_app_build_command: "",
   target_app_status_command: "",
   target_app_cwd: "",
   target_app_env_json: "{}",
   target_app_start_timeout_seconds: "120",
   target_app_stop_timeout_seconds: "60",
-  target_app_rebuild_timeout_seconds: "300",
+  target_app_build_timeout_seconds: "300",
   target_app_status_timeout_seconds: "10",
   target_app_log_path: "",
   target_app_http_check_url: "",
@@ -59,7 +59,7 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
 
     await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
     await expect(page.getByTestId("target-app-stop-command")).toHaveValue("./.refine/manage-app.sh stop");
-    await expect(page.getByTestId("target-app-rebuild-command")).toHaveValue("./.refine/manage-app.sh rebuild");
+    await expect(page.getByTestId("target-app-build-command")).toHaveValue("./.refine/manage-app.sh build");
     await expect(page.getByTestId("target-app-status-command")).toHaveValue("./.refine/manage-app.sh status");
     await expect(page.getByTestId("target-app-env")).toHaveValue(/REFINE_SMOKE_TARGET/);
     await expect(page.getByTestId("target-app-http-url")).toHaveValue("http://127.0.0.1:3456/health");
@@ -99,13 +99,13 @@ test("keeps Generate with AI loading state after reload until the background job
                 config: {
                   start_command: "./.refine/manage-app.sh start",
                   stop_command: "./.refine/manage-app.sh stop",
-                  rebuild_command: "./.refine/manage-app.sh rebuild",
+                  build_command: "./.refine/manage-app.sh build",
                   status_command: "./.refine/manage-app.sh status",
                   cwd: ".",
                   env: {},
                   start_timeout_seconds: 120,
                   stop_timeout_seconds: 60,
-                  rebuild_timeout_seconds: 300,
+                  build_timeout_seconds: 300,
                   status_timeout_seconds: 10,
                   log_path: ".refine/manage-app.log",
                   http_check_url: "",
@@ -164,13 +164,13 @@ test("autosaves target-app config fields", async ({ page, request }) => {
     await fillAndChange(page, "target-app-url", "http://127.0.0.1:4321");
     await fillAndChange(page, "target-app-start-command", "printf manual-start");
     await fillAndChange(page, "target-app-stop-command", "printf manual-stop");
-    await fillAndChange(page, "target-app-rebuild-command", "printf manual-rebuild");
+    await fillAndChange(page, "target-app-build-command", "printf manual-build");
     await fillAndChange(page, "target-app-status-command", "printf manual-status");
     await fillAndChange(page, "target-app-cwd", "demo-app");
     await fillAndChange(page, "target-app-env", "{\"MANUAL_TARGET_APP\":\"1\"}");
     await fillAndChange(page, "target-app-start-timeout", "21");
     await fillAndChange(page, "target-app-stop-timeout", "22");
-    await fillAndChange(page, "target-app-rebuild-timeout", "23");
+    await fillAndChange(page, "target-app-build-timeout", "23");
     await fillAndChange(page, "target-app-status-timeout", "24");
     await fillAndChange(page, "target-app-log-path", "target/manual-target-app.log");
     await fillAndChange(page, "target-app-http-url", "http://127.0.0.1:4321/health");
@@ -185,13 +185,13 @@ test("autosaves target-app config fields", async ({ page, request }) => {
         settings.target_app_url,
         settings.target_app_start_command,
         settings.target_app_stop_command,
-        settings.target_app_rebuild_command,
+        settings.target_app_build_command,
         settings.target_app_status_command,
         settings.target_app_cwd,
         settings.target_app_env_json,
         settings.target_app_start_timeout_seconds,
         settings.target_app_stop_timeout_seconds,
-        settings.target_app_rebuild_timeout_seconds,
+        settings.target_app_build_timeout_seconds,
         settings.target_app_status_timeout_seconds,
         settings.target_app_log_path,
         settings.target_app_http_check_url,
@@ -203,7 +203,7 @@ test("autosaves target-app config fields", async ({ page, request }) => {
       "http://127.0.0.1:4321",
       "printf manual-start",
       "printf manual-stop",
-      "printf manual-rebuild",
+      "printf manual-build",
       "printf manual-status",
       "demo-app",
       "{\"MANUAL_TARGET_APP\":\"1\"}",

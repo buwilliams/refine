@@ -16,9 +16,7 @@ fn cli_surface_suite() {
     system_doctor_and_api_groups_run(&fixture);
     gap_create_list_show_edit_note_round_delete(&fixture);
     gap_feature_assignment_and_round_edit_latest(&fixture);
-    workflow_allowed_and_user_transitions(&fixture);
     gap_workflow_actions_start_retry_verify_merge_undo(&fixture);
-    workflow_bulk_schedule_pause_resume_and_enforce(&fixture);
     feature_create_membership_rollup_and_delete(&fixture);
     feature_show_edit_reorder_move_cancel_and_import(&fixture);
     node_create_activate_archive(&fixture);
@@ -371,171 +369,6 @@ fn gap_feature_assignment_and_round_edit_latest(fixture: &IntegrationFixture) {
     );
 }
 
-fn workflow_allowed_and_user_transitions(fixture: &IntegrationFixture) {
-    let statuses = [
-        "backlog",
-        "todo",
-        "in-progress",
-        "qa",
-        "ready-merge",
-        "awaiting-rebuild",
-        "review",
-        "done",
-        "failed",
-        "cancelled",
-    ];
-    for from in statuses {
-        for to in statuses {
-            let output = fixture.run_refine(&["workflow", "allowed", from, to]);
-            fixture.assert_success(&format!("workflow allowed {from} {to}"), &output);
-            let payload = fixture.json_stdout(&output);
-            let expected_allowed = from == to || manual_transition_allowed(from, to);
-            assert_eq!(
-                payload["allowed"], expected_allowed,
-                "unexpected workflow allowed result for {from} -> {to}: {payload:#}"
-            );
-            assert_eq!(
-                payload["no_op"],
-                from == to,
-                "unexpected workflow no-op result for {from} -> {to}: {payload:#}"
-            );
-            if expected_allowed {
-                assert!(payload["reason"].is_null(), "{from} -> {to}: {payload:#}");
-            } else {
-                assert!(
-                    payload["reason"].as_str().unwrap_or_default().len() > 0,
-                    "{from} -> {to}: {payload:#}"
-                );
-            }
-        }
-    }
-
-    let backlog_to_todo = fixture.create_gap("workflow transition backlog todo");
-    assert_workflow_transition(fixture, &backlog_to_todo, "todo", "todo");
-    fixture.assert_success(
-        "gap delete workflow backlog todo",
-        &fixture.run_refine(&["gap", "delete", &backlog_to_todo]),
-    );
-
-    let todo_to_backlog = fixture.create_gap("workflow transition todo backlog");
-    assert_workflow_transition(fixture, &todo_to_backlog, "todo", "todo");
-    assert_workflow_transition(fixture, &todo_to_backlog, "backlog", "backlog");
-    fixture.assert_success(
-        "gap delete workflow todo backlog",
-        &fixture.run_refine(&["gap", "delete", &todo_to_backlog]),
-    );
-
-    let review_to_todo = fixture.create_gap("workflow transition review todo");
-    seed_gap_status(fixture, &review_to_todo, "review");
-    assert_workflow_transition(fixture, &review_to_todo, "todo", "todo");
-    fixture.assert_success(
-        "gap delete workflow review todo",
-        &fixture.run_refine(&["gap", "delete", &review_to_todo]),
-    );
-
-    let done_to_review = fixture.create_gap("workflow transition done review");
-    seed_gap_status(fixture, &done_to_review, "done");
-    assert_workflow_transition(fixture, &done_to_review, "review", "review");
-    fixture.assert_success(
-        "gap delete workflow done review",
-        &fixture.run_refine(&["gap", "delete", &done_to_review]),
-    );
-
-    let failed_to_todo = fixture.create_gap("workflow transition failed todo");
-    seed_gap_status(fixture, &failed_to_todo, "failed");
-    assert_workflow_transition(fixture, &failed_to_todo, "todo", "todo");
-    fixture.assert_success(
-        "gap delete workflow failed todo",
-        &fixture.run_refine(&["gap", "delete", &failed_to_todo]),
-    );
-
-    let cancelled_to_todo = fixture.create_gap("workflow transition cancelled todo");
-    fixture.assert_success(
-        "gap cancel workflow transition seed",
-        &fixture.run_refine(&["gap", "cancel", &cancelled_to_todo]),
-    );
-    assert_eq!(fixture.gap_field(&cancelled_to_todo, "status"), "cancelled");
-    assert_workflow_transition(fixture, &cancelled_to_todo, "todo", "todo");
-    fixture.assert_success(
-        "gap delete workflow cancelled todo",
-        &fixture.run_refine(&["gap", "delete", &cancelled_to_todo]),
-    );
-
-    let qa_noop = fixture.create_gap("workflow transition qa noop");
-    seed_gap_status(fixture, &qa_noop, "failed");
-    let retried = fixture.run_refine(&["gap", "retry", &qa_noop, "--stage", "quality"]);
-    fixture.assert_success("gap retry workflow qa seed", &retried);
-    assert_eq!(fixture.gap_field(&qa_noop, "status"), "qa");
-    assert_workflow_transition(fixture, &qa_noop, "qa", "qa");
-    fixture.assert_success(
-        "gap cancel workflow qa cleanup",
-        &fixture.run_refine(&["gap", "cancel", &qa_noop]),
-    );
-    fixture.assert_success(
-        "gap delete workflow qa noop",
-        &fixture.run_refine(&["gap", "delete", &qa_noop]),
-    );
-
-    let denied = fixture.create_gap("workflow transition denied");
-    assert_workflow_transition(fixture, &denied, "todo", "todo");
-    let blocked = fixture.run_refine(&["workflow", "transition", &denied, "ready-merge"]);
-    assert!(
-        !blocked.status.success(),
-        "blocked transition unexpectedly succeeded"
-    );
-    assert_eq!(fixture.gap_field(&denied, "status"), "todo");
-    assert!(
-        String::from_utf8_lossy(&blocked.stderr)
-            .to_lowercase()
-            .contains("not allowed"),
-        "blocked transition stderr: {}",
-        String::from_utf8_lossy(&blocked.stderr)
-    );
-    fixture.assert_success(
-        "gap delete workflow denied",
-        &fixture.run_refine(&["gap", "delete", &denied]),
-    );
-}
-
-fn manual_transition_allowed(from: &str, to: &str) -> bool {
-    matches!(
-        (from, to),
-        ("backlog", "todo")
-            | ("todo", "backlog")
-            | ("review", "todo")
-            | ("done", "review")
-            | ("failed", "todo")
-            | ("cancelled", "todo")
-    )
-}
-
-fn seed_gap_status(fixture: &IntegrationFixture, gap_id: &str, status: &str) {
-    let output = fixture.run_refine(&[
-        "workflow",
-        "bulk-transition",
-        status,
-        "--selected-id",
-        gap_id,
-    ]);
-    fixture.assert_success(&format!("workflow seed {gap_id} {status}"), &output);
-    assert_eq!(fixture.gap_field(gap_id, "status"), status);
-}
-
-fn assert_workflow_transition(
-    fixture: &IntegrationFixture,
-    gap_id: &str,
-    target: &str,
-    expected_status: &str,
-) {
-    let output = fixture.run_refine(&["workflow", "transition", gap_id, target]);
-    fixture.assert_success(&format!("workflow transition {gap_id} {target}"), &output);
-    assert_eq!(
-        fixture.json_stdout(&output)["gap"]["status"],
-        expected_status
-    );
-    assert_eq!(fixture.gap_field(gap_id, "status"), expected_status);
-}
-
 fn gap_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixture) {
     let started_id = fixture.create_gap("gap action start");
     let started = fixture.run_refine(&["gap", "start", &started_id]);
@@ -559,14 +392,7 @@ fn gap_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixtu
     );
 
     let quality_id = fixture.create_gap("gap action quality retry");
-    let failed_quality = fixture.run_refine(&[
-        "workflow",
-        "bulk-transition",
-        "failed",
-        "--selected-id",
-        &quality_id,
-    ]);
-    fixture.assert_success("workflow failed quality seed", &failed_quality);
+    seed_gap_status(fixture, &quality_id, "failed");
     let retried_quality = fixture.run_refine(&["gap", "retry", &quality_id, "--stage", "quality"]);
     fixture.assert_success("gap retry quality", &retried_quality);
     assert_eq!(fixture.json_stdout(&retried_quality)["gap"]["status"], "qa");
@@ -588,14 +414,7 @@ fn gap_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixtu
     );
 
     let merge_id = fixture.create_gap("gap action merge retry");
-    let failed_merge = fixture.run_refine(&[
-        "workflow",
-        "bulk-transition",
-        "failed",
-        "--selected-id",
-        &merge_id,
-    ]);
-    fixture.assert_success("workflow failed merge seed", &failed_merge);
+    seed_gap_status(fixture, &merge_id, "failed");
     let retried_merge = fixture.run_refine(&["gap", "retry", &merge_id, "--stage", "merge"]);
     fixture.assert_success("gap retry merge", &retried_merge);
     assert_eq!(
@@ -628,156 +447,20 @@ fn gap_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixtu
     );
 }
 
-fn workflow_bulk_schedule_pause_resume_and_enforce(fixture: &IntegrationFixture) {
-    let first = fixture.create_gap("bulk transition first");
-    let second = fixture.create_gap("bulk transition second");
-    let bulk = fixture.run_refine(&[
-        "workflow",
-        "bulk-transition",
-        "todo",
-        "--selected-id",
-        &first,
-        "--selected-id",
-        &second,
-    ]);
-    fixture.assert_success("workflow bulk-transition", &bulk);
-    assert_eq!(fixture.gap_field(&first, "status"), "todo");
-    assert_eq!(fixture.gap_field(&second, "status"), "todo");
-
-    let failed = fixture.run_refine(&[
-        "workflow",
-        "bulk-transition",
-        "failed",
-        "--selected-id",
-        &first,
-        "--selected-id",
-        &second,
-    ]);
-    fixture.assert_success("workflow bulk-transition failed", &failed);
-    assert_eq!(fixture.gap_field(&first, "status"), "failed");
-    assert_eq!(fixture.gap_field(&second, "status"), "failed");
-
-    let restore = fixture.run_refine(&["workflow", "restore"]);
-    fixture.assert_success("workflow restore", &restore);
-    let restore_payload = fixture.json_stdout(&restore);
-    assert_eq!(restore_payload["updated"], 2);
-    assert_eq!(fixture.gap_field(&first, "status"), "todo");
-    assert_eq!(fixture.gap_field(&second, "status"), "todo");
-
-    let scheduler_settings = fixture.api_json(
-        "PATCH",
-        "/api/settings",
+fn seed_gap_status(fixture: &IntegrationFixture, gap_id: &str, status: &str) {
+    let payload = fixture.api_json(
+        "POST",
+        "/api/work/gaps/bulk",
         serde_json::json!({
-            "agent_cli": "smoke-ai"
+            "selected_ids": [gap_id],
+            "exclude_ids": [],
+            "update": {
+                "status": status
+            }
         }),
     );
-    assert_eq!(
-        scheduler_settings["settings"]["agent_cli"], "smoke-ai",
-        "{scheduler_settings:#}"
-    );
-    let schedule = fixture.run_refine(&["workflow", "schedule"]);
-    fixture.assert_success("workflow schedule", &schedule);
-    let schedule_payload = fixture.json_stdout(&schedule);
-    assert_eq!(schedule_payload["promoted"], 2, "{schedule_payload:#}");
-    assert!(
-        schedule_payload["dispatched"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(
-                |dispatch| dispatch["gap_id"].as_str() == Some(first.as_str())
-                    && dispatch["final_status"].as_str() == Some("review")
-                    && dispatch["merge"]["ok"].as_bool() == Some(true)
-                    && dispatch["provider"].as_str() == Some("smoke-ai")
-            ),
-        "{schedule_payload:#}"
-    );
-    assert!(
-        schedule_payload["dispatched"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(
-                |dispatch| dispatch["gap_id"].as_str() == Some(second.as_str())
-                    && dispatch["final_status"].as_str() == Some("review")
-                    && dispatch["merge"]["ok"].as_bool() == Some(true)
-                    && dispatch["provider"].as_str() == Some("smoke-ai")
-            ),
-        "{schedule_payload:#}"
-    );
-    assert!(schedule_payload["merged"].is_null(), "{schedule_payload:#}");
-    assert_eq!(fixture.gap_field(&first, "status"), "review");
-    assert_eq!(fixture.gap_field(&second, "status"), "review");
-
-    let runtime_root = fixture.runtime_root.display().to_string();
-    let pause = fixture.run_refine(&["workflow", "pause", "--runtime-root", &runtime_root]);
-    fixture.assert_success("workflow pause", &pause);
-    assert_eq!(fixture.json_stdout(&pause)["agents_paused"], true);
-    let resume = fixture.run_refine(&["workflow", "resume", "--runtime-root", &runtime_root]);
-    fixture.assert_success("workflow resume", &resume);
-    assert_eq!(fixture.json_stdout(&resume)["agents_paused"], false);
-
-    let enforce = fixture.run_refine(&["workflow", "enforce"]);
-    fixture.assert_success("workflow enforce", &enforce);
-    assert!(fixture.json_stdout(&enforce).is_object());
-
-    fixture.assert_success(
-        "gap delete bulk first",
-        &fixture.run_refine(&["gap", "delete", &first]),
-    );
-    fixture.assert_success(
-        "gap delete bulk second",
-        &fixture.run_refine(&["gap", "delete", &second]),
-    );
-
-    let settings = fixture.api_json(
-        "PATCH",
-        "/api/settings",
-        serde_json::json!({
-            "backlog_promote_after_seconds": "0",
-            "parallel_run_cap": "4",
-            "parallel_per_node_cap": "4",
-        }),
-    );
-    assert_eq!(
-        settings["settings"]["backlog_promote_after_seconds"], "0",
-        "{settings:#}"
-    );
-    let backlog = fixture.create_gap("workflow schedule auto-promote backlog");
-    assert_eq!(fixture.gap_field(&backlog, "status"), "backlog");
-    let auto_schedule = fixture.run_refine(&["workflow", "schedule"]);
-    fixture.assert_success("workflow schedule auto-promote backlog", &auto_schedule);
-    let auto_payload = fixture.json_stdout(&auto_schedule);
-    assert_eq!(auto_payload["promoted"], 1, "{auto_payload:#}");
-    assert!(
-        auto_payload["reservations"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(
-                |reservation| reservation["gap_id"].as_str() == Some(backlog.as_str())
-                    && reservation["state"].as_str() == Some("completed")
-            ),
-        "{auto_payload:#}"
-    );
-    assert!(
-        auto_payload["dispatched"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(
-                |dispatch| dispatch["gap_id"].as_str() == Some(backlog.as_str())
-                    && dispatch["final_status"].as_str() == Some("review")
-                    && dispatch["merge"]["ok"].as_bool() == Some(true)
-            ),
-        "{auto_payload:#}"
-    );
-    assert!(auto_payload["merged"].is_null(), "{auto_payload:#}");
-    assert_eq!(fixture.gap_field(&backlog, "status"), "review");
-    fixture.assert_success(
-        "gap delete auto-promoted backlog",
-        &fixture.run_refine(&["gap", "delete", &backlog]),
-    );
+    assert_eq!(payload["updated"], 1, "{payload:#}");
+    assert_eq!(fixture.gap_field(gap_id, "status"), status);
 }
 
 fn feature_create_membership_rollup_and_delete(fixture: &IntegrationFixture) {

@@ -6,17 +6,19 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
-use crate::core::host::agent_providers::{AgentProviderService, HostAgentProviderService};
-use crate::core::host::installation::InstallTarget;
-use crate::core::host::process_supervision::{FileProcessSupervisor, ManagedProcess, ProcessOwner};
-use crate::core::observability::activity::{ActivityService, FileActivityService};
-use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::core::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
-use crate::core::product::project_registry::registry_apps_array;
-use crate::core::product::project_state::RuntimeProjection;
-use crate::core::supervisor::errors::RefineResult;
-use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry};
 use crate::model::JsonObject;
+use crate::tools::host::agent_providers::{AgentProviderService, HostAgentProviderService};
+use crate::tools::host::installation::InstallTarget;
+use crate::tools::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcess, ProcessOwner,
+};
+use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
+use crate::tools::product::project_registry::registry_apps_array;
+use crate::tools::product::project_state::RuntimeProjection;
+use crate::tools::supervisor::errors::RefineResult;
+use crate::tools::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry};
 
 use super::super::*;
 use super::*;
@@ -437,8 +439,8 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
             "Plan Draft extraction is ready for Draft Feature requests",
         ),
         (
-            "target_app_rebuilder",
-            "target-app rebuild worker is ready for manual rebuild requests",
+            "target_app_builder",
+            "target-app build worker is ready for manual build requests",
         ),
         (
             "target_app_config_generator",
@@ -513,7 +515,7 @@ pub(in crate::surfaces::web_server) fn provider_status_value_refresh() -> Refine
 fn cached_provider_status_value(refresh: bool) -> RefineResult<Value> {
     let cache = PROVIDER_STATUS_CACHE.get_or_init(|| Mutex::new(None));
     let mut cache = cache.lock().map_err(|_| {
-        crate::core::supervisor::errors::RefineError::Io(
+        crate::tools::supervisor::errors::RefineError::Io(
             "provider status cache lock was poisoned".to_string(),
         )
     })?;

@@ -26,18 +26,18 @@ const WORKFLOW_STATUSES = [
   "in-progress",
   "qa",
   "ready-merge",
-  "awaiting-rebuild",
+  "build",
   "review",
   "done",
   "failed",
   "cancelled",
 ];
-const POST_REBUILD_WORKFLOW_STATUSES = [
+const POST_BUILD_WORKFLOW_STATUSES = [
   "backlog",
   "todo",
   "in-progress",
   "ready-merge",
-  "awaiting-rebuild",
+  "build",
   "qa",
   "review",
   "done",
@@ -51,7 +51,7 @@ const WORKFLOW_STATUS_LABELS = {
   "in-progress": "In progress",
   "qa": "QA",
   "ready-merge": "Ready to merge",
-  "awaiting-rebuild": "Awaiting rebuild",
+  "build": "Build",
   "review": "Review",
   "done": "Done",
   "failed": "Failed",
@@ -63,8 +63,8 @@ function workflowStatusLabel(status) {
 }
 
 function workflowStatuses() {
-  return state.dashboard?.quality_timing === "post_rebuild"
-    ? POST_REBUILD_WORKFLOW_STATUSES
+  return state.dashboard?.quality_timing === "post_build"
+    ? POST_BUILD_WORKFLOW_STATUSES
     : WORKFLOW_STATUSES;
 }
 

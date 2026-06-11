@@ -1,6 +1,6 @@
 use serde_json::json;
 
-use crate::core::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+use crate::tools::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
 
 use super::support::*;
 use super::*;
@@ -36,22 +36,6 @@ impl InProcessWebServer {
                     "supported_api_contract_versions": [API_CONTRACT_VERSION]
                 }),
             );
-        }
-
-        if request.method == "POST" && request.path == "/workflow/schedule" {
-            return self.handle_workflow_schedule();
-        }
-
-        if request.method == "POST" && request.path == "/workflow/allowed" {
-            return self.handle_workflow_allowed(request);
-        }
-
-        if request.method == "POST" && request.path == "/workflow/restore" {
-            return self.handle_workflow_restore();
-        }
-
-        if request.method == "POST" && request.path == "/workflow/enforce" {
-            return self.handle_workflow_enforce();
         }
 
         if request.method == "GET" && request.path == "/activity" {
@@ -273,7 +257,7 @@ impl InProcessWebServer {
         if request.method == "POST"
             && matches!(
                 request.path.as_str(),
-                "/target-app/start" | "/target-app/stop" | "/target-app/rebuild"
+                "/target-app/start" | "/target-app/stop" | "/target-app/build"
             )
         {
             return self.handle_target_app_action(request);
@@ -283,10 +267,8 @@ impl InProcessWebServer {
             return self.handle_target_app_generate_instructions(request);
         }
 
-        if request.method == "POST"
-            && request.path == "/runner-workers/target-app-rebuilder/rebuild"
-        {
-            return self.handle_target_app_rebuild_queue();
+        if request.method == "POST" && request.path == "/runner-workers/target-app-builder/build" {
+            return self.handle_target_app_build_queue();
         }
 
         if request.method == "POST" && request.path == "/runner-workers/merger/hard-reset-worktree"

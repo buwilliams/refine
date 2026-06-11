@@ -2,9 +2,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::core::product::project_state::ProjectionSnapshot;
-use crate::core::supervisor::errors::RefineResult;
-use crate::core::supervisor::lifecycle::DaemonStatus;
+use crate::tools::product::project_state::ProjectionSnapshot;
+use crate::tools::supervisor::errors::RefineResult;
+use crate::tools::supervisor::lifecycle::DaemonStatus;
 
 pub const API_CONTRACT_VERSION: &str = "1";
 pub const IDEMPOTENCY_DIR: &str = "idempotency";
@@ -39,7 +39,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/workflow",
-        capability: "workflow scheduling, restore, enforcement",
+        capability: "workflow automation",
     },
     ApiRouteGroup {
         prefix: "/activity",
@@ -203,7 +203,6 @@ macro_rules! require_durable_root {
     }};
 }
 
-mod auth_routes;
 mod http;
 mod job_routes;
 mod project_routes;

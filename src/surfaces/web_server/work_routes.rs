@@ -5,27 +5,27 @@ use std::time::Duration;
 
 use serde_json::{Map, Value, json};
 
-use crate::core::host::agent_providers::{
+use crate::model::log::LogEntry;
+use crate::model::workflow::GapStatus;
+use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::core::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::core::observability::activity::{ActivityService, FileActivityService};
-use crate::core::observability::logs::FileLogService;
-use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::core::product::imports::{FileImportService, ImportDraft, import_drafts_from_value};
-use crate::core::product::nodes::FileNodeRegistryService;
-use crate::core::product::project_state::{
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::logs::FileLogService;
+use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::tools::product::imports::{FileImportService, ImportDraft, import_drafts_from_value};
+use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
-use crate::core::product::work_items::{
+use crate::tools::product::work_items::{
     BulkFeatureSelection, BulkGapSelection, FileWorkItemService,
 };
-use crate::core::supervisor::config::{ConfigService, FileSettingsService};
-use crate::core::supervisor::errors::RefineError;
-use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
-use crate::model::log::LogEntry;
-use crate::model::workflow::GapStatus;
+use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
+use crate::tools::supervisor::errors::RefineError;
+use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 
 use super::support::*;
 use super::*;
@@ -175,10 +175,56 @@ Provider notes after JSON."#;
     }
 
     #[test]
+    fn plan_import_result_merges_feature_behavior_and_implementation_gap_arrays() {
+        let output = json!({
+            "feature": {
+                "name": "Budget Alerts",
+                "description": "Alert users when spending nears limits.",
+                "gaps": [
+                    {
+                        "name": "Budget threshold alert",
+                        "actual": "Users do not receive budget threshold alerts.",
+                        "target": "Users receive an alert before a category exceeds its monthly budget.",
+                        "priority": "high"
+                    }
+                ],
+                "implementation_gaps": [
+                    {
+                        "name": "Persist alert preferences",
+                        "actual": "There is no durable model for per-category alert thresholds.",
+                        "target": "The backend persists threshold preferences and exposes them through the budget settings API.",
+                        "priority": "medium"
+                    }
+                ],
+                "technical_gaps": [
+                    {
+                        "name": "Verify alert trigger coverage",
+                        "actual": "No test covers threshold crossing behavior.",
+                        "target": "Automated tests cover below-threshold, threshold-crossing, and disabled-alert cases.",
+                        "priority": "medium"
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
+        assert_eq!(result.drafts.len(), 3);
+        assert_eq!(result.drafts[0].name, "Budget threshold alert");
+        assert_eq!(result.drafts[1].name, "Persist alert preferences");
+        assert_eq!(result.drafts[2].name, "Verify alert trigger coverage");
+        assert!(result.drafts[1].actual.contains("durable model"));
+        assert!(result.drafts[2].target.contains("Automated tests"));
+    }
+
+    #[test]
     fn plan_import_prompt_excludes_refine_from_feature_metadata_contract() {
         let prompt = import_extraction_prompt("Personal Budget App\nTrack expenses.", "plan");
         assert!(prompt.contains("feature"));
-        assert!(prompt.contains("Gap drafts must be concrete product behavior"));
+        assert!(prompt.contains("implementation_gaps"));
+        assert!(prompt.contains("Draft every concrete implementation gap"));
+        assert!(prompt.contains("backend data model and API work"));
+        assert!(prompt.contains("test/verification work"));
         assert!(prompt.contains("do not mention Refine"));
         assert!(prompt.contains("Product Spec"));
     }
@@ -304,10 +350,16 @@ fn import_extraction_prompt(text: &str, purpose: &str) -> String {
             "Extract one product Feature and its Gaps from this Plan chat transcript. Return only \
              one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
              \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
-             \"priority\":\"low\"}]}. The feature name and description must describe the user's \
+             \"priority\":\"low\"}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
+             \"target\":\"...\",\"reporter\":\"\",\"priority\":\"medium\"}]}. The feature name and \
+             description must describe the user's \
              product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
-             extraction, or how the plan was created. Gap drafts must be concrete product behavior \
-             gaps that are relevant to the spec."
+             extraction, or how the plan was created. Draft every concrete implementation gap \
+             needed to build the feature, not only user-visible product behavior. Include backend \
+             data model and API work, frontend state and interaction work, workflow/integration \
+             work, migrations or compatibility work, and test/verification work when the \
+             transcript implies them. Each Gap must be independently actionable with actual and \
+             target states."
         }
         "round" => {
             "Draft Round data from this Gap chat transcript. Return only one actual => target line."
@@ -371,7 +423,7 @@ fn import_provider_from_settings(durable_root: &std::path::Path, body: &Value) -
 fn parse_provider_import_result(
     output: &str,
     reporter: Option<&str>,
-) -> crate::core::supervisor::errors::RefineResult<ImportExtractionResult> {
+) -> crate::tools::supervisor::errors::RefineResult<ImportExtractionResult> {
     if let Some(result) = parse_structured_import_result(output, reporter) {
         return Ok(result);
     }
@@ -488,21 +540,30 @@ fn import_extraction_response(
 }
 
 fn normalize_plan_feature_draft_object(object: &mut Map<String, Value>) {
-    if object.get("drafts").is_some() || object.get("items").is_some() {
-        return;
-    }
-    if let Some(gaps) = object.get("gaps").cloned() {
-        object.insert("drafts".to_string(), gaps);
-        return;
-    }
+    let mut drafts = Vec::new();
+    append_plan_gap_arrays(object, &mut drafts);
     if let Some(feature) = object.get("feature").and_then(Value::as_object) {
-        if let Some(gaps) = feature
-            .get("gaps")
-            .or_else(|| feature.get("drafts"))
-            .or_else(|| feature.get("items"))
-            .cloned()
-        {
-            object.insert("drafts".to_string(), gaps);
+        append_plan_gap_arrays(feature, &mut drafts);
+    }
+    if !drafts.is_empty() {
+        object.insert("drafts".to_string(), Value::Array(drafts));
+    }
+}
+
+fn append_plan_gap_arrays(object: &Map<String, Value>, drafts: &mut Vec<Value>) {
+    for key in [
+        "drafts",
+        "gaps",
+        "items",
+        "implementation_gaps",
+        "technical_gaps",
+        "engineering_gaps",
+        "backend_gaps",
+        "frontend_gaps",
+        "testing_gaps",
+    ] {
+        if let Some(items) = object.get(key).and_then(Value::as_array) {
+            drafts.extend(items.iter().cloned());
         }
     }
 }
@@ -592,7 +653,7 @@ fn trim_feature_text(value: String, max_chars: usize) -> String {
 }
 
 fn feature_detail_response_from_gaps(
-    feature: &crate::core::product::project_state::FeatureSummaryProjection,
+    feature: &crate::tools::product::project_state::FeatureSummaryProjection,
     gaps: Vec<crate::model::gap::GapIndexProjection>,
 ) -> Value {
     let mut value = serde_json::to_value(&feature.feature).unwrap_or_else(|_| json!({}));
@@ -626,7 +687,7 @@ fn feature_detail_response_from_gaps(
 
 fn feature_reorder_order_from_body(
     body: Option<&Value>,
-    projection: &crate::core::product::project_state::ProjectionSnapshot,
+    projection: &crate::tools::product::project_state::ProjectionSnapshot,
     feature_id: &str,
     gap_id: &str,
 ) -> Result<i64, ApiResponse> {
@@ -3036,7 +3097,7 @@ impl InProcessWebServer {
         let import_result = if failures.is_empty() {
             let mut gap_ids = Vec::new();
             let mut duplicate_actions = ImportDuplicateActions::default();
-            let result: Result<crate::core::product::imports::ImportPersistResult, RefineError> =
+            let result: Result<crate::tools::product::imports::ImportPersistResult, RefineError> =
                 (|| {
                     if let Some(feature_id) = feature_id.as_deref() {
                         service.show_feature_summary(feature_id)?;
@@ -3052,7 +3113,7 @@ impl InProcessWebServer {
                             let _ = gap_id;
                         }
                     }
-                    Ok(crate::core::product::imports::ImportPersistResult {
+                    Ok(crate::tools::product::imports::ImportPersistResult {
                         created: gap_ids.len(),
                         gap_ids,
                         feature_id: feature_id.clone(),

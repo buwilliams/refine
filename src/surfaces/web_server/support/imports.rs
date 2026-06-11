@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::core::product::work_items::{BulkGapUpdate, FileWorkItemService};
-use crate::core::supervisor::errors::RefineResult;
+use crate::tools::product::work_items::{BulkGapUpdate, FileWorkItemService};
+use crate::tools::supervisor::errors::RefineResult;
 
 use super::super::*;
 
@@ -17,7 +17,7 @@ pub(in crate::surfaces::web_server) fn body_text(body: &serde_json::Value) -> &s
 pub(in crate::surfaces::web_server) fn import_destination_feature_id(
     service: &FileWorkItemService,
     body: &serde_json::Value,
-) -> RefineResult<Option<crate::core::product::project_state::FeatureSummaryProjection>> {
+) -> RefineResult<Option<crate::tools::product::project_state::FeatureSummaryProjection>> {
     if let Some(name) = body
         .get("new_feature_name")
         .and_then(|value| value.as_str())
@@ -55,7 +55,7 @@ pub(in crate::surfaces::web_server) fn import_destination_feature_id(
 }
 
 pub(in crate::surfaces::web_server) fn feature_import_response(
-    feature: &crate::core::product::project_state::FeatureSummaryProjection,
+    feature: &crate::tools::product::project_state::FeatureSummaryProjection,
 ) -> serde_json::Value {
     json!({
         "id": feature.feature.id,

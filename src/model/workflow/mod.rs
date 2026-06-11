@@ -8,7 +8,7 @@ pub enum GapStatus {
     InProgress,
     Qa,
     ReadyMerge,
-    AwaitingRebuild,
+    Build,
     Review,
     Done,
     Failed,
@@ -23,7 +23,7 @@ impl GapStatus {
             Self::InProgress => "in-progress",
             Self::Qa => "qa",
             Self::ReadyMerge => "ready-merge",
-            Self::AwaitingRebuild => "awaiting-rebuild",
+            Self::Build => "build",
             Self::Review => "review",
             Self::Done => "done",
             Self::Failed => "failed",
@@ -38,7 +38,7 @@ impl GapStatus {
             "in-progress" => Some(Self::InProgress),
             "qa" => Some(Self::Qa),
             "ready-merge" => Some(Self::ReadyMerge),
-            "awaiting-rebuild" => Some(Self::AwaitingRebuild),
+            "build" => Some(Self::Build),
             "review" => Some(Self::Review),
             "done" => Some(Self::Done),
             "failed" => Some(Self::Failed),
@@ -61,7 +61,7 @@ pub enum AutomatedGapStatus {
     InProgress,
     Qa,
     ReadyMerge,
-    AwaitingRebuild,
+    Build,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -69,7 +69,7 @@ pub enum AutomatedGapStatus {
 pub enum BulkStatusTarget {
     Backlog,
     Todo,
-    AwaitingRebuild,
+    Build,
     Review,
     Done,
     Failed,
@@ -91,7 +91,7 @@ pub enum FeatureProtectedStatus {
     Review,
     Done,
     ReadyMerge,
-    AwaitingRebuild,
+    Build,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -102,7 +102,7 @@ pub enum FeatureCancelStatus {
     InProgress,
     Qa,
     ReadyMerge,
-    AwaitingRebuild,
+    Build,
     Review,
     Failed,
 }
@@ -213,7 +213,7 @@ pub fn is_bulk_target_allowed(status: &GapStatus) -> bool {
 pub fn is_automated_status(status: &GapStatus) -> bool {
     matches!(
         status,
-        GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge | GapStatus::AwaitingRebuild
+        GapStatus::InProgress | GapStatus::Qa | GapStatus::ReadyMerge | GapStatus::Build
     )
 }
 
@@ -224,7 +224,7 @@ pub fn is_terminal_status(status: &GapStatus) -> bool {
 pub fn is_feature_protected_status(status: &GapStatus) -> bool {
     matches!(
         status,
-        GapStatus::Review | GapStatus::Done | GapStatus::ReadyMerge | GapStatus::AwaitingRebuild
+        GapStatus::Review | GapStatus::Done | GapStatus::ReadyMerge | GapStatus::Build
     )
 }
 
@@ -236,7 +236,7 @@ pub fn is_feature_cancel_status(status: &GapStatus) -> bool {
             | GapStatus::InProgress
             | GapStatus::Qa
             | GapStatus::ReadyMerge
-            | GapStatus::AwaitingRebuild
+            | GapStatus::Build
             | GapStatus::Review
             | GapStatus::Failed
     )
@@ -318,7 +318,7 @@ mod tests {
         assert!(!is_bulk_target_allowed(&GapStatus::InProgress));
         assert!(!is_bulk_target_allowed(&GapStatus::Qa));
         assert!(!is_bulk_target_allowed(&GapStatus::ReadyMerge));
-        assert!(is_bulk_target_allowed(&GapStatus::AwaitingRebuild));
+        assert!(is_bulk_target_allowed(&GapStatus::Build));
         assert!(is_bulk_target_allowed(&GapStatus::Done));
     }
 
@@ -327,7 +327,7 @@ mod tests {
         assert!(is_feature_protected_status(&GapStatus::Review));
         assert!(is_feature_protected_status(&GapStatus::Done));
         assert!(is_feature_protected_status(&GapStatus::ReadyMerge));
-        assert!(is_feature_protected_status(&GapStatus::AwaitingRebuild));
+        assert!(is_feature_protected_status(&GapStatus::Build));
         assert!(!is_feature_protected_status(&GapStatus::Failed));
     }
 }

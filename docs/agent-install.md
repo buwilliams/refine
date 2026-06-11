@@ -159,12 +159,8 @@ Workflow and Gap commands:
 ./r gap create "Describe the product gap"
 ./r gap list
 ./r gap show <gap-id>
-./r workflow allowed <gap-id>
-./r workflow schedule
 ./r workflow pause
 ./r workflow resume
-./r workflow restore
-./r workflow enforce
 ```
 
 Distributed/node commands:

@@ -72,7 +72,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
       <div class="form-row"><label>${renderSettingsGuideLabel(
         "Auto-promote backlog → todo",
         "runtime-backlog-promote",
-        "how long a Gap may sit in backlog before the dispatcher moves it to todo. Default 1 hour.",
+        "how long a Gap may sit in backlog before the Workflow Engine moves it to todo. Default 1 hour.",
       )}</label>
         <select id="s-backlog-promote" data-testid="runtime-backlog-promote">
           ${[

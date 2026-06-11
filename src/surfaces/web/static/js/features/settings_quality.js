@@ -2,7 +2,7 @@
 
 function renderSettingsQualityNodeSections(quality) {
   const qualityEnabled = String(quality.enabled || "0") === "1";
-  const qualityTiming = quality.timing === "post_rebuild" ? "post_rebuild" : "pre_merge";
+  const qualityTiming = quality.timing === "post_build" ? "post_build" : "pre_merge";
   const regressionsEnabled = String(quality.regressions_enabled || "0") === "1";
   const regressions = Array.isArray(quality.regressions) ? quality.regressions : [];
   return `
@@ -10,7 +10,7 @@ function renderSettingsQualityNodeSections(quality) {
       <h3>Quality gate</h3>
       <p class="scope-label muted small">Project-wide</p>
       <p class="muted small" style="margin-top:0">
-        Choose whether QA runs before merge in the Gap worktree or after the shared application rebuild.
+        Choose whether QA runs before merge in the Gap worktree or after the shared application build.
       </p>
       <div class="form-grid two">
         <div class="form-row"><label>${renderSettingsGuideLabel("QA enabled", "quality-enabled")}</label>
@@ -25,7 +25,7 @@ function renderSettingsQualityNodeSections(quality) {
         <div class="form-row"><label>${renderSettingsGuideLabel("Quality timing", "quality-gate")}</label>
           <select id="s-quality-timing" aria-label="Quality timing" data-testid="quality-timing-select">
             <option value="pre_merge" ${qualityTiming === "pre_merge" ? "selected" : ""}>Pre-merge QA</option>
-            <option value="post_rebuild" ${qualityTiming === "post_rebuild" ? "selected" : ""}>Post-rebuild QA</option>
+            <option value="post_build" ${qualityTiming === "post_build" ? "selected" : ""}>Post-build QA</option>
           </select></div>
       </div>
     </section>

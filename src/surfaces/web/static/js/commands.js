@@ -28,7 +28,7 @@ function normalizeCommandStatus(value) {
     failed: "failed",
     cancelled: "cancelled",
     canceled: "cancelled",
-    "awaiting-rebuild": "awaiting-rebuild",
+    "build": "build",
   }[compact] || compact;
 }
 
@@ -511,11 +511,11 @@ registerCommand({
   },
 });
 
-for (const action of ["start", "stop", "rebuild"]) {
+for (const action of ["start", "stop", "build"]) {
   const busyLabel = {
     start: "Starting...",
     stop: "Stopping...",
-    rebuild: "Queueing...",
+    build: "Queueing...",
   }[action];
   registerCommand({
     id: `target_app.${action}`,
@@ -710,7 +710,7 @@ registerCommand({
   group: "AI",
   aliases: ["generate-app-config", "target-generate"],
   confirm: () => modalConfirm(
-    "Ask the agent to analyse the codebase, write .refine/manage-app.sh, and point the start/stop/rebuild/status commands at it? This can take a minute or two and overwrites the saved target-app fields and any existing .refine/manage-app.sh.",
+    "Ask the agent to analyse the codebase, write .refine/manage-app.sh, and point the start/stop/build/status commands at it? This can take a minute or two and overwrites the saved target-app fields and any existing .refine/manage-app.sh.",
     { title: "Generate target-app config", okLabel: "Generate" },
   ),
   run: async ({ button } = {}) => {

@@ -1,4 +1,4 @@
-use crate::core::supervisor::config::{
+use crate::tools::supervisor::config::{
     ConfigService, FileGovernanceService, FileGuidanceService, FileReporterService,
     FileSettingsService,
 };
@@ -8,22 +8,22 @@ use std::thread;
 use chrono::Utc;
 use serde_json::{Value, json};
 
-use crate::core::host::agent_providers::{
+use crate::model::workflow::GapStatus;
+use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
-use crate::core::host::process_supervision::{
+use crate::tools::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
+use crate::tools::host::process_supervision::{
     FileProcessSupervisor, ProcessOwner, ProcessSupervisor,
 };
-use crate::core::host::target_apps::TargetAppGeneratedConfig;
-use crate::core::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
-use crate::core::product::project_registry::{ProjectRegistryService, registry_apps_array};
-use crate::core::product::scheduling::FileSchedulingService;
-use crate::core::product::work_items::BulkGapSelection;
-use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
-use crate::core::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
-use crate::model::workflow::GapStatus;
+use crate::tools::host::target_apps::TargetAppGeneratedConfig;
+use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
+use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
+use crate::tools::product::work_items::BulkGapSelection;
+use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::tools::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
@@ -99,8 +99,8 @@ fn target_app_generation_prompt(source_root: &std::path::Path) -> String {
     format!(
         "Analyze this target app codebase and generate lifecycle commands for Refine to wrap. \
          Return only JSON with kind=target-app and fields start_command, stop_command, \
-         rebuild_command, status_command, cwd, env, \
-         start_timeout_seconds, stop_timeout_seconds, rebuild_timeout_seconds, \
+         build_command, status_command, cwd, env, \
+         start_timeout_seconds, stop_timeout_seconds, build_timeout_seconds, \
          status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
          process_check_command, and notes. Do not write files; Refine will write \
          .refine/manage-app.sh from your analysis.\n\nProject root: {}",
@@ -109,8 +109,13 @@ fn target_app_generation_prompt(source_root: &std::path::Path) -> String {
 }
 
 fn target_config_string(value: &Value, key: &str, fallback: &str) -> String {
+    let legacy_key = match key {
+        "build_command" => Some("rebuild_command"),
+        _ => None,
+    };
     value
         .get(key)
+        .or_else(|| legacy_key.and_then(|key| value.get(key)))
         .and_then(Value::as_str)
         .unwrap_or(fallback)
         .trim()
@@ -118,8 +123,13 @@ fn target_config_string(value: &Value, key: &str, fallback: &str) -> String {
 }
 
 fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
+    let legacy_key = match key {
+        "build_timeout_seconds" => Some("rebuild_timeout_seconds"),
+        _ => None,
+    };
     value
         .get(key)
+        .or_else(|| legacy_key.and_then(|key| value.get(key)))
         .and_then(Value::as_u64)
         .or_else(|| {
             value
@@ -238,21 +248,21 @@ fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedC
         .cloned()
         .unwrap_or_default();
     let start_command = target_config_string(cfg, "start_command", "");
-    let rebuild_command = target_config_string(cfg, "rebuild_command", "");
+    let build_command = target_config_string(cfg, "build_command", "");
     let status_command = target_config_string(cfg, "status_command", "");
-    if start_command.is_empty() && rebuild_command.is_empty() && status_command.is_empty() {
+    if start_command.is_empty() && build_command.is_empty() && status_command.is_empty() {
         return None;
     }
     Some(TargetAppGeneratedConfig {
         start_command,
         stop_command: target_config_string(cfg, "stop_command", ""),
-        rebuild_command,
+        build_command,
         status_command,
         cwd: target_config_string(cfg, "cwd", "."),
         env,
         start_timeout_seconds: target_config_u64(cfg, "start_timeout_seconds", 120),
         stop_timeout_seconds: target_config_u64(cfg, "stop_timeout_seconds", 60),
-        rebuild_timeout_seconds: target_config_u64(cfg, "rebuild_timeout_seconds", 300),
+        build_timeout_seconds: target_config_u64(cfg, "build_timeout_seconds", 300),
         status_timeout_seconds: target_config_u64(cfg, "status_timeout_seconds", 10),
         log_path: target_config_string(cfg, "log_path", ""),
         http_check_url: target_config_string(cfg, "http_check_url", ""),
@@ -267,13 +277,13 @@ fn target_app_generated_settings(config: &TargetAppGeneratedConfig) -> Value {
     json!({
         "target_app_start_command": config.start_command.clone(),
         "target_app_stop_command": config.stop_command.clone(),
-        "target_app_rebuild_command": config.rebuild_command.clone(),
+        "target_app_build_command": config.build_command.clone(),
         "target_app_status_command": config.status_command.clone(),
         "target_app_cwd": config.cwd.clone(),
         "target_app_env_json": serde_json::to_string_pretty(&config.env).unwrap_or_else(|_| "{}".to_string()),
         "target_app_start_timeout_seconds": config.start_timeout_seconds.to_string(),
         "target_app_stop_timeout_seconds": config.stop_timeout_seconds.to_string(),
-        "target_app_rebuild_timeout_seconds": config.rebuild_timeout_seconds.to_string(),
+        "target_app_build_timeout_seconds": config.build_timeout_seconds.to_string(),
         "target_app_status_timeout_seconds": config.status_timeout_seconds.to_string(),
         "target_app_log_path": config.log_path.clone(),
         "target_app_http_check_url": config.http_check_url.clone(),
@@ -759,7 +769,7 @@ impl InProcessWebServer {
             Ok(service) => match kind.as_str() {
                 "start" => service.start(),
                 "stop" => service.stop(),
-                "rebuild" => service.rebuild(),
+                "build" => service.build(),
                 _ => Err(RefineError::InvalidInput(format!(
                     "unknown target-app action {kind}"
                 ))),
@@ -911,10 +921,10 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_target_app_rebuild_queue(&self) -> ApiResponse {
+    pub(super) fn handle_target_app_build_queue(&self) -> ApiResponse {
         match self
             .target_app_service()
-            .and_then(|service| service.rebuild())
+            .and_then(|service| service.build())
         {
             Ok(snapshot) => {
                 let mut value = self.target_app_response(snapshot);
@@ -1251,9 +1261,8 @@ impl InProcessWebServer {
         match FileSettingsService::new(&durable_root).update(&body) {
             Ok(value) => {
                 if let Some(runtime_root) = &self.runtime_root {
-                    let scheduler =
-                        FileSchedulingService::with_durable_root(runtime_root, durable_root);
-                    if let Err(error) = scheduler.apply_runtime_settings() {
+                    let automation = WorkflowEngine::with_durable_root(runtime_root, durable_root);
+                    if let Err(error) = automation.apply_runtime_settings() {
                         return error_response(error);
                     }
                 }

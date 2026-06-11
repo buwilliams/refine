@@ -2,14 +2,14 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::core::host::process_supervision::FileProcessSupervisor;
-use crate::core::host::quality::{
+use crate::tools::host::process_supervision::FileProcessSupervisor;
+use crate::tools::host::quality::{
     FileQualityService, QualityCheckRequest, QualityJobRunner, QualityService, QualitySettingsPatch,
 };
-use crate::core::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
-use crate::core::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
-use crate::core::supervisor::config::{ConfigService, FileSettingsService};
-use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
+use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
+use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
+use crate::tools::supervisor::errors::{RefineError, RefineResult};
 
 use super::support::*;
 use super::*;
@@ -93,7 +93,7 @@ impl InProcessWebServer {
             "app_url": get("target_app_url"),
             "has_start_command": !get("target_app_start_command").trim().is_empty(),
             "has_stop_command": !get("target_app_stop_command").trim().is_empty(),
-            "has_rebuild_command": !get("target_app_rebuild_command").trim().is_empty(),
+            "has_build_command": !get("target_app_build_command").trim().is_empty(),
             "has_status_checks": !get("target_app_status_command").trim().is_empty()
                 || !get("target_app_http_check_url").trim().is_empty()
                 || !get("target_app_tcp_check_host").trim().is_empty()
@@ -113,12 +113,12 @@ impl InProcessWebServer {
             "last_operation": snapshot.last_operation,
             "process_id": snapshot.process_id,
             "pid": snapshot.pid,
-            "auto_rebuild": get("target_app_auto_rebuild"),
-            "auto_rebuild_hour_utc": get("target_app_auto_rebuild_hour_utc"),
-            "auto_rebuild_last_started_at": "",
-            "auto_rebuild_last_finished_at": "",
-            "auto_rebuild_last_ok": false,
-            "auto_rebuild_last_message": "",
+            "auto_build": get("target_app_auto_build"),
+            "auto_build_hour_utc": get("target_app_auto_build_hour_utc"),
+            "auto_build_last_started_at": "",
+            "auto_build_last_finished_at": "",
+            "auto_build_last_ok": false,
+            "auto_build_last_message": "",
             "legacy_config_present": !get("target_app_start_instructions").trim().is_empty()
                 || !get("target_app_stop_instructions").trim().is_empty()
                 || !get("target_app_health_url").trim().is_empty(),

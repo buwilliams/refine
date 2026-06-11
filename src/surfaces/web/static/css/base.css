@@ -399,14 +399,14 @@ pre {
 .nav-context-menu[data-state="stopped"] .nav-context-summary-dot,
 .nav-context-menu[data-state="failed"] .nav-context-summary-dot { background: var(--color-danger); box-shadow: 0 0 0 3px var(--color-danger-soft); }
 .target-app-indicator[data-state="starting"] .target-app-dot,
-.target-app-indicator[data-state="rebuilding"] .target-app-dot,
+.target-app-indicator[data-state="building"] .target-app-dot,
 .target-app-indicator[data-state="stopping"] .target-app-dot {
   background: var(--color-warning);
   box-shadow: 0 0 0 3px var(--color-warning-soft);
   animation: target-app-pulse 1.1s ease-in-out infinite;
 }
 .nav-context-menu[data-state="starting"] .nav-context-summary-dot,
-.nav-context-menu[data-state="rebuilding"] .nav-context-summary-dot,
+.nav-context-menu[data-state="building"] .nav-context-summary-dot,
 .nav-context-menu[data-state="stopping"] .nav-context-summary-dot {
   background: var(--color-warning);
   box-shadow: 0 0 0 3px var(--color-warning-soft);

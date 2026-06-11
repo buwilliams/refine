@@ -16,21 +16,21 @@ pub struct IntegrationFixture {
     pub artifact_root: PathBuf,
     binary: PathBuf,
     daemon: Option<Child>,
-    agent_scheduler_enabled: bool,
+    agent_automation_enabled: bool,
 }
 
 impl IntegrationFixture {
     #[allow(dead_code)]
     pub fn start(suite: &str) -> Self {
-        Self::start_with_scheduler(suite, false)
+        Self::start_with_automation(suite, false)
     }
 
     #[allow(dead_code)]
-    pub fn start_with_agent_scheduler(suite: &str) -> Self {
-        Self::start_with_scheduler(suite, true)
+    pub fn start_with_agent_automation(suite: &str) -> Self {
+        Self::start_with_automation(suite, true)
     }
 
-    fn start_with_scheduler(suite: &str, agent_scheduler_enabled: bool) -> Self {
+    fn start_with_automation(suite: &str, agent_automation_enabled: bool) -> Self {
         let repo_root = repo_root();
         let port = test_port();
         let runtime_root = env_path("REFINE_TEST_RUNTIME_ROOT")
@@ -51,7 +51,7 @@ impl IntegrationFixture {
             artifact_root,
             binary,
             daemon: None,
-            agent_scheduler_enabled,
+            agent_automation_enabled,
         };
         fixture.reset_paths();
         fixture.ensure_test_app();
@@ -305,7 +305,7 @@ impl IntegrationFixture {
                 self.app_root.display().to_string(),
             ),
         ];
-        if !self.agent_scheduler_enabled {
+        if !self.agent_automation_enabled {
             env.push((
                 "REFINE_AGENT_SCHEDULER_DISABLED".to_string(),
                 "1".to_string(),

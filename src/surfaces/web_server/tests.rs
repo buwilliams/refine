@@ -1,13 +1,13 @@
-use crate::core::observability::activity::{ActivityService, FileActivityService};
-use crate::core::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::core::product::chat::{ChatAttachment, ChatService, FileChatService};
-use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
-use crate::core::supervisor::config::{ConfigService, FileSettingsService};
-use crate::core::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
 use crate::model::log::LogEntry;
+use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
+use crate::tools::supervisor::config::{ConfigService, FileSettingsService};
+use crate::tools::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
+use crate::workflow::{WorkflowAutomation, WorkflowEngine};
 use serde_json::json;
 
-use crate::core::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::supervisor::errors::{RefineError, RefineResult};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
@@ -18,15 +18,6 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
-use crate::core::host::agent_providers::smoke_ai_env_lock;
-use crate::core::host::process_supervision::{
-    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
-};
-use crate::core::product::project_state::{
-    DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection,
-    PROJECTION_SNAPSHOT_FILE, PROJECTION_SNAPSHOT_VERSION, ProjectStateStore, ProjectionSnapshot,
-    RuntimeProjection,
-};
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::gap::{GapIndexProjection, GapPriority};
 use crate::model::log::ActivityEntry;
@@ -34,6 +25,16 @@ use crate::model::workflow::GapStatus;
 use crate::surfaces::web_server::support::{
     runtime_process_status_value, runtime_process_summary_value,
 };
+use crate::tools::host::agent_providers::smoke_ai_env_lock;
+use crate::tools::host::process_supervision::{
+    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
+};
+use crate::tools::product::project_state::{
+    DashboardProjection, FeatureSummaryProjection, FileProjectStateStore, GapSummaryProjection,
+    PROJECTION_SNAPSHOT_FILE, PROJECTION_SNAPSHOT_VERSION, ProjectStateStore, ProjectionSnapshot,
+    RuntimeProjection,
+};
+use crate::tools::product::work_items::FileWorkItemService;
 
 #[test]
 fn web_server_routes_work_gap_queries_through_projection() {
@@ -1497,87 +1498,6 @@ fn web_server_updates_feature_metadata_and_runs_gap_actions() {
 }
 
 #[test]
-fn web_server_schedules_workflow_through_file_scheduler_service() {
-    let temp_root = unique_temp_dir("http-workflow-schedule");
-    let durable_root = temp_root.join(".refine");
-    let runtime_root = temp_root.join("run/8080");
-    let smoke_ai = temp_root.join("smoke-ai");
-    fs::create_dir_all(&temp_root).unwrap();
-    fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
-    git(&temp_root, &["init", "-q"]).unwrap();
-    git(
-        &temp_root,
-        &["config", "user.email", "refine-test@example.invalid"],
-    )
-    .unwrap();
-    git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
-    git(&temp_root, &["add", "app.py"]).unwrap();
-    git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
-    fs::write(
-        &smoke_ai,
-        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai\\n' >> app.py\nprintf '%s\\n' 'smoke-ai gap-agent response'\n",
-    )
-    .unwrap();
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&smoke_ai, permissions).unwrap();
-    }
-    let _smoke_ai_env_guard = smoke_ai_env_lock().lock().unwrap();
-    let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
-    }
-    let mut server = server_with_projection();
-    server.durable_root = Some(durable_root.clone());
-    server.runtime_root = Some(runtime_root.clone());
-
-    server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/gaps".to_string(),
-        body: Some(json!({"id": "GAP1", "name": "Schedulable"})),
-    });
-    server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/gaps/GAP1/transition".to_string(),
-        body: Some(json!({"status": "todo"})),
-    });
-    FileSettingsService::new(&durable_root)
-        .update(&json!({"agent_cli": "smoke-ai"}))
-        .unwrap();
-
-    let schedule = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/workflow/schedule".to_string(),
-        body: Some(json!({})),
-    });
-    assert_eq!(schedule.status, 200);
-    assert_eq!(schedule.body["promoted"], 1);
-    assert_eq!(schedule.body["reservations"][0]["gap_id"], "GAP1");
-    assert_eq!(schedule.body["reservations"][0]["state"], "completed");
-    assert_eq!(schedule.body["dispatched"][0]["gap_id"], "GAP1");
-    assert_eq!(schedule.body["dispatched"][0]["final_status"], "review");
-    assert_eq!(schedule.body["merged"], serde_json::Value::Null);
-    let show = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/gaps/GAP1".to_string(),
-        body: None,
-    });
-    assert_eq!(show.body["gap"]["status"], "review");
-    assert!(runtime_root.join("scheduler-state.json").exists());
-    unsafe {
-        if let Some(previous) = previous_smoke_ai {
-            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
-        } else {
-            std::env::remove_var("REFINE_SMOKE_AI_PATH");
-        }
-    }
-
-    fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
 fn web_server_cancels_and_deletes_features() {
     let temp_root = unique_temp_dir("http-feature-cancel-delete");
     let durable_root = temp_root.join(".refine");
@@ -1617,7 +1537,7 @@ fn web_server_cancels_and_deletes_features() {
     let process = supervisor
         .register(ManagedProcess {
             id: "agent-gap2".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::Agent,
+            owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
             pid: None,
             state: "running".to_string(),
             label: Some("agent".to_string()),
@@ -1861,8 +1781,8 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
 }
 
 #[test]
-fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_request() {
-    let temp_root = unique_temp_dir("daemon-agent-scheduler-loop");
+fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
+    let temp_root = unique_temp_dir("daemon-agent-automation-loop");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
@@ -1879,7 +1799,7 @@ fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_requ
     git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
     fs::write(
         &smoke_ai,
-        "#!/bin/sh\nprintf '\\n# scheduled by smoke-ai loop\\n' >> app.py\nprintf '%s\\n' 'smoke-ai loop response'\n",
+        "#!/bin/sh\nprintf '\\n# automated by smoke-ai loop\\n' >> app.py\nprintf '%s\\n' 'smoke-ai loop response'\n",
     )
     .unwrap();
     {
@@ -1915,7 +1835,7 @@ fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_requ
         server: server.clone(),
         static_root: None,
     };
-    let scheduler_loop = daemon.start_agent_scheduler_loop(Duration::from_millis(25));
+    let automation_loop = daemon.start_agent_automation_loop(Duration::from_millis(25));
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
         let show = server.handle(ApiRequest {
@@ -1929,19 +1849,19 @@ fn daemon_agent_scheduler_loop_dispatches_todo_gaps_without_manual_schedule_requ
         }
         assert!(
             Instant::now() < deadline,
-            "scheduler loop did not dispatch GAP1 before timeout: {}",
+            "automation loop did not execute GAP1 before timeout: {}",
             show.body["gap"]["status"]
         );
         thread::sleep(Duration::from_millis(25));
     }
-    scheduler_loop.stop_for_test();
+    automation_loop.stop_for_test();
 
-    let state = fs::read_to_string(runtime_root.join("scheduler-state.json")).unwrap();
+    let state = fs::read_to_string(runtime_root.join("workflow-automation-state.json")).unwrap();
     assert!(state.contains("\"gap_id\": \"GAP1\""));
     assert!(
         !fs::read_to_string(runtime_root.join(API_EVENTS_FILE))
             .unwrap_or_default()
-            .contains("/workflow/schedule")
+            .contains("/workflow/")
     );
 
     unsafe {
@@ -2932,7 +2852,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     supervisor
         .register(ManagedProcess {
             id: "sse-process".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("sse".to_string()),
@@ -3035,14 +2955,14 @@ fn web_server_reads_and_cancels_runtime_jobs() {
 }
 
 #[test]
-fn web_server_retries_scheduler_jobs_and_reads_retry_logs() {
+fn web_server_retries_automation_jobs_and_reads_retry_logs() {
     let temp_root = unique_temp_dir("http-job-retry");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
-    let scheduler = FileSchedulingService::new(&runtime_root);
-    let reservation_id = scheduler.reserve("GAP1").unwrap();
-    let job_id = scheduler.dispatch(&reservation_id).unwrap();
+    let automation = WorkflowEngine::new(&runtime_root);
+    let claim_id = automation.claim("GAP1").unwrap();
+    let job_id = automation.start_claim(&claim_id).unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -3105,26 +3025,28 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap();
     chat.stop(&stopped_chat.id).unwrap();
     supervisor
-        .launch(crate::core::host::process_supervision::ManagedProcessSpec {
-            owner: crate::core::host::process_supervision::ProcessOwner::Agent,
-            command: if cfg!(windows) { "cmd" } else { "sh" }.to_string(),
-            args: if cfg!(windows) {
-                vec!["/C".to_string(), "echo agent".to_string()]
-            } else {
-                vec!["-c".to_string(), "echo agent".to_string()]
+        .launch(
+            crate::tools::host::process_supervision::ManagedProcessSpec {
+                owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
+                command: if cfg!(windows) { "cmd" } else { "sh" }.to_string(),
+                args: if cfg!(windows) {
+                    vec!["/C".to_string(), "echo agent".to_string()]
+                } else {
+                    vec!["-c".to_string(), "echo agent".to_string()]
+                },
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
             },
-            cwd: None,
-            env: Vec::new(),
-            stdin: None,
-            limits: None,
-            authorization_command: None,
-            sensitive: false,
-        })
+        )
         .unwrap();
     supervisor
         .register(ManagedProcess {
             id: "agent-context".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::Agent,
+            owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Agent context".to_string()),
@@ -3140,7 +3062,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "chat-context".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Chat context".to_string()),
@@ -3158,7 +3080,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "ui-context".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("UI context".to_string()),
@@ -3174,7 +3096,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "exited-agent-context".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::Agent,
+            owner: crate::tools::host::process_supervision::ProcessOwner::Agent,
             pid: None,
             state: "exited".to_string(),
             label: Some("Exited agent context".to_string()),
@@ -3215,7 +3137,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         vec![
             "merger",
             "plan_draft_extractor",
-            "target_app_rebuilder",
+            "target_app_builder",
             "target_app_config_generator",
             "sqlite_cache_rebuild",
             "activity_log_cleanup"
@@ -3366,9 +3288,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     fs::write(&stdout_path, "hello stdout\n").unwrap();
     fs::write(&stderr_path, "warn stderr\n").unwrap();
     supervisor
-        .register(crate::core::host::process_supervision::ManagedProcess {
+        .register(crate::tools::host::process_supervision::ManagedProcess {
             id: "stream-test".to_string(),
-            owner: crate::core::host::process_supervision::ProcessOwner::UserHelper,
+            owner: crate::tools::host::process_supervision::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("stream".to_string()),
@@ -3401,6 +3323,16 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .contains("warn stderr")
     );
 
+    let work_items = FileWorkItemService::new(&durable_root);
+    work_items
+        .create_gap_summary("Stop background rollback", Some("GAP-BACKGROUND"))
+        .unwrap();
+    work_items
+        .transition_gap_status("GAP-BACKGROUND", GapStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_gap_status("GAP-BACKGROUND", GapStatus::InProgress)
+        .unwrap();
     let background = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/processes/background".to_string(),
@@ -3408,6 +3340,14 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(background.status, 200);
     assert_eq!(background.body["background_processes_stopped"], true);
+    assert_eq!(
+        work_items
+            .show_gap_summary("GAP-BACKGROUND")
+            .unwrap()
+            .gap
+            .status,
+        GapStatus::Todo
+    );
     assert!(
         background.body["runner_work"]
             .as_array()
@@ -3416,6 +3356,15 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .all(|work| work["status"] == "paused")
     );
 
+    work_items
+        .create_gap_summary("Pause agents rollback", Some("GAP-AGENTS"))
+        .unwrap();
+    work_items
+        .transition_gap_status("GAP-AGENTS", GapStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_gap_status("GAP-AGENTS", GapStatus::InProgress)
+        .unwrap();
     let agents = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/processes/agents".to_string(),
@@ -3423,6 +3372,14 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(agents.status, 200);
     assert_eq!(agents.body["agents_paused"], true);
+    assert_eq!(
+        work_items
+            .show_gap_summary("GAP-AGENTS")
+            .unwrap()
+            .gap
+            .status,
+        GapStatus::Todo
+    );
     assert!(runtime_root.join("process-control.json").exists());
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -3530,7 +3487,7 @@ fn web_server_manages_quality_settings_and_regressions() {
         path: "/api/quality".to_string(),
         body: Some(json!({
             "enabled": "1",
-            "timing": "post_rebuild",
+            "timing": "post_build",
             "regressions_enabled": true,
             "business_requirements": "Dashboard must render",
             "instructions": "Run focused checks"
@@ -3538,7 +3495,7 @@ fn web_server_manages_quality_settings_and_regressions() {
     });
     assert_eq!(saved.status, 200);
     assert_eq!(saved.body["enabled"], "1");
-    assert_eq!(saved.body["timing"], "post_rebuild");
+    assert_eq!(saved.body["timing"], "post_build");
     assert_eq!(saved.body["regressions_enabled"], "1");
     assert_eq!(saved.body["configured"], true);
 
@@ -4213,11 +4170,11 @@ fn web_server_applies_runtime_settings_updates_immediately() {
         "0"
     );
 
-    let state = fs::read_to_string(runtime_root.join("scheduler-state.json")).unwrap();
+    let state = fs::read_to_string(runtime_root.join("workflow-automation-state.json")).unwrap();
     let state: serde_json::Value = serde_json::from_str(&state).unwrap();
     assert_eq!(state["policy"]["global_limit"], 6);
     assert_eq!(state["policy"]["per_node_limit"], 6);
-    assert_eq!(state["reservations"].as_array().unwrap().len(), 0);
+    assert_eq!(state["claims"].as_array().unwrap().len(), 0);
 
     let gap = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -4503,7 +4460,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         body: Some(json!({
             "target_app_url": "http://127.0.0.1:3000",
             "target_app_start_command": "npm run dev",
-            "target_app_auto_rebuild": "never"
+            "target_app_auto_build": "never"
         })),
     });
     server.handle(ApiRequest {
@@ -4717,13 +4674,13 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         "./.refine/manage-app.sh start"
     );
     assert_eq!(
-        generated.body["settings"]["target_app_rebuild_command"],
-        "./.refine/manage-app.sh rebuild"
+        generated.body["settings"]["target_app_build_command"],
+        "./.refine/manage-app.sh build"
     );
     assert_eq!(generated.body["config"]["tcp_check_port"], "3000");
     let wrapper = fs::read_to_string(temp_root.join(".refine/manage-app.sh")).unwrap();
     assert!(wrapper.contains("START_COMMAND='npm run dev'"));
-    assert!(wrapper.contains("REBUILD_COMMAND='npm run build'"));
+    assert!(wrapper.contains("BUILD_COMMAND='npm run build'"));
 
     let generated_job = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4746,7 +4703,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
 
     let rebuild = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/runner-workers/target-app-rebuilder/rebuild".to_string(),
+        path: "/api/runner-workers/target-app-builder/build".to_string(),
         body: None,
     });
     assert_eq!(rebuild.status, 200);
@@ -4912,7 +4869,7 @@ fn seeded_remote_clone(temp_root: &Path) -> (PathBuf, PathBuf) {
 
 fn wait_for_http_request_metrics(
     runtime_root: &Path,
-) -> Vec<crate::core::observability::metrics::PerformanceEvent> {
+) -> Vec<crate::tools::observability::metrics::PerformanceEvent> {
     for _ in 0..20 {
         let report = FileMetricsService::new(runtime_root)
             .report(PerformanceQuery {

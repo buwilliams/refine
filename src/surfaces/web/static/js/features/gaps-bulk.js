@@ -9,7 +9,7 @@ const BULK_STATUS_OPTIONS = [
   { value: "__last_workflow_state", label: "(Last workflow state)" },
   { value: "backlog", label: "backlog" },
   { value: "todo", label: "todo" },
-  { value: "awaiting-rebuild", label: "awaiting-rebuild" },
+  { value: "build", label: "build" },
   { value: "review", label: "review" },
   { value: "done", label: "done" },
   { value: "failed", label: "failed" },
@@ -222,7 +222,7 @@ async function openBulkTransferNodeModal() {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        In-progress, qa, ready-merge, and awaiting-rebuild Gaps are skipped.
+        In-progress, qa, ready-merge, and build Gaps are skipped.
       </p>
     </div>
     <div class="modal-actions">

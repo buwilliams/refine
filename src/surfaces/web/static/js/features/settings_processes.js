@@ -126,10 +126,10 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
     cpu_priority: { label: "-" },
     max_memory: { label: "-" },
   };
-  const agentScheduler = {
-    id: "agent-scheduler",
-    kind: "agent_scheduler",
-    label: "Agent scheduler",
+  const agentAutomation = {
+    id: "agent-automation",
+    kind: "agent_automation",
+    label: "Agent workflow automation",
     status: backgroundStopped || agentsPaused ? "paused" : "active",
     runner_reachable: runnerReachable,
     pid: null,
@@ -145,7 +145,7 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
     max_memory: { label: "-" },
   };
   return orderManagedProcessRows(
-    rows, agentScheduler, background, backend.process_model === "supervisor",
+    rows, agentAutomation, background, backend.process_model === "supervisor",
   );
 }
 
@@ -174,7 +174,7 @@ function syntheticTargetAppProcess() {
     state: "unknown",
     has_start_command: false,
     has_stop_command: false,
-    has_rebuild_command: false,
+    has_build_command: false,
     has_status_checks: false,
   };
   return {
@@ -211,13 +211,13 @@ function isCurrentProcessStatus(status = "") {
   return !new Set(["exited", "failed", "stopped", "cancelled", "complete", "completed"]).has(status);
 }
 
-function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
+function orderManagedProcessRows(rows, agentAutomation, background, supervised) {
   const targetApp = rows.find((proc) => proc.kind === "target_app");
   const targetAppId = targetApp ? targetApp.id : null;
   if (!supervised) {
     return [
       ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
-      agentScheduler,
+      agentAutomation,
       background,
       ...(targetApp ? [targetApp] : []),
     ];
@@ -226,7 +226,7 @@ function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
   if (!supervisor) {
     return [
       ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
-      agentScheduler,
+      agentAutomation,
       background,
       ...(targetApp ? [targetApp] : []),
     ];
@@ -234,7 +234,7 @@ function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
   const childKinds = new Set(["ui", "runner"]);
   const children = [
     ...rows.filter((proc) => childKinds.has(proc.kind)),
-    agentScheduler,
+    agentAutomation,
     background,
   ].map((proc) => ({
     ...proc,
@@ -250,9 +250,9 @@ function orderManagedProcessRows(rows, agentScheduler, background, supervised) {
   return [
     {
       ...supervisor,
-      agents_paused: agentScheduler.agents_paused,
+      agents_paused: agentAutomation.agents_paused,
       background_processes_stopped: background.background_processes_stopped,
-      runner_reachable: agentScheduler.runner_reachable,
+      runner_reachable: agentAutomation.runner_reachable,
       supervisor_parent: true,
       supervisor_expanded: supervisorProcessExpanded,
       supervisor_child_count: children.length,
@@ -440,7 +440,7 @@ function processKindLabel(kind) {
     daemon: "Supervisor",
     runner: "Runner",
     target_app: "Application",
-    agent_scheduler: "agent scheduler",
+    agent_automation: "agent workflow automation",
     background_processes: "background processes",
     agent: "Agent",
     chat: "Chat",
@@ -460,7 +460,7 @@ function processStatusLabel(status) {
     queued: "queued",
     degraded: "degraded",
     starting: "starting",
-    rebuilding: "rebuilding",
+    building: "building",
     stopping: "stopping",
     stopped: "stopped",
     failed: "failed",
@@ -481,7 +481,7 @@ function renderProcessActions(proc) {
       <button class="${agentsPaused ? "" : "secondary"}" data-testid="process-agent-toggle" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}">${agentsPaused ? "Unpause" : "Pause"} agents</button>
       <button class="${stopped ? "" : "danger"}" data-testid="process-background-toggle" data-toggle-background-processes="${stopped ? "start" : "stop"}">${stopped ? "Start" : "Stop"} Background</button>`;
   }
-  if (proc.kind === "agent_scheduler") {
+  if (proc.kind === "agent_automation") {
     const agentsPaused = !!proc.agents_paused;
     return `
       <button class="${agentsPaused ? "" : "secondary"}" data-testid="process-agent-toggle" data-toggle-agent-processes="${agentsPaused ? "unpause" : "pause"}" ${proc.runner_reachable ? "" : "disabled"}>${agentsPaused ? "Unpause" : "Pause"} agents</button>`;
@@ -501,7 +501,7 @@ function renderProcessActions(proc) {
   }
   if (proc.kind === "target_app") {
     const snap = proc.target_app || {};
-    const inFlight = ["starting", "stopping", "rebuilding"].includes(snap.state);
+    const inFlight = ["starting", "stopping", "building"].includes(snap.state);
     const isRunning = snap.state === "running" || snap.state === "degraded";
     const isStopped = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
     const showStop = targetAppShowsStopAction(snap.state);
@@ -510,7 +510,7 @@ function renderProcessActions(proc) {
         <button id="s-target-run-start" data-testid="process-target-app-start" class="${showStop ? "target-app-action-hidden" : ""}" ${showStop || isRunning || inFlight || !snap.has_start_command ? "disabled" : ""} ${showStop ? `aria-hidden="true" tabindex="-1"` : ""}>Start</button>
         <button class="danger ${showStop ? "" : "target-app-action-hidden"}" id="s-target-run-stop" data-testid="process-target-app-stop" ${!showStop || isStopped || inFlight || !snap.has_stop_command ? "disabled" : ""} ${showStop ? "" : `aria-hidden="true" tabindex="-1"`}>Stop</button>
       </span>
-      <button class="secondary" id="s-target-run-rebuild" data-testid="process-target-app-rebuild" ${inFlight ? "disabled" : ""}>Rebuild</button>
+      <button class="secondary" id="s-target-run-build" data-testid="process-target-app-build" ${inFlight ? "disabled" : ""}>Build</button>
       <button class="secondary" id="s-target-sync-now" data-testid="process-target-app-sync">Sync</button>
       <button class="secondary" id="s-target-health-now" data-testid="process-target-app-health">Check</button>`;
   }
@@ -518,7 +518,7 @@ function renderProcessActions(proc) {
 }
 
 function targetAppShowsStopAction(state) {
-  return ["running", "degraded", "stopping", "rebuilding"].includes(state);
+  return ["running", "degraded", "stopping", "building"].includes(state);
 }
 
 function setTargetAppActionVisible(button, visible) {
@@ -586,9 +586,9 @@ function renderRunnerWorkRow(work, anchorMs) {
 }
 
 function renderRunnerWorkActions(work) {
-  if (work.kind === "target_app_rebuilder") {
+  if (work.kind === "target_app_builder") {
     const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="secondary" data-testid="runner-target-app-rebuild" data-runner-target-app-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
+    return `<button class="secondary" data-testid="runner-target-app-build" data-runner-target-app-build ${busy ? "disabled" : ""}>Build</button>`;
   }
   if (work.kind === "target_app_config_generator") {
     const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
@@ -615,7 +615,7 @@ function runnerWorkKindLabel(kind) {
     merger: "merger",
     governance: "governance",
     plan_draft_extractor: "Plan Draft extractor",
-    target_app_rebuilder: "target-app rebuilder",
+    target_app_builder: "target-app builder",
     target_app_config_generator: "target-app config generator",
     sqlite_cache_rebuild: "projection cache rebuilder",
     activity_log_cleanup: "activity log cleanup",
@@ -687,7 +687,7 @@ function shortPath(path) {
 async function refreshTargetAppStatus() {
   const block = document.getElementById("target-app-status-block");
   const hasControls = document.getElementById("s-target-run-start")
-    || document.getElementById("s-target-run-rebuild")
+    || document.getElementById("s-target-run-build")
     || document.getElementById("s-target-run-stop");
   if (!block && !hasControls) return;
   try {
@@ -705,7 +705,7 @@ function drawTargetAppStatusBlock(snap) {
     running:  "Running",
     degraded: "Degraded",
     starting: "Starting…",
-    rebuilding: "Rebuilding…",
+    building: "Building…",
     stopping: "Stopping…",
     stopped:  "Stopped",
     failed:   "Failed",
@@ -723,16 +723,16 @@ function drawTargetAppStatusBlock(snap) {
   const op = snap.last_operation
     ? `<p class="muted small" style="margin-top:6px">Last operation: ${htmlEscape(snap.last_operation.kind)} → ${htmlEscape(snap.last_operation.state)} · ${fmtTime(snap.last_operation.finished_at)}</p>`
     : "";
-  const autoRebuildMode = snap.auto_rebuild === "nightly" ? "daily" : snap.auto_rebuild;
-  const autoRebuildLabel = {
+  const autoBuildMode = snap.auto_build === "nightly" ? "daily" : snap.auto_build;
+  const autoBuildLabel = {
     never: "Never",
     on_worktree_merge: "On worktree merge",
     hourly: "Hourly",
-    daily: `Daily (${String(snap.auto_rebuild_hour_utc || "0").padStart(2, "0")}:00 UTC)`,
-  }[autoRebuildMode || "never"] || "Never";
-  const autoRebuild = `<p class="muted small" style="margin-top:6px">Automatic rebuild: ${htmlEscape(autoRebuildLabel)}${
-    snap.auto_rebuild_last_finished_at
-      ? ` · last ${snap.auto_rebuild_last_ok ? "OK" : "failed"} at ${fmtTime(snap.auto_rebuild_last_finished_at)}`
+    daily: `Daily (${String(snap.auto_build_hour_utc || "0").padStart(2, "0")}:00 UTC)`,
+  }[autoBuildMode || "never"] || "Never";
+  const autoBuild = `<p class="muted small" style="margin-top:6px">Automatic build: ${htmlEscape(autoBuildLabel)}${
+    snap.auto_build_last_finished_at
+      ? ` · last ${snap.auto_build_last_ok ? "OK" : "failed"} at ${fmtTime(snap.auto_build_last_finished_at)}`
       : ""
   }</p>`;
   const block = document.getElementById("target-app-status-block");
@@ -746,7 +746,7 @@ function drawTargetAppStatusBlock(snap) {
       <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
       ${healthDetail}
       ${op}
-      ${autoRebuild}
+      ${autoBuild}
       ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
       ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
     `;
@@ -759,7 +759,7 @@ function drawTargetAppStatusBlock(snap) {
         degraded: "#d4a106",
         stopped:  "#c63838",
         starting: "#d4a106",
-        rebuilding: "#d4a106",
+        building: "#d4a106",
         stopping: "#d4a106",
         failed:   "#c63838",
       }[snap.state]) || "#b8bcc6";
@@ -768,17 +768,17 @@ function drawTargetAppStatusBlock(snap) {
   // Keep the target-app action set visually stable. State changes only
   // enable/disable buttons so the action column does not flicker.
   const startBtn = document.getElementById("s-target-run-start");
-  const rebuildBtn = document.getElementById("s-target-run-rebuild");
+  const buildBtn = document.getElementById("s-target-run-build");
   const stopBtn  = document.getElementById("s-target-run-stop");
-  if (startBtn && stopBtn && rebuildBtn) {
+  if (startBtn && stopBtn && buildBtn) {
     const isRunning  = snap.state === "running" || snap.state === "degraded";
     const isStopped  = snap.state === "stopped" || snap.state === "unknown" || snap.state === "failed";
-    const inFlight   = snap.state === "starting" || snap.state === "stopping" || snap.state === "rebuilding";
+    const inFlight   = snap.state === "starting" || snap.state === "stopping" || snap.state === "building";
     const showStop = targetAppShowsStopAction(snap.state);
     setTargetAppActionVisible(startBtn, !showStop);
     setTargetAppActionVisible(stopBtn, showStop);
     startBtn.disabled = showStop || isRunning || inFlight || !snap.has_start_command;
-    rebuildBtn.disabled = inFlight;
+    buildBtn.disabled = inFlight;
     stopBtn.disabled  = !showStop || isStopped || inFlight || !snap.has_stop_command;
     if (!snap.has_start_command) {
       startBtn.title = "Configure a start command above first.";
@@ -799,11 +799,11 @@ function drawTargetAppStatusBlock(snap) {
       stopBtn.title = "";
     }
     if (inFlight) {
-      rebuildBtn.title = "Application state is changing.";
-    } else if (!snap.has_rebuild_command) {
-      rebuildBtn.title = "No rebuild command configured; rebuild will still run the stop/start sequence.";
+      buildBtn.title = "Application state is changing.";
+    } else if (!snap.has_build_command) {
+      buildBtn.title = "No build command configured; build will still run the stop/start sequence.";
     } else {
-      rebuildBtn.title = "";
+      buildBtn.title = "";
     }
   }
   const targetRow = document.querySelector('[data-process-id="target-app"]');
@@ -839,7 +839,7 @@ function bindSettingsProcessesTab(s) {
       const shouldStop = b.dataset.toggleBackgroundProcesses === "stop";
       const ok = shouldStop
         ? await modalConfirm(
-            "Stop background processes? Refine will keep the UI and backend running, pause scheduling, stop chats and agents, clear queued rebuilds, and cancel active background jobs.",
+            "Stop background processes? Refine will keep the UI and backend running, pause workflow automation, stop chats and agents, clear queued builds, and cancel active background jobs.",
             { title: "Stop background processes", okLabel: "Stop background processes", danger: true },
           )
         : true;
@@ -859,7 +859,7 @@ function bindSettingsProcessesTab(s) {
       const shouldPause = b.dataset.toggleAgentProcesses === "pause";
       const ok = shouldPause
         ? await modalConfirm(
-            "Pause agent scheduling? Refine will stop running Gap agents and leave other background processes alone.",
+            "Pause workflow automation? Refine will stop running Gap agents and leave other background processes alone.",
             { title: "Pause agents", okLabel: "Pause agents", danger: true },
           )
         : true;
@@ -909,11 +909,11 @@ function bindSettingsProcessesTab(s) {
       });
     });
   });
-  $$("[data-runner-target-app-rebuild]").forEach((b) => {
+  $$("[data-runner-target-app-build]").forEach((b) => {
     b.addEventListener("click", async () => {
       await withButtonBusy(b, "Queueing…", async () => {
         try {
-          await api("POST", "/api/runner-workers/target-app-rebuilder/rebuild");
+          await api("POST", "/api/runner-workers/target-app-builder/build");
           await refreshProcessesSettingsTab({ force: true });
         } catch (e) { await showActionError(e); }
       });
@@ -943,7 +943,7 @@ function bindSettingsProcessesTab(s) {
   });
   bindCommand("#s-target-run-start", "target_app.start");
   bindCommand("#s-target-run-stop", "target_app.stop");
-  bindCommand("#s-target-run-rebuild", "target_app.rebuild");
+  bindCommand("#s-target-run-build", "target_app.build");
   bindCommand("#s-target-sync-now", "target_app.sync");
   bindCommand("#s-target-health-now", "target_app.health");
   // Kick off the initial status load (and let SSE refresh later).

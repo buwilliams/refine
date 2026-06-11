@@ -22,14 +22,14 @@ use serde_json::{Value, json};
 use tokio::sync::{Notify, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::core::observability::activity::{ActivityService, FileActivityService};
-use crate::core::observability::metrics::FileMetricsService;
-use crate::core::product::project_state::ProjectionQuery;
-use crate::core::product::scheduling::FileSchedulingService;
-use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::lifecycle::{
+use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::metrics::FileMetricsService;
+use crate::tools::product::project_state::ProjectionQuery;
+use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::supervisor::lifecycle::{
     DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
 };
+use crate::workflow::WorkflowEngine;
 
 use super::support::*;
 use super::*;
@@ -130,12 +130,12 @@ pub struct LocalHttpDaemon {
     pub static_root: Option<PathBuf>,
 }
 
-pub(super) struct AgentSchedulerLoop {
+pub(super) struct AgentWorkflowLoop {
     stop: Arc<AtomicBool>,
     handle: Option<JoinHandle<()>>,
 }
 
-impl AgentSchedulerLoop {
+impl AgentWorkflowLoop {
     #[cfg(test)]
     pub(super) fn stop_for_test(mut self) {
         self.stop.store(true, Ordering::Relaxed);
@@ -145,7 +145,7 @@ impl AgentSchedulerLoop {
     }
 }
 
-impl Drop for AgentSchedulerLoop {
+impl Drop for AgentWorkflowLoop {
     fn drop(&mut self) {
         self.stop.store(true, Ordering::Relaxed);
         let _ = self.handle.take();
@@ -222,15 +222,15 @@ impl LocalHttpDaemon {
         lifecycle: FileDaemonLifecycleService,
         port: u16,
     ) -> RefineResult<()> {
-        let _scheduler_loop = if agent_scheduler_loop_disabled() {
+        let _automation_loop = if agent_automation_loop_disabled() {
             None
         } else {
-            Some(self.start_agent_scheduler_loop(AGENT_SCHEDULER_INTERVAL))
+            Some(self.start_agent_automation_loop(AGENT_SCHEDULER_INTERVAL))
         };
         self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
     }
 
-    pub(super) fn start_agent_scheduler_loop(&self, interval: Duration) -> AgentSchedulerLoop {
+    pub(super) fn start_agent_automation_loop(&self, interval: Duration) -> AgentWorkflowLoop {
         let stop = Arc::new(AtomicBool::new(false));
         let thread_stop = Arc::clone(&stop);
         let server = self.server.clone();
@@ -238,7 +238,7 @@ impl LocalHttpDaemon {
         let handle = thread::spawn(move || {
             while !thread_stop.load(Ordering::Relaxed) {
                 let started = Instant::now();
-                let _ = run_agent_scheduler_once(&server);
+                let _ = run_agent_automation_once(&server);
                 let elapsed = started.elapsed();
                 let remaining = interval.saturating_sub(elapsed);
                 if !remaining.is_zero() {
@@ -246,7 +246,7 @@ impl LocalHttpDaemon {
                 }
             }
         });
-        AgentSchedulerLoop {
+        AgentWorkflowLoop {
             stop,
             handle: Some(handle),
         }
@@ -810,22 +810,22 @@ fn terminal_events_route(path: &str) -> Option<String> {
     Some(session_id.to_string())
 }
 
-fn run_agent_scheduler_once(server: &InProcessWebServer) -> RefineResult<()> {
+fn run_agent_automation_once(server: &InProcessWebServer) -> RefineResult<()> {
     let Some(runtime_root) = &server.runtime_root else {
         return Ok(());
     };
     let Some(durable_root) = server.current_durable_root()? else {
         return Ok(());
     };
-    let scheduler = FileSchedulingService::with_durable_root(runtime_root, durable_root);
-    let result = scheduler.schedule_and_dispatch();
+    let automation = WorkflowEngine::with_durable_root(runtime_root, durable_root);
+    let result = automation.evaluate_workflow();
     let refresh_result = server.refresh_projection_cache_after_mutation();
     result?;
     refresh_result?;
     Ok(())
 }
 
-fn agent_scheduler_loop_disabled() -> bool {
+fn agent_automation_loop_disabled() -> bool {
     matches!(
         env::var("REFINE_AGENT_SCHEDULER_DISABLED")
             .ok()

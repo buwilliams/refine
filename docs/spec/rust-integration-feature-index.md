@@ -4,8 +4,8 @@ Nav & Content: Dashboard
 	Node scope switcher: Current node, All nodes (#/?node=all)
 	Banners (global error/attention; "Re-check auth" action when runtime unreachable)
 	Workflow Visualization
-		Status cards: backlog, todo, in-progress, qa, ready-merge, awaiting-rebuild, review, done, failed, cancelled
-		"AI" badge on agent-managed statuses (todo, in-progress, qa, ready-merge, awaiting-rebuild)
+		Status cards: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, cancelled
+		"AI" badge on agent-managed statuses (todo, in-progress, qa, ready-merge, build)
 		Gap count per status
 		Click a status opens Gaps screen filtered to that status
 	Awaiting your review
@@ -100,7 +100,7 @@ Nav & Guide: Manage Drop-down
 				List with counts; Rename (cascades rounds), Merge (move gaps to destination), Remove (danger, keeps history), Add reporter
 			Processes
 				Process management table: name (supervisor parent/child expand), status, PID, CPU priority, max memory, details
-					Actions by kind: Pause/Unpause agents, Stop/Start background, Hard reset worktree, Cancel (agent), Stop (chat), target app Start/Stop/Rebuild/Sync/Check
+					Actions by kind: Pause/Unpause agents, Stop/Start background, Hard reset worktree, Cancel (agent), Stop (chat), target app Start/Stop/Build/Sync/Check
 				Subprocesses table: name, status, PID, CPU priority, max memory, elapsed (live), details
 					Actions: Rebuild, Generate, Clean up (days dropdown, danger)
 				Projection cache rebuild progress
@@ -112,7 +112,7 @@ Nav & Guide: Manage Drop-down
 			Target App Config
 				Scope label, Copy from node, Generate with AI
 				Application scope: agent subpath, merge target branch
-				Target app: URL, start/stop/rebuild/status commands, automatic rebuild (never/on merge/hourly/daily), daily rebuild hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
+				Target app: URL, start/stop/build/status commands, automatic build (never/on merge/hourly/daily), daily build hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
 				Optional checks: HTTP URL, TCP host + port, process check command
 			Refine Runtime Config
 				Scope label, Copy from node
@@ -126,7 +126,7 @@ Nav & Guide: Manage Drop-down
 				Constitution (markdown field)
 				Rules: list (text input + Remove per rule), Add rule, Generate rules (needs product + constitution), autosave
 			Quality
-				Quality gate: QA enabled toggle, timing (pre_merge / post_rebuild)
+				Quality gate: QA enabled toggle, timing (pre_merge / post_build)
 				Regression checks: enabled toggle, New regression (modal), Run current checkout, list (title/desc/spec path, last-run status, screenshot thumbnail, enable/disable, Delete), autosave
 				Business requirements + Instructions (markdown fields)
 				Incomplete warning banner if requirements/instructions missing
@@ -150,7 +150,7 @@ Nav: Command Palette
 		Changes: clear filters
 		Logs: clear filters
 		System: Pause/unpause agents, Hard reset worktree (danger), Rebuild projection cache, Clean up old activity logs (days)
-		Application: target app start/stop/rebuild/sync/check status
+		Application: target app start/stop/build/sync/check status
 		Quality: create regression, run regressions on current checkout
 		Runtime: re-check auth
 		Settings: copy application/runtime settings from node
@@ -245,7 +245,7 @@ Modals
 	Bulk Action Modals (from Gaps bulk actions)
 		Set Status / Priority / Reporter: value control, filter + selection context, help text, result toast
 		Assign Feature: feature dropdown (name/status/progress), skips already-assigned / other-node gaps
-		Transfer node: active-node dropdown, skips in-progress/qa/ready-merge/awaiting-rebuild
+		Transfer node: active-node dropdown, skips in-progress/qa/ready-merge/build
 		Delete: danger confirmation (cancels subprocesses, removes worktrees/branches, erases gap.json), partial-failure handling
 		Background job support (progress/result)
 	Request refine feature/bugfix Modal (Report Bug)
@@ -258,11 +258,11 @@ Implementation Internals (for e2e testing)
 	Testing contract (read first; full integration-test plan in docs/spec/rust-integration-spec.md)
 		Determinism — tag every flow before testing it
 			[crud] deterministic, assert directly: create/edit gaps·features·rounds·notes; filters/search/sort/pagination; bulk status/priority/reporter/feature/transfer/delete; manual workflow buttons (backlog↔todo, review→done via Verify, done↔review); reporter/node/cluster mgmt; settings edits; Undo (git revert)
-			[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/gap/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the dispatcher-driven chain todo→in-progress→qa→ready-merge→awaiting-rebuild→review (incl. auto-promote backlog→todo)
+				[agent] drives a real provider — run the smoke-ai fixture via REFINE_SMOKE_AI_PATH, then wait on the outcome: chat reply (standalone/gap/plan); Draft Feature / Draft Round / import AI extract; governance + quality evaluation; Generate rules; Generate target-app config; and the Workflow Engine-driven chain todo→in-progress→qa→ready-merge→build→review (incl. auto-promote backlog→todo)
 		Preconditions — gated features; build the state first
 			Verify / Verify selected: a review gap assigned to the currently selected reporter
 			←QA / ←Merge buttons: only on failed gaps in quality-retry / merge-retry context
-			Bulk transfer/assign: skip in-progress·qa·ready-merge·awaiting-rebuild and other-node gaps
+			Bulk transfer/assign: skip in-progress·qa·ready-merge·build and other-node gaps
 			Generate rules: product + constitution both filled; Run regressions: ≥1 regression defined
 			Node / Governance surfaces: an attached project; Application controls: supervisor/registry enabled
 		Oracles — non-obvious success states to assert
@@ -319,16 +319,16 @@ Implementation Internals (for e2e testing)
 		Toolbar dock height clamp 120px–85vh (default 20vh)
 	Gap workflow state machine (GAP_WORKFLOW; user buttons only where listed)
 		backlog → Todo → (forward: todo)
-		todo → ← Backlog (back: backlog) — agent then drives todo → in-progress → qa → ready-merge → awaiting-rebuild → review automatically
-		in-progress: dispatcher-owned, no user buttons
+		todo → ← Backlog (back: backlog) — agent then drives todo → in-progress → qa → ready-merge → build → review automatically
+			in-progress: Workflow Engine-owned, no user buttons
 		qa: Quality-owned, no user buttons
 		ready-merge: merger-owned, no user buttons
-		awaiting-rebuild: target-app-rebuild-owned, no user buttons
+		build: target-app-build-owned, no user buttons
 		review → ← Todo (back: todo) | Verify → (forward: done, POST /api/gaps/:id/verify)
 		done → ← Review (back: review)
 		failed → ← Todo (back: todo); if QA-retry context: ← QA (POST /api/gaps/:id/retry-quality); if merge-retry context: ← Merge (POST /api/gaps/:id/retry-merge)
 		cancelled → ← Todo (back: todo)
-		Status enum: backlog, todo, in-progress, qa, ready-merge, awaiting-rebuild, review, done, failed, cancelled
+		Status enum: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, cancelled
 		Priority enum: low, medium, high
 	Chat sessions
 		POST /api/chat/start with body { purpose:"plan" } (Plan tab) | { gap_id } (Gap chat) | {} (Standalone)
@@ -351,7 +351,7 @@ Implementation Internals (for e2e testing)
 		Dashboard/lists: /api/dashboard, /api/changes(/undo), /api/activity(/cleanup|/ui-error), /api/performance(/cleanup), /api/diagnostics
 		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/regressions(/:id|/run)), /api/guidance
 		Import/jobs: /api/import/extract|csv/parse|dedup|persist, /api/jobs/:id(/cancel)
-		Processes/runner: /api/processes(/agents|/background), /api/agents, /api/runner-workers/merger/hard-reset-worktree, /api/runner-workers/target-app-rebuilder/rebuild, /api/cache/rebuild
+		Processes/runner: /api/processes(/agents|/background), /api/agents, /api/runner-workers/merger/hard-reset-worktree, /api/runner-workers/target-app-builder/build, /api/cache/rebuild
 		Files: /api/files/tree|read|search
 		Settings/runtime: /api/settings, /api/settings/recheck-auth
 		Streaming: /api/sse (SSE), /api/chat/* (see Chat sessions)

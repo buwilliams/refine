@@ -50,7 +50,7 @@ Effort: High (11 commits, 1 milestone)
 
 Milestones started: multi-node architecture.
 
-Fewer commits, but meaningful architecture: node-scoped JSON state, transfer flow, active Gap cancellation during transfer, target app rebuild, guidance.
+Fewer commits, but meaningful architecture: node-scoped JSON state, transfer flow, active Gap cancellation during transfer, target app build, guidance.
 
 ## Day 8: 2026-05-20 (Wednesday)
 
@@ -114,7 +114,7 @@ Effort: Low (4 commits, 2 milestones)
 
 Milestones started: setup/install polish; legacy installer checkout recovery.
 
-A smaller hardening day: installer output and setup flow became clearer, the splash text was polished, no-op target-app rebuilds became the default, and legacy installer checkouts gained an upgrade repair path.
+A smaller hardening day: installer output and setup flow became clearer, the splash text was polished, no-op target-app builds became the default, and legacy installer checkouts gained an upgrade repair path.
 
 ## Day 16: 2026-05-28 (Thursday)
 
@@ -122,7 +122,7 @@ Effort: High (14 commits, 3 milestones)
 
 Milestones started: management settings simplification; rebuild/quality convergence; runtime setting recovery.
 
-Settings and runtime controls tightened: agent pause returned to the supervisor rows, management surfaces were split and polished, obsolete transfer/sync controls disappeared, file search got more responsive, uv installs gained a pipx fallback, target-app rebuilds moved onto one path, post-rebuild Quality gating landed, and backlog auto-promote settings survived upgrades.
+Settings and runtime controls tightened: agent pause returned to the supervisor rows, management surfaces were split and polished, obsolete transfer/sync controls disappeared, file search got more responsive, uv installs gained a pipx fallback, target-app builds moved onto one path, post-build Quality gating landed, and backlog auto-promote settings survived upgrades.
 
 ## Day 17: 2026-05-29 (Friday)
 
@@ -154,7 +154,7 @@ Effort: High (16 commits, 5 milestones)
 
 Milestones started: Logs screen parity; CLI ergonomics; distributed cluster nodes; template packaging; runtime worker recovery hardening.
 
-Logs and CLI ergonomics sharpened, then the distributed runtime took over: the gap-filtered Logs screen gained round logs and multiline rows, `r` and `update` landed, Guide state/highlight behavior was refined, cluster nodes and distributed project sync shipped, app templates were packaged for deployed installs, node-scoped dispatcher/status accounting was repaired, and runner-worker recovery hardened around stale sockets, orphan workers, and false in-progress Gap failures.
+Logs and CLI ergonomics sharpened, then the distributed runtime took over: the gap-filtered Logs screen gained round logs and multiline rows, `r` and `update` landed, Guide state/highlight behavior was refined, cluster nodes and distributed project sync shipped, app templates were packaged for deployed installs, node-scoped workflow/status accounting was repaired, and runner-worker recovery hardened around stale sockets, orphan workers, and false in-progress Gap failures.
 
 ## Day 21: 2026-06-02 (Tuesday)
 

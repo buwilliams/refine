@@ -6,37 +6,34 @@ use std::path::PathBuf;
 use clap::Parser;
 use serde_json::{Value, json};
 
-use crate::core::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
-use crate::core::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
-use crate::core::host::deployed_update::{
-    DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
-};
-use crate::core::host::installation::{FileInstallationService, InstallationService};
-use crate::core::observability::activity::{ActivityService, FileActivityService};
-use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
-use crate::core::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
-use crate::core::product::imports::FileImportService;
-use crate::core::product::nodes::FileNodeRegistryService;
-use crate::core::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
-use crate::core::product::project_state::{
-    FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
-};
-use crate::core::product::scheduling::FileSchedulingService;
-use crate::core::product::work_items::{
-    BulkGapFilter, BulkGapSelection, BulkGapUpdate, FileWorkItemService,
-};
-use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::lifecycle::{
-    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
-    current_launch_executable, current_launch_mode, http_probe,
-};
-use crate::core::supervisor::runtime::RuntimeRoot;
-use crate::model::workflow::{GapStatus, user_status_transition};
+use crate::model::workflow::GapStatus;
 use crate::surfaces::web_server::{
     API_CONTRACT_VERSION, API_GROUPS, InProcessWebServer, LocalHttpDaemon,
 };
+use crate::tools::host::agent_providers::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
+use crate::tools::host::cluster::{ClusterNodeUpdate, ClusterService, FileClusterRegistryService};
+use crate::tools::host::deployed_update::{
+    DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout, run_deployed_update,
+};
+use crate::tools::host::installation::{FileInstallationService, InstallationService};
+use crate::tools::observability::activity::{ActivityService, FileActivityService};
+use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
+use crate::tools::product::imports::FileImportService;
+use crate::tools::product::nodes::FileNodeRegistryService;
+use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
+use crate::tools::product::project_state::{
+    FileProjectStateStore, ProjectStateStore, ProjectionQuery, ProjectionSnapshot,
+};
+use crate::tools::product::work_items::{BulkGapFilter, BulkGapSelection, FileWorkItemService};
+use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::supervisor::lifecycle::{
+    BackgroundDaemonConfig, DaemonLifecycleService, DaemonStatus, FileDaemonLifecycleService,
+    current_launch_executable, current_launch_mode, http_probe,
+};
+use crate::tools::supervisor::runtime::RuntimeRoot;
 
 use super::actions::*;
 use super::helpers::*;
@@ -76,125 +73,6 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     };
 
     match cli.command {
-        Commands::Workflow {
-            action: WorkflowAction::Allowed { from, to },
-        } => {
-            let from: GapStatus = from.into();
-            let to: GapStatus = to.into();
-            let decision = user_status_transition(&from, &to);
-            println!("{}", serde_json::to_string_pretty(&decision).unwrap());
-            Ok(())
-        }
-        Commands::Workflow {
-            action:
-                WorkflowAction::Transition {
-                    id,
-                    target,
-                    durable_root: Some(durable_root),
-                },
-        } => {
-            let target: GapStatus = target.into();
-            let gap = FileWorkItemService::new(durable_root).transition_gap_status(&id, target)?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({"gap": gap.gap})).unwrap()
-            );
-            Ok(())
-        }
-        Commands::Workflow {
-            action:
-                WorkflowAction::BulkTransition {
-                    target,
-                    durable_root: Some(durable_root),
-                    selected_ids,
-                    status,
-                    q,
-                },
-        } => {
-            let target: GapStatus = target.into();
-            let selection = BulkGapSelection {
-                filter: BulkGapFilter {
-                    status,
-                    q,
-                    ..Default::default()
-                },
-                selected_ids: if selected_ids.is_empty() {
-                    None
-                } else {
-                    Some(selected_ids)
-                },
-                exclude_ids: Vec::new(),
-            };
-            let result = FileWorkItemService::new(durable_root).bulk_update_gaps(
-                selection,
-                BulkGapUpdate::Status(target.as_str().to_string()),
-            )?;
-            println!("{}", serde_json::to_string_pretty(&result).unwrap());
-            Ok(())
-        }
-        Commands::Workflow {
-            action:
-                WorkflowAction::Schedule {
-                    durable_root,
-                    runtime_root,
-                },
-        } => {
-            if skipped_durable_root(&durable_root) {
-                let response = daemon_json("POST", "/workflow/schedule", None)?;
-                print_json(&response);
-                return Ok(());
-            }
-            let scheduler = FileSchedulingService::with_durable_root(runtime_root, durable_root);
-            let result = scheduler.schedule_and_dispatch()?;
-            println!("{}", serde_json::to_string_pretty(&result).unwrap());
-            Ok(())
-        }
-        Commands::Workflow {
-            action: WorkflowAction::Pause { runtime_root },
-        } => {
-            let state = FileSchedulingService::new(runtime_root).set_agent_workflow_paused(true)?;
-            println!("{}", serde_json::to_string_pretty(&state).unwrap());
-            Ok(())
-        }
-        Commands::Workflow {
-            action: WorkflowAction::Resume { runtime_root },
-        } => {
-            let state =
-                FileSchedulingService::new(runtime_root).set_agent_workflow_paused(false)?;
-            println!("{}", serde_json::to_string_pretty(&state).unwrap());
-            Ok(())
-        }
-        Commands::Workflow {
-            action: WorkflowAction::Restore { durable_root },
-        } => {
-            if skipped_durable_root(&durable_root) {
-                let response = daemon_json("POST", "/workflow/restore", None)?;
-                print_json(&response);
-                return Ok(());
-            }
-            let result = FileWorkItemService::new(durable_root).bulk_update_gaps(
-                BulkGapSelection {
-                    filter: BulkGapFilter::default(),
-                    selected_ids: None,
-                    exclude_ids: Vec::new(),
-                },
-                BulkGapUpdate::Status("__last_workflow_state".to_string()),
-            )?;
-            println!("{}", serde_json::to_string_pretty(&result).unwrap());
-            Ok(())
-        }
-        Commands::Workflow {
-            action: WorkflowAction::Enforce { durable_root },
-        } => {
-            if skipped_durable_root(&durable_root) {
-                let response = daemon_json("POST", "/workflow/enforce", None)?;
-                print_json(&response);
-                return Ok(());
-            }
-            let summary = FileWorkItemService::new(durable_root).workflow_enforcement_summary()?;
-            println!("{}", serde_json::to_string_pretty(&summary).unwrap());
-            Ok(())
-        }
         Commands::System {
             action: SystemAction::ApiGroups,
         } => {
@@ -624,7 +502,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 .into_iter()
                 .find(|entry| entry.id == id)
             else {
-                return Err(crate::core::supervisor::errors::RefineError::NotFound(
+                return Err(crate::tools::supervisor::errors::RefineError::NotFound(
                     format!("Log entry {id} was not found"),
                 ));
             };
@@ -1187,17 +1065,17 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 )?
             } else {
                 let Some(reporter) = reporter.as_deref() else {
-                    return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                         "round reporter is required".to_string(),
                     ));
                 };
                 let Some(actual) = actual.as_deref() else {
-                    return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                         "round actual is required".to_string(),
                     ));
                 };
                 let Some(target) = target.as_deref() else {
-                    return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                         "round target is required".to_string(),
                     ));
                 };
@@ -1264,7 +1142,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 "quality" | "qa" => service.retry_gap_quality_summary(&id)?,
                 "merge" => service.retry_gap_merge_summary(&id)?,
                 _ => {
-                    return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                         "retry stage must be quality or merge".to_string(),
                     ));
                 }
@@ -1348,7 +1226,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             let service = FileWorkItemService::new(durable_root);
             let current = service.show_gap_summary(&id)?;
             let Some(feature_id) = current.gap.feature_id.clone() else {
-                return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                     format!("Gap {id} is not assigned to a Feature"),
                 ));
             };
@@ -1535,7 +1413,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             let Some(target) = GapStatus::parse_wire(&target) else {
-                return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                     "target must be backlog or todo".to_string(),
                 ));
             };
@@ -1639,7 +1517,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 service.import_from_file(file, csv, reporter.as_deref(), feature_id.as_deref())?
             } else {
                 let Some(text) = text.as_deref() else {
-                    return Err(crate::core::supervisor::errors::RefineError::InvalidInput(
+                    return Err(crate::tools::supervisor::errors::RefineError::InvalidInput(
                         "feature import requires --text or --file".to_string(),
                     ));
                 };
@@ -2182,57 +2060,6 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
 
 fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
     let response = match action {
-        WorkflowAction::Allowed { from, to } => {
-            let from: GapStatus = from.into();
-            let to: GapStatus = to.into();
-            daemon_json(
-                "POST",
-                "/workflow/allowed",
-                Some(json!({
-                    "from": from.as_str(),
-                    "to": to.as_str()
-                })),
-            )?
-        }
-        WorkflowAction::Transition {
-            id,
-            target,
-            durable_root: None,
-        } => {
-            let status: GapStatus = target.into();
-            daemon_json(
-                "POST",
-                &format!("/work/gaps/{}/transition", path_segment(&id)),
-                Some(json!({ "status": status.as_str() })),
-            )?
-        }
-        WorkflowAction::BulkTransition {
-            target,
-            durable_root: None,
-            selected_ids,
-            status,
-            q,
-        } => {
-            let target: GapStatus = target.into();
-            daemon_json(
-                "POST",
-                "/work/gaps/bulk",
-                Some(json!({
-                    "filter": {
-                        "status": status,
-                        "q": q
-                    },
-                    "selected_ids": if selected_ids.is_empty() { None } else { Some(selected_ids) },
-                    "exclude_ids": [],
-                    "update": {
-                        "status": target.as_str()
-                    }
-                })),
-            )?
-        }
-        WorkflowAction::Schedule { durable_root, .. } if skipped_durable_root(&durable_root) => {
-            daemon_json("POST", "/workflow/schedule", None)?
-        }
         WorkflowAction::Pause { .. } => {
             daemon_json(
                 "POST",
@@ -2252,17 +2079,6 @@ fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
                 "/processes/agents",
                 Some(json!({ "paused": false })),
             )?
-        }
-        WorkflowAction::Restore { durable_root } if skipped_durable_root(&durable_root) => {
-            daemon_json("POST", "/workflow/restore", None)?
-        }
-        WorkflowAction::Enforce { durable_root } if skipped_durable_root(&durable_root) => {
-            daemon_json("POST", "/workflow/enforce", None)?
-        }
-        other => {
-            return Err(RefineError::InvalidInput(format!(
-                "Workflow command cannot be routed to the daemon in this mode: {other:?}"
-            )));
         }
     };
     print_json(&response);
@@ -2900,14 +2716,7 @@ pub(super) fn explicit_durable_root_path(command: &Commands) -> Option<&PathBuf>
             FeatureAction::Import { durable_root, .. } => Some(durable_root),
         },
         Commands::Workflow { action } => match action {
-            WorkflowAction::Allowed { .. }
-            | WorkflowAction::Pause { .. }
-            | WorkflowAction::Resume { .. } => None,
-            WorkflowAction::Transition { durable_root, .. }
-            | WorkflowAction::BulkTransition { durable_root, .. } => durable_root.as_ref(),
-            WorkflowAction::Schedule { durable_root, .. }
-            | WorkflowAction::Restore { durable_root }
-            | WorkflowAction::Enforce { durable_root } => Some(durable_root),
+            WorkflowAction::Pause { .. } | WorkflowAction::Resume { .. } => None,
         },
         Commands::Node { action } => match action {
             NodeAction::List { durable_root }

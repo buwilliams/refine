@@ -67,7 +67,7 @@ impl FeatureRollup {
                     GapStatus::InProgress
                         | GapStatus::Qa
                         | GapStatus::ReadyMerge
-                        | GapStatus::AwaitingRebuild
+                        | GapStatus::Build
                         | GapStatus::Review
                 )
             })

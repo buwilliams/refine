@@ -4,17 +4,17 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
-use crate::core::host::agent_providers::{
+use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::core::host::installation::{FileInstallationService, InstallationService};
-use crate::core::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
-use crate::core::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
-use crate::core::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
-use crate::core::product::scheduling::{FileSchedulingService, SchedulingService};
-use crate::core::supervisor::errors::{RefineError, RefineResult};
-use crate::core::supervisor::jobs::{FileJobRegistry, JobRegistry};
-use crate::core::supervisor::security::{NativeSecretStore, SecretStore};
+use crate::tools::host::installation::{FileInstallationService, InstallationService};
+use crate::tools::host::process_supervision::{FileProcessSupervisor, ProcessSupervisor};
+use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
+use crate::tools::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::tools::supervisor::security::{NativeSecretStore, SecretStore};
+use crate::workflow::{WorkflowAutomation, WorkflowEngine};
 
 use super::support::*;
 use super::*;
@@ -127,14 +127,12 @@ impl InProcessWebServer {
         else {
             return job_id_required();
         };
-        let scheduler = match self.current_durable_root() {
-            Ok(Some(durable_root)) => {
-                FileSchedulingService::with_durable_root(runtime_root, durable_root)
-            }
-            Ok(None) => FileSchedulingService::new(runtime_root),
+        let automation = match self.current_durable_root() {
+            Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
+            Ok(None) => WorkflowEngine::new(runtime_root),
             Err(error) => return error_response(error),
         };
-        match scheduler.retry(job_id) {
+        match automation.retry(job_id) {
             Ok(retried_job_id) => {
                 match FileJobRegistry::new(runtime_root).status(&retried_job_id) {
                     Ok(job) => {
@@ -230,7 +228,22 @@ impl InProcessWebServer {
             .and_then(|stopped| stopped.as_bool())
             .unwrap_or(!current.background_processes_stopped);
         match supervisor.set_background_processes_stopped(stopped) {
-            Ok(_) => self.handle_processes("/processes"),
+            Ok(_) => {
+                if stopped {
+                    let durable_root = match self.current_durable_root() {
+                        Ok(root) => root,
+                        Err(error) => return error_response(error),
+                    };
+                    if let Some(durable_root) = durable_root
+                        && let Err(error) =
+                            WorkflowEngine::with_durable_root(runtime_root, durable_root)
+                                .rollback_in_progress_gaps_to_todo()
+                    {
+                        return error_response(error);
+                    }
+                }
+                self.handle_processes("/processes")
+            }
             Err(error) => error_response(error),
         }
     }
@@ -251,7 +264,22 @@ impl InProcessWebServer {
             .and_then(|paused| paused.as_bool())
             .unwrap_or(!current.agents_paused);
         match supervisor.set_agents_paused(paused) {
-            Ok(_) => self.handle_processes("/processes"),
+            Ok(_) => {
+                if paused {
+                    let durable_root = match self.current_durable_root() {
+                        Ok(root) => root,
+                        Err(error) => return error_response(error),
+                    };
+                    if let Some(durable_root) = durable_root
+                        && let Err(error) =
+                            WorkflowEngine::with_durable_root(runtime_root, durable_root)
+                                .rollback_in_progress_gaps_to_todo()
+                    {
+                        return error_response(error);
+                    }
+                }
+                self.handle_processes("/processes")
+            }
             Err(error) => error_response(error),
         }
     }

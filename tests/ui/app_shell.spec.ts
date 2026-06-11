@@ -146,7 +146,7 @@ test("renders dashboard workflow status cards for every Gap state", async ({ pag
     "in-progress",
     "qa",
     "ready-merge",
-    "awaiting-rebuild",
+    "build",
     "review",
     "done",
     "failed",
@@ -157,7 +157,7 @@ test("renders dashboard workflow status cards for every Gap state", async ({ pag
     "in-progress",
     "qa",
     "ready-merge",
-    "awaiting-rebuild",
+    "build",
   ]);
   const createdIds: string[] = [];
   const baseDashboard = await jsonObject(await request.get("/api/dashboard?node=current"));

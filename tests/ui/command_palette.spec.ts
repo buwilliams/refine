@@ -161,7 +161,7 @@ test("rebuilds the projection cache from the command palette", async ({ page, re
   try {
     await page.goto("/");
     await runPaletteCommand(page, "rebuild-cache", { commandId: "system.cache.rebuild" });
-    await expect(page.getByTestId("modal-dialog")).toContainText("Rebuild projection cache");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Build projection cache");
     const rebuilt = page.waitForResponse((response) =>
       response.url().includes("/api/cache/rebuild") &&
       response.request().method() === "POST" &&
@@ -456,13 +456,13 @@ test("runs target-app action commands from the command palette", async ({ page, 
     data: {
       target_app_start_command: "printf palette-target-start",
       target_app_stop_command: "printf palette-target-stop",
-      target_app_rebuild_command: "printf palette-target-rebuild",
+      target_app_build_command: "printf palette-target-build",
       target_app_status_command: "printf palette-target-status",
       target_app_cwd: "",
       target_app_env_json: "{}",
       target_app_start_timeout_seconds: "5",
       target_app_stop_timeout_seconds: "5",
-      target_app_rebuild_timeout_seconds: "5",
+      target_app_build_timeout_seconds: "5",
       target_app_status_timeout_seconds: "5",
       target_app_http_check_url: "",
       target_app_tcp_check_host: "",
@@ -497,18 +497,18 @@ test("runs target-app action commands from the command palette", async ({ page, 
     expect(startPayload.ok).toBe(true);
     expect(startPayload.state).toBe("running");
 
-    const rebuild = page.waitForResponse((response) =>
-      response.url().includes("/api/target-app/rebuild") &&
+    const build = page.waitForResponse((response) =>
+      response.url().includes("/api/target-app/build") &&
       response.request().method() === "POST" &&
       response.status() === 200
     );
-    await runPaletteCommand(page, "app-rebuild", { commandId: "target_app.rebuild" });
-    await expect(page.getByTestId("modal-dialog")).toContainText("Rebuild the target application now?");
+    await runPaletteCommand(page, "app-build", { commandId: "target_app.build" });
+    await expect(page.getByTestId("modal-dialog")).toContainText("Build the target application now?");
     await page.getByTestId("modal-ok").click();
-    const rebuildPayload = await (await rebuild).json();
-    expect(rebuildPayload.ok).toBe(true);
-    expect(rebuildPayload.state).toBe("stopped");
-    expect(String(rebuildPayload.last_operation?.stdout ?? "")).toBe("palette-target-rebuild");
+    const buildPayload = await (await build).json();
+    expect(buildPayload.ok).toBe(true);
+    expect(buildPayload.state).toBe("stopped");
+    expect(String(buildPayload.last_operation?.stdout ?? "")).toBe("palette-target-build");
 
     const stop = page.waitForResponse((response) =>
       response.url().includes("/api/target-app/stop") &&
@@ -527,13 +527,13 @@ test("runs target-app action commands from the command palette", async ({ page, 
       data: {
         target_app_start_command: "",
         target_app_stop_command: "",
-        target_app_rebuild_command: "",
+        target_app_build_command: "",
         target_app_status_command: "",
         target_app_cwd: "",
         target_app_env_json: "{}",
         target_app_start_timeout_seconds: "120",
         target_app_stop_timeout_seconds: "60",
-        target_app_rebuild_timeout_seconds: "300",
+        target_app_build_timeout_seconds: "300",
         target_app_status_timeout_seconds: "10",
         target_app_http_check_url: "",
         target_app_tcp_check_host: "",
@@ -725,13 +725,13 @@ test("runs AI plan, draft, and target-app generation from the command palette", 
       data: {
         target_app_start_command: "",
         target_app_stop_command: "",
-        target_app_rebuild_command: "",
+        target_app_build_command: "",
         target_app_status_command: "",
         target_app_cwd: "",
         target_app_env_json: "{}",
         target_app_start_timeout_seconds: "120",
         target_app_stop_timeout_seconds: "60",
-        target_app_rebuild_timeout_seconds: "300",
+        target_app_build_timeout_seconds: "300",
         target_app_status_timeout_seconds: "10",
         target_app_log_path: "",
         target_app_http_check_url: "",

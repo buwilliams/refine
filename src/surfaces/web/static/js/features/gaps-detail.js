@@ -103,12 +103,12 @@ async function loadGapDetail(gapId) {
 
 // User-driven workflow transitions for a Gap. Each state declares its
 // `back` and `forward` neighbors. System-owned states have no user buttons —
-// `in-progress` (dispatcher owns), `qa` (Quality owns), `ready-merge`
-// (merger owns), and `awaiting-rebuild` (target-app rebuild owns) have no user buttons
+// `in-progress` (Workflow Engine owns), `qa` (Quality owns), `ready-merge`
+// (merger owns), and `build` (target-app build owns) have no user buttons
 // because they're system-driven phases the agent passes through
-// automatically (todo → in-progress → qa → ready-merge → awaiting-rebuild → review).
+// automatically (todo → in-progress → qa → ready-merge → build → review).
 // Forward from `review` goes through the dedicated /verify endpoint for
-// approval. No user action moves a Gap into `review`; successful rebuild does.
+// approval. No user action moves a Gap into `review`; successful build does.
 //
 // failed / cancelled only expose a back arrow — there's no obvious
 // forward target for them (they're terminal-ish in opposite directions
@@ -117,10 +117,10 @@ async function loadGapDetail(gapId) {
 const GAP_WORKFLOW = {
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
-  // in-progress: no user buttons — dispatcher owns.
+  // in-progress: no user buttons — Workflow Engine owns.
   // qa: no user buttons — Quality owns.
   // ready-merge: no user buttons — merger owns.
-  // awaiting-rebuild: no user buttons — target-app rebuild owns.
+  // build: no user buttons — target-app build owns.
   review:       { back:    { label: "← Todo",     next: "todo"   },
                   forward: { label: "Verify →",   next: "done", verify: true } },
   done:         { back:    { label: "← Review",   next: "review" } },

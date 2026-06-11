@@ -5,12 +5,12 @@ const AGENT_MANAGED_WORKFLOW_STATUSES = new Set([
   "in-progress",
   "qa",
   "ready-merge",
-  "awaiting-rebuild",
+  "build",
 ]);
 
 const WORKFLOW_VISUALIZATION_LABELS = {
   "ready-merge": "Ready merge",
-  "awaiting-rebuild": "Rebuild",
+  "build": "Rebuild",
 };
 
 function workflowVisualizationLabel(status) {

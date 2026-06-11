@@ -132,7 +132,7 @@ function applyTargetAppSnapshot(snap) {
     degraded: "degraded",
     stopped: "stopped",
     starting: "starting…",
-    rebuilding: "rebuilding…",
+    building: "building…",
     stopping: "stopping…",
     failed: "failed",
     unknown: "unknown",
@@ -166,42 +166,42 @@ function applyTargetAppSnapshot(snap) {
 }
 
 async function runTargetAppAction(action) {
-  // action is "start", "stop", or "rebuild". Called from the buttons on System.
+  // action is "start", "stop", or "build". Called from the buttons on System.
   const snap = _targetAppSnapshot || {};
   const hasPrompt = action === "start"
     ? snap.has_start_command
     : action === "stop"
       ? snap.has_stop_command
-      : snap.has_rebuild_command;
+      : snap.has_build_command;
   const isStop = action === "stop";
-  const isRebuild = action === "rebuild";
+  const isBuild = action === "build";
   const noCommand = !hasPrompt;
   const ok = await modalConfirm(
     isStop
       ? (noCommand
           ? "No stop command is configured. Continue with a no-op?"
           : "Stop the target application now?")
-      : isRebuild
+      : isBuild
         ? (noCommand
-            ? "No rebuild command is configured. Queue the stop/start rebuild sequence anyway?"
-            : "Rebuild the target application now? Refine will stop, rebuild, and start the app on the host.")
+            ? "No build command is configured. Queue the stop/start build sequence anyway?"
+            : "Build the target application now? Refine will stop, build, and start the app on the host.")
         : (noCommand
             ? "No start command is configured. Continue with a no-op?"
             : "Start the target application now? Refine will run the saved start command on the host."),
-    { title: isStop ? "Stop application" : (isRebuild ? "Rebuild application" : "Start application"),
-      okLabel: isStop ? "Stop" : (isRebuild ? "Rebuild" : "Start"),
+    { title: isStop ? "Stop application" : (isBuild ? "Build application" : "Start application"),
+      okLabel: isStop ? "Stop" : (isBuild ? "Build" : "Start"),
       danger: isStop },
   );
   if (!ok) return;
   // Optimistic UI flip so the dot transitions immediately.
   applyTargetAppSnapshot({
     ..._targetAppSnapshot,
-    state: isStop ? "stopping" : (isRebuild ? "rebuilding" : "starting"),
+    state: isStop ? "stopping" : (isBuild ? "building" : "starting"),
   });
   try {
     const r = await api("POST", `/api/target-app/${action}`);
-    if (isRebuild && r.queued !== undefined) {
-      toast(r.queued ? "Target application rebuild queued" : "Target application rebuild was not queued", r.queued ? "info" : "warn");
+    if (isBuild && r.queued !== undefined) {
+      toast(r.queued ? "Target application build queued" : "Target application build was not queued", r.queued ? "info" : "warn");
       await refreshTargetAppToggle();
       return;
     }

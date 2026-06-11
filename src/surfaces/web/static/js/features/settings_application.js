@@ -45,8 +45,8 @@ function renderSettingsApplicationTab({
 }
 
 function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
-  const rawAutoRebuildMode = String(s.target_app_auto_rebuild || "on_worktree_merge");
-  const autoRebuildMode = rawAutoRebuildMode === "nightly" ? "daily" : rawAutoRebuildMode;
+  const rawAutoBuildMode = String(s.target_app_auto_build || "on_worktree_merge");
+  const autoBuildMode = rawAutoBuildMode === "nightly" ? "daily" : rawAutoBuildMode;
   return `
     <section class="settings-section">
       <h3>Application</h3>
@@ -88,7 +88,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         <strong>Generate with AI</strong> analyses the codebase, writes a
         <code>.refine/manage-app.sh</code> wrapper with timestamped logging,
         and points the commands below at it
-        (<code>./.refine/manage-app.sh start|stop|rebuild|status</code>).
+        (<code>./.refine/manage-app.sh start|stop|build|status</code>).
         Refine runs the saved commands directly on the host. You can override
         any field — including swapping in your own commands.
       </p>
@@ -126,38 +126,38 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
                placeholder="./.refine/manage-app.sh stop"
                value="${htmlEscape(s.target_app_stop_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Rebuild command",
-        "application-rebuild",
+        "Build command",
+        "application-build",
         "one-line shell command that prepares generated artifacts for review.",
       )}</label>
-        <input type="text" id="s-target-rebuild-command"
-               data-testid="target-app-rebuild-command"
-               placeholder="./.refine/manage-app.sh rebuild"
-               value="${htmlEscape(s.target_app_rebuild_command || "")}"></div>
+        <input type="text" id="s-target-build-command"
+               data-testid="target-app-build-command"
+               placeholder="./.refine/manage-app.sh build"
+               value="${htmlEscape(s.target_app_build_command || "")}"></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Automatic application rebuild",
-        "application-auto-rebuild",
-        "controls when Refine rebuilds merged work before it becomes ready for review.",
+        "Automatic application build",
+        "application-auto-build",
+        "controls when Refine builds merged work before it becomes ready for review.",
       )}</label>
-        <select id="s-target-auto-rebuild">
+        <select id="s-target-auto-build">
           ${[
             ["never", "Never"],
             ["on_worktree_merge", "On worktree merge"],
             ["hourly", "Hourly"],
             ["daily", "Daily (time)"],
-          ].map(([v, lbl]) => `<option value="${v}" ${autoRebuildMode === v ? "selected" : ""}>${lbl}</option>`).join("")}
+          ].map(([v, lbl]) => `<option value="${v}" ${autoBuildMode === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Daily rebuild time",
-        "application-auto-rebuild-time",
-        "UTC whole-hour time used when automatic rebuild is Daily.",
+        "Daily build time",
+        "application-auto-build-time",
+        "UTC whole-hour time used when automatic build is Daily.",
       )}</label>
-        <select id="s-target-auto-rebuild-hour-utc"
-                ${autoRebuildMode === "daily" ? "" : "disabled"}>
+        <select id="s-target-auto-build-hour-utc"
+                ${autoBuildMode === "daily" ? "" : "disabled"}>
           ${Array.from({ length: 24 }, (_, hour) => {
             const value = String(hour);
             const label = `${String(hour).padStart(2, "0")}:00 UTC`;
-            return `<option value="${value}" ${String(s.target_app_auto_rebuild_hour_utc || "0") === value ? "selected" : ""}>${label}</option>`;
+            return `<option value="${value}" ${String(s.target_app_auto_build_hour_utc || "0") === value ? "selected" : ""}>${label}</option>`;
           }).join("")}
         </select></div>
       <div class="form-row"><label>${renderSettingsGuideLabel(
@@ -189,8 +189,8 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
           <input type="number" id="s-target-start-timeout" data-testid="target-app-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Stop timeout (s)", "application-stop-timeout")}</label>
           <input type="number" id="s-target-stop-timeout" data-testid="target-app-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("Rebuild timeout (s)", "application-rebuild-timeout")}</label>
-          <input type="number" id="s-target-rebuild-timeout" data-testid="target-app-rebuild-timeout" value="${htmlEscape(s.target_app_rebuild_timeout_seconds || "300")}"></div>
+        <div class="form-row"><label>${renderSettingsGuideLabel("Build timeout (s)", "application-build-timeout")}</label>
+          <input type="number" id="s-target-build-timeout" data-testid="target-app-build-timeout" value="${htmlEscape(s.target_app_build_timeout_seconds || "300")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Status timeout (s)", "application-status-timeout")}</label>
           <input type="number" id="s-target-status-timeout" data-testid="target-app-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
         <div class="form-row"><label>${renderSettingsGuideLabel("Log path", "application-log-path")}</label>
@@ -232,15 +232,15 @@ function collectSettingsApplicationPayload() {
     target_app_url: $("#s-target-app-url").value,
     target_app_start_command: $("#s-target-start-command").value,
     target_app_stop_command: $("#s-target-stop-command").value,
-    target_app_rebuild_command: $("#s-target-rebuild-command").value,
-    target_app_auto_rebuild: $("#s-target-auto-rebuild").value,
-    target_app_auto_rebuild_hour_utc: $("#s-target-auto-rebuild-hour-utc").value,
+    target_app_build_command: $("#s-target-build-command").value,
+    target_app_auto_build: $("#s-target-auto-build").value,
+    target_app_auto_build_hour_utc: $("#s-target-auto-build-hour-utc").value,
     target_app_status_command: $("#s-target-status-command").value,
     target_app_cwd: $("#s-target-cwd").value,
     target_app_env_json: $("#s-target-env").value,
     target_app_start_timeout_seconds: $("#s-target-start-timeout").value,
     target_app_stop_timeout_seconds: $("#s-target-stop-timeout").value,
-    target_app_rebuild_timeout_seconds: $("#s-target-rebuild-timeout").value,
+    target_app_build_timeout_seconds: $("#s-target-build-timeout").value,
     target_app_status_timeout_seconds: $("#s-target-status-timeout").value,
     target_app_log_path: $("#s-target-log-path").value,
     target_app_http_check_url: $("#s-target-http-url").value,
@@ -267,13 +267,13 @@ function applyGeneratedTargetAppConfig(cfg) {
   };
   set("#s-target-start-command", cfg.start_command || "");
   set("#s-target-stop-command", cfg.stop_command || "");
-  set("#s-target-rebuild-command", cfg.rebuild_command || "");
+  set("#s-target-build-command", cfg.build_command || "");
   set("#s-target-status-command", cfg.status_command || "");
   set("#s-target-cwd", cfg.cwd || "");
   set("#s-target-env", JSON.stringify(cfg.env || {}, null, 2));
   set("#s-target-start-timeout", cfg.start_timeout_seconds || 120);
   set("#s-target-stop-timeout", cfg.stop_timeout_seconds || 60);
-  set("#s-target-rebuild-timeout", cfg.rebuild_timeout_seconds || 300);
+  set("#s-target-build-timeout", cfg.build_timeout_seconds || 300);
   set("#s-target-status-timeout", cfg.status_timeout_seconds || 10);
   set("#s-target-log-path", cfg.log_path || "");
   set("#s-target-http-url", cfg.http_check_url || "");
@@ -411,16 +411,16 @@ function bindNodeApplicationConfigControls() {
     syncTargetAppGenerateButtonState();
   }
   const root = document.querySelector('[data-tab-pane="target-app"]');
-  const autoRebuild = $("#s-target-auto-rebuild");
-  const autoRebuildHour = $("#s-target-auto-rebuild-hour-utc");
-  if (autoRebuild && autoRebuildHour) {
-    autoRebuild.addEventListener("change", () => {
-      autoRebuildHour.disabled = autoRebuild.value !== "daily";
+  const autoBuild = $("#s-target-auto-build");
+  const autoBuildHour = $("#s-target-auto-build-hour-utc");
+  if (autoBuild && autoBuildHour) {
+    autoBuild.addEventListener("change", () => {
+      autoBuildHour.disabled = autoBuild.value !== "daily";
     });
   }
   bindSettingsAutosave(
     root,
-    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-rebuild-command, #s-target-auto-rebuild, #s-target-auto-rebuild-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-rebuild-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
+    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-build-command, #s-target-auto-build, #s-target-auto-build-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-build-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
     autosaveSettingsApplication,
   );
 }

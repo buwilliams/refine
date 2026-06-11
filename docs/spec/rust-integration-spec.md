@@ -96,7 +96,8 @@ Initial coverage should port the existing `refine-test` Rust CLI cases:
 - `project status` reports the disposable app.
 - `project doctor` runs.
 - `gap create/list/show/edit/note/round/delete`.
-- `workflow allowed` and user-driven transitions.
+- `workflow pause/resume`; Gap and Feature commands cover user-driven state
+  changes.
 - `feature create/list/add-gap/remove-gap/delete`, with rollup assertions read
   from `list` or `show` output.
 - `node list/create/activate/archive`.
@@ -157,8 +158,8 @@ machine, SSE channels, storage keys, timing constants) lives in
      `smoke-ai` fixture (via `REFINE_SMOKE_AI_PATH`), then wait on the outcome.
      These include: chat replies (standalone/gap/plan), Draft Feature, Draft
      Round, import AI extraction, governance and quality evaluation, Generate
-     rules, Generate target-app config, and the dispatcher-driven status chain
-     `todo → in-progress → qa → ready-merge → awaiting-rebuild → review`
+     rules, Generate target-app config, and the Workflow Engine-driven status chain
+     `todo → in-progress → qa → ready-merge → build → review`
      (including auto-promote `backlog → todo`). Never assert these against a
      real external provider.
 
@@ -168,7 +169,7 @@ machine, SSE channels, storage keys, timing constants) lives in
    - **← QA / ← Merge** buttons: only on `failed` Gaps in quality-retry /
      merge-retry context.
    - **Bulk transfer / assign**: skip `in-progress`, `qa`, `ready-merge`,
-     `awaiting-rebuild`, and other-node Gaps — seed eligible Gaps.
+     `build`, and other-node Gaps — seed eligible Gaps.
    - **Generate rules**: product and constitution both filled.
    - **Run regressions**: at least one regression defined.
    - **Node / Governance** surfaces: an attached project; **Application**

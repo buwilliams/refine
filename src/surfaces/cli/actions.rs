@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::core::host::installation::InstallTarget;
 use crate::model::workflow::GapStatus;
+use crate::tools::host::installation::InstallTarget;
 
 #[derive(Debug, Parser)]
 #[command(name = "refine")]
@@ -366,36 +366,6 @@ pub enum FeatureAction {
 
 #[derive(Debug, Subcommand)]
 pub enum WorkflowAction {
-    Allowed {
-        from: CliGapStatus,
-        to: CliGapStatus,
-    },
-    Transition {
-        id: String,
-        target: CliGapStatus,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        durable_root: Option<PathBuf>,
-    },
-    BulkTransition {
-        target: CliGapStatus,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        durable_root: Option<PathBuf>,
-        #[arg(long = "selected-id")]
-        selected_ids: Vec<String>,
-        #[arg(long)]
-        status: Option<String>,
-        #[arg(long)]
-        q: Option<String>,
-    },
-    Schedule {
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
-        durable_root: PathBuf,
-        #[arg(long, default_value = "run")]
-        runtime_root: PathBuf,
-    },
     Pause {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
@@ -403,16 +373,6 @@ pub enum WorkflowAction {
     Resume {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
-    },
-    Restore {
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
-        durable_root: PathBuf,
-    },
-    Enforce {
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = PathBuf::new()))]
-        durable_root: PathBuf,
     },
 }
 
@@ -423,7 +383,7 @@ pub enum CliGapStatus {
     InProgress,
     Qa,
     ReadyMerge,
-    AwaitingRebuild,
+    Build,
     Review,
     Done,
     Failed,
@@ -438,7 +398,7 @@ impl From<CliGapStatus> for GapStatus {
             CliGapStatus::InProgress => Self::InProgress,
             CliGapStatus::Qa => Self::Qa,
             CliGapStatus::ReadyMerge => Self::ReadyMerge,
-            CliGapStatus::AwaitingRebuild => Self::AwaitingRebuild,
+            CliGapStatus::Build => Self::Build,
             CliGapStatus::Review => Self::Review,
             CliGapStatus::Done => Self::Done,
             CliGapStatus::Failed => Self::Failed,

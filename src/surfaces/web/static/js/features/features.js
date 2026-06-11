@@ -8,10 +8,10 @@ const FEATURES_DEFAULT_DIR = {
 };
 const FEATURES_STATUS_OPTIONS = [
   "", "backlog", "todo", "in-progress", "qa", "ready-merge",
-  "awaiting-rebuild", "review", "done", "failed", "cancelled",
+  "build", "review", "done", "failed", "cancelled",
 ];
 const FEATURE_WORKFLOW_PROTECTED_STATUSES = new Set([
-  "review", "done", "ready-merge", "awaiting-rebuild",
+  "review", "done", "ready-merge", "build",
 ]);
 
 let _featureModalRoot = null;

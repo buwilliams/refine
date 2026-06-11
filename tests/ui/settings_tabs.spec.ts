@@ -559,7 +559,7 @@ test("controls background and agent processes from the Processes tab", async ({ 
       '[data-testid="managed-process-row"][data-process-kind="background_processes"]',
     );
     const agentRow = page.locator(
-      '[data-testid="managed-process-row"][data-process-kind="agent_scheduler"]',
+      '[data-testid="managed-process-row"][data-process-kind="agent_automation"]',
     );
     const supervisorRow = page.locator(
       '[data-testid="managed-process-row"][data-process-kind="supervisor"]',
@@ -606,7 +606,7 @@ test("controls background and agent processes from the Processes tab", async ({ 
       response.status() === 200
     );
     await agentRow.getByTestId("process-agent-toggle").click();
-    await expect(page.getByTestId("modal-dialog")).toContainText("Pause agent scheduling?");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Pause workflow automation?");
     await page.getByTestId("modal-ok").click();
     const agentsPausedPayload = await (await agentsPaused).json();
     expect(agentsPausedPayload.agents_paused).toBe(true);
@@ -642,13 +642,13 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
     "agent_cli",
     "target_app_start_command",
     "target_app_stop_command",
-    "target_app_rebuild_command",
+    "target_app_build_command",
     "target_app_status_command",
     "target_app_cwd",
     "target_app_env_json",
     "target_app_start_timeout_seconds",
     "target_app_stop_timeout_seconds",
-    "target_app_rebuild_timeout_seconds",
+    "target_app_build_timeout_seconds",
     "target_app_status_timeout_seconds",
     "target_app_log_path",
     "target_app_http_check_url",
@@ -667,11 +667,11 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
         agent_cli: "smoke-ai",
         target_app_start_command: "",
         target_app_stop_command: "",
-        target_app_rebuild_command: "printf processes-worker-rebuild",
+        target_app_build_command: "printf processes-worker-build",
         target_app_status_command: "",
         target_app_cwd: "",
         target_app_env_json: "{}",
-        target_app_rebuild_timeout_seconds: "5",
+        target_app_build_timeout_seconds: "5",
         target_app_http_check_url: "",
         target_app_tcp_check_host: "",
         target_app_tcp_check_port: "",
@@ -693,7 +693,7 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
       `[data-testid="runner-work-row"][data-runner-work-kind="${kind}"]`,
     );
     for (const kind of [
-      "target_app_rebuilder",
+      "target_app_builder",
       "target_app_config_generator",
       "sqlite_cache_rebuild",
       "activity_log_cleanup",
@@ -702,16 +702,16 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
       await expect(row(kind).locator("td").nth(1)).toHaveText("idle");
     }
 
-    const rebuiltTargetApp = page.waitForResponse((response) =>
-      response.url().includes("/api/runner-workers/target-app-rebuilder/rebuild") &&
+    const builtTargetApp = page.waitForResponse((response) =>
+      response.url().includes("/api/runner-workers/target-app-builder/build") &&
       response.request().method() === "POST" &&
       response.status() === 200
     );
-    await row("target_app_rebuilder").getByTestId("runner-target-app-rebuild").click();
-    const rebuildPayload = await (await rebuiltTargetApp).json();
-    expect(rebuildPayload.ok).toBe(true);
-    expect(rebuildPayload.queued).toBe(true);
-    expect(String(rebuildPayload.last_operation?.stdout ?? "")).toBe("processes-worker-rebuild");
+    await row("target_app_builder").getByTestId("runner-target-app-build").click();
+    const buildPayload = await (await builtTargetApp).json();
+    expect(buildPayload.ok).toBe(true);
+    expect(buildPayload.queued).toBe(true);
+    expect(String(buildPayload.last_operation?.stdout ?? "")).toBe("processes-worker-build");
 
     const generated = page.waitForResponse((response) =>
       response.url().includes("/api/target-app/generate-instructions") &&
@@ -740,7 +740,7 @@ test("runs subprocess worker actions from the Processes tab", async ({ page, req
       response.status() === 200
     );
     await row("sqlite_cache_rebuild").getByTestId("runner-cache-rebuild").click();
-    await expect(page.getByTestId("modal-dialog")).toContainText("Rebuild projection cache");
+    await expect(page.getByTestId("modal-dialog")).toContainText("Build projection cache");
     await page.getByTestId("modal-ok").click();
     const cachePayload = await (await rebuiltCache).json();
     expect(cachePayload.ok).toBe(true);

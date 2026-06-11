@@ -9,14 +9,14 @@ use support::integration::IntegrationFixture;
 
 #[test]
 #[ignore]
-fn daemon_scheduler_runs_full_gap_workflow_through_git_worktree() {
+fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
     let provider = deterministic_provider_script();
     let previous_provider = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
         std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
     }
 
-    let fixture = IntegrationFixture::start_with_agent_scheduler("full-workflow");
+    let fixture = IntegrationFixture::start_with_agent_automation("full-workflow");
     fixture.api_json(
         "PATCH",
         "/api/settings",
@@ -31,7 +31,7 @@ fn daemon_scheduler_runs_full_gap_workflow_through_git_worktree() {
         "PATCH",
         "/api/governance",
         serde_json::json!({
-            "product": "Disposable scheduler workflow test app",
+            "product": "Disposable automation workflow test app",
             "constitution": "Allow deterministic smoke workflow changes.",
             "rules": [{"text": "Allow deterministic smoke workflow changes.", "source": "test"}]
         }),
