@@ -560,7 +560,7 @@ fn system_status_reports_current_version_and_running_ports() {
         pid: Some(std::process::id()),
         state: "running".to_string(),
         label: Some("helper".to_string()),
-        details: None,
+        details: Some("{\"kind\":\"ui\",\"secret\":\"not-for-status\"}".to_string()),
         stdout_path: None,
         stderr_path: None,
         stdin_path: None,
@@ -585,7 +585,15 @@ fn system_status_reports_current_version_and_running_ports() {
     assert!(status["ports"][0]["executable_path"].is_string());
     assert!(status["ports"][0]["daemon_healthy"].as_bool().unwrap());
     assert_eq!(status["ports"][0]["process_count"], 1);
-    assert_eq!(status["ports"][0]["processes"][0]["id"], "helper-1");
+    let process = status["ports"][0]["processes"][0].as_object().unwrap();
+    assert_eq!(process.len(), 3);
+    assert!(process.contains_key("pid"));
+    assert!(process.contains_key("status"));
+    assert!(process.contains_key("label"));
+    assert_eq!(process["pid"], serde_json::json!(std::process::id()));
+    assert_eq!(process["status"], "running");
+    assert_eq!(process["label"], "helper");
+    assert!(status["ports"][0].get("process_summary").is_none());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -643,6 +651,14 @@ fn system_ps_lists_and_stops_supervised_processes() {
             .unwrap()
             .iter()
             .any(|process| process["id"] == "running-helper" && process["port"] == port)
+    );
+    assert!(
+        listed["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|process| process["id"] == "running-helper"
+                && process["details"] == "{\"kind\":\"ui\"}")
     );
 
     let stopped = system_ps_response(

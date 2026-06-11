@@ -1815,10 +1815,16 @@ fn port_status_with_processes(runtime: &RuntimeRoot, status: &DaemonStatus) -> s
                     "processes".to_string(),
                     summary
                         .get("processes")
-                        .cloned()
+                        .and_then(|value| value.as_array())
+                        .map(|processes| {
+                            processes
+                                .iter()
+                                .map(minimal_status_process)
+                                .collect::<Vec<_>>()
+                        })
+                        .map(Value::Array)
                         .unwrap_or_else(|| json!([])),
                 );
-                object.insert("process_summary".to_string(), summary);
             }
             Err(error) => {
                 object.insert("process_count".to_string(), json!(0));
@@ -1828,6 +1834,14 @@ fn port_status_with_processes(runtime: &RuntimeRoot, status: &DaemonStatus) -> s
         }
     }
     value
+}
+
+fn minimal_status_process(process: &Value) -> Value {
+    json!({
+        "pid": process.get("pid").cloned().unwrap_or(Value::Null),
+        "status": process.get("status").cloned().unwrap_or(Value::Null),
+        "label": process.get("label").cloned().unwrap_or(Value::Null),
+    })
 }
 
 pub(super) fn absolute_cli_path(path: PathBuf) -> RefineResult<PathBuf> {
