@@ -126,7 +126,7 @@ Nav & Guide: Manage Drop-down
 				Rules: list (text input + Remove per rule), Add rule, Generate rules (needs product + constitution), autosave
 			Quality
 				Quality gate: QA enabled toggle, timing (pre_merge / post_build)
-				Target-app tests: configured target-app test command summary, Configure action
+				Target-app tests: enabled/disabled CLI command list using the shared edit/save config control
 				Business requirements + Instructions (markdown fields)
 				Incomplete warning banner if requirements/instructions missing
 			Guidance

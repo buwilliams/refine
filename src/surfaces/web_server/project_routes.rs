@@ -286,6 +286,11 @@ fn target_app_generated_settings(config: &TargetAppGeneratedConfig) -> Value {
         "target_app_stop_command": config.stop_command.clone(),
         "target_app_build_command": config.build_command.clone(),
         "target_app_test_command": config.test_command.clone(),
+        "target_app_test_commands": if config.test_command.trim().is_empty() {
+            String::new()
+        } else {
+            json!([{"command": config.test_command.clone(), "enabled": true}]).to_string()
+        },
         "target_app_status_command": config.status_command.clone(),
         "target_app_cwd": config.cwd.clone(),
         "target_app_env_json": serde_json::to_string_pretty(&config.env).unwrap_or_else(|_| "{}".to_string()),

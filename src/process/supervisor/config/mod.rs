@@ -53,11 +53,21 @@ impl FileSettingsService {
         }
         let mut current = self.load()?;
         let allowed = allowed_settings();
+        let mut updated_test_command = false;
+        let mut updated_test_commands = false;
         for (key, value) in updates {
             if !allowed.contains(key.as_str()) {
                 return Err(RefineError::InvalidInput(format!("unknown setting: {key}")));
             }
             current.insert(key.clone(), Value::String(normalize_setting(key, value)?));
+            if key == "target_app_test_command" {
+                updated_test_command = true;
+            } else if key == "target_app_test_commands" {
+                updated_test_commands = true;
+            }
+        }
+        if updated_test_command || updated_test_commands {
+            sync_target_app_test_settings(&mut current, updated_test_commands)?;
         }
         self.validate(&current)?;
         self.write(&current)?;
@@ -119,6 +129,9 @@ impl ConfigService for FileSettingsService {
                 );
                 migrated = true;
             }
+        }
+        if sync_target_app_test_settings(&mut settings, false)? {
+            migrated = true;
         }
         if migrated {
             self.write(&settings)?;
@@ -420,6 +433,7 @@ fn default_settings() -> JsonObject {
         ("target_app_stop_command", ""),
         ("target_app_build_command", ""),
         ("target_app_test_command", ""),
+        ("target_app_test_commands", ""),
         ("target_app_status_command", ""),
         ("target_app_cwd", ""),
         ("target_app_env_json", "{}"),
@@ -474,6 +488,7 @@ fn allowed_settings() -> BTreeSet<&'static str> {
         "target_app_stop_command",
         "target_app_build_command",
         "target_app_test_command",
+        "target_app_test_commands",
         "target_app_status_command",
         "target_app_cwd",
         "target_app_env_json",
@@ -546,6 +561,7 @@ fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
             }
             Ok(parsed.to_string())
         }
+        "target_app_test_commands" => normalize_target_app_test_commands(value),
         "parallel_run_cap"
         | "parallel_per_node_cap"
         | "parallel_per_provider_cap"
@@ -573,6 +589,114 @@ fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
         }
         _ => Ok(as_string(value).trim().to_string()),
     }
+}
+
+fn sync_target_app_test_settings(
+    settings: &mut JsonObject,
+    prefer_command_list: bool,
+) -> RefineResult<bool> {
+    let command_text = settings
+        .get("target_app_test_command")
+        .map(as_string)
+        .unwrap_or_default();
+    let commands_text = settings
+        .get("target_app_test_commands")
+        .map(as_string)
+        .unwrap_or_default();
+
+    if prefer_command_list {
+        let enabled = enabled_target_app_test_command(&commands_text);
+        if enabled != command_text {
+            settings.insert(
+                "target_app_test_command".to_string(),
+                Value::String(enabled),
+            );
+            return Ok(true);
+        }
+        return Ok(false);
+    }
+
+    if commands_text.trim().is_empty() && !command_text.trim().is_empty() {
+        settings.insert(
+            "target_app_test_commands".to_string(),
+            Value::String(normalize_target_app_test_commands(&Value::Array(vec![
+                json!({
+                    "command": command_text,
+                    "enabled": true
+                }),
+            ]))?),
+        );
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+fn enabled_target_app_test_command(commands_text: &str) -> String {
+    let Ok(Value::Array(items)) = serde_json::from_str::<Value>(commands_text.trim()) else {
+        return String::new();
+    };
+    items
+        .iter()
+        .find(|item| item.get("enabled").and_then(Value::as_bool).unwrap_or(true))
+        .and_then(|item| item.get("command").and_then(Value::as_str))
+        .unwrap_or("")
+        .trim()
+        .to_string()
+}
+
+fn normalize_target_app_test_commands(value: &Value) -> RefineResult<String> {
+    let raw_items = match value {
+        Value::Array(items) => items.clone(),
+        Value::String(text) => {
+            let trimmed = text.trim();
+            if trimmed.is_empty() {
+                return Ok(String::new());
+            }
+            match serde_json::from_str::<Value>(trimmed) {
+                Ok(Value::Array(items)) => items,
+                Ok(_) => {
+                    return Err(RefineError::InvalidInput(
+                        "target_app_test_commands must be a JSON array".to_string(),
+                    ));
+                }
+                Err(_) => vec![Value::String(trimmed.to_string())],
+            }
+        }
+        Value::Null => return Ok(String::new()),
+        _ => {
+            return Err(RefineError::InvalidInput(
+                "target_app_test_commands must be a JSON array".to_string(),
+            ));
+        }
+    };
+
+    let mut commands = Vec::new();
+    let mut seen = BTreeSet::new();
+    for item in raw_items {
+        let command = item
+            .get("command")
+            .and_then(Value::as_str)
+            .or_else(|| item.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if command.is_empty() || seen.contains(&command) {
+            continue;
+        }
+        seen.insert(command.clone());
+        commands.push(json!({
+            "command": command,
+            "enabled": item.get("enabled").and_then(Value::as_bool).unwrap_or(true)
+        }));
+    }
+    if commands.is_empty() {
+        return Ok(String::new());
+    }
+    serde_json::to_string(&commands).map_err(|error| {
+        RefineError::Serialization(format!(
+            "failed to encode target_app_test_commands: {error}"
+        ))
+    })
 }
 
 fn normalize_range(key: &str, value: &Value, min: i64, max: i64) -> RefineResult<String> {
@@ -996,6 +1120,41 @@ mod tests {
         let written = fs::read_to_string(service.path()).unwrap();
         assert!(written.contains("target_app_build_command"));
         assert!(!written.contains("target_app_rebuild_command"));
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_settings_service_syncs_target_app_test_command_list() {
+        let temp_root = unique_temp_dir("settings-test-commands");
+        let refine_dir = temp_root.join(".refine");
+        let service = FileSettingsService::new(&refine_dir);
+
+        let legacy = service
+            .update(&json!({
+                "target_app_test_command": "npm test"
+            }))
+            .unwrap();
+        assert_eq!(legacy["settings"]["target_app_test_command"], "npm test");
+        assert_eq!(
+            legacy["settings"]["target_app_test_commands"],
+            r#"[{"command":"npm test","enabled":true}]"#
+        );
+
+        let updated = service
+            .update(&json!({
+                "target_app_test_commands": [
+                    {"command": "npm run lint", "enabled": false},
+                    {"command": "npm test", "enabled": true},
+                    {"command": "npm run e2e", "enabled": true}
+                ]
+            }))
+            .unwrap();
+        assert_eq!(updated["settings"]["target_app_test_command"], "npm test");
+        assert_eq!(
+            updated["settings"]["target_app_test_commands"],
+            r#"[{"command":"npm run lint","enabled":false},{"command":"npm test","enabled":true},{"command":"npm run e2e","enabled":true}]"#
+        );
 
         fs::remove_dir_all(temp_root).unwrap();
     }

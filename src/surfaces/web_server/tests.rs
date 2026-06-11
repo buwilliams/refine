@@ -3833,10 +3833,17 @@ fn web_server_manages_quality_settings_and_checks() {
         path: "/api/settings".to_string(),
         body: Some(json!({
             "target_app_url": "http://127.0.0.1:3000",
-            "target_app_test_command": "printf target-test-ok"
+            "target_app_test_commands": [
+                {"command": "printf target-test-ok", "enabled": true},
+                {"command": "printf skipped", "enabled": false}
+            ]
         })),
     });
     assert_eq!(app_settings.status, 200);
+    assert_eq!(
+        app_settings.body["settings"]["target_app_test_command"],
+        "printf target-test-ok"
+    );
 
     let initial = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -4997,6 +5004,10 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         generated.body["settings"]["target_app_test_command"],
         "./.refine/manage-app.sh test"
     );
+    assert_eq!(
+        generated.body["settings"]["target_app_test_commands"],
+        r#"[{"command":"./.refine/manage-app.sh test","enabled":true}]"#
+    );
     assert_eq!(generated.body["config"]["tcp_check_port"], "3000");
     let wrapper = fs::read_to_string(temp_root.join(".refine/manage-app.sh")).unwrap();
     assert!(wrapper.contains("START_COMMAND='npm run dev'"));
@@ -5031,6 +5042,10 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(
         settings["target_app_test_command"],
         "./.refine/manage-app.sh test"
+    );
+    assert_eq!(
+        settings["target_app_test_commands"],
+        r#"[{"command":"./.refine/manage-app.sh test","enabled":true}]"#
     );
 
     let rebuild = server.handle(ApiRequest {
