@@ -26,6 +26,7 @@ use crate::tools::host::deployed_update::{
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::tools::product::imports::FileImportService;
 use crate::tools::product::nodes::FileNodeRegistryService;
@@ -773,6 +774,23 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 },
         } => {
             print_json(&system_status_response(runtime_root)?);
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::Ps {
+                    port,
+                    runtime_root,
+                    stop,
+                    signal,
+                },
+        } => {
+            print_json(&system_ps_response(
+                runtime_root,
+                port,
+                stop.as_deref(),
+                &signal,
+            )?);
             Ok(())
         }
         Commands::Project {
@@ -1657,9 +1675,16 @@ fn run_system_start(
 }
 
 pub(super) fn system_status_response(runtime_root: PathBuf) -> RefineResult<serde_json::Value> {
-    let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot { root: runtime_root });
+    let runtime = RuntimeRoot {
+        root: runtime_root.clone(),
+    };
+    let lifecycle = FileDaemonLifecycleService::new(runtime.clone());
     let ports = lifecycle.running_statuses()?;
     let running_ports: Vec<u16> = ports.iter().map(|status| status.port).collect();
+    let ports = ports
+        .iter()
+        .map(|status| port_status_with_processes(&runtime, status))
+        .collect::<Vec<_>>();
     Ok(json!({
         "product": "refine",
         "version": env!("CARGO_PKG_VERSION"),
@@ -1670,6 +1695,140 @@ pub(super) fn system_status_response(runtime_root: PathBuf) -> RefineResult<serd
         "running_ports": running_ports,
         "ports": ports,
     }))
+}
+
+pub(super) fn system_ps_response(
+    runtime_root: PathBuf,
+    port: Option<u16>,
+    stop: Option<&str>,
+    signal: &str,
+) -> RefineResult<serde_json::Value> {
+    let runtime = RuntimeRoot {
+        root: runtime_root.clone(),
+    };
+    if let Some(process_id) = stop {
+        return stop_system_process(&runtime, port, process_id, signal);
+    }
+    let ports = selected_process_ports(&runtime, port)?;
+    let mut flattened = Vec::new();
+    let mut port_values = Vec::new();
+    for port in ports {
+        let port_root = runtime.port_root(port);
+        let summary = FileProcessStatusService::new(&port_root).summary()?;
+        if let Some(processes) = summary.get("processes").and_then(|value| value.as_array()) {
+            for process in processes {
+                let mut process = process.clone();
+                if let Some(object) = process.as_object_mut() {
+                    object.insert("port".to_string(), json!(port));
+                    object.insert(
+                        "runtime_root".to_string(),
+                        json!(port_root.display().to_string()),
+                    );
+                }
+                flattened.push(process);
+            }
+        }
+        port_values.push(json!({
+            "port": port,
+            "runtime_root": port_root.display().to_string(),
+            "process_count": summary.get("processes").and_then(|value| value.as_array()).map(|processes| processes.len()).unwrap_or(0),
+            "process_summary": summary
+        }));
+    }
+    Ok(json!({
+        "product": "refine",
+        "runtime_root": runtime_root,
+        "ports": port_values,
+        "process_count": flattened.len(),
+        "processes": flattened
+    }))
+}
+
+fn selected_process_ports(runtime: &RuntimeRoot, port: Option<u16>) -> RefineResult<Vec<u16>> {
+    if let Some(port) = port {
+        return Ok(vec![port]);
+    }
+    let ports = FileDaemonLifecycleService::new(runtime.clone())
+        .known_statuses()?
+        .into_iter()
+        .map(|status| status.port)
+        .collect::<Vec<_>>();
+    if ports.is_empty() {
+        Ok(vec![8080])
+    } else {
+        Ok(ports)
+    }
+}
+
+fn stop_system_process(
+    runtime: &RuntimeRoot,
+    port: Option<u16>,
+    process_id: &str,
+    signal: &str,
+) -> RefineResult<serde_json::Value> {
+    let ports = selected_process_ports(runtime, port)?;
+    let mut misses = Vec::new();
+    for port in ports {
+        let port_root = runtime.port_root(port);
+        let service = FileProcessStatusService::new(&port_root);
+        match service.stop(process_id, signal) {
+            Ok(process) => {
+                return Ok(json!({
+                    "stopped": true,
+                    "port": port,
+                    "runtime_root": port_root.display().to_string(),
+                    "process": process.api_json()
+                }));
+            }
+            Err(RefineError::NotFound(message)) => misses.push(message),
+            Err(error) => return Err(error),
+        }
+    }
+    Err(RefineError::NotFound(format!(
+        "Process {process_id} was not found{}",
+        if misses.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", misses.join("; "))
+        }
+    )))
+}
+
+fn port_status_with_processes(runtime: &RuntimeRoot, status: &DaemonStatus) -> serde_json::Value {
+    let port_root = runtime.port_root(status.port);
+    let process_summary = FileProcessStatusService::new(&port_root).summary();
+    let mut value = serde_json::to_value(status).unwrap_or_else(|_| json!({}));
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "runtime_root".to_string(),
+            json!(port_root.display().to_string()),
+        );
+        match process_summary {
+            Ok(summary) => {
+                let process_count = summary
+                    .get("processes")
+                    .and_then(|value| value.as_array())
+                    .map(|processes| processes.len())
+                    .unwrap_or(0);
+                object.insert("process_count".to_string(), json!(process_count));
+                object.insert("running_process_count".to_string(), json!(process_count));
+                object.insert(
+                    "processes".to_string(),
+                    summary
+                        .get("processes")
+                        .cloned()
+                        .unwrap_or_else(|| json!([])),
+                );
+                object.insert("process_summary".to_string(), summary);
+            }
+            Err(error) => {
+                object.insert("process_count".to_string(), json!(0));
+                object.insert("processes".to_string(), json!([]));
+                object.insert("process_error".to_string(), json!(error.to_string()));
+            }
+        }
+    }
+    value
 }
 
 pub(super) fn absolute_cli_path(path: PathBuf) -> RefineResult<PathBuf> {
@@ -2791,6 +2950,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | SystemAction::Stop { .. }
             | SystemAction::Restart { .. }
             | SystemAction::Status { .. }
+            | SystemAction::Ps { .. }
             | SystemAction::ApiGroups => None,
         },
     }

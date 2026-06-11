@@ -1081,9 +1081,6 @@ fn pid_alive(pid: u32) -> RefineResult<bool> {
     }
     #[cfg(not(windows))]
     {
-        if reap_exited_child(pid) {
-            return Ok(false);
-        }
         if unix_pid_is_zombie(pid)? {
             return Ok(false);
         }
@@ -1099,17 +1096,6 @@ fn pid_alive(pid: u32) -> RefineResult<bool> {
             })?;
         Ok(status.success())
     }
-}
-
-#[cfg(not(windows))]
-fn reap_exited_child(pid: u32) -> bool {
-    const WNOHANG: i32 = 1;
-    unsafe extern "C" {
-        fn waitpid(pid: i32, status: *mut i32, options: i32) -> i32;
-    }
-    let mut status = 0;
-    let result = unsafe { waitpid(pid as i32, &mut status, WNOHANG) };
-    result == pid as i32
 }
 
 #[cfg(not(windows))]
@@ -1203,6 +1189,37 @@ mod tests {
         assert_eq!(stopped.state, "stopped");
         assert!(supervisor.inspect(&process.id).is_err());
         assert_eq!(supervisor.list().unwrap().len(), 0);
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_process_supervisor_recovery_does_not_steal_completion_status() {
+        let temp_root = unique_temp_dir("process-completion-recovery");
+        let runtime_root = temp_root.join("run/8080");
+        let supervisor = FileProcessSupervisor::new(&runtime_root);
+        let output = supervisor
+            .run_to_completion_with_output(
+                ManagedProcessSpec {
+                    owner: ProcessOwner::Agent,
+                    command: shell_binary().to_string(),
+                    args: shell_args("printf recovered-output").to_vec(),
+                    cwd: None,
+                    env: Vec::new(),
+                    stdin: None,
+                    limits: None,
+                    authorization_command: None,
+                    sensitive: false,
+                    metadata: Default::default(),
+                },
+                |_, _| {
+                    let _ = FileProcessSupervisor::new(&runtime_root).recover();
+                },
+            )
+            .unwrap();
+
+        assert!(output.success());
+        assert_eq!(output.stdout, "recovered-output");
 
         fs::remove_dir_all(temp_root).unwrap();
     }

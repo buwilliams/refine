@@ -13,6 +13,7 @@ use crate::tools::host::agent_providers::{
 };
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::workflow::{WorkflowAutomation, WorkflowEngine};
 
@@ -218,6 +219,32 @@ impl InProcessWebServer {
                     }
                 }),
             ),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(super) fn handle_process_stop(&self, request: ApiRequest) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("stop managed process");
+        };
+        let Some(process_id) = request
+            .path
+            .strip_prefix("/processes/")
+            .and_then(|path| path.strip_suffix("/stop"))
+            .filter(|process_id| !process_id.is_empty() && !process_id.contains('/'))
+        else {
+            return process_id_required();
+        };
+        let signal = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("signal"))
+            .and_then(|signal| signal.as_str())
+            .unwrap_or("terminate");
+        match FileProcessStatusService::new(runtime_root).stop(process_id, signal) {
+            Ok(process) => {
+                ApiResponse::json(200, json!({"stopped": true, "process": process.api_json()}))
+            }
             Err(error) => error_response(error),
         }
     }

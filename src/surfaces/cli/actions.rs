@@ -718,6 +718,16 @@ pub enum SystemAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
+    Ps {
+        #[arg(long)]
+        port: Option<u16>,
+        #[arg(long, default_value = "run")]
+        runtime_root: PathBuf,
+        #[arg(long)]
+        stop: Option<String>,
+        #[arg(long, default_value = "terminate")]
+        signal: String,
+    },
     Doctor {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

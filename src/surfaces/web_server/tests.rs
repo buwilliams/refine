@@ -3263,8 +3263,8 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         body: None,
     });
     assert_eq!(summary.status, 200);
-    assert_eq!(summary.body["agent_count"], 2);
-    assert_eq!(summary.body["process_count"], 6);
+    assert_eq!(summary.body["agent_count"], 1);
+    assert_eq!(summary.body["process_count"], 5);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -3321,6 +3321,31 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .unwrap()
             .contains("warn stderr")
     );
+    supervisor
+        .register(crate::process::subprocess::ManagedProcess {
+            id: "stop-test".to_string(),
+            owner: crate::process::subprocess::ProcessOwner::UserHelper,
+            pid: None,
+            state: "running".to_string(),
+            label: Some("stop".to_string()),
+            details: None,
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/processes/stop-test/stop".to_string(),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200);
+    assert_eq!(stopped.body["stopped"], true);
+    assert_eq!(stopped.body["process"]["id"], "stop-test");
+    assert!(supervisor.inspect("stop-test").is_err());
 
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items

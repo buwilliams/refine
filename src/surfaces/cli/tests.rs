@@ -1,7 +1,11 @@
 use super::dispatch::{
-    absolute_cli_path, dispatch, explicit_target_root_path, system_status_response,
+    absolute_cli_path, dispatch, explicit_target_root_path, system_ps_response,
+    system_status_response,
 };
 use super::*;
+use crate::process::subprocess::{
+    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
+};
 use crate::process::supervisor::lifecycle::{DaemonLifecycleService, FileDaemonLifecycleService};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::tools::observability::activity::ActivityService;
@@ -521,6 +525,27 @@ fn system_status_reports_current_version_and_running_ports() {
     lifecycle.start(stale_port).unwrap();
     lifecycle.start(4556).unwrap();
     lifecycle.stop(4556).unwrap();
+    FileProcessSupervisor::new(
+        RuntimeRoot {
+            root: runtime_root.clone(),
+        }
+        .port_root(live_port),
+    )
+    .register(ManagedProcess {
+        id: "helper-1".to_string(),
+        owner: ProcessOwner::UserHelper,
+        pid: Some(std::process::id()),
+        state: "running".to_string(),
+        label: Some("helper".to_string()),
+        details: None,
+        stdout_path: None,
+        stderr_path: None,
+        stdin_path: None,
+        limits: None,
+        started_at: String::new(),
+        exit_code: None,
+    })
+    .unwrap();
     fs::create_dir_all(runtime_root.join("not-a-port")).unwrap();
 
     let status = system_status_response(runtime_root).unwrap();
@@ -536,6 +561,77 @@ fn system_status_reports_current_version_and_running_ports() {
     assert!(status["ports"][0]["launch_mode"].is_string());
     assert!(status["ports"][0]["executable_path"].is_string());
     assert!(status["ports"][0]["daemon_healthy"].as_bool().unwrap());
+    assert_eq!(status["ports"][0]["process_count"], 1);
+    assert_eq!(status["ports"][0]["processes"][0]["id"], "helper-1");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn system_ps_lists_and_stops_supervised_processes() {
+    let temp_root = unique_temp_dir("cli-system-ps");
+    let runtime_root = temp_root.join("run");
+    let port = 19091;
+    let port_root = RuntimeRoot {
+        root: runtime_root.clone(),
+    }
+    .port_root(port);
+    let supervisor = FileProcessSupervisor::new(&port_root);
+    supervisor
+        .register(ManagedProcess {
+            id: "running-helper".to_string(),
+            owner: ProcessOwner::UserHelper,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("helper".to_string()),
+            details: Some("{\"kind\":\"ui\"}".to_string()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    let stoppable = supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::UserHelper,
+            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
+            args: if cfg!(windows) {
+                vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
+            } else {
+                vec!["30".to_string()]
+            },
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: Default::default(),
+        })
+        .unwrap();
+
+    let listed = system_ps_response(runtime_root.clone(), Some(port), None, "terminate").unwrap();
+    assert_eq!(listed["process_count"], 2);
+    assert!(
+        listed["processes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|process| process["id"] == "running-helper" && process["port"] == port)
+    );
+
+    let stopped = system_ps_response(
+        runtime_root.clone(),
+        Some(port),
+        Some(&stoppable.id),
+        "terminate",
+    )
+    .unwrap();
+    assert_eq!(stopped["stopped"], true);
+    assert_eq!(stopped["process"]["id"], stoppable.id);
+    assert!(supervisor.inspect(&stoppable.id).is_err());
 
     fs::remove_dir_all(temp_root).unwrap();
 }

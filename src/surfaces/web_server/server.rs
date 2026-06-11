@@ -89,6 +89,13 @@ impl InProcessWebServer {
             return self.handle_process_stream(request);
         }
 
+        if request.method == "POST"
+            && request.path.starts_with("/processes/")
+            && request.path.ends_with("/stop")
+        {
+            return self.handle_process_stop(request);
+        }
+
         if request.method == "GET" && request.path == "/processes" {
             return self.handle_processes(&raw_path);
         }
