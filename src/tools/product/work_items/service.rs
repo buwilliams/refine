@@ -7,7 +7,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::Utc;
 use serde_json::{Map, Value};
 
-use crate::model::feature::{Feature, FeatureDetail};
+use crate::model::feature::{Feature, FeatureDetail, failed_gap_feature_blocking_notice};
 use crate::model::gap::{Gap, GapPriority};
 use crate::model::workflow::{
     FeatureOperation, GapOperation, GapStatus, feature_operation_allowed, gap_operation_allowed,
@@ -211,7 +211,10 @@ impl FileWorkItemService {
     }
 
     pub fn show_gap_detail(&self, gap_id: &str) -> RefineResult<Value> {
-        let current = self.show_gap_summary(gap_id)?;
+        let snapshot = self.projection_snapshot()?;
+        let current = snapshot.gaps.get(gap_id).cloned().ok_or_else(|| {
+            RefineError::NotFound(format!("Gap {gap_id} was not found in refine state"))
+        })?;
         let (_, mut value) = self.read_gap_value_unchecked(&current)?;
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Gap {gap_id} is not a JSON object"))
@@ -243,6 +246,28 @@ impl FileWorkItemService {
             .or_else(|| self.node_display_name(current.gap.node_id.as_deref()))
         {
             object.insert("node_display_name".to_string(), Value::String(display_name));
+        }
+        if let Some(feature_id) = current.gap.feature_id.as_deref() {
+            let mut feature_gaps = snapshot
+                .gaps
+                .values()
+                .filter(|projection| projection.gap.feature_id.as_deref() == Some(feature_id))
+                .map(|projection| projection.gap.clone())
+                .collect::<Vec<_>>();
+            feature_gaps.sort_by(|a, b| {
+                a.feature_order
+                    .unwrap_or(i64::MAX)
+                    .cmp(&b.feature_order.unwrap_or(i64::MAX))
+                    .then_with(|| a.id.cmp(&b.id))
+            });
+            if let Some(notice) = failed_gap_feature_blocking_notice(&current.gap, &feature_gaps) {
+                let notice = serde_json::to_value(notice).map_err(|error| {
+                    RefineError::Serialization(format!(
+                        "failed to encode Feature blocking notice: {error}"
+                    ))
+                })?;
+                object.insert("feature_blocking_notice".to_string(), notice);
+            }
         }
         self.attach_round_logs(gap_id, object)?;
         Ok(value)

@@ -338,7 +338,7 @@ Implementation Internals (for e2e testing)
 		Layout regions: #main (active screen), #toolbar-dock, #guide-panel, #banners, template#t-banner
 		Toolbar dock: #btn-dock-toggle, #btn-dock-fullscreen, .toolbar-dock-resize, .toolbar-tabs, [data-close-tab]
 		Chat: #chat-input, #btn-chat-send, #btn-chat-toggle (start/stop), #btn-chat-clear, #chat-output, #chat-status, #chat-queue, #chat-progress-panel, #chat-progress, #chat-activity-toggle, #chat-input-pending-dots, #chat-gap-link, #btn-plan-draft, #btn-gap-round-extract, #gap-round-extract-form/-body/-title, #btn-add-extracted-round
-		Gap modal: #btn-state-back, #btn-state-forward, #gap-action-menu, #btn-view-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-gap-feature-assign, #btn-gap-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #gap-notes-status
+		Gap modal: #btn-state-back, #btn-state-forward, #gap-action-menu, #gap-feature-blocking-banner, #btn-view-logs, #btn-reporter, #btn-rename, #btn-priority, #btn-gap-feature-assign, #btn-gap-feature-remove, #btn-cancel, #btn-delete, #btn-add-note, #gap-notes-status
 		Gaps list: #gap-select-page, #gap-select-all (+ row checkboxes), table header sort controls
 		Import: #import-tabs, #import-title, #import-feature-text, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)

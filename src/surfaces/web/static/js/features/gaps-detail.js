@@ -12,6 +12,7 @@ async function renderGapDetail(r) {
 
 let _gapModalRoot = null;
 let _gapRoundFormDraft = null;
+const _loggedFeatureBlockingNoticeKeys = new Set();
 
 function gapDetailContainer() {
   return _gapModalRoot?.querySelector(".gap-detail-modal-body") || null;
@@ -258,6 +259,7 @@ function drawGapDetail(gap) {
   const latest = rounds[rounds.length - 1] || null;
   const failureBanner = computeFailureBanner(gap, latest);
   const governanceBanner = computeGovernanceBanner(gap, latest);
+  const featureBlockingNotice = computeFeatureBlockingNotice(gap);
   const nodeDisplayName = gap.node_display_name || gap.node_id || "Unknown";
   const nodeOwnerTitle = gap.node_id
     ? `Node owner: ${nodeDisplayName} (${gap.node_id})`
@@ -333,6 +335,10 @@ function drawGapDetail(gap) {
         <div class="banner ${governanceBanner.severity}" data-testid="gap-governance-banner">
           <span class="banner-msg" data-testid="gap-governance-banner-message">${htmlEscape(governanceBanner.message)}</span>
         </div>` : ""}
+      ${featureBlockingNotice ? `
+        <div class="banner ${featureBlockingNotice.severity}" data-testid="gap-feature-blocking-banner">
+          <span class="banner-msg" data-testid="gap-feature-blocking-banner-message">${htmlEscape(featureBlockingNotice.message)}</span>
+        </div>` : ""}
 
       ${latest ? renderGovernanceSummary(latest) : ""}
       ${latest ? renderQualitySummary(latest) : ""}
@@ -389,6 +395,7 @@ function drawGapDetail(gap) {
       </details>
     </div>
   `;
+  recordFeatureBlockingNotice(gap, featureBlockingNotice);
 
   $("#btn-chat")?.addEventListener("click", () => {
     openChatDock({ gapId: gap.id, gapStatus: gap.status });
@@ -953,6 +960,44 @@ function computeGovernanceBanner(gap, latest) {
     severity: gap.status === "backlog" ? "warn" : "error",
     message: latest.governance_message || "Governance review requires changes before implementation.",
   };
+}
+
+function computeFeatureBlockingNotice(gap) {
+  const notice = gap?.feature_blocking_notice;
+  if (!notice || !notice.message) return null;
+  return {
+    severity: "warn",
+    message: notice.message,
+    details: {
+      gap_id: gap.id,
+      feature_id: notice.feature_id || gap.feature_id || null,
+      blocked_count: notice.blocked_count || 0,
+      blocked_gap_ids: notice.blocked_gap_ids || [],
+      next_blocked_gap_id: notice.next_blocked_gap_id || null,
+    },
+  };
+}
+
+function recordFeatureBlockingNotice(gap, notice) {
+  if (!notice || typeof recordUiNotice !== "function") return;
+  const details = notice.details || {};
+  const key = [
+    gap?.id || "",
+    gap?.updated || "",
+    details.feature_id || "",
+    details.blocked_count || 0,
+    details.next_blocked_gap_id || "",
+  ].join(":");
+  if (_loggedFeatureBlockingNoticeKeys.has(key)) return;
+  _loggedFeatureBlockingNoticeKeys.add(key);
+  if (_loggedFeatureBlockingNoticeKeys.size > 100) {
+    _loggedFeatureBlockingNoticeKeys.delete(_loggedFeatureBlockingNoticeKeys.values().next().value);
+  }
+  recordUiNotice(notice.message, {
+    kind: "warn",
+    source: "workflow",
+    details,
+  });
 }
 
 function bindFailureBannerActions(_gap) {

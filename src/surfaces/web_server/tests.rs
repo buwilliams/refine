@@ -364,6 +364,18 @@ fn static_import_modal_exposes_feature_import_surface() {
     assert!(import_prepare.contains("async function reviewPlanFeatureDraftPayload"));
 }
 
+#[test]
+fn static_gap_detail_logs_feature_blocking_notice_to_system() {
+    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let gaps_detail = fs::read_to_string(static_root.join("js/features/gaps-detail.js")).unwrap();
+
+    assert!(gaps_detail.contains("feature_blocking_notice"));
+    assert!(gaps_detail.contains(r#"data-testid="gap-feature-blocking-banner""#));
+    assert!(gaps_detail.contains("function recordFeatureBlockingNotice"));
+    assert!(gaps_detail.contains("recordUiNotice(notice.message"));
+    assert!(gaps_detail.contains(r#"source: "workflow""#));
+}
+
 fn extract_prefixed_string_literals(source: &str, prefix: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut rest = source;
@@ -1079,6 +1091,58 @@ fn web_server_creates_and_shows_gap() {
     });
     assert_eq!(show.status, 200);
     assert_eq!(show.body["gap"]["name"], "Created by API");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_gap_detail_exposes_failed_feature_blocking_notice() {
+    let temp_root = unique_temp_dir("http-gap-feature-blocking-notice");
+    let refine_dir = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    let service = FileWorkItemService::new(&refine_dir);
+    service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
+    service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
+    service
+        .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
+        .unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
+    service
+        .transition_gap_status("GAP1", GapStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+        .unwrap();
+    service
+        .advance_automated_gap_status("GAP1", GapStatus::Failed)
+        .unwrap();
+    service
+        .transition_gap_status("GAP2", GapStatus::Todo)
+        .unwrap();
+
+    let show = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/work/gaps/GAP1".to_string(),
+        body: None,
+    });
+
+    assert_eq!(show.status, 200);
+    assert_eq!(
+        show.body["gap"]["feature_blocking_notice"]["feature_id"],
+        "FEA1"
+    );
+    assert_eq!(
+        show.body["gap"]["feature_blocking_notice"]["blocked_gap_ids"],
+        json!(["GAP2"])
+    );
+    assert!(
+        show.body["gap"]["feature_blocking_notice"]["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Submit a recovery round")
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

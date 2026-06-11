@@ -1,4 +1,5 @@
 use crate::model::gap::GapPriority;
+use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
 
@@ -192,6 +193,47 @@ fn file_work_item_service_reorders_and_moves_feature_workflow() {
     assert_eq!(
         service.show_gap_summary("GAP2").unwrap().gap.status,
         GapStatus::Backlog
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_work_item_service_exposes_failed_feature_blocking_notice_on_gap_detail() {
+    let temp_root = unique_temp_dir("work-item-feature-blocking-notice");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service.create_gap_summary("Gap A", Some("GAP1")).unwrap();
+    service.create_gap_summary("Gap B", Some("GAP2")).unwrap();
+    service
+        .create_feature_summary("Feature A", Some("FEA1"), None, None, None)
+        .unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP1").unwrap();
+    service.assign_gap_to_feature("FEA1", "GAP2").unwrap();
+    service
+        .transition_gap_status("GAP1", GapStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_gap_status("GAP1", GapStatus::InProgress)
+        .unwrap();
+    service
+        .advance_automated_gap_status("GAP1", GapStatus::Failed)
+        .unwrap();
+    service
+        .transition_gap_status("GAP2", GapStatus::Todo)
+        .unwrap();
+
+    let detail = service.show_gap_detail("GAP1").unwrap();
+    let notice = &detail["feature_blocking_notice"];
+    assert_eq!(notice["feature_id"], "FEA1");
+    assert_eq!(notice["blocking_gap_id"], "GAP1");
+    assert_eq!(notice["blocked_count"], 1);
+    assert_eq!(notice["blocked_gap_ids"], json!(["GAP2"]));
+    assert!(
+        notice["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("blocking the next Gap")
     );
 
     fs::remove_dir_all(temp_root).unwrap();

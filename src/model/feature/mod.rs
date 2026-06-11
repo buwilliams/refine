@@ -52,6 +52,16 @@ pub struct FeatureRollup {
     pub next_gap: Option<String>,
 }
 
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct FeatureGapBlockingNotice {
+    pub feature_id: String,
+    pub blocking_gap_id: String,
+    pub blocked_gap_ids: Vec<String>,
+    pub blocked_count: usize,
+    pub next_blocked_gap_id: Option<String>,
+    pub message: String,
+}
+
 impl FeatureRollup {
     pub fn derive(gaps: &[GapIndexProjection]) -> Self {
         let gap_count = gaps.len();
@@ -112,6 +122,129 @@ impl FeatureRollup {
             cancelled_count,
             blocked_count,
             next_gap,
+        }
+    }
+}
+
+pub fn failed_gap_feature_blocking_notice(
+    gap: &GapIndexProjection,
+    feature_gaps: &[GapIndexProjection],
+) -> Option<FeatureGapBlockingNotice> {
+    if gap.status != GapStatus::Failed {
+        return None;
+    }
+    let feature_id = gap.feature_id.as_deref()?;
+    let feature_order = gap.feature_order?;
+    let node_id = gap.node_id.as_deref().unwrap_or("default");
+    let mut blocked_gaps = feature_gaps
+        .iter()
+        .filter(|other| other.id != gap.id)
+        .filter(|other| other.feature_id.as_deref() == Some(feature_id))
+        .filter(|other| other.node_id.as_deref().unwrap_or("default") == node_id)
+        .filter(|other| {
+            other
+                .feature_order
+                .is_some_and(|order| order > feature_order)
+        })
+        .filter(|other| !matches!(other.status, GapStatus::Done | GapStatus::Cancelled))
+        .cloned()
+        .collect::<Vec<_>>();
+    blocked_gaps.sort_by(|a, b| {
+        a.feature_order
+            .unwrap_or(i64::MAX)
+            .cmp(&b.feature_order.unwrap_or(i64::MAX))
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    if blocked_gaps.is_empty() {
+        return None;
+    }
+    let blocked_gap_ids = blocked_gaps
+        .iter()
+        .map(|blocked_gap| blocked_gap.id.clone())
+        .collect::<Vec<_>>();
+    let blocked_count = blocked_gap_ids.len();
+    let next_blocked_gap_id = blocked_gap_ids.first().cloned();
+    let plural = if blocked_count == 1 { "Gap" } else { "Gaps" };
+    let message = match next_blocked_gap_id.as_deref() {
+        Some(next) if blocked_count == 1 => format!(
+            "This failed Gap is blocking the next Gap in Feature {feature_id} ({next}). Submit a recovery round so this Gap can finish, or cancel it to let later Feature work continue."
+        ),
+        Some(next) => format!(
+            "This failed Gap is blocking {blocked_count} later {plural} in Feature {feature_id}; next blocked Gap: {next}. Submit a recovery round so this Gap can finish, or cancel it to let later Feature work continue."
+        ),
+        None => format!(
+            "This failed Gap is blocking later Feature work in Feature {feature_id}. Submit a recovery round so this Gap can finish, or cancel it to let later Feature work continue."
+        ),
+    };
+    Some(FeatureGapBlockingNotice {
+        feature_id: feature_id.to_string(),
+        blocking_gap_id: gap.id.clone(),
+        blocked_gap_ids,
+        blocked_count,
+        next_blocked_gap_id,
+        message,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::gap::GapPriority;
+
+    #[test]
+    fn failed_gap_feature_blocking_notice_names_later_feature_work() {
+        let failed = gap("GAP1", GapStatus::Failed, Some(1));
+        let blocked = gap("GAP2", GapStatus::Todo, Some(2));
+        let done = gap("GAP3", GapStatus::Done, Some(3));
+
+        let notice =
+            failed_gap_feature_blocking_notice(&failed, &[blocked.clone(), done, failed.clone()])
+                .expect("failed first Gap should block later unfinished Feature work");
+
+        assert_eq!(notice.feature_id, "FEA1");
+        assert_eq!(notice.blocking_gap_id, "GAP1");
+        assert_eq!(notice.blocked_gap_ids, vec!["GAP2"]);
+        assert_eq!(notice.next_blocked_gap_id.as_deref(), Some("GAP2"));
+        assert!(
+            notice
+                .message
+                .contains("This failed Gap is blocking the next Gap")
+        );
+    }
+
+    #[test]
+    fn failed_gap_feature_blocking_notice_ignores_unordered_or_terminal_work() {
+        let failed = gap("GAP1", GapStatus::Failed, Some(1));
+        let done = gap("GAP2", GapStatus::Done, Some(2));
+        let unordered = gap("GAP3", GapStatus::Todo, None);
+        let active = gap("GAP4", GapStatus::Todo, Some(0));
+
+        assert!(failed_gap_feature_blocking_notice(&failed, &[done, unordered, active],).is_none());
+        assert!(
+            failed_gap_feature_blocking_notice(
+                &gap("GAP1", GapStatus::Todo, Some(1)),
+                &[gap("GAP2", GapStatus::Todo, Some(2))],
+            )
+            .is_none()
+        );
+    }
+
+    fn gap(id: &str, status: GapStatus, feature_order: Option<i64>) -> GapIndexProjection {
+        GapIndexProjection {
+            id: id.to_string(),
+            name: id.to_string(),
+            status,
+            priority: GapPriority::Medium,
+            reporter: None,
+            assignee: None,
+            round_count: 1,
+            created: "created".to_string(),
+            updated: "updated".to_string(),
+            branch_name: None,
+            node_id: Some("default".to_string()),
+            feature_id: Some("FEA1".to_string()),
+            feature_order,
+            json_path: format!("gaps/{id}/gap.json"),
         }
     }
 }
