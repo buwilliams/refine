@@ -230,8 +230,8 @@ Workflow and toolbar work moved into more complete product shape: runtime settin
 
 ## Day 30: 2026-06-11 (Thursday)
 
-Effort: High (12 commits, 4 milestones)
+Effort: Very High (18 commits, 5 milestones)
 
-Milestones started: workflow behavior-engine refactor; operation naming cleanup; target-root/runtime clarification; target-app QA gate.
+Milestones started: workflow behavior-engine refactor; operation naming cleanup; target-root/runtime clarification; target-app QA gate; canonical Node model.
 
-Workflow internals were reshaped around clearer architecture: the scheduler moved into workflow-oriented services, process handling was refactored, behavior engines landed, and background jobs were renamed to operations. Runtime and target-root boundaries were clarified across daemon launch and web handling, Playwright integration scaffolding was removed, QA now runs through target-app tests, and daemon launch liveness detection was fixed. The day closed by cleaning up flaky Rust unit tests around Smoke AI isolation, chat session persistence, and the automation loop's build-stage fixture.
+Workflow internals were reshaped around clearer architecture: the scheduler moved into workflow-oriented services, process handling was refactored, behavior engines landed, and background jobs were renamed to operations. Runtime and target-root boundaries were clarified across daemon launch and web handling, Playwright integration scaffolding was removed, QA now runs through target-app tests, and daemon launch liveness detection was fixed. The day closed by cleaning up flaky Rust unit tests around Smoke AI isolation, chat session persistence, the automation loop's build-stage fixture, system process visibility, and the Node/cluster split: Node became the canonical model, while cluster became operations over registered nodes and legacy `cluster.json` state migrates into `nodes.json`.

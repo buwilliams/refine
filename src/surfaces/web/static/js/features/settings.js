@@ -94,8 +94,7 @@ async function loadSettingsSurfaceData() {
   }
   const needs = settingsSurfaceDataNeeds(surface, activeSlug);
   const [
-    s, diag, reps, gov, quality, dash, nodes, cluster, guidance,
-    performance, processes,
+    s, diag, reps, gov, quality, dash, nodes, guidance, performance, processes,
   ] = await Promise.all([
     needs.settings ? api("GET", "/api/settings") : Promise.resolve({}),
     needs.diagnostics ? api("GET", "/api/diagnostics") : Promise.resolve({}),
@@ -104,7 +103,6 @@ async function loadSettingsSurfaceData() {
     needs.quality ? api("GET", "/api/quality") : Promise.resolve({}),
     needs.dashboard ? api("GET", "/api/dashboard") : Promise.resolve({}),
     needs.nodes ? api("GET", "/api/nodes") : Promise.resolve({}),
-    needs.cluster ? api("GET", "/api/cluster") : Promise.resolve({}),
     needs.guidance ? api("GET", "/api/guidance") : Promise.resolve({}),
     needs.performance ? api("GET", typeof performanceApiPath === "function"
       ? performanceApiPath()
@@ -136,7 +134,6 @@ async function loadSettingsSurfaceData() {
     dash: dash || {},
     nodes: nodeList,
     nodeCounts: nodes.counts || {},
-    clusterNodes: cluster.nodes || [],
     activeNodeId,
     activeNodeLabel,
     guidanceItems: guidance.guidance || [],
@@ -160,7 +157,6 @@ function settingsSurfaceDataNeeds(surface, slug) {
     quality: false,
     dashboard: false,
     nodes: false,
-    cluster: false,
     guidance: false,
     performance: false,
     processes: false,
@@ -184,7 +180,6 @@ function settingsSurfaceDataNeeds(surface, slug) {
   } else if (surface === SETTINGS_SURFACES.node) {
     if (slug === "application") {
       needs.nodes = true;
-      needs.cluster = true;
     } else if (slug === "reporters") {
       needs.reporters = true;
       needs.nodes = true;
@@ -239,7 +234,6 @@ function detachedSettingsSurfaceData(project = {}) {
     dash: {},
     nodes: nodeList,
     nodeCounts: {},
-    clusterNodes: [],
     activeNodeId,
     activeNodeLabel,
     guidanceItems: [],
@@ -866,7 +860,6 @@ function renderSettingsTabBody(surface, slug, data) {
           nodes: data.nodes,
           nodeCounts: data.nodeCounts,
           activeNodeId: data.activeNodeId,
-          clusterNodes: data.clusterNodes,
         })}`;
     }
     if (slug === "target-app") {
