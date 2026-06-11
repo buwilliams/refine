@@ -685,7 +685,7 @@ pub enum SystemAction {
         version: String,
     },
     Start {
-        #[arg(long, default_value_t = 8080)]
+        #[arg(long, default_value_t = 8082)]
         port: u16,
         #[arg(long, default_value_t = IpAddr::V4(Ipv4Addr::LOCALHOST))]
         bind_address: IpAddr,
@@ -701,19 +701,19 @@ pub enum SystemAction {
         foreground: bool,
     },
     Stop {
-        #[arg(long, default_value_t = 8080)]
+        #[arg(long, default_value_t = 8082)]
         port: u16,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
     Restart {
-        #[arg(long, default_value_t = 8080)]
+        #[arg(long, default_value_t = 8082)]
         port: u16,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
     Status {
-        #[arg(long, default_value_t = 8080)]
+        #[arg(long, default_value_t = 8082)]
         port: u16,
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,

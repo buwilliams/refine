@@ -153,6 +153,29 @@ fn system_start_owns_foreground_web_options() {
 }
 
 #[test]
+fn system_lifecycle_commands_default_to_8082() {
+    for (verb, expected) in [
+        ("start", "Start"),
+        ("stop", "Stop"),
+        ("restart", "Restart"),
+        ("status", "Status"),
+    ] {
+        let parsed = Cli::try_parse_from(["refine", "system", verb]).unwrap();
+        let Commands::System { action } = parsed.command else {
+            panic!("expected system command");
+        };
+        let port = match action {
+            SystemAction::Start { port, .. }
+            | SystemAction::Stop { port, .. }
+            | SystemAction::Restart { port, .. }
+            | SystemAction::Status { port, .. } => port,
+            other => panic!("expected {expected} action, got {other:?}"),
+        };
+        assert_eq!(port, 8082, "{expected} should default to port 8082");
+    }
+}
+
+#[test]
 fn project_registry_commands_use_shared_file_project_registry_service() {
     let temp_root = unique_temp_dir("cli-project-registry");
     let runtime_root = temp_root.join("run");

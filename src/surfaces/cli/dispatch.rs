@@ -1753,7 +1753,7 @@ fn selected_process_ports(runtime: &RuntimeRoot, port: Option<u16>) -> RefineRes
         .map(|status| status.port)
         .collect::<Vec<_>>();
     if ports.is_empty() {
-        Ok(vec![8080])
+        Ok(vec![8082])
     } else {
         Ok(ports)
     }
@@ -2733,7 +2733,7 @@ fn daemon_port() -> u16 {
         .ok()
         .and_then(|value| value.parse::<u16>().ok())
         .filter(|port| *port > 0)
-        .unwrap_or(8080)
+        .unwrap_or(8082)
 }
 
 fn parse_daemon_response(response: &[u8]) -> RefineResult<serde_json::Value> {

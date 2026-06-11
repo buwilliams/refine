@@ -24,7 +24,7 @@ Options:
 
 The container does not install Refine. Run the install one-liner manually inside it.
 First startup bootstraps Linuxbrew so the installer can use brew for dependencies.
-Published browser ports: 8080, 18080, 19080.
+Published browser ports: 8082, 18080, 19080.
 USAGE
 }
 

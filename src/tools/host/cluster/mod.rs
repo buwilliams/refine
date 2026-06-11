@@ -155,7 +155,7 @@ impl FileClusterService {
             node.ssh_port = port_or_default(ssh_port, 22);
         }
         if let Some(refine_port) = update.refine_port {
-            node.refine_port = port_or_default(refine_port, 8080);
+            node.refine_port = port_or_default(refine_port, 8082);
         }
         if let Some(refine_checkout) = update.refine_checkout {
             node.refine_checkout = refine_checkout.trim().to_string();
@@ -729,7 +729,7 @@ fn default_node(id: &str) -> Node {
         ssh_port: 22,
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
-        refine_port: 8080,
+        refine_port: 8082,
         enabled: true,
         health: None,
         created_at: now.clone(),
@@ -838,7 +838,7 @@ mod tests {
             ssh_port: 22,
             refine_checkout: String::new(),
             target_app_path: String::new(),
-            refine_port: 8080,
+            refine_port: 8082,
             dry_run: true,
         })
         .unwrap_err();

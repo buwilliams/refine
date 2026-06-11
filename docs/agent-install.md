@@ -24,7 +24,7 @@ Ask only when the answer is not clear from the user's environment, prior convers
 
 - Which agent provider should Refine use: `claude`, `codex`, `gemini`, or `copilot`?
 - Where should Refine be installed? Default: `$HOME/refine`.
-- Which UI port should Refine use? Default: `8080`.
+- Which UI port should Refine use? Default: `8082`.
 - Which package manager should the agent use for missing dependencies: `apt`, `brew`, or manual user setup?
 - Should missing provider CLI installation or provider authentication happen now, or should the user complete it later?
 
@@ -103,7 +103,7 @@ cd <refine-checkout>
 ./r system doctor --repo-root .
 ```
 
-2. Open the UI at `http://localhost:<port>`. The default is `http://localhost:8080`.
+2. Open the UI at `http://localhost:<port>`. The default is `http://localhost:8082`.
 3. Attach or create the target app if the target is already clear:
 
 ```bash

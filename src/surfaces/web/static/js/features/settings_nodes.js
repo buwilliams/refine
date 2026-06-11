@@ -20,7 +20,7 @@ function renderSettingsNodesTab({
               <td data-testid="node-settings-id"><code>${htmlEscape(inst.id)}</code></td>
               <td class="muted small">${total}</td>
               <td data-testid="node-settings-remote-host">${htmlEscape(inst.ssh_host || "")}</td>
-              <td data-testid="node-settings-refine-port">${htmlEscape(String(inst.refine_port || 8080))}</td>
+              <td data-testid="node-settings-refine-port">${htmlEscape(String(inst.refine_port || 8082))}</td>
               <td data-testid="node-settings-status">${inst.enabled === false ? "disabled" : htmlEscape(inst.health?.status || (hasRemote ? "enabled" : "local"))}</td>
               <td class="actions">
                 <button class="secondary" data-node-activate="${htmlEscape(inst.id)}" data-testid="node-activate" ${isActive || inst.archived ? "disabled" : ""}>Activate</button>
@@ -35,7 +35,7 @@ function renderSettingsNodesTab({
                         data-ssh-port="${htmlEscape(String(inst.ssh_port || 22))}"
                         data-refine-checkout="${htmlEscape(inst.refine_checkout || "~/refine")}"
                         data-target-app-path="${htmlEscape(inst.target_app_path || "")}"
-                        data-refine-port="${htmlEscape(String(inst.refine_port || 8080))}">Connection</button>
+                        data-refine-port="${htmlEscape(String(inst.refine_port || 8082))}">Connection</button>
                 <button class="secondary" data-node-remote-bootstrap="${htmlEscape(inst.id)}" data-testid="node-remote-bootstrap" ${hasRemote && !inst.archived ? "" : "disabled"}>Bootstrap</button>
                 <button class="secondary" data-node-remote-toggle="${htmlEscape(inst.id)}" data-enabled="${inst.enabled === false ? "0" : "1"}" data-testid="node-remote-toggle" ${hasRemote && !inst.archived ? "" : "disabled"}>${inst.enabled === false ? "Enable" : "Disable"}</button>
                 <button class="danger" data-node-archive="${htmlEscape(inst.id)}" data-testid="node-archive" ${isActive ? "disabled" : ""}>Archive</button>
@@ -176,7 +176,7 @@ function openNodeConnectionModal(button) {
                        value="${htmlEscape(button.dataset.sshIdentityPath || "")}"></div>
               <div class="form-row"><label>Refine UI port</label>
                 <input type="number" name="refine_port" data-testid="node-connection-refine-port"
-                       value="${htmlEscape(button.dataset.refinePort || "8080")}"></div>
+                       value="${htmlEscape(button.dataset.refinePort || "8082")}"></div>
             </div>
             <div class="form-row"><label>Refine checkout path</label>
               <input type="text" name="refine_checkout" data-testid="node-connection-refine-checkout"
@@ -233,7 +233,7 @@ function openNodeConnectionModal(button) {
         ssh_port: Number(value("ssh_port")) || 22,
         refine_checkout: value("refine_checkout") || "~/refine",
         target_app_path: value("target_app_path"),
-        refine_port: Number(value("refine_port")) || 8080,
+        refine_port: Number(value("refine_port")) || 8082,
       });
     }
 

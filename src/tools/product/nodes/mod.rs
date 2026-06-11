@@ -103,7 +103,7 @@ impl FileNodeRegistryService {
             ssh_port: 22,
             refine_checkout: "~/refine".to_string(),
             target_app_path: String::new(),
-            refine_port: 8080,
+            refine_port: 8082,
             health: None,
             archived: false,
         });
@@ -133,7 +133,7 @@ impl FileNodeRegistryService {
             ssh_port: 22,
             refine_checkout: "~/refine".to_string(),
             target_app_path: String::new(),
-            refine_port: 8080,
+            refine_port: 8082,
             health: None,
             archived: false,
         };
@@ -334,7 +334,7 @@ fn default_node(id: &str, display_name: &str) -> Node {
         ssh_port: 22,
         refine_checkout: "~/refine".to_string(),
         target_app_path: String::new(),
-        refine_port: 8080,
+        refine_port: 8082,
         health: None,
         archived: false,
     }
