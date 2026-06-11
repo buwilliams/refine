@@ -22,23 +22,48 @@ function renderSettingsNodesTab({
               <td data-testid="node-settings-remote-host">${htmlEscape(inst.ssh_host || "")}</td>
               <td data-testid="node-settings-refine-port">${htmlEscape(String(inst.refine_port || 8082))}</td>
               <td data-testid="node-settings-status">${inst.enabled === false ? "disabled" : htmlEscape(inst.health?.status || (hasRemote ? "enabled" : "local"))}</td>
-              <td class="actions">
-                <button class="secondary" data-node-activate="${htmlEscape(inst.id)}" data-testid="node-activate" ${isActive || inst.archived ? "disabled" : ""}>Activate</button>
-                <button class="secondary" data-node-rename="${htmlEscape(inst.id)}" data-name="${htmlEscape(inst.display_name || inst.id)}" data-testid="node-rename">Rename</button>
-                <button class="secondary"
-                        data-node-remote-configure="${htmlEscape(inst.id)}"
-                        data-testid="node-remote-configure"
-                        data-name="${htmlEscape(inst.display_name || inst.id)}"
-                        data-ssh-host="${htmlEscape(inst.ssh_host || "")}"
-                        data-ssh-user="${htmlEscape(inst.ssh_user || "")}"
-                        data-ssh-identity-path="${htmlEscape(inst.ssh_identity_path || "")}"
-                        data-ssh-port="${htmlEscape(String(inst.ssh_port || 22))}"
-                        data-refine-checkout="${htmlEscape(inst.refine_checkout || "~/refine")}"
-                        data-target-app-path="${htmlEscape(inst.target_app_path || "")}"
-                        data-refine-port="${htmlEscape(String(inst.refine_port || 8082))}">Connection</button>
-                <button class="secondary" data-node-remote-bootstrap="${htmlEscape(inst.id)}" data-testid="node-remote-bootstrap" ${hasRemote && !inst.archived ? "" : "disabled"}>Bootstrap</button>
-                <button class="secondary" data-node-remote-toggle="${htmlEscape(inst.id)}" data-enabled="${inst.enabled === false ? "0" : "1"}" data-testid="node-remote-toggle" ${hasRemote && !inst.archived ? "" : "disabled"}>${inst.enabled === false ? "Enable" : "Disable"}</button>
-                <button class="danger" data-node-archive="${htmlEscape(inst.id)}" data-testid="node-archive" ${isActive ? "disabled" : ""}>Archive</button>
+              <td class="actions node-row-actions">
+                <div class="nav-create-group node-action-group">
+                  <button data-node-activate="${htmlEscape(inst.id)}"
+                          data-testid="node-activate"
+                          class="node-action-primary"
+                          ${isActive || inst.archived ? "disabled" : ""}>Activate</button>
+                  <details class="nav-menu node-action-menu">
+                    <summary class="btn secondary node-action-more"
+                             aria-label="More node actions"
+                             data-testid="node-action-menu-toggle"></summary>
+                    <div class="nav-menu-panel node-action-panel">
+                      <button class="nav-menu-item" type="button"
+                              data-node-rename="${htmlEscape(inst.id)}"
+                              data-name="${htmlEscape(inst.display_name || inst.id)}"
+                              data-testid="node-rename">Rename</button>
+                      <button class="nav-menu-item" type="button"
+                              data-node-remote-configure="${htmlEscape(inst.id)}"
+                              data-testid="node-remote-configure"
+                              data-name="${htmlEscape(inst.display_name || inst.id)}"
+                              data-ssh-host="${htmlEscape(inst.ssh_host || "")}"
+                              data-ssh-user="${htmlEscape(inst.ssh_user || "")}"
+                              data-ssh-identity-path="${htmlEscape(inst.ssh_identity_path || "")}"
+                              data-ssh-port="${htmlEscape(String(inst.ssh_port || 22))}"
+                              data-refine-checkout="${htmlEscape(inst.refine_checkout || "~/refine")}"
+                              data-target-app-path="${htmlEscape(inst.target_app_path || "")}"
+                              data-refine-port="${htmlEscape(String(inst.refine_port || 8082))}">Connection</button>
+                      <button class="nav-menu-item" type="button"
+                              data-node-remote-bootstrap="${htmlEscape(inst.id)}"
+                              data-testid="node-remote-bootstrap"
+                              ${hasRemote && !inst.archived ? "" : "disabled"}>Bootstrap</button>
+                      <button class="nav-menu-item" type="button"
+                              data-node-remote-toggle="${htmlEscape(inst.id)}"
+                              data-enabled="${inst.enabled === false ? "0" : "1"}"
+                              data-testid="node-remote-toggle"
+                              ${hasRemote && !inst.archived ? "" : "disabled"}>${inst.enabled === false ? "Enable" : "Disable"}</button>
+                      <button class="nav-menu-item danger" type="button"
+                              data-node-archive="${htmlEscape(inst.id)}"
+                              data-testid="node-archive"
+                              ${isActive ? "disabled" : ""}>Archive</button>
+                    </div>
+                  </details>
+                </div>
               </td>
             </tr>`;
           }).join("")}
@@ -51,6 +76,17 @@ function renderSettingsNodesTab({
 }
 
 function bindSettingsNodesTab() {
+  const closeNodeActionMenu = (button) => {
+    const menu = button.closest(".node-action-menu");
+    if (menu) menu.open = false;
+  };
+  $$("[data-testid='node-action-menu-toggle']").forEach((summary) => {
+    summary.addEventListener("click", () => {
+      $$(".node-action-menu[open]").forEach((menu) => {
+        if (!menu.contains(summary)) menu.open = false;
+      });
+    });
+  });
   $("#node-add")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     const name = await modalPrompt("Node name", "",
@@ -81,6 +117,7 @@ function bindSettingsNodesTab() {
     });
   }));
   $$("[data-node-rename]").forEach((b) => b.addEventListener("click", async () => {
+    closeNodeActionMenu(b);
     const name = await modalPrompt("Node name", b.dataset.name || "",
                                    { title: "Rename node" });
     if (!name || !name.trim()) return;
@@ -94,6 +131,7 @@ function bindSettingsNodesTab() {
     });
   }));
   $$("[data-node-archive]").forEach((b) => b.addEventListener("click", async () => {
+    closeNodeActionMenu(b);
     const ok = await modalConfirm(
       "Archive this node? Gap ownership IDs stay unchanged and can still be transferred.",
       { title: "Archive node", okLabel: "Archive", danger: true },
@@ -109,6 +147,7 @@ function bindSettingsNodesTab() {
     });
   }));
   $$("[data-node-remote-configure]").forEach((b) => b.addEventListener("click", async () => {
+    closeNodeActionMenu(b);
     const payload = await openNodeConnectionModal(b);
     if (!payload) return;
     await withButtonBusy(b, "Saving...", async () => {
@@ -122,6 +161,7 @@ function bindSettingsNodesTab() {
     });
   }));
   $$("[data-node-remote-toggle]").forEach((b) => b.addEventListener("click", async () => {
+    closeNodeActionMenu(b);
     const enabled = b.dataset.enabled !== "1";
     await withButtonBusy(b, enabled ? "Enabling..." : "Disabling...", async () => {
       try {
@@ -133,6 +173,7 @@ function bindSettingsNodesTab() {
     });
   }));
   $$("[data-node-remote-bootstrap]").forEach((b) => b.addEventListener("click", async () => {
+    closeNodeActionMenu(b);
     const ok = await modalConfirm(
       "Bootstrap this node over SSH using the current host user?",
       { title: "Bootstrap node", okLabel: "Bootstrap" },
