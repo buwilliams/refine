@@ -747,7 +747,7 @@ function renderChatPanel(active, { toggleClass, toggleLabel, statusLine, hasSess
           </button>
           <button id="btn-standalone-submit-merge" class="secondary" data-testid="standalone-submit-merge"
                   ${standaloneChatCanSubmitReadyMerge(active) ? "" : "disabled"}>
-            Submit Gap
+            Submit Worktree
           </button>` : ""}
         ${active.gapId ? `
           <button id="btn-gap-round-extract" class="secondary" data-testid="gap-draft-round"
@@ -2743,7 +2743,7 @@ function openStandaloneReadyMergeModal(tab) {
     <div class="modal import-modal" role="dialog" aria-modal="true"
          data-testid="standalone-ready-merge-modal"
          aria-labelledby="standalone-ready-merge-title">
-      <div class="modal-title" id="standalone-ready-merge-title">Submit Gap</div>
+      <div class="modal-title" id="standalone-ready-merge-title">Submit Worktree</div>
       <div class="modal-body" style="max-height:72vh;overflow:auto">
         <div class="muted small" style="margin-bottom:8px">
           Review the Gap details before handing the standalone worktree to the merge workflow.

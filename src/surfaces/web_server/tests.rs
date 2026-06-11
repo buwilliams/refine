@@ -1861,6 +1861,39 @@ fn web_server_extracts_plan_drafts_from_chat_session_context() {
 }
 
 #[test]
+fn web_server_fails_background_plan_extraction_without_gap_drafts() {
+    let temp_root = unique_temp_dir("http-import-plan-empty-background");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    init_git_app(&temp_root);
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/import/extract".to_string(),
+        body: Some(json!({
+            "purpose": "plan",
+            "background": true,
+            "text": "[]"
+        })),
+    });
+    assert_eq!(started.status, 202);
+    let operation_id = started.body["operation"]["id"].as_str().unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = wait_for_operation_status(&registry, operation_id, OperationState::Failed);
+    let error = operation.error.unwrap();
+    assert_eq!(error["code"], "invalid_input");
+    assert_eq!(
+        error["message"],
+        "Plan Draft extraction did not return any Gap drafts"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn daemon_agent_automation_loop_executes_todo_gaps_without_manual_request() {
     let temp_root = unique_temp_dir("daemon-agent-automation-loop");
     let refine_dir = temp_root.join(".refine");

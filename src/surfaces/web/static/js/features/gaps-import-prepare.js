@@ -130,7 +130,16 @@ async function openPlanDraftModalFromText(text) {
 }
 
 async function openPlanDraftModalFromResult(text, result) {
-  await openPlanDraftModalFromDrafts(text, result?.drafts || [], result?.feature_destination || {
+  const drafts = Array.isArray(result?.drafts) ? result.drafts : [];
+  if (!drafts.length) {
+    const err = new Error(
+      result?.error?.message || "Plan Draft extraction did not return any Gap drafts"
+    );
+    err.details = result?.error?.details;
+    err.code = result?.error?.code || "empty_plan_drafts";
+    throw err;
+  }
+  await openPlanDraftModalFromDrafts(text, drafts, result?.feature_destination || {
     mode: "new",
     newName: inferPlanFeatureName(text),
     newDescription: inferPlanFeatureDescription(text),

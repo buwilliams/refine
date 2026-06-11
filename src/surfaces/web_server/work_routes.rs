@@ -435,6 +435,18 @@ fn import_extraction_response(
     ApiResponse::json(200, body)
 }
 
+fn validate_import_extraction_result(
+    result: ImportExtractionResult,
+    purpose: &str,
+) -> Result<ImportExtractionResult, RefineError> {
+    if purpose == "plan" && result.drafts.is_empty() {
+        return Err(RefineError::InvalidInput(
+            "Plan Draft extraction did not return any Gap drafts".to_string(),
+        ));
+    }
+    Ok(result)
+}
+
 fn feature_detail_response_from_gaps(
     feature: &crate::tools::product::project_state::FeatureSummaryProjection,
     gaps: Vec<crate::model::gap::GapIndexProjection>,
@@ -2518,7 +2530,10 @@ impl InProcessWebServer {
         if purpose == "plan"
             && let Some(result) = parse_structured_import_result(&text, reporter)
         {
-            return import_extraction_response(result, &provider, purpose, "input");
+            return match validate_import_extraction_result(result, purpose) {
+                Ok(result) => import_extraction_response(result, &provider, purpose, "input"),
+                Err(error) => error_response(error),
+            };
         }
         let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match HostAgentProviderService::new().invoke(ProviderInvocation {
@@ -2532,7 +2547,10 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         match parse_provider_import_result(&output, reporter) {
-            Ok(result) => import_extraction_response(result, &provider, purpose, "provider"),
+            Ok(result) => match validate_import_extraction_result(result, purpose) {
+                Ok(result) => import_extraction_response(result, &provider, purpose, "provider"),
+                Err(error) => error_response(error),
+            },
             Err(error) => error_response(error),
         }
     }
