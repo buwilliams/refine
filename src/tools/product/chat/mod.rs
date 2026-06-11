@@ -386,7 +386,6 @@ impl FileChatService {
             work_items.set_gap_branch_name(&gap_id, &worktree.branch)?;
             work_items.transition_gap_status(&gap_id, GapStatus::Todo)?;
             work_items.advance_automated_gap_status(&gap_id, GapStatus::InProgress)?;
-            work_items.advance_automated_gap_status(&gap_id, GapStatus::Qa)?;
             let gap = work_items.advance_automated_gap_status(&gap_id, GapStatus::ReadyMerge)?;
             self.mark_worktree_submitted(session_id, &gap_id)?;
             self.interrupt(session_id, "submitted for ready-merge")?;

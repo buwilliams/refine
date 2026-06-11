@@ -2106,24 +2106,10 @@ fn dispatch_feature_daemon(action: FeatureAction) -> RefineResult<()> {
 fn dispatch_workflow_daemon(action: WorkflowAction) -> RefineResult<()> {
     let response = match action {
         WorkflowAction::Pause { .. } => {
-            daemon_json(
-                "POST",
-                "/processes/background",
-                Some(json!({ "stopped": true })),
-            )?;
-            daemon_json("POST", "/processes/agents", Some(json!({ "paused": true })))?
+            daemon_json("POST", "/workflow/pause", Some(json!({ "paused": true })))?
         }
         WorkflowAction::Resume { .. } => {
-            daemon_json(
-                "POST",
-                "/processes/background",
-                Some(json!({ "stopped": false })),
-            )?;
-            daemon_json(
-                "POST",
-                "/processes/agents",
-                Some(json!({ "paused": false })),
-            )?
+            daemon_json("POST", "/workflow/pause", Some(json!({ "paused": false })))?
         }
     };
     print_json(&response);

@@ -125,6 +125,10 @@ impl InProcessWebServer {
             return self.handle_processes_agents(request);
         }
 
+        if request.method == "POST" && request.path == "/workflow/pause" {
+            return self.handle_workflow_pause(request);
+        }
+
         if request.method == "GET"
             && request.path.starts_with("/agents/")
             && request.path.ends_with("/diagnostics")

@@ -471,18 +471,19 @@ registerCommand({
 
 registerCommand({
   id: "system.agents.pause_toggle",
-  title: "Pause or unpause agents",
+  title: "Pause or unpause workflow",
   group: "System",
-  aliases: ["pause-agents", "unpause-agents", "resume-agents"],
+  aliases: ["pause-workflow", "unpause-workflow", "resume-workflow", "pause-agents", "unpause-agents", "resume-agents"],
   run: async ({ button, settings } = {}) => {
     const settingsPayload = settings || (await api("GET", "/api/settings"));
-    const agentsPaused = !!settingsPayload.runtime?.agents_paused ||
-      settingsPayload.settings?.agents_paused === "1";
-    await withButtonBusy(button, agentsPaused ? "Unpausing..." : "Pausing...", async () => {
-      await api("POST", "/api/processes/agents", { paused: !agentsPaused });
+    const workflowPaused = !!settingsPayload.runtime?.agents_paused ||
+      !!settingsPayload.runtime?.background_processes_stopped ||
+      settingsPayload.settings?.paused === "1";
+    await withButtonBusy(button, workflowPaused ? "Unpausing..." : "Pausing...", async () => {
+      await api("POST", "/api/workflow/pause", { paused: !workflowPaused });
       if (state.currentRoute === "node") await refreshProcessesSettingsTab({ force: true });
       if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
-      if (agentsPaused) scheduleProcessesTabRefreshes();
+      if (workflowPaused) scheduleProcessesTabRefreshes();
     });
   },
 });

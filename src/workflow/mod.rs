@@ -224,21 +224,27 @@ impl WorkflowEngine {
         Ok(promoted)
     }
 
-    pub fn set_agent_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
+    pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
         let state = if paused {
             supervisor.set_agents_paused(true)?;
             let state = supervisor.set_background_processes_stopped(true)?;
             self.rollback_in_progress_gaps_to_todo()?;
-            self.pause(WorkflowPauseControl::Agents)?;
+            self.pause(WorkflowPauseControl::AllAutomation)?;
             state
         } else {
             supervisor.set_background_processes_stopped(false)?;
             let state = supervisor.set_agents_paused(false)?;
+            self.resume(WorkflowPauseControl::AllAutomation)?;
             self.resume(WorkflowPauseControl::Agents)?;
+            self.resume(WorkflowPauseControl::TargetApp)?;
             state
         };
         Ok(state)
+    }
+
+    pub fn set_agent_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
+        self.set_workflow_paused(paused)
     }
 
     pub fn rollback_in_progress_gaps_to_todo(&self) -> RefineResult<usize> {
@@ -291,15 +297,16 @@ impl WorkflowEngine {
     fn ensure_automation_running(&self, state: &WorkflowAutomationState) -> RefineResult<()> {
         if state.paused.contains(&WorkflowPauseControl::AllAutomation)
             || state.paused.contains(&WorkflowPauseControl::Agents)
+            || state.paused.contains(&WorkflowPauseControl::TargetApp)
         {
             return Err(RefineError::Conflict(
-                "automation is paused for agents".to_string(),
+                "workflow automation is paused".to_string(),
             ));
         }
         let pause_state = FileProcessSupervisor::new(&self.runtime_root).pause_state()?;
         if pause_state.background_processes_stopped || pause_state.agents_paused {
             return Err(RefineError::Conflict(
-                "automation is paused for agents".to_string(),
+                "workflow automation is paused".to_string(),
             ));
         }
         Ok(())
@@ -433,7 +440,13 @@ impl WorkflowEngine {
             other.gap.id != gap.gap.id
                 && other.gap.feature_id.as_deref() == Some(feature_id)
                 && other.gap.node_id.as_deref().unwrap_or("default") == node_id
-                && matches!(other.gap.status, GapStatus::InProgress | GapStatus::Qa)
+                && matches!(
+                    other.gap.status,
+                    GapStatus::InProgress
+                        | GapStatus::ReadyMerge
+                        | GapStatus::Build
+                        | GapStatus::Qa
+                )
         })
     }
 
@@ -587,12 +600,12 @@ impl WorkflowEngine {
     fn advance_claim_behaviors(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<()> {
         let todo = WorkflowTodo;
         let implementation = WorkflowImplementation;
-        let qa = WorkflowQa;
         let ready_merge = WorkflowReadyMerge;
         let build = WorkflowBuild;
+        let qa = WorkflowQa;
         let review = WorkflowReview;
         let behaviors: [&dyn WorkflowBehavior; 6] =
-            [&todo, &implementation, &qa, &ready_merge, &build, &review];
+            [&todo, &implementation, &ready_merge, &build, &qa, &review];
         let mut current = GapStatus::Todo;
         loop {
             let Some(behavior) = behaviors
@@ -1842,13 +1855,110 @@ mod tests {
     }
 
     #[test]
+    fn file_automation_fails_gap_reverts_merge_and_recreates_worktree_on_qa_failure() {
+        let temp_root = unique_temp_dir("automation-qa-revert");
+        let target_root = temp_root.clone();
+        let refine_dir = target_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::create_dir_all(&temp_root).unwrap();
+        fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+        git(&temp_root, &["init", "-q"]).unwrap();
+        git(
+            &temp_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&temp_root, &["add", "app.py"]).unwrap();
+        git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            "#!/bin/sh\n\
+             printf 'qa should fail\\n' > fail-qa\n\
+             printf '%s\\n' 'smoke-ai gap-agent response'\n",
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let branch = "refine/GAP1/round-1";
+        let worktree_path = temp_root.parent().unwrap().join(format!(
+            "{}-{}",
+            temp_root.file_name().unwrap().to_string_lossy(),
+            branch.replace('/', "-")
+        ));
+        let build_command = format!("rm -rf {} && printf build-ok", shell_word(&worktree_path));
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_gap_summary("Implementation with failing QA", Some("GAP1"))
+            .unwrap();
+        work_items
+            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .unwrap();
+        work_items
+            .transition_gap_status("GAP1", GapStatus::Todo)
+            .unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "1",
+                "target_app_build_command": build_command,
+                "target_app_test_command": "test ! -f fail-qa",
+                "allowed_commands": "rm, printf, test"
+            }))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        let error = automation.evaluate_workflow().unwrap_err();
+        assert!(error.to_string().contains("quality checks failed"));
+        assert_eq!(
+            work_items.show_gap_summary("GAP1").unwrap().gap.status,
+            GapStatus::Failed
+        );
+        assert!(!target_root.join("fail-qa").exists());
+        assert!(worktree_path.exists());
+        let subject = git_stdout(&target_root, &["log", "--pretty=%s", "-1"]).unwrap();
+        assert!(subject.trim().starts_with("Revert "));
+        let worktrees = git_stdout(&target_root, &["worktree", "list", "--porcelain"]).unwrap();
+        assert!(worktrees.contains(&format!("branch refs/heads/{branch}")));
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+
+        fs::remove_dir_all(&worktree_path).ok();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
     fn file_automation_pauses_cancels_and_retries_executions() {
         let temp_root = unique_temp_dir("automation-controls");
         let automation = WorkflowEngine::new(temp_root.join("run/8080"));
 
-        automation.pause(WorkflowPauseControl::Agents).unwrap();
+        automation
+            .pause(WorkflowPauseControl::AllAutomation)
+            .unwrap();
         assert!(automation.claim("GAP1").is_err());
-        automation.resume(WorkflowPauseControl::Agents).unwrap();
+        automation
+            .resume(WorkflowPauseControl::AllAutomation)
+            .unwrap();
         FileProcessSupervisor::new(temp_root.join("run/8080"))
             .set_agents_paused(true)
             .unwrap();
@@ -1901,6 +2011,13 @@ mod tests {
         let pause_state = automation.set_agent_workflow_paused(true).unwrap();
         assert!(pause_state.agents_paused);
         assert!(pause_state.background_processes_stopped);
+        assert!(
+            automation
+                .load_state()
+                .unwrap()
+                .paused
+                .contains(&WorkflowPauseControl::AllAutomation)
+        );
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
             GapStatus::Todo
@@ -1934,5 +2051,26 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         )))
+    }
+
+    fn git_stdout(repo: &Path, args: &[&str]) -> RefineResult<String> {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .map_err(|error| RefineError::Io(format!("failed to run git: {error}")))?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).to_string());
+        }
+        Err(RefineError::Io(format!(
+            "git {} failed\nstdout:\n{}\nstderr:\n{}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )))
+    }
+
+    fn shell_word(path: &Path) -> String {
+        format!("'{}'", path.display().to_string().replace('\'', "'\\''"))
     }
 }

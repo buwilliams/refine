@@ -55,10 +55,10 @@ fn validate_automated_gap_transition(from: &GapStatus, to: &GapStatus) -> Refine
     let allowed = matches!(
         (from, to),
         (GapStatus::Todo, GapStatus::InProgress)
-            | (GapStatus::InProgress, GapStatus::Qa)
-            | (GapStatus::Qa, GapStatus::ReadyMerge)
+            | (GapStatus::InProgress, GapStatus::ReadyMerge)
             | (GapStatus::ReadyMerge, GapStatus::Build)
-            | (GapStatus::Build, GapStatus::Review)
+            | (GapStatus::Build, GapStatus::Qa)
+            | (GapStatus::Qa, GapStatus::Review)
             | (GapStatus::InProgress, GapStatus::Failed)
             | (GapStatus::Qa, GapStatus::Failed)
             | (GapStatus::ReadyMerge, GapStatus::Failed)

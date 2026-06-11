@@ -161,12 +161,12 @@ impl FileMergerService {
             "Workflow status changed: ready-merge -> build",
             Some(json_object(json!({"merge": &merge}))),
         )?;
-        work_items.advance_automated_gap_status(gap_id, GapStatus::Review)?;
+        work_items.advance_automated_gap_status(gap_id, GapStatus::Qa)?;
         self.append_operation_log(
             operation_id,
             gap_id,
             "info",
-            "Workflow status changed: build -> review",
+            "Workflow status changed: build -> qa",
             None,
         )?;
         self.operation_registry.finish_with_result(
@@ -177,7 +177,7 @@ impl FileMergerService {
                 "branch_name": branch_name,
                 "target_branch": target_branch,
                 "merge": merge,
-                "final_status": "review"
+                "final_status": "qa"
             }),
         )?;
         Ok(MergerGapResult {
@@ -185,7 +185,7 @@ impl FileMergerService {
             branch_name: branch_name.to_string(),
             target_branch: target_branch.to_string(),
             operation_id: operation_id.to_string(),
-            status: "review".to_string(),
+            status: "qa".to_string(),
             conflicts: Vec::new(),
         })
     }
@@ -359,9 +359,6 @@ mod tests {
                 .advance_automated_gap_status(id, GapStatus::InProgress)
                 .unwrap();
             work_items
-                .advance_automated_gap_status(id, GapStatus::Qa)
-                .unwrap();
-            work_items
                 .advance_automated_gap_status(id, GapStatus::ReadyMerge)
                 .unwrap();
             work_items
@@ -377,7 +374,7 @@ mod tests {
         assert_eq!(first.gap_id, "GAP1");
         assert_eq!(
             work_items.show_gap_summary("GAP1").unwrap().gap.status,
-            GapStatus::Review
+            GapStatus::Qa
         );
         assert_eq!(
             work_items.show_gap_summary("GAP2").unwrap().gap.status,
@@ -398,7 +395,7 @@ mod tests {
         assert_eq!(second.gap_id, "GAP2");
         assert_eq!(
             work_items.show_gap_summary("GAP2").unwrap().gap.status,
-            GapStatus::Review
+            GapStatus::Qa
         );
 
         fs::remove_dir_all(temp_root).unwrap();
@@ -422,9 +419,6 @@ mod tests {
                 .unwrap();
             work_items
                 .advance_automated_gap_status(id, GapStatus::InProgress)
-                .unwrap();
-            work_items
-                .advance_automated_gap_status(id, GapStatus::Qa)
                 .unwrap();
             work_items
                 .advance_automated_gap_status(id, GapStatus::ReadyMerge)
@@ -456,7 +450,7 @@ mod tests {
         assert_eq!(clean.gap_id, "ZZZ");
         assert_eq!(
             work_items.show_gap_summary("ZZZ").unwrap().gap.status,
-            GapStatus::Review
+            GapStatus::Qa
         );
 
         fs::remove_dir_all(temp_root).unwrap();

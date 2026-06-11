@@ -3324,61 +3324,46 @@ fn web_server_lists_processes_and_updates_pause_controls() {
 
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
-        .create_gap_summary("Stop background rollback", Some("GAP-BACKGROUND"))
+        .create_gap_summary("Pause workflow rollback", Some("GAP-WORKFLOW"))
         .unwrap();
     work_items
-        .transition_gap_status("GAP-BACKGROUND", GapStatus::Todo)
+        .transition_gap_status("GAP-WORKFLOW", GapStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_gap_status("GAP-BACKGROUND", GapStatus::InProgress)
+        .advance_automated_gap_status("GAP-WORKFLOW", GapStatus::InProgress)
         .unwrap();
-    let background = server.handle(ApiRequest {
+    let paused = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/processes/background".to_string(),
-        body: Some(json!({"stopped": true})),
+        path: "/api/workflow/pause".to_string(),
+        body: Some(json!({"paused": true})),
     });
-    assert_eq!(background.status, 200);
-    assert_eq!(background.body["background_processes_stopped"], true);
+    assert_eq!(paused.status, 200);
+    assert_eq!(paused.body["background_processes_stopped"], true);
+    assert_eq!(paused.body["agents_paused"], true);
     assert_eq!(
         work_items
-            .show_gap_summary("GAP-BACKGROUND")
+            .show_gap_summary("GAP-WORKFLOW")
             .unwrap()
             .gap
             .status,
         GapStatus::Todo
     );
     assert!(
-        background.body["runner_work"]
+        paused.body["runner_work"]
             .as_array()
             .unwrap()
             .iter()
             .all(|work| work["status"] == "paused")
     );
 
-    work_items
-        .create_gap_summary("Pause agents rollback", Some("GAP-AGENTS"))
-        .unwrap();
-    work_items
-        .transition_gap_status("GAP-AGENTS", GapStatus::Todo)
-        .unwrap();
-    work_items
-        .advance_automated_gap_status("GAP-AGENTS", GapStatus::InProgress)
-        .unwrap();
-    let agents = server.handle(ApiRequest {
+    let resumed = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/processes/agents".to_string(),
-        body: Some(json!({"paused": true})),
+        path: "/api/workflow/pause".to_string(),
+        body: Some(json!({"paused": false})),
     });
-    assert_eq!(agents.status, 200);
-    assert_eq!(agents.body["agents_paused"], true);
-    assert_eq!(
-        work_items
-            .show_gap_summary("GAP-AGENTS")
-            .unwrap()
-            .gap
-            .status,
-        GapStatus::Todo
-    );
+    assert_eq!(resumed.status, 200);
+    assert_eq!(resumed.body["background_processes_stopped"], false);
+    assert_eq!(resumed.body["agents_paused"], false);
     assert!(runtime_root.join("process-control.json").exists());
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -3386,7 +3371,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap();
     assert_eq!(
         cached.runtime.supervisor.unwrap()["agents_paused"],
-        json!(true)
+        json!(false)
     );
 
     fs::remove_dir_all(temp_root).unwrap();

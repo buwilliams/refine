@@ -240,10 +240,14 @@ impl FileTargetAppService {
         let command = setting(&settings, "target_app_build_command");
         if command.trim().is_empty() {
             let mut snapshot = self.load_snapshot()?;
-            snapshot.ok = false;
-            snapshot.state = "failed".to_string();
+            snapshot.ok = true;
+            snapshot.state = "stopped".to_string();
             snapshot.message = "No target-app build command is configured.".to_string();
-            snapshot.last_error = snapshot.message.clone();
+            snapshot.last_check_ok = true;
+            snapshot.last_check_message = snapshot.message.clone();
+            snapshot.last_health_ok = true;
+            snapshot.last_health_message = snapshot.message.clone();
+            snapshot.last_error = String::new();
             self.save_snapshot(&snapshot)?;
             return Ok(snapshot);
         }
@@ -1289,6 +1293,30 @@ mod tests {
         let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
         assert!(audit.contains("\"actor\":\"quality\""));
         assert!(runtime_root.join(TARGET_APP_STATE_FILE).exists());
+
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn target_app_service_treats_missing_build_command_as_success() {
+        let temp_root = unique_temp_dir("target-app-no-build");
+        let refine_dir = temp_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let target_root = temp_root.join("app");
+        fs::create_dir_all(&refine_dir).unwrap();
+        fs::create_dir_all(&target_root).unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({"target_app_cwd": target_root.to_str().unwrap()}))
+            .unwrap();
+        let service = FileTargetAppService::new(&refine_dir, &runtime_root, &target_root);
+
+        let built = service.build().unwrap();
+        assert!(built.ok);
+        assert_eq!(built.state, "stopped");
+        assert_eq!(built.message, "No target-app build command is configured.");
+        assert!(built.last_check_ok);
+        assert!(built.last_health_ok);
+        assert_eq!(built.last_error, "");
 
         fs::remove_dir_all(temp_root).unwrap();
     }

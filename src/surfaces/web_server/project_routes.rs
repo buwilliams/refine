@@ -1263,12 +1263,33 @@ impl InProcessWebServer {
         if let Some(paused) = body.get("paused").map(runtime_bool_setting)
             && let Some(runtime_root) = &self.runtime_root
         {
-            let supervisor = FileProcessSupervisor::new(runtime_root);
-            if let Err(error) = supervisor.set_agents_paused(paused) {
-                return error_response(error);
-            }
-            if let Err(error) = supervisor.set_background_processes_stopped(paused) {
-                return error_response(error);
+            match self.current_target_root() {
+                Ok(Some(target_root)) => {
+                    if let Err(error) = WorkflowEngine::with_target_root(runtime_root, target_root)
+                        .set_workflow_paused(paused)
+                    {
+                        return error_response(error);
+                    }
+                }
+                Ok(None) => {
+                    let supervisor = FileProcessSupervisor::new(runtime_root);
+                    if paused {
+                        if let Err(error) = supervisor.set_agents_paused(true) {
+                            return error_response(error);
+                        }
+                        if let Err(error) = supervisor.set_background_processes_stopped(true) {
+                            return error_response(error);
+                        }
+                    } else {
+                        if let Err(error) = supervisor.set_background_processes_stopped(false) {
+                            return error_response(error);
+                        }
+                        if let Err(error) = supervisor.set_agents_paused(false) {
+                            return error_response(error);
+                        }
+                    }
+                }
+                Err(error) => return error_response(error),
             }
         }
         match FileSettingsService::new(&refine_dir).update(&body) {

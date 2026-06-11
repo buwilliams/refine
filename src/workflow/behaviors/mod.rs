@@ -1,4 +1,5 @@
 use serde_json::{Value, json};
+use std::path::Path;
 
 use crate::model::workflow::GapStatus;
 use crate::process::supervisor::config::FileGovernanceService;
@@ -177,10 +178,10 @@ impl WorkflowBehavior for WorkflowImplementation {
         ctx.agent_cwd = Some(agent_cwd);
         ctx.provider_output = Some(provider_output);
         ctx.commit = Some(commit);
-        ctx.request_transition(GapStatus::InProgress, GapStatus::Qa)?;
+        ctx.request_transition(GapStatus::InProgress, GapStatus::ReadyMerge)?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GapStatus::InProgress,
-            to: GapStatus::Qa,
+            to: GapStatus::ReadyMerge,
             reason: "Implementation completed".to_string(),
         })
     }
@@ -201,16 +202,19 @@ impl WorkflowBehavior for WorkflowQa {
         };
         record_quality(ctx, &quality)?;
         if !quality.ok {
-            return fail(
-                ctx,
-                "quality",
-                RefineError::Conflict("quality checks failed".to_string()),
-            );
+            let cleanup = revert_merged_commit_after_quality_failure(ctx);
+            let detail = match cleanup {
+                Ok(()) => "quality checks failed".to_string(),
+                Err(error) => {
+                    format!("quality checks failed; failed to restore merged work: {error}")
+                }
+            };
+            return fail(ctx, "quality", RefineError::Conflict(detail));
         }
-        ctx.request_transition(GapStatus::Qa, GapStatus::ReadyMerge)?;
+        ctx.request_transition(GapStatus::Qa, GapStatus::Review)?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GapStatus::Qa,
-            to: GapStatus::ReadyMerge,
+            to: GapStatus::Review,
             reason: "Quality checks passed".to_string(),
         })
     }
@@ -290,10 +294,10 @@ impl WorkflowBehavior for WorkflowBuild {
             "Target app build passed",
             Some(json_object(json!({"target_app": &build}))),
         )?;
-        ctx.request_transition(GapStatus::Build, GapStatus::Review)?;
+        ctx.request_transition(GapStatus::Build, GapStatus::Qa)?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GapStatus::Build,
-            to: GapStatus::Review,
+            to: GapStatus::Qa,
             reason: "Target app build passed".to_string(),
         })
     }
@@ -375,6 +379,55 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
         ok: snapshot.ok,
         diagnostics,
     })
+}
+
+fn revert_merged_commit_after_quality_failure(ctx: &WorkflowContext<'_>) -> RefineResult<()> {
+    let branch = ctx.require_branch()?.to_string();
+    let commit = ctx.require_commit()?.to_string();
+    let worktree_path = ctx.require_worktree_path()?.to_string();
+    let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
+    let target_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+    target_git.switch(&target_branch)?;
+    let revert = target_git.revert_commit(&commit)?;
+    if !revert.ok {
+        let recover = target_git.recover()?;
+        ctx.log(
+            "quality",
+            "Failed to revert implementation commit after QA failure",
+            Some(json_object(json!({
+                "commit": commit,
+                "target_branch": target_branch,
+                "revert": revert,
+                "recover": recover
+            }))),
+        )?;
+        return Err(RefineError::Conflict(
+            "reverting implementation commit failed".to_string(),
+        ));
+    }
+    ctx.log(
+        "quality",
+        "Reverted implementation commit after QA failure",
+        Some(json_object(json!({
+            "commit": commit,
+            "target_branch": target_branch,
+            "revert": revert
+        }))),
+    )?;
+    let path = Path::new(&worktree_path);
+    if !path.exists() {
+        let _ = target_git.remove_worktree(path, true);
+        let recreated = target_git.ensure_worktree(&branch, path)?;
+        ctx.log(
+            "quality",
+            "Recreated implementation worktree after QA failure",
+            Some(json_object(json!({
+                "branch": branch,
+                "worktree": recreated
+            }))),
+        )?;
+    }
+    Ok(())
 }
 
 fn record_quality(ctx: &WorkflowContext<'_>, result: &QualityCheckResult) -> RefineResult<()> {
