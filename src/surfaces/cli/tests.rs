@@ -1221,6 +1221,74 @@ fn feature_import_uses_shared_import_service() {
 }
 
 #[test]
+fn feature_import_parses_structured_project_spec_with_shared_import_service() {
+    let temp_root = unique_temp_dir("cli-feature-import-project-spec");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "feature",
+            "create",
+            "Imported Project Feature",
+            "--target-root",
+            target_root.to_str().unwrap(),
+            "--id",
+            "FEA1",
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    let spec = r#"{
+        "project": {
+            "name": "Budget App",
+            "features": [
+                {
+                    "name": "Transactions",
+                    "gaps": [
+                        {
+                            "title": "Categorize transactions",
+                            "current_state": "Transactions are uncategorized.",
+                            "desired_state": "Users can categorize each transaction.",
+                            "priority": "medium"
+                        }
+                    ]
+                }
+            ]
+        }
+    }"#;
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "feature",
+            "import",
+            "--target-root",
+            target_root.to_str().unwrap(),
+            "--text",
+            spec,
+            "--reporter",
+            "Product",
+            "--feature-id",
+            "FEA1",
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    let snapshot = FileProjectStateStore::new(&refine_dir)
+        .rebuild_projection()
+        .unwrap();
+    let gap = snapshot.gaps.values().next().unwrap();
+    assert_eq!(gap.gap.name, "Categorize transactions");
+    assert_eq!(gap.gap.feature_id.as_deref(), Some("FEA1"));
+    assert_eq!(gap.gap.priority.as_str(), "medium");
+    assert_eq!(gap.gap.reporter.as_deref(), Some("Product"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn log_commands_use_shared_activity_service() {
     let temp_root = unique_temp_dir("cli-log-activity");
     let target_root = temp_root.clone();

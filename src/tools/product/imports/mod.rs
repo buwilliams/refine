@@ -2,6 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value, json};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::product::work_items::FileWorkItemService;
@@ -24,6 +25,18 @@ pub struct ImportPersistResult {
     pub created: usize,
     pub gap_ids: Vec<String>,
     pub feature_id: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ImportExtractionResult {
+    pub drafts: Vec<ImportDraft>,
+    pub feature_destination: Option<PlanFeatureDestination>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PlanFeatureDestination {
+    pub name: String,
+    pub description: String,
 }
 
 #[derive(Clone, Debug)]
@@ -116,6 +129,14 @@ impl FileImportService {
         Ok(drafts)
     }
 
+    pub fn parse_structured_or_text(
+        &self,
+        text: &str,
+        reporter: Option<&str>,
+    ) -> RefineResult<Vec<ImportDraft>> {
+        parse_provider_import_result(text, reporter).map(|result| result.drafts)
+    }
+
     pub fn import_from_text(
         &self,
         text: &str,
@@ -126,7 +147,7 @@ impl FileImportService {
         let drafts = if csv {
             self.parse_csv(text, reporter)?
         } else {
-            self.parse_text(text, reporter)?
+            self.parse_structured_or_text(text, reporter)?
         };
         if drafts.is_empty() {
             return Err(RefineError::InvalidInput(
@@ -241,15 +262,37 @@ fn import_draft_from_value(
             "draft {index} must be an object"
         )));
     };
-    let field = |key: &str| -> &str {
-        object
-            .get(key)
-            .and_then(|value| value.as_str())
-            .unwrap_or("")
-            .trim()
-    };
-    let actual = field("actual").to_string();
-    let target = field("target").to_string();
+    let field = |key: &str| -> &str { string_field(object, &[key]) };
+    let actual = string_field(
+        object,
+        &[
+            "actual",
+            "current",
+            "current_state",
+            "current_behavior",
+            "existing",
+            "existing_state",
+            "problem",
+            "issue",
+            "as_is",
+        ],
+    )
+    .to_string();
+    let target = string_field(
+        object,
+        &[
+            "target",
+            "desired",
+            "desired_state",
+            "desired_behavior",
+            "expected",
+            "expected_state",
+            "outcome",
+            "goal",
+            "to_be",
+        ],
+    )
+    .to_string();
     let priority = normalized_priority(field("priority")).map_err(|_| {
         RefineError::InvalidInput(format!(
             "draft {index} priority must be one of low, medium, or high"
@@ -258,7 +301,11 @@ fn import_draft_from_value(
     let reporter = nonempty_or(field("reporter"), default_reporter).to_string();
     let assignee = nonempty_or(field("assignee"), &reporter).to_string();
     Ok(ImportDraft {
-        name: import_name(field("name"), &actual, &target),
+        name: import_name(
+            string_field(object, &["name", "title", "summary"]),
+            &actual,
+            &target,
+        ),
         actual,
         target,
         reporter,
@@ -343,6 +390,373 @@ fn nonempty_option(value: &str) -> Option<&str> {
     (!value.is_empty()).then_some(value)
 }
 
+pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
+    let instruction = match purpose {
+        "plan" => {
+            "Extract one product Feature and its Gaps from this Plan chat transcript. Return only \
+             one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
+             \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
+             \"priority\":\"low\"}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
+             \"target\":\"...\",\"reporter\":\"\",\"priority\":\"medium\"}]}. The feature name and \
+             description must describe the user's \
+             product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
+             extraction, or how the plan was created. Draft every concrete implementation gap \
+             needed to build the feature, not only user-visible product behavior. Include backend \
+             data model and API work, frontend state and interaction work, workflow/integration \
+             work, migrations or compatibility work, and test/verification work when the \
+             transcript implies them. Each Gap must be independently actionable with actual and \
+             target states."
+        }
+        "round" => {
+            "Draft Round data from this Gap chat transcript. Return only one actual => target line."
+        }
+        "standalone_gap" => {
+            "Draft one standalone Gap from this Standalone chat transcript. Return only one \
+             JSON object with name, actual, target, reporter, and priority, or one actual => target line."
+        }
+        _ => {
+            "Import these notes into Refine Gap drafts. Return only draft data, one draft per line, \
+             using actual => target text or JSON objects with name, actual, target, reporter, and priority."
+        }
+    };
+    format!("{instruction}\n\n{text}")
+}
+
+pub fn parse_provider_import_result(
+    output: &str,
+    reporter: Option<&str>,
+) -> RefineResult<ImportExtractionResult> {
+    if let Some(result) = parse_structured_import_result(output, reporter) {
+        return Ok(result);
+    }
+
+    FileImportService::new(PathBuf::new())
+        .parse_text(output, reporter)
+        .map(|drafts| ImportExtractionResult {
+            drafts,
+            feature_destination: None,
+        })
+}
+
+pub fn parse_structured_import_result(
+    output: &str,
+    reporter: Option<&str>,
+) -> Option<ImportExtractionResult> {
+    if let Ok(value) = serde_json::from_str::<Value>(output)
+        && let Some(result) = import_extraction_from_json_value(value, reporter)
+    {
+        return Some(result);
+    }
+
+    if let Some(result) = embedded_json_import_extraction(output, reporter) {
+        return Some(result);
+    }
+
+    let json_lines = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .map(serde_json::from_str::<Value>)
+        .collect::<Result<Vec<_>, _>>();
+    if let Ok(items) = json_lines
+        && !items.is_empty()
+    {
+        let body = json!({ "drafts": items, "reporter": reporter.unwrap_or("") });
+        if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
+            return Some(ImportExtractionResult {
+                drafts,
+                feature_destination: None,
+            });
+        }
+    }
+
+    None
+}
+
+fn embedded_json_import_extraction(
+    output: &str,
+    reporter: Option<&str>,
+) -> Option<ImportExtractionResult> {
+    for (idx, ch) in output.char_indices() {
+        if ch != '{' && ch != '[' {
+            continue;
+        }
+        let mut values = serde_json::Deserializer::from_str(&output[idx..]).into_iter::<Value>();
+        let Some(Ok(value)) = values.next() else {
+            continue;
+        };
+        if let Some(result) = import_extraction_from_json_value(value, reporter) {
+            return Some(result);
+        }
+    }
+    None
+}
+
+fn import_extraction_from_json_value(
+    value: Value,
+    reporter: Option<&str>,
+) -> Option<ImportExtractionResult> {
+    let feature_destination = plan_feature_destination_from_value(&value);
+    let mut collected = Vec::new();
+    collect_import_draft_values(&value, &mut collected, false);
+
+    let body = if collected.is_empty() {
+        match value {
+            Value::Array(items) => json!({ "drafts": items, "reporter": reporter.unwrap_or("") }),
+            Value::Object(mut object) => {
+                normalize_plan_feature_draft_object(&mut object);
+                Value::Object(object)
+            }
+            other => other,
+        }
+    } else {
+        json!({ "drafts": collected, "reporter": reporter.unwrap_or("") })
+    };
+
+    import_drafts_from_value(&body, reporter)
+        .ok()
+        .map(|drafts| ImportExtractionResult {
+            drafts,
+            feature_destination,
+        })
+}
+
+fn normalize_plan_feature_draft_object(object: &mut Map<String, Value>) {
+    let mut drafts = Vec::new();
+    append_plan_gap_arrays(object, &mut drafts);
+    if let Some(feature) = object.get("feature").and_then(Value::as_object) {
+        append_plan_gap_arrays(feature, &mut drafts);
+    }
+    if !drafts.is_empty() {
+        object.insert("drafts".to_string(), Value::Array(drafts));
+    }
+}
+
+fn append_plan_gap_arrays(object: &Map<String, Value>, drafts: &mut Vec<Value>) {
+    for key in GAP_ARRAY_KEYS {
+        if let Some(items) = object.get(*key).and_then(Value::as_array) {
+            drafts.extend(items.iter().cloned());
+        }
+    }
+}
+
+fn collect_import_draft_values(value: &Value, drafts: &mut Vec<Value>, in_gap_array: bool) {
+    match value {
+        Value::Array(items) => {
+            for item in items {
+                collect_import_draft_values(item, drafts, in_gap_array);
+            }
+        }
+        Value::Object(object) => {
+            if in_gap_array || is_import_draft_object(object) {
+                drafts.push(Value::Object(object.clone()));
+                return;
+            }
+            for (key, child) in object {
+                if GAP_ARRAY_KEYS.contains(&key.as_str()) {
+                    if let Value::Array(items) = child {
+                        for item in items {
+                            collect_import_draft_values(item, drafts, true);
+                        }
+                    }
+                    continue;
+                }
+                if should_descend_import_container(key, child) {
+                    collect_import_draft_values(child, drafts, false);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+const GAP_ARRAY_KEYS: &[&str] = &[
+    "drafts",
+    "gaps",
+    "items",
+    "implementation_gaps",
+    "technical_gaps",
+    "engineering_gaps",
+    "backend_gaps",
+    "frontend_gaps",
+    "testing_gaps",
+    "work_gaps",
+];
+
+fn should_descend_import_container(key: &str, value: &Value) -> bool {
+    matches!(
+        key,
+        "feature"
+            | "features"
+            | "project"
+            | "projects"
+            | "capability"
+            | "capabilities"
+            | "module"
+            | "modules"
+            | "component"
+            | "components"
+            | "surface"
+            | "surfaces"
+            | "workflow"
+            | "workflows"
+            | "workstream"
+            | "workstreams"
+            | "epic"
+            | "epics"
+            | "milestone"
+            | "milestones"
+    ) || matches!(value, Value::Object(_) | Value::Array(_))
+}
+
+fn is_import_draft_object(object: &Map<String, Value>) -> bool {
+    if has_nested_gap_arrays(object) {
+        return false;
+    }
+    object_has_any(
+        object,
+        &[
+            "actual",
+            "target",
+            "current",
+            "current_state",
+            "current_behavior",
+            "desired",
+            "desired_state",
+            "desired_behavior",
+            "problem",
+            "issue",
+            "expected",
+            "outcome",
+            "goal",
+            "as_is",
+            "to_be",
+        ],
+    ) || object_has_any(object, &["name", "title", "summary"])
+        && object_has_any(
+            object,
+            &[
+                "priority",
+                "reporter",
+                "assignee",
+                "duplicate_decision",
+                "kind",
+                "type",
+            ],
+        )
+}
+
+fn has_nested_gap_arrays(object: &Map<String, Value>) -> bool {
+    GAP_ARRAY_KEYS
+        .iter()
+        .any(|key| object.get(*key).and_then(Value::as_array).is_some())
+        || object.get("features").and_then(Value::as_array).is_some()
+}
+
+fn object_has_any(object: &Map<String, Value>, keys: &[&str]) -> bool {
+    keys.iter().any(|key| object.contains_key(*key))
+}
+
+fn string_field<'a>(object: &'a Map<String, Value>, keys: &[&str]) -> &'a str {
+    keys.iter()
+        .find_map(|key| object.get(*key).and_then(Value::as_str))
+        .unwrap_or("")
+        .trim()
+}
+
+fn plan_feature_destination_from_value(value: &Value) -> Option<PlanFeatureDestination> {
+    let feature = match value {
+        Value::Object(object) => object
+            .get("feature")
+            .and_then(Value::as_object)
+            .or_else(|| object.get("project").and_then(Value::as_object))
+            .or_else(|| {
+                object
+                    .get("features")
+                    .and_then(Value::as_array)
+                    .and_then(|features| features.iter().find_map(Value::as_object))
+            })
+            .or(Some(object)),
+        _ => None,
+    }?;
+    let name = sanitize_plan_feature_name(
+        feature
+            .get("name")
+            .or_else(|| feature.get("feature_name"))
+            .or_else(|| feature.get("project_name"))
+            .or_else(|| feature.get("title"))
+            .and_then(Value::as_str)
+            .unwrap_or(""),
+    );
+    let description = sanitize_plan_feature_description(
+        feature
+            .get("description")
+            .or_else(|| feature.get("summary"))
+            .or_else(|| feature.get("purpose"))
+            .and_then(Value::as_str)
+            .unwrap_or(""),
+    );
+    if name.is_empty() && description.is_empty() {
+        return None;
+    }
+    Some(PlanFeatureDestination { name, description })
+}
+
+fn sanitize_plan_feature_name(raw: &str) -> String {
+    let mut value = collapse_ws(raw);
+    for suffix in [
+        " - Product Spec",
+        " – Product Spec",
+        " — Product Spec",
+        ": Product Spec",
+        " Product Spec",
+    ] {
+        if value.to_lowercase().ends_with(&suffix.to_lowercase()) {
+            value.truncate(value.len().saturating_sub(suffix.len()));
+            value = collapse_ws(&value);
+        }
+    }
+    for prefix in ["Product Spec:", "Plan:", "Feature:", "Project:"] {
+        if value.to_lowercase().starts_with(&prefix.to_lowercase()) {
+            value = collapse_ws(&value[prefix.len()..]);
+        }
+    }
+    trim_feature_text(value, 80)
+}
+
+fn sanitize_plan_feature_description(raw: &str) -> String {
+    let value = collapse_ws(raw);
+    let lower = value.to_lowercase();
+    if lower.is_empty()
+        || lower.contains("created by plan")
+        || lower.contains("created from plan")
+        || lower.contains("plan mode")
+        || lower.contains("refine")
+        || lower.contains("product spec")
+        || lower.contains("draft")
+        || lower.contains("extract")
+    {
+        return String::new();
+    }
+    trim_feature_text(value, 500)
+}
+
+fn collapse_ws(raw: &str) -> String {
+    raw.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn trim_feature_text(value: String, max_chars: usize) -> String {
+    if value.chars().count() <= max_chars {
+        return value.trim().to_string();
+    }
+    let mut trimmed = value.chars().take(max_chars).collect::<String>();
+    trimmed = trimmed
+        .trim_end_matches(|ch: char| !ch.is_alphanumeric())
+        .trim()
+        .to_string();
+    trimmed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -373,6 +787,88 @@ mod tests {
         assert_eq!(gap.gap.reporter.as_deref(), Some("Reporter"));
 
         std::fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn provider_import_result_flattens_nested_project_features_into_gaps() {
+        let output = json!({
+            "project": {
+                "name": "Personal Budget App — Product Spec",
+                "purpose": "Help users track spending and budgets.",
+                "features": [
+                    {
+                        "name": "Transaction Tracking",
+                        "gaps": [
+                            {
+                                "title": "Categorize transactions",
+                                "current_state": "Imported transactions are uncategorized.",
+                                "desired_state": "Users can assign each transaction to a category.",
+                                "priority": "medium"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "Budget Alerts",
+                        "implementation_gaps": [
+                            {
+                                "name": "Persist alert preferences",
+                                "actual": "Alert thresholds are not stored.",
+                                "target": "Alert thresholds are persisted per category.",
+                                "priority": "high"
+                            }
+                        ]
+                    }
+                ]
+            }
+        })
+        .to_string();
+
+        let result = parse_provider_import_result(&output, Some("Product")).unwrap();
+
+        assert_eq!(result.drafts.len(), 2);
+        assert_eq!(result.drafts[0].name, "Categorize transactions");
+        assert_eq!(
+            result.drafts[0].actual,
+            "Imported transactions are uncategorized."
+        );
+        assert_eq!(
+            result.drafts[0].target,
+            "Users can assign each transaction to a category."
+        );
+        assert_eq!(result.drafts[0].reporter, "Product");
+        assert_eq!(result.drafts[1].name, "Persist alert preferences");
+        let feature = result.feature_destination.unwrap();
+        assert_eq!(feature.name, "Personal Budget App");
+        assert_eq!(
+            feature.description,
+            "Help users track spending and budgets."
+        );
+    }
+
+    #[test]
+    fn provider_import_result_keeps_feature_wrapper_out_of_drafts() {
+        let output = json!({
+            "features": [
+                {
+                    "name": "User Profiles",
+                    "description": "Manage profile details.",
+                    "gaps": [
+                        {
+                            "name": "Profile editor",
+                            "actual": "Users cannot edit profile details.",
+                            "target": "Users can update profile details.",
+                            "priority": "low"
+                        }
+                    ]
+                }
+            ]
+        })
+        .to_string();
+
+        let result = parse_provider_import_result(&output, None).unwrap();
+
+        assert_eq!(result.drafts.len(), 1);
+        assert_eq!(result.drafts[0].name, "Profile editor");
     }
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {

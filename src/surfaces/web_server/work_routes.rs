@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::thread;
 use std::time::Duration;
 
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
@@ -19,7 +19,10 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::tools::product::imports::{FileImportService, ImportDraft, import_drafts_from_value};
+use crate::tools::product::imports::{
+    FileImportService, ImportDraft, ImportExtractionResult, import_drafts_from_value,
+    import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
+};
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_state::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GapProjectionQuery,
@@ -346,50 +349,6 @@ fn nonempty_import_option(value: &str) -> Option<&str> {
     (!trimmed.is_empty()).then_some(trimmed)
 }
 
-fn import_extraction_prompt(text: &str, purpose: &str) -> String {
-    let instruction = match purpose {
-        "plan" => {
-            "Extract one product Feature and its Gaps from this Plan chat transcript. Return only \
-             one JSON object shaped like {\"feature\":{\"name\":\"...\",\"description\":\"...\"},\
-             \"drafts\":[{\"name\":\"...\",\"actual\":\"...\",\"target\":\"...\",\"reporter\":\"\",\
-             \"priority\":\"low\"}],\"implementation_gaps\":[{\"name\":\"...\",\"actual\":\"...\",\
-             \"target\":\"...\",\"reporter\":\"\",\"priority\":\"medium\"}]}. The feature name and \
-             description must describe the user's \
-             product or capability only; do not mention Refine, Plan Mode, Product Spec, drafts, \
-             extraction, or how the plan was created. Draft every concrete implementation gap \
-             needed to build the feature, not only user-visible product behavior. Include backend \
-             data model and API work, frontend state and interaction work, workflow/integration \
-             work, migrations or compatibility work, and test/verification work when the \
-             transcript implies them. Each Gap must be independently actionable with actual and \
-             target states."
-        }
-        "round" => {
-            "Draft Round data from this Gap chat transcript. Return only one actual => target line."
-        }
-        "standalone_gap" => {
-            "Draft one standalone Gap from this Standalone chat transcript. Return only one \
-             JSON object with name, actual, target, reporter, and priority, or one actual => target line."
-        }
-        _ => {
-            "Import these notes into Refine Gap drafts. Return only draft data, one draft per line, \
-             using actual => target text or JSON objects with name, actual, target, reporter, and priority."
-        }
-    };
-    format!("{instruction}\n\n{text}")
-}
-
-#[derive(Clone, Debug)]
-struct ImportExtractionResult {
-    drafts: Vec<ImportDraft>,
-    feature_destination: Option<PlanFeatureDestination>,
-}
-
-#[derive(Clone, Debug)]
-struct PlanFeatureDestination {
-    name: String,
-    description: String,
-}
-
 fn import_provider_from_settings(refine_dir: &std::path::Path, body: &Value) -> String {
     body.get("provider")
         .and_then(Value::as_str)
@@ -422,97 +381,6 @@ fn import_provider_from_settings(refine_dir: &std::path::Path, body: &Value) -> 
         .unwrap_or_else(|| "claude".to_string())
 }
 
-fn parse_provider_import_result(
-    output: &str,
-    reporter: Option<&str>,
-) -> crate::process::supervisor::errors::RefineResult<ImportExtractionResult> {
-    if let Some(result) = parse_structured_import_result(output, reporter) {
-        return Ok(result);
-    }
-
-    FileImportService::new(PathBuf::new())
-        .parse_text(output, reporter)
-        .map(|drafts| ImportExtractionResult {
-            drafts,
-            feature_destination: None,
-        })
-}
-
-fn parse_structured_import_result(
-    output: &str,
-    reporter: Option<&str>,
-) -> Option<ImportExtractionResult> {
-    if let Ok(value) = serde_json::from_str::<Value>(output)
-        && let Some(result) = import_extraction_from_json_value(value, reporter)
-    {
-        return Some(result);
-    }
-
-    if let Some(result) = embedded_json_import_extraction(output, reporter) {
-        return Some(result);
-    }
-
-    let json_lines = output
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())
-        .map(serde_json::from_str::<Value>)
-        .collect::<Result<Vec<_>, _>>();
-    if let Ok(items) = json_lines
-        && !items.is_empty()
-    {
-        let body = json!({ "drafts": items, "reporter": reporter.unwrap_or("") });
-        if let Ok(drafts) = import_drafts_from_value(&body, reporter) {
-            return Some(ImportExtractionResult {
-                drafts,
-                feature_destination: None,
-            });
-        }
-    }
-
-    None
-}
-
-fn embedded_json_import_extraction(
-    output: &str,
-    reporter: Option<&str>,
-) -> Option<ImportExtractionResult> {
-    for (idx, ch) in output.char_indices() {
-        if ch != '{' && ch != '[' {
-            continue;
-        }
-        let mut values = serde_json::Deserializer::from_str(&output[idx..]).into_iter::<Value>();
-        let Some(Ok(value)) = values.next() else {
-            continue;
-        };
-        if let Some(result) = import_extraction_from_json_value(value, reporter) {
-            return Some(result);
-        }
-    }
-    None
-}
-
-fn import_extraction_from_json_value(
-    value: Value,
-    reporter: Option<&str>,
-) -> Option<ImportExtractionResult> {
-    let feature_destination = plan_feature_destination_from_value(&value);
-    let body = match value {
-        Value::Array(items) => json!({ "drafts": items, "reporter": reporter.unwrap_or("") }),
-        Value::Object(mut object) => {
-            normalize_plan_feature_draft_object(&mut object);
-            Value::Object(object)
-        }
-        other => other,
-    };
-    import_drafts_from_value(&body, reporter)
-        .ok()
-        .map(|drafts| ImportExtractionResult {
-            drafts,
-            feature_destination,
-        })
-}
-
 fn import_extraction_response(
     result: ImportExtractionResult,
     provider: &str,
@@ -539,119 +407,6 @@ fn import_extraction_response(
         );
     }
     ApiResponse::json(200, body)
-}
-
-fn normalize_plan_feature_draft_object(object: &mut Map<String, Value>) {
-    let mut drafts = Vec::new();
-    append_plan_gap_arrays(object, &mut drafts);
-    if let Some(feature) = object.get("feature").and_then(Value::as_object) {
-        append_plan_gap_arrays(feature, &mut drafts);
-    }
-    if !drafts.is_empty() {
-        object.insert("drafts".to_string(), Value::Array(drafts));
-    }
-}
-
-fn append_plan_gap_arrays(object: &Map<String, Value>, drafts: &mut Vec<Value>) {
-    for key in [
-        "drafts",
-        "gaps",
-        "items",
-        "implementation_gaps",
-        "technical_gaps",
-        "engineering_gaps",
-        "backend_gaps",
-        "frontend_gaps",
-        "testing_gaps",
-    ] {
-        if let Some(items) = object.get(key).and_then(Value::as_array) {
-            drafts.extend(items.iter().cloned());
-        }
-    }
-}
-
-fn plan_feature_destination_from_value(value: &Value) -> Option<PlanFeatureDestination> {
-    let feature = match value {
-        Value::Object(object) => object
-            .get("feature")
-            .and_then(Value::as_object)
-            .or(Some(object)),
-        _ => None,
-    }?;
-    let name = sanitize_plan_feature_name(
-        feature
-            .get("name")
-            .or_else(|| feature.get("feature_name"))
-            .or_else(|| feature.get("title"))
-            .and_then(Value::as_str)
-            .unwrap_or(""),
-    );
-    let description = sanitize_plan_feature_description(
-        feature
-            .get("description")
-            .or_else(|| feature.get("summary"))
-            .and_then(Value::as_str)
-            .unwrap_or(""),
-    );
-    if name.is_empty() && description.is_empty() {
-        return None;
-    }
-    Some(PlanFeatureDestination { name, description })
-}
-
-fn sanitize_plan_feature_name(raw: &str) -> String {
-    let mut value = collapse_ws(raw);
-    for suffix in [
-        " - Product Spec",
-        " – Product Spec",
-        " — Product Spec",
-        ": Product Spec",
-        " Product Spec",
-    ] {
-        if value.to_lowercase().ends_with(&suffix.to_lowercase()) {
-            value.truncate(value.len().saturating_sub(suffix.len()));
-            value = collapse_ws(&value);
-        }
-    }
-    for prefix in ["Product Spec:", "Plan:", "Feature:", "Project:"] {
-        if value.to_lowercase().starts_with(&prefix.to_lowercase()) {
-            value = collapse_ws(&value[prefix.len()..]);
-        }
-    }
-    trim_feature_text(value, 80)
-}
-
-fn sanitize_plan_feature_description(raw: &str) -> String {
-    let value = collapse_ws(raw);
-    let lower = value.to_lowercase();
-    if lower.is_empty()
-        || lower.contains("created by plan")
-        || lower.contains("created from plan")
-        || lower.contains("plan mode")
-        || lower.contains("refine")
-        || lower.contains("product spec")
-        || lower.contains("draft")
-        || lower.contains("extract")
-    {
-        return String::new();
-    }
-    trim_feature_text(value, 500)
-}
-
-fn collapse_ws(raw: &str) -> String {
-    raw.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn trim_feature_text(value: String, max_chars: usize) -> String {
-    if value.chars().count() <= max_chars {
-        return value.trim().to_string();
-    }
-    let mut trimmed = value.chars().take(max_chars).collect::<String>();
-    trimmed = trimmed
-        .trim_end_matches(|ch: char| !ch.is_alphanumeric())
-        .trim()
-        .to_string();
-    trimmed
 }
 
 fn feature_detail_response_from_gaps(

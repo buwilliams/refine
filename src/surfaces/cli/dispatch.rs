@@ -1537,7 +1537,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                 let drafts = if csv {
                     import.parse_csv(&source, reporter.as_deref())?
                 } else {
-                    import.parse_text(&source, reporter.as_deref())?
+                    import.parse_structured_or_text(&source, reporter.as_deref())?
                 };
                 if drafts.is_empty() {
                     return Err(RefineError::InvalidInput(
