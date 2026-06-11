@@ -92,10 +92,9 @@ Nav & Guide: Manage Drop-down
 			Tabs: Application, Reporters, Processes, Performance, Target App Config, Refine Runtime Config
 			Application
 				Target application: select known app, status indicator, app path
-				Add app (file path / Git clone URL / new directory), Switch to selected (migration check), Remove selected (danger), Copy from node, Generate with AI, Select app template
+				Add app (file path / Git clone URL / new directory), Switch to selected (migration check), Remove selected (danger), Copy from node, Generate with AI
 				Disabled unless supervisor/registry enabled
-				Nodes section: table (name + active pill, ID, gap counts), Activate, Rename, Archive (danger), Create node
-					Cluster section: remote node management (name/ID, SSH host/port, version/port, health), Configure, Bootstrap (over SSH), Enable/Disable, Register node
+				Nodes section: table (name + active pill, ID, gap counts, optional host/port/status), Activate, Rename, Connection, Bootstrap (over SSH), Enable/Disable, Archive (danger), Create node
 			Reporters
 				List with counts; Rename (cascades rounds), Merge (move gaps to destination), Remove (danger, keeps history), Add reporter
 			Processes
@@ -344,7 +343,7 @@ Implementation Internals (for e2e testing)
 		Import: #import-tabs, #import-title, #import-text, #import-csv-text, #import-csv-file, #import-csv-file-button, #import-csv-file-name, #import-csv-distribute, #import-upload-distribute, #import-drafts, #btn-extract, #btn-persist
 		Settings inputs prefixed #s- (e.g. #s-cap, #s-idle, #s-hard, #s-chat-idle, #s-backlog-promote, #s-cli, #s-agent-limit-pause, #s-file-browser-ignore, #s-governance-add-rule, #s-governance-generate, #s-application-copy-node, #s-project-select)
 	API surface (grouped; :id = path param)
-		Project/app: /api/project/status|attach|path|directories|templates|scaffold|sync, /api/apps, /api/apps/status, /api/target-app/:id, /api/target-app/generate-instructions
+		Project/app: /api/project/status|attach|path|directories|sync, /api/apps, /api/apps/status, /api/target-app/:id, /api/target-app/generate-instructions
 		Nodes/cluster: /api/nodes(/activate|/copy-settings|/transfer-gaps), /api/cluster, /api/cluster/nodes, /api/reporters, /api/reporters/:id/merge
 		Gaps: /api/gaps, /api/gaps/:id, /api/gaps/:id/rounds(/latest), /api/gaps/:id/verify|cancel|retry-quality|retry-merge, /api/gaps/bulk, /api/gaps/bulk/delete
 		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/gaps/:id(/reorder), /api/features/:id/gaps/bulk

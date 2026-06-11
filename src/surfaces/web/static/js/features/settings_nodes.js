@@ -8,7 +8,7 @@ function renderSettingsNodesTab({
       <h3>${renderSettingsGuideLabel("Nodes", "node-manage")}</h3>
       <p class="scope-label muted small">Project-wide</p>
       <table class="table" data-testid="node-settings-table">
-        <thead><tr><th>Name</th><th>ID</th><th>Gaps</th><th>Remote host</th><th>Refine</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>ID</th><th>Gaps</th><th>Host</th><th>Refine</th><th>Status</th><th></th></tr></thead>
         <tbody>
           ${nodes.map((inst) => {
             const counts = nodeCounts[inst.id] || {};
@@ -30,12 +30,14 @@ function renderSettingsNodesTab({
                         data-testid="node-remote-configure"
                         data-name="${htmlEscape(inst.display_name || inst.id)}"
                         data-ssh-host="${htmlEscape(inst.ssh_host || "")}"
+                        data-ssh-user="${htmlEscape(inst.ssh_user || "")}"
+                        data-ssh-identity-path="${htmlEscape(inst.ssh_identity_path || "")}"
                         data-ssh-port="${htmlEscape(String(inst.ssh_port || 22))}"
                         data-refine-checkout="${htmlEscape(inst.refine_checkout || "~/refine")}"
                         data-target-app-path="${htmlEscape(inst.target_app_path || "")}"
-                        data-refine-port="${htmlEscape(String(inst.refine_port || 8080))}">Remote</button>
+                        data-refine-port="${htmlEscape(String(inst.refine_port || 8080))}">Connection</button>
                 <button class="secondary" data-node-remote-bootstrap="${htmlEscape(inst.id)}" data-testid="node-remote-bootstrap" ${hasRemote && !inst.archived ? "" : "disabled"}>Bootstrap</button>
-                <button class="secondary" data-node-remote-toggle="${htmlEscape(inst.id)}" data-enabled="${inst.enabled === false ? "0" : "1"}" data-testid="node-remote-toggle" ${inst.archived ? "disabled" : ""}>${inst.enabled === false ? "Enable" : "Disable"}</button>
+                <button class="secondary" data-node-remote-toggle="${htmlEscape(inst.id)}" data-enabled="${inst.enabled === false ? "0" : "1"}" data-testid="node-remote-toggle" ${hasRemote && !inst.archived ? "" : "disabled"}>${inst.enabled === false ? "Enable" : "Disable"}</button>
                 <button class="danger" data-node-archive="${htmlEscape(inst.id)}" data-testid="node-archive" ${isActive ? "disabled" : ""}>Archive</button>
               </td>
             </tr>`;
@@ -44,7 +46,6 @@ function renderSettingsNodesTab({
       </table>
       <div class="actions" style="margin-top:8px">
         <button id="node-add" data-testid="node-add">Create node</button>
-        <button class="secondary" id="node-remote-add" data-testid="node-remote-add">Register remote node</button>
       </div>
     </section>`;
 }
@@ -107,48 +108,14 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
-  $("#node-remote-add")?.addEventListener("click", async (e) => {
-    const btn = e.currentTarget;
-    const id = await modalPrompt("Node ID", "", { title: "Register remote node" });
-    if (!id || !id.trim()) return;
-    const sshHost = await modalPrompt("SSH host", "", { title: "Register remote node" });
-    if (!sshHost || !sshHost.trim()) return;
-    const targetAppPath = await modalPrompt("Target app path", "", { title: "Register remote node" });
-    if (targetAppPath == null) return;
-    await withButtonBusy(btn, "Registering...", async () => {
-      try {
-        await api("POST", "/api/cluster/nodes", {
-          id: id.trim(),
-          display_name: id.trim(),
-          ssh_host: sshHost.trim(),
-          target_app_path: targetAppPath.trim(),
-        });
-        await refreshSettingsTab("application", { force: true });
-      } catch (e) { await showActionError(e); }
-    });
-  });
   $$("[data-node-remote-configure]").forEach((b) => b.addEventListener("click", async () => {
-    const displayName = await modalPrompt("Display name", b.dataset.name || "", { title: "Configure remote node" });
-    if (displayName == null) return;
-    const sshHost = await modalPrompt("SSH host", b.dataset.sshHost || "", { title: "Configure remote node" });
-    if (sshHost == null || !sshHost.trim()) return;
-    const sshPort = await modalPrompt("SSH port", b.dataset.sshPort || "22", { title: "Configure remote node" });
-    if (sshPort == null) return;
-    const refineCheckout = await modalPrompt("Refine checkout path", b.dataset.refineCheckout || "~/refine", { title: "Configure remote node" });
-    if (refineCheckout == null) return;
-    const targetAppPath = await modalPrompt("Target app path", b.dataset.targetAppPath || "", { title: "Configure remote node" });
-    if (targetAppPath == null) return;
-    const refinePort = await modalPrompt("Refine UI port", b.dataset.refinePort || "8080", { title: "Configure remote node" });
-    if (refinePort == null) return;
+    const payload = await openNodeConnectionModal(b);
+    if (!payload) return;
     await withButtonBusy(b, "Saving...", async () => {
       try {
         await api("PATCH", "/api/cluster/nodes/" + encodeURIComponent(b.dataset.nodeRemoteConfigure), {
-          display_name: displayName.trim() || b.dataset.nodeRemoteConfigure,
-          ssh_host: sshHost.trim(),
-          ssh_port: Number(sshPort) || 22,
-          refine_checkout: refineCheckout.trim() || "~/refine",
-          target_app_path: targetAppPath.trim(),
-          refine_port: Number(refinePort) || 8080,
+          ...payload,
+          display_name: payload.display_name || b.dataset.nodeRemoteConfigure,
         });
         await refreshSettingsTab("application", { force: true });
       } catch (e) { await showActionError(e); }
@@ -179,4 +146,109 @@ function bindSettingsNodesTab() {
       } catch (e) { await showActionError(e); }
     });
   }));
+}
+
+function openNodeConnectionModal(button) {
+  return new Promise((resolve) => {
+    const root = document.createElement("div");
+    root.className = "modal-backdrop";
+    root.dataset.testid = "modal-backdrop";
+    root.innerHTML = `
+      <div class="modal" role="dialog" aria-modal="true" data-testid="node-connection-modal" style="max-width:680px">
+        <div class="modal-title">Configure node connection</div>
+        <form data-node-connection-form>
+          <div class="modal-body">
+            <div class="form-grid two">
+              <div class="form-row"><label>Display name</label>
+                <input class="modal-input" type="text" name="display_name" data-testid="node-connection-display-name"
+                       value="${htmlEscape(button.dataset.name || "")}"></div>
+              <div class="form-row"><label>SSH host</label>
+                <input type="text" name="ssh_host" data-testid="node-connection-ssh-host"
+                       value="${htmlEscape(button.dataset.sshHost || "")}"></div>
+              <div class="form-row"><label>SSH user</label>
+                <input type="text" name="ssh_user" data-testid="node-connection-ssh-user"
+                       value="${htmlEscape(button.dataset.sshUser || "")}"></div>
+              <div class="form-row"><label>SSH port</label>
+                <input type="number" name="ssh_port" data-testid="node-connection-ssh-port"
+                       value="${htmlEscape(button.dataset.sshPort || "22")}"></div>
+              <div class="form-row"><label>Identity path</label>
+                <input type="text" name="ssh_identity_path" data-testid="node-connection-identity-path"
+                       value="${htmlEscape(button.dataset.sshIdentityPath || "")}"></div>
+              <div class="form-row"><label>Refine UI port</label>
+                <input type="number" name="refine_port" data-testid="node-connection-refine-port"
+                       value="${htmlEscape(button.dataset.refinePort || "8080")}"></div>
+            </div>
+            <div class="form-row"><label>Refine checkout path</label>
+              <input type="text" name="refine_checkout" data-testid="node-connection-refine-checkout"
+                     value="${htmlEscape(button.dataset.refineCheckout || "~/refine")}"></div>
+            <div class="form-row"><label>Target app path</label>
+              <input type="text" name="target_app_path" data-testid="node-connection-target-app-path"
+                     value="${htmlEscape(button.dataset.targetAppPath || "")}"></div>
+            <div class="form-error" data-node-connection-error style="display:none"></div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="secondary" data-cancel data-testid="node-connection-cancel">Cancel</button>
+            <button type="submit" data-ok data-testid="node-connection-save">Save</button>
+          </div>
+        </form>
+      </div>`;
+    document.body.appendChild(root);
+
+    let resolved = false;
+    const form = root.querySelector("[data-node-connection-form]");
+    const error = root.querySelector("[data-node-connection-error]");
+
+    function close(value) {
+      if (resolved) return;
+      resolved = true;
+      document.removeEventListener("keydown", onKey, true);
+      root.remove();
+      resolve(value);
+    }
+
+    function onKey(event) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close(null);
+      }
+    }
+
+    function value(name) {
+      return String(form.elements[name]?.value || "").trim();
+    }
+
+    function submit() {
+      const sshHost = value("ssh_host");
+      if (!sshHost) {
+        error.textContent = "SSH host is required to attach a remote connection.";
+        error.style.display = "";
+        form.elements.ssh_host?.focus();
+        return;
+      }
+      close({
+        display_name: value("display_name"),
+        ssh_host: sshHost,
+        ssh_user: value("ssh_user"),
+        ssh_identity_path: value("ssh_identity_path"),
+        ssh_port: Number(value("ssh_port")) || 22,
+        refine_checkout: value("refine_checkout") || "~/refine",
+        target_app_path: value("target_app_path"),
+        refine_port: Number(value("refine_port")) || 8080,
+      });
+    }
+
+    document.addEventListener("keydown", onKey, true);
+    root.addEventListener("click", (event) => {
+      if (event.target === root) close(null);
+    });
+    root.querySelector("[data-cancel]")?.addEventListener("click", () => close(null));
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      submit();
+    });
+
+    const focus = form.elements.ssh_host || form.querySelector(".modal-input");
+    focus?.focus();
+    focus?.select?.();
+  });
 }

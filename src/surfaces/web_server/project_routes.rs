@@ -1219,27 +1219,6 @@ impl InProcessWebServer {
         )
     }
 
-    pub(super) fn handle_project_templates(&self) -> ApiResponse {
-        ApiResponse::json(200, json!({"templates": []}))
-    }
-
-    pub(super) fn handle_project_scaffold(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "create scaffold Gaps");
-        let name = request
-            .body
-            .as_ref()
-            .and_then(|body| body.get("name"))
-            .and_then(|value| value.as_str())
-            .unwrap_or("Scaffold target application");
-        match self
-            .work_item_service(refine_dir)
-            .create_gap_summary(name, None)
-        {
-            Ok(gap) => ApiResponse::json(201, json!({"ok": true, "gap": gap.gap})),
-            Err(error) => error_response(error),
-        }
-    }
-
     pub(super) fn handle_settings_get(&self) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "read settings");
         match FileSettingsService::new(refine_dir).list_response() {

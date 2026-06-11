@@ -26,7 +26,6 @@ function renderProjectApplicationsSection({
         </select></div>
       <div class="actions settings-section-actions">
         <button class="secondary" id="s-project-add" data-testid="project-add-app" ${projectRegistryEnabled ? "" : "disabled"}>Add app</button>
-        <button class="secondary" id="s-project-template" data-testid="project-template" ${currentProject ? "" : "disabled"}>Select app template</button>
         <button id="s-project-switch" data-testid="project-switch-app" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Switch to selected</button>
         <button class="danger" id="s-project-remove" data-testid="project-remove-app" ${projectApps.length && projectRegistryEnabled ? "" : "disabled"}>Remove selected</button>
       </div>
@@ -315,9 +314,6 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
   $("#s-project-add")?.addEventListener("click", async () => {
     await openAddAppModal();
   });
-  $("#s-project-template")?.addEventListener("click", async () => {
-    await openProjectTemplateSelector();
-  });
   $("#s-project-switch")?.addEventListener("click", async (e) => {
     const btn = e.currentTarget;
     const path = ($("#s-project-select")?.value || "").trim();
@@ -375,7 +371,6 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
         if (result.auto_attached) {
           await applyProjectAttachResult(result, { toast: false });
           toast("App removed; loaded next app", "info");
-          await maybeOpenProjectTemplateModal(result);
           return;
         }
         state.project = result.attached === false

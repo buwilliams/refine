@@ -1177,17 +1177,27 @@ function flushTerminalInput() {
 }
 
 function terminalReceiveOutput(text) {
+  if (text) {
+    terminalState.display = `${terminalState.display || ""}${text}`;
+    if (terminalState.display.length > TERMINAL_OUTPUT_MAX_CHARS) {
+      terminalState.display = terminalState.display.slice(-TERMINAL_OUTPUT_MAX_CHARS);
+    }
+  }
   if (terminalState.term) {
     terminalState.term.write(text || "");
-  } else {
-    terminalState.display = `${terminalState.display || ""}${text || ""}`;
   }
   scrollTerminalOutputToEnd();
 }
 
 function ensureTerminalRenderer(output) {
   if (!output || !window.Terminal) return;
-  if (terminalState.term?.element && output.contains(terminalState.term.element)) return;
+  if (terminalState.term?.element) {
+    if (!output.contains(terminalState.term.element)) {
+      output.replaceChildren(terminalState.term.element);
+    }
+    resizeTerminalRenderer(output);
+    return;
+  }
   if (terminalState.term) {
     terminalState.term.dispose();
     terminalState.term = null;
@@ -1229,6 +1239,15 @@ function ensureTerminalRenderer(output) {
   if (terminalState.display) term.write(terminalState.display);
   term.onData((data) => queueTerminalInput(data));
   terminalState.term = term;
+  resizeTerminalRenderer(output);
+}
+
+function resizeTerminalRenderer(output = document.querySelector(".terminal-output")) {
+  if (!terminalState.term || typeof terminalState.term.resize !== "function") return;
+  const size = terminalSize(output);
+  try {
+    terminalState.term.resize(size.cols, size.rows);
+  } catch {}
 }
 
 function terminalApplyOutput(text) {

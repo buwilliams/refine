@@ -424,14 +424,6 @@ impl InProcessWebServer {
             return self.handle_project_sync();
         }
 
-        if request.method == "GET" && request.path == "/project/templates" {
-            return self.handle_project_templates();
-        }
-
-        if request.method == "POST" && request.path == "/project/scaffold" {
-            return self.handle_project_scaffold(request);
-        }
-
         if request.method == "GET" && request.path == "/settings" {
             return self.handle_settings_get();
         }
