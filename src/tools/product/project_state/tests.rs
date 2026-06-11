@@ -1,6 +1,7 @@
 use crate::model::feature::FeatureRollup;
 use crate::model::workflow::GapStatus;
 use crate::tools::observability::activity::ACTIVITY_LOG_FILE;
+use crate::tools::observability::logs::FileLogService;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -8,7 +9,7 @@ use std::path::{Path, PathBuf};
 use super::*;
 use crate::model::feature::FeatureIndexProjection;
 use crate::model::gap::{GapIndexProjection, GapPriority};
-use crate::model::log::ActivityEntry;
+use crate::model::log::{ActivityEntry, LogEntry};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use std::process::Command;
 use std::sync::{Arc, Barrier};
@@ -302,6 +303,40 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
     let cached = store.load_or_refresh_projection(&cache_dir).unwrap();
     assert_eq!(cached.generated_at, "cached-sentinel");
 
+    FileLogService::new(&refine_dir)
+        .append_round_log(
+            "GAP1",
+            0,
+            LogEntry {
+                datetime: "2026-01-03T00:00:00Z".to_string(),
+                severity: "info".to_string(),
+                category: "workflow".to_string(),
+                message: "Sidecar cache refresh".to_string(),
+                details: None,
+                actions: Vec::new(),
+                actor: Some("workflow".to_string()),
+                gap_id: Some("GAP1".to_string()),
+            },
+        )
+        .unwrap();
+    let sidecar_refreshed = store.load_or_refresh_projection(&cache_dir).unwrap();
+    assert_ne!(sidecar_refreshed.generated_at, "cached-sentinel");
+    assert_eq!(
+        sidecar_refreshed
+            .list_activity(ActivityProjectionQuery {
+                gap_id: Some("GAP1".to_string()),
+                ..ActivityProjectionQuery::default()
+            })
+            .activity[0]
+            .message,
+        "Sidecar cache refresh"
+    );
+
+    let mut snapshot = sidecar_refreshed;
+    snapshot.generated_at = "cached-after-sidecar".to_string();
+    store
+        .persist_projection_snapshot(&cache_dir, &snapshot)
+        .unwrap();
     fs::write(
         gap_dir.join("gap.json"),
         r#"{
@@ -317,7 +352,7 @@ fn file_store_loads_cached_projection_until_fingerprints_change() {
         refreshed.gaps["GAP1"].gap.name,
         "Refreshed name with changed refine content"
     );
-    assert_ne!(refreshed.generated_at, "cached-sentinel");
+    assert_ne!(refreshed.generated_at, "cached-after-sidecar");
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -386,6 +421,22 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
             ),
         )
         .unwrap();
+    FileLogService::new(&refine_dir)
+        .append_round_log(
+            "GAP1",
+            1,
+            LogEntry {
+                datetime: "2026-01-05T00:00:00Z".to_string(),
+                severity: "warn".to_string(),
+                category: "workflow".to_string(),
+                message: "Round sidecar activity".to_string(),
+                details: None,
+                actions: Vec::new(),
+                actor: Some("workflow".to_string()),
+                gap_id: None,
+            },
+        )
+        .unwrap();
 
     let snapshot = FileProjectStateStore::new(&refine_dir)
         .rebuild_projection()
@@ -451,18 +502,48 @@ fn rebuild_projection_scans_python_style_gap_and_feature_records() {
             .and_then(|counts| counts.get(&GapStatus::Todo)),
         Some(&1)
     );
-    assert_eq!(snapshot.activity.len(), 2);
+    assert_eq!(snapshot.activity.len(), 3);
+    assert_eq!(
+        snapshot.gaps["GAP1"].activity_ids,
+        vec!["round-log:GAP1:1:0"]
+    );
     assert_eq!(snapshot.gaps["GAP2"].activity_ids, vec!["act-1"]);
     assert!(snapshot.activity["act-1"].searchable_text.contains("#app"));
     assert_eq!(
+        snapshot.activity["round-log:GAP1:1:0"].entry.message,
+        "Round sidecar activity"
+    );
+    assert_eq!(
+        snapshot.activity["round-log:GAP1:1:0"]
+            .entry
+            .gap_id
+            .as_deref(),
+        Some("GAP1")
+    );
+    assert_eq!(
         snapshot.dashboard.recent_activity_ids,
-        vec!["act-2".to_string(), "act-1".to_string()]
+        vec![
+            "round-log:GAP1:1:0".to_string(),
+            "act-2".to_string(),
+            "act-1".to_string()
+        ]
     );
     assert!(
         snapshot
             .source_fingerprints
             .contains_key("logs/activity.jsonl")
     );
+    assert!(
+        snapshot
+            .source_fingerprints
+            .contains_key("gaps/GA/P1/logs.jsonl")
+    );
+    let gap_activity = snapshot.list_activity(ActivityProjectionQuery {
+        gap_id: Some("GAP1".to_string()),
+        ..ActivityProjectionQuery::default()
+    });
+    assert_eq!(gap_activity.total, 1);
+    assert_eq!(gap_activity.activity[0].message, "Round sidecar activity");
     let activity_filtered = snapshot.list_gaps(GapProjectionQuery {
         severity: Some("error".to_string()),
         category: Some("quality".to_string()),

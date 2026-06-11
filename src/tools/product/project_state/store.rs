@@ -9,11 +9,12 @@ use serde_json::Value;
 
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::gap::GapIndexProjection;
-use crate::model::log::ActivityEntry;
+use crate::model::log::{ActivityEntry, RoundLogEntry};
 use crate::model::workflow::GapStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::observability::activity::ACTIVITY_LOG_FILE;
+use crate::tools::observability::logs::FileLogService;
 
 use super::helpers::*;
 use super::types::*;
@@ -101,6 +102,10 @@ impl FileProjectStateStore {
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
         for path in Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")? {
+            let rel_path = self.relative_path(&path)?;
+            source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
+        }
+        for path in Self::collect_json_files(&self.refine_dir.join("gaps"), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
@@ -330,6 +335,31 @@ impl FileProjectStateStore {
         Ok(activity)
     }
 
+    fn project_gap_round_activity(
+        &self,
+        gaps: &BTreeMap<String, GapSummaryProjection>,
+    ) -> RefineResult<BTreeMap<String, ActivitySummaryProjection>> {
+        let log_service = FileLogService::new(&self.refine_dir);
+        let mut activity = BTreeMap::new();
+        for gap_id in gaps.keys() {
+            if gap_id.len() < 2 {
+                continue;
+            }
+            for (index, log) in log_service.all_round_logs(gap_id)?.into_iter().enumerate() {
+                let entry = round_log_activity_entry(gap_id, index, log);
+                let searchable_text = activity_searchable_text(&entry);
+                activity.insert(
+                    entry.id.clone(),
+                    ActivitySummaryProjection {
+                        entry,
+                        searchable_text,
+                    },
+                );
+            }
+        }
+        Ok(activity)
+    }
+
     fn project_changes(
         &self,
         gaps: &BTreeMap<String, GapSummaryProjection>,
@@ -403,6 +433,22 @@ impl FileProjectStateStore {
         } else {
             FileGitWorktreeService::new(target_root)
         }
+    }
+}
+
+fn round_log_activity_entry(gap_id: &str, index: usize, mut log: RoundLogEntry) -> ActivityEntry {
+    let round_idx = log.round_idx.unwrap_or(0);
+    let details = log.entry.details.take();
+    ActivityEntry {
+        id: format!("round-log:{gap_id}:{round_idx}:{index}"),
+        datetime: log.entry.datetime,
+        severity: log.entry.severity,
+        category: log.entry.category,
+        message: log.entry.message,
+        gap_id: Some(gap_id.to_string()),
+        actor: log.entry.actor,
+        details,
+        actions: log.entry.actions,
     }
 }
 
@@ -559,9 +605,15 @@ impl ProjectStateStore for FileProjectStateStore {
         }
 
         let activity = self.project_activity()?;
+        let mut activity = activity;
+        activity.extend(self.project_gap_round_activity(&gaps)?);
         if activity_path.exists() {
             let rel_path = self.relative_path(&activity_path)?;
             source_fingerprints.insert(rel_path, Self::fingerprint(&activity_path)?);
+        }
+        for path in Self::collect_json_files(&self.refine_dir.join("gaps"), "logs.jsonl")? {
+            let rel_path = self.relative_path(&path)?;
+            source_fingerprints.insert(rel_path, Self::fingerprint(&path)?);
         }
         if let Some(fingerprint) = self.git_head_fingerprint() {
             source_fingerprints.insert(fingerprint.path.clone(), fingerprint);

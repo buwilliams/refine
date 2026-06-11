@@ -1284,8 +1284,10 @@ fn web_server_appends_and_edits_latest_round() {
 fn web_server_appends_and_reads_gap_round_logs() {
     let temp_root = unique_temp_dir("http-gap-round-logs");
     let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root);
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/gaps".to_string(),
@@ -1296,6 +1298,13 @@ fn web_server_appends_and_reads_gap_round_logs() {
         path: "/api/gaps/GAP1/rounds".to_string(),
         body: Some(json!({"reporter": "Reporter", "actual": "Actual", "target": "Target"})),
     });
+    let activity_before_logs = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/activity?gap_id=GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(activity_before_logs.status, 200);
+    assert_eq!(activity_before_logs.body["page"]["total"], 0);
 
     let append = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -1321,6 +1330,18 @@ fn web_server_appends_and_reads_gap_round_logs() {
         logs.body["logs"][0]["message"],
         "Workflow status changed: backlog -> todo"
     );
+    let activity = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/activity?gap_id=GAP1".to_string(),
+        body: None,
+    });
+    assert_eq!(activity.status, 200);
+    assert_eq!(activity.body["page"]["total"], 1);
+    assert_eq!(
+        activity.body["activity"][0]["message"],
+        "Workflow status changed: backlog -> todo"
+    );
+    assert_eq!(activity.body["activity"][0]["gap_id"], "GAP1");
 
     let evaluation = server.handle(ApiRequest {
         method: "PATCH".to_string(),

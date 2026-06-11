@@ -95,6 +95,10 @@ impl FileLogService {
         Ok((page, has_more, total))
     }
 
+    pub fn all_round_logs(&self, gap_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
+        self.read_sidecar(gap_id)
+    }
+
     fn read_sidecar(&self, gap_id: &str) -> RefineResult<Vec<RoundLogEntry>> {
         let path = gap_logs_path(&self.refine_dir, gap_id);
         if !path.exists() {
