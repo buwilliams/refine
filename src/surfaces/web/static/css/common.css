@@ -486,6 +486,49 @@ select {
   color: var(--color-primary-hover);
   transform: scale(1.12);
 }
+.settings-editable-field {
+  gap: 6px;
+}
+.settings-editable-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.settings-editable-heading label {
+  min-width: 0;
+}
+.settings-editable-toggle {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+.settings-editable-toggle svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.settings-editable-preview {
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.settings-editable-none {
+  color: var(--color-text-soft);
+}
 .table {
   width: 100%;
   border-collapse: separate;

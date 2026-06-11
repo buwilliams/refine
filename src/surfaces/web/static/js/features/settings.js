@@ -530,6 +530,44 @@ function renderSettingsGuideIcon(itemId = "", title = "setting") {
     </button>`;
 }
 
+function renderSettingsEditableField({
+  id,
+  label,
+  guideItemId = "",
+  description = "",
+  control,
+  valueLabel = "",
+  emptyLabel = "none",
+}) {
+  const htmlId = htmlEscape(id);
+  const title = String(label || "Setting");
+  const trimmed = String(valueLabel == null ? "" : valueLabel).trim();
+  const preview = trimmed
+    ? htmlEscape(trimmed)
+    : `<span class="settings-editable-none">${htmlEscape(emptyLabel)}</span>`;
+  return `
+    <div class="form-row settings-editable-field"
+         data-settings-editable-field
+         data-settings-editable-title="${htmlEscape(title)}"
+         data-settings-empty-label="${htmlEscape(emptyLabel)}">
+      <div class="settings-editable-heading">
+        <label for="${htmlId}">${renderSettingsGuideLabel(title, guideItemId, description)}</label>
+        <button type="button"
+                class="secondary settings-editable-toggle"
+                title="Edit ${htmlEscape(title)}"
+                aria-label="Edit ${htmlEscape(title)}"
+                data-testid="${htmlId}-edit"
+                data-settings-editable-toggle>
+          ${settingsMarkdownIcon("edit")}
+        </button>
+      </div>
+      <div class="settings-editable-preview" data-settings-editable-preview>${preview}</div>
+      <div class="settings-editable-editor" data-settings-editable-editor hidden>
+        ${control}
+      </div>
+    </div>`;
+}
+
 function settingsMarkdownIcon(name) {
   if (name === "save") {
     return `
@@ -544,6 +582,123 @@ function settingsMarkdownIcon(name) {
       <path d="M12 20h9"></path>
       <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
     </svg>`;
+}
+
+function settingsEditableControl(field) {
+  return field?.querySelector("[data-settings-editable-editor] input, [data-settings-editable-editor] select, [data-settings-editable-editor] textarea") || null;
+}
+
+function settingsEditablePreviewValue(control) {
+  if (!control) return "";
+  if (control.tagName === "SELECT") {
+    return control.selectedOptions?.[0]?.textContent || control.value || "";
+  }
+  return control.value == null ? "" : String(control.value);
+}
+
+function setSettingsEditableButtonState(btn, editing) {
+  if (!btn) return;
+  const title = btn.closest("[data-settings-editable-field]")?.dataset.settingsEditableTitle || "setting";
+  const action = editing ? "Save" : "Edit";
+  btn.dataset.settingsEditableEditing = editing ? "1" : "0";
+  btn.title = `${action} ${title}`;
+  btn.setAttribute("aria-label", `${action} ${title}`);
+  btn.innerHTML = settingsMarkdownIcon(editing ? "save" : "edit");
+}
+
+function updateSettingsEditablePreview(field) {
+  if (!field) return;
+  const preview = field.querySelector("[data-settings-editable-preview]");
+  const control = settingsEditableControl(field);
+  if (!preview || !control) return;
+  const value = settingsEditablePreviewValue(control).trim();
+  const empty = field.dataset.settingsEmptyLabel || "none";
+  preview.innerHTML = value
+    ? htmlEscape(value)
+    : `<span class="settings-editable-none">${htmlEscape(empty)}</span>`;
+}
+
+function syncSettingsEditableDisabled(control) {
+  const field = control?.closest("[data-settings-editable-field]");
+  const btn = field?.querySelector("[data-settings-editable-toggle]");
+  if (!field || !btn) return;
+  btn.disabled = !!control.disabled;
+  if (control.disabled) {
+    const preview = field.querySelector("[data-settings-editable-preview]");
+    const editor = field.querySelector("[data-settings-editable-editor]");
+    editor.hidden = true;
+    if (preview) preview.hidden = false;
+    setSettingsEditableButtonState(btn, false);
+  }
+}
+
+function editSettingsEditableField(field) {
+  if (!field) return;
+  const preview = field.querySelector("[data-settings-editable-preview]");
+  const editor = field.querySelector("[data-settings-editable-editor]");
+  const btn = field.querySelector("[data-settings-editable-toggle]");
+  const control = settingsEditableControl(field);
+  if (!editor || !control || control.disabled) return;
+  preview?.setAttribute("hidden", "");
+  editor.hidden = false;
+  setSettingsEditableButtonState(btn, true);
+  control.focus();
+  if (control instanceof HTMLInputElement && control.type !== "number") {
+    control.select();
+  }
+}
+
+function commitSettingsEditableField(field) {
+  if (!field) return;
+  const preview = field.querySelector("[data-settings-editable-preview]");
+  const editor = field.querySelector("[data-settings-editable-editor]");
+  const btn = field.querySelector("[data-settings-editable-toggle]");
+  const control = settingsEditableControl(field);
+  if (!preview || !editor || !control) return;
+  updateSettingsEditablePreview(field);
+  editor.hidden = true;
+  preview.hidden = false;
+  setSettingsEditableButtonState(btn, false);
+  if (control.dataset.settingsCommittedValue !== settingsControlValue(control)) {
+    control.dataset.settingsCommittedValue = settingsControlValue(control);
+    control.dispatchEvent(new Event("settings-editable-commit", { bubbles: true }));
+  }
+}
+
+function bindSettingsEditableFields(root) {
+  if (!root) return;
+  $$("[data-settings-editable-field]", root).forEach((field) => {
+    const control = settingsEditableControl(field);
+    const btn = field.querySelector("[data-settings-editable-toggle]");
+    if (!control || !btn) return;
+    control.dataset.settingsCommittedValue = settingsControlValue(control);
+    updateSettingsEditablePreview(field);
+    syncSettingsEditableDisabled(control);
+    btn.addEventListener("mousedown", (e) => {
+      if (btn.dataset.settingsEditableEditing === "1") e.preventDefault();
+    });
+    btn.addEventListener("click", () => {
+      if (btn.dataset.settingsEditableEditing === "1") {
+        commitSettingsEditableField(field);
+      } else {
+        editSettingsEditableField(field);
+      }
+    });
+    control.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && control.tagName !== "TEXTAREA") {
+        e.preventDefault();
+        commitSettingsEditableField(field);
+      } else if (e.key === "Escape") {
+        if ("settingsCommittedValue" in control.dataset) {
+          setSettingsControlValue(control, control.dataset.settingsCommittedValue);
+        }
+        commitSettingsEditableField(field);
+      }
+    });
+    control.addEventListener("change", () => {
+      updateSettingsEditablePreview(field);
+    });
+  });
 }
 
 function setSettingsMarkdownButtonState(btn, editing) {

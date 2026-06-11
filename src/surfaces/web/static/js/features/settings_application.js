@@ -43,9 +43,19 @@ function renderSettingsApplicationTab({
   });
 }
 
+function targetAppAutoBuildLabel(value) {
+  return ({
+    never: "Never",
+    on_worktree_merge: "On worktree merge",
+    hourly: "Hourly",
+    daily: "Daily (time)",
+  })[value] || value || "none";
+}
+
 function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
   const rawAutoBuildMode = String(s.target_app_auto_build || "on_worktree_merge");
   const autoBuildMode = rawAutoBuildMode === "nightly" ? "daily" : rawAutoBuildMode;
+  const autoBuildHour = String(s.target_app_auto_build_hour_utc || "0");
   return `
     <section class="settings-section">
       <h3>Application</h3>
@@ -63,22 +73,26 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
         target location still owns all git plumbing — worktree create, fetch,
         merge, push.
       </p>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Agent subpath",
-        "application-agent-subpath",
-        "optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.",
-      )}</label>
-        <input type="text" id="s-subpath"
-               placeholder="e.g. apps/web"
-               value="${htmlEscape(s.agent_subpath || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Merge target branch",
-        "application-merge-target",
-        "branch all Gap worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch.",
-      )}</label>
-        <input type="text" id="s-merge-target"
-               placeholder="e.g. main"
-               value="${htmlEscape(s.merge_target_branch || "")}"></div>
+      ${renderSettingsEditableField({
+        id: "s-subpath",
+        label: "Agent subpath",
+        guideItemId: "application-agent-subpath",
+        description: "optional sub-project (relative to the repo root) used as the cwd for agent + chat subprocesses. Leave blank to use the repo root.",
+        valueLabel: s.agent_subpath || "",
+        control: `<input type="text" id="s-subpath"
+                         placeholder="e.g. apps/web"
+                         value="${htmlEscape(s.agent_subpath || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-merge-target",
+        label: "Merge target branch",
+        guideItemId: "application-merge-target",
+        description: "branch all Gap worktrees are based on and all Merge agent work lands on. Leave blank to follow the host's currently-checked-out branch.",
+        valueLabel: s.merge_target_branch || "",
+        control: `<input type="text" id="s-merge-target"
+                         placeholder="e.g. main"
+                         value="${htmlEscape(s.merge_target_branch || "")}">`,
+      })}
     </section>
 
     <section class="settings-section">
@@ -97,139 +111,203 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
           workers → target-app config generator to convert them into structured
           commands.
         </p>` : ""}
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "App URL",
-        "application-url",
-        "opened from the status indicator when the app is running.",
-      )}</label>
-        <input type="url" id="s-target-app-url"
-               data-testid="target-app-url"
-               placeholder="http://localhost:3000"
-               value="${htmlEscape(s.target_app_url || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Start command",
-        "application-start",
-        "one-line shell command that starts the app and returns promptly.",
-      )}</label>
-        <input type="text" id="s-target-start-command"
-               data-testid="target-app-start-command"
-               placeholder="./.refine/manage-app.sh start"
-               value="${htmlEscape(s.target_app_start_command || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Stop command",
-        "application-stop",
-        "one-line shell command that stops the app; should be idempotent when practical.",
-      )}</label>
-        <input type="text" id="s-target-stop-command"
-               data-testid="target-app-stop-command"
-               placeholder="./.refine/manage-app.sh stop"
-               value="${htmlEscape(s.target_app_stop_command || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Build command",
-        "application-build",
-        "one-line shell command that prepares generated artifacts for review.",
-      )}</label>
-        <input type="text" id="s-target-build-command"
-               data-testid="target-app-build-command"
-               placeholder="./.refine/manage-app.sh build"
-               value="${htmlEscape(s.target_app_build_command || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Test command",
-        "application-test",
-        "one-line shell command that runs target-app tests for workflow QA.",
-      )}</label>
-        <input type="text" id="s-target-test-command"
-               data-testid="target-app-test-command"
-               placeholder="./.refine/manage-app.sh test"
-               value="${htmlEscape(s.target_app_test_command || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Automatic application build",
-        "application-auto-build",
-        "controls when Refine builds merged work before it becomes ready for review.",
-      )}</label>
-        <select id="s-target-auto-build">
+      ${renderSettingsEditableField({
+        id: "s-target-app-url",
+        label: "App URL",
+        guideItemId: "application-url",
+        description: "opened from the status indicator when the app is running.",
+        valueLabel: s.target_app_url || "",
+        control: `<input type="url" id="s-target-app-url"
+                         data-testid="target-app-url"
+                         placeholder="http://localhost:3000"
+                         value="${htmlEscape(s.target_app_url || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-start-command",
+        label: "Start command",
+        guideItemId: "application-start",
+        description: "one-line shell command that starts the app and returns promptly.",
+        valueLabel: s.target_app_start_command || "",
+        control: `<input type="text" id="s-target-start-command"
+                         data-testid="target-app-start-command"
+                         placeholder="./.refine/manage-app.sh start"
+                         value="${htmlEscape(s.target_app_start_command || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-stop-command",
+        label: "Stop command",
+        guideItemId: "application-stop",
+        description: "one-line shell command that stops the app; should be idempotent when practical.",
+        valueLabel: s.target_app_stop_command || "",
+        control: `<input type="text" id="s-target-stop-command"
+                         data-testid="target-app-stop-command"
+                         placeholder="./.refine/manage-app.sh stop"
+                         value="${htmlEscape(s.target_app_stop_command || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-build-command",
+        label: "Build command",
+        guideItemId: "application-build",
+        description: "one-line shell command that prepares generated artifacts for review.",
+        valueLabel: s.target_app_build_command || "",
+        control: `<input type="text" id="s-target-build-command"
+                         data-testid="target-app-build-command"
+                         placeholder="./.refine/manage-app.sh build"
+                         value="${htmlEscape(s.target_app_build_command || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-test-command",
+        label: "Test command",
+        guideItemId: "application-test",
+        description: "one-line shell command that runs target-app tests for workflow QA.",
+        valueLabel: s.target_app_test_command || "",
+        control: `<input type="text" id="s-target-test-command"
+                         data-testid="target-app-test-command"
+                         placeholder="./.refine/manage-app.sh test"
+                         value="${htmlEscape(s.target_app_test_command || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-auto-build",
+        label: "Automatic application build",
+        guideItemId: "application-auto-build",
+        description: "controls when Refine builds merged work before it becomes ready for review.",
+        valueLabel: targetAppAutoBuildLabel(autoBuildMode),
+        control: `<select id="s-target-auto-build">
           ${[
             ["never", "Never"],
             ["on_worktree_merge", "On worktree merge"],
             ["hourly", "Hourly"],
             ["daily", "Daily (time)"],
           ].map(([v, lbl]) => `<option value="${v}" ${autoBuildMode === v ? "selected" : ""}>${lbl}</option>`).join("")}
-        </select></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Daily build time",
-        "application-auto-build-time",
-        "UTC whole-hour time used when automatic build is Daily.",
-      )}</label>
-        <select id="s-target-auto-build-hour-utc"
-                ${autoBuildMode === "daily" ? "" : "disabled"}>
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-auto-build-hour-utc",
+        label: "Daily build time",
+        guideItemId: "application-auto-build-time",
+        description: "UTC whole-hour time used when automatic build is Daily.",
+        valueLabel: `${String(autoBuildHour).padStart(2, "0")}:00 UTC`,
+        control: `<select id="s-target-auto-build-hour-utc"
+                          ${autoBuildMode === "daily" ? "" : "disabled"}>
           ${Array.from({ length: 24 }, (_, hour) => {
             const value = String(hour);
             const label = `${String(hour).padStart(2, "0")}:00 UTC`;
-            return `<option value="${value}" ${String(s.target_app_auto_build_hour_utc || "0") === value ? "selected" : ""}>${label}</option>`;
+            return `<option value="${value}" ${autoBuildHour === value ? "selected" : ""}>${label}</option>`;
           }).join("")}
-        </select></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Status command",
-        "application-status",
-        "exit 0 only when the app is healthy or running.",
-      )}</label>
-        <input type="text" id="s-target-status-command"
-               data-testid="target-app-status-command"
-               placeholder="./.refine/manage-app.sh status"
-               value="${htmlEscape(s.target_app_status_command || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Working directory",
-        "application-working-directory",
-        "repo-relative path, or blank for repo root.",
-      )}</label>
-        <input type="text" id="s-target-cwd"
-               data-testid="target-app-cwd"
-               placeholder="."
-               value="${htmlEscape(s.target_app_cwd || "")}"></div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Environment overrides",
-        "application-environment",
-        "JSON object merged into the host environment.",
-      )}</label>
-        <textarea id="s-target-env" data-testid="target-app-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea></div>
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-status-command",
+        label: "Status command",
+        guideItemId: "application-status",
+        description: "exit 0 only when the app is healthy or running.",
+        valueLabel: s.target_app_status_command || "",
+        control: `<input type="text" id="s-target-status-command"
+                         data-testid="target-app-status-command"
+                         placeholder="./.refine/manage-app.sh status"
+                         value="${htmlEscape(s.target_app_status_command || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-cwd",
+        label: "Working directory",
+        guideItemId: "application-working-directory",
+        description: "repo-relative path, or blank for repo root.",
+        valueLabel: s.target_app_cwd || "",
+        control: `<input type="text" id="s-target-cwd"
+                         data-testid="target-app-cwd"
+                         placeholder="."
+                         value="${htmlEscape(s.target_app_cwd || "")}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-target-env",
+        label: "Environment overrides",
+        guideItemId: "application-environment",
+        description: "JSON object merged into the host environment.",
+        valueLabel: s.target_app_env_json || "{}",
+        control: `<textarea id="s-target-env" data-testid="target-app-env" rows="3" placeholder='{"PORT":"3000"}'>${htmlEscape(s.target_app_env_json || "{}")}</textarea>`,
+      })}
       <div class="form-grid two">
-        <div class="form-row"><label>${renderSettingsGuideLabel("Start timeout (s)", "application-start-timeout")}</label>
-          <input type="number" id="s-target-start-timeout" data-testid="target-app-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("Stop timeout (s)", "application-stop-timeout")}</label>
-          <input type="number" id="s-target-stop-timeout" data-testid="target-app-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("Build timeout (s)", "application-build-timeout")}</label>
-          <input type="number" id="s-target-build-timeout" data-testid="target-app-build-timeout" value="${htmlEscape(s.target_app_build_timeout_seconds || "300")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("Test timeout (s)", "application-test-timeout")}</label>
-          <input type="number" id="s-target-test-timeout" data-testid="target-app-test-timeout" value="${htmlEscape(s.target_app_test_timeout_seconds || "600")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("Status timeout (s)", "application-status-timeout")}</label>
-          <input type="number" id="s-target-status-timeout" data-testid="target-app-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("Log path", "application-log-path")}</label>
-          <input type="text" id="s-target-log-path" data-testid="target-app-log-path" value="${htmlEscape(s.target_app_log_path || "")}"></div>
+        ${renderSettingsEditableField({
+          id: "s-target-start-timeout",
+          label: "Start timeout (s)",
+          guideItemId: "application-start-timeout",
+          valueLabel: s.target_app_start_timeout_seconds || "120",
+          control: `<input type="number" id="s-target-start-timeout" data-testid="target-app-start-timeout" value="${htmlEscape(s.target_app_start_timeout_seconds || "120")}">`,
+        })}
+        ${renderSettingsEditableField({
+          id: "s-target-stop-timeout",
+          label: "Stop timeout (s)",
+          guideItemId: "application-stop-timeout",
+          valueLabel: s.target_app_stop_timeout_seconds || "60",
+          control: `<input type="number" id="s-target-stop-timeout" data-testid="target-app-stop-timeout" value="${htmlEscape(s.target_app_stop_timeout_seconds || "60")}">`,
+        })}
+        ${renderSettingsEditableField({
+          id: "s-target-build-timeout",
+          label: "Build timeout (s)",
+          guideItemId: "application-build-timeout",
+          valueLabel: s.target_app_build_timeout_seconds || "300",
+          control: `<input type="number" id="s-target-build-timeout" data-testid="target-app-build-timeout" value="${htmlEscape(s.target_app_build_timeout_seconds || "300")}">`,
+        })}
+        ${renderSettingsEditableField({
+          id: "s-target-test-timeout",
+          label: "Test timeout (s)",
+          guideItemId: "application-test-timeout",
+          valueLabel: s.target_app_test_timeout_seconds || "600",
+          control: `<input type="number" id="s-target-test-timeout" data-testid="target-app-test-timeout" value="${htmlEscape(s.target_app_test_timeout_seconds || "600")}">`,
+        })}
+        ${renderSettingsEditableField({
+          id: "s-target-status-timeout",
+          label: "Status timeout (s)",
+          guideItemId: "application-status-timeout",
+          valueLabel: s.target_app_status_timeout_seconds || "10",
+          control: `<input type="number" id="s-target-status-timeout" data-testid="target-app-status-timeout" value="${htmlEscape(s.target_app_status_timeout_seconds || "10")}">`,
+        })}
+        ${renderSettingsEditableField({
+          id: "s-target-log-path",
+          label: "Log path",
+          guideItemId: "application-log-path",
+          valueLabel: s.target_app_log_path || "",
+          control: `<input type="text" id="s-target-log-path" data-testid="target-app-log-path" value="${htmlEscape(s.target_app_log_path || "")}">`,
+        })}
       </div>
       <h4 style="margin:16px 0 8px">Optional checks</h4>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "HTTP check URL",
-        "application-http-check-url",
-        "optional; 2xx means healthy. Runs on the host.",
-      )}</label>
-        <input type="text" id="s-target-http-url"
-               data-testid="target-app-http-url"
-               placeholder="http://localhost:3000/health"
-               value="${htmlEscape(s.target_app_http_check_url || s.target_app_health_url || "")}"></div>
+      ${renderSettingsEditableField({
+        id: "s-target-http-url",
+        label: "HTTP check URL",
+        guideItemId: "application-http-check-url",
+        description: "optional; 2xx means healthy. Runs on the host.",
+        valueLabel: s.target_app_http_check_url || s.target_app_health_url || "",
+        control: `<input type="text" id="s-target-http-url"
+                         data-testid="target-app-http-url"
+                         placeholder="http://localhost:3000/health"
+                         value="${htmlEscape(s.target_app_http_check_url || s.target_app_health_url || "")}">`,
+      })}
       <div class="form-grid two">
-        <div class="form-row"><label>${renderSettingsGuideLabel("TCP host", "application-tcp-host")}</label>
-          <input type="text" id="s-target-tcp-host" data-testid="target-app-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}"></div>
-        <div class="form-row"><label>${renderSettingsGuideLabel("TCP port", "application-tcp-port")}</label>
-          <input type="number" id="s-target-tcp-port" data-testid="target-app-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}"></div>
+        ${renderSettingsEditableField({
+          id: "s-target-tcp-host",
+          label: "TCP host",
+          guideItemId: "application-tcp-host",
+          valueLabel: s.target_app_tcp_check_host || "",
+          control: `<input type="text" id="s-target-tcp-host" data-testid="target-app-tcp-host" value="${htmlEscape(s.target_app_tcp_check_host || "")}">`,
+        })}
+        ${renderSettingsEditableField({
+          id: "s-target-tcp-port",
+          label: "TCP port",
+          guideItemId: "application-tcp-port",
+          valueLabel: s.target_app_tcp_check_port || "",
+          control: `<input type="number" id="s-target-tcp-port" data-testid="target-app-tcp-port" value="${htmlEscape(s.target_app_tcp_check_port || "")}">`,
+        })}
       </div>
-      <div class="form-row"><label>${renderSettingsGuideLabel(
-        "Process check command",
-        "application-process-check-command",
-        "optional one-line command; exit 0 when the expected process exists.",
-      )}</label>
-        <input type="text" id="s-target-process-command"
-               data-testid="target-app-process-command"
-               value="${htmlEscape(s.target_app_process_check_command || "")}"></div>
+      ${renderSettingsEditableField({
+        id: "s-target-process-command",
+        label: "Process check command",
+        guideItemId: "application-process-check-command",
+        description: "optional one-line command; exit 0 when the expected process exists.",
+        valueLabel: s.target_app_process_check_command || "",
+        control: `<input type="text" id="s-target-process-command"
+                         data-testid="target-app-process-command"
+                         value="${htmlEscape(s.target_app_process_check_command || "")}">`,
+      })}
       <div class="form-row" id="s-target-notes-row" style="display:none"><label>Generated notes</label>
         <p class="muted small" id="s-target-notes" data-testid="target-app-notes"></p></div>
     </section>`;
@@ -424,13 +502,16 @@ function bindNodeApplicationConfigControls() {
   if (autoBuild && autoBuildHour) {
     autoBuild.addEventListener("change", () => {
       autoBuildHour.disabled = autoBuild.value !== "daily";
+      syncSettingsEditableDisabled(autoBuildHour);
     });
   }
   bindSettingsAutosave(
     root,
-    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-build-command, #s-target-auto-build, #s-target-auto-build-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-build-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
+    "#s-subpath, #s-merge-target, #s-target-app-url, #s-target-start-command, #s-target-stop-command, #s-target-build-command, #s-target-test-command, #s-target-auto-build, #s-target-auto-build-hour-utc, #s-target-status-command, #s-target-cwd, #s-target-env, #s-target-start-timeout, #s-target-stop-timeout, #s-target-build-timeout, #s-target-test-timeout, #s-target-status-timeout, #s-target-log-path, #s-target-http-url, #s-target-tcp-host, #s-target-tcp-port, #s-target-process-command",
     autosaveSettingsApplication,
+    { event: "settings-editable-commit" },
   );
+  bindSettingsEditableFields(root);
 }
 
 function bindSettingsApplicationTab(currentProject) {
