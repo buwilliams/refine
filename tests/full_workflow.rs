@@ -23,7 +23,7 @@ fn daemon_automation_runs_full_gap_workflow_through_git_worktree() {
         serde_json::json!({
             "agent_cli": "smoke-ai",
             "quality_enabled": "1",
-            "quality_regressions_enabled": "0",
+            "target_app_test_command": "printf target-tests-ok",
             "branch_name_pattern": "refine/{gap_id}"
         }),
     );

@@ -112,7 +112,7 @@ Nav & Guide: Manage Drop-down
 			Target App Config
 				Scope label, Copy from node, Generate with AI
 				Application scope: agent subpath, merge target branch
-				Target app: URL, start/stop/build/status commands, automatic build (never/on merge/hourly/daily), daily build hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
+				Target app: URL, start/stop/build/test/status commands, automatic build (never/on merge/hourly/daily), daily build hour, working directory, environment overrides (JSON), timeouts, log path, generated notes
 				Optional checks: HTTP URL, TCP host + port, process check command
 			Refine Runtime Config
 				Scope label, Copy from node
@@ -127,7 +127,7 @@ Nav & Guide: Manage Drop-down
 				Rules: list (text input + Remove per rule), Add rule, Generate rules (needs product + constitution), autosave
 			Quality
 				Quality gate: QA enabled toggle, timing (pre_merge / post_build)
-				Regression checks: enabled toggle, New regression (modal), Run current checkout, list (title/desc/spec path, last-run status, screenshot thumbnail, enable/disable, Delete), autosave
+				Target-app tests: configured target-app test command summary, Configure action
 				Business requirements + Instructions (markdown fields)
 				Incomplete warning banner if requirements/instructions missing
 			Guidance
@@ -150,8 +150,8 @@ Nav: Command Palette
 		Changes: clear filters
 		Logs: clear filters
 		System: Pause/unpause agents, Hard reset worktree (danger), Rebuild projection cache, Clean up old activity logs (days)
-		Application: target app start/stop/build/sync/check status
-		Quality: create regression, run regressions on current checkout
+		Application: target app start/stop/build/test/sync/check status
+		Quality: configure QA gate and target-app tests
 		Runtime: re-check auth
 		Settings: copy application/runtime settings from node
 		Support: Request refine feature/bugfix
@@ -263,7 +263,7 @@ Implementation Internals (for e2e testing)
 			Verify / Verify selected: a review gap assigned to the currently selected reporter
 			←QA / ←Merge buttons: only on failed gaps in quality-retry / merge-retry context
 			Bulk transfer/assign: skip in-progress·qa·ready-merge·build and other-node gaps
-			Generate rules: product + constitution both filled; Run regressions: ≥1 regression defined
+			Generate rules: product + constitution both filled; QA: target-app test command configured
 			Node / Governance surfaces: an attached project; Application controls: supervisor/registry enabled
 		Oracles — non-obvious success states to assert
 			Verify → status becomes done; Cancel Feature keeps done gaps, cancels non-terminal ones
@@ -349,7 +349,7 @@ Implementation Internals (for e2e testing)
 		Gaps: /api/gaps, /api/gaps/:id, /api/gaps/:id/rounds(/latest), /api/gaps/:id/verify|cancel|retry-quality|retry-merge, /api/gaps/bulk, /api/gaps/bulk/delete
 		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/gaps/:id(/reorder), /api/features/:id/gaps/bulk
 		Dashboard/lists: /api/dashboard, /api/changes(/undo), /api/activity(/cleanup|/ui-error), /api/performance(/cleanup), /api/diagnostics
-		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/regressions(/:id|/run)), /api/guidance
+		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/checks|/screenshots), /api/guidance
 		Import/operations: /api/import/extract|csv/parse|dedup|persist, /api/operations/:id(/cancel)
 		Processes/runner: /api/processes(/agents|/background), /api/agents, /api/runner-workers/merger/hard-reset-worktree, /api/runner-workers/target-app-builder/build, /api/cache/rebuild
 		Files: /api/files/tree|read|search

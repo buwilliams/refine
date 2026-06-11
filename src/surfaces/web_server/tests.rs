@@ -3450,11 +3450,10 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
 }
 
 #[test]
-fn web_server_manages_quality_settings_and_regressions() {
+fn web_server_manages_quality_settings_and_checks() {
     let temp_root = unique_temp_dir("http-quality");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
-    write_fake_playwright(&temp_root, 0);
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
@@ -3462,7 +3461,10 @@ fn web_server_manages_quality_settings_and_regressions() {
     let app_settings = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
-        body: Some(json!({"target_app_url": "http://127.0.0.1:3000"})),
+        body: Some(json!({
+            "target_app_url": "http://127.0.0.1:3000",
+            "target_app_test_command": "printf target-test-ok"
+        })),
     });
     assert_eq!(app_settings.status, 200);
 
@@ -3481,7 +3483,6 @@ fn web_server_manages_quality_settings_and_regressions() {
         body: Some(json!({
             "enabled": "1",
             "timing": "post_build",
-            "regressions_enabled": true,
             "business_requirements": "Dashboard must render",
             "instructions": "Run focused checks"
         })),
@@ -3489,7 +3490,6 @@ fn web_server_manages_quality_settings_and_regressions() {
     assert_eq!(saved.status, 200);
     assert_eq!(saved.body["enabled"], "1");
     assert_eq!(saved.body["timing"], "post_build");
-    assert_eq!(saved.body["regressions_enabled"], "1");
     assert_eq!(saved.body["configured"], true);
 
     let checks = server.handle(ApiRequest {
@@ -3522,42 +3522,6 @@ fn web_server_manages_quality_settings_and_regressions() {
             .any(|log| log.message == "Quality checks passed")
     );
 
-    let created = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/quality/regressions".to_string(),
-        body: Some(json!({
-            "title": "Dashboard smoke",
-            "prompt": "Open the dashboard",
-            "description": "Dashboard scenario"
-        })),
-    });
-    assert_eq!(created.status, 201);
-    assert_eq!(created.body["regression"]["id"], "dashboard-smoke");
-    assert!(
-        refine_dir
-            .join("regressions/specs/dashboard-smoke.spec.cjs")
-            .exists()
-    );
-
-    let run = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/quality/regressions/run".to_string(),
-        body: Some(json!({})),
-    });
-    assert_eq!(run.status, 200);
-    assert_eq!(run.body["ok"], true);
-    assert_eq!(run.body["runs"].as_array().unwrap().len(), 1);
-    assert_eq!(
-        run.body["runs"][0]["message"],
-        "Playwright regression passed"
-    );
-    assert!(
-        run.body["runs"][0]["json_report_path"]
-            .as_str()
-            .unwrap()
-            .ends_with("report.json")
-    );
-
     let screenshots = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/quality/screenshots?owner_id=GAP1".to_string(),
@@ -3565,12 +3529,12 @@ fn web_server_manages_quality_settings_and_regressions() {
     });
     assert_eq!(screenshots.status, 200);
     assert_eq!(screenshots.body["owner_id"], "GAP1");
-    assert_eq!(screenshots.body["screenshot_count"], 1);
+    assert_eq!(screenshots.body["screenshot_count"], 0);
     assert!(
-        screenshots.body["screenshots"][0]
-            .as_str()
+        screenshots.body["screenshots"]
+            .as_array()
             .unwrap()
-            .ends_with("screenshot.png")
+            .is_empty()
     );
 
     let listed = server.handle(ApiRequest {
@@ -3579,23 +3543,7 @@ fn web_server_manages_quality_settings_and_regressions() {
         body: None,
     });
     assert_eq!(listed.status, 200);
-    assert_eq!(listed.body["regressions"][0]["latest_run"]["ok"], true);
-
-    let disabled = server.handle(ApiRequest {
-        method: "PATCH".to_string(),
-        path: "/api/quality/regressions/dashboard-smoke".to_string(),
-        body: Some(json!({"enabled": false})),
-    });
-    assert_eq!(disabled.status, 200);
-    assert_eq!(disabled.body["regression"]["enabled"], false);
-
-    let deleted = server.handle(ApiRequest {
-        method: "DELETE".to_string(),
-        path: "/api/quality/regressions/dashboard-smoke".to_string(),
-        body: None,
-    });
-    assert_eq!(deleted.status, 200);
-    assert_eq!(deleted.body["ok"], true);
+    assert!(listed.body.get("regressions").is_none());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -4444,7 +4392,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(
         temp_root.join("package.json"),
-        r#"{"scripts":{"dev":"vite","build":"vite build"}}"#,
+        r#"{"scripts":{"dev":"vite","build":"vite build","test":"vitest run"}}"#,
     )
     .unwrap();
     let mut server = server_with_projection();
@@ -4673,10 +4621,15 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
         generated.body["settings"]["target_app_build_command"],
         "./.refine/manage-app.sh build"
     );
+    assert_eq!(
+        generated.body["settings"]["target_app_test_command"],
+        "./.refine/manage-app.sh test"
+    );
     assert_eq!(generated.body["config"]["tcp_check_port"], "3000");
     let wrapper = fs::read_to_string(temp_root.join(".refine/manage-app.sh")).unwrap();
     assert!(wrapper.contains("START_COMMAND='npm run dev'"));
     assert!(wrapper.contains("BUILD_COMMAND='npm run build'"));
+    assert!(wrapper.contains("TEST_COMMAND='npm test'"));
 
     let generated_operation = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -4702,6 +4655,10 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert_eq!(
         settings["target_app_start_command"],
         "./.refine/manage-app.sh start"
+    );
+    assert_eq!(
+        settings["target_app_test_command"],
+        "./.refine/manage-app.sh test"
     );
 
     let rebuild = server.handle(ApiRequest {
@@ -4948,25 +4905,6 @@ fn wait_for_chat_read_line(
         path: format!("/api/chat/{session_id}/read"),
         body: None,
     })
-}
-
-fn write_fake_playwright(root: &Path, exit_code: i32) {
-    let bin_dir = root.join("node_modules/.bin");
-    fs::create_dir_all(&bin_dir).unwrap();
-    let path = bin_dir.join("playwright");
-    let mut file = fs::File::create(&path).unwrap();
-    writeln!(
-            file,
-            "#!/bin/sh\nprintf '%s\\n' '{{\"status\":\"passed\"}}'\nif [ -n \"$REFINE_REGRESSION_SCREENSHOT\" ]; then printf 'png' > \"$REFINE_REGRESSION_SCREENSHOT\"; fi\nexit {exit_code}"
-        )
-        .unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&path).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&path, permissions).unwrap();
-    }
 }
 
 fn write_fake_provider(refine_dir: &Path, name: &str, exit_code: i32, output: &str) {

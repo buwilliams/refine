@@ -99,9 +99,9 @@ fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
     format!(
         "Analyze this target app codebase and generate lifecycle commands for Refine to wrap. \
          Return only JSON with kind=target-app and fields start_command, stop_command, \
-         build_command, status_command, cwd, env, \
+         build_command, test_command, status_command, cwd, env, \
          start_timeout_seconds, stop_timeout_seconds, build_timeout_seconds, \
-         status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
+         test_timeout_seconds, status_timeout_seconds, log_path, http_check_url, tcp_check_host, tcp_check_port, \
          process_check_command, and notes. Do not write files; Refine will write \
          .refine/manage-app.sh from your analysis.\n\nProject root: {}",
         target_root.display()
@@ -249,20 +249,27 @@ fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedC
         .unwrap_or_default();
     let start_command = target_config_string(cfg, "start_command", "");
     let build_command = target_config_string(cfg, "build_command", "");
+    let test_command = target_config_string(cfg, "test_command", "");
     let status_command = target_config_string(cfg, "status_command", "");
-    if start_command.is_empty() && build_command.is_empty() && status_command.is_empty() {
+    if start_command.is_empty()
+        && build_command.is_empty()
+        && test_command.is_empty()
+        && status_command.is_empty()
+    {
         return None;
     }
     Some(TargetAppGeneratedConfig {
         start_command,
         stop_command: target_config_string(cfg, "stop_command", ""),
         build_command,
+        test_command,
         status_command,
         cwd: target_config_string(cfg, "cwd", "."),
         env,
         start_timeout_seconds: target_config_u64(cfg, "start_timeout_seconds", 120),
         stop_timeout_seconds: target_config_u64(cfg, "stop_timeout_seconds", 60),
         build_timeout_seconds: target_config_u64(cfg, "build_timeout_seconds", 300),
+        test_timeout_seconds: target_config_u64(cfg, "test_timeout_seconds", 600),
         status_timeout_seconds: target_config_u64(cfg, "status_timeout_seconds", 10),
         log_path: target_config_string(cfg, "log_path", ""),
         http_check_url: target_config_string(cfg, "http_check_url", ""),
@@ -278,12 +285,14 @@ fn target_app_generated_settings(config: &TargetAppGeneratedConfig) -> Value {
         "target_app_start_command": config.start_command.clone(),
         "target_app_stop_command": config.stop_command.clone(),
         "target_app_build_command": config.build_command.clone(),
+        "target_app_test_command": config.test_command.clone(),
         "target_app_status_command": config.status_command.clone(),
         "target_app_cwd": config.cwd.clone(),
         "target_app_env_json": serde_json::to_string_pretty(&config.env).unwrap_or_else(|_| "{}".to_string()),
         "target_app_start_timeout_seconds": config.start_timeout_seconds.to_string(),
         "target_app_stop_timeout_seconds": config.stop_timeout_seconds.to_string(),
         "target_app_build_timeout_seconds": config.build_timeout_seconds.to_string(),
+        "target_app_test_timeout_seconds": config.test_timeout_seconds.to_string(),
         "target_app_status_timeout_seconds": config.status_timeout_seconds.to_string(),
         "target_app_log_path": config.log_path.clone(),
         "target_app_http_check_url": config.http_check_url.clone(),

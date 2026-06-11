@@ -207,7 +207,10 @@ function settingsSurfaceDataNeeds(surface, slug) {
       needs.performance = true;
     }
   } else if (surface === SETTINGS_SURFACES.project) {
-    if (slug === "quality") needs.quality = true;
+    if (slug === "quality") {
+      needs.quality = true;
+      needs.settings = true;
+    }
     else if (slug === "governance") needs.governance = true;
     else if (slug === "guidance") needs.guidance = true;
   }
@@ -232,7 +235,7 @@ function detachedSettingsSurfaceData(project = {}) {
     reps: [],
     project: project || {},
     gov: {},
-    quality: { regressions: [] },
+    quality: {},
     dash: {},
     nodes: nodeList,
     nodeCounts: {},
@@ -435,8 +438,6 @@ function setSettingsControlValue(el, value) {
     el.classList.toggle("warn", !enabled);
     if (el.id === "s-quality-enabled") {
       el.textContent = enabled ? "QA enabled" : "QA disabled";
-    } else if (el.id === "s-quality-regressions-enabled") {
-      el.textContent = enabled ? "Regressions enabled" : "Regressions disabled";
     }
   } else if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
     el.checked = value === "1";
@@ -879,7 +880,7 @@ function renderSettingsTabBody(surface, slug, data) {
     }
   }
   if (surface === SETTINGS_SURFACES.project) {
-    if (slug === "quality") return renderSettingsQualityTab(data.quality);
+    if (slug === "quality") return renderSettingsQualityTab(data.quality, data.s);
     if (slug === "governance") return renderSettingsGovernanceTab(data.gov);
     if (slug === "guidance") return renderSettingsGuidanceTab(data.guidanceItems);
   }

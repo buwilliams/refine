@@ -1231,40 +1231,6 @@ ensure_provider_cli() {
   return 1
 }
 
-ensure_playwright_headless() {
-  section "Playwright"
-  local default_answer="y"
-  if [ "$REFINE_UPGRADED" = "1" ]; then
-    default_answer="n"
-  fi
-  if ! confirm "Install or repair Playwright Chromium for regression screenshots" "$default_answer"; then
-    warn "Skipped Playwright. Managed regression screenshots may fail until Playwright is installed."
-    return 0
-  fi
-  ensure_node_for_provider || true
-  if ! have npx; then
-    warn_issue \
-      "Playwright Chromium install" \
-      "Managed regression screenshots use Playwright Chromium." \
-      "Install Node.js/npm 18+, then run: npx --yes playwright install --with-deps chromium" \
-      "npx is missing. Install Node.js/npm 18+, then run: npx --yes playwright install --with-deps chromium"
-    return 0
-  fi
-  if dry_run; then
-    log_detail "${DIM}+ npx --yes playwright install --with-deps chromium${RESET}"
-    return 0
-  fi
-  if npx --yes playwright install --with-deps chromium; then
-    ok "Playwright Chromium ready"
-  else
-    warn_issue \
-      "Playwright Chromium install" \
-      "Managed regression screenshots use Playwright Chromium." \
-      "Run manually: npx --yes playwright install --with-deps chromium" \
-      "Playwright install failed. Run manually: npx --yes playwright install --with-deps chromium"
-  fi
-}
-
 ensure_rootless_docker() {
   if have docker && docker info >/dev/null 2>&1; then
     ok "Docker is reachable"
@@ -1907,7 +1873,6 @@ main() {
   fi
 
   provider_flow
-  ensure_playwright_headless
   choose_target_app
   ensure_rootless_docker
   target_refine

@@ -75,7 +75,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/quality",
-        capability: "checks, regressions, screenshots",
+        capability: "checks and screenshots",
     },
     ApiRouteGroup {
         prefix: "/chat",

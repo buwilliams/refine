@@ -420,13 +420,6 @@
   min-height: 150px;
   resize: vertical;
 }
-.regression-create-modal {
-  max-width: 560px;
-}
-.regression-create-modal textarea {
-  min-height: 150px;
-  resize: vertical;
-}
 @keyframes modal-fade {
   from { opacity: 0; }
   to   { opacity: 1; }

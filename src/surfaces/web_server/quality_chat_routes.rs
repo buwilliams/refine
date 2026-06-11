@@ -95,6 +95,7 @@ impl InProcessWebServer {
             "has_start_command": !get("target_app_start_command").trim().is_empty(),
             "has_stop_command": !get("target_app_stop_command").trim().is_empty(),
             "has_build_command": !get("target_app_build_command").trim().is_empty(),
+            "has_test_command": !get("target_app_test_command").trim().is_empty(),
             "has_status_checks": !get("target_app_status_command").trim().is_empty()
                 || !get("target_app_http_check_url").trim().is_empty()
                 || !get("target_app_tcp_check_host").trim().is_empty()
@@ -181,16 +182,10 @@ impl InProcessWebServer {
             .and_then(|value| value.as_str())
             .unwrap_or("")
             .to_string();
-        let browser_required = body
-            .get("browser_required")
-            .or_else(|| body.get("browser"))
-            .and_then(|value| value.as_bool())
-            .unwrap_or(false);
         match QualityOperationRunner::new(&refine_dir, runtime_root).run_checks(
             QualityCheckRequest {
                 owner_id,
                 command,
-                browser_required,
                 process_metadata: Default::default(),
             },
         ) {
@@ -231,76 +226,6 @@ impl InProcessWebServer {
                     }),
                 )
             }
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_quality_regression_create(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "create quality regressions");
-        let body = request.body.unwrap_or_else(|| json!({}));
-        let title = body
-            .get("title")
-            .and_then(|value| value.as_str())
-            .unwrap_or("");
-        let prompt = body
-            .get("prompt")
-            .and_then(|value| value.as_str())
-            .unwrap_or("");
-        let description = body
-            .get("description")
-            .and_then(|value| value.as_str())
-            .unwrap_or("");
-        match FileQualityService::new(&refine_dir).create_regression(title, description, prompt) {
-            Ok(regression) => {
-                append_quality_activity(
-                    &refine_dir,
-                    format!("Regression created: {}", regression.title),
-                );
-                ApiResponse::json(201, json!({"ok": true, "regression": regression}))
-            }
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_quality_regression_update(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "update quality regressions");
-        let Some(regression_id) = request
-            .path
-            .strip_prefix("/quality/regressions/")
-            .filter(|regression_id| !regression_id.is_empty() && !regression_id.contains('/'))
-        else {
-            return regression_id_required();
-        };
-        let body = request.body.unwrap_or_else(|| json!({}));
-        match FileQualityService::new(refine_dir).update_regression(regression_id, &body) {
-            Ok(regression) => ApiResponse::json(200, json!({"ok": true, "regression": regression})),
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_quality_regression_delete(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "delete quality regressions");
-        let Some(regression_id) = request
-            .path
-            .strip_prefix("/quality/regressions/")
-            .filter(|regression_id| !regression_id.is_empty() && !regression_id.contains('/'))
-        else {
-            return regression_id_required();
-        };
-        match FileQualityService::new(refine_dir).delete_regression(regression_id) {
-            Ok(()) => ApiResponse::json(200, json!({"ok": true})),
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_quality_regression_run(&self) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "run quality regressions");
-        let Some(runtime_root) = &self.runtime_root else {
-            return runtime_root_unavailable("run quality regressions");
-        };
-        match FileQualityService::with_runtime_root(refine_dir, runtime_root).run_regressions(true)
-        {
-            Ok(result) => ApiResponse::json(200, json!(result)),
             Err(error) => error_response(error),
         }
     }

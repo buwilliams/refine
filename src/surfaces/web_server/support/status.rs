@@ -138,18 +138,6 @@ pub(in crate::surfaces::web_server) fn agent_provider_from_path<'a>(
         .filter(|provider| !provider.is_empty() && !provider.contains('/'))
 }
 
-pub(in crate::surfaces::web_server) fn regression_id_required() -> ApiResponse {
-    ApiResponse::json(
-        404,
-        json!({
-            "error": {
-                "code": "not_found",
-                "message": "Regression route requires a regression id"
-            }
-        }),
-    )
-}
-
 pub(in crate::surfaces::web_server) fn chat_session_id_required() -> ApiResponse {
     ApiResponse::json(
         404,

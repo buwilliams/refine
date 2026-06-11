@@ -96,9 +96,9 @@ Installer day: guided Quick Start, setup mode, Plan chat, and supervised app-swi
 
 Effort: Very High (32 commits, 4 milestones)
 
-Milestones started: installer polish and repo reorganization; Typer CLI; command palette and Playwright regressions; semver release and upgrade path.
+Milestones started: installer polish and repo reorganization; Typer CLI; command palette and managed QA checks; semver release and upgrade path.
 
-Product polish and UI platform work: installer defaults, docs/script reorganization, README simplification, Typer CLI migration, design-system refinements, mobile table fixes, System tab controls, command palette, GitHub issue shortcut, managed Playwright regression checks, hype-video planning, and published-release upgrade detection with local-development safeguards.
+Product polish and UI platform work: installer defaults, docs/script reorganization, README simplification, Typer CLI migration, design-system refinements, mobile table fixes, System tab controls, command palette, GitHub issue shortcut, managed QA checks, hype-video planning, and published-release upgrade detection with local-development safeguards.
 
 ## Day 14: 2026-05-26 (Tuesday)
 
@@ -202,7 +202,7 @@ Effort: Medium (8 commits, 2 milestones)
 
 Milestones started: Rust integration-test specification; deterministic surface harness.
 
-The integration-test strategy became executable: the obsolete 2.x spec was removed, the new Rust integration spec landed, and the harness grew from design into real coverage. Smoke AI, native Rust CLI tests, Playwright UI tests, support fixtures, and workflow-focused integration cases established a deterministic public-surface test path for the Rust implementation.
+The integration-test strategy became executable: the obsolete 2.x spec was removed, the new Rust integration spec landed, and the harness grew from design into real coverage. Smoke AI, native Rust CLI tests, support fixtures, and workflow-focused integration cases established a deterministic public-surface test path for the Rust implementation.
 
 ## Day 27: 2026-06-08 (Monday)
 
@@ -210,4 +210,4 @@ Effort: Extreme (52 commits, 7 milestones)
 
 Milestones started: full Rust release gate; multi-instance and cluster coverage; target-app and chat workflow fixes; installer/release hardening; UI regression cleanup; manual Docker release testing; 3.0 patch releases.
 
-The Rust stack was pushed through release-grade hardening: `cargo test` now drives the full suite, Smoke AI stdin handling and fixture isolation were fixed, true multi-instance sync and Docker-backed cluster/install tests landed, and daemon-backed workflow coverage exercises real Git worktrees. Product fixes kept pace with target-app AI generation, wrapper generation, stale process cleanup, all-node filtering, Changes/Logs visualization polish, chat-session process visibility, standalone chat-to-Gap drafting, duplicate transcript prevention, and mutation-cache race fixes. Installer and release behavior tightened around deployed release binaries, port-scoped install services, automated migrations, system update routing, and 3.0 patch releases, while manual Docker tooling created an ephemeral Linux install environment with host-visible Refine ports and Docker-safe bind defaults. The long Playwright paths covering Features, Gaps, CSV import, chat, governance, and Settings were stabilized before the next patch release.
+The Rust stack was pushed through release-grade hardening: `cargo test` now drives the full suite, Smoke AI stdin handling and fixture isolation were fixed, true multi-instance sync and Docker-backed cluster/install tests landed, and daemon-backed workflow coverage exercises real Git worktrees. Product fixes kept pace with target-app AI generation, wrapper generation, stale process cleanup, all-node filtering, Changes/Logs visualization polish, chat-session process visibility, standalone chat-to-Gap drafting, duplicate transcript prevention, and mutation-cache race fixes. Installer and release behavior tightened around deployed release binaries, port-scoped install services, automated migrations, system update routing, and 3.0 patch releases, while manual Docker tooling created an ephemeral Linux install environment with host-visible Refine ports and Docker-safe bind defaults. Long UI and workflow paths covering Features, Gaps, CSV import, chat, governance, and Settings were stabilized before the next patch release.

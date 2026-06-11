@@ -496,22 +496,6 @@ impl InProcessWebServer {
             return self.handle_quality_screenshots(&raw_path);
         }
 
-        if request.method == "POST" && request.path == "/quality/regressions" {
-            return self.handle_quality_regression_create(request);
-        }
-
-        if request.method == "POST" && request.path == "/quality/regressions/run" {
-            return self.handle_quality_regression_run();
-        }
-
-        if request.method == "PATCH" && request.path.starts_with("/quality/regressions/") {
-            return self.handle_quality_regression_update(request);
-        }
-
-        if request.method == "DELETE" && request.path.starts_with("/quality/regressions/") {
-            return self.handle_quality_regression_delete(request);
-        }
-
         if request.method == "POST" && request.path == "/chat/start" {
             return self.handle_chat_start(request);
         }

@@ -17,9 +17,9 @@ The recommended shape is layered:
   `REFINE_SMOKE_AI_PATH`.
 - `xtask` commands that run the suites with isolated setup and teardown.
 
-There is no repo-local browser integration scaffold. Do not add Playwright,
-`tests/ui`, npm manifests, or browser-test runner commands for first-party
-integration coverage.
+There is no repo-local browser integration scaffold. Do not add `tests/ui`,
+npm manifests, or browser-test runner commands for first-party integration
+coverage.
 
 ## Goals
 
@@ -173,7 +173,7 @@ tests/
     smoke-ai/
 ```
 
-Do not add repo-local `tests/ui`, `tests/playwright`, `playwright.config.ts`,
+Do not add repo-local browser test directories, browser runner config,
 `package.json`, or `package-lock.json` for integration testing.
 
 ## CI Strategy
@@ -201,5 +201,5 @@ Artifacts to retain on CI failure:
   services through public CLI commands.
 - Production CLI guardrails prove internal target-root escape hatches are not
   available in normal builds.
-- No first-party Playwright scaffold, npm manifest, browser test directory, or
+- No first-party browser scaffold, npm manifest, browser test directory, or
   browser runner command exists in the repo.
