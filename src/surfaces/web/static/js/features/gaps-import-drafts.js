@@ -259,18 +259,18 @@ function drawImportDrafts(root, drafts, close, options = {}) {
           background: true,
           ...destinationPayload,
         });
-        if (r.job) {
-          if (saveSession) saveSession({ phase: "saving", drafts: draftState, featureDestination, jobId: r.job.id, result: null, error: "" });
+        if (r.operation) {
+          if (saveSession) saveSession({ phase: "saving", drafts: draftState, featureDestination, operationId: r.operation.id, result: null, error: "" });
           drawImportSaving(root, readImportSession(), close, saveSession);
-          r = await waitForImportPersistJob(r.job.id, root, close, saveSession);
+          r = await waitForImportPersistOperation(r.operation.id, root, close, saveSession);
         } else {
-          if (saveSession) saveSession({ phase: "saving", drafts: draftState, featureDestination, jobId: "", result: null, error: "" });
+          if (saveSession) saveSession({ phase: "saving", drafts: draftState, featureDestination, operationId: "", result: null, error: "" });
         }
         await handleImportPersistResult(root, r, payload, skipped, close, saveSession, {
           clearSession: clearSessionOnClose,
         });
       } catch (e) {
-        if (e.code === "job_cancelled") {
+        if (e.code === "operation_cancelled") {
           if (clearSessionOnClose) clearImportSession();
           close(true, { force: true });
           return;

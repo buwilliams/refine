@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -28,52 +28,56 @@ static DIAGNOSTICS_CACHE: OnceLock<Mutex<BTreeMap<String, DiagnosticsCacheEntry>
     OnceLock::new();
 
 impl InProcessWebServer {
-    pub(super) fn handle_job_status(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_operation_status(&self, request: ApiRequest) -> ApiResponse {
         if self.runtime_root.is_none() {
-            return runtime_root_unavailable("read background jobs");
+            return runtime_root_unavailable("read background operations");
         }
-        let Some(job_id) = request
+        let Some(operation_id) = request
             .path
-            .strip_prefix("/jobs/")
-            .filter(|job_id| !job_id.is_empty() && !job_id.contains('/'))
+            .strip_prefix("/operations/")
+            .filter(|operation_id| !operation_id.is_empty() && !operation_id.contains('/'))
         else {
-            return job_id_required();
+            return operation_id_required();
         };
         match self.current_projection_with_runtime() {
             Ok(projection) => projection
                 .runtime
-                .background_jobs
+                .background_operations
                 .into_iter()
-                .find(|job| job.get("id").and_then(|value| value.as_str()) == Some(job_id))
-                .map(|job| ApiResponse::json(200, json!({"job": job})))
+                .find(|operation| {
+                    operation.get("id").and_then(|value| value.as_str()) == Some(operation_id)
+                })
+                .map(|operation| ApiResponse::json(200, json!({"operation": operation})))
                 .unwrap_or_else(|| {
-                    error_response(RefineError::NotFound(format!("Job {job_id} was not found")))
+                    error_response(RefineError::NotFound(format!(
+                        "Operation {operation_id} was not found"
+                    )))
                 }),
             Err(error) => error_response(error),
         }
     }
 
-    pub(super) fn handle_job_logs(&self, request: ApiRequest, raw_path: &str) -> ApiResponse {
+    pub(super) fn handle_operation_logs(&self, request: ApiRequest, raw_path: &str) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
-            return runtime_root_unavailable("read background job logs");
+            return runtime_root_unavailable("read background operation logs");
         };
-        let Some(job_id) = request
+        let Some(operation_id) = request
             .path
-            .strip_prefix("/jobs/")
+            .strip_prefix("/operations/")
             .and_then(|path| path.strip_suffix("/logs"))
-            .filter(|job_id| !job_id.is_empty() && !job_id.contains('/'))
+            .filter(|operation_id| !operation_id.is_empty() && !operation_id.contains('/'))
         else {
-            return job_id_required();
+            return operation_id_required();
         };
         let limit = bounded_query_usize(raw_path, "limit", 50, 200);
         let offset = bounded_query_usize(raw_path, "offset", 0, usize::MAX);
-        match FileJobRegistry::new(runtime_root).page_logs(job_id, limit, offset) {
+        match FileOperationRegistry::new(runtime_root).page_logs(operation_id, limit, offset) {
             Ok((logs, has_more, total)) => {
                 let log_count = logs.len();
                 ApiResponse::json(
                     200,
                     json!({
-                        "job_id": job_id,
+                        "operation_id": operation_id,
                         "logs": logs,
                         "log_count": log_count,
                         "has_more": has_more,
@@ -91,48 +95,28 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_job_cancel(&self, request: ApiRequest) -> ApiResponse {
+    pub(super) fn handle_operation_cancel(&self, request: ApiRequest) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
-            return runtime_root_unavailable("cancel background jobs");
+            return runtime_root_unavailable("cancel background operations");
         };
-        let Some(job_id) = request
+        let Some(operation_id) = request
             .path
-            .strip_prefix("/jobs/")
+            .strip_prefix("/operations/")
             .and_then(|path| path.strip_suffix("/cancel"))
-            .filter(|job_id| !job_id.is_empty() && !job_id.contains('/'))
+            .filter(|operation_id| !operation_id.is_empty() && !operation_id.contains('/'))
         else {
-            return job_id_required();
+            return operation_id_required();
         };
-        match FileJobRegistry::new(runtime_root).cancel(job_id) {
-            Ok(job) => {
-                let job = job_response(job);
+        match FileOperationRegistry::new(runtime_root).cancel(operation_id) {
+            Ok(operation) => {
+                let operation = operation_response(operation);
                 if let Err(error) = self.current_projection_with_runtime() {
                     return error_response(error);
                 }
-                ApiResponse::json(200, json!({"job": job}))
+                ApiResponse::json(200, json!({"operation": operation}))
             }
             Err(error) => error_response(error),
         }
-    }
-
-    pub(super) fn handle_job_retry(&self, request: ApiRequest) -> ApiResponse {
-        let Some(runtime_root) = &self.runtime_root else {
-            return runtime_root_unavailable("retry background jobs");
-        };
-        let Some(execution_id) = request
-            .path
-            .strip_prefix("/jobs/")
-            .and_then(|path| path.strip_suffix("/retry"))
-            .filter(|execution_id| !execution_id.is_empty() && !execution_id.contains('/'))
-        else {
-            return job_id_required();
-        };
-        let automation = match self.current_durable_root() {
-            Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
-            Ok(None) => WorkflowEngine::new(runtime_root),
-            Err(error) => return error_response(error),
-        };
-        workflow_retry_response(&automation, execution_id)
     }
 
     pub(super) fn handle_workflow_execution_retry(&self, request: ApiRequest) -> ApiResponse {
@@ -145,7 +129,7 @@ impl InProcessWebServer {
             .and_then(|path| path.strip_suffix("/retry"))
             .filter(|execution_id| !execution_id.is_empty() && !execution_id.contains('/'))
         else {
-            return job_id_required();
+            return operation_id_required();
         };
         let automation = match self.current_durable_root() {
             Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),
@@ -165,7 +149,7 @@ impl InProcessWebServer {
             .and_then(|path| path.strip_suffix("/cancel"))
             .filter(|execution_id| !execution_id.is_empty() && !execution_id.contains('/'))
         else {
-            return job_id_required();
+            return operation_id_required();
         };
         let automation = match self.current_durable_root() {
             Ok(Some(durable_root)) => WorkflowEngine::with_durable_root(runtime_root, durable_root),

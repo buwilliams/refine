@@ -247,11 +247,11 @@ Modals
 		Assign Feature: feature dropdown (name/status/progress), skips already-assigned / other-node gaps
 		Transfer node: active-node dropdown, skips in-progress/qa/ready-merge/build
 		Delete: danger confirmation (cancels subprocesses, removes worktrees/branches, erases gap.json), partial-failure handling
-		Background job support (progress/result)
+		Background operation support (progress/result)
 	Request refine feature/bugfix Modal (Report Bug)
 		Title (Short summary), Description (What should change?)
 		Cancel, Open GitHub (pre-fills new-issue URL); validation; popup-blocked error
-	Shared: Escape closes, Enter submits (non-textarea), click-outside, focus management, toasts, danger confirmations, background-job polling
+	Shared: Escape closes, Enter submits (non-textarea), click-outside, focus management, toasts, danger confirmations, background-operation polling
 
 Implementation Internals (for e2e testing)
 	Purpose: contract details a test needs to drive the UI, wait correctly, and assert outcomes. Frontend is a hash-routed SPA served from one index.html; all data via JSON over /api; live updates via SSE.
@@ -292,7 +292,7 @@ Implementation Internals (for e2e testing)
 		Tests should wait on resulting DOM change, not a fixed delay; SSE de-dupes repeat events (sseEventChanged)
 	Data fetching & caching
 		api(method, path, body, options) — fetch wrapper; GET responses cached per-path
-		Error envelope: { error: { message, code, details } }; non-OK throws with message; code "background_job_active" surfaces "Active operation: …"
+		Error envelope: { error: { message, code, details } }; non-OK throws with message; code "background_operation_active" surfaces "Active operation: …"
 		Screen-data GET cache TTL 5000ms (SCREEN_DATA_CACHE_TTL_MS); pass {cache:false} to bypass; invalidated on every SSE event
 		Background prefetch: delay 2000ms after navigation, 50ms between requests, 30000ms per-screen cooldown
 	Polling / timers
@@ -306,7 +306,7 @@ Implementation Internals (for e2e testing)
 		refine_system_tab / refine_node_tab / refine_project_tab — last active settings tab per surface
 		refine_guide_state / refine_guide_checklist / refine_guide_width — guide panel mode, checklist status, panel width
 		refine_last_reporter — global reporter selection
-		refine_import_session_v — import wizard session (mode/phase/source/drafts/destination/jobId), for recovery
+		refine_import_session_v — import wizard session (mode/phase/source/drafts/destination/operationId), for recovery
 		refine_checkout / refine_port — runtime/desktop wiring
 	Constants & limits (assert truncation/pagination against these)
 		Default list limit 50; entries options 50/100/250/500/1000 (gaps, changes, logs, features, performance)
@@ -350,7 +350,7 @@ Implementation Internals (for e2e testing)
 		Features: /api/features, /api/features/:id(/cancel|/workflow), /api/features/:id/gaps/:id(/reorder), /api/features/:id/gaps/bulk
 		Dashboard/lists: /api/dashboard, /api/changes(/undo), /api/activity(/cleanup|/ui-error), /api/performance(/cleanup), /api/diagnostics
 		Governance/quality/guidance: /api/governance(/generate-rules), /api/quality(/regressions(/:id|/run)), /api/guidance
-		Import/jobs: /api/import/extract|csv/parse|dedup|persist, /api/jobs/:id(/cancel)
+		Import/operations: /api/import/extract|csv/parse|dedup|persist, /api/operations/:id(/cancel)
 		Processes/runner: /api/processes(/agents|/background), /api/agents, /api/runner-workers/merger/hard-reset-worktree, /api/runner-workers/target-app-builder/build, /api/cache/rebuild
 		Files: /api/files/tree|read|search
 		Settings/runtime: /api/settings, /api/settings/recheck-auth
@@ -358,5 +358,5 @@ Implementation Internals (for e2e testing)
 	Testing notes
 		Prefer waiting on SSE-driven DOM updates or button busy-state clearing over fixed sleeps
 		Destructive actions (Delete, Hard reset, Undo, bulk delete) route through danger modalConfirm — assert the confirm dialog, then the okLabel button
-		Long ops (import persist, bulk, cache rebuild) return a job; poll /api/jobs/:id; UI shows progress and supports Cancel/Hide
+		Long ops (import persist, bulk, cache rebuild) return an operation; poll /api/operations/:id; UI shows progress and supports Cancel/Hide
 		Per repo guidance: do not run mutating endpoints against a real refine clone in tests — use a temp/throwaway project

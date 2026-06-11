@@ -27,15 +27,15 @@ function waitForPlanExtractionQueued(page: Page) {
   );
 }
 
-async function expectPlanExtractionProcess(request: APIRequestContext, jobId: string) {
+async function expectPlanExtractionProcess(request: APIRequestContext, operationId: string) {
   const processPayload = await jsonObject(await request.get("/api/processes"));
   const runnerWork = processPayload.runner_work as Array<{
     kind?: string;
-    job_id?: string;
+    operation_id?: string;
     status?: string;
   }> | undefined;
   const planExtractor = (runnerWork ?? []).find((work) => work.kind === "plan_draft_extractor");
-  expect(planExtractor?.job_id).toBe(jobId);
+  expect(planExtractor?.operation_id).toBe(operationId);
   expect(["running", "complete"].includes(String(planExtractor?.status ?? ""))).toBe(true);
 }
 
@@ -121,9 +121,9 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
     await page.getByTestId("plan-draft").click();
     await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0);
     const extractionPayload = await (await extractionQueued).json();
-    const extractionJobId = String(extractionPayload.job?.id ?? "");
-    expect(extractionJobId).toBeTruthy();
-    await expectPlanExtractionProcess(request, extractionJobId);
+    const extractionOperationId = String(extractionPayload.operation?.id ?? "");
+    expect(extractionOperationId).toBeTruthy();
+    await expectPlanExtractionProcess(request, extractionOperationId);
     await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
     await expect(page.getByTestId("import-feature-mode-new")).toBeChecked();
     await expect(page.getByTestId("import-feature-new-name")).toHaveValue("Smoke AI Plan Feature");
@@ -151,11 +151,11 @@ test("runs a Plan chat turn and drafts a Feature through Smoke AI", async ({ pag
       gaps?: Array<{ id?: string }>;
     } | null = null;
     const importCompleted = page.waitForResponse(async (response) => {
-      if (!/\/api\/jobs\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
+      if (!/\/api\/operations\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
       if (response.request().method() !== "GET" || response.status() !== 200) return false;
       const payload = await response.json();
-      if (payload.job?.status === "complete") {
-        completedImportResult = payload.job.result || null;
+      if (payload.operation?.status === "complete") {
+        completedImportResult = payload.operation.result || null;
         return true;
       }
       return false;
@@ -350,7 +350,7 @@ test("updates an original Gap from a Plan draft duplicate decision", async ({ pa
     await page.getByTestId("plan-draft").click();
     await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0);
     const extractionPayload = await (await extractionQueued).json();
-    expect(String(extractionPayload.job?.id ?? "")).toBeTruthy();
+    expect(String(extractionPayload.operation?.id ?? "")).toBeTruthy();
     await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
     await expect(page.getByTestId("import-duplicate-decision")).toHaveText("Needs duplicate resolution");
     await page.getByTestId("import-draft-priority").first().selectOption("high");
@@ -366,12 +366,12 @@ test("updates an original Gap from a Plan draft duplicate decision", async ({ pa
       gaps?: Array<{ id?: string }>;
     } | null = null;
     const importCompleted = page.waitForResponse(async (response) => {
-      if (!/\/api\/jobs\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
+      if (!/\/api\/operations\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
       if (response.request().method() !== "GET" || response.status() !== 200) return false;
       const payload = await response.json();
-      const job = payload.job || {};
-      if (job.status !== "complete") return false;
-      completedImportResult = job.result || {};
+      const operation = payload.operation || {};
+      if (operation.status !== "complete") return false;
+      completedImportResult = operation.result || {};
       return true;
     });
     await page.getByTestId("import-persist").click();

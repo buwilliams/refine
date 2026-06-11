@@ -9,7 +9,9 @@ use serde_json::{Value, json};
 use crate::model::JsonObject;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess, ProcessOwner};
 use crate::process::supervisor::errors::RefineResult;
-use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationHandle, OperationRegistry,
+};
 use crate::tools::host::agent_providers::{AgentProviderService, HostAgentProviderService};
 use crate::tools::host::installation::InstallTarget;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
@@ -35,7 +37,7 @@ static PROVIDER_STATUS_CACHE: OnceLock<Mutex<Option<ProviderStatusCacheEntry>>> 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(in crate::surfaces::web_server) struct RuntimeReconcileSummary {
     pub(in crate::surfaces::web_server) processes: usize,
-    pub(in crate::surfaces::web_server) jobs: usize,
+    pub(in crate::surfaces::web_server) operations: usize,
 }
 
 pub(in crate::surfaces::web_server) fn runtime_record_matches(
@@ -47,7 +49,7 @@ pub(in crate::surfaces::web_server) fn runtime_record_matches(
         || process_text_matches(process.details.as_deref(), feature_id, gap_ids)
 }
 
-pub(in crate::surfaces::web_server) fn job_owner_matches(
+pub(in crate::surfaces::web_server) fn operation_owner_matches(
     owner: &str,
     feature_id: &str,
     gap_ids: &[String],
@@ -90,13 +92,13 @@ pub(in crate::surfaces::web_server) fn runtime_root_unavailable(action: &str) ->
     )
 }
 
-pub(in crate::surfaces::web_server) fn job_id_required() -> ApiResponse {
+pub(in crate::surfaces::web_server) fn operation_id_required() -> ApiResponse {
     ApiResponse::json(
         404,
         json!({
             "error": {
                 "code": "not_found",
-                "message": "Job route requires a job id"
+                "message": "Operation route requires an operation id"
             }
         }),
     )
@@ -206,15 +208,17 @@ pub(in crate::surfaces::web_server) fn append_quality_activity(
     let _ = service.append(entry);
 }
 
-pub(in crate::surfaces::web_server) fn job_response(job: JobHandle) -> serde_json::Value {
+pub(in crate::surfaces::web_server) fn operation_response(
+    operation: OperationHandle,
+) -> serde_json::Value {
     json!({
-        "id": job.id,
-        "owner": job.owner,
-        "status": job.state.as_api_status(),
-        "state": job.state,
-        "progress": job.progress,
-        "result": job.result,
-        "error": job.error
+        "id": operation.id,
+        "owner": operation.owner,
+        "status": operation.state.as_api_status(),
+        "state": operation.state,
+        "progress": operation.progress,
+        "result": operation.result,
+        "error": operation.error
     })
 }
 
@@ -399,36 +403,36 @@ fn runner_reachable_value(runtime_root: &Path) -> bool {
 
 fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
     let status = if background_stopped { "paused" } else { "idle" };
-    let jobs = FileJobRegistry::new(runtime_root)
+    let operations = FileOperationRegistry::new(runtime_root)
         .recover()
         .unwrap_or_default();
-    let merger_job = jobs
+    let merger_operation = operations
         .iter()
         .rev()
-        .find(|job| job.owner.starts_with("merger:"));
-    let plan_extract_job = jobs
+        .find(|operation| operation.owner.starts_with("merger:"));
+    let plan_extract_operation = operations
         .iter()
         .rev()
-        .find(|job| job.owner == "import:extract:plan");
+        .find(|operation| operation.owner == "import:extract:plan");
     let merger_status = if background_stopped {
         "paused".to_string()
     } else {
-        merger_job
-            .map(|job| job.state.as_api_status().to_string())
+        merger_operation
+            .map(|operation| operation.state.as_api_status().to_string())
             .unwrap_or_else(|| "idle".to_string())
     };
-    let merger_gap_id = merger_job
-        .and_then(|job| job.owner.strip_prefix("merger:"))
+    let merger_gap_id = merger_operation
+        .and_then(|operation| operation.owner.strip_prefix("merger:"))
         .map(ToString::to_string);
     let plan_extract_status = if background_stopped {
         "paused".to_string()
     } else {
-        plan_extract_job
-            .map(|job| job.state.as_api_status().to_string())
+        plan_extract_operation
+            .map(|operation| operation.state.as_api_status().to_string())
             .unwrap_or_else(|| "idle".to_string())
     };
-    let plan_extract_details = plan_extract_job
-        .and_then(|job| job.progress.get("message").and_then(Value::as_str))
+    let plan_extract_details = plan_extract_operation
+        .and_then(|operation| operation.progress.get("message").and_then(Value::as_str))
         .unwrap_or("Plan Draft extraction is ready for Draft Feature requests");
     let mut rows = [
         ("merger", "serial Gap branch merger"),
@@ -462,7 +466,7 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
                 "elapsed_seconds": 0,
                 "queued": 0,
                 "details": details,
-                "job_id": merger_job.map(|job| job.id.clone()),
+                "operation_id": merger_operation.map(|operation| operation.id.clone()),
                 "gap_id": merger_gap_id
             })
         } else if kind == "plan_draft_extractor" {
@@ -472,7 +476,7 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
                 "elapsed_seconds": 0,
                 "queued": 0,
                 "details": plan_extract_details,
-                "job_id": plan_extract_job.map(|job| job.id.clone())
+                "operation_id": plan_extract_operation.map(|operation| operation.id.clone())
             })
         } else {
             json!({

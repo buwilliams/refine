@@ -11,8 +11,10 @@ use serde_json::{Value, json};
 use crate::model::workflow::GapStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
 use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -793,23 +795,23 @@ impl InProcessWebServer {
             let Some(runtime_root) = &self.runtime_root else {
                 return runtime_root_unavailable("generate target-app config in the background");
             };
-            let registry = FileJobRegistry::new(runtime_root);
-            let job = match registry.register("target-app:generate") {
-                Ok(job) => job,
+            let registry = FileOperationRegistry::new(runtime_root);
+            let operation = match registry.register("target-app:generate") {
+                Ok(operation) => operation,
                 Err(error) => return error_response(error),
             };
             let _ = registry.update_progress(
-                &job.id,
+                &operation.id,
                 json!({
                     "message": "Generating target-app config with AI"
                 }),
             );
-            let job = registry.status(&job.id).unwrap_or(job);
+            let operation = registry.status(&operation.id).unwrap_or(operation);
             let server = self.clone();
             let runtime_root = runtime_root.clone();
-            let job_id = job.id.clone();
+            let operation_id = operation.id.clone();
             thread::spawn(move || {
-                let registry = FileJobRegistry::new(&runtime_root);
+                let registry = FileOperationRegistry::new(&runtime_root);
                 let response = server.target_app_generate_response(&body, true);
                 let mut result = response.body.clone();
                 match result.as_object_mut() {
@@ -830,19 +832,23 @@ impl InProcessWebServer {
                             "details": result
                         })
                     });
-                    let _ = registry.fail_with_error(&job_id, error);
+                    let _ = registry.fail_with_error(&operation_id, error);
                 } else {
                     let _ = registry.update_progress(
-                        &job_id,
+                        &operation_id,
                         json!({
                             "message": "Generated target-app config"
                         }),
                     );
-                    let _ = registry.finish_with_result(&job_id, JobState::Succeeded, result);
+                    let _ = registry.finish_with_result(
+                        &operation_id,
+                        OperationState::Succeeded,
+                        result,
+                    );
                 }
                 let _ = server.refresh_projection_cache_after_mutation();
             });
-            return ApiResponse::json(202, json!({"job": job_response(job)}));
+            return ApiResponse::json(202, json!({"operation": operation_response(operation)}));
         }
         self.target_app_generate_response(&body, false)
     }

@@ -150,7 +150,7 @@ function openImportModal() {
     const dirty = importSessionIsDirty(session);
     if (dirty) {
       const ok = await modalConfirm(
-        "Cancel this import and discard the recoverable import state? Any running save job will be asked to stop and roll back Gaps it created.",
+        "Cancel this import and discard the recoverable import state? Any running save operation will be asked to stop and roll back Gaps it created.",
         { title: "Cancel import", okLabel: "Cancel import", danger: true },
       );
       if (!ok) return;
@@ -159,19 +159,19 @@ function openImportModal() {
       activeAbort.abort();
       activeAbort = null;
     }
-    if (session.jobId) {
+    if (session.operationId) {
       try {
-        await api("POST", `/api/jobs/${session.jobId}/cancel`, {});
-        await waitForImportJobCancellation(session.jobId, root, close, saveSession);
+        await api("POST", `/api/operations/${session.operationId}/cancel`, {});
+        await waitForImportOperationCancellation(session.operationId, root, close, saveSession);
       } catch (e) {
-        await showActionError(e, "Could not cancel import job");
+        await showActionError(e, "Could not cancel import operation");
         return;
       }
     }
-    if (session.prepareJobId) {
+    if (session.prepareOperationId) {
       try {
-        await api("POST", `/api/jobs/${session.prepareJobId}/cancel`, {});
-        await waitForImportJobCancellation(session.prepareJobId, root, close, saveSession);
+        await api("POST", `/api/operations/${session.prepareOperationId}/cancel`, {});
+        await waitForImportOperationCancellation(session.prepareOperationId, root, close, saveSession);
       } catch (e) {
         await showActionError(e, "Could not cancel import preparation");
         return;
@@ -257,10 +257,10 @@ function openImportModal() {
           ? !!root.querySelector("#import-csv-distribute")?.checked
           : !!root.querySelector("#import-upload-distribute")?.checked;
         const drafts = await parseImportCsvBackend(csvText, draftsRoot, saveSession, { distribute });
-        if (saveSession) saveSession({ prepareJobId: "", error: "" });
+        if (saveSession) saveSession({ prepareOperationId: "", error: "" });
         await reviewImportDrafts(root, drafts, close, saveSession);
       } catch (e) {
-        saveSession({ phase: "editing", prepareJobId: "", error: e.message });
+        saveSession({ phase: "editing", prepareOperationId: "", error: e.message });
         if (draftsRoot) {
           draftsRoot.innerHTML = `<p class="muted" style="color:var(--error)">${htmlEscape(e.message)}</p>`;
         }
@@ -275,37 +275,37 @@ function openImportModal() {
     root.querySelector("#import-csv-file-name").textContent = session.fileName;
   }
   setImportMode(activeMode);
-  if (session.prepareJobId) {
+  if (session.prepareOperationId) {
     drawImportPrepareProgress(root.querySelector("#import-drafts"), session.progress || {
       message: "Preparing CSV import",
       completed: 0,
       total: 0,
     });
-    waitForImportPrepareJob(session.prepareJobId, root.querySelector("#import-drafts"), saveSession)
+    waitForImportPrepareOperation(session.prepareOperationId, root.querySelector("#import-drafts"), saveSession)
       .then((r) => {
         const drafts = r.drafts || [];
-        if (saveSession) saveSession({ phase: "review", drafts, prepareJobId: "", error: "" });
+        if (saveSession) saveSession({ phase: "review", drafts, prepareOperationId: "", error: "" });
         drawImportDrafts(root, drafts, close, { saveSession });
       })
       .catch(async (e) => {
-        if (e.code === "job_cancelled") {
+        if (e.code === "operation_cancelled") {
           clearImportSession();
           close(true, { force: true });
           return;
         }
         await showActionError(e, "Import failed");
       });
-  } else if (session.jobId) {
+  } else if (session.operationId) {
     drawImportSaving(root, session, close, saveSession);
     const restoredDrafts = (session.drafts || []).map(normalizeImportDraft);
     const skipped = restoredDrafts.filter((draft) => draft.duplicateDecision === "duplicate").length;
     const payload = restoredDrafts
       .filter((draft) => draft.duplicateDecision !== "duplicate")
       .map(importDraftPayload);
-    waitForImportPersistJob(session.jobId, root, close, saveSession)
+    waitForImportPersistOperation(session.operationId, root, close, saveSession)
       .then((r) => handleImportPersistResult(root, r, payload, skipped, close, saveSession))
       .catch(async (e) => {
-        if (e.code === "job_cancelled") {
+        if (e.code === "operation_cancelled") {
           clearImportSession();
           close(true, { force: true });
           return;

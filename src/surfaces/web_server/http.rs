@@ -776,9 +776,9 @@ impl LocalHttpDaemon {
                     data: payload,
                 });
             }
-            for payload in recent_job_sse_events(runtime_root, 10)? {
+            for payload in recent_operation_sse_events(runtime_root, 10)? {
                 events.push(SseEventFrame {
-                    event: "job_progress",
+                    event: "operation_progress",
                     data: payload,
                 });
             }

@@ -13,7 +13,9 @@ use crate::model::workflow::GapStatus;
 use crate::model::{JsonObject, Timestamp};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
+};
 use crate::tools::host::agent_providers::{
     HostAgentProviderService, ProviderInvocation, ProviderInvocationResult,
 };
@@ -194,7 +196,7 @@ impl FileChatService {
             }
             self.write_record(&record)?;
         }
-        let active_job = self.session_has_active_job(&record.id)?;
+        let active_operation = self.session_has_active_operation(&record.id)?;
         Ok(ChatReadResult {
             alive: !record.closed,
             session_id: record.id.clone(),
@@ -203,7 +205,7 @@ impl FileChatService {
             queued_messages: record.queued_messages.clone(),
             importable_artifacts: record.importable_artifacts.clone(),
             closed_reason: record.interruption_detail.clone(),
-            in_flight: record.in_flight || record.queue_dispatching || active_job,
+            in_flight: record.in_flight || record.queue_dispatching || active_operation,
             provider_session_id: record.provider_session_id.clone(),
             worktree: record.worktree.clone(),
         })
@@ -557,7 +559,7 @@ impl FileChatService {
         ));
         self.write_record(&record)?;
 
-        let job = self.register_provider_job(&record, "resume")?;
+        let operation = self.register_provider_operation(&record, "resume")?;
         let provider = HostAgentProviderService {
             path_override: self.provider_path_override(),
             runtime_root: Some(self.runtime_root.clone()),
@@ -568,15 +570,19 @@ impl FileChatService {
         }) {
             Ok(result) => {
                 self.apply_provider_success(&mut record, result, "Provider session resumed.");
-                self.finish_provider_job(&job.id, JobState::Succeeded, "Provider session resumed")?;
+                self.finish_provider_operation(
+                    &operation.id,
+                    OperationState::Succeeded,
+                    "Provider session resumed",
+                )?;
             }
             Err(error) => {
                 let detail =
                     format!("Provider session resume failed; transcript preserved: {error}");
                 self.apply_provider_failure(&mut record, detail);
-                self.finish_provider_job(
-                    &job.id,
-                    JobState::Failed,
+                self.finish_provider_operation(
+                    &operation.id,
+                    OperationState::Failed,
                     "Provider session resume failed",
                 )?;
             }
@@ -588,18 +594,18 @@ impl FileChatService {
 
     pub fn recover_interrupted_turns(&self, detail: &str) -> RefineResult<Vec<ChatSessionRecord>> {
         let message = detail.trim();
-        let registry = self.job_registry();
+        let registry = self.operation_registry();
         let mut recovered_session_ids = Vec::new();
-        for job in registry.recover()? {
-            let Some(session_id) = chat_session_id_from_job(&job) else {
+        for operation in registry.recover()? {
+            let Some(session_id) = chat_session_id_from_operation(&operation) else {
                 continue;
             };
             if !matches!(
-                job.state,
-                JobState::Pending
-                    | JobState::Running
-                    | JobState::Cancelling
-                    | JobState::Interrupted
+                operation.state,
+                OperationState::Pending
+                    | OperationState::Running
+                    | OperationState::Cancelling
+                    | OperationState::Interrupted
             ) {
                 continue;
             }
@@ -609,8 +615,8 @@ impl FileChatService {
             }
             self.mark_record_interrupted(&mut record, message);
             self.write_record(&record)?;
-            if !matches!(job.state, JobState::Interrupted) {
-                registry.finish(&job.id, JobState::Interrupted)?;
+            if !matches!(operation.state, OperationState::Interrupted) {
+                registry.finish(&operation.id, OperationState::Interrupted)?;
             }
             recovered_session_ids.push(record.id);
         }
@@ -762,48 +768,54 @@ impl FileChatService {
         ));
     }
 
-    fn job_registry(&self) -> FileJobRegistry {
-        FileJobRegistry::new(&self.runtime_root)
+    fn operation_registry(&self) -> FileOperationRegistry {
+        FileOperationRegistry::new(&self.runtime_root)
     }
 
-    fn register_provider_job(
+    fn register_provider_operation(
         &self,
         record: &ChatSessionRecord,
-        operation: &str,
-    ) -> RefineResult<JobHandle> {
-        let registry = self.job_registry();
-        let job = registry.register(&format!("chat:{}", record.id))?;
+        operation_kind: &str,
+    ) -> RefineResult<OperationHandle> {
+        let registry = self.operation_registry();
+        let operation = registry.register(&format!("chat:{}", record.id))?;
         let mut details = JsonObject::new();
         details.insert("session_id".to_string(), json!(record.id));
         details.insert("provider".to_string(), json!(record.provider));
         details.insert("mode".to_string(), json!(record.mode));
-        details.insert("operation".to_string(), json!(operation));
+        details.insert("operation".to_string(), json!(operation_kind));
         registry.append_log(
-            &job.id,
-            chat_job_log("info", "Chat provider job started", Some(details)),
+            &operation.id,
+            chat_operation_log("info", "Chat provider operation started", Some(details)),
         )?;
-        Ok(job)
+        Ok(operation)
     }
 
-    fn finish_provider_job(
+    fn finish_provider_operation(
         &self,
-        job_id: &str,
-        state: JobState,
+        operation_id: &str,
+        state: OperationState,
         message: &str,
-    ) -> RefineResult<JobHandle> {
-        let registry = self.job_registry();
-        registry.append_log(job_id, chat_job_log("info", message, None))?;
-        registry.finish(job_id, state)
+    ) -> RefineResult<OperationHandle> {
+        let registry = self.operation_registry();
+        registry.append_log(operation_id, chat_operation_log("info", message, None))?;
+        registry.finish(operation_id, state)
     }
 
-    fn session_has_active_job(&self, session_id: &str) -> RefineResult<bool> {
-        Ok(self.job_registry().recover()?.into_iter().any(|job| {
-            chat_session_id_from_job(&job) == Some(session_id)
-                && matches!(
-                    job.state,
-                    JobState::Pending | JobState::Running | JobState::Cancelling
-                )
-        }))
+    fn session_has_active_operation(&self, session_id: &str) -> RefineResult<bool> {
+        Ok(self
+            .operation_registry()
+            .recover()?
+            .into_iter()
+            .any(|operation| {
+                chat_session_id_from_operation(&operation) == Some(session_id)
+                    && matches!(
+                        operation.state,
+                        OperationState::Pending
+                            | OperationState::Running
+                            | OperationState::Cancelling
+                    )
+            }))
     }
 
     fn ensure_queue_dispatch(&self, record: &mut ChatSessionRecord) -> RefineResult<()> {
@@ -869,7 +881,7 @@ impl FileChatService {
             record.updated_at = now_timestamp();
             self.write_record(&record)?;
 
-            let job = self.register_provider_job(&record, "invoke")?;
+            let operation = self.register_provider_operation(&record, "invoke")?;
             let provider = HostAgentProviderService {
                 path_override: self.provider_path_override(),
                 runtime_root: Some(self.runtime_root.clone()),
@@ -888,9 +900,9 @@ impl FileChatService {
             ) {
                 Ok(result) => {
                     self.apply_provider_success(&mut record, result, "Provider turn completed.");
-                    self.finish_provider_job(
-                        &job.id,
-                        JobState::Succeeded,
+                    self.finish_provider_operation(
+                        &operation.id,
+                        OperationState::Succeeded,
                         "Provider turn completed",
                     )?;
                 }
@@ -899,7 +911,11 @@ impl FileChatService {
                         &mut record,
                         format!("Provider turn failed: {error}"),
                     );
-                    self.finish_provider_job(&job.id, JobState::Failed, "Provider turn failed")?;
+                    self.finish_provider_operation(
+                        &operation.id,
+                        OperationState::Failed,
+                        "Provider turn failed",
+                    )?;
                 }
             }
             record.updated_at = now_timestamp();
@@ -1384,11 +1400,11 @@ fn default_chat_runtime_root(durable_root: &Path) -> PathBuf {
         .unwrap_or_else(|| durable_root.join("run/chat"))
 }
 
-fn chat_session_id_from_job(job: &JobHandle) -> Option<&str> {
-    job.owner.strip_prefix("chat:")
+fn chat_session_id_from_operation(operation: &OperationHandle) -> Option<&str> {
+    operation.owner.strip_prefix("chat:")
 }
 
-fn chat_job_log(severity: &str, message: &str, details: Option<JsonObject>) -> LogEntry {
+fn chat_operation_log(severity: &str, message: &str, details: Option<JsonObject>) -> LogEntry {
     LogEntry {
         datetime: now_timestamp(),
         severity: severity.to_string(),
@@ -1702,12 +1718,12 @@ mod tests {
         .unwrap();
         assert!(persisted.get("in_flight").is_none());
         assert!(persisted.get("last_turn_started_at").is_none());
-        let jobs = FileJobRegistry::new(&service.runtime_root)
+        let operations = FileOperationRegistry::new(&service.runtime_root)
             .recover()
             .unwrap();
-        assert_eq!(jobs.len(), 1);
-        assert_eq!(jobs[0].owner, format!("chat:{}", session.id));
-        assert_eq!(jobs[0].state, JobState::Succeeded);
+        assert_eq!(operations.len(), 1);
+        assert_eq!(operations[0].owner, format!("chat:{}", session.id));
+        assert_eq!(operations[0].state, OperationState::Succeeded);
 
         let read = service.read(&session.id).unwrap();
         assert!(!read.in_flight);
@@ -1776,16 +1792,16 @@ mod tests {
         let session = service
             .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
             .unwrap();
-        let registry = FileJobRegistry::new(&service.runtime_root);
-        let job = registry.register(&format!("chat:{}", session.id)).unwrap();
+        let registry = FileOperationRegistry::new(&service.runtime_root);
+        let operation = registry.register(&format!("chat:{}", session.id)).unwrap();
 
         let recovered = service
             .recover_interrupted_turns("daemon restarted during provider turn")
             .unwrap();
         assert_eq!(recovered.len(), 1);
         assert_eq!(
-            registry.status(&job.id).unwrap().state,
-            JobState::Interrupted
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Interrupted
         );
         let resumed = service.resume(&session.id).unwrap();
         assert!(!resumed.in_flight);

@@ -8,18 +8,18 @@ export async function jsonObject(response: APIResponse): Promise<Record<string, 
   return data as Record<string, unknown>;
 }
 
-export async function waitForJobResult(
+export async function waitForOperationResult(
   request: APIRequestContext,
-  jobId: string,
+  operationId: string,
 ): Promise<Record<string, unknown>> {
   await expect.poll(async () => {
-    const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-    const job = (payload.job as Record<string, unknown> | undefined) ?? {};
-    return String(job.status ?? "");
+    const payload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+    const operation = (payload.operation as Record<string, unknown> | undefined) ?? {};
+    return String(operation.status ?? "");
   }).toBe("complete");
-  const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-  const job = (payload.job as Record<string, unknown> | undefined) ?? {};
-  return (job.result as Record<string, unknown> | undefined) ?? {};
+  const payload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+  const operation = (payload.operation as Record<string, unknown> | undefined) ?? {};
+  return (operation.result as Record<string, unknown> | undefined) ?? {};
 }
 
 export async function ensureAttachedProject(request: APIRequestContext): Promise<void> {

@@ -23,15 +23,15 @@ function drawImportSaving(root, session, close, saveSession = null) {
   `;
   actions.querySelector("[data-cancel]").addEventListener("click", async () => {
     const ok = await modalConfirm(
-      "Cancel this import? Refine will stop the save job and roll back Gaps created by this import.",
+      "Cancel this import? Refine will stop the save operation and roll back Gaps created by this import.",
       { title: "Cancel import", okLabel: "Cancel import", danger: true },
     );
     if (!ok) return;
-    if (session?.jobId) {
-      await api("POST", `/api/jobs/${session.jobId}/cancel`, {});
-      await waitForImportJobCancellation(session.jobId, root, close, saveSession);
+    if (session?.operationId) {
+      await api("POST", `/api/operations/${session.operationId}/cancel`, {});
+      await waitForImportOperationCancellation(session.operationId, root, close, saveSession);
     }
-    if (saveSession) saveSession({ phase: "cancelled", jobId: "", drafts: [] });
+    if (saveSession) saveSession({ phase: "cancelled", operationId: "", drafts: [] });
     clearImportSession();
     close(true, { force: true });
   });
@@ -40,55 +40,55 @@ function drawImportSaving(root, session, close, saveSession = null) {
   });
 }
 
-async function waitForImportPersistJob(jobId, root, close, saveSession = null) {
+async function waitForImportPersistOperation(operationId, root, close, saveSession = null) {
   while (true) {
-    const snap = await api("GET", `/api/jobs/${jobId}`);
-    const job = snap.job || {};
-    if (job.status === "complete") {
-      const result = job.result || {};
+    const snap = await api("GET", `/api/operations/${operationId}`);
+    const operation = snap.operation || {};
+    if (operation.status === "complete") {
+      const result = operation.result || {};
       if (result.http_status && result.http_status >= 400) {
         const raw = result.error || {};
-        const err = new Error(raw.message || "Background job failed");
+        const err = new Error(raw.message || "Background operation failed");
         err.details = raw.details;
         err.code = raw.code;
         throw err;
       }
       return result;
     }
-    if (job.status === "cancelled") {
+    if (operation.status === "cancelled") {
       const err = new Error("Import cancelled");
-      err.code = "job_cancelled";
+      err.code = "operation_cancelled";
       throw err;
     }
-    if (job.status === "failed") {
-      const err = new Error(job.error?.message || "Background job failed");
-      err.details = job.error?.details;
-      err.code = job.error?.code;
+    if (operation.status === "failed") {
+      const err = new Error(operation.error?.message || "Background operation failed");
+      err.details = operation.error?.details;
+      err.code = operation.error?.code;
       throw err;
     }
-    if (saveSession) saveSession({ phase: "saving", jobId, progress: job.progress || {} });
+    if (saveSession) saveSession({ phase: "saving", operationId, progress: operation.progress || {} });
     drawImportSaving(root, readImportSession(), close, saveSession);
     await new Promise((resolve) => setTimeout(resolve, 750));
   }
 }
 
-async function waitForImportJobCancellation(jobId, root, close, saveSession = null) {
+async function waitForImportOperationCancellation(operationId, root, close, saveSession = null) {
   while (true) {
-    const snap = await api("GET", `/api/jobs/${jobId}`);
-    const job = snap.job || {};
-    if (job.status === "cancelled") return job;
-    if (job.status === "complete") return job;
-    if (job.status === "failed") {
-      const err = new Error(job.error?.message || "Background job failed");
-      err.details = job.error?.details;
-      err.code = job.error?.code;
+    const snap = await api("GET", `/api/operations/${operationId}`);
+    const operation = snap.operation || {};
+    if (operation.status === "cancelled") return operation;
+    if (operation.status === "complete") return operation;
+    if (operation.status === "failed") {
+      const err = new Error(operation.error?.message || "Background operation failed");
+      err.details = operation.error?.details;
+      err.code = operation.error?.code;
       throw err;
     }
     if (saveSession) {
       saveSession({
         phase: "saving",
-        jobId,
-        progress: { ...(job.progress || {}), message: "Cancelling" },
+        operationId,
+        progress: { ...(operation.progress || {}), message: "Cancelling" },
       });
     }
     drawImportSaving(root, readImportSession(), close, saveSession);
@@ -120,7 +120,7 @@ async function handleImportPersistResult(root, r, payload, skipped, close, saveS
         error: failure.error || failure.message || "Could not save this Gap.",
       };
     });
-    if (saveSession) saveSession({ phase: "failed", drafts: failedDrafts, jobId: "", result: r });
+    if (saveSession) saveSession({ phase: "failed", drafts: failedDrafts, operationId: "", result: r });
     toast(
       root.isConnected
         ? `Created ${createdCount} gap${createdCount === 1 ? "" : "s"}; ${failures.length} need fixes`

@@ -12,7 +12,9 @@ use crate::model::workflow::GapStatus;
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::product::project_state::{FileProjectStateStore, GapSummaryProjection};
 use crate::tools::product::work_items::FileWorkItemService;
@@ -27,7 +29,7 @@ pub struct MergerGapResult {
     pub gap_id: String,
     pub branch_name: String,
     pub target_branch: String,
-    pub job_id: String,
+    pub operation_id: String,
     pub status: String,
     pub conflicts: Vec<String>,
 }
@@ -36,14 +38,14 @@ pub struct MergerGapResult {
 pub struct FileMergerService {
     pub runtime_root: PathBuf,
     pub durable_root: PathBuf,
-    pub job_registry: FileJobRegistry,
+    pub operation_registry: FileOperationRegistry,
 }
 
 impl FileMergerService {
     pub fn new(runtime_root: impl Into<PathBuf>, durable_root: impl Into<PathBuf>) -> Self {
         let runtime_root = runtime_root.into();
         Self {
-            job_registry: FileJobRegistry::new(&runtime_root),
+            operation_registry: FileOperationRegistry::new(&runtime_root),
             runtime_root,
             durable_root: durable_root.into(),
         }
@@ -56,7 +58,7 @@ impl FileMergerService {
         {
             return Ok(MergerTickResult { processed: None });
         }
-        if self.active_merger_job()? {
+        if self.active_merger_operation()? {
             return Ok(MergerTickResult { processed: None });
         }
         let Some(gap) = self.next_ready_merge_gap()? else {
@@ -70,9 +72,11 @@ impl FileMergerService {
             .clone()
             .unwrap_or_else(|| branch_name_for_gap(&settings, &gap_id));
         let target_branch = setting_string(&settings, "merge_target_branch", "main");
-        let job = self.job_registry.register(&format!("merger:{gap_id}"))?;
-        self.append_job_log(
-            &job.id,
+        let operation = self
+            .operation_registry
+            .register(&format!("merger:{gap_id}"))?;
+        self.append_operation_log(
+            &operation.id,
             &gap_id,
             "info",
             "Merging Gap branch",
@@ -81,14 +85,14 @@ impl FileMergerService {
                 "target_branch": target_branch
             }))),
         )?;
-        let result = self.merge_gap_branch(&gap_id, &branch_name, &target_branch, &job.id);
+        let result = self.merge_gap_branch(&gap_id, &branch_name, &target_branch, &operation.id);
         match result {
             Ok(merge_result) => Ok(MergerTickResult {
                 processed: Some(merge_result),
             }),
             Err(error) => {
-                let _ = self.job_registry.fail_with_error(
-                    &job.id,
+                let _ = self.operation_registry.fail_with_error(
+                    &operation.id,
                     json!({
                         "gap_id": gap_id,
                         "branch_name": branch_name,
@@ -120,7 +124,7 @@ impl FileMergerService {
         gap_id: &str,
         branch_name: &str,
         target_branch: &str,
-        job_id: &str,
+        operation_id: &str,
     ) -> RefineResult<MergerGapResult> {
         let source_root = source_root(&self.durable_root)?;
         let git = FileGitWorktreeService::with_runtime_root(&source_root, &self.runtime_root);
@@ -128,12 +132,19 @@ impl FileMergerService {
         let merge = git.merge_no_ff(branch_name)?;
         if !merge.ok {
             let recover = git.recover()?;
-            self.fail_gap_merge(gap_id, job_id, branch_name, target_branch, &merge, &recover)?;
+            self.fail_gap_merge(
+                gap_id,
+                operation_id,
+                branch_name,
+                target_branch,
+                &merge,
+                &recover,
+            )?;
             return Ok(MergerGapResult {
                 gap_id: gap_id.to_string(),
                 branch_name: branch_name.to_string(),
                 target_branch: target_branch.to_string(),
-                job_id: job_id.to_string(),
+                operation_id: operation_id.to_string(),
                 status: "failed".to_string(),
                 conflicts: merge.conflicts,
             });
@@ -143,24 +154,24 @@ impl FileMergerService {
             self.runtime_root.join("cache"),
         );
         work_items.advance_automated_gap_status(gap_id, GapStatus::Build)?;
-        self.append_job_log(
-            job_id,
+        self.append_operation_log(
+            operation_id,
             gap_id,
             "info",
             "Workflow status changed: ready-merge -> build",
             Some(json_object(json!({"merge": &merge}))),
         )?;
         work_items.advance_automated_gap_status(gap_id, GapStatus::Review)?;
-        self.append_job_log(
-            job_id,
+        self.append_operation_log(
+            operation_id,
             gap_id,
             "info",
             "Workflow status changed: build -> review",
             None,
         )?;
-        self.job_registry.finish_with_result(
-            job_id,
-            JobState::Succeeded,
+        self.operation_registry.finish_with_result(
+            operation_id,
+            OperationState::Succeeded,
             json!({
                 "gap_id": gap_id,
                 "branch_name": branch_name,
@@ -173,7 +184,7 @@ impl FileMergerService {
             gap_id: gap_id.to_string(),
             branch_name: branch_name.to_string(),
             target_branch: target_branch.to_string(),
-            job_id: job_id.to_string(),
+            operation_id: operation_id.to_string(),
             status: "review".to_string(),
             conflicts: Vec::new(),
         })
@@ -182,7 +193,7 @@ impl FileMergerService {
     fn fail_gap_merge(
         &self,
         gap_id: &str,
-        job_id: &str,
+        operation_id: &str,
         branch_name: &str,
         target_branch: &str,
         merge: &MergeResult,
@@ -193,8 +204,8 @@ impl FileMergerService {
             self.runtime_root.join("cache"),
         );
         work_items.advance_automated_gap_status(gap_id, GapStatus::Failed)?;
-        self.append_job_log(
-            job_id,
+        self.append_operation_log(
+            operation_id,
             gap_id,
             "error",
             "Gap branch merge failed",
@@ -205,8 +216,8 @@ impl FileMergerService {
                 "recover": recover
             }))),
         )?;
-        self.job_registry.fail_with_error(
-            job_id,
+        self.operation_registry.fail_with_error(
+            operation_id,
             json!({
                 "gap_id": gap_id,
                 "branch_name": branch_name,
@@ -239,26 +250,32 @@ impl FileMergerService {
         Ok(candidates.into_iter().next())
     }
 
-    fn active_merger_job(&self) -> RefineResult<bool> {
-        Ok(self.job_registry.recover()?.into_iter().any(|job| {
-            job.owner.starts_with("merger:")
-                && matches!(
-                    job.state,
-                    JobState::Pending | JobState::Running | JobState::Cancelling
-                )
-        }))
+    fn active_merger_operation(&self) -> RefineResult<bool> {
+        Ok(self
+            .operation_registry
+            .recover()?
+            .into_iter()
+            .any(|operation| {
+                operation.owner.starts_with("merger:")
+                    && matches!(
+                        operation.state,
+                        OperationState::Pending
+                            | OperationState::Running
+                            | OperationState::Cancelling
+                    )
+            }))
     }
 
-    fn append_job_log(
+    fn append_operation_log(
         &self,
-        job_id: &str,
+        operation_id: &str,
         gap_id: &str,
         severity: &str,
         message: &str,
         details: Option<JsonObject>,
     ) -> RefineResult<()> {
-        self.job_registry.append_log(
-            job_id,
+        self.operation_registry.append_log(
+            operation_id,
             LogEntry {
                 datetime: now_timestamp(),
                 severity: severity.to_string(),

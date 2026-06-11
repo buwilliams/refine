@@ -336,7 +336,7 @@ async function api(method, path, body, options = {}) {
       let msg = data?.error?.message || res.statusText || "Request failed";
       const details = data?.error?.details;
       const code = data?.error?.code;
-      if (code === "background_job_active" && details) {
+      if (code === "background_operation_active" && details) {
         msg = `${msg} Active operation: ${details}.`;
       }
       const err = new Error(msg);
@@ -389,49 +389,49 @@ async function api(method, path, body, options = {}) {
   }
 }
 
-async function waitForBackgroundJob(jobOrId, {
+async function waitForBackgroundOperation(operationOrId, {
   intervalMs = 750,
   timeoutMs = 10 * 60 * 1000,
   onProgress = null,
 } = {}) {
-  const jobId = typeof jobOrId === "string" ? jobOrId : jobOrId?.id;
-  if (!jobId) throw new Error("Background job id missing");
+  const operationId = typeof operationOrId === "string" ? operationOrId : operationOrId?.id;
+  if (!operationId) throw new Error("Background operation id missing");
   const started = Date.now();
   let lastProgress = "";
   while (true) {
-    const snap = await api("GET", `/api/jobs/${jobId}`);
-    const job = snap.job || {};
-    const progressKey = JSON.stringify(job.progress || {});
+    const snap = await api("GET", `/api/operations/${operationId}`);
+    const operation = snap.operation || {};
+    const progressKey = JSON.stringify(operation.progress || {});
     if (onProgress && progressKey !== lastProgress) {
       lastProgress = progressKey;
-      onProgress(job.progress || {}, job);
+      onProgress(operation.progress || {}, operation);
     }
-    if (job.status === "complete") return job.result || {};
-    if (job.status === "failed") {
-      const err = new Error(job.error?.message || "Background job failed");
-      err.details = job.error?.details;
-      err.code = job.error?.code;
+    if (operation.status === "complete") return operation.result || {};
+    if (operation.status === "failed") {
+      const err = new Error(operation.error?.message || "Background operation failed");
+      err.details = operation.error?.details;
+      err.code = operation.error?.code;
       throw err;
     }
-    if (job.status === "cancelled") {
-      const err = new Error("Background job cancelled");
-      err.code = "job_cancelled";
+    if (operation.status === "cancelled") {
+      const err = new Error("Background operation cancelled");
+      err.code = "operation_cancelled";
       throw err;
     }
     if (Date.now() - started > timeoutMs) {
-      throw new Error("Background job timed out");
+      throw new Error("Background operation timed out");
     }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 }
 
-async function resolveBackgroundJobResponse(response, message = "") {
-  if (!response?.job) return response;
+async function resolveBackgroundOperationResponse(response, message = "") {
+  if (!response?.operation) return response;
   if (message) toast(message, "info");
-  const result = await waitForBackgroundJob(response.job);
+  const result = await waitForBackgroundOperation(response.operation);
   if (result.http_status && result.http_status >= 400) {
     const raw = result.error || {};
-    const err = new Error(raw.message || "Background job failed");
+    const err = new Error(raw.message || "Background operation failed");
     err.details = raw.details;
     err.code = raw.code;
     throw err;
@@ -1327,11 +1327,11 @@ function isNodeOwnershipError(err) {
     || (err?.status === 409 && /owned by another node/i.test(err?.message || ""));
 }
 
-function isBackgroundJobActiveError(err) {
-  return err?.code === "background_job_active";
+function isBackgroundOperationActiveError(err) {
+  return err?.code === "background_operation_active";
 }
 
-function backgroundJobActiveMessage(err) {
+function backgroundOperationActiveMessage(err) {
   const base = err?.message || "Refine is already applying changes.";
   const hasDetails = err?.details && base.includes(err.details);
   const details = err?.details && !hasDetails ? `\n\nActive operation: ${err.details}` : "";
@@ -1345,8 +1345,8 @@ async function showActionError(err, fallbackPrefix = "") {
     });
     return;
   }
-  if (isBackgroundJobActiveError(err)) {
-    await modalAlert(backgroundJobActiveMessage(err), {
+  if (isBackgroundOperationActiveError(err)) {
+    await modalAlert(backgroundOperationActiveMessage(err), {
       title: "Refine is busy",
       okLabel: "OK",
       kind: "warn",

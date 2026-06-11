@@ -119,8 +119,8 @@ function buildManagedProcessRows(processes, pauseState, backend, runnerReachable
     runner_reachable: runnerReachable,
     pid: null,
     details: backgroundStopped
-      ? "Automatic runner work, agent launches, chats, and UI background jobs are stopped."
-      : "Automatic runner work, agent launches, chats, and UI background jobs can run.",
+      ? "Automatic runner work, agent launches, chats, and UI background operations are stopped."
+      : "Automatic runner work, agent launches, chats, and UI background operations can run.",
     background_processes_stopped: backgroundStopped,
     actions: [backgroundStopped ? "start_background_processes" : "stop_background_processes", "hard_reset_worktree"],
     cpu_priority: { label: "-" },
@@ -839,7 +839,7 @@ function bindSettingsProcessesTab(s) {
       const shouldStop = b.dataset.toggleBackgroundProcesses === "stop";
       const ok = shouldStop
         ? await modalConfirm(
-            "Stop background processes? Refine will keep the UI and backend running, pause workflow automation, stop chats and agents, clear queued builds, and cancel active background jobs.",
+            "Stop background processes? Refine will keep the UI and backend running, pause workflow automation, stop chats and agents, clear queued builds, and cancel active background operations.",
             { title: "Stop background processes", okLabel: "Stop background processes", danger: true },
           )
         : true;

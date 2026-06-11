@@ -10,7 +10,9 @@ use crate::model::log::LogEntry;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
+};
 use crate::process::supervisor::security::FileSecurityService;
 
 use super::types::*;
@@ -815,8 +817,8 @@ pub struct QualityCheckResult {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct QualityJobResult {
-    pub job: JobHandle,
+pub struct QualityOperationResult {
+    pub operation: OperationHandle,
     pub result: QualityCheckResult,
 }
 
@@ -830,12 +832,12 @@ pub trait QualityService {
 }
 
 #[derive(Clone, Debug)]
-pub struct QualityJobRunner {
+pub struct QualityOperationRunner {
     pub durable_root: PathBuf,
     pub runtime_root: PathBuf,
 }
 
-impl QualityJobRunner {
+impl QualityOperationRunner {
     pub fn new(durable_root: impl Into<PathBuf>, runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             durable_root: durable_root.into(),
@@ -843,12 +845,12 @@ impl QualityJobRunner {
         }
     }
 
-    pub fn run_checks(&self, request: QualityCheckRequest) -> RefineResult<QualityJobResult> {
-        let registry = FileJobRegistry::new(&self.runtime_root);
-        let job = registry.register(&format!("quality:{}", request.owner_id))?;
+    pub fn run_checks(&self, request: QualityCheckRequest) -> RefineResult<QualityOperationResult> {
+        let registry = FileOperationRegistry::new(&self.runtime_root);
+        let operation = registry.register(&format!("quality:{}", request.owner_id))?;
         registry.append_log(
-            &job.id,
-            quality_job_log(
+            &operation.id,
+            quality_operation_log(
                 &request.owner_id,
                 "info",
                 "Quality checks started",
@@ -861,8 +863,8 @@ impl QualityJobRunner {
         let service = FileQualityService::with_runtime_root(&self.durable_root, &self.runtime_root);
         let result = service.run_checks(request)?;
         registry.append_log(
-            &job.id,
-            quality_job_log(
+            &operation.id,
+            quality_operation_log(
                 &result.owner_id,
                 if result.ok { "info" } else { "error" },
                 if result.ok {
@@ -876,15 +878,15 @@ impl QualityJobRunner {
                 })),
             ),
         )?;
-        let job = registry.finish(
-            &job.id,
+        let operation = registry.finish(
+            &operation.id,
             if result.ok {
-                JobState::Succeeded
+                OperationState::Succeeded
             } else {
-                JobState::Failed
+                OperationState::Failed
             },
         )?;
-        Ok(QualityJobResult { job, result })
+        Ok(QualityOperationResult { operation, result })
     }
 }
 
@@ -1213,7 +1215,7 @@ pub(super) fn tail_text(value: &str, max_chars: usize) -> Option<String> {
     }
 }
 
-pub(super) fn quality_job_log(
+pub(super) fn quality_operation_log(
     owner_id: &str,
     severity: &str,
     message: &str,

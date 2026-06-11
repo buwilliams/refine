@@ -168,7 +168,7 @@ Desktop shell      Browser UI          CLI
                       |
                     workflow/tools
    supervisor, product workflow, host adapters,
-   jobs, storage orchestration, observability
+   operations, storage orchestration, observability
                       |
                     model
        canonical records, workflow states,
@@ -373,7 +373,7 @@ Rules:
   Gaps, and skips already `cancelled` Gaps.
 - Feature cancel must stop or reconcile active work before recording the final
   cancellation result, so users do not see running agent, QA, merge, or rebuild
-  jobs continue after the Feature was cancelled.
+  operations continue after the Feature was cancelled.
 
 ### Workflow Model
 
@@ -562,7 +562,7 @@ Requirements:
 - Desktop, browser, and CLI use the same local daemon routes.
 - The daemon must bind and expose supported HTTP APIs only as a local control
   surface. Local mutation routes do not require authorization tokens.
-- Web UI can stream activity, process output, job progress, and chat events.
+- Web UI can stream activity, process output, operation progress, and chat events.
 - Desktop can subscribe to events for badges, tray state, and notifications.
 
 ### Project Registry
@@ -733,11 +733,11 @@ Owns abstractions for: run checks, browser QA, regressions, screenshots, compare
 
 Requirements:
 
-- Quality checks are jobs supervised by the daemon.
+- Quality checks are operations supervised by the daemon.
 - Browser automation dependencies are discovered and repaired separately from
   Refine's own runtime dependencies.
 - Results are persisted, visible, and tied to the relevant Gap, Feature, or app.
-- Users can rerun, cancel, and inspect quality jobs from any surface.
+- Users can rerun, cancel, and inspect quality operations from any surface.
 
 ### Chat And Planning
 
@@ -756,7 +756,7 @@ Requirements:
   mode, provider, provider session id when known, attached Gap or Feature id,
   created/updated timestamps, transcript events, importable artifacts, and
   closed/interrupted status are persisted outside in-memory process state.
-- In-flight provider processes are runtime jobs, not durable conversation
+- In-flight provider processes are runtime operations, not durable conversation
   state. After a daemon crash or restart, unfinished turns are marked
   interrupted with enough diagnostic detail for the UI or CLI to show what
   happened and let the user resume or start a new turn.
@@ -871,7 +871,7 @@ refine/
         cluster/
       supervisor/
         lifecycle/
-        jobs/
+        operations/
         security/
         runtime/
         config/
@@ -930,7 +930,7 @@ workflow
   workflow::{engine, context, behavior, behaviors}
       |
 tools
-  tools::supervisor::{lifecycle, jobs, security, runtime, config}
+  tools::supervisor::{lifecycle, operations, security, runtime, config}
   tools::product::{work_items, project_state, ...}
   tools::host::{process_supervision, target_apps, git_worktrees, ...}
       |
@@ -953,7 +953,7 @@ Rules:
 - `tools::host::*` modules own OS, Git, process, provider, browser, Docker,
   toolchain, target-app, quality, and cluster integration using model-defined
   process and ownership types.
-- `tools::supervisor::*` modules own daemon authority, runtime lifecycle, jobs,
+- `tools::supervisor::*` modules own daemon authority, runtime lifecycle, operations,
   security, configuration, error translation, and testing support.
 - `tools::observability::*` modules own the single abstraction for logs,
   activity, metrics, diagnostics, and support bundles. Processing modules emit
@@ -980,8 +980,8 @@ product capability:
 - `tools::supervisor::runtime`; path: `src/tools/supervisor/runtime/`. Owns
   runtime bootstrap, OS path selection, instance identity, process startup
   context, and repo-root `run/` path resolution.
-- `tools::supervisor::jobs`; path: `src/tools/supervisor/jobs/`. Owns the
-  job registry, operation handles, cancellation plumbing, and operation
+- `tools::supervisor::operations`; path: `src/tools/supervisor/operations/`. Owns the
+  operation registry, operation handles, cancellation plumbing, and operation
   recovery coordination.
 - `tools::supervisor::config`; path: `src/tools/supervisor/config/`. Owns
   loading, validating, and merging user, project, and runtime configuration.
@@ -1058,7 +1058,7 @@ Representative API groups:
 - `/apps`: target-app registry, attach, switch, detach, commands.
 - `/work`: Gaps, Features, imports, state transitions.
 - `/agents`: provider configuration, auth, diagnostics.
-- `/jobs`: operation status, logs, cancel, retry.
+- `/operations`: operation status, logs, cancel.
 - `/processes`: managed process list and controls.
 - `/quality`: checks, regressions, screenshots.
 - `/chat`: sessions, messages, streaming events.
@@ -1204,11 +1204,11 @@ Dashboard projection:
 
 Runtime projection:
 
-- Keep supervisor, process, background-job, target-app, performance, and
+- Keep supervisor, process, background-operation, target-app, performance, and
   preflight snapshots in local runtime cache state rather than Git-visible
   durable model records.
 - These runtime projections still need indexed lookup and pagination where the
-  UI asks for process, performance, or job tables, but they are not part of the
+  UI asks for process, performance, or operation tables, but they are not part of the
   portable workflow model.
 
 Project, settings, and source-tree caches:
@@ -1221,8 +1221,8 @@ Project, settings, and source-tree caches:
   projections. They describe the target application's source tree, not Refine
   workflow state, and should be invalidated by filesystem fingerprints or Git
   metadata.
-- Keep in-flight chat turns, provider processes, and import preparation jobs in
-  runtime/job state. Durable chat records preserve session metadata,
+- Keep in-flight chat turns, provider processes, and import preparation operations in
+  runtime/operation state. Durable chat records preserve session metadata,
   transcripts, provider resume ids, and interrupted/closed status, but runtime
   process handles and transient progress buffers remain local runtime state.
 - Keep cache rebuild, cleanup, and projection diagnostics observable through

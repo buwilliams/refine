@@ -41,21 +41,21 @@ async function extractPlanDraftsInBackground(text) {
       purpose: "plan",
       background: true,
     });
-    if (!response?.job?.id) return response;
+    if (!response?.operation?.id) return response;
     recordUiNotice("Plan Draft extraction queued", {
       kind: "queued",
-      source: "background-job",
-      details: { job_id: response.job.id },
+      source: "background-operation",
+      details: { operation_id: response.operation.id },
     });
     try {
-      const result = await waitForBackgroundJob(response.job.id, {
-        onProgress: (progress, job) => {
+      const result = await waitForBackgroundOperation(response.operation.id, {
+        onProgress: (progress, operation) => {
           const message = String(progress?.message || "").trim();
           if (message) {
             recordUiNotice(message, {
-              kind: job?.status === "complete" ? "success" : "info",
-              source: "background-job",
-              details: { job_id: response.job.id },
+              kind: operation?.status === "complete" ? "success" : "info",
+              source: "background-operation",
+              details: { operation_id: response.operation.id },
             });
           }
           if (state.currentRoute === "node" && typeof refreshCurrentSettingsSurface === "function") {
@@ -72,15 +72,15 @@ async function extractPlanDraftsInBackground(text) {
       }
       recordUiNotice("Plan Draft extraction completed", {
         kind: "success",
-        source: "background-job",
-        details: { job_id: response.job.id },
+        source: "background-operation",
+        details: { operation_id: response.operation.id },
       });
       return result;
     } catch (error) {
       recordUiNotice(error.message || "Plan Draft extraction failed", {
         kind: "error",
-        source: "background-job",
-        details: { job_id: response.job.id, code: error.code || "" },
+        source: "background-operation",
+        details: { operation_id: response.operation.id, code: error.code || "" },
       });
       throw error;
     } finally {
@@ -114,7 +114,7 @@ function drawImportProgress(root, state) {
 async function reviewImportDrafts(root, drafts, close, saveSession = null) {
   if (saveSession) saveSession({ phase: "deduping", drafts });
   const annotated = await annotateImportDuplicateDrafts(drafts);
-  if (saveSession) saveSession({ phase: "review", drafts: annotated, jobId: "", result: null, error: "" });
+  if (saveSession) saveSession({ phase: "review", drafts: annotated, operationId: "", result: null, error: "" });
   drawImportDrafts(root, annotated, close, { saveSession });
 }
 
@@ -259,15 +259,15 @@ async function parseImportCsvBackend(text, progressRoot = null, saveSession = nu
     dedup: true,
     distribute: !!options.distribute,
   });
-  if (r.job) {
+  if (r.operation) {
     if (saveSession) {
       saveSession({
         phase: "parsing",
-        prepareJobId: r.job.id,
-        progress: r.job.progress || {},
+        prepareOperationId: r.operation.id,
+        progress: r.operation.progress || {},
       });
     }
-    r = await waitForImportPrepareJob(r.job.id, progressRoot, saveSession);
+    r = await waitForImportPrepareOperation(r.operation.id, progressRoot, saveSession);
   }
   return r.drafts || [];
 }
@@ -290,21 +290,21 @@ function drawImportPrepareProgress(root, progress = {}) {
   `;
 }
 
-async function waitForImportPrepareJob(jobId, progressRoot = null, saveSession = null) {
+async function waitForImportPrepareOperation(operationId, progressRoot = null, saveSession = null) {
   while (true) {
-    const snap = await api("GET", `/api/jobs/${jobId}`);
-    const job = snap.job || {};
-    const progress = job.progress || {};
+    const snap = await api("GET", `/api/operations/${operationId}`);
+    const operation = snap.operation || {};
+    const progress = operation.progress || {};
     if (saveSession) {
       saveSession({
         phase: "parsing",
-        prepareJobId: jobId,
+        prepareOperationId: operationId,
         progress,
       });
     }
     drawImportPrepareProgress(progressRoot, progress);
-    if (job.status === "complete") {
-      const result = job.result || {};
+    if (operation.status === "complete") {
+      const result = operation.result || {};
       if (result.http_status && result.http_status >= 400) {
         const raw = result.error || {};
         const err = new Error(raw.message || "CSV import preparation failed");
@@ -314,15 +314,15 @@ async function waitForImportPrepareJob(jobId, progressRoot = null, saveSession =
       }
       return result;
     }
-    if (job.status === "cancelled") {
+    if (operation.status === "cancelled") {
       const err = new Error("Import preparation cancelled");
-      err.code = "job_cancelled";
+      err.code = "operation_cancelled";
       throw err;
     }
-    if (job.status === "failed") {
-      const err = new Error(job.error?.message || "CSV import preparation failed");
-      err.details = job.error?.details;
-      err.code = job.error?.code;
+    if (operation.status === "failed") {
+      const err = new Error(operation.error?.message || "CSV import preparation failed");
+      err.details = operation.error?.details;
+      err.code = operation.error?.code;
       throw err;
     }
     await new Promise((resolve) => setTimeout(resolve, 500));

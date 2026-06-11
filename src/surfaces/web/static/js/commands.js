@@ -70,7 +70,7 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
       filter: currentNodeBulkFilter(source),
       update: { status: dest },
     });
-    r = await resolveBackgroundJobResponse(
+    r = await resolveBackgroundOperationResponse(
       r,
       "Bulk status update is running in the background",
     );
@@ -95,7 +95,7 @@ async function runFailedBackCommand({ button = null } = {}) {
       filter: currentNodeBulkFilter("failed"),
       update: { status: "__last_workflow_state" },
     });
-    r = await resolveBackgroundJobResponse(
+    r = await resolveBackgroundOperationResponse(
       r,
       "Bulk retry is running in the background",
     );
@@ -579,36 +579,36 @@ async function ensureTargetAppSettingsPane() {
   await refreshSettingsTab("target-app", { force: true });
 }
 
-const TARGET_APP_GENERATE_JOB_KEY = "refine_target_app_generate_job";
-let targetAppGeneratePollJobId = "";
+const TARGET_APP_GENERATE_OPERATION_KEY = "refine_target_app_generate_operation";
+let targetAppGeneratePollOperationId = "";
 let targetAppGeneratePollPromise = null;
 
-function readTargetAppGenerateJob() {
+function readTargetAppGenerateOperation() {
   try {
-    const raw = localStorage.getItem(TARGET_APP_GENERATE_JOB_KEY);
+    const raw = localStorage.getItem(TARGET_APP_GENERATE_OPERATION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    const jobId = String(parsed?.jobId || "").trim();
-    if (!jobId) return null;
+    const operationId = String(parsed?.operationId || "").trim();
+    if (!operationId) return null;
     const startedAt = Number(parsed?.startedAt || 0);
     if (startedAt && Date.now() - startedAt > 12 * 60 * 60 * 1000) {
-      localStorage.removeItem(TARGET_APP_GENERATE_JOB_KEY);
+      localStorage.removeItem(TARGET_APP_GENERATE_OPERATION_KEY);
       return null;
     }
-    return { jobId, startedAt };
+    return { operationId, startedAt };
   } catch {
-    localStorage.removeItem(TARGET_APP_GENERATE_JOB_KEY);
+    localStorage.removeItem(TARGET_APP_GENERATE_OPERATION_KEY);
     return null;
   }
 }
 
-function writeTargetAppGenerateJob(jobId) {
-  if (!jobId) {
-    localStorage.removeItem(TARGET_APP_GENERATE_JOB_KEY);
+function writeTargetAppGenerateOperation(operationId) {
+  if (!operationId) {
+    localStorage.removeItem(TARGET_APP_GENERATE_OPERATION_KEY);
     return;
   }
-  localStorage.setItem(TARGET_APP_GENERATE_JOB_KEY, JSON.stringify({
-    jobId,
+  localStorage.setItem(TARGET_APP_GENERATE_OPERATION_KEY, JSON.stringify({
+    operationId,
     startedAt: Date.now(),
   }));
 }
@@ -636,70 +636,70 @@ async function handleTargetAppGenerateResult(result) {
   throw new Error("Generation produced no configuration");
 }
 
-async function waitForTargetAppGenerateJob(jobId) {
-  if (targetAppGeneratePollJobId === jobId && targetAppGeneratePollPromise) {
+async function waitForTargetAppGenerateOperation(operationId) {
+  if (targetAppGeneratePollOperationId === operationId && targetAppGeneratePollPromise) {
     return await targetAppGeneratePollPromise;
   }
-  targetAppGeneratePollJobId = jobId;
-  targetAppGeneratePollPromise = waitForBackgroundJob(jobId, {
+  targetAppGeneratePollOperationId = operationId;
+  targetAppGeneratePollPromise = waitForBackgroundOperation(operationId, {
     onProgress: (progress) => {
       const message = String(progress?.message || "").trim();
-      if (message) recordUiNotice(message, { kind: "info", source: "background-job" });
+      if (message) recordUiNotice(message, { kind: "info", source: "background-operation" });
     },
   });
   try {
     return await targetAppGeneratePollPromise;
   } finally {
-    targetAppGeneratePollJobId = "";
+    targetAppGeneratePollOperationId = "";
     targetAppGeneratePollPromise = null;
   }
 }
 
-async function resumeTargetAppGenerateJob() {
-  const active = readTargetAppGenerateJob();
+async function resumeTargetAppGenerateOperation() {
+  const active = readTargetAppGenerateOperation();
   if (!active) {
     setTargetAppGenerateButtonLoading(false);
     return null;
   }
   setTargetAppGenerateButtonLoading(true);
   try {
-    const result = await waitForTargetAppGenerateJob(active.jobId);
-    writeTargetAppGenerateJob("");
+    const result = await waitForTargetAppGenerateOperation(active.operationId);
+    writeTargetAppGenerateOperation("");
     setTargetAppGenerateButtonLoading(false);
     return await handleTargetAppGenerateResult(result);
   } catch (error) {
-    writeTargetAppGenerateJob("");
+    writeTargetAppGenerateOperation("");
     setTargetAppGenerateButtonLoading(false);
     throw error;
   }
 }
 
 function syncTargetAppGenerateButtonState() {
-  if (!readTargetAppGenerateJob()) {
+  if (!readTargetAppGenerateOperation()) {
     setTargetAppGenerateButtonLoading(false);
     return;
   }
-  resumeTargetAppGenerateJob().catch((error) => {
+  resumeTargetAppGenerateOperation().catch((error) => {
     showActionError(error, "Target-app config generation failed");
   });
 }
 
-async function runTargetAppGenerateJob() {
+async function runTargetAppGenerateOperation() {
   const response = await api("POST", "/api/target-app/generate-instructions", {
     kind: "all",
     background: true,
   });
-  if (!response?.job?.id) {
+  if (!response?.operation?.id) {
     return await handleTargetAppGenerateResult(response);
   }
-  writeTargetAppGenerateJob(response.job.id);
+  writeTargetAppGenerateOperation(response.operation.id);
   setTargetAppGenerateButtonLoading(true);
   recordUiNotice("Target-app config generation queued", {
     kind: "queued",
-    source: "background-job",
+    source: "background-operation",
   });
-  const result = await waitForTargetAppGenerateJob(response.job.id);
-  writeTargetAppGenerateJob("");
+  const result = await waitForTargetAppGenerateOperation(response.operation.id);
+  writeTargetAppGenerateOperation("");
   setTargetAppGenerateButtonLoading(false);
   return await handleTargetAppGenerateResult(result);
 }
@@ -716,7 +716,7 @@ registerCommand({
   run: async ({ button } = {}) => {
     await ensureTargetAppSettingsPane();
     await withButtonBusy(button, "Generating...", async () => {
-      await runTargetAppGenerateJob();
+      await runTargetAppGenerateOperation();
     });
   },
 });
@@ -780,9 +780,9 @@ registerCommand({
   run: async ({ button } = {}) => {
     await withButtonBusy(button, "Rebuilding...", async () => {
       let result = await api("POST", "/api/cache/rebuild", { background: true });
-      if (result.job) {
-        drawSqliteCacheProgress(result.job.progress || {});
-        result = await waitForBackgroundJob(result.job, {
+      if (result.operation) {
+        drawSqliteCacheProgress(result.operation.progress || {});
+        result = await waitForBackgroundOperation(result.operation, {
           onProgress: drawSqliteCacheProgress,
         });
         if (result.http_status && result.http_status >= 400) {

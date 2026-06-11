@@ -51,14 +51,14 @@ impl InProcessWebServer {
         }
 
         if request.method == "GET"
-            && request.path.starts_with("/jobs/")
+            && request.path.starts_with("/operations/")
             && request.path.ends_with("/logs")
         {
-            return self.handle_job_logs(request, &raw_path);
+            return self.handle_operation_logs(request, &raw_path);
         }
 
-        if request.method == "GET" && request.path.starts_with("/jobs/") {
-            return self.handle_job_status(request);
+        if request.method == "GET" && request.path.starts_with("/operations/") {
+            return self.handle_operation_status(request);
         }
 
         if request.method == "POST"
@@ -76,17 +76,10 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST"
-            && request.path.starts_with("/jobs/")
-            && request.path.ends_with("/retry")
-        {
-            return self.handle_job_retry(request);
-        }
-
-        if request.method == "POST"
-            && request.path.starts_with("/jobs/")
+            && request.path.starts_with("/operations/")
             && request.path.ends_with("/cancel")
         {
-            return self.handle_job_cancel(request);
+            return self.handle_operation_cancel(request);
         }
 
         if request.method == "GET"
@@ -750,7 +743,7 @@ impl InProcessWebServer {
                 200,
                 json!({
                     "stream": "sse",
-                    "events": ["activity", "process", "job", "chat"]
+                    "events": ["activity", "process", "operation", "chat"]
                 }),
             ),
             _ => ApiResponse::json(

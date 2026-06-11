@@ -337,7 +337,7 @@ fn sse_event_names(event_stream: &str) -> Vec<String> {
 fn desktop_badge_event(event: &str) -> bool {
     matches!(
         event,
-        "activity_added" | "job_progress" | "chat_event" | "process_output"
+        "activity_added" | "operation_progress" | "chat_event" | "process_output"
     )
 }
 
@@ -383,7 +383,7 @@ mod tests {
             .apply_event_stream(
                 "event: ready\ndata: {}\n\n\
                  event: status_change\ndata: {}\n\n\
-                 event: job_progress\ndata: {}\n\n\
+                 event: operation_progress\ndata: {}\n\n\
                  event: chat_event\ndata: {}\n\n",
             )
             .unwrap();

@@ -58,8 +58,8 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "provider configuration, auth, diagnostics",
     },
     ApiRouteGroup {
-        prefix: "/jobs",
-        capability: "operation status, logs, cancel, retry",
+        prefix: "/operations",
+        capability: "operation status, logs, cancel",
     },
     ApiRouteGroup {
         prefix: "/runner-workers",
@@ -71,7 +71,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/events",
-        capability: "server-sent events for app, process, job, chat updates",
+        capability: "server-sent events for app, process, operation, chat updates",
     },
     ApiRouteGroup {
         prefix: "/quality",
@@ -204,7 +204,7 @@ macro_rules! require_durable_root {
 }
 
 mod http;
-mod job_routes;
+mod operation_routes;
 mod project_routes;
 mod quality_chat_routes;
 mod runtime;

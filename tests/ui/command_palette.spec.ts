@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import { ensureAttachedProject, jsonObject, waitForJobResult } from "./helpers";
+import { ensureAttachedProject, jsonObject, waitForOperationResult } from "./helpers";
 
 function testAppRoot(): string {
   return process.env.REFINE_TEST_APP_ROOT ||
@@ -689,7 +689,7 @@ test("runs AI plan, draft, and target-app generation from the command palette", 
     await runPaletteCommand(page, "draft-gaps");
     await expect(page.getByTestId("plan-drafts-modal")).toHaveCount(0);
     const extractPayload = await (await extracted).json();
-    expect(String(extractPayload.job?.id ?? "")).toBeTruthy();
+    expect(String(extractPayload.operation?.id ?? "")).toBeTruthy();
     await expect(page.getByTestId("plan-drafts-modal")).toBeVisible();
     await page.getByTestId("import-feature-new-name").fill(featureName);
     await expect(page.getByTestId("import-draft-actual").first()).toHaveValue(/smoke-ai plan actual behavior one/);
@@ -706,10 +706,10 @@ test("runs AI plan, draft, and target-app generation from the command palette", 
     await runPaletteCommand(page, "target-generate");
     await page.getByRole("button", { name: "Generate", exact: true }).click();
     const generatePayload = await (await generated).json();
-    const generateJobId = String(generatePayload.job?.id ?? "");
-    expect(generatePayload.job?.owner).toBe("target-app:generate");
-    expect(generateJobId).toBeTruthy();
-    const generateResult = await waitForJobResult(request, generateJobId);
+    const generateOperationId = String(generatePayload.operation?.id ?? "");
+    expect(generatePayload.operation?.owner).toBe("target-app:generate");
+    expect(generateOperationId).toBeTruthy();
+    const generateResult = await waitForOperationResult(request, generateOperationId);
     expect(generateResult.provider).toBe("smoke-ai");
     expect(generateResult.source).toBe("provider");
     const generateConfig = (generateResult.config as Record<string, unknown> | undefined) ?? {};

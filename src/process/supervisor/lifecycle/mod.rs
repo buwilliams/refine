@@ -11,7 +11,7 @@ use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessSupervisor,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::process::supervisor::runtime::RuntimeRoot;
 
 pub const DAEMON_STATUS_FILE: &str = "daemon-status.json";
@@ -370,7 +370,7 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
     fn recover(&self, port: u16) -> RefineResult<DaemonStatus> {
         let port_root = self.runtime_root.port_root(port);
         let recovered = FileProcessSupervisor::new(&port_root).recover()?;
-        let interrupted_jobs = FileJobRegistry::new(&port_root).interrupt_active()?;
+        let interrupted_operations = FileOperationRegistry::new(&port_root).interrupt_active()?;
         let mut status = running_status(port);
         status.active_operations = recovered
             .iter()
@@ -378,11 +378,13 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
             .map(|process| process.id.clone())
             .collect();
         status.active_operations.extend(
-            FileJobRegistry::new(&port_root)
+            FileOperationRegistry::new(&port_root)
                 .recover()?
                 .into_iter()
-                .filter(|job| matches!(job.state.as_api_status(), "pending" | "running"))
-                .map(|job| job.id),
+                .filter(|operation| {
+                    matches!(operation.state.as_api_status(), "pending" | "running")
+                })
+                .map(|operation| operation.id),
         );
         if recovered
             .iter()
@@ -392,10 +394,10 @@ impl DaemonLifecycleService for FileDaemonLifecycleService {
                 .degraded_integrations
                 .push("process-recovery-reconciled".to_string());
         }
-        if !interrupted_jobs.is_empty() {
+        if !interrupted_operations.is_empty() {
             status
                 .degraded_integrations
-                .push("job-recovery-interrupted".to_string());
+                .push("operation-recovery-interrupted".to_string());
         }
         self.write_status(&status)?;
         Ok(status)
@@ -562,8 +564,10 @@ mod tests {
                 exit_code: None,
             })
             .unwrap();
-        let job_registry = FileJobRegistry::new(runtime_root.port_root(4555));
-        let job = job_registry.register("gap GAP1 implementation").unwrap();
+        let operation_registry = FileOperationRegistry::new(runtime_root.port_root(4555));
+        let operation = operation_registry
+            .register("gap GAP1 implementation")
+            .unwrap();
         let service = FileDaemonLifecycleService::new(runtime_root);
 
         let status = service.recover(4555).unwrap();
@@ -580,10 +584,14 @@ mod tests {
         assert!(
             status
                 .degraded_integrations
-                .contains(&"job-recovery-interrupted".to_string())
+                .contains(&"operation-recovery-interrupted".to_string())
         );
         assert_eq!(
-            job_registry.status(&job.id).unwrap().state.as_api_status(),
+            operation_registry
+                .status(&operation.id)
+                .unwrap()
+                .state
+                .as_api_status(),
             "interrupted"
         );
 

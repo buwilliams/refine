@@ -2540,7 +2540,7 @@ async function draftGapsFromPlan() {
   toast("Extracting Plan Feature and Gaps in the background.", "info");
   recordUiNotice("Plan Draft extraction started", {
     kind: "info",
-    source: "background-job",
+    source: "background-operation",
   });
   minimizeToolbar();
   try {

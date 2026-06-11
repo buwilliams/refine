@@ -1,6 +1,8 @@
 use crate::model::log::LogEntry;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobHandle, JobRegistry, JobState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
+};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
@@ -266,7 +268,7 @@ fn web_server_route_groups_cover_static_web_surface() {
         "/governance",
         "/guidance",
         "/import",
-        "/jobs",
+        "/operations",
         "/nodes",
         "/performance",
         "/processes",
@@ -1550,7 +1552,7 @@ fn web_server_cancels_and_deletes_features() {
             exit_code: None,
         })
         .unwrap();
-    let job = FileJobRegistry::new(&runtime_root)
+    let operation = FileOperationRegistry::new(&runtime_root)
         .register("feature FEA1 gap GAP2")
         .unwrap();
 
@@ -1562,14 +1564,14 @@ fn web_server_cancels_and_deletes_features() {
     assert_eq!(feature_cancel.status, 200);
     assert_eq!(feature_cancel.body["rollup"]["cancelled_count"], 2);
     assert_eq!(feature_cancel.body["runtime_reconciled"]["processes"], 1);
-    assert_eq!(feature_cancel.body["runtime_reconciled"]["jobs"], 1);
+    assert_eq!(feature_cancel.body["runtime_reconciled"]["operations"], 1);
     assert!(supervisor.inspect(&process.id).is_err());
     assert_eq!(
-        FileJobRegistry::new(&runtime_root)
-            .status(&job.id)
+        FileOperationRegistry::new(&runtime_root)
+            .status(&operation.id)
             .unwrap()
             .state,
-        JobState::Cancelled
+        OperationState::Cancelled
     );
 
     let feature_delete = server.handle(ApiRequest {
@@ -1910,35 +1912,41 @@ fn web_server_cancels_background_import_persist_and_rolls_back_created_gaps() {
         })),
     });
     assert_eq!(started.status, 202);
-    let job_id = started.body["job"]["id"].as_str().unwrap().to_string();
+    let operation_id = started.body["operation"]["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: format!("/api/jobs/{job_id}/cancel"),
+        path: format!("/api/operations/{operation_id}/cancel"),
         body: None,
     });
     assert_eq!(cancel.status, 200);
-    assert_eq!(cancel.body["job"]["status"], "cancelled");
+    assert_eq!(cancel.body["operation"]["status"], "cancelled");
 
-    let registry = FileJobRegistry::new(&runtime_root);
+    let registry = FileOperationRegistry::new(&runtime_root);
     let worker_deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        let job = registry.status(&job_id).unwrap();
-        if job.progress["message"] == "Import cancelled" {
-            assert_eq!(job.state, JobState::Cancelled);
-            assert_eq!(job.progress["completed"], 0);
-            assert_eq!(job.progress["total"], 240);
+        let operation = registry.status(&operation_id).unwrap();
+        if operation.progress["message"] == "Import cancelled" {
+            assert_eq!(operation.state, OperationState::Cancelled);
+            assert_eq!(operation.progress["completed"], 0);
+            assert_eq!(operation.progress["total"], 240);
             break;
         }
         assert!(
-            !matches!(job.state, JobState::Succeeded | JobState::Failed),
+            !matches!(
+                operation.state,
+                OperationState::Succeeded | OperationState::Failed
+            ),
             "background import finished instead of observing cancellation: {:?}",
-            job
+            operation
         );
         assert!(
             Instant::now() < worker_deadline,
             "timed out waiting for background import worker to observe cancellation: {:?}",
-            job
+            operation
         );
         thread::sleep(Duration::from_millis(10));
     }
@@ -2829,16 +2837,16 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert_eq!(health.status, 200);
     assert_eq!(health.body["last_check_ok"], true);
 
-    let job_registry = FileJobRegistry::new(&runtime_root);
-    let job = job_registry.register("sse-job").unwrap();
-    job_registry
+    let operation_registry = FileOperationRegistry::new(&runtime_root);
+    let operation = operation_registry.register("sse-operation").unwrap();
+    operation_registry
         .append_log(
-            &job.id,
+            &operation.id,
             LogEntry {
                 datetime: String::new(),
                 severity: "info".to_string(),
-                category: "job".to_string(),
-                message: "SSE job progress".to_string(),
+                category: "operation".to_string(),
+                message: "SSE operation progress".to_string(),
                 details: None,
                 actions: Vec::new(),
                 actor: None,
@@ -2890,8 +2898,8 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert!(sse_body.contains("event: system_operation"));
     assert!(sse_body.contains("event: process_output"));
     assert!(sse_body.contains("SSE process output"));
-    assert!(sse_body.contains("event: job_progress"));
-    assert!(sse_body.contains("SSE job progress"));
+    assert!(sse_body.contains("event: operation_progress"));
+    assert!(sse_body.contains("SSE operation progress"));
     assert!(sse_body.contains("event: chat_event"));
     assert!(sse_body.contains("SSE chat event"));
 
@@ -2899,41 +2907,41 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
 }
 
 #[test]
-fn web_server_reads_and_cancels_runtime_jobs() {
-    let temp_root = unique_temp_dir("http-jobs");
+fn web_server_reads_and_cancels_runtime_operations() {
+    let temp_root = unique_temp_dir("http-operations");
     let durable_root = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(&durable_root).unwrap();
-    let registry = FileJobRegistry::new(&runtime_root);
-    let job = registry.register("bulk_update_gaps").unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = registry.register("bulk_update_gaps").unwrap();
     let mut server = server_with_projection();
     server.durable_root = Some(durable_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
     let status = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: format!("/api/jobs/{}", job.id),
+        path: format!("/api/operations/{}", operation.id),
         body: None,
     });
     assert_eq!(status.status, 200);
-    assert_eq!(status.body["job"]["status"], "running");
+    assert_eq!(status.body["operation"]["status"], "running");
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert_eq!(cached.runtime.background_jobs[0]["id"], job.id);
-    assert_eq!(cached.runtime.background_jobs[0]["status"], "running");
+    assert_eq!(cached.runtime.background_operations[0]["id"], operation.id);
+    assert_eq!(cached.runtime.background_operations[0]["status"], "running");
 
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: format!("/api/jobs/{}/cancel", job.id),
+        path: format!("/api/operations/{}/cancel", operation.id),
         body: None,
     });
     assert_eq!(cancel.status, 200);
-    assert_eq!(cancel.body["job"]["status"], "cancelled");
+    assert_eq!(cancel.body["operation"]["status"], "cancelled");
     let logs = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: format!("/api/jobs/{}/logs?limit=10", job.id),
+        path: format!("/api/operations/{}/logs?limit=10", operation.id),
         body: None,
     });
     assert_eq!(logs.status, 200);
@@ -2943,13 +2951,16 @@ fn web_server_reads_and_cancels_runtime_jobs() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|entry| entry["message"] == "Job cancelled")
+            .any(|entry| entry["message"] == "Operation cancelled")
     );
     let cached = FileProjectStateStore::new(&durable_root)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert_eq!(cached.runtime.background_jobs[0]["status"], "cancelled");
+    assert_eq!(
+        cached.runtime.background_operations[0]["status"],
+        "cancelled"
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -2982,7 +2993,7 @@ fn web_server_retries_workflow_executions() {
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert!(cached.runtime.background_jobs.is_empty());
+    assert!(cached.runtime.background_operations.is_empty());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -3494,21 +3505,21 @@ fn web_server_manages_quality_settings_and_regressions() {
     assert_eq!(checks.status, 200);
     assert_eq!(checks.body["ok"], true);
     assert_eq!(checks.body["result"]["owner_id"], "GAP1");
-    assert_eq!(checks.body["job"]["owner"], "quality:GAP1");
-    assert_eq!(checks.body["job"]["status"], "complete");
+    assert_eq!(checks.body["operation"]["owner"], "quality:GAP1");
+    assert_eq!(checks.body["operation"]["status"], "complete");
     assert!(
         checks.body["result"]["diagnostics"][0]
             .as_str()
             .unwrap()
             .contains("quality-ok")
     );
-    let quality_job_id = checks.body["job"]["id"].as_str().unwrap();
-    let quality_job_logs = FileJobRegistry::new(&runtime_root)
-        .page_logs(quality_job_id, 10, 0)
+    let quality_operation_id = checks.body["operation"]["id"].as_str().unwrap();
+    let quality_operation_logs = FileOperationRegistry::new(&runtime_root)
+        .page_logs(quality_operation_id, 10, 0)
         .unwrap()
         .0;
     assert!(
-        quality_job_logs
+        quality_operation_logs
             .iter()
             .any(|log| log.message == "Quality checks passed")
     );
@@ -3665,18 +3676,21 @@ fn web_server_manages_durable_chat_sessions() {
         read.body["importable_artifacts"][0]["round"]["reporter"],
         "QA"
     );
-    let jobs = FileJobRegistry::new(&runtime_root).recover().unwrap();
-    assert_eq!(jobs.len(), 1);
-    assert_eq!(jobs[0].owner, format!("chat:{session_id}"));
-    assert_eq!(jobs[0].state, JobState::Succeeded);
-    let job = server.handle(ApiRequest {
+    let operations = FileOperationRegistry::new(&runtime_root).recover().unwrap();
+    assert_eq!(operations.len(), 1);
+    assert_eq!(operations[0].owner, format!("chat:{session_id}"));
+    assert_eq!(operations[0].state, OperationState::Succeeded);
+    let operation = server.handle(ApiRequest {
         method: "GET".to_string(),
-        path: format!("/api/jobs/{}", jobs[0].id),
+        path: format!("/api/operations/{}", operations[0].id),
         body: None,
     });
-    assert_eq!(job.status, 200);
-    assert_eq!(job.body["job"]["owner"], format!("chat:{session_id}"));
-    assert_eq!(job.body["job"]["status"], "complete");
+    assert_eq!(operation.status, 200);
+    assert_eq!(
+        operation.body["operation"]["owner"],
+        format!("chat:{session_id}")
+    );
+    assert_eq!(operation.body["operation"]["status"], "complete");
 
     let stopped = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -3868,7 +3882,7 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let session = chat
         .start_with_options(ChatAttachment::Standalone, Some("smoke-ai"), Some("chat"))
         .unwrap();
-    let job = FileJobRegistry::new(&runtime_root)
+    let operation = FileOperationRegistry::new(&runtime_root)
         .register(&format!("chat:{}", session.id))
         .unwrap();
     let session_path = durable_root.join(format!("chat/sessions/{}.json", session.id));
@@ -3894,11 +3908,11 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
             .contains("Daemon restarted")
     );
     assert_eq!(
-        FileJobRegistry::new(&runtime_root)
-            .status(&job.id)
+        FileOperationRegistry::new(&runtime_root)
+            .status(&operation.id)
             .unwrap()
             .state,
-        JobState::Interrupted
+        OperationState::Interrupted
     );
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -4666,17 +4680,24 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_cluster() {
     assert!(wrapper.contains("START_COMMAND='npm run dev'"));
     assert!(wrapper.contains("BUILD_COMMAND='npm run build'"));
 
-    let generated_job = server.handle(ApiRequest {
+    let generated_operation = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/target-app/generate-instructions".to_string(),
         body: Some(json!({"kind": "all", "provider": "__local__", "background": true})),
     });
-    assert_eq!(generated_job.status, 202, "{:?}", generated_job.body);
-    let generated_job_id = generated_job.body["job"]["id"].as_str().unwrap();
-    let registry = FileJobRegistry::new(&runtime_root);
-    let generated_job = wait_for_job_status(&registry, generated_job_id, JobState::Succeeded);
     assert_eq!(
-        generated_job.result["config"]["start_command"],
+        generated_operation.status, 202,
+        "{:?}",
+        generated_operation.body
+    );
+    let generated_operation_id = generated_operation.body["operation"]["id"]
+        .as_str()
+        .unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let generated_operation =
+        wait_for_operation_status(&registry, generated_operation_id, OperationState::Succeeded);
+    assert_eq!(
+        generated_operation.result["config"]["start_command"],
         "./.refine/manage-app.sh start"
     );
     let settings = FileSettingsService::new(&durable_root).load().unwrap();
@@ -4869,17 +4890,23 @@ fn wait_for_http_request_metrics(
     Vec::new()
 }
 
-fn wait_for_job_status(registry: &FileJobRegistry, job_id: &str, expected: JobState) -> JobHandle {
+fn wait_for_operation_status(
+    registry: &FileOperationRegistry,
+    operation_id: &str,
+    expected: OperationState,
+) -> OperationHandle {
     let deadline = Instant::now() + Duration::from_secs(5);
     loop {
-        if let Ok(job) = registry.status(job_id)
-            && job.state == expected
+        if let Ok(operation) = registry.status(operation_id)
+            && operation.state == expected
         {
-            return job;
+            return operation;
         }
         if Instant::now() >= deadline {
-            let latest = registry.status(job_id).ok();
-            panic!("timed out waiting for job {job_id} to reach {expected:?}: {latest:?}");
+            let latest = registry.status(operation_id).ok();
+            panic!(
+                "timed out waiting for operation {operation_id} to reach {expected:?}: {latest:?}"
+            );
         }
         thread::sleep(Duration::from_millis(25));
     }

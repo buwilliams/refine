@@ -56,9 +56,9 @@ Fewer commits, but meaningful architecture: node-scoped JSON state, transfer flo
 
 Effort: Extreme (44 commits, 2 milestones)
 
-Milestones started: per-port Refine runtimes; cache/import/background-job hardening.
+Milestones started: per-port Refine runtimes; cache/import/background-operation hardening.
 
-Huge systems day: backend isolation, gap ownership, node hardening, transition guards, provider env capture, large import recovery, SQLite cache rebuild/background jobs.
+Huge systems day: backend isolation, gap ownership, node hardening, transition guards, provider env capture, large import recovery, SQLite cache rebuild/background operations.
 
 ## Day 9: 2026-05-21 (Thursday)
 

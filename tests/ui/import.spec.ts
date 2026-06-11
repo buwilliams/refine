@@ -57,11 +57,11 @@ test("extracts and saves AI Import drafts through Smoke AI", async ({ page, requ
       gaps?: Array<{ id?: string; name?: string }>;
     } | null = null;
     const importCompleted = page.waitForResponse(async (response) => {
-      if (!/\/api\/jobs\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
+      if (!/\/api\/operations\/[^/]+$/.test(new URL(response.url()).pathname)) return false;
       if (response.request().method() !== "GET" || response.status() !== 200) return false;
       const payload = await response.json();
-      if (payload.job?.status === "complete") {
-        completedImportResult = payload.job.result || null;
+      if (payload.operation?.status === "complete") {
+        completedImportResult = payload.operation.result || null;
         return true;
       }
       return false;
@@ -200,22 +200,22 @@ test("reviews CSV import drafts with pagination and bulk duplicate decisions", a
     );
     await page.getByTestId("import-persist").click();
     const persistStartPayload = await (await persisted).json();
-    const jobId = String(persistStartPayload.job?.id ?? "");
-    expect(jobId).toBeTruthy();
+    const operationId = String(persistStartPayload.operation?.id ?? "");
+    expect(operationId).toBeTruthy();
     await expect.poll(async () => {
-      const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-      const job = payload.job as { status?: string; result?: { count?: number } };
+      const payload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+      const operation = payload.operation as { status?: string; result?: { count?: number } };
       return {
-        status: job.status,
-        count: job.result?.count,
+        status: operation.status,
+        count: operation.result?.count,
       };
     }, { timeout: 30_000 }).toMatchObject({
       status: "complete",
       count: 29,
     });
-    const finalJobPayload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-    const jobPayload = finalJobPayload.job as { result?: { gaps?: Array<{ id?: string }> } };
-    for (const gap of jobPayload.result?.gaps ?? []) {
+    const finalOperationPayload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+    const operationPayload = finalOperationPayload.operation as { result?: { gaps?: Array<{ id?: string }> } };
+    for (const gap of operationPayload.result?.gaps ?? []) {
       if (gap.id) createdGapIds.add(String(gap.id));
     }
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
@@ -289,31 +289,31 @@ test("hides and recovers a background CSV import save", async ({ page, request }
     );
     await page.getByTestId("import-persist").click();
     const startPayload = await (await persisted).json();
-    const jobId = String(startPayload.job?.id ?? "");
-    expect(jobId).toBeTruthy();
+    const operationId = String(startPayload.operation?.id ?? "");
+    expect(operationId).toBeTruthy();
 
     await expect(page.getByTestId("import-save-hide")).toBeVisible();
     await page.getByTestId("import-save-hide").click();
     await expect(page.getByTestId("import-modal")).toHaveCount(0);
     const savedSession = await page.evaluate(() => localStorage.getItem("refine_import_session_v1"));
-    expect(savedSession).toContain(jobId);
+    expect(savedSession).toContain(operationId);
 
     await page.getByTestId("create-menu-toggle").click();
     await page.getByTestId("nav-import-gaps").click();
     await expect.poll(async () => {
-      const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-      const job = payload.job as { status?: string; result?: { count?: number } };
+      const payload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+      const operation = payload.operation as { status?: string; result?: { count?: number } };
       return {
-        status: job.status,
-        count: job.result?.count,
+        status: operation.status,
+        count: operation.result?.count,
       };
     }, { timeout: 30_000 }).toMatchObject({
       status: "complete",
       count: 60,
     });
-    const finalJobPayload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-    const jobPayload = finalJobPayload.job as { result?: { gaps?: Array<{ id?: string }> } };
-    for (const gap of jobPayload.result?.gaps ?? []) {
+    const finalOperationPayload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+    const operationPayload = finalOperationPayload.operation as { result?: { gaps?: Array<{ id?: string }> } };
+    for (const gap of operationPayload.result?.gaps ?? []) {
       if (gap.id) createdGapIds.add(String(gap.id));
     }
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
@@ -388,11 +388,11 @@ test("cancels a background CSV import save and rolls back created gaps", async (
     );
     await page.getByTestId("import-persist").click();
     const startPayload = await (await persisted).json();
-    const jobId = String(startPayload.job?.id ?? "");
-    expect(jobId).toBeTruthy();
+    const operationId = String(startPayload.operation?.id ?? "");
+    expect(operationId).toBeTruthy();
 
     const cancelled = page.waitForResponse((response) =>
-      response.url().includes(`/api/jobs/${jobId}/cancel`) &&
+      response.url().includes(`/api/operations/${operationId}/cancel`) &&
       response.request().method() === "POST" &&
       response.status() === 200
     );
@@ -400,18 +400,18 @@ test("cancels a background CSV import save and rolls back created gaps", async (
     await page.getByTestId("import-save-cancel").click();
     await page.getByTestId("modal-ok").click();
     const cancelPayload = await (await cancelled).json();
-    expect(cancelPayload.job?.status).toBe("cancelled");
+    expect(cancelPayload.operation?.status).toBe("cancelled");
 
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });
     await expect.poll(async () => page.evaluate(() => localStorage.getItem("refine_import_session_v1"))).toBeNull();
     await expect.poll(async () => {
-      const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-      const job = payload.job as { status?: string; progress?: { message?: string; completed?: number; total?: number } };
+      const payload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+      const operation = payload.operation as { status?: string; progress?: { message?: string; completed?: number; total?: number } };
       return {
-        status: job.status,
-        message: job.progress?.message,
-        completed: job.progress?.completed,
-        total: job.progress?.total,
+        status: operation.status,
+        message: operation.progress?.message,
+        completed: operation.progress?.completed,
+        total: operation.progress?.total,
       };
     }, { timeout: 30_000 }).toMatchObject({
       status: "cancelled",
@@ -509,8 +509,8 @@ test("recovers failed import drafts and retries after correcting the review", as
     );
     await page.getByTestId("import-persist").click();
     const failedPersistPayload = await (await failedPersist).json();
-    const failedJobId = String(failedPersistPayload.job?.id ?? "");
-    expect(failedJobId).toBeTruthy();
+    const failedOperationId = String(failedPersistPayload.operation?.id ?? "");
+    expect(failedOperationId).toBeTruthy();
     await expect(page.getByText("Failed drafts (1)", { exact: false })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("import-draft-error")).toContainText("was not found");
     await expect.poll(async () => page.evaluate(() => JSON.parse(localStorage.getItem("refine_import_session_v1") || "{}").phase)).toBe("failed");
@@ -532,21 +532,21 @@ test("recovers failed import drafts and retries after correcting the review", as
     );
     await page.getByTestId("import-persist").click();
     const retryPayload = await (await retried).json();
-    const retryJobId = String(retryPayload.job?.id ?? "");
-    expect(retryJobId).toBeTruthy();
+    const retryOperationId = String(retryPayload.operation?.id ?? "");
+    expect(retryOperationId).toBeTruthy();
     let retriedGapId = "";
     await expect.poll(async () => {
-      const payload = await jsonObject(await request.get(`/api/jobs/${retryJobId}`));
-      const job = payload.job as { status?: string; result?: { count?: number; gaps?: Array<{ id?: string }> } };
-      for (const gap of job.result?.gaps ?? []) {
+      const payload = await jsonObject(await request.get(`/api/operations/${retryOperationId}`));
+      const operation = payload.operation as { status?: string; result?: { count?: number; gaps?: Array<{ id?: string }> } };
+      for (const gap of operation.result?.gaps ?? []) {
         if (gap.id) {
           retriedGapId = String(gap.id);
           createdGapIds.add(retriedGapId);
         }
       }
       return {
-        status: job.status,
-        count: job.result?.count,
+        status: operation.status,
+        count: operation.result?.count,
       };
     }, { timeout: 30_000 }).toMatchObject({
       status: "complete",
@@ -634,22 +634,22 @@ test("uploads and persists CSV import drafts", async ({ page, request }) => {
     );
     await page.getByTestId("import-persist").click();
     const startPayload = await (await persisted).json();
-    const jobId = String(startPayload.job?.id ?? "");
-    expect(jobId).toBeTruthy();
+    const operationId = String(startPayload.operation?.id ?? "");
+    expect(operationId).toBeTruthy();
     await expect.poll(async () => {
-      const payload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-      const job = payload.job as { status?: string; result?: { count?: number } };
+      const payload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+      const operation = payload.operation as { status?: string; result?: { count?: number } };
       return {
-        status: job.status,
-        count: job.result?.count,
+        status: operation.status,
+        count: operation.result?.count,
       };
     }, { timeout: 30_000 }).toMatchObject({
       status: "complete",
       count: 3,
     });
-    const finalJobPayload = await jsonObject(await request.get(`/api/jobs/${jobId}`));
-    const jobPayload = finalJobPayload.job as { result?: { gaps?: Array<{ id?: string }> } };
-    for (const gap of jobPayload.result?.gaps ?? []) {
+    const finalOperationPayload = await jsonObject(await request.get(`/api/operations/${operationId}`));
+    const operationPayload = finalOperationPayload.operation as { result?: { gaps?: Array<{ id?: string }> } };
+    for (const gap of operationPayload.result?.gaps ?? []) {
       if (gap.id) createdGapIds.add(String(gap.id));
     }
     await expect(page.getByTestId("import-modal")).toHaveCount(0, { timeout: 30_000 });

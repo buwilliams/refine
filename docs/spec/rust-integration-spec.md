@@ -401,7 +401,7 @@ Acceptance:
 - Add surface smoke to the release or pre-merge gate once stable.
 - Persist artifacts on failure.
 - Track runtime duration and flake rate.
-- Split extended host-dependent tests into explicit manual jobs.
+- Split extended host-dependent tests into explicit manual operations.
 
 Acceptance:
 
@@ -415,7 +415,7 @@ Acceptance:
 - Should the Smoke AI fixture be a separate tiny Rust binary, an `xtask`   subcommand, or an executable script during the first migration? -> separate tiny binary
 - Should CLI integration tests allocate a random port by default, or use a stable default with an environment override? -> Use a stable default port, 18080
 - Should `cargo test` include the CLI surface tests by default, or should those be gated behind an ignored test or `xtask` command because they start a daemon? -> Gate daemon-backed CLI surface tests behind `xtask test-cli`; keep any `cargo test` integration tests fast, in-process, or explicitly ignored.
-- Which CI job should own Playwright browser installation and cache priming?
+- Which CI operation should own Playwright browser installation and cache priming?
 
 ## Recommendation
 

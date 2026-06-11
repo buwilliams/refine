@@ -4,7 +4,7 @@ mod tests;
 mod types;
 
 pub use service::{
-    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityJobResult,
-    QualityJobRunner, QualityService,
+    FileQualityService, QualityCheckRequest, QualityCheckResult, QualityOperationResult,
+    QualityOperationRunner, QualityService,
 };
 pub use types::*;

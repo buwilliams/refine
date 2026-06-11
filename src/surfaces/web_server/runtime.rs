@@ -7,7 +7,9 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::observability::metrics::PerformanceQuery;
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
@@ -210,10 +212,10 @@ impl InProcessWebServer {
             .into_iter()
             .filter_map(value_object)
             .collect::<Vec<_>>();
-        let background_jobs = FileJobRegistry::new(runtime_root)
+        let background_operations = FileOperationRegistry::new(runtime_root)
             .recover()?
             .into_iter()
-            .map(job_response)
+            .map(operation_response)
             .filter_map(value_object)
             .collect::<Vec<_>>();
         let target_app = match self.target_app_service() {
@@ -230,7 +232,7 @@ impl InProcessWebServer {
         Ok(RuntimeProjection {
             supervisor: value_object(process),
             processes,
-            background_jobs,
+            background_operations,
             target_app,
             performance,
             preflight,
@@ -334,19 +336,22 @@ impl InProcessWebServer {
             }
         }
 
-        let registry = FileJobRegistry::new(runtime_root);
-        let mut jobs = 0;
-        for job in registry.recover()? {
+        let registry = FileOperationRegistry::new(runtime_root);
+        let mut operations = 0;
+        for operation in registry.recover()? {
             if matches!(
-                job.state,
-                JobState::Pending | JobState::Running | JobState::Cancelling
-            ) && job_owner_matches(&job.owner, feature_id, gap_ids)
+                operation.state,
+                OperationState::Pending | OperationState::Running | OperationState::Cancelling
+            ) && operation_owner_matches(&operation.owner, feature_id, gap_ids)
             {
-                registry.cancel(&job.id)?;
-                jobs += 1;
+                registry.cancel(&operation.id)?;
+                operations += 1;
             }
         }
-        Ok(RuntimeReconcileSummary { processes, jobs })
+        Ok(RuntimeReconcileSummary {
+            processes,
+            operations,
+        })
     }
 
     pub(super) fn source_root(&self) -> Option<PathBuf> {
@@ -394,7 +399,7 @@ fn runtime_projection_fingerprint(
     for path in [
         runtime_root.join("processes"),
         runtime_root.join("process-control.json"),
-        runtime_root.join("jobs"),
+        runtime_root.join("operations"),
         runtime_root.join("target-app-state.json"),
         runtime_root.join("runner-health.json"),
         runtime_root.join("metrics/performance.jsonl"),
@@ -485,7 +490,7 @@ fn should_scan_runtime_path_children(runtime_root: &Path, path: &Path) -> bool {
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/");
-    !matches!(relative.as_str(), "processes" | "jobs")
+    !matches!(relative.as_str(), "processes" | "operations")
 }
 
 #[cfg(test)]

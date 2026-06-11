@@ -6,7 +6,8 @@ use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::quality::{
-    FileQualityService, QualityCheckRequest, QualityJobRunner, QualityService, QualitySettingsPatch,
+    FileQualityService, QualityCheckRequest, QualityOperationRunner, QualityService,
+    QualitySettingsPatch,
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
 use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
@@ -185,26 +186,28 @@ impl InProcessWebServer {
             .or_else(|| body.get("browser"))
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
-        match QualityJobRunner::new(&durable_root, runtime_root).run_checks(QualityCheckRequest {
-            owner_id,
-            command,
-            browser_required,
-            process_metadata: Default::default(),
-        }) {
-            Ok(job_result) => {
+        match QualityOperationRunner::new(&durable_root, runtime_root).run_checks(
+            QualityCheckRequest {
+                owner_id,
+                command,
+                browser_required,
+                process_metadata: Default::default(),
+            },
+        ) {
+            Ok(operation_result) => {
                 append_quality_activity(
                     &durable_root,
                     format!(
                         "Quality checks completed for {}",
-                        job_result.result.owner_id
+                        operation_result.result.owner_id
                     ),
                 );
                 ApiResponse::json(
                     200,
                     json!({
-                        "ok": job_result.result.ok,
-                        "result": job_result.result,
-                        "job": job_response(job_result.job)
+                        "ok": operation_result.result.ok,
+                        "result": operation_result.result,
+                        "operation": operation_response(operation_result.operation)
                     }),
                 )
             }

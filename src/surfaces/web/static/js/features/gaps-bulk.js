@@ -107,7 +107,7 @@ async function openBulkModal(field) {
     let r = await api("POST", "/api/gaps/bulk", {
       filter, ...selectionFields, update: { [field]: next },
     });
-    r = await resolveBackgroundJobResponse(
+    r = await resolveBackgroundOperationResponse(
       r,
       `Bulk ${label.toLowerCase()} update is running in the background`,
     );

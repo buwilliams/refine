@@ -9,7 +9,9 @@ use crate::model::log::LogEntry;
 use crate::model::workflow::GapStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::RefineError;
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry, JobState};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -774,10 +776,10 @@ enum ImportPersistWorkerError {
     Failed(RefineError),
 }
 
-fn import_job_cancelled(registry: &FileJobRegistry, job_id: &str) -> bool {
+fn import_operation_cancelled(registry: &FileOperationRegistry, operation_id: &str) -> bool {
     registry
-        .status(job_id)
-        .map(|job| matches!(job.state, JobState::Cancelled))
+        .status(operation_id)
+        .map(|operation| matches!(operation.state, OperationState::Cancelled))
         .unwrap_or(false)
 }
 
@@ -1942,7 +1944,7 @@ impl InProcessWebServer {
                     "rollup": feature.rollup,
                     "runtime_reconciled": {
                         "processes": runtime_reconciled.processes,
-                        "jobs": runtime_reconciled.jobs
+                        "operations": runtime_reconciled.operations
                     }
                 }),
             ),
@@ -2663,13 +2665,13 @@ impl InProcessWebServer {
             } else {
                 "import:extract"
             };
-            let registry = FileJobRegistry::new(runtime_root);
-            let job = match registry.register(owner) {
-                Ok(job) => job,
+            let registry = FileOperationRegistry::new(runtime_root);
+            let operation = match registry.register(owner) {
+                Ok(operation) => operation,
                 Err(error) => return error_response(error),
             };
             let _ = registry.update_progress(
-                &job.id,
+                &operation.id,
                 json!({
                     "message": if purpose == "plan" {
                         "Extracting Plan Feature and Gaps"
@@ -2680,12 +2682,12 @@ impl InProcessWebServer {
                     "total": 1
                 }),
             );
-            let job = registry.status(&job.id).unwrap_or(job);
+            let operation = registry.status(&operation.id).unwrap_or(operation);
             let server = self.clone();
-            let job_id = job.id.clone();
+            let operation_id = operation.id.clone();
             let runtime_root = runtime_root.clone();
             thread::spawn(move || {
-                let registry = FileJobRegistry::new(&runtime_root);
+                let registry = FileOperationRegistry::new(&runtime_root);
                 let response = server.import_extract_response(durable_root, body);
                 let mut result = response.body.clone();
                 match result.as_object_mut() {
@@ -2704,7 +2706,7 @@ impl InProcessWebServer {
                         .get("error")
                         .cloned()
                         .unwrap_or_else(|| result.clone());
-                    let _ = registry.fail_with_error(&job_id, error);
+                    let _ = registry.fail_with_error(&operation_id, error);
                     return;
                 }
                 let draft_count = result
@@ -2713,7 +2715,7 @@ impl InProcessWebServer {
                     .map(Vec::len)
                     .unwrap_or(0);
                 let _ = registry.update_progress(
-                    &job_id,
+                    &operation_id,
                     json!({
                         "message": "Plan Feature and Gap drafts extracted",
                         "completed": 1,
@@ -2721,9 +2723,10 @@ impl InProcessWebServer {
                         "draft_count": draft_count
                     }),
                 );
-                let _ = registry.finish_with_result(&job_id, JobState::Succeeded, result);
+                let _ =
+                    registry.finish_with_result(&operation_id, OperationState::Succeeded, result);
             });
-            return ApiResponse::json(202, json!({"job": job_response(job)}));
+            return ApiResponse::json(202, json!({"operation": operation_response(operation)}));
         }
         self.import_extract_response(durable_root, body)
     }
@@ -2846,9 +2849,9 @@ impl InProcessWebServer {
             let Some(runtime_root) = &self.runtime_root else {
                 return runtime_root_unavailable("persist imported Gaps in the background");
             };
-            let registry = FileJobRegistry::new(runtime_root);
-            let job = match registry.register("import:persist") {
-                Ok(job) => job,
+            let registry = FileOperationRegistry::new(runtime_root);
+            let operation = match registry.register("import:persist") {
+                Ok(operation) => operation,
                 Err(error) => return error_response(error),
             };
             let draft_total = body
@@ -2857,24 +2860,24 @@ impl InProcessWebServer {
                 .map(Vec::len)
                 .unwrap_or(0);
             let _ = registry.update_progress(
-                &job.id,
+                &operation.id,
                 json!({
                     "message": "Saving import",
                     "completed": 0,
                     "total": draft_total
                 }),
             );
-            let job = registry.status(&job.id).unwrap_or(job);
+            let operation = registry.status(&operation.id).unwrap_or(operation);
             let server = self.clone();
-            let job_id = job.id.clone();
+            let operation_id = operation.id.clone();
             let runtime_root = runtime_root.clone();
             thread::spawn(move || {
-                let registry = FileJobRegistry::new(&runtime_root);
+                let registry = FileOperationRegistry::new(&runtime_root);
                 let response = server.import_persist_background_response(
                     durable_root,
                     body,
                     &registry,
-                    &job_id,
+                    &operation_id,
                 );
                 if response.status == 499 {
                     return;
@@ -2893,7 +2896,7 @@ impl InProcessWebServer {
                 }
                 let count = result.get("count").and_then(Value::as_u64).unwrap_or(0);
                 let _ = registry.update_progress(
-                    &job_id,
+                    &operation_id,
                     json!({
                         "message": "Import saved",
                         "completed": count,
@@ -2902,23 +2905,23 @@ impl InProcessWebServer {
                 );
                 let refresh_result = server.refresh_projection_cache_after_mutation();
                 let state = if response.status >= 400 {
-                    JobState::Failed
+                    OperationState::Failed
                 } else {
-                    JobState::Succeeded
+                    OperationState::Succeeded
                 };
                 if let Err(error) = refresh_result {
                     let _ = registry.fail_with_error(
-                        &job_id,
+                        &operation_id,
                         json!({
                             "code": "projection_refresh_failed",
                             "message": error.to_string()
                         }),
                     );
                 } else {
-                    let _ = registry.finish_with_result(&job_id, state, result);
+                    let _ = registry.finish_with_result(&operation_id, state, result);
                 }
             });
-            return ApiResponse::json(202, json!({ "job": job_response(job) }));
+            return ApiResponse::json(202, json!({ "operation": operation_response(operation) }));
         }
         self.import_persist_response(durable_root, body)
     }
@@ -2927,8 +2930,8 @@ impl InProcessWebServer {
         &self,
         durable_root: PathBuf,
         body: Value,
-        registry: &FileJobRegistry,
-        job_id: &str,
+        registry: &FileOperationRegistry,
+        operation_id: &str,
     ) -> ApiResponse {
         let drafts = match import_drafts_from_value(&body, None) {
             Ok(drafts) => drafts,
@@ -2963,7 +2966,7 @@ impl InProcessWebServer {
                 drafts,
                 feature_id.as_deref(),
                 registry,
-                job_id,
+                operation_id,
                 &mut created_gap_ids,
                 &mut duplicate_actions,
             ) {
@@ -2972,7 +2975,7 @@ impl InProcessWebServer {
                     rollback_import_gaps(&service, &created_gap_ids);
                     if let Err(error) = self.refresh_projection_cache_after_mutation() {
                         let _ = registry.fail_with_error(
-                            job_id,
+                            operation_id,
                             json!({
                                 "code": "projection_refresh_failed",
                                 "message": error.to_string()
@@ -2981,7 +2984,7 @@ impl InProcessWebServer {
                         return error_response(error);
                     }
                     let _ = registry.update_progress(
-                        job_id,
+                        operation_id,
                         json!({
                             "message": "Import cancelled",
                             "completed": 0,
@@ -3028,8 +3031,8 @@ impl InProcessWebServer {
         service: &FileWorkItemService,
         drafts: Vec<ImportDraft>,
         feature_id: Option<&str>,
-        registry: &FileJobRegistry,
-        job_id: &str,
+        registry: &FileOperationRegistry,
+        operation_id: &str,
         created_gap_ids: &mut Vec<String>,
         duplicate_actions: &mut ImportDuplicateActions,
     ) -> Result<(), ImportPersistWorkerError> {
@@ -3040,7 +3043,7 @@ impl InProcessWebServer {
         }
         let total = drafts.len();
         for draft in drafts {
-            if import_job_cancelled(registry, job_id) {
+            if import_operation_cancelled(registry, operation_id) {
                 return Err(ImportPersistWorkerError::Cancelled);
             }
             if let Some(gap_id) = persist_import_draft_with_duplicate_decision(
@@ -3055,7 +3058,7 @@ impl InProcessWebServer {
                 let _ = gap_id;
             }
             let _ = registry.update_progress(
-                job_id,
+                operation_id,
                 json!({
                     "message": "Saving import",
                     "completed": created_gap_ids.len(),
@@ -3064,7 +3067,7 @@ impl InProcessWebServer {
             );
             thread::sleep(Duration::from_millis(5));
         }
-        if import_job_cancelled(registry, job_id) {
+        if import_operation_cancelled(registry, operation_id) {
             return Err(ImportPersistWorkerError::Cancelled);
         }
         Ok(())

@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::jobs::{FileJobRegistry, JobRegistry};
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::tools::product::chat::ChatSessionRecord;
 
 use super::super::http::HttpRequest;
@@ -33,8 +33,8 @@ pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String 
         format!("/terminal{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/files") {
         format!("/files{rest}")
-    } else if let Some(rest) = path.strip_prefix("/api/jobs") {
-        format!("/jobs{rest}")
+    } else if let Some(rest) = path.strip_prefix("/api/operations") {
+        format!("/operations{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/processes") {
         format!("/processes{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/quality") {
@@ -254,18 +254,18 @@ pub(in crate::surfaces::web_server) fn recent_api_mutation_events(
     Ok(events)
 }
 
-pub(in crate::surfaces::web_server) fn recent_job_sse_events(
+pub(in crate::surfaces::web_server) fn recent_operation_sse_events(
     runtime_root: &Path,
     limit: usize,
 ) -> RefineResult<Vec<Value>> {
-    let registry = FileJobRegistry::new(runtime_root);
-    let jobs = registry.recover()?;
+    let registry = FileOperationRegistry::new(runtime_root);
+    let operations = registry.recover()?;
     let mut events = Vec::new();
-    for job in jobs.into_iter().rev().take(limit) {
-        let (logs, _, _) = registry.page_logs(&job.id, 5, 0)?;
+    for operation in operations.into_iter().rev().take(limit) {
+        let (logs, _, _) = registry.page_logs(&operation.id, 5, 0)?;
         let latest_log = logs.last().cloned();
         events.push(json!({
-            "job": job_response(job),
+            "operation": operation_response(operation),
             "logs": logs,
             "latest_log": latest_log,
             "timestamp": now_timestamp_web()

@@ -12,7 +12,7 @@ use crate::model::log::LogEntry;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub enum JobState {
+pub enum OperationState {
     Pending,
     Running,
     Cancelling,
@@ -22,7 +22,7 @@ pub enum JobState {
     Interrupted,
 }
 
-impl JobState {
+impl OperationState {
     pub fn as_api_status(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
@@ -37,10 +37,10 @@ impl JobState {
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct JobHandle {
+pub struct OperationHandle {
     pub id: String,
     pub owner: String,
-    pub state: JobState,
+    pub state: OperationState,
     #[serde(default = "empty_object")]
     pub progress: Value,
     #[serde(default = "empty_object")]
@@ -49,117 +49,121 @@ pub struct JobHandle {
     pub error: Option<Value>,
 }
 
-pub trait JobRegistry {
-    fn register(&self, owner: &str) -> RefineResult<JobHandle>;
-    fn status(&self, job_id: &str) -> RefineResult<JobHandle>;
-    fn cancel(&self, job_id: &str) -> RefineResult<JobHandle>;
-    fn recover(&self) -> RefineResult<Vec<JobHandle>>;
+pub trait OperationRegistry {
+    fn register(&self, owner: &str) -> RefineResult<OperationHandle>;
+    fn status(&self, operation_id: &str) -> RefineResult<OperationHandle>;
+    fn cancel(&self, operation_id: &str) -> RefineResult<OperationHandle>;
+    fn recover(&self) -> RefineResult<Vec<OperationHandle>>;
 }
 
 #[derive(Clone, Debug)]
-pub struct FileJobRegistry {
+pub struct FileOperationRegistry {
     pub runtime_root: PathBuf,
 }
 
-impl FileJobRegistry {
+impl FileOperationRegistry {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
         }
     }
 
-    pub fn jobs_dir(&self) -> PathBuf {
-        self.runtime_root.join("jobs")
+    pub fn operations_dir(&self) -> PathBuf {
+        self.runtime_root.join("operations")
     }
 
-    fn job_path(&self, job_id: &str) -> PathBuf {
-        self.jobs_dir().join(format!("{job_id}.json"))
+    fn operation_path(&self, operation_id: &str) -> PathBuf {
+        self.operations_dir().join(format!("{operation_id}.json"))
     }
 
-    fn log_path(&self, job_id: &str) -> PathBuf {
-        self.jobs_dir().join(format!("{job_id}.logs.jsonl"))
+    fn log_path(&self, operation_id: &str) -> PathBuf {
+        self.operations_dir()
+            .join(format!("{operation_id}.logs.jsonl"))
     }
 
-    fn write(&self, handle: &JobHandle) -> RefineResult<()> {
-        fs::create_dir_all(self.jobs_dir()).map_err(|error| {
+    fn write(&self, handle: &OperationHandle) -> RefineResult<()> {
+        fs::create_dir_all(self.operations_dir()).map_err(|error| {
             RefineError::Io(format!(
-                "failed to create job registry {}: {error}",
-                self.jobs_dir().display()
+                "failed to create operation registry {}: {error}",
+                self.operations_dir().display()
             ))
         })?;
-        let path = self.job_path(&handle.id);
+        let path = self.operation_path(&handle.id);
         let encoded = serde_json::to_vec_pretty(handle).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode job: {error}"))
+            RefineError::Serialization(format!("failed to encode operation: {error}"))
         })?;
         fs::write(&path, encoded).map_err(|error| {
-            RefineError::Io(format!("failed to write job {}: {error}", path.display()))
+            RefineError::Io(format!(
+                "failed to write operation {}: {error}",
+                path.display()
+            ))
         })
     }
 
-    pub fn interrupt_active(&self) -> RefineResult<Vec<JobHandle>> {
+    pub fn interrupt_active(&self) -> RefineResult<Vec<OperationHandle>> {
         let mut interrupted = Vec::new();
-        for mut job in self.recover()? {
+        for mut operation in self.recover()? {
             if matches!(
-                job.state,
-                JobState::Pending | JobState::Running | JobState::Cancelling
+                operation.state,
+                OperationState::Pending | OperationState::Running | OperationState::Cancelling
             ) {
-                job.state = JobState::Interrupted;
-                self.write(&job)?;
+                operation.state = OperationState::Interrupted;
+                self.write(&operation)?;
                 self.append_log(
-                    &job.id,
-                    job_log_entry(&job, "warning", "Job interrupted", None),
+                    &operation.id,
+                    operation_log_entry(&operation, "warning", "Operation interrupted", None),
                 )?;
-                interrupted.push(job);
+                interrupted.push(operation);
             }
         }
         Ok(interrupted)
     }
 
-    pub fn append_log(&self, job_id: &str, mut entry: LogEntry) -> RefineResult<LogEntry> {
-        let job = self.status(job_id)?;
+    pub fn append_log(&self, operation_id: &str, mut entry: LogEntry) -> RefineResult<LogEntry> {
+        let operation = self.status(operation_id)?;
         if entry.datetime.trim().is_empty() {
             entry.datetime = now_timestamp();
         }
         if entry.category.trim().is_empty() {
-            entry.category = "job".to_string();
+            entry.category = "operation".to_string();
         }
         if entry.actor.is_none() {
             entry.actor = Some("refine".to_string());
         }
         let mut details = entry.details.unwrap_or_default();
         details
-            .entry("job_id".to_string())
-            .or_insert_with(|| json!(job.id));
+            .entry("operation_id".to_string())
+            .or_insert_with(|| json!(operation.id));
         details
             .entry("owner".to_string())
-            .or_insert_with(|| json!(job.owner));
+            .or_insert_with(|| json!(operation.owner));
         details
             .entry("state".to_string())
-            .or_insert_with(|| json!(job.state));
+            .or_insert_with(|| json!(operation.state));
         entry.details = Some(details);
-        fs::create_dir_all(self.jobs_dir()).map_err(|error| {
+        fs::create_dir_all(self.operations_dir()).map_err(|error| {
             RefineError::Io(format!(
-                "failed to create job log registry {}: {error}",
-                self.jobs_dir().display()
+                "failed to create operation log registry {}: {error}",
+                self.operations_dir().display()
             ))
         })?;
-        let path = self.log_path(job_id);
+        let path = self.log_path(operation_id);
         let mut file = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&path)
             .map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to open job log {}: {error}",
+                    "failed to open operation log {}: {error}",
                     path.display()
                 ))
             })?;
         let encoded = serde_json::to_string(&entry).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode job log: {error}"))
+            RefineError::Serialization(format!("failed to encode operation log: {error}"))
         })?;
         writeln!(file, "{encoded}").map_err(|error| {
             RefineError::Io(format!(
-                "failed to append job log {}: {error}",
+                "failed to append operation log {}: {error}",
                 path.display()
             ))
         })?;
@@ -168,18 +172,18 @@ impl FileJobRegistry {
 
     pub fn page_logs(
         &self,
-        job_id: &str,
+        operation_id: &str,
         limit: usize,
         offset: usize,
     ) -> RefineResult<(Vec<LogEntry>, bool, usize)> {
-        self.status(job_id)?;
-        let path = self.log_path(job_id);
+        self.status(operation_id)?;
+        let path = self.log_path(operation_id);
         if !path.exists() {
             return Ok((Vec::new(), false, 0));
         }
         let file = fs::File::open(&path).map_err(|error| {
             RefineError::Io(format!(
-                "failed to open job log {}: {error}",
+                "failed to open operation log {}: {error}",
                 path.display()
             ))
         })?;
@@ -187,7 +191,7 @@ impl FileJobRegistry {
         for line in BufReader::new(file).lines() {
             let line = line.map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to read job log {}: {error}",
+                    "failed to read operation log {}: {error}",
                     path.display()
                 ))
             })?;
@@ -196,7 +200,7 @@ impl FileJobRegistry {
             }
             let entry = serde_json::from_str::<LogEntry>(&line).map_err(|error| {
                 RefineError::Serialization(format!(
-                    "failed to parse job log {}: {error}",
+                    "failed to parse operation log {}: {error}",
                     path.display()
                 ))
             })?;
@@ -218,27 +222,38 @@ impl FileJobRegistry {
         Ok((page, has_more, total))
     }
 
-    pub fn finish(&self, job_id: &str, state: JobState) -> RefineResult<JobHandle> {
+    pub fn finish(
+        &self,
+        operation_id: &str,
+        state: OperationState,
+    ) -> RefineResult<OperationHandle> {
         if !matches!(
             state,
-            JobState::Succeeded | JobState::Failed | JobState::Cancelled | JobState::Interrupted
+            OperationState::Succeeded
+                | OperationState::Failed
+                | OperationState::Cancelled
+                | OperationState::Interrupted
         ) {
             return Err(RefineError::InvalidInput(
-                "finished jobs must use a terminal state".to_string(),
+                "finished operations must use a terminal state".to_string(),
             ));
         }
-        let mut handle = self.status(job_id)?;
+        let mut handle = self.status(operation_id)?;
         handle.state = state;
         self.write(&handle)?;
         self.append_log(
             &handle.id,
-            job_log_entry(&handle, "info", "Job finished", None),
+            operation_log_entry(&handle, "info", "Operation finished", None),
         )?;
         Ok(handle)
     }
 
-    pub fn update_progress(&self, job_id: &str, progress: Value) -> RefineResult<JobHandle> {
-        let mut handle = self.status(job_id)?;
+    pub fn update_progress(
+        &self,
+        operation_id: &str,
+        progress: Value,
+    ) -> RefineResult<OperationHandle> {
+        let mut handle = self.status(operation_id)?;
         handle.progress = progress;
         self.write(&handle)?;
         Ok(handle)
@@ -246,46 +261,50 @@ impl FileJobRegistry {
 
     pub fn finish_with_result(
         &self,
-        job_id: &str,
-        state: JobState,
+        operation_id: &str,
+        state: OperationState,
         result: Value,
-    ) -> RefineResult<JobHandle> {
-        if !matches!(state, JobState::Succeeded | JobState::Failed) {
+    ) -> RefineResult<OperationHandle> {
+        if !matches!(state, OperationState::Succeeded | OperationState::Failed) {
             return Err(RefineError::InvalidInput(
-                "result jobs must finish as succeeded or failed".to_string(),
+                "result operations must finish as succeeded or failed".to_string(),
             ));
         }
-        let mut handle = self.status(job_id)?;
+        let mut handle = self.status(operation_id)?;
         handle.state = state;
         handle.result = result;
         handle.error = None;
         self.write(&handle)?;
         self.append_log(
             &handle.id,
-            job_log_entry(&handle, "info", "Job finished", None),
+            operation_log_entry(&handle, "info", "Operation finished", None),
         )?;
         Ok(handle)
     }
 
-    pub fn fail_with_error(&self, job_id: &str, error: Value) -> RefineResult<JobHandle> {
-        let mut handle = self.status(job_id)?;
-        handle.state = JobState::Failed;
+    pub fn fail_with_error(
+        &self,
+        operation_id: &str,
+        error: Value,
+    ) -> RefineResult<OperationHandle> {
+        let mut handle = self.status(operation_id)?;
+        handle.state = OperationState::Failed;
         handle.error = Some(error);
         self.write(&handle)?;
         self.append_log(
             &handle.id,
-            job_log_entry(&handle, "error", "Job failed", None),
+            operation_log_entry(&handle, "error", "Operation failed", None),
         )?;
         Ok(handle)
     }
 }
 
-impl JobRegistry for FileJobRegistry {
-    fn register(&self, owner: &str) -> RefineResult<JobHandle> {
-        let handle = JobHandle {
-            id: new_job_id(),
+impl OperationRegistry for FileOperationRegistry {
+    fn register(&self, owner: &str) -> RefineResult<OperationHandle> {
+        let handle = OperationHandle {
+            id: new_operation_id(),
             owner: owner.to_string(),
-            state: JobState::Running,
+            state: OperationState::Running,
             progress: empty_object(),
             result: empty_object(),
             error: None,
@@ -293,73 +312,81 @@ impl JobRegistry for FileJobRegistry {
         self.write(&handle)?;
         self.append_log(
             &handle.id,
-            job_log_entry(&handle, "info", "Job registered", None),
+            operation_log_entry(&handle, "info", "Operation registered", None),
         )?;
         Ok(handle)
     }
 
-    fn status(&self, job_id: &str) -> RefineResult<JobHandle> {
-        let path = self.job_path(job_id);
+    fn status(&self, operation_id: &str) -> RefineResult<OperationHandle> {
+        let path = self.operation_path(operation_id);
         let bytes = fs::read(&path).map_err(|error| {
             if error.kind() == std::io::ErrorKind::NotFound {
-                return RefineError::NotFound(format!("Job {job_id} was not found"));
+                return RefineError::NotFound(format!("Operation {operation_id} was not found"));
             }
-            RefineError::Io(format!("failed to read job {}: {error}", path.display()))
+            RefineError::Io(format!(
+                "failed to read operation {}: {error}",
+                path.display()
+            ))
         })?;
         serde_json::from_slice(&bytes).map_err(|error| {
-            RefineError::Serialization(format!("failed to parse job {}: {error}", path.display()))
+            RefineError::Serialization(format!(
+                "failed to parse operation {}: {error}",
+                path.display()
+            ))
         })
     }
 
-    fn cancel(&self, job_id: &str) -> RefineResult<JobHandle> {
-        let mut handle = self.status(job_id)?;
-        handle.state = JobState::Cancelled;
+    fn cancel(&self, operation_id: &str) -> RefineResult<OperationHandle> {
+        let mut handle = self.status(operation_id)?;
+        handle.state = OperationState::Cancelled;
         self.write(&handle)?;
         self.append_log(
             &handle.id,
-            job_log_entry(&handle, "warning", "Job cancelled", None),
+            operation_log_entry(&handle, "warning", "Operation cancelled", None),
         )?;
         Ok(handle)
     }
 
-    fn recover(&self) -> RefineResult<Vec<JobHandle>> {
-        let dir = self.jobs_dir();
+    fn recover(&self) -> RefineResult<Vec<OperationHandle>> {
+        let dir = self.operations_dir();
         if !dir.exists() {
             return Ok(Vec::new());
         }
-        let mut jobs = Vec::new();
+        let mut operations = Vec::new();
         for entry in fs::read_dir(&dir).map_err(|error| {
             RefineError::Io(format!(
-                "failed to read job registry {}: {error}",
+                "failed to read operation registry {}: {error}",
                 dir.display()
             ))
         })? {
             let entry = entry.map_err(|error| {
-                RefineError::Io(format!("failed to inspect job registry entry: {error}"))
+                RefineError::Io(format!(
+                    "failed to inspect operation registry entry: {error}"
+                ))
             })?;
             if entry.path().extension().and_then(|ext| ext.to_str()) != Some("json") {
                 continue;
             }
             let bytes = fs::read(entry.path()).map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to read job {}: {error}",
+                    "failed to read operation {}: {error}",
                     entry.path().display()
                 ))
             })?;
-            let job = serde_json::from_slice::<JobHandle>(&bytes).map_err(|error| {
+            let operation = serde_json::from_slice::<OperationHandle>(&bytes).map_err(|error| {
                 RefineError::Serialization(format!(
-                    "failed to parse job {}: {error}",
+                    "failed to parse operation {}: {error}",
                     entry.path().display()
                 ))
             })?;
-            jobs.push(job);
+            operations.push(operation);
         }
-        jobs.sort_by(|a, b| a.id.cmp(&b.id));
-        Ok(jobs)
+        operations.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(operations)
     }
 }
 
-fn new_job_id() -> String {
+fn new_operation_id() -> String {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -376,25 +403,25 @@ fn empty_object() -> Value {
     json!({})
 }
 
-fn job_log_entry(
-    job: &JobHandle,
+fn operation_log_entry(
+    operation: &OperationHandle,
     severity: &str,
     message: &str,
     details: Option<crate::model::JsonObject>,
 ) -> LogEntry {
     let mut details = details.unwrap_or_default();
-    details.insert("job_id".to_string(), json!(job.id));
-    details.insert("owner".to_string(), json!(job.owner));
-    details.insert("state".to_string(), json!(job.state));
+    details.insert("operation_id".to_string(), json!(operation.id));
+    details.insert("owner".to_string(), json!(operation.owner));
+    details.insert("state".to_string(), json!(operation.state));
     LogEntry {
         datetime: now_timestamp(),
         severity: severity.to_string(),
-        category: "job".to_string(),
+        category: "operation".to_string(),
         message: message.to_string(),
         details: Some(details),
         actions: Vec::new(),
         actor: Some("refine".to_string()),
-        gap_id: job
+        gap_id: operation
             .owner
             .strip_prefix("gap:")
             .map(|gap_id| gap_id.to_string()),
@@ -410,23 +437,26 @@ mod tests {
     use super::*;
 
     #[test]
-    fn file_job_registry_registers_recovers_and_cancels_jobs() {
-        let temp_root = unique_temp_dir("jobs");
-        let registry = FileJobRegistry::new(temp_root.join("run/8080"));
-        let job = registry.register("bulk_update_gaps").unwrap();
-        assert_eq!(job.state, JobState::Running);
-        assert_eq!(registry.status(&job.id).unwrap().owner, "bulk_update_gaps");
+    fn file_operation_registry_registers_recovers_and_cancels_operations() {
+        let temp_root = unique_temp_dir("operations");
+        let registry = FileOperationRegistry::new(temp_root.join("run/8080"));
+        let operation = registry.register("bulk_update_gaps").unwrap();
+        assert_eq!(operation.state, OperationState::Running);
+        assert_eq!(
+            registry.status(&operation.id).unwrap().owner,
+            "bulk_update_gaps"
+        );
         assert_eq!(registry.recover().unwrap().len(), 1);
 
         let interrupted = registry.interrupt_active().unwrap();
         assert_eq!(interrupted.len(), 1);
         assert_eq!(
-            registry.status(&job.id).unwrap().state,
-            JobState::Interrupted
+            registry.status(&operation.id).unwrap().state,
+            OperationState::Interrupted
         );
 
-        let cancelled = registry.cancel(&job.id).unwrap();
-        assert_eq!(cancelled.state, JobState::Cancelled);
+        let cancelled = registry.cancel(&operation.id).unwrap();
+        assert_eq!(cancelled.state, OperationState::Cancelled);
         assert_eq!(cancelled.state.as_api_status(), "cancelled");
 
         fs::remove_dir_all(temp_root).unwrap();

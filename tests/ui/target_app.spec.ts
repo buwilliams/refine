@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
-import { ensureAttachedProject, jsonObject, waitForJobResult } from "./helpers";
+import { ensureAttachedProject, jsonObject, waitForOperationResult } from "./helpers";
 
 const EMPTY_TARGET_APP_SETTINGS = {
   target_app_url: "",
@@ -46,10 +46,10 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
     await page.getByTestId("target-app-generate-ai").click();
     await page.getByRole("button", { name: "Generate", exact: true }).click();
     const payload = await (await generated).json();
-    const jobId = String(payload.job?.id ?? "");
-    expect(payload.job?.owner).toBe("target-app:generate");
-    expect(jobId).toBeTruthy();
-    const result = await waitForJobResult(request, jobId);
+    const operationId = String(payload.operation?.id ?? "");
+    expect(payload.operation?.owner).toBe("target-app:generate");
+    expect(operationId).toBeTruthy();
+    const result = await waitForOperationResult(request, operationId);
 
     expect(result.provider).toBe("smoke-ai");
     expect(result.source).toBe("provider");
@@ -79,18 +79,18 @@ test("generates target-app config through Smoke AI", async ({ page, request }) =
   }
 });
 
-test("keeps Generate with AI loading state after reload until the background job finishes", async ({ page, request }) => {
+test("keeps Generate with AI loading state after reload until the background operation finishes", async ({ page, request }) => {
   await ensureAttachedProject(request);
   await resetTargetAppSettings(request);
 
   let complete = false;
-  await page.route("**/api/jobs/job-target-reload", async (route) => {
+  await page.route("**/api/operations/operation-target-reload", async (route) => {
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
-        job: complete
+        operation: complete
           ? {
-              id: "job-target-reload",
+              id: "operation-target-reload",
               owner: "target-app:generate",
               status: "complete",
               result: {
@@ -117,7 +117,7 @@ test("keeps Generate with AI loading state after reload until the background job
               },
             }
           : {
-              id: "job-target-reload",
+              id: "operation-target-reload",
               owner: "target-app:generate",
               status: "running",
               progress: { message: "Generating target-app config with AI" },
@@ -130,8 +130,8 @@ test("keeps Generate with AI loading state after reload until the background job
   try {
     await page.goto("/#/node/target-app");
     await page.evaluate(() => {
-      localStorage.setItem("refine_target_app_generate_job", JSON.stringify({
-        jobId: "job-target-reload",
+      localStorage.setItem("refine_target_app_generate_operation", JSON.stringify({
+        operationId: "operation-target-reload",
         startedAt: Date.now(),
       }));
     });
@@ -146,9 +146,9 @@ test("keeps Generate with AI loading state after reload until the background job
     await expect(page.getByTestId("target-app-start-command")).toHaveValue("./.refine/manage-app.sh start");
     await expect(page.getByTestId("target-app-generate-ai")).toBeEnabled();
     await expect(page.getByTestId("target-app-generate-ai")).toHaveText("Generate with AI");
-    await expect.poll(() => page.evaluate(() => localStorage.getItem("refine_target_app_generate_job"))).toBeNull();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("refine_target_app_generate_operation"))).toBeNull();
   } finally {
-    await page.unroute("**/api/jobs/job-target-reload");
+    await page.unroute("**/api/operations/operation-target-reload");
     await resetTargetAppSettings(request);
   }
 });

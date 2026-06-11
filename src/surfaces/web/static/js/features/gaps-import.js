@@ -50,8 +50,8 @@ function newImportSession() {
     uploadText: "",
     fileName: "",
     drafts: [],
-    prepareJobId: "",
-    jobId: "",
+    prepareOperationId: "",
+    operationId: "",
     result: null,
     error: "",
     featureDestination: {
@@ -90,15 +90,15 @@ function importSessionIsDirty(session = readImportSession()) {
     || (session.csvText || "").trim()
     || (session.uploadText || "").trim()
     || (session.drafts || []).length
-    || session.prepareJobId
-    || session.jobId
+    || session.prepareOperationId
+    || session.operationId
   );
 }
 
 function importSessionHasDrafts(session) {
-  return !!((session?.drafts || []).length || session?.jobId);
+  return !!((session?.drafts || []).length || session?.operationId);
 }
 
 function importSessionIsBackgroundSaving(session) {
-  return !!(session?.phase === "saving" && session?.jobId);
+  return !!(session?.phase === "saving" && session?.operationId);
 }

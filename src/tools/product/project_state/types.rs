@@ -105,7 +105,7 @@ pub struct DashboardProjection {
 pub struct RuntimeProjection {
     pub supervisor: Option<JsonObject>,
     pub processes: Vec<JsonObject>,
-    pub background_jobs: Vec<JsonObject>,
+    pub background_operations: Vec<JsonObject>,
     pub target_app: Option<JsonObject>,
     pub performance: Option<JsonObject>,
     pub preflight: Option<JsonObject>,
