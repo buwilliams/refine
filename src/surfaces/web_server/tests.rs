@@ -3285,6 +3285,22 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap();
     chat.stop(&stopped_chat.id).unwrap();
     supervisor
+        .register(ManagedProcess {
+            id: "supervisor-context".to_string(),
+            owner: ProcessOwner::Daemon,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("setsid".to_string()),
+            details: None,
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    supervisor
         .launch(crate::process::subprocess::ManagedProcessSpec {
             owner: crate::process::subprocess::ProcessOwner::Agent,
             command: if cfg!(windows) { "cmd" } else { "sh" }.to_string(),
@@ -3410,6 +3426,16 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .all(|work| work["status"] == "idle")
     );
     let listed_processes = listed.body["processes"].as_array().unwrap();
+    let supervisor_context = listed_processes
+        .iter()
+        .find(|process| process["id"] == "supervisor-context")
+        .unwrap();
+    assert_eq!(supervisor_context["kind"], "daemon");
+    assert_eq!(supervisor_context["actions"], json!(["terminate", "kill"]));
+    assert_eq!(
+        supervisor_context["management_actions"],
+        json!(["pause_workflow"])
+    );
     assert!(
         !listed_processes
             .iter()
@@ -3421,6 +3447,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .unwrap();
     assert_eq!(agent_context["gap_id"], "GAPCTX");
     assert_eq!(agent_context["round_idx"], 1);
+    assert_eq!(agent_context["management_actions"], json!(["cancel_agent"]));
     let chat_context = listed_processes
         .iter()
         .find(|process| process["id"] == "chat-context")
@@ -3428,6 +3455,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(chat_context["kind"], "chat");
     assert_eq!(chat_context["session_id"], "chat-context-session");
     assert_eq!(chat_context["mode"], "standalone");
+    assert_eq!(chat_context["management_actions"], json!(["stop_chat"]));
     let standalone_context = listed_processes
         .iter()
         .find(|process| process["id"] == format!("chat-session-{}", standalone_chat.id))
@@ -3524,7 +3552,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     });
     assert_eq!(summary.status, 200);
     assert_eq!(summary.body["agent_count"], 1);
-    assert_eq!(summary.body["process_count"], 5);
+    assert_eq!(summary.body["process_count"], 6);
     assert_eq!(summary.body["processes"].as_array().unwrap().len(), 0);
     let cached = FileProjectStateStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
@@ -3625,6 +3653,16 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     assert_eq!(paused.status, 200);
     assert_eq!(paused.body["background_processes_stopped"], true);
     assert_eq!(paused.body["agents_paused"], true);
+    let paused_supervisor = paused.body["processes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|process| process["id"] == "supervisor-context")
+        .unwrap();
+    assert_eq!(
+        paused_supervisor["management_actions"],
+        json!(["unpause_workflow"])
+    );
     assert_eq!(
         work_items
             .show_gap_summary("GAP-WORKFLOW")

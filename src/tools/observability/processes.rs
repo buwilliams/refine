@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use crate::model::JsonObject;
 use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessSupervisor,
+    FileProcessSupervisor, ManagedProcess, ProcessOwner, ProcessPauseState, ProcessSupervisor,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
@@ -72,7 +72,8 @@ pub fn process_summary_value_with_chat_sessions(
             if !seen_process_ids.insert(process.id.clone()) {
                 continue;
             }
-            let value = process.api_json();
+            let mut value = process.api_json();
+            apply_process_management_actions(&mut value, &pause_state);
             if is_current_process_api_value(&value) {
                 process_values.push(value);
             }
@@ -98,6 +99,7 @@ pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {
         .supervisor
         .clone()
         .unwrap_or_else(serde_json::Map::new);
+    let pause_state = process_pause_state_from_summary(&summary);
     summary.insert(
         "processes".to_string(),
         Value::Array(
@@ -106,7 +108,11 @@ pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {
                 .iter()
                 .filter(|process| is_current_process_object(process))
                 .cloned()
-                .map(Value::Object)
+                .map(|process| {
+                    let mut value = Value::Object(process);
+                    apply_process_management_actions(&mut value, &pause_state);
+                    value
+                })
                 .collect(),
         ),
     );
@@ -246,8 +252,59 @@ fn chat_session_process_value(session: &ChatSessionRecord) -> Value {
         "cpu_priority": {"label": "-"},
         "max_memory": {"label": "-"},
         "isolation": "in_process",
+        "management_actions": ["stop_chat"],
         "actions": ["stop"]
     })
+}
+
+fn apply_process_management_actions(value: &mut Value, pause_state: &ProcessPauseState) {
+    let actions = process_management_actions(value, pause_state);
+    let Some(object) = value.as_object_mut() else {
+        return;
+    };
+    if actions.is_empty() {
+        object.remove("management_actions");
+    } else {
+        object.insert("management_actions".to_string(), json!(actions));
+    }
+}
+
+fn process_management_actions(value: &Value, pause_state: &ProcessPauseState) -> Vec<&'static str> {
+    let Some(process) = value.as_object() else {
+        return Vec::new();
+    };
+    let kind = process.get("kind").and_then(Value::as_str).unwrap_or("");
+    let workflow_toggle = if pause_state.background_processes_stopped || pause_state.agents_paused {
+        "unpause_workflow"
+    } else {
+        "pause_workflow"
+    };
+    match kind {
+        "daemon" | "supervisor" => vec![workflow_toggle],
+        "workflow_automation" | "agent_automation" | "background_processes" => {
+            vec![workflow_toggle, "hard_reset_worktree"]
+        }
+        "agent" if process.get("gap_id").and_then(Value::as_str).is_some() => {
+            vec!["cancel_agent"]
+        }
+        "chat" if process.get("session_id").and_then(Value::as_str).is_some() => {
+            vec!["stop_chat"]
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn process_pause_state_from_summary(summary: &JsonObject) -> ProcessPauseState {
+    ProcessPauseState {
+        background_processes_stopped: summary
+            .get("background_processes_stopped")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+        agents_paused: summary
+            .get("agents_paused")
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
+    }
 }
 
 fn is_current_process_api_value(process: &Value) -> bool {

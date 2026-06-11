@@ -464,7 +464,11 @@ function workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggl
 }
 
 function processActionIds(proc) {
-  if (Array.isArray(proc.actions)) return proc.actions;
+  if (Array.isArray(proc.management_actions)) return proc.management_actions;
+  if (Array.isArray(proc.actions)) {
+    const supported = proc.actions.filter((actionId) => isSupportedProcessActionId(proc, actionId));
+    if (supported.length) return supported;
+  }
   if (proc.kind === "supervisor") {
     const workflowPaused = !!proc.background_processes_stopped || !!proc.agents_paused;
     return [workflowPaused ? "unpause_workflow" : "pause_workflow"];
@@ -478,6 +482,13 @@ function processActionIds(proc) {
     return [stopped ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
   }
   return null;
+}
+
+function isSupportedProcessActionId(proc, actionId) {
+  if (["pause_workflow", "unpause_workflow", "hard_reset_worktree"].includes(actionId)) return true;
+  if (actionId === "cancel_agent") return proc.kind === "agent" && !!proc.gap_id;
+  if (actionId === "stop_chat" || actionId === "stop") return proc.kind === "chat" && !!proc.session_id;
+  return false;
 }
 
 function renderProcessActions(proc) {
@@ -524,6 +535,12 @@ function renderProcessActionButton(proc, actionId) {
   if (actionId === "hard_reset_worktree") {
     const disabled = !proc.runner_reachable || hardResetWorktreeDisabled(proc);
     return `<button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${disabled ? "disabled" : ""}>Hard reset worktree</button>`;
+  }
+  if (actionId === "cancel_agent" && proc.kind === "agent" && proc.gap_id) {
+    return `<button class="danger" data-testid="process-cancel-agent" data-cancel-agent="${htmlEscape(proc.gap_id)}">Cancel</button>`;
+  }
+  if ((actionId === "stop_chat" || actionId === "stop") && proc.kind === "chat" && proc.session_id) {
+    return `<button class="danger" data-testid="process-stop-chat" data-stop-chat="${htmlEscape(proc.session_id)}">Stop</button>`;
   }
   return "";
 }
