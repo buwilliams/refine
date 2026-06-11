@@ -585,11 +585,16 @@ function settingsMarkdownIcon(name) {
 }
 
 function settingsEditableControl(field) {
-  return field?.querySelector("[data-settings-editable-editor] input, [data-settings-editable-editor] select, [data-settings-editable-editor] textarea") || null;
+  return field?.querySelector("[data-settings-editable-value]") ||
+    field?.querySelector("[data-settings-editable-editor] input, [data-settings-editable-editor] select, [data-settings-editable-editor] textarea") ||
+    null;
 }
 
 function settingsEditablePreviewValue(control) {
   if (!control) return "";
+  if (control.dataset.settingsPreviewValue != null) {
+    return control.dataset.settingsPreviewValue;
+  }
   if (control.tagName === "SELECT") {
     return control.selectedOptions?.[0]?.textContent || control.value || "";
   }
@@ -611,6 +616,10 @@ function updateSettingsEditablePreview(field) {
   const preview = field.querySelector("[data-settings-editable-preview]");
   const control = settingsEditableControl(field);
   if (!preview || !control) return;
+  if (control.dataset.settingsPreviewHtml) {
+    preview.innerHTML = control.dataset.settingsPreviewHtml;
+    return;
+  }
   const value = settingsEditablePreviewValue(control).trim();
   const empty = field.dataset.settingsEmptyLabel || "none";
   preview.innerHTML = value
@@ -642,9 +651,10 @@ function editSettingsEditableField(field) {
   preview?.setAttribute("hidden", "");
   editor.hidden = false;
   setSettingsEditableButtonState(btn, true);
-  control.focus();
-  if (control instanceof HTMLInputElement && control.type !== "number") {
-    control.select();
+  const focusControl = field.querySelector("[data-settings-editable-focus]") || control;
+  focusControl.focus();
+  if (focusControl instanceof HTMLInputElement && focusControl.type !== "number") {
+    focusControl.select();
   }
 }
 

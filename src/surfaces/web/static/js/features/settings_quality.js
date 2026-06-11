@@ -3,7 +3,6 @@
 function renderSettingsQualityNodeSections(quality, settings = {}) {
   const qualityEnabled = String(quality.enabled || "0") === "1";
   const qualityTiming = quality.timing === "post_build" ? "post_build" : "pre_merge";
-  const testCommand = String(settings.target_app_test_command || "").trim();
   return `
     <section class="settings-section">
       <h3>Quality gate</h3>
@@ -27,17 +26,10 @@ function renderSettingsQualityNodeSections(quality, settings = {}) {
             <option value="post_build" ${qualityTiming === "post_build" ? "selected" : ""}>Post-build QA</option>
           </select></div>
       </div>
-      <div class="settings-list">
-        <div class="settings-list-row" data-testid="quality-target-app-test-command">
-          <div>
-            <strong>Target-app tests</strong>
-            <p class="muted small" style="margin:4px 0 0">${testCommand ? htmlEscape(testCommand) : "No target-app test command configured."}</p>
-          </div>
-          <div class="actions">
-            <button type="button" class="secondary" id="s-quality-open-target-app">Configure</button>
-          </div>
-        </div>
-      </div>
+      ${renderTargetAppTestCommandsField(settings, {
+        guideItemId: "application-test",
+        description: "CLI commands Refine runs during workflow QA.",
+      })}
     </section>`;
 }
 
@@ -106,6 +98,14 @@ function bindSettingsQualityProjectSections(tabSlug = "runtime") {
 
 function bindSettingsQualityNodeSections(tabSlug = "nodes") {
   const root = document.querySelector(`[data-tab-pane="${tabSlug}"]`);
+  bindTargetAppTestCommandList(root);
+  bindSettingsAutosave(
+    root,
+    "#s-target-test-commands",
+    () => autosaveSettingsTargetAppTests(root),
+    { event: "settings-editable-commit" },
+  );
+  bindSettingsEditableFields(root);
   const autosaveQuality = createSettingsAutosave(
     () => autosaveSettingsQuality(root),
     {
@@ -129,9 +129,5 @@ function bindSettingsQualityNodeSections(tabSlug = "nodes") {
   });
   $("#s-quality-timing")?.addEventListener("change", async () => {
     await autosaveQuality();
-  });
-  $("#s-quality-open-target-app")?.addEventListener("click", () => {
-    setSettingsTab("target-app");
-    document.getElementById("s-target-test-command")?.focus();
   });
 }

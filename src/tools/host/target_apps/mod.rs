@@ -286,33 +286,46 @@ impl FileTargetAppService {
         process_metadata: Map<String, Value>,
     ) -> RefineResult<TargetAppSnapshot> {
         let settings = self.settings()?;
-        let command = setting(&settings, "target_app_test_command");
-        if command.trim().is_empty() {
+        let commands = target_app_test_commands(&settings);
+        if commands.is_empty() {
             let mut snapshot = self.load_snapshot()?;
             snapshot.ok = false;
             snapshot.state = "failed".to_string();
-            snapshot.message = "No target-app test command is configured.".to_string();
+            snapshot.message = "No enabled target-app test command is configured.".to_string();
             snapshot.last_error = snapshot.message.clone();
             self.save_snapshot(&snapshot)?;
             return Ok(snapshot);
         }
-        let operation = self.run_quality_command("test", &command, &settings, process_metadata)?;
-        let ok = operation.exit_code == Some(0);
+
+        let mut last_operation = None;
+        let mut messages = Vec::new();
+        let mut ok = true;
+        for command in commands {
+            let operation =
+                self.run_quality_command("test", &command, &settings, process_metadata.clone())?;
+            let operation_ok = operation.exit_code == Some(0);
+            let message = operation_message(&operation);
+            messages.push(format!("{command}: {message}"));
+            if !operation_ok {
+                ok = false;
+                last_operation = Some(operation);
+                break;
+            }
+            last_operation = Some(operation);
+        }
+        let operation = last_operation.expect("non-empty commands must produce an operation");
+        let message = messages.join("\n");
         let snapshot = TargetAppSnapshot {
             ok,
             state: if ok { "stopped" } else { "failed" }.to_string(),
-            message: operation_message(&operation),
+            message: message.clone(),
             last_check_at: String::new(),
             last_check_ok: ok,
-            last_check_message: operation_message(&operation),
+            last_check_message: message.clone(),
             last_health_at: String::new(),
             last_health_ok: ok,
-            last_health_message: operation_message(&operation),
-            last_error: if ok {
-                String::new()
-            } else {
-                operation_message(&operation)
-            },
+            last_health_message: message.clone(),
+            last_error: if ok { String::new() } else { message.clone() },
             last_operation_id: operation.id.clone(),
             last_operation: Some(operation),
             process_id: None,
@@ -738,6 +751,39 @@ fn setting(settings: &JsonObject, key: &str) -> String {
         .and_then(|value| value.as_str())
         .unwrap_or("")
         .to_string()
+}
+
+fn target_app_test_commands(settings: &JsonObject) -> Vec<String> {
+    let raw = setting(settings, "target_app_test_commands");
+    let mut commands = serde_json::from_str::<Value>(raw.trim())
+        .ok()
+        .and_then(|value| value.as_array().cloned())
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|item| {
+            if !item.get("enabled").and_then(Value::as_bool).unwrap_or(true) {
+                return None;
+            }
+            let command = item
+                .get("command")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if command.is_empty() {
+                None
+            } else {
+                Some(command)
+            }
+        })
+        .collect::<Vec<_>>();
+    if commands.is_empty() {
+        let command = setting(settings, "target_app_test_command");
+        if !command.trim().is_empty() {
+            commands.push(command);
+        }
+    }
+    commands
 }
 
 fn apply_package_json_defaults(
@@ -1269,7 +1315,11 @@ mod tests {
             .update(&json!({
                 "target_app_status_command": "test -f status-ok",
                 "target_app_build_command": "touch built && echo built",
-                "target_app_test_command": "printf test-ok > tested && echo test-ok",
+                "target_app_test_commands": [
+                    {"command": "printf skipped > disabled-test", "enabled": false},
+                    {"command": "printf first-ok > tested && echo first-ok", "enabled": true},
+                    {"command": "printf second-ok > tested-two && echo second-ok", "enabled": true}
+                ],
                 "target_app_cwd": target_root.to_str().unwrap(),
                 "allowed_commands": "test, touch, printf"
             }))
@@ -1288,8 +1338,10 @@ mod tests {
         let tested = service.test().unwrap();
         assert!(tested.ok);
         assert_eq!(tested.last_operation.as_ref().unwrap().kind, "test");
-        assert_eq!(tested.last_operation.as_ref().unwrap().stdout, "test-ok");
+        assert_eq!(tested.last_operation.as_ref().unwrap().stdout, "second-ok");
         assert!(target_root.join("tested").exists());
+        assert!(target_root.join("tested-two").exists());
+        assert!(!target_root.join("disabled-test").exists());
         let audit = fs::read_to_string(runtime_root.join("security-audit.jsonl")).unwrap();
         assert!(audit.contains("\"actor\":\"quality\""));
         assert!(runtime_root.join(TARGET_APP_STATE_FILE).exists());

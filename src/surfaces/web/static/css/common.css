@@ -529,6 +529,40 @@ select {
 .settings-editable-none {
   color: var(--color-text-soft);
 }
+.target-test-command-preview-list {
+  display: grid;
+  gap: 6px;
+}
+.target-test-command-preview-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+.target-test-command-preview-row.is-disabled code {
+  color: var(--color-text-soft);
+}
+.target-test-command-row {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.target-test-command-enabled {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .target-test-command-row {
+    grid-template-columns: 1fr;
+  }
+  .target-test-command-row button {
+    justify-self: start;
+  }
+}
 .table {
   width: 100%;
   border-collapse: separate;
