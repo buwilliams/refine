@@ -353,14 +353,14 @@ fn static_import_modal_exposes_feature_import_surface() {
     }
     assert!(import_modal.contains(r#"data-testid="import-feature-text""#));
     assert!(import_modes.contains("Extract Feature"));
-    assert!(
-        import_modal.contains("extractPlanFeatureDraftPayload(text, { force_provider: true })")
-    );
-    assert!(
-        import_modal.contains("reviewPlanFeatureDraftPayload(root, payload, close, saveSession)")
-    );
+    assert!(import_modal.contains("startImportExtractOperation(text,"));
+    assert!(import_modal.contains("force_provider: true"));
+    assert!(import_modal.contains("queueImportPreparation(started.operation, activeMode"));
+    assert!(import_modal.contains("startImportCsvParseOperation(csvText"));
     assert!(import_prepare.contains("function planDraftPayloadFromResult"));
-    assert!(import_prepare.contains("async function extractPlanFeatureDraftPayload"));
+    assert!(import_prepare.contains("async function startImportExtractOperation"));
+    assert!(import_prepare.contains("async function startImportCsvParseOperation"));
+    assert!(import_prepare.contains("async function saveImportDraftReviewState"));
     assert!(import_prepare.contains("async function reviewPlanFeatureDraftPayload"));
 }
 
@@ -1813,6 +1813,36 @@ fn web_server_parses_and_persists_imported_gaps_with_feature_destination() {
     assert_eq!(gap.body["gap"]["reporter"], "QA");
     assert_eq!(gap.body["gap"]["round_count"], 1);
     assert_eq!(gap.body["gap"]["feature_id"], feature_id);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn web_server_parses_import_csv_in_background() {
+    let temp_root = unique_temp_dir("http-import-csv-background");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/import/csv/parse".to_string(),
+        body: Some(json!({
+            "background": true,
+            "text": "name,actual,target,reporter,priority\nBackground CSV,Actual state,Target state,QA,high\n"
+        })),
+    });
+    assert_eq!(started.status, 202);
+    let operation_id = started.body["operation"]["id"].as_str().unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = wait_for_operation_status(&registry, operation_id, OperationState::Succeeded);
+    let result = operation.result;
+    assert_eq!(result["http_status"], 200);
+    assert_eq!(result["drafts"].as_array().unwrap().len(), 1);
+    assert_eq!(result["drafts"][0]["name"], "Background CSV");
+    assert_eq!(result["drafts"][0]["priority"], "high");
 
     fs::remove_dir_all(temp_root).unwrap();
 }

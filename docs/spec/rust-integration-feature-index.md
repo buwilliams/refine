@@ -232,7 +232,7 @@ Modals
 		Feature destination: standalone / new (name + description) / existing (dropdown); bulk save; duplicate detection
 	Import Modal (#/gaps/import)
 		Tabs/sources: Import Feature (paste long spec), Import Gaps (paste text), Import Gaps (.csv) (paste CSV), Upload Gaps (.csv) (Choose CSV file)
-			Distribute across nodes checkbox; Extract Feature / Extract drafts / Parse CSV / Parse upload (progress)
+			Distribute across nodes checkbox; Extract Feature / Extract drafts / Parse CSV / Parse upload queue background preparation, close the modal, then reopen review when drafts are ready
 		Review (drafts, 25/page)
 			Per draft: checkbox, order, name (+ error), reporter, priority, node, actual, target; possible-duplicate info
 			Duplicate decision per row: move original to backlog / ignore / import

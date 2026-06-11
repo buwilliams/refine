@@ -2470,6 +2470,7 @@ impl InProcessWebServer {
             let server = self.clone();
             let operation_id = operation.id.clone();
             let runtime_root = runtime_root.clone();
+            let plan_purpose = purpose == "plan";
             thread::spawn(move || {
                 let registry = FileOperationRegistry::new(&runtime_root);
                 let response = server.import_extract_response(refine_dir, body);
@@ -2501,7 +2502,11 @@ impl InProcessWebServer {
                 let _ = registry.update_progress(
                     &operation_id,
                     json!({
-                        "message": "Plan Feature and Gap drafts extracted",
+                        "message": if plan_purpose {
+                            "Plan Feature and Gap drafts extracted"
+                        } else {
+                            "Import drafts extracted"
+                        },
                         "completed": 1,
                         "total": 1,
                         "draft_count": draft_count
@@ -2563,6 +2568,86 @@ impl InProcessWebServer {
 
     pub(super) fn handle_import_csv_parse(&self, request: ApiRequest) -> ApiResponse {
         let body = request.body.unwrap_or_else(|| json!({}));
+        if body
+            .get("background")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            let Some(runtime_root) = &self.runtime_root else {
+                return runtime_root_unavailable("parse CSV import in the background");
+            };
+            let registry = FileOperationRegistry::new(runtime_root);
+            let operation = match registry.register("import:csv:parse") {
+                Ok(operation) => operation,
+                Err(error) => return error_response(error),
+            };
+            let row_total = body_text(&body)
+                .lines()
+                .skip(1)
+                .filter(|line| !line.trim().is_empty())
+                .count();
+            let _ = registry.update_progress(
+                &operation.id,
+                json!({
+                    "message": "Preparing CSV import",
+                    "completed": 0,
+                    "total": row_total
+                }),
+            );
+            let operation = registry.status(&operation.id).unwrap_or(operation);
+            let runtime_root = runtime_root.clone();
+            let body_for_worker = body.clone();
+            let operation_id = operation.id.clone();
+            thread::spawn(move || {
+                let registry = FileOperationRegistry::new(&runtime_root);
+                let response = match FileImportService::new(PathBuf::new()).parse_csv(
+                    body_text(&body_for_worker),
+                    body_for_worker
+                        .get("reporter")
+                        .and_then(|value| value.as_str()),
+                ) {
+                    Ok(drafts) => ApiResponse::json(200, json!({"drafts": drafts})),
+                    Err(error) => error_response(error),
+                };
+                let mut result = response.body.clone();
+                match result.as_object_mut() {
+                    Some(object) => {
+                        object.insert("http_status".to_string(), json!(response.status));
+                    }
+                    None => {
+                        result = json!({
+                            "http_status": response.status,
+                            "body": result
+                        });
+                    }
+                }
+                if response.status >= 400 {
+                    let error = result
+                        .get("error")
+                        .cloned()
+                        .unwrap_or_else(|| result.clone());
+                    let _ = registry.fail_with_error(&operation_id, error);
+                    return;
+                }
+                let draft_count = result
+                    .get("drafts")
+                    .and_then(Value::as_array)
+                    .map(Vec::len)
+                    .unwrap_or(0);
+                let _ = registry.update_progress(
+                    &operation_id,
+                    json!({
+                        "message": "CSV import prepared",
+                        "completed": draft_count,
+                        "total": row_total,
+                        "draft_count": draft_count
+                    }),
+                );
+                let _ =
+                    registry.finish_with_result(&operation_id, OperationState::Succeeded, result);
+            });
+            return ApiResponse::json(202, json!({"operation": operation_response(operation)}));
+        }
         match FileImportService::new(PathBuf::new()).parse_csv(
             body_text(&body),
             body.get("reporter").and_then(|value| value.as_str()),

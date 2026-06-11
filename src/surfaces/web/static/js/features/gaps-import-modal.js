@@ -122,6 +122,66 @@ function openImportModal() {
     session = { ...session, ...changes };
     writeImportSession(session);
   }
+  function preparationPhase(mode) {
+    return mode === "csv" || mode === "upload" ? "parsing" : "extracting";
+  }
+  function preparationQueuedMessage(mode) {
+    return mode === "feature"
+      ? "Feature extraction is running in the background."
+      : mode === "ai"
+        ? "Gap extraction is running in the background."
+        : "CSV import preparation is running in the background.";
+  }
+  function queueImportPreparation(operation, mode, onComplete) {
+    const operationId = operation?.id || "";
+    if (!operationId) return;
+    saveSession({
+      phase: preparationPhase(mode),
+      mode,
+      prepareOperationId: operationId,
+      progress: operation.progress || {},
+      drafts: [],
+      error: "",
+    });
+    recordUiNotice(preparationQueuedMessage(mode), {
+      kind: "queued",
+      source: "background-operation",
+      details: { operation_id: operationId },
+    });
+    toast(preparationQueuedMessage(mode), "info");
+    close(true, { allowBackground: true });
+    waitForImportPrepareOperation(operationId, null, saveSession, { phase: preparationPhase(mode) })
+      .then(async (result) => {
+        const latest = readImportSession();
+        if (!latest || latest.prepareOperationId !== operationId) return;
+        await onComplete(result);
+        recordUiNotice("Import drafts are ready for review", {
+          kind: "success",
+          source: "background-operation",
+          details: { operation_id: operationId },
+        });
+        if (!_importModalOpen) {
+          if (!location.hash.startsWith("#/gaps/import")) {
+            location.hash = "#/gaps/import";
+          }
+          openImportModal();
+        }
+      })
+      .catch((error) => {
+        if (error.code === "operation_cancelled") return;
+        saveSession({
+          phase: "editing",
+          prepareOperationId: "",
+          error: error.message || "Import preparation failed",
+        });
+        recordUiNotice(error.message || "Import preparation failed", {
+          kind: "error",
+          source: "background-operation",
+          details: { operation_id: operationId, code: error.code || "" },
+        });
+        toast(error.message || "Import preparation failed", "error");
+      });
+  }
   function markDirtyFromInputs() {
     const featureText = root.querySelector("#import-feature-text")?.value || "";
     const sourceText = root.querySelector("#import-text")?.value || "";
@@ -239,9 +299,20 @@ function openImportModal() {
           feature: true,
         });
       }
-      await withButtonBusy(btn, "Extracting…", async () => {
+      await withButtonBusy(btn, "Starting…", async () => {
         try {
-          const payload = await extractPlanFeatureDraftPayload(text, { force_provider: true });
+          const started = await startImportExtractOperation(text, {
+            purpose: "plan",
+            force_provider: true,
+          });
+          if (started.operation) {
+            queueImportPreparation(started.operation, activeMode, async (result) => {
+              const payload = planDraftPayloadFromResult(text, result);
+              await savePlanFeatureDraftReviewState(payload, saveSession);
+            });
+            return;
+          }
+          const payload = planDraftPayloadFromResult(text, started.result);
           await reviewPlanFeatureDraftPayload(root, payload, close, saveSession);
         } catch (e) {
           saveSession({ phase: "editing", error: e.message });
@@ -261,18 +332,17 @@ function openImportModal() {
           lineCount: countImportLines(text),
         });
       }
-      await withButtonBusy(btn, "Extracting…", async () => {
+      await withButtonBusy(btn, "Starting…", async () => {
         try {
-          activeAbort = new AbortController();
-          const drafts = await extractImportDrafts(text, draftsRoot, activeAbort.signal);
-          activeAbort = null;
-          drafts.forEach((draft) => {
-            draft.reporter = draft.reporter || state.lastReporter || "";
-            draft.priority = draft.priority || "low";
-          });
-          await reviewImportDrafts(root, drafts, close, saveSession);
+          const started = await startImportExtractOperation(text);
+          if (started.operation) {
+            queueImportPreparation(started.operation, activeMode, async (result) => {
+              await saveImportDraftReviewState(result.drafts || [], saveSession);
+            });
+            return;
+          }
+          await reviewImportDrafts(root, started.result?.drafts || [], close, saveSession);
         } catch (e) {
-          activeAbort = null;
           if (e.name === "AbortError") return;
           saveSession({ phase: "editing", error: e.message });
           if (draftsRoot) draftsRoot.innerHTML = "";
@@ -282,7 +352,7 @@ function openImportModal() {
       return;
     }
 
-    await withButtonBusy(btn, "Parsing…", async () => {
+    await withButtonBusy(btn, "Starting…", async () => {
       try {
         saveSession({ phase: "parsing", mode: activeMode, error: "" });
         const csvText = activeMode === "csv"
@@ -297,9 +367,14 @@ function openImportModal() {
         const distribute = activeMode === "csv"
           ? !!root.querySelector("#import-csv-distribute")?.checked
           : !!root.querySelector("#import-upload-distribute")?.checked;
-        const drafts = await parseImportCsvBackend(csvText, draftsRoot, saveSession, { distribute });
-        if (saveSession) saveSession({ prepareOperationId: "", error: "" });
-        await reviewImportDrafts(root, drafts, close, saveSession);
+        const started = await startImportCsvParseOperation(csvText, { distribute });
+        if (started.operation) {
+          queueImportPreparation(started.operation, activeMode, async (result) => {
+            await saveImportDraftReviewState(result.drafts || [], saveSession);
+          });
+          return;
+        }
+        await reviewImportDrafts(root, started.result?.drafts || [], close, saveSession);
       } catch (e) {
         saveSession({ phase: "editing", prepareOperationId: "", error: e.message });
         if (draftsRoot) {
@@ -323,10 +398,19 @@ function openImportModal() {
       completed: 0,
       total: 0,
     });
-    waitForImportPrepareOperation(session.prepareOperationId, root.querySelector("#import-drafts"), saveSession)
-      .then((r) => {
-        const drafts = r.drafts || [];
-        if (saveSession) saveSession({ phase: "review", drafts, prepareOperationId: "", error: "" });
+    waitForImportPrepareOperation(
+      session.prepareOperationId,
+      root.querySelector("#import-drafts"),
+      saveSession,
+      { phase: session.phase || preparationPhase(activeMode) },
+    )
+      .then(async (r) => {
+        if (activeMode === "feature") {
+          const payload = planDraftPayloadFromResult(session.featureText || "", r);
+          await reviewPlanFeatureDraftPayload(root, payload, close, saveSession);
+          return;
+        }
+        const drafts = await saveImportDraftReviewState(r.drafts || [], saveSession);
         drawImportDrafts(root, drafts, close, { saveSession });
       })
       .catch(async (e) => {

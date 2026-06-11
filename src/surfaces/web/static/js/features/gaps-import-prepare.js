@@ -31,18 +31,28 @@ async function extractImportDrafts(text, draftsRoot, signal = null, options = {}
   return drafts;
 }
 
+async function startImportExtractOperation(text, options = {}) {
+  const response = await api("POST", "/api/import/extract", {
+    text,
+    background: true,
+    ...options,
+  });
+  if (!response?.operation?.id) {
+    return { result: response };
+  }
+  return { operation: response.operation };
+}
+
 let planDraftExtractionPromise = null;
 
 async function extractPlanDraftsInBackground(text, options = {}) {
   if (planDraftExtractionPromise) return await planDraftExtractionPromise;
   planDraftExtractionPromise = (async () => {
-    const response = await api("POST", "/api/import/extract", {
-      text,
+    const response = await startImportExtractOperation(text, {
       purpose: "plan",
-      background: true,
       ...options,
     });
-    if (!response?.operation?.id) return response;
+    if (!response.operation?.id) return response.result;
     recordUiNotice("Plan Draft extraction queued", {
       kind: "queued",
       source: "background-operation",
@@ -114,9 +124,7 @@ function drawImportProgress(root, state) {
 }
 
 async function reviewImportDrafts(root, drafts, close, saveSession = null) {
-  if (saveSession) saveSession({ phase: "deduping", drafts });
-  const annotated = await annotateImportDuplicateDrafts(drafts);
-  if (saveSession) saveSession({ phase: "review", drafts: annotated, operationId: "", result: null, error: "" });
+  const annotated = await saveImportDraftReviewState(drafts, saveSession);
   drawImportDrafts(root, annotated, close, { saveSession });
 }
 
@@ -162,37 +170,50 @@ async function extractPlanFeatureDraftPayload(text, options = {}) {
 }
 
 async function reviewPlanFeatureDraftPayload(root, payload, close, saveSession = null, options = {}) {
-  const drafts = payload.drafts || [];
-  drafts.forEach((draft) => {
-    draft.reporter = draft.reporter || state.lastReporter || "";
-    draft.priority = draft.priority || "low";
-  });
-  if (saveSession) {
-    saveSession({
-      phase: "deduping",
-      drafts,
-      featureDestination: payload.featureDestination,
-      prepareOperationId: "",
-      result: null,
-      error: "",
-    });
-  }
-  const annotated = await annotateImportDuplicateDrafts(drafts);
-  if (saveSession) {
-    saveSession({
-      phase: "review",
-      drafts: annotated,
-      featureDestination: payload.featureDestination,
-      operationId: "",
-      result: null,
-      error: "",
-    });
-  }
+  const annotated = await savePlanFeatureDraftReviewState(payload, saveSession);
   drawImportDrafts(root, annotated, close, {
     saveSession,
     clearSession: options.clearSession,
     featureDestination: payload.featureDestination,
   });
+}
+
+async function saveImportDraftReviewState(drafts, saveSession = null, featureDestination = undefined) {
+  const draftList = drafts || [];
+  draftList.forEach((draft) => {
+    draft.reporter = draft.reporter || state.lastReporter || "";
+    draft.priority = draft.priority || "low";
+  });
+  if (saveSession) {
+    const start = {
+      phase: "deduping",
+      drafts: draftList,
+      prepareOperationId: "",
+      result: null,
+      error: "",
+    };
+    if (featureDestination !== undefined) start.featureDestination = featureDestination;
+    saveSession(start);
+  }
+  const annotated = await annotateImportDuplicateDrafts(draftList);
+  if (saveSession) {
+    const done = {
+      phase: "review",
+      drafts: annotated,
+      prepareOperationId: "",
+      operationId: "",
+      result: null,
+      error: "",
+    };
+    if (featureDestination !== undefined) done.featureDestination = featureDestination;
+    saveSession(done);
+  }
+  return annotated;
+}
+
+async function savePlanFeatureDraftReviewState(payload, saveSession = null) {
+  const drafts = payload.drafts || [];
+  return await saveImportDraftReviewState(drafts, saveSession, payload.featureDestination);
 }
 
 async function openPlanDraftModalFromDrafts(_text, drafts, featureDestination) {
@@ -308,12 +329,7 @@ function readImportCsvFile(input) {
 }
 
 async function parseImportCsvBackend(text, progressRoot = null, saveSession = null, options = {}) {
-  let r = await api("POST", "/api/import/csv/parse", {
-    text,
-    background: true,
-    dedup: true,
-    distribute: !!options.distribute,
-  });
+  let r = await startImportCsvParseOperation(text, options);
   if (r.operation) {
     if (saveSession) {
       saveSession({
@@ -323,8 +339,23 @@ async function parseImportCsvBackend(text, progressRoot = null, saveSession = nu
       });
     }
     r = await waitForImportPrepareOperation(r.operation.id, progressRoot, saveSession);
+  } else {
+    r = r.result || {};
   }
   return r.drafts || [];
+}
+
+async function startImportCsvParseOperation(text, options = {}) {
+  const response = await api("POST", "/api/import/csv/parse", {
+    text,
+    background: true,
+    dedup: true,
+    distribute: !!options.distribute,
+  });
+  if (!response?.operation?.id) {
+    return { result: response };
+  }
+  return { operation: response.operation };
 }
 
 function drawImportPrepareProgress(root, progress = {}) {
@@ -345,14 +376,15 @@ function drawImportPrepareProgress(root, progress = {}) {
   `;
 }
 
-async function waitForImportPrepareOperation(operationId, progressRoot = null, saveSession = null) {
+async function waitForImportPrepareOperation(operationId, progressRoot = null, saveSession = null, options = {}) {
+  const phase = options.phase || "parsing";
   while (true) {
     const snap = await api("GET", `/api/operations/${operationId}`);
     const operation = snap.operation || {};
     const progress = operation.progress || {};
     if (saveSession) {
       saveSession({
-        phase: "parsing",
+        phase,
         prepareOperationId: operationId,
         progress,
       });
