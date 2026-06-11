@@ -241,7 +241,7 @@ function openImportModal() {
       }
       await withButtonBusy(btn, "Extracting…", async () => {
         try {
-          const payload = await extractPlanFeatureDraftPayload(text);
+          const payload = await extractPlanFeatureDraftPayload(text, { force_provider: true });
           await reviewPlanFeatureDraftPayload(root, payload, close, saveSession);
         } catch (e) {
           saveSession({ phase: "editing", error: e.message });

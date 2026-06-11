@@ -2527,7 +2527,13 @@ impl InProcessWebServer {
             .unwrap_or("import");
         let reporter = body.get("reporter").and_then(|value| value.as_str());
         let provider = import_provider_from_settings(&refine_dir, &body);
+        let force_provider = body
+            .get("force_provider")
+            .or_else(|| body.get("forceProvider"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
         if purpose == "plan"
+            && !force_provider
             && let Some(result) = parse_structured_import_result(&text, reporter)
         {
             return match validate_import_extraction_result(result, purpose) {
