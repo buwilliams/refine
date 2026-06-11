@@ -448,7 +448,10 @@ impl WorkflowEngine {
                     .gap
                     .feature_order
                     .is_some_and(|order| order < feature_order)
-                && !matches!(other.gap.status, GapStatus::Done | GapStatus::Cancelled)
+                && !matches!(
+                    other.gap.status,
+                    GapStatus::Review | GapStatus::Done | GapStatus::Cancelled
+                )
         }) && !snapshot.gaps.values().any(|other| {
             other.gap.id != gap.gap.id
                 && other.gap.feature_id.as_deref() == Some(feature_id)
@@ -1730,11 +1733,18 @@ mod tests {
                     selected_ids: Some(vec!["FIRST".to_string()]),
                     ..Default::default()
                 },
-                crate::tools::product::work_items::BulkGapUpdate::Status("done".to_string()),
+                crate::tools::product::work_items::BulkGapUpdate::Status("review".to_string()),
             )
             .unwrap();
         let claim_automation = WorkflowEngine::with_target_root(&claim_runtime_root, &target_root);
-        let second_claim = claim_automation.claim("SECOND").unwrap();
+        assert_eq!(claim_automation.promote().unwrap(), 1);
+        let state = claim_automation.load_state().unwrap();
+        let second_claim = state
+            .claims
+            .iter()
+            .find(|claim| claim.gap_id == "SECOND")
+            .map(|claim| claim.claim_id.clone())
+            .unwrap();
         work_items
             .bulk_update_gaps(
                 BulkGapSelection {
@@ -1939,6 +1949,115 @@ mod tests {
             temp_root.file_name().unwrap().to_string_lossy()
         )))
         .ok();
+        fs::remove_dir_all(temp_root).unwrap();
+    }
+
+    #[test]
+    fn file_automation_reuses_existing_round_worktree_on_retry() {
+        let temp_root = unique_temp_dir("automation-existing-worktree-retry");
+        let target_root = temp_root.clone();
+        let refine_dir = target_root.join(".refine");
+        let runtime_root = temp_root.join("run/8080");
+        let smoke_ai = temp_root.join("smoke-ai");
+        fs::create_dir_all(&temp_root).unwrap();
+        fs::write(temp_root.join("app.py"), "def health():\n    return 'ok'\n").unwrap();
+        git(&temp_root, &["init", "-q"]).unwrap();
+        git(
+            &temp_root,
+            &["config", "user.email", "refine-test@example.invalid"],
+        )
+        .unwrap();
+        git(&temp_root, &["config", "user.name", "Refine Test"]).unwrap();
+        git(&temp_root, &["add", "app.py"]).unwrap();
+        git(&temp_root, &["commit", "-q", "-m", "Initialize test app"]).unwrap();
+
+        let branch = "refine/GAP1/round-1";
+        let worktree_path = temp_root.parent().unwrap().join(format!(
+            "{}-{}",
+            temp_root.file_name().unwrap().to_string_lossy(),
+            branch.replace('/', "-")
+        ));
+        git(
+            &temp_root,
+            &[
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                worktree_path.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        fs::write(
+            worktree_path.join("agent.txt"),
+            "existing retry implementation\n",
+        )
+        .unwrap();
+        git(&worktree_path, &["add", "agent.txt"]).unwrap();
+        git(&worktree_path, &["commit", "-q", "-m", "agent precommit"]).unwrap();
+        let precommitted = git_stdout(&worktree_path, &["rev-parse", "HEAD"]).unwrap();
+        fs::write(
+            &smoke_ai,
+            "#!/bin/sh\n\
+             printf '%s\\n' 'smoke-ai reused existing worktree'\n",
+        )
+        .unwrap();
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
+            permissions.set_mode(0o755);
+            fs::set_permissions(&smoke_ai, permissions).unwrap();
+        }
+
+        let _smoke_ai_env_guard = smoke_ai_env_lock()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        }
+        let work_items = FileWorkItemService::new(&refine_dir);
+        work_items
+            .create_gap_summary("Retry existing worktree", Some("GAP1"))
+            .unwrap();
+        work_items
+            .append_gap_round_summary("GAP1", "Reporter", "Actual", "Target")
+            .unwrap();
+        work_items
+            .update_gap_branch_name("GAP1", Some(branch))
+            .unwrap();
+        work_items
+            .transition_gap_status("GAP1", GapStatus::Todo)
+            .unwrap();
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({
+                "agent_cli": "smoke-ai",
+                "quality_enabled": "0"
+            }))
+            .unwrap();
+
+        let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        let result = automation.evaluate_workflow().unwrap();
+        assert_eq!(result.steps.len(), 1);
+        assert_eq!(result.steps[0].commit, precommitted.trim());
+        assert_eq!(
+            work_items.show_gap_summary("GAP1").unwrap().gap.status,
+            GapStatus::Review
+        );
+        assert_eq!(
+            fs::read_to_string(target_root.join("agent.txt")).unwrap(),
+            "existing retry implementation\n"
+        );
+
+        unsafe {
+            if let Some(previous) = previous_smoke_ai {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+
+        fs::remove_dir_all(&worktree_path).ok();
         fs::remove_dir_all(temp_root).unwrap();
     }
 

@@ -74,7 +74,19 @@ impl WorkflowBehavior for WorkflowTodo {
         );
         let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
         ctx.request_transition(GapStatus::Todo, GapStatus::InProgress)?;
-        let worktree_path = match app_git.worktree(&branch) {
+        let worktree_target = ctx
+            .target_root
+            .parent()
+            .unwrap_or_else(|| Path::new("."))
+            .join(format!(
+                "{}-{}",
+                ctx.target_root
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .unwrap_or("worktree"),
+                branch.replace('/', "-")
+            ));
+        let worktree_path = match app_git.ensure_worktree(&branch, &worktree_target) {
             Ok(path) => path,
             Err(error) => return fail(ctx, "branch", error),
         };
